@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Floating Zoom Control Palette with Revealer -->
+<interface>
+  <requires lib="gtk" version="4.0"/>
+
+  <!-- Main container with revealer -->
+  <object class="GtkBox" id="zoom_control_container">
+    <property name="orientation">vertical</property>
+    <property name="spacing">18</property>
+    <property name="halign">end</property>
+    <property name="valign">end</property>
+    <property name="margin-end">12</property>
+    <property name="margin-bottom">12</property>
+
+    <!-- Revealer for predefined zoom levels (appears above main palette) -->
+    <child>
+      <object class="GtkRevealer" id="zoom_revealer">
+        <property name="reveal-child">false</property>
+        <property name="transition-type">slide-down</property>
+        <property name="transition-duration">200</property>
+        <child>
+          <object class="GtkBox">
+            <property name="orientation">vertical</property>
+            <property name="spacing">1</property>
+            <property name="margin-bottom">2</property>
+            <style>
+              <class name="zoom-revealer-content"/>
+            </style>
+
+            <!-- Predefined zoom level buttons -->
+            <child>
+              <object class="GtkButton" id="zoom_25">
+                <property name="label">25%</property>
+                <property name="hexpand">true</property>
+                <property name="height-request">24</property>
+                <style>
+                  <class name="zoom-level-button"/>
+                </style>
+              </object>
+            </child>
+
+            <child>
+              <object class="GtkButton" id="zoom_50">
+                <property name="label">50%</property>
+                <property name="hexpand">true</property>
+                <property name="height-request">24</property>
+                <style>
+                  <class name="zoom-level-button"/>
+                </style>
+              </object>
+            </child>
+
+            <child>
+              <object class="GtkButton" id="zoom_75">
+                <property name="label">75%</property>
+                <property name="hexpand">true</property>
+                <property name="height-request">24</property>
+                <style>
+                  <class name="zoom-level-button"/>
+                </style>
+              </object>
+            </child>
+
+            <child>
+              <object class="GtkButton" id="zoom_100">
+                <property name="label">100%</property>
+                <property name="hexpand">true</property>
+                <property name="height-request">24</property>
+                <style>
+                  <class name="zoom-level-button"/>
+                </style>
+              </object>
+            </child>
+
+            <child>
+              <object class="GtkButton" id="zoom_150">
+                <property name="label">150%</property>
+                <property name="hexpand">true</property>
+                <property name="height-request">24</property>
+                <style>
+                  <class name="zoom-level-button"/>
+                </style>
+              </object>
+            </child>
+
+            <child>
+              <object class="GtkButton" id="zoom_200">
+                <property name="label">200%</property>
+                <property name="hexpand">true</property>
+                <property name="height-request">24</property>
+                <style>
+                  <class name="zoom-level-button"/>
+                </style>
+              </object>
+            </child>
+
+            <child>
+              <object class="GtkButton" id="zoom_400">
+                <property name="label">400%</property>
+                <property name="hexpand">true</property>
+                <property name="height-request">24</property>
+                <style>
+                  <class name="zoom-level-button"/>
+                </style>
+              </object>
+            </child>
+
+            <child>
+              <object class="GtkSeparator">
+                <property name="margin-top">2</property>
+                <property name="margin-bottom">2</property>
+              </object>
+            </child>
+
+            <child>
+              <object class="GtkButton" id="zoom_fit">
+                <property name="label">Fit</property>
+                <property name="hexpand">true</property>
+                <property name="height-request">24</property>
+                <style>
+                  <class name="zoom-level-button"/>
+                </style>
+              </object>
+            </child>
+
+          </object>
+        </child>
+      </object>
+    </child>
+
+    <!-- Main zoom control palette -->
+    <child>
+      <object class="GtkBox" id="zoom_control">
+        <property name="orientation">horizontal</property>
+        <property name="spacing">0</property>
+        <style>
+          <class name="zoom-palette"/>
+          <class name="toolbar"/>
+        </style>
+
+        <!-- Zoom Out Button [-] -->
+        <child>
+          <object class="GtkButton" id="zoom_out_button">
+            <property name="label">−</property>
+            <property name="tooltip-text">Zoom Out</property>
+            <property name="width-request">28</property>
+            <property name="height-request">28</property>
+            <style>
+              <class name="zoom-button"/>
+            </style>
+          </object>
+        </child>
+
+        <!-- Zoom Level Display Button (toggles revealer) -->
+        <child>
+          <object class="GtkButton" id="zoom_display_button">
+            <property name="label">100%</property>
+            <property name="tooltip-text">Click to select zoom level</property>
+            <property name="width-request">50</property>
+            <property name="height-request">28</property>
+            <style>
+              <class name="zoom-display"/>
+            </style>
+          </object>
+        </child>
+
+        <!-- Zoom In Button [+] -->
+        <child>
+          <object class="GtkButton" id="zoom_in_button">
+            <property name="label">+</property>
+            <property name="tooltip-text">Zoom In</property>
+            <property name="width-request">28</property>
+            <property name="height-request">28</property>
+            <style>
+              <class name="zoom-button"/>
+            </style>
+          </object>
+        </child>
+
+      </object>
+    </child>
+
+  </object>
+
+</interface>

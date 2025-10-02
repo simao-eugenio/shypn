@@ -1,0 +1,14 @@
+name: shypn
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pygobject
+  - gtk4
+  - pip
+  - pip:
+      - pytest
+      - black
+      - flake8
+      - pre-commit
+      # Add any additional Python-only dependencies here

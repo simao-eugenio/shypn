@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- GTK4 Dynamic Analyses panel - can be docked or float as separate window -->
+<interface>
+  <requires lib="gtk" version="4.0"/>
+
+  <object class="GtkWindow" id="right_panel_window">
+    <property name="title">Dynamic Analyses</property>
+    <property name="default-width">280</property>
+    <property name="default-height">400</property>
+    <property name="resizable">true</property>
+    
+    <child>
+      <object class="GtkBox" id="right_panel_content">
+        <property name="orientation">vertical</property>
+        <property name="spacing">6</property>
+        <property name="margin-start">6</property>
+        <property name="margin-end">6</property>
+        <property name="margin-top">6</property>
+        <property name="margin-bottom">6</property>
+        
+        <child>
+          <object class="GtkBox" id="panel_header">
+            <property name="orientation">horizontal</property>
+            <property name="spacing">6</property>
+            <child>
+              <object class="GtkToggleButton" id="float_button">
+                <property name="icon-name">window-new-symbolic</property>
+                <property name="tooltip-text">Float/Dock panel toggle</property>
+                <property name="halign">start</property>
+                <property name="active">false</property>
+                <style>
+                  <class name="flat"/>
+                </style>
+              </object>
+            </child>
+            <child>
+              <object class="GtkLabel" id="panel_title">
+                <property name="label">Dynamic Analyses</property>
+                <property name="halign">start</property>
+                <property name="hexpand">true</property>
+                <style>
+                  <class name="heading"/>
+                </style>
+              </object>
+            </child>
+          </object>
+        </child>
+        
+        <child>
+          <object class="GtkSeparator">
+            <property name="orientation">horizontal</property>
+          </object>
+        </child>
+        
+        <child>
+          <object class="GtkScrolledWindow" id="analyses_scrolled">
+            <property name="vexpand">true</property>
+            <property name="hexpand">true</property>
+            <child>
+              <object class="GtkBox" id="analyses_content">
+                <property name="orientation">vertical</property>
+                <property name="spacing">6</property>
+                <!-- Dynamic analyses content will be added programmatically -->
+              </object>
+            </child>
+          </object>
+        </child>
+        
+      </object>
+    </child>
+  </object>
+</interface>
