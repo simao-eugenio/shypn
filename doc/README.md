@@ -1,3 +1,2 @@
-# Documentation
-
-This folder contains the main documentation files in Markdown format for the project.
+# doc/
+This folder contains documentation for the project. Use it for guides, architecture notes, API documentation, and other resources to help users and developers understand the project.

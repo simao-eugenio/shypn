@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- GTK4 Model Canvas - Multi-document Petri Net drawing area -->
+<interface>
+  <requires lib="gtk" version="4.0"/>
+
+  <object class="GtkBox" id="model_canvas_container">
+    <property name="orientation">vertical</property>
+    <property name="hexpand">true</property>
+    <property name="vexpand">true</property>
+    
+    <!-- Notebook for multi-document tabs -->
+    <child>
+      <object class="GtkNotebook" id="canvas_notebook">
+        <property name="hexpand">true</property>
+        <property name="vexpand">true</property>
+        <property name="scrollable">true</property>
+        <property name="enable-popup">true</property>
+        <property name="show-border">true</property>
+        
+        <!-- First page/document -->
+        <child>
+          <object class="GtkNotebookPage">
+            <property name="tab-expand">false</property>
+            <property name="tab">
+              <object class="GtkLabel">
+                <property name="label">Model 1</property>
+              </object>
+            </property>
+            <property name="child">
+              <object class="GtkOverlay" id="canvas_overlay_1">
+                <property name="hexpand">true</property>
+                <property name="vexpand">true</property>
+                
+                <!-- Main canvas content -->
+                <child>
+                  <object class="GtkScrolledWindow" id="canvas_scroll_1">
+                    <property name="hexpand">true</property>
+                    <property name="vexpand">true</property>
+                    <property name="hscrollbar-policy">automatic</property>
+                    <property name="vscrollbar-policy">automatic</property>
+                    
+                    <child>
+                      <object class="GtkDrawingArea" id="canvas_drawing_1">
+                        <property name="hexpand">true</property>
+                        <property name="vexpand">true</property>
+                        <property name="width-request">800</property>
+                        <property name="height-request">600</property>
+                        <property name="content-width">2000</property>
+                        <property name="content-height">2000</property>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                
+                <!-- Overlay container for zoom control (will be added programmatically) -->
+                <child type="overlay">
+                  <object class="GtkBox" id="canvas_overlay_box_1">
+                    <property name="orientation">vertical</property>
+                    <property name="halign">end</property>
+                    <property name="valign">end</property>
+                    <!-- Zoom control will be added here dynamically -->
+                  </object>
+                </child>
+                
+              </object>
+            </property>
+          </object>
+        </child>
+        
+      </object>
+    </child>
+    
+  </object>
+</interface>

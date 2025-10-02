@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- GTK4 main window skeleton with dock/undock architecture -->
+<interface>
+  <requires lib="gtk" version="4.0"/>
+
+  <object class="GtkApplicationWindow" id="main_window">
+    <property name="title">Shypn</property>
+    <property name="default-width">800</property>
+    <property name="default-height">600</property>
+
+    <!-- Header Bar with panel toggle buttons -->
+    <child type="titlebar">
+      <object class="GtkHeaderBar" id="header_bar">
+        <property name="show-title-buttons">true</property>
+        <child type="start">
+          <object class="GtkToggleButton" id="left_panel_toggle">
+            <property name="label">File Ops</property>
+            <property name="active">false</property>
+            <property name="tooltip-text">Toggle File Operations panel (attach/detach)</property>
+          </object>
+        </child>
+        <child type="end">
+          <object class="GtkToggleButton" id="right_panel_toggle">
+            <property name="label">Analyses</property>
+            <property name="active">false</property>
+            <property name="tooltip-text">Toggle Dynamic Analyses panel (attach/detach)</property>
+          </object>
+        </child>
+        <child type="title">
+          <object class="GtkLabel" id="header_title">
+            <property name="label">Shypn</property>
+            <style>
+              <class name="title"/>
+            </style>
+          </object>
+        </child>
+      </object>
+    </child>
+
+    <!-- Main content area: horizontal layout with left dock + workspace -->
+    <!-- Main content area: paned layout with left dock + workspace + right dock -->
+    <child>
+      <object class="GtkPaned" id="left_paned">
+        <property name="orientation">horizontal</property>
+        <property name="position">0</property>
+        <property name="shrink-start-child">false</property>
+        <property name="resize-start-child">false</property>
+        <property name="shrink-end-child">false</property>
+        <property name="resize-end-child">true</property>
+        <property name="vexpand">true</property>
+        <property name="hexpand">true</property>
+        
+        <!-- Left dock area for attachable panels (extreme left) - resizable with curtain effect -->
+        <child>
+          <object class="GtkBox" id="left_dock_area">
+            <property name="orientation">vertical</property>
+            <property name="spacing">0</property>
+            <property name="width-request">0</property>
+            <property name="visible">false</property>
+            <!-- Panel content will be attached here dynamically -->
+          </object>
+        </child>
+        
+        <!-- Right side: another paned for workspace + right dock -->
+        <child>
+          <object class="GtkPaned" id="right_paned">
+            <property name="orientation">horizontal</property>
+            <property name="position">10000</property>
+            <property name="shrink-start-child">false</property>
+            <property name="resize-start-child">true</property>
+            <property name="shrink-end-child">false</property>
+            <property name="resize-end-child">false</property>
+            <property name="vexpand">true</property>
+            <property name="hexpand">true</property>
+            
+            <!-- Main workspace area -->
+            <child>
+              <object class="GtkBox" id="main_workspace">
+                <property name="orientation">vertical</property>
+                <property name="hexpand">true</property>
+                <property name="vexpand">true</property>
+                <!-- Empty workspace - canvas/content will be added later -->
+              </object>
+            </child>
+            
+            <!-- Right dock area for attachable panels (extreme right) - resizable with curtain effect -->
+            <child>
+              <object class="GtkBox" id="right_dock_area">
+                <property name="orientation">vertical</property>
+                <property name="spacing">0</property>
+                <property name="width-request">0</property>
+                <property name="visible">false</property>
+                <!-- Panel content will be attached here dynamically -->
+              </object>
+            </child>
+            
+          </object>
+        </child>
+        
+      </object>
+    </child>  </object>
+</interface>

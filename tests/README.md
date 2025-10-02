@@ -1,0 +1,2 @@
+# tests/
+This folder contains all test scripts and test modules for the project. Use this folder for unit tests, integration tests, and test utilities. Organize tests to mirror the structure of your main code in `src/shypn/`.

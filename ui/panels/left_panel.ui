@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- GTK4 File Operations panel - can be docked or float as separate window -->
+<interface>
+  <requires lib="gtk" version="4.0"/>
+
+  <object class="GtkWindow" id="left_panel_window">
+    <property name="title">File Operations</property>
+    <property name="default-width">250</property>
+    <property name="default-height">400</property>
+    <property name="resizable">true</property>
+    
+    <child>
+      <object class="GtkBox" id="left_panel_content">
+        <property name="orientation">vertical</property>
+        <property name="spacing">6</property>
+        <property name="margin-start">6</property>
+        <property name="margin-end">6</property>
+        <property name="margin-top">6</property>
+        <property name="margin-bottom">6</property>
+        
+        <child>
+          <object class="GtkBox" id="panel_header">
+            <property name="orientation">horizontal</property>
+            <property name="spacing">6</property>
+            <child>
+              <object class="GtkLabel" id="panel_title">
+                <property name="label">File Operations</property>
+                <property name="halign">start</property>
+                <property name="hexpand">true</property>
+                <style>
+                  <class name="heading"/>
+                </style>
+              </object>
+            </child>
+            <child>
+              <object class="GtkButton" id="new_document_button">
+                <property name="icon-name">document-new-symbolic</property>
+                <property name="tooltip-text">Create new document</property>
+                <property name="halign">end</property>
+                <style>
+                  <class name="flat"/>
+                </style>
+              </object>
+            </child>
+            <child>
+              <object class="GtkToggleButton" id="float_button">
+                <property name="icon-name">window-new-symbolic</property>
+                <property name="tooltip-text">Float/Dock panel toggle</property>
+                <property name="halign">end</property>
+                <property name="active">false</property>
+                <style>
+                  <class name="flat"/>
+                </style>
+              </object>
+            </child>
+          </object>
+        </child>
+        
+        <child>
+          <object class="GtkSeparator">
+            <property name="orientation">horizontal</property>
+          </object>
+        </child>
+        
+        <child>
+          <object class="GtkListBox" id="file_operations_list">
+            <property name="vexpand">true</property>
+            <property name="selection-mode">none</property>
+            <!-- File operation items will be added programmatically -->
+          </object>
+        </child>
+        
+      </object>
+    </child>
+  </object>
+</interface>
