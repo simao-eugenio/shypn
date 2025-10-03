@@ -231,7 +231,7 @@ def render(self, cr, zoom=1.0):
 Manages selection state and provides queries for selected objects.
 """
 from typing import List, Optional, Tuple
-from shypn.api import PetriNetObject, Place, Transition, Arc
+from shypn.netobjs import PetriNetObject, Place, Transition, Arc
 
 
 class SelectionManager:
@@ -345,7 +345,7 @@ and transform handles for selected objects.
 """
 import math
 from shypn.data.selection_manager import SelectionManager
-from shypn.api import Place, Transition
+from shypn.netobjs import Place, Transition
 
 
 class ObjectEditingTransforms:

@@ -117,7 +117,7 @@ class SelectionManager:
         Returns:
             (min_x, min_y, max_x, max_y) in world coordinates, or None if no selection
         """
-        from shypn.api import Place, Transition, Arc
+        from shypn.netobjs import Place, Transition, Arc
         
         selected = self.get_selected_objects(manager)
         if not selected:

@@ -75,7 +75,7 @@ class ObjectEditingTransforms:
             obj: Object to render selection for
             zoom: Current zoom level
         """
-        from shypn.api import Place, Transition, Arc
+        from shypn.netobjs import Place, Transition, Arc
         
         offset = self.SELECTION_OFFSET / zoom
         

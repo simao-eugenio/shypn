@@ -245,7 +245,7 @@ NameError: name 'Place' is not defined
 Added imports in `model_canvas_loader.py`:
 ```python
 import math  # For sqrt, atan2, cos, sin in preview rendering
-from shypn.api import Place, Transition, Arc  # For isinstance checks
+from shypn.netobjs import Place, Transition, Arc  # For isinstance checks
 ```
 
 **Files Modified**:

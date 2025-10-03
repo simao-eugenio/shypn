@@ -45,7 +45,7 @@ shypn/
 
 - **Data models**: `from shypn.data.model_canvas_manager import ModelCanvasManager`
 - **UI helpers**: `from shypn.helpers.model_canvas_loader import create_model_canvas`
-- **APIs**: `from shypn.api import ...`
+- **APIs**: `from shypn.netobjs import ...`
 - **Utils**: `from shypn.utils import ...`
 
 ## Recent Reorganization (October 2025)

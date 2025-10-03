@@ -252,7 +252,7 @@ def _on_draw(self, drawing_area, cr, width, height, manager):
 ```python
 def _show_object_context_menu(self, x, y, drawing_area, manager, obj):
     """Show object-specific context menu."""
-    from shypn.api import Place, Transition, Arc
+    from shypn.netobjs import Place, Transition, Arc
     
     # Create context menu
     menu = Gtk.Menu()
@@ -310,7 +310,7 @@ def _show_object_context_menu(self, x, y, drawing_area, manager, obj):
 ```python
 def _on_object_properties(self, obj, manager, drawing_area):
     """Show properties dialog for object."""
-    from shypn.api import Place, Transition, Arc
+    from shypn.netobjs import Place, Transition, Arc
     
     dialog = Gtk.Dialog(
         title=f"{obj.name} Properties",

@@ -38,7 +38,7 @@ except Exception as e:
     sys.exit(1)
 
 # Import the FileExplorer API
-from shypn.api.file import FileExplorer
+from shypn.file import FileExplorer
 
 
 class FileExplorerPanel:

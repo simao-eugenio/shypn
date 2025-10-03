@@ -6,7 +6,7 @@ Rendered as an arrow with optional weight label.
 """
 import math
 from typing import List, Tuple
-from shypn.api.netobjs.petri_net_object import PetriNetObject
+from shypn.netobjs.petri_net_object import PetriNetObject
 
 
 class Arc(PetriNetObject):
@@ -69,8 +69,8 @@ class Arc(PetriNetObject):
         Raises:
             ValueError: If source and target are of the same type
         """
-        from shypn.api.netobjs.place import Place
-        from shypn.api.netobjs.transition import Transition
+        from shypn.netobjs.place import Place
+        from shypn.netobjs.transition import Transition
         
         source_is_place = isinstance(source, Place)
         target_is_place = isinstance(target, Place)
@@ -155,8 +155,8 @@ class Arc(PetriNetObject):
             tuple: (x, y) point on object boundary
         """
         # Import here to avoid circular dependency
-        from shypn.api.netobjs.place import Place
-        from shypn.api.netobjs.transition import Transition
+        from shypn.netobjs.place import Place
+        from shypn.netobjs.transition import Transition
         
         if isinstance(obj, Place):
             # Circle boundary: exact intersection

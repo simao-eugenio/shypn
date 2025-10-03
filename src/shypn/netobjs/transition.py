@@ -4,7 +4,7 @@
 Transitions represent events or actions that transform the net state.
 Rendered as a filled black rectangle.
 """
-from shypn.api.netobjs.petri_net_object import PetriNetObject
+from shypn.netobjs.petri_net_object import PetriNetObject
 
 
 class Transition(PetriNetObject):

@@ -86,8 +86,8 @@ Added `_validate_connection()` static method to Arc class:
 @staticmethod
 def _validate_connection(source, target):
     """Validate that connection follows bipartite property."""
-    from shypn.api.place import Place
-    from shypn.api.transition import Transition
+    from shypn.netobjs.place import Place
+    from shypn.netobjs.transition import Transition
     
     source_is_place = isinstance(source, Place)
     target_is_place = isinstance(target, Place)

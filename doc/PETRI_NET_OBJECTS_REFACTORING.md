@@ -86,9 +86,9 @@ src/shypn/api/
 **`__init__.py`** (updated)
 ```python
 from shypn.api.petri_net_object import PetriNetObject
-from shypn.api.place import Place
+from shypn.netobjs.place import Place
 from shypn.api.arc import Arc
-from shypn.api.transition import Transition
+from shypn.netobjs.transition import Transition
 
 __all__ = ['PetriNetObject', 'Place', 'Arc', 'Transition']
 ```
@@ -173,9 +173,9 @@ from shypn.api import Place, Arc, Transition
 
 Or individually:
 ```python
-from shypn.api.place import Place
+from shypn.netobjs.place import Place
 from shypn.api.arc import Arc
-from shypn.api.transition import Transition
+from shypn.netobjs.transition import Transition
 from shypn.api.petri_net_object import PetriNetObject  # If needed
 ```
 

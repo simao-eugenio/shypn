@@ -21,7 +21,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(REPO_ROOT / 'src'))
 
-from shypn.api.file import FileExplorer
+from shypn.file import FileExplorer
 
 
 def test_file_operations():

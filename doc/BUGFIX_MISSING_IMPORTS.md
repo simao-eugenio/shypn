@@ -27,7 +27,7 @@ import math  # For preview line geometry calculations
 
 # Import Petri net object types for isinstance checks
 try:
-    from shypn.api import Place, Transition, Arc
+    from shypn.netobjs import Place, Transition, Arc
 except ImportError as e:
     print(f'ERROR: Cannot import Petri net objects: {e}', file=sys.stderr)
     sys.exit(1)
@@ -84,7 +84,7 @@ Created A1: P1 → T1
 
 - `src/shypn/helpers/model_canvas_loader.py`:
   * Added `import math` at line 4
-  * Added `from shypn.api import Place, Transition, Arc` at lines 35-38
+  * Added `from shypn.netobjs import Place, Transition, Arc` at lines 35-38
 
 ---
 
