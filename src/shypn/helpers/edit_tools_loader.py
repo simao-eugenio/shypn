@@ -31,6 +31,7 @@ class EditToolsLoader(GObject.GObject):
     
     # Tool constants
     TOOL_NONE = None
+    TOOL_SELECT = 'select'
     TOOL_PLACE = 'place'
     TOOL_TRANSITION = 'transition'
     TOOL_ARC = 'arc'
@@ -57,6 +58,7 @@ class EditToolsLoader(GObject.GObject):
         self.edit_tools_container = None  # Tools box
         
         # Tool buttons
+        self.select_tool_button = None
         self.place_tool_button = None
         self.transition_tool_button = None
         self.arc_tool_button = None
@@ -90,6 +92,7 @@ class EditToolsLoader(GObject.GObject):
         # Extract widgets
         self.edit_tools_revealer = self.builder.get_object('edit_tools_revealer')
         self.edit_tools_container = self.builder.get_object('edit_tools_container')
+        self.select_tool_button = self.builder.get_object('select_tool_button')
         self.place_tool_button = self.builder.get_object('place_tool_button')
         self.transition_tool_button = self.builder.get_object('transition_tool_button')
         self.arc_tool_button = self.builder.get_object('arc_tool_button')
@@ -98,10 +101,11 @@ class EditToolsLoader(GObject.GObject):
             raise ValueError("Object 'edit_tools_revealer' not found in edit_tools_palette.ui")
         
         # Verify all buttons exist
-        if not all([self.place_tool_button, self.transition_tool_button, self.arc_tool_button]):
+        if not all([self.select_tool_button, self.place_tool_button, self.transition_tool_button, self.arc_tool_button]):
             raise ValueError("One or more tool buttons not found in edit_tools_palette.ui")
         
         # Connect button signals
+        self.select_tool_button.connect('toggled', self._on_select_toggled)
         self.place_tool_button.connect('toggled', self._on_place_toggled)
         self.transition_tool_button.connect('toggled', self._on_transition_toggled)
         self.arc_tool_button.connect('toggled', self._on_arc_toggled)
@@ -164,6 +168,35 @@ class EditToolsLoader(GObject.GObject):
     
     # ==================== Event Handlers ====================
     
+    def _on_select_toggled(self, toggle_button):
+        """Handle Select tool button toggle.
+        
+        Args:
+            toggle_button: GtkToggleButton that was toggled.
+        """
+        if self._updating_buttons:
+            return
+        
+        is_active = toggle_button.get_active()
+        
+        if is_active:
+            # Select tool selected - deactivate other tools
+            self._updating_buttons = True
+            self.place_tool_button.set_active(False)
+            self.transition_tool_button.set_active(False)
+            self.arc_tool_button.set_active(False)
+            self._updating_buttons = False
+            
+            self.current_tool = self.TOOL_SELECT
+            self.emit('tool-changed', self.TOOL_SELECT)
+        else:
+            # Select tool deselected - if no other tool is active, clear selection
+            if not any([self.place_tool_button.get_active(), 
+                       self.transition_tool_button.get_active(),
+                       self.arc_tool_button.get_active()]):
+                self.current_tool = self.TOOL_NONE
+                self.emit('tool-changed', '')
+    
     def _on_place_toggled(self, toggle_button):
         """Handle Place tool button toggle.
         
@@ -178,6 +211,7 @@ class EditToolsLoader(GObject.GObject):
         if is_active:
             # Place tool selected - deactivate other tools
             self._updating_buttons = True
+            self.select_tool_button.set_active(False)
             self.transition_tool_button.set_active(False)
             self.arc_tool_button.set_active(False)
             self._updating_buttons = False
@@ -186,7 +220,9 @@ class EditToolsLoader(GObject.GObject):
             self.emit('tool-changed', self.TOOL_PLACE)
         else:
             # Place tool deselected - if no other tool is active, clear selection
-            if not self.transition_tool_button.get_active() and not self.arc_tool_button.get_active():
+            if not any([self.select_tool_button.get_active(),
+                       self.transition_tool_button.get_active(), 
+                       self.arc_tool_button.get_active()]):
                 self.current_tool = self.TOOL_NONE
                 self.emit('tool-changed', '')
     
@@ -204,6 +240,7 @@ class EditToolsLoader(GObject.GObject):
         if is_active:
             # Transition tool selected - deactivate other tools
             self._updating_buttons = True
+            self.select_tool_button.set_active(False)
             self.place_tool_button.set_active(False)
             self.arc_tool_button.set_active(False)
             self._updating_buttons = False
@@ -212,7 +249,9 @@ class EditToolsLoader(GObject.GObject):
             self.emit('tool-changed', self.TOOL_TRANSITION)
         else:
             # Transition tool deselected
-            if not self.place_tool_button.get_active() and not self.arc_tool_button.get_active():
+            if not any([self.select_tool_button.get_active(),
+                       self.place_tool_button.get_active(),
+                       self.arc_tool_button.get_active()]):
                 self.current_tool = self.TOOL_NONE
                 self.emit('tool-changed', '')
     
@@ -230,6 +269,7 @@ class EditToolsLoader(GObject.GObject):
         if is_active:
             # Arc tool selected - deactivate other tools
             self._updating_buttons = True
+            self.select_tool_button.set_active(False)
             self.place_tool_button.set_active(False)
             self.transition_tool_button.set_active(False)
             self._updating_buttons = False
@@ -238,7 +278,9 @@ class EditToolsLoader(GObject.GObject):
             self.emit('tool-changed', self.TOOL_ARC)
         else:
             # Arc tool deselected
-            if not self.place_tool_button.get_active() and not self.transition_tool_button.get_active():
+            if not any([self.select_tool_button.get_active(),
+                       self.place_tool_button.get_active(),
+                       self.transition_tool_button.get_active()]):
                 self.current_tool = self.TOOL_NONE
                 self.emit('tool-changed', '')
     

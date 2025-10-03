@@ -9,10 +9,10 @@ This package provides the core Petri net object classes:
 
 All classes are exported at the package level for convenient importing.
 """
-from shypn.api.petri_net_object import PetriNetObject
-from shypn.api.place import Place
-from shypn.api.arc import Arc
-from shypn.api.inhibitor_arc import InhibitorArc
-from shypn.api.transition import Transition
+from shypn.api.netobjs.petri_net_object import PetriNetObject
+from shypn.api.netobjs.place import Place
+from shypn.api.netobjs.arc import Arc
+from shypn.api.netobjs.inhibitor_arc import InhibitorArc
+from shypn.api.netobjs.transition import Transition
 
 __all__ = ['PetriNetObject', 'Place', 'Arc', 'InhibitorArc', 'Transition']

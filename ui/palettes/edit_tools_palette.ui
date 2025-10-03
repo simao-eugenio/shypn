@@ -22,6 +22,20 @@
           <class name="edit-tools-palette"/>
         </style>
 
+        <!-- Select Tool Button [S] -->
+        <child>
+          <object class="GtkToggleButton" id="select_tool_button">
+            <property name="visible">True</property>
+            <property name="label">S</property>
+            <property name="tooltip-text">Select Tool - Select and manipulate objects</property>
+            <property name="width-request">40</property>
+            <property name="height-request">40</property>
+            <style>
+              <class name="tool-button"/>
+            </style>
+          </object>
+        </child>
+
         <!-- Place Tool Button [P] -->
         <child>
           <object class="GtkToggleButton" id="place_tool_button">

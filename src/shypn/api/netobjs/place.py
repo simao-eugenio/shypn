@@ -5,7 +5,7 @@ Places represent conditions or states and can contain tokens.
 Rendered as a circle with optional label and token display.
 """
 import math
-from shypn.api.petri_net_object import PetriNetObject
+from shypn.api.netobjs.petri_net_object import PetriNetObject
 
 
 class Place(PetriNetObject):
@@ -70,13 +70,7 @@ class Place(PetriNetObject):
         cr.set_line_width(self.border_width / max(zoom, 1e-6))  # Compensate for zoom
         cr.stroke()
         
-        # Draw selection highlight if selected
-        if self.selected:
-            # Offset by 3px in screen space = 3/zoom in world space
-            cr.arc(self.x, self.y, self.radius + 3 / zoom, 0, 2 * math.pi)
-            cr.set_source_rgba(0.2, 0.6, 1.0, 0.5)  # Blue highlight
-            cr.set_line_width(3.0 / zoom)  # Compensate for zoom
-            cr.stroke()
+        # Selection rendering moved to ObjectEditingTransforms in src/shypn/api/edit/
         
         # Draw tokens if any
         if self.tokens > 0:

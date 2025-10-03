@@ -10,13 +10,17 @@ for the Petri Net model editor. It handles:
 - Rendering pipeline for grid and model elements
 - Document metadata and state validation
 - Petri net object collections (places, transitions, arcs)
+- View state persistence (pan, zoom)
 
 The manager maintains the model state separately from GTK widgets,
 making it easier to test and maintain.
 """
 import math
+import json
+import os
 from datetime import datetime
 from shypn.api import Place, Arc, Transition
+from shypn.edit import SelectionManager, ObjectEditingTransforms, RectangleSelection
 
 
 class ModelCanvasManager:
@@ -92,6 +96,11 @@ class ModelCanvasManager:
         self._next_place_id = 1
         self._next_transition_id = 1
         self._next_arc_id = 1
+        
+        # Selection and transformation system
+        self.selection_manager = SelectionManager()
+        self.editing_transforms = ObjectEditingTransforms(self.selection_manager)
+        self.rectangle_selection = RectangleSelection()
         
         # Dirty flag for redraw optimization
         self._needs_redraw = True
@@ -313,9 +322,10 @@ class ModelCanvasManager:
             y: Y coordinate in world space
             
         Returns:
-            Place, Transition, or None: The object at the position, or None
+            Place, Transition, Arc, or None: The object at the position, or None
         """
         # Check in reverse rendering order (top to bottom)
+        # Transitions and places are checked first (easier to click)
         for transition in reversed(self.transitions):
             if transition.contains_point(x, y):
                 return transition
@@ -324,10 +334,30 @@ class ModelCanvasManager:
             if place.contains_point(x, y):
                 return place
         
-        # Arcs are harder to click, so they're checked last
-        # (and we don't implement arc clicking yet)
+        # Arcs are thinner and harder to click, check them last
+        for arc in reversed(self.arcs):
+            if arc.contains_point(x, y):
+                return arc
         
         return None
+    
+    def get_all_objects(self):
+        """Get all Petri net objects in the model.
+        
+        Returns:
+            list: All places, transitions, and arcs combined
+        """
+        return self.places + self.transitions + self.arcs
+    
+    def clear_all_selections(self):
+        """Clear selection state on all objects.
+        
+        Used when SelectionManager needs to clear all selections.
+        """
+        for obj in self.get_all_objects():
+            obj.selected = False
+        self.selection_manager.clear_selection()
+        self.mark_dirty()
     
     def clear_all_objects(self):
         """Remove all Petri net objects from the model."""
@@ -426,6 +456,9 @@ class ModelCanvasManager:
         
         # Clamp pan to maintain infinite canvas bounds
         self.clamp_pan()
+        
+        # Save view state after zoom operation
+        self.save_view_state_to_file()
         
         self._needs_redraw = True
     
@@ -915,3 +948,94 @@ class ModelCanvasManager:
         if filename != self.filename:
             self.filename = filename
             self.mark_modified()
+    
+    # ==================== View State Persistence ====================
+    
+    def get_view_state(self):
+        """Get current canvas view state for persistence.
+        
+        Returns:
+            dict: View state containing pan_x, pan_y, zoom
+        """
+        return {
+            'pan_x': self.pan_x,
+            'pan_y': self.pan_y,
+            'zoom': self.zoom
+        }
+    
+    def set_view_state(self, view_state):
+        """Restore canvas view state from saved data.
+        
+        Args:
+            view_state: Dictionary containing pan_x, pan_y, zoom
+        """
+        if view_state:
+            self.pan_x = view_state.get('pan_x', 0.0)
+            self.pan_y = view_state.get('pan_y', 0.0)
+            self.zoom = view_state.get('zoom', 1.0)
+            
+            # Clamp zoom to valid range
+            self.zoom = max(self.MIN_ZOOM, min(self.MAX_ZOOM, self.zoom))
+            
+            # Clamp pan to infinite canvas bounds
+            self.clamp_pan()
+            
+            # Mark that we don't need initial centering
+            self._initial_pan_set = True
+            
+            self.mark_dirty()
+    
+    def save_view_state_to_file(self, filepath=None):
+        """Save current view state to a JSON file.
+        
+        Args:
+            filepath: Optional custom file path. If None, uses default location.
+            
+        Returns:
+            bool: True if saved successfully, False otherwise
+        """
+        if filepath is None:
+            # Create .shypn config directory in user's home
+            config_dir = os.path.expanduser('~/.shypn')
+            os.makedirs(config_dir, exist_ok=True)
+            
+            # Use filename to create view state file
+            filename = self.filename if self.filename else 'default'
+            filepath = os.path.join(config_dir, f'{filename}_view.json')
+        
+        try:
+            view_state = self.get_view_state()
+            with open(filepath, 'w') as f:
+                json.dump(view_state, f, indent=2)
+            return True
+        except Exception as e:
+            print(f"[View State] Failed to save view state: {e}")
+            return False
+    
+    def load_view_state_from_file(self, filepath=None):
+        """Load view state from a JSON file.
+        
+        Args:
+            filepath: Optional custom file path. If None, uses default location.
+            
+        Returns:
+            bool: True if loaded successfully, False otherwise
+        """
+        if filepath is None:
+            # Look for view state file in config directory
+            config_dir = os.path.expanduser('~/.shypn')
+            filename = self.filename if self.filename else 'default'
+            filepath = os.path.join(config_dir, f'{filename}_view.json')
+        
+        if not os.path.exists(filepath):
+            return False
+        
+        try:
+            with open(filepath, 'r') as f:
+                view_state = json.load(f)
+            self.set_view_state(view_state)
+            print(f"[View State] Restored view: pan=({self.pan_x:.1f}, {self.pan_y:.1f}), zoom={self.zoom:.2f}")
+            return True
+        except Exception as e:
+            print(f"[View State] Failed to load view state: {e}")
+            return False

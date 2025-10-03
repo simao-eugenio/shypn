@@ -6,7 +6,7 @@ Rendered as an arrow with optional weight label.
 """
 import math
 from typing import List, Tuple
-from shypn.api.petri_net_object import PetriNetObject
+from shypn.api.netobjs.petri_net_object import PetriNetObject
 
 
 class Arc(PetriNetObject):
@@ -69,8 +69,8 @@ class Arc(PetriNetObject):
         Raises:
             ValueError: If source and target are of the same type
         """
-        from shypn.api.place import Place
-        from shypn.api.transition import Transition
+        from shypn.api.netobjs.place import Place
+        from shypn.api.netobjs.transition import Transition
         
         source_is_place = isinstance(source, Place)
         target_is_place = isinstance(target, Place)
@@ -136,17 +136,15 @@ class Arc(PetriNetObject):
         if self.weight > 1:
             self._render_weight(cr, start_world_x, start_world_y, end_world_x, end_world_y, zoom)
         
-        # Draw selection highlight if selected
-        if self.selected:
-            cr.move_to(start_world_x, start_world_y)
-            cr.line_to(end_world_x, end_world_y)
-            cr.set_source_rgba(0.2, 0.6, 1.0, 0.5)
-            cr.set_line_width((self.width + 4) / zoom)  # Compensate for zoom
-            cr.stroke()
+        # Selection rendering moved to ObjectEditingTransforms in src/shypn/api/edit/
     
     def _get_boundary_point(self, obj, cx: float, cy: float, 
                            dx: float, dy: float) -> Tuple[float, float]:
         """Calculate where arc intersects object boundary.
+        
+        Uses proper geometric intersection:
+        - For Place (circle): Ray-circle intersection
+        - For Transition (rectangle): Ray-rectangle intersection
         
         Args:
             obj: Place or Transition object
@@ -157,20 +155,57 @@ class Arc(PetriNetObject):
             tuple: (x, y) point on object boundary
         """
         # Import here to avoid circular dependency
-        from shypn.api.place import Place
-        from shypn.api.transition import Transition
+        from shypn.api.netobjs.place import Place
+        from shypn.api.netobjs.transition import Transition
         
         if isinstance(obj, Place):
-            # Circle boundary
+            # Circle boundary: exact intersection
+            # Point on circle is simply center + radius * direction
             return (cx + dx * obj.radius, cy + dy * obj.radius)
+            
         elif isinstance(obj, Transition):
-            # Rectangle boundary - simplified approximation
+            # Rectangle boundary: ray-rectangle intersection
+            # Rectangle dimensions (accounting for orientation)
             w = obj.width if obj.horizontal else obj.height
             h = obj.height if obj.horizontal else obj.width
-            # Use larger dimension for approximation
-            dist = max(w, h) / 2
-            return (cx + dx * dist, cy + dy * dist)
+            half_w = w / 2
+            half_h = h / 2
+            
+            # Calculate intersection with rectangle edges
+            # The rectangle is axis-aligned in world space
+            # We need to find which edge the ray intersects first
+            
+            # Avoid division by zero
+            if abs(dx) < 1e-10:
+                dx = 1e-10
+            if abs(dy) < 1e-10:
+                dy = 1e-10
+            
+            # Calculate t values for intersection with each edge
+            # Ray: (cx, cy) + t * (dx, dy)
+            # Edges: x = cx ± half_w, y = cy ± half_h
+            
+            # Right/Left edges (x = cx ± half_w)
+            t_right = half_w / dx if dx > 0 else float('inf')
+            t_left = -half_w / dx if dx < 0 else float('inf')
+            
+            # Top/Bottom edges (y = cy ± half_h)
+            t_bottom = half_h / dy if dy > 0 else float('inf')
+            t_top = -half_h / dy if dy < 0 else float('inf')
+            
+            # Find minimum positive t (closest intersection)
+            t = min(t_right, t_left, t_bottom, t_top)
+            
+            # Calculate intersection point
+            # Clamp to rectangle bounds to handle floating point errors
+            intersect_x = cx + t * dx
+            intersect_y = cy + t * dy
+            intersect_x = max(cx - half_w, min(cx + half_w, intersect_x))
+            intersect_y = max(cy - half_h, min(cy + half_h, intersect_y))
+            
+            return (intersect_x, intersect_y)
         else:
+            # Unknown object type: use center
             return (cx, cy)
     
     def _render_arrowhead(self, cr, x: float, y: float, dx: float, dy: float, zoom: float = 1.0):
@@ -323,9 +358,34 @@ class Arc(PetriNetObject):
         Returns:
             bool: True if point is near the arc line
         """
-        # TODO: Implement proper line distance calculation
-        # For now, arcs are not easily selectable
-        return False
+        # Get source and target positions
+        src_x, src_y = self.source.x, self.source.y
+        tgt_x, tgt_y = self.target.x, self.target.y
+        
+        # Calculate line segment parameters
+        dx = tgt_x - src_x
+        dy = tgt_y - src_y
+        length_sq = dx * dx + dy * dy
+        
+        if length_sq < 1e-6:
+            return False  # Degenerate arc
+        
+        # Calculate closest point on line segment to (x, y)
+        # Parameter t represents position along line: 0=start, 1=end
+        t = max(0.0, min(1.0, ((x - src_x) * dx + (y - src_y) * dy) / length_sq))
+        
+        # Closest point on segment
+        closest_x = src_x + t * dx
+        closest_y = src_y + t * dy
+        
+        # Distance from point to line segment
+        dist_sq = (x - closest_x) ** 2 + (y - closest_y) ** 2
+        
+        # Tolerance: 10 pixels in world space (generous for clicking)
+        # This should be adjusted based on zoom, but for now use fixed tolerance
+        tolerance = 10.0
+        
+        return dist_sq <= (tolerance * tolerance)
     
     def set_position(self, x: float, y: float):
         """Arcs don't have a direct position (they connect other objects).

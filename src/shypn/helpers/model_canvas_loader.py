@@ -255,6 +255,9 @@ class ModelCanvasLoader:
         except Exception as e:
             print(f"[DPI] Could not detect DPI: {e}, using default 96.0")
         
+        # Load saved view state if it exists
+        manager.load_view_state_from_file()
+        
         # Initialize new document and validate
         validation = manager.create_new_document()
         # Silently ignore validation errors on initialization
@@ -368,6 +371,17 @@ class ModelCanvasLoader:
             'cursor_pos': (0, 0)  # Last cursor position for preview
         }
         
+        # Store double-click tracking per drawing area
+        if not hasattr(self, '_click_state'):
+            self._click_state = {}
+        self._click_state[drawing_area] = {
+            'last_click_time': 0.0,
+            'last_click_obj': None,
+            'double_click_threshold': 0.3,  # 300ms for double-click
+            'pending_timeout': None,  # GLib timeout ID for delayed single-click
+            'pending_click_data': None  # Store click data while waiting
+        }
+        
         # Setup context menu
         self._setup_canvas_context_menu(drawing_area, manager)
     
@@ -423,38 +437,158 @@ class ModelCanvasLoader:
                 
                 return True
         
-        # Check if other tools are active (left-click only)
+        # Check if creation tools are active (left-click only)
+        # Note: Select tool is handled separately below in selection mode
         if event.button == 1 and manager.is_tool_active():
-            # Tool mode: handle object creation
             tool = manager.get_tool()
-            world_x, world_y = manager.screen_to_world(event.x, event.y)
             
-            if tool == 'place':
-                # Create place at click position
-                place = manager.add_place(world_x, world_y)
-                print(f"Created {place.name} at ({world_x:.1f}, {world_y:.1f})")
-                widget.queue_draw()
-            elif tool == 'transition':
-                # Create transition at click position
-                transition = manager.add_transition(world_x, world_y)
-                print(f"Created {transition.name} at ({world_x:.1f}, {world_y:.1f})")
-                widget.queue_draw()
-            
-            # Don't start drag mode when using tools
-            return True
+            # Only handle creation tools (place, transition) here
+            # Select tool is handled in selection mode logic below
+            if tool in ('place', 'transition'):
+                # Tool mode: handle object creation
+                world_x, world_y = manager.screen_to_world(event.x, event.y)
+                
+                if tool == 'place':
+                    # Create place at click position
+                    place = manager.add_place(world_x, world_y)
+                    print(f"Created {place.name} at ({world_x:.1f}, {world_y:.1f})")
+                    widget.queue_draw()
+                elif tool == 'transition':
+                    # Create transition at click position
+                    transition = manager.add_transition(world_x, world_y)
+                    print(f"Created {transition.name} at ({world_x:.1f}, {world_y:.1f})")
+                    widget.queue_draw()
+                
+                # Don't start drag mode when using creation tools
+                return True
         
-        # No tool active: selection mode
-        if event.button == 1:
-            # Left-click: toggle selection
+        # Selection mode: active when no tool OR select tool is active
+        # This allows both clicking objects with no tool and explicit select tool
+        tool = manager.get_tool() if manager.is_tool_active() else None
+        is_selection_mode = (tool is None or tool == 'select')
+        
+        if event.button == 1 and is_selection_mode:
+            # Left-click: toggle selection OR start rectangle selection
             world_x, world_y = manager.screen_to_world(event.x, event.y)
             clicked_obj = manager.find_object_at_position(world_x, world_y)
             
+            # Check for Ctrl key (multi-select)
+            is_ctrl = event.state & Gdk.ModifierType.CONTROL_MASK
+            
             if clicked_obj is not None:
-                # Toggle selection
-                clicked_obj.selected = not clicked_obj.selected
-                status = "selected" if clicked_obj.selected else "deselected"
-                print(f"{clicked_obj.name} {status}")
-                widget.queue_draw()
+                # Check for double-click to enter edit mode
+                import time
+                from gi.repository import GLib
+                
+                click_state = self._click_state[widget]
+                current_time = time.time()
+                time_since_last = current_time - click_state['last_click_time']
+                is_double_click = (
+                    time_since_last < click_state['double_click_threshold'] and
+                    click_state['last_click_obj'] == clicked_obj
+                )
+                
+                # ALWAYS cancel any pending single-click first
+                # This prevents multiple pending clicks from accumulating
+                if click_state['pending_timeout'] is not None:
+                    GLib.source_remove(click_state['pending_timeout'])
+                    click_state['pending_timeout'] = None
+                    click_state['pending_click_data'] = None
+                
+                if is_double_click:
+                    # Double-click detected: enter EDIT mode (only if already selected)
+                    if clicked_obj.selected:
+                        manager.selection_manager.enter_edit_mode(clicked_obj, manager=manager)
+                        print(f"{clicked_obj.name} entered EDIT mode (transform handles visible)")
+                    else:
+                        # First click selected, second click enters edit mode - handle immediately
+                        manager.selection_manager.toggle_selection(clicked_obj, multi=is_ctrl, manager=manager)
+                        manager.selection_manager.enter_edit_mode(clicked_obj, manager=manager)
+                        print(f"{clicked_obj.name} selected and entered EDIT mode")
+                    
+                    click_state['last_click_time'] = 0.0  # Reset to prevent triple-click
+                    click_state['last_click_obj'] = None
+                    widget.queue_draw()
+                    return True
+                else:
+                    # Potential single-click: delay processing to detect double-click
+                    # Store click data
+                    click_state['pending_click_data'] = {
+                        'obj': clicked_obj,
+                        'is_ctrl': is_ctrl,
+                        'widget': widget,
+                        'manager': manager
+                    }
+                    
+                    # Schedule delayed single-click processing
+                    def process_single_click():
+                        data = click_state['pending_click_data']
+                        if data is None:
+                            return False  # Already processed or cancelled
+                        
+                        obj = data['obj']
+                        ctrl = data['is_ctrl']
+                        w = data['widget']
+                        mgr = data['manager']
+                        
+                        # Check if we entered EDIT mode (via double-click) before this callback fired
+                        # If so, don't process the single-click - it's already handled
+                        if mgr.selection_manager.is_edit_mode() and mgr.selection_manager.edit_target == obj:
+                            # Double-click already handled this, skip single-click processing
+                            click_state['pending_timeout'] = None
+                            click_state['pending_click_data'] = None
+                            return False
+                        
+                        # Exit edit mode only when selecting a DIFFERENT object
+                        if mgr.selection_manager.is_edit_mode():
+                            current_edit_target = mgr.selection_manager.edit_target
+                            if current_edit_target != obj:
+                                mgr.selection_manager.exit_edit_mode()
+                                print(f"Exited EDIT mode (selected different object)")
+                        
+                        mgr.selection_manager.toggle_selection(obj, multi=ctrl, manager=mgr)
+                        status = "selected" if obj.selected else "deselected"
+                        multi_str = " (multi)" if ctrl else ""
+                        print(f"{obj.name} {status}{multi_str} [NORMAL mode]")
+                        
+                        w.queue_draw()
+                        
+                        # Clear pending data
+                        click_state['pending_timeout'] = None
+                        click_state['pending_click_data'] = None
+                        return False  # Don't repeat
+                    
+                    # Wait 300ms to see if double-click comes
+                    timeout_ms = int(click_state['double_click_threshold'] * 1000)
+                    click_state['pending_timeout'] = GLib.timeout_add(timeout_ms, process_single_click)
+                    
+                    # Update click tracking
+                    click_state['last_click_time'] = current_time
+                    click_state['last_click_obj'] = clicked_obj
+                    
+                    return True
+            else:
+                # Clicked empty space: start rectangle selection (rubber-band)
+                manager.rectangle_selection.start(world_x, world_y)
+                
+                # Exit EDIT mode when clicking empty space
+                if manager.selection_manager.is_edit_mode():
+                    manager.selection_manager.exit_edit_mode()
+                    print("Exited EDIT mode (clicked empty space)")
+                
+                # Also start drag state for tracking
+                state['active'] = True
+                state['button'] = event.button
+                state['start_x'] = event.x
+                state['start_y'] = event.y
+                state['is_panning'] = False
+                state['is_rect_selecting'] = True  # Flag for rectangle selection
+                
+                # Clear selection if not multi-select
+                if not is_ctrl:
+                    manager.clear_all_selections()
+                
+                widget.grab_focus()
                 return True
         
         # Default behavior: pan mode
@@ -466,6 +600,7 @@ class ModelCanvasLoader:
         state['start_pan_x'] = manager.pan_x  # Store initial pan offset
         state['start_pan_y'] = manager.pan_y
         state['is_panning'] = False
+        state['is_rect_selecting'] = False  # Initialize flag
         
         widget.grab_focus()
         
@@ -476,6 +611,22 @@ class ModelCanvasLoader:
         """Handle button release events (GTK3)."""
         state = self._drag_state[widget]
         
+        # Handle rectangle selection finish
+        if state.get('is_rect_selecting', False):
+            # Check for Ctrl key (multi-select)
+            is_ctrl = event.state & Gdk.ModifierType.CONTROL_MASK
+            
+            # Finish rectangle selection and select objects
+            bounds = manager.rectangle_selection.finish()
+            if bounds:
+                count = manager.rectangle_selection.select_objects(manager, multi=is_ctrl)
+                multi_str = " (multi)" if is_ctrl else ""
+                print(f"Rectangle selection: {count} objects selected{multi_str}")
+            
+            # Reset state
+            state['is_rect_selecting'] = False
+            widget.queue_draw()
+        
         # Right-click: show context menu ONLY if no panning occurred
         if event.button == 3 and not state['is_panning']:
             # Double-check: only show menu if it was a click (< 5px movement), not a drag
@@ -484,12 +635,26 @@ class ModelCanvasLoader:
             distance = (dx * dx + dy * dy) ** 0.5
             
             if distance < 5:
-                self._show_canvas_context_menu(event.x, event.y, widget)
+                # Check if clicked on an object
+                world_x, world_y = manager.screen_to_world(event.x, event.y)
+                clicked_obj = manager.find_object_at_position(world_x, world_y)
+                
+                if clicked_obj:
+                    # Show object-specific context menu
+                    self._show_object_context_menu(event.x, event.y, widget, manager, clicked_obj)
+                else:
+                    # Show canvas context menu
+                    self._show_canvas_context_menu(event.x, event.y, widget)
         
         # Reset all drag state
+        was_panning = state['is_panning']
         state['active'] = False
         state['button'] = 0
         state['is_panning'] = False  # IMPORTANT: Reset panning flag
+        
+        # Save view state after panning operation completes
+        if was_panning:
+            manager.save_view_state_to_file()
         
         # Return True to prevent default handling
         return True
@@ -516,6 +681,14 @@ class ModelCanvasLoader:
             # Start panning if movement detected (5px threshold)
             if not state['is_panning'] and (abs(dx) >= 5 or abs(dy) >= 5):
                 state['is_panning'] = True
+            
+            # Handle rectangle selection drag
+            if state.get('is_rect_selecting', False):
+                # Update rectangle selection
+                world_x, world_y = manager.screen_to_world(event.x, event.y)
+                manager.rectangle_selection.update(world_x, world_y)
+                widget.queue_draw()
+                return True
             
             # Pan with right button (3) or middle button (2) or Shift+left (1)
             is_shift_pressed = event.state & Gdk.ModifierType.SHIFT_MASK
@@ -569,8 +742,16 @@ class ModelCanvasLoader:
     
     def _on_key_press_event(self, widget, event, manager):
         """Handle key press events (GTK3)."""
-        # Escape key to dismiss context menu
+        # Escape key: exit edit mode OR dismiss context menu
         if event.keyval == Gdk.KEY_Escape:
+            # First priority: exit edit mode if active
+            if manager.selection_manager.is_edit_mode():
+                manager.selection_manager.exit_edit_mode()
+                print("Exited EDIT mode → NORMAL mode")
+                widget.queue_draw()
+                return True
+            
+            # Second priority: dismiss context menu
             if hasattr(self, '_canvas_context_menu') and self._canvas_context_menu:
                 # GTK3 Menu: use popdown()
                 if isinstance(self._canvas_context_menu, Gtk.Menu):
@@ -616,6 +797,12 @@ class ModelCanvasLoader:
         # Objects are rendered in order: arcs (behind), then places, then transitions
         for obj in manager.get_all_objects():
             obj.render(cr, zoom=manager.zoom)  # Pass zoom for line width compensation
+        
+        # Draw selection layer (selection highlights, bounding box, transform handles)
+        manager.editing_transforms.render_selection_layer(cr, manager, manager.zoom)
+        
+        # Draw rectangle selection (rubber-band) if active
+        manager.rectangle_selection.render(cr, manager.zoom)
         
         # Restore device space (for overlays)
         cr.restore()
@@ -714,6 +901,67 @@ class ModelCanvasLoader:
                 # GTK3: popup menu at pointer position
                 # popup(parent_menu_shell, parent_menu_item, func, data, button, activate_time)
                 menu.popup(None, None, None, None, 3, Gtk.get_current_event_time())
+    
+    def _show_object_context_menu(self, x, y, drawing_area, manager, obj):
+        """Show object-specific context menu.
+        
+        Args:
+            x, y: Position to show menu (widget-relative coordinates)
+            drawing_area: GtkDrawingArea widget
+            manager: ModelCanvasManager instance
+            obj: Selected object (Place, Transition, or Arc)
+        """
+        from shypn.api import Place, Transition, Arc
+        
+        # Create context menu
+        menu = Gtk.Menu()
+        
+        # Determine object type for title
+        if isinstance(obj, Place):
+            obj_type = "Place"
+        elif isinstance(obj, Transition):
+            obj_type = "Transition"
+        elif isinstance(obj, Arc):
+            obj_type = "Arc"
+        else:
+            obj_type = "Object"
+        
+        # Add title item (disabled)
+        title_item = Gtk.MenuItem(label=f"{obj_type}: {obj.name}")
+        title_item.set_sensitive(False)
+        title_item.show()
+        menu.append(title_item)
+        
+        # Add separator
+        separator = Gtk.SeparatorMenuItem()
+        separator.show()
+        menu.append(separator)
+        
+        # Add menu items
+        menu_items = [
+            ("Edit Properties...", lambda: self._on_object_properties(obj, manager, drawing_area)),
+            ("Edit Mode (Double-click)", lambda: self._on_object_edit_mode(obj, manager, drawing_area)),
+            None,  # Separator
+            ("Delete", lambda: self._on_object_delete(obj, manager, drawing_area)),
+        ]
+        
+        # Add arc-specific options
+        if isinstance(obj, Arc):
+            menu_items.insert(2, ("Edit Weight...", lambda: self._on_arc_edit_weight(obj, manager, drawing_area)))
+        
+        for item_data in menu_items:
+            if item_data is None:
+                menu_item = Gtk.SeparatorMenuItem()
+            else:
+                label, callback = item_data
+                menu_item = Gtk.MenuItem(label=label)
+                menu_item.connect("activate", lambda w, cb=callback: cb())
+            
+            menu_item.show()
+            menu.append(menu_item)
+        
+        # Show menu
+        menu.popup(None, None, None, None, 3, Gtk.get_current_event_time())
     
     # ==================== Public API ====================
     
@@ -891,6 +1139,217 @@ class ModelCanvasLoader:
         manager.pan_x = 0
         manager.pan_y = 0
         drawing_area.queue_draw()
+    
+    # ==================== Object Context Menu Actions ====================
+    
+    def _on_object_delete(self, obj, manager, drawing_area):
+        """Delete an object from the canvas.
+        
+        Args:
+            obj: Object to delete (Place, Transition, or Arc)
+            manager: ModelCanvasManager instance
+            drawing_area: GtkDrawingArea widget
+        """
+        from shypn.api import Place, Transition, Arc
+        
+        # Remove from appropriate list
+        if isinstance(obj, Place):
+            if obj in manager.places:
+                manager.places.remove(obj)
+                print(f"Deleted {obj.name}")
+        elif isinstance(obj, Transition):
+            if obj in manager.transitions:
+                manager.transitions.remove(obj)
+                print(f"Deleted {obj.name}")
+        elif isinstance(obj, Arc):
+            if obj in manager.arcs:
+                manager.arcs.remove(obj)
+                print(f"Deleted {obj.name}")
+        
+        # Deselect the object
+        if obj.selected:
+            manager.selection_manager.deselect(obj)
+        
+        # Exit EDIT mode if this was the edit target
+        if manager.selection_manager.is_edit_mode() and manager.selection_manager.edit_target == obj:
+            manager.selection_manager.exit_edit_mode()
+        
+        manager.mark_dirty()
+        drawing_area.queue_draw()
+    
+    def _on_object_edit_mode(self, obj, manager, drawing_area):
+        """Enter EDIT mode for an object.
+        
+        Args:
+            obj: Object to edit
+            manager: ModelCanvasManager instance
+            drawing_area: GtkDrawingArea widget
+        """
+        # Select the object if not selected
+        if not obj.selected:
+            manager.selection_manager.select(obj, multi=False, manager=manager)
+        
+        # Enter EDIT mode
+        manager.selection_manager.enter_edit_mode(obj, manager=manager)
+        print(f"{obj.name} entered EDIT mode")
+        drawing_area.queue_draw()
+    
+    def _on_object_properties(self, obj, manager, drawing_area):
+        """Open properties dialog for an object.
+        
+        Args:
+            obj: Object to edit properties for
+            manager: ModelCanvasManager instance
+            drawing_area: GtkDrawingArea widget
+        """
+        from shypn.api import Place, Transition, Arc
+        
+        # Create properties dialog
+        dialog = Gtk.Dialog(
+            title=f"{type(obj).__name__} Properties",
+            parent=self.parent_window,
+            flags=Gtk.DialogFlags.MODAL | Gtk.DialogFlags.DESTROY_WITH_PARENT
+        )
+        dialog.add_buttons(
+            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+            Gtk.STOCK_OK, Gtk.ResponseType.OK
+        )
+        
+        content_area = dialog.get_content_area()
+        content_area.set_spacing(10)
+        content_area.set_border_width(10)
+        
+        # Add property fields
+        grid = Gtk.Grid()
+        grid.set_column_spacing(10)
+        grid.set_row_spacing(5)
+        
+        row = 0
+        
+        # Name (read-only)
+        label = Gtk.Label(label="Name:")
+        label.set_halign(Gtk.Align.END)
+        grid.attach(label, 0, row, 1, 1)
+        
+        name_label = Gtk.Label(label=obj.name)
+        name_label.set_halign(Gtk.Align.START)
+        grid.attach(name_label, 1, row, 1, 1)
+        row += 1
+        
+        # Label (editable)
+        label = Gtk.Label(label="Label:")
+        label.set_halign(Gtk.Align.END)
+        grid.attach(label, 0, row, 1, 1)
+        
+        label_entry = Gtk.Entry()
+        label_entry.set_text(obj.label or "")
+        label_entry.set_hexpand(True)
+        grid.attach(label_entry, 1, row, 1, 1)
+        row += 1
+        
+        # Type-specific properties
+        if isinstance(obj, Place):
+            # Initial marking
+            label = Gtk.Label(label="Marking:")
+            label.set_halign(Gtk.Align.END)
+            grid.attach(label, 0, row, 1, 1)
+            
+            marking_spin = Gtk.SpinButton()
+            marking_spin.set_adjustment(Gtk.Adjustment(value=obj.marking, lower=0, upper=999, step_increment=1))
+            marking_spin.set_digits(0)
+            grid.attach(marking_spin, 1, row, 1, 1)
+            row += 1
+            
+        elif isinstance(obj, Arc):
+            # Arc weight
+            label = Gtk.Label(label="Weight:")
+            label.set_halign(Gtk.Align.END)
+            grid.attach(label, 0, row, 1, 1)
+            
+            weight_spin = Gtk.SpinButton()
+            weight_spin.set_adjustment(Gtk.Adjustment(value=obj.weight, lower=1, upper=999, step_increment=1))
+            weight_spin.set_digits(0)
+            grid.attach(weight_spin, 1, row, 1, 1)
+            row += 1
+        
+        grid.show_all()
+        content_area.pack_start(grid, True, True, 0)
+        
+        # Show dialog and get response
+        response = dialog.run()
+        
+        if response == Gtk.ResponseType.OK:
+            # Update object properties
+            new_label = label_entry.get_text()
+            if new_label != obj.label:
+                obj.label = new_label
+                print(f"Updated {obj.name} label: '{new_label}'")
+            
+            # Update type-specific properties
+            if isinstance(obj, Place):
+                new_marking = int(marking_spin.get_value())
+                if new_marking != obj.marking:
+                    obj.set_marking(new_marking)
+                    print(f"Updated {obj.name} marking: {new_marking}")
+            
+            elif isinstance(obj, Arc):
+                new_weight = int(weight_spin.get_value())
+                if new_weight != obj.weight:
+                    obj.set_weight(new_weight)
+                    print(f"Updated {obj.name} weight: {new_weight}")
+            
+            manager.mark_modified()
+            drawing_area.queue_draw()
+        
+        dialog.destroy()
+    
+    def _on_arc_edit_weight(self, arc, manager, drawing_area):
+        """Quick edit arc weight.
+        
+        Args:
+            arc: Arc object
+            manager: ModelCanvasManager instance
+            drawing_area: GtkDrawingArea widget
+        """
+        # Create simple dialog for weight
+        dialog = Gtk.Dialog(
+            title=f"Edit {arc.name} Weight",
+            parent=self.parent_window,
+            flags=Gtk.DialogFlags.MODAL | Gtk.DialogFlags.DESTROY_WITH_PARENT
+        )
+        dialog.add_buttons(
+            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+            Gtk.STOCK_OK, Gtk.ResponseType.OK
+        )
+        
+        content_area = dialog.get_content_area()
+        content_area.set_spacing(10)
+        content_area.set_border_width(10)
+        
+        box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        
+        label = Gtk.Label(label="Weight:")
+        box.pack_start(label, False, False, 0)
+        
+        weight_spin = Gtk.SpinButton()
+        weight_spin.set_adjustment(Gtk.Adjustment(value=arc.weight, lower=1, upper=999, step_increment=1))
+        weight_spin.set_digits(0)
+        box.pack_start(weight_spin, True, True, 0)
+        
+        box.show_all()
+        content_area.pack_start(box, True, True, 0)
+        
+        response = dialog.run()
+        
+        if response == Gtk.ResponseType.OK:
+            new_weight = int(weight_spin.get_value())
+            if new_weight != arc.weight:
+                arc.set_weight(new_weight)
+                print(f"Updated {arc.name} weight: {new_weight}")
+                manager.mark_modified()
+                drawing_area.queue_draw()
+        
+        dialog.destroy()
 
 
 def create_model_canvas(ui_path=None):

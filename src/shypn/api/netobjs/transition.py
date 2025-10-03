@@ -4,7 +4,7 @@
 Transitions represent events or actions that transform the net state.
 Rendered as a filled black rectangle.
 """
-from shypn.api.petri_net_object import PetriNetObject
+from shypn.api.netobjs.petri_net_object import PetriNetObject
 
 
 class Transition(PetriNetObject):
@@ -91,15 +91,7 @@ class Transition(PetriNetObject):
         cr.set_line_width(self.border_width / max(zoom, 1e-6))
         cr.stroke()
         
-        # Draw selection highlight if selected
-        if self.selected:
-            # Offset by 3px in screen space = 3/zoom in world space
-            offset = 3 / zoom
-            cr.rectangle(self.x - half_w - offset, self.y - half_h - offset, 
-                        width + 2 * offset, height + 2 * offset)
-            cr.set_source_rgba(0.2, 0.6, 1.0, 0.5)  # Blue highlight
-            cr.set_line_width(3.0 / zoom)  # Compensate for zoom
-            cr.stroke()
+        # Selection rendering moved to ObjectEditingTransforms in src/shypn/api/edit/
         
         # Draw label if provided
         if self.label:
