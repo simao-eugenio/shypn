@@ -17,6 +17,7 @@ Future extensions:
 """
 import os
 import sys
+import math
 
 try:
     import gi
@@ -34,11 +35,26 @@ except ImportError as e:
     print(f'ERROR: Cannot import ModelCanvasManager: {e}', file=sys.stderr)
     sys.exit(1)
 
+# Import Petri net object types for isinstance checks
+try:
+    from shypn.api import Place, Transition, Arc
+except ImportError as e:
+    print(f'ERROR: Cannot import Petri net objects: {e}', file=sys.stderr)
+    sys.exit(1)
+
 # Import zoom palette
 try:
     from shypn.helpers.predefined_zoom import create_zoom_palette
 except ImportError as e:
     print(f'ERROR: Cannot import zoom palette: {e}', file=sys.stderr)
+    sys.exit(1)
+
+# Import edit palettes
+try:
+    from shypn.helpers.edit_palette_loader import create_edit_palette
+    from shypn.helpers.edit_tools_loader import create_edit_tools_palette
+except ImportError as e:
+    print(f'ERROR: Cannot import edit palettes: {e}', file=sys.stderr)
     sys.exit(1)
 
 
@@ -70,6 +86,10 @@ class ModelCanvasLoader:
         
         # Dictionary to map drawing areas to their zoom palettes
         self.zoom_palettes = {}  # {drawing_area: PredefinedZoom}
+        
+        # Dictionary to map drawing areas to their edit palettes
+        self.edit_palettes = {}  # {drawing_area: EditPaletteLoader}
+        self.edit_tools_palettes = {}  # {drawing_area: EditToolsLoader}
         
         # Parent window reference (for zoom window transient behavior)
         self.parent_window = None
@@ -111,12 +131,13 @@ class ModelCanvasLoader:
             page = self.notebook.get_nth_page(0)
             drawing_area = None
             overlay_box = None
+            overlay_widget = None
             
             # Page is now a GtkOverlay, get the overlay box and scrolled window
             if isinstance(page, Gtk.Overlay):
-                overlay = page
+                overlay_widget = page  # Store the actual GtkOverlay for add_overlay
                 # Get the scrolled window (first child)
-                scrolled = overlay.get_child()
+                scrolled = overlay_widget.get_child()
                 if isinstance(scrolled, Gtk.ScrolledWindow):
                     drawing_area = scrolled.get_child()
                     # ScrolledWindow may wrap child in Viewport
@@ -125,7 +146,7 @@ class ModelCanvasLoader:
                     if drawing_area and isinstance(drawing_area, Gtk.DrawingArea):
                         # Get overlay box for adding zoom control
                         overlay_box = self.builder.get_object('canvas_overlay_box_1')
-                        self._setup_canvas_manager(drawing_area, overlay_box)
+                        self._setup_canvas_manager(drawing_area, overlay_box, overlay_widget)
             # Fallback for old structure without overlay
             elif isinstance(page, Gtk.ScrolledWindow):
                 drawing_area = page.get_child()
@@ -208,12 +229,13 @@ class ModelCanvasLoader:
         
         return page_index, drawing
     
-    def _setup_canvas_manager(self, drawing_area, overlay_box=None):
+    def _setup_canvas_manager(self, drawing_area, overlay_box=None, overlay_widget=None):
         """Setup canvas manager and wire up callbacks for a drawing area.
         
         Args:
             drawing_area: GtkDrawingArea widget to setup.
             overlay_box: Optional GtkBox for overlay widgets (zoom control).
+            overlay_widget: Optional GtkOverlay for adding overlays directly.
         """
         
         # Create canvas manager for this drawing area (no filename needed)
@@ -238,13 +260,55 @@ class ModelCanvasLoader:
         
         # Setup zoom palette if overlay box is provided
         if overlay_box:
+            # Create and add zoom palette
             zoom_palette = create_zoom_palette()
             zoom_widget = zoom_palette.get_widget()
             if zoom_widget:
                 overlay_box.pack_start(zoom_widget, False, False, 0)  # GTK3 uses pack_start
                 zoom_palette.set_canvas_manager(manager, drawing_area, self.parent_window)
                 self.zoom_palettes[drawing_area] = zoom_palette
+            
+            # Create and add edit palettes (independent overlays, positioned via their own properties)
+            if overlay_widget:
+                # Create edit tools palette first (so edit palette can reference it)
+                edit_tools_palette = create_edit_tools_palette()
+                edit_tools_widget = edit_tools_palette.get_widget()
+                
+                # Create edit palette (main [E] button)
+                edit_palette = create_edit_palette()
+                edit_widget = edit_palette.get_widget()
+                
+                # Link the two palettes
+                edit_palette.set_tools_palette_loader(edit_tools_palette)
+                
+                # Add widgets as independent overlays using the GtkOverlay (like legacy code does)
+                # Tools palette added first (appears above [E] button when revealed)
+                if edit_tools_widget:
+                    overlay_widget.add_overlay(edit_tools_widget)
+                    self.edit_tools_palettes[drawing_area] = edit_tools_palette
+                
+                if edit_widget:
+                    overlay_widget.add_overlay(edit_widget)
+                    self.edit_palettes[drawing_area] = edit_palette
+                
+                # Connect tool-changed signal to update canvas manager
+                edit_tools_palette.connect('tool-changed', self._on_tool_changed, manager, drawing_area)
         
+    
+    def _on_tool_changed(self, tools_palette, tool_name, manager, drawing_area):
+        """Handle tool selection change from edit tools palette.
+        
+        Args:
+            tools_palette: EditToolsLoader instance that emitted the signal.
+            tool_name: Name of the selected tool ('place', 'transition', 'arc') or empty string for none.
+            manager: ModelCanvasManager instance.
+            drawing_area: GtkDrawingArea widget.
+        """
+        # Update canvas manager with selected tool
+        if tool_name:
+            manager.set_tool(tool_name)
+        else:
+            manager.clear_tool()
     
     def _setup_event_controllers(self, drawing_area, manager):
         """Setup mouse and keyboard event controllers.
@@ -283,6 +347,14 @@ class ModelCanvasLoader:
             'is_panning': False
         }
         
+        # Store arc creation state per drawing area
+        if not hasattr(self, '_arc_state'):
+            self._arc_state = {}
+        self._arc_state[drawing_area] = {
+            'source': None,  # Source object for arc creation
+            'cursor_pos': (0, 0)  # Last cursor position for preview
+        }
+        
         # Setup context menu
         self._setup_canvas_context_menu(drawing_area, manager)
     
@@ -291,7 +363,88 @@ class ModelCanvasLoader:
     def _on_button_press(self, widget, event, manager):
         """Handle button press events (GTK3)."""
         state = self._drag_state[widget]
+        arc_state = self._arc_state[widget]
         
+        # Check if arc tool is active (special handling)
+        if event.button == 1 and manager.is_tool_active() and manager.get_tool() == 'arc':
+            # Arc tool: two-click arc creation
+            world_x, world_y = manager.screen_to_world(event.x, event.y)
+            clicked_obj = manager.find_object_at_position(world_x, world_y)
+            
+            if clicked_obj is None:
+                # Click on empty space: reset arc source
+                if arc_state['source'] is not None:
+                    arc_state['source'] = None
+                    widget.queue_draw()
+                return True
+            
+            if arc_state['source'] is None:
+                # First click: set source
+                # Only places and transitions can be arc sources
+                if isinstance(clicked_obj, (Place, Transition)):
+                    arc_state['source'] = clicked_obj
+                    print(f"Arc creation: source {clicked_obj.name} selected")
+                    widget.queue_draw()
+                return True
+            else:
+                # Second click: create arc from source to target
+                target = clicked_obj
+                source = arc_state['source']
+                
+                if target == source:
+                    # Same object: ignore
+                    return True
+                
+                # Try to create arc (bipartite validation happens in Arc.__init__)
+                try:
+                    arc = manager.add_arc(source, target)
+                    print(f"Created {arc.name}: {source.name} → {target.name}")
+                    widget.queue_draw()
+                except ValueError as e:
+                    # Bipartite validation failed
+                    print(f"Cannot create arc: {e}")
+                finally:
+                    # Reset arc source
+                    arc_state['source'] = None
+                    widget.queue_draw()
+                
+                return True
+        
+        # Check if other tools are active (left-click only)
+        if event.button == 1 and manager.is_tool_active():
+            # Tool mode: handle object creation
+            tool = manager.get_tool()
+            world_x, world_y = manager.screen_to_world(event.x, event.y)
+            
+            if tool == 'place':
+                # Create place at click position
+                place = manager.add_place(world_x, world_y)
+                print(f"Created {place.name} at ({world_x:.1f}, {world_y:.1f})")
+                widget.queue_draw()
+            elif tool == 'transition':
+                # Create transition at click position
+                transition = manager.add_transition(world_x, world_y)
+                print(f"Created {transition.name} at ({world_x:.1f}, {world_y:.1f})")
+                widget.queue_draw()
+            
+            # Don't start drag mode when using tools
+            return True
+        
+        # No tool active: selection mode
+        if event.button == 1:
+            # Left-click: toggle selection
+            world_x, world_y = manager.screen_to_world(event.x, event.y)
+            clicked_obj = manager.find_object_at_position(world_x, world_y)
+            
+            if clicked_obj is not None:
+                # Toggle selection
+                clicked_obj.selected = not clicked_obj.selected
+                status = "selected" if clicked_obj.selected else "deselected"
+                print(f"{clicked_obj.name} {status}")
+                widget.queue_draw()
+                return True
+        
+        # Default behavior: pan mode
         # All buttons can start drag (including right-click for pan)
         state['active'] = True
         state['button'] = event.button
@@ -329,9 +482,16 @@ class ModelCanvasLoader:
     def _on_motion_notify(self, widget, event, manager):
         """Handle motion events (GTK3)."""
         state = self._drag_state[widget]
+        arc_state = self._arc_state[widget]
         
-        # Update cursor position always (for zoom centering)
+        # Update cursor position always (for zoom centering and arc preview)
         manager.set_pointer_position(event.x, event.y)
+        world_x, world_y = manager.screen_to_world(event.x, event.y)
+        arc_state['cursor_pos'] = (world_x, world_y)
+        
+        # If arc tool active with source selected, redraw for preview
+        if manager.is_tool_active() and manager.get_tool() == 'arc' and arc_state['source'] is not None:
+            widget.queue_draw()
         
         # Handle dragging only if button is pressed
         if state['active'] and state['button'] > 0:
@@ -357,13 +517,35 @@ class ModelCanvasLoader:
         return True
     
     def _on_scroll_event(self, widget, event, manager):
-        """Handle scroll events for zoom (GTK3)."""
-        if event.direction == Gdk.ScrollDirection.UP:
-            manager.zoom_at_point(1.1, event.x, event.y)
-            widget.queue_draw()
-        elif event.direction == Gdk.ScrollDirection.DOWN:
-            manager.zoom_at_point(0.9, event.x, event.y)
-            widget.queue_draw()
+        """Handle scroll events for zoom (GTK3).
+        
+        Supports both discrete scroll wheels and smooth scrolling (trackpads).
+        Zooms centered at cursor position (pointer-centered zoom).
+        """
+        direction = event.direction
+        factor = None
+        
+        # Smooth scrolling (trackpad) uses delta_y sign
+        if direction == Gdk.ScrollDirection.SMOOTH:
+            dy = event.delta_y
+            if abs(dy) < 1e-6:
+                return False
+            # delta_y > 0 = scroll down = zoom out
+            # delta_y < 0 = scroll up = zoom in
+            factor = (1 / 1.1) if dy > 0 else 1.1
+        else:
+            # Discrete scroll wheel
+            if direction == Gdk.ScrollDirection.UP:
+                factor = 1.1  # Zoom in 10%
+            elif direction == Gdk.ScrollDirection.DOWN:
+                factor = 1 / 1.1  # Zoom out ~9%
+        
+        if factor is None:
+            return False
+        
+        # Apply pointer-centered zoom
+        manager.zoom_at_point(factor, event.x, event.y)
+        widget.queue_draw()
         return True
     
     def _on_key_press_event(self, widget, event, manager):
@@ -382,6 +564,11 @@ class ModelCanvasLoader:
     def _on_draw(self, drawing_area, cr, width, height, manager):
         """Draw callback for the canvas.
         
+        Uses Cairo transformation approach (legacy-compatible):
+        - Apply cr.scale() and cr.translate() for automatic coordinate transformation
+        - Objects render in world coordinates, Cairo scales them automatically
+        - Line widths compensated to maintain constant pixel size
+        
         Args:
             drawing_area: GtkDrawingArea being drawn.
             cr: Cairo context.
@@ -397,13 +584,101 @@ class ModelCanvasLoader:
         cr.set_source_rgb(1.0, 1.0, 1.0)  # White background
         cr.paint()
         
-        # Draw grid
+        # Apply pan and zoom transformation (legacy-compatible)
+        # This makes all subsequent drawing operations happen in world coordinates
+        cr.save()
+        cr.translate(manager.pan_x * manager.zoom, manager.pan_y * manager.zoom)
+        cr.scale(manager.zoom, manager.zoom)
+        
+        # Draw grid in world space (scales with zoom)
         manager.draw_grid(cr)
         
-        # TODO: Draw Petri Net objects here (Places, Transitions, Arcs)
+        # Draw Petri Net objects in world coordinates
+        # Objects are rendered in order: arcs (behind), then places, then transitions
+        for obj in manager.get_all_objects():
+            obj.render(cr, zoom=manager.zoom)  # Pass zoom for line width compensation
+        
+        # Restore device space (for overlays)
+        cr.restore()
+        
+        # Draw arc preview line in device space (overlay)
+        if drawing_area in self._arc_state:
+            arc_state = self._arc_state[drawing_area]
+            if (manager.is_tool_active() and manager.get_tool() == 'arc' and 
+                arc_state['source'] is not None):
+                self._draw_arc_preview(cr, arc_state, manager)
         
         # Mark as clean after drawing
         manager.mark_clean()
+    
+    def _draw_arc_preview(self, cr, arc_state, manager):
+        """Draw orange preview line for arc creation.
+        
+        Args:
+            cr: Cairo context.
+            arc_state: Arc state dictionary with 'source' and 'cursor_pos'.
+            manager: ModelCanvasManager instance.
+        """
+        source = arc_state['source']
+        cursor_x, cursor_y = arc_state['cursor_pos']
+        
+        # Get source position in world space
+        src_x, src_y = source.x, source.y
+        
+        # Calculate direction vector
+        dx = cursor_x - src_x
+        dy = cursor_y - src_y
+        dist = math.sqrt(dx * dx + dy * dy)
+        
+        if dist < 1:
+            return  # Too close, don't draw
+        
+        # Normalize direction
+        ux, uy = dx / dist, dy / dist
+        
+        # Determine source radius (offset start point)
+        if isinstance(source, Place):
+            src_radius = source.radius
+        elif isinstance(source, Transition):
+            # Approximate with max dimension
+            w = source.width if source.horizontal else source.height
+            h = source.height if source.horizontal else source.width
+            src_radius = max(w, h) / 2.0
+        else:
+            src_radius = 20.0  # Fallback
+        
+        # Calculate start point (offset by radius)
+        start_x = src_x + ux * src_radius
+        start_y = src_y + uy * src_radius
+        
+        # Convert to screen space
+        start_sx, start_sy = manager.world_to_screen(start_x, start_y)
+        end_sx, end_sy = manager.world_to_screen(cursor_x, cursor_y)
+        
+        # Draw orange preview line (legacy style)
+        cr.set_source_rgba(0.95, 0.5, 0.1, 0.85)  # Orange, semi-transparent
+        cr.set_line_width(2.0)
+        cr.move_to(start_sx, start_sy)
+        cr.line_to(end_sx, end_sy)
+        cr.stroke()
+        
+        # Draw arrowhead at cursor (smaller preview arrowhead)
+        arrow_len = 11.0
+        arrow_width = 6.0
+        angle = math.atan2(dy, dx)
+        
+        # Calculate arrowhead points
+        left_x = end_sx - arrow_len * math.cos(angle) + arrow_width * math.sin(angle)
+        left_y = end_sy - arrow_len * math.sin(angle) - arrow_width * math.cos(angle)
+        right_x = end_sx - arrow_len * math.cos(angle) - arrow_width * math.sin(angle)
+        right_y = end_sy - arrow_len * math.sin(angle) + arrow_width * math.cos(angle)
+        
+        # Draw filled arrowhead
+        cr.move_to(end_sx, end_sy)
+        cr.line_to(left_x, left_y)
+        cr.line_to(right_x, right_y)
+        cr.close_path()
+        cr.fill()
     
     def _show_canvas_context_menu(self, x, y, drawing_area):
         """Show the canvas context menu at the given position.
