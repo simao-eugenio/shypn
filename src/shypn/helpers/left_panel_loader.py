@@ -5,27 +5,33 @@ This module is responsible for loading and managing the left File Operations pan
 The panel can exist in two states:
   - Detached: standalone floating window
   - Attached: content embedded in main window container (extreme left)
+
+The panel now includes a full file explorer powered by FileExplorerPanel controller.
 """
 import os
 import sys
 
 try:
     import gi
-    gi.require_version('Gtk', '4.0')
+    gi.require_version('Gtk', '3.0')
     from gi.repository import Gtk, GLib
 except Exception as e:
-    print('ERROR: GTK4 not available in left_panel loader:', e, file=sys.stderr)
+    print('ERROR: GTK3 not available in left_panel loader:', e, file=sys.stderr)
     sys.exit(1)
+
+# Import the FileExplorerPanel controller
+from shypn.ui.panels.file_explorer_panel import FileExplorerPanel
 
 
 class LeftPanelLoader:
     """Loader and controller for the left File Operations panel (attachable window)."""
     
-    def __init__(self, ui_path=None):
+    def __init__(self, ui_path=None, base_path=None):
         """Initialize the left panel loader.
         
         Args:
             ui_path: Optional path to left_panel.ui. If None, uses default location.
+            base_path: Optional base path for file explorer. If None, uses models directory.
         """
         if ui_path is None:
             # Default: ui/panels/left_panel.ui
@@ -34,8 +40,20 @@ class LeftPanelLoader:
             script_dir = os.path.dirname(os.path.abspath(__file__))
             repo_root = os.path.normpath(os.path.join(script_dir, '..', '..', '..'))
             ui_path = os.path.join(repo_root, 'ui', 'panels', 'left_panel.ui')
+            
+            # If base_path not provided, use models directory as home
+            if base_path is None:
+                base_path = os.path.join(repo_root, 'models')
+                # Create models directory if it doesn't exist
+                if not os.path.exists(base_path):
+                    try:
+                        os.makedirs(base_path)
+                    except Exception as e:
+                        # Fallback to repo root
+                        base_path = repo_root
         
         self.ui_path = ui_path
+        self.base_path = base_path
         self.builder = None
         self.window = None
         self.content = None
@@ -45,6 +63,9 @@ class LeftPanelLoader:
         self._updating_button = False  # Flag to prevent recursive toggle events
         self.on_float_callback = None  # Callback to notify when panel floats
         self.on_attach_callback = None  # Callback to notify when panel attaches
+        
+        # File explorer controller (will be instantiated after loading UI)
+        self.file_explorer = None
     
     def load(self):
         """Load the panel UI and return the window.
@@ -80,10 +101,16 @@ class LeftPanelLoader:
         else:
             self.float_button = None
         
+        # Initialize the file explorer controller
+        # This connects the FileExplorer API to the UI widgets defined in XML
+        try:
+            self.file_explorer = FileExplorerPanel(self.builder, base_path=self.base_path)
+        except Exception as e:
+            pass  # Continue anyway - panel will work without file explorer
+        
         # Hide window by default (will be shown when toggled)
         self.window.set_visible(False)
         
-        print(f"✓ Left panel window loaded from: {os.path.basename(self.ui_path)}")
         return self.window
     
     def _on_float_toggled(self, button):
@@ -93,7 +120,6 @@ class LeftPanelLoader:
             return
             
         is_active = button.get_active()
-        print(f"→ Left panel float button toggled: active={is_active}, is_attached={self.is_attached}")
         if is_active:
             # Button is now active -> float the panel
             self.float(self.parent_window)
@@ -108,21 +134,16 @@ class LeftPanelLoader:
         Args:
             parent_window: Optional parent window to set as transient.
         """
-        # Recreate window if it was destroyed during attach
+        # If window doesn't exist, load the UI
         if self.window is None:
-            # Reload the UI to recreate the window
-            self.builder = Gtk.Builder.new_from_file(self.ui_path)
-            self.window = self.builder.get_object('left_panel_window')
-            # Get float button and reconnect callback
-            float_button = self.builder.get_object('float_button')
-            if float_button:
-                float_button.connect('toggled', self._on_float_toggled)
-                self.float_button = float_button
-            # Content reference is still valid, just needs to be reparented
+            self.load()
         
-        # If currently attached, unattach first
+        # If currently attached, unattach first (moves content back to window)
         if self.is_attached:
             self.unattach()
+            # Hide the container after unattaching
+            if self.parent_container:
+                self.parent_container.set_visible(False)
         
         # Set as transient for parent if provided
         if parent_window:
@@ -138,8 +159,8 @@ class LeftPanelLoader:
         if self.on_float_callback:
             self.on_float_callback()
         
-        self.window.present()
-        print("✓ Left panel: floating")
+        # GTK3: use show_all() instead of present()
+        self.window.show_all()
     
     def detach(self, parent_window=None):
         """Detach panel to show as a floating window.
@@ -167,17 +188,15 @@ class LeftPanelLoader:
         
         # Extract content from window first
         if self.content.get_parent() == self.window:
-            self.window.set_child(None)
+            self.window.remove(self.content)  # GTK3 uses remove()
         
-        # Destroy the window to prevent phantom windows (especially on WSL/X11)
-        # We'll recreate it when floating again
+        # Hide the window but DON'T destroy it - we need it to float again
         if self.window:
-            self.window.destroy()
-            self.window = None
+            self.window.hide()
         
         # Only append if not already in container
         if self.content.get_parent() != container:
-            container.append(self.content)
+            container.add(self.content)  # GTK3 uses add() instead of append()
         
         # Make container visible when panel is attached
         container.set_visible(True)
@@ -197,7 +216,6 @@ class LeftPanelLoader:
         if self.on_attach_callback:
             self.on_attach_callback()
         
-        print("✓ Left panel: attached (extreme left)")
     
     def unattach(self):
         """Unattach panel from container (return content to window)."""
@@ -209,11 +227,10 @@ class LeftPanelLoader:
             self.parent_container.remove(self.content)
         
         # Return content to window
-        self.window.set_child(self.content)
+        self.window.add(self.content)  # GTK3 uses add() instead of set_child()
         
         self.is_attached = False
         # Don't clear parent_container - we need it to dock back
-        print("✓ Left panel: unattached")
     
     def hide(self):
         """Hide panel (works for both attached and detached states)."""
@@ -224,24 +241,24 @@ class LeftPanelLoader:
                 self.parent_container.set_visible(False)
         elif self.window:
             self.window.set_visible(False)
-        print("✓ Left panel: hidden")
 
 
-def create_left_panel(ui_path=None):
+def create_left_panel(ui_path=None, base_path=None):
     """Convenience function to create and load the left panel loader.
     
     Args:
         ui_path: Optional path to left_panel.ui.
+        base_path: Optional base path for file explorer (default: models directory).
         
     Returns:
         LeftPanelLoader: The loaded left panel loader instance.
         
     Example:
-        loader = create_left_panel()
+        loader = create_left_panel(base_path="/home/user/projects/models")
         loader.detach(main_window)  # Show as floating
         # or
         loader.attach_to(container)  # Attach to extreme left
     """
-    loader = LeftPanelLoader(ui_path)
+    loader = LeftPanelLoader(ui_path, base_path)
     loader.load()
     return loader

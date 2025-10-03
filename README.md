@@ -1,10 +1,30 @@
-# Project Title
+````markdown
+# SHYpn - Stochastic Hybrid Petri Net Editor
 
-A brief description of your project.
- 
-## GTK 4 Migration Notice
+A GTK-based visual editor for Stochastic Hybrid Petri Nets with advanced modeling capabilities.
 
-This project is in the process of incrementally migrating from GTK 3.2+ to GTK 4. During this transition, some legacy code and UI components may still use GTK 3, but all new development and refactoring should target GTK 4 for long-term maintainability and compatibility. Contributors are encouraged to update modules to GTK 4 as they are migrated or refactored.
+## Project Status (October 2, 2025)
+
+**Current State**: Active development and refactoring
+- ✅ GTK3 stable implementation
+- ✅ Multi-document canvas system with tabbed interface
+- ✅ Dockable/undockable left and right panels
+- ✅ File explorer with hierarchical tree view
+- ✅ Zoom palette with predefined zoom levels
+- ✅ Canvas context menus (right-click)
+- ✅ Grid system with multiple styles (line/dot/cross)
+- ✅ Clean production codebase (debug code removed)
+- 🔄 Preparing for transition dialog integration from legacy
+
+**Recent Updates**:
+- Repository reorganization (tests consolidated, transition files removed)
+- Complete debug code cleanup (8 files cleaned)
+- Empty panel visibility fixes
+- Grid spacing corrections
+
+## GTK 3 Notice
+
+This project currently uses GTK 3.2+. While there was consideration for GTK 4 migration, the project is stabilizing on GTK 3 for production use. The codebase follows modern Python and OOP practices regardless of the GTK version.
  
 ## Architectural Guideline: Object-Oriented Design
 
@@ -13,29 +33,84 @@ This project is designed with an object-oriented programming (OOP) approach. Cor
 
 ```
 shypn/
-├── data/         # Data model files (schemas, ORM models, sample data)
-├── doc/          # Main documentation in Markdown format
+├── data/           # Data model files (schemas, ORM models, sample data)
+├── doc/            # Main documentation in Markdown format
+├── legacy/         # Legacy code from previous versions (reference only)
+├── models/         # User Petri net model files (.shy format)
+├── scripts/        # Utility scripts, demos (non-test)
 ├── src/
-│   ├── apis/     # Object-oriented modules (classes, interfaces)
-│   ├── dev/      # Experimental or in-development code
-│   ├── helpers/  # Functional programming helpers (pure functions)
-│   └── utils/    # Specific code routines and specialized utilities
-├── tests/        # Test suite
+│   └── shypn/
+│       ├── api/    # Business logic APIs (file operations, etc.)
+│       ├── data/   # Data models and canvas managers
+│       ├── dev/    # Experimental or in-development code
+│       ├── helpers/# UI loaders and helper functions
+│       ├── ui/     # UI component classes
+│       └── utils/  # Specific code routines and utilities
+├── tests/          # Test suite (consolidated from scripts/)
 ├── ui/
-│   ├── main/     # Main window interface
-│   ├── canvas/   # Document model interfaces (canvas, drawing, etc.)
-│   ├── dialogs/  # Instantly loadable dialogs (modal/pop-up)
-│   ├── palettes/ # Control interfaces (toolbars, color pickers, etc.)
-│   └── panels/   # Dockable/undockable panels (sidebars, inspectors)
+│   ├── canvas/     # Document canvas interfaces (.ui files)
+│   ├── dialogs/    # Modal dialogs (.ui files)
+│   ├── main/       # Main window interface (.ui files)
+│   ├── palettes/   # Control palettes like zoom (.ui files)
+│   └── panels/     # Dockable panels (left/right) (.ui files)
+└── venv/           # Python virtual environment (optional)
 ```
+
+**Key Directories**:
+- `src/shypn/`: Main application source code (Python)
+- `ui/`: GTK UI definition files (Glade XML format)
+- `tests/`: All test files (moved from scripts/)
+- `models/`: User workspace for Petri net models
+- `legacy/`: Historical code for reference
 
 ## Installation
 
-Instructions for installing dependencies and setting up the environment.
+### Prerequisites
+- Python 3.8+
+- GTK 3.22+
+- PyGObject (python3-gi)
+- Cairo graphics library
+
+### System Dependencies (Ubuntu/Debian)
+```bash
+sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-3.0
+```
+
+### Python Environment
+```bash
+# Option 1: Virtual environment (recommended)
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# Option 2: System site-packages (for WSL/WSLg)
+python3 -m venv venv/shypnenv --system-site-packages
+source venv/shypnenv/bin/activate
+```
 
 ## Usage
 
-How to use the project.
+### Running the Application
+```bash
+# From repository root
+python3 src/shypn.py
+
+# Or with virtual environment activated
+source venv/bin/activate
+python3 src/shypn.py
+```
+
+### Basic Operations
+- **New Document**: Click the "+" button in the left panel toolbar
+- **Toggle Panels**: Use the toggle buttons in the main window header
+- **Zoom**: Click the zoom button in the canvas to access zoom controls
+- **Grid Styles**: Right-click on canvas → Grid Style (line/dot/cross)
+- **Pan Canvas**: Right-click and drag on the canvas
+
+### File Organization
+- Models are saved in the `models/` directory
+- The file explorer panel shows this directory by default
+- Supports hierarchical folder navigation within models directory
 
 ## Running the GTK4 UI under WSLg / Windows
 
@@ -62,7 +137,22 @@ Notes:
 
 ## Contributing
 
-Guidelines for contributing.
+Please read [CONTRIBUTING.md](doc/CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
+
+## Documentation
+
+All project documentation is located in the [`doc/`](doc/) directory:
+
+- **[CONTRIBUTING.md](doc/CONTRIBUTING.md)** - Contribution guidelines and code standards
+- **[CHANGELOG.md](doc/CHANGELOG.md)** - Version history and changes
+- **[REFINEMENTS_LOG.md](doc/REFINEMENTS_LOG.md)** - Detailed technical refinements and fixes
+- **[CANVAS_CONTROLS.md](doc/CANVAS_CONTROLS.md)** - Canvas control and interaction documentation
+- **[ZOOM_PALETTE.md](doc/ZOOM_PALETTE.md)** - Zoom palette implementation details
+- **[FIX_EMPTY_PANEL.md](doc/FIX_EMPTY_PANEL.md)** - Panel visibility fixes documentation
+- **[VSCODE_SETUP_VALIDATION.md](doc/VSCODE_SETUP_VALIDATION.md)** - VS Code setup and validation
+- **[DOCUMENTATION_UPDATE_SUMMARY.md](doc/DOCUMENTATION_UPDATE_SUMMARY.md)** - Recent documentation updates
+
+See the [`doc/`](doc/) directory for additional technical documentation and implementation notes.
 
 ## License
 

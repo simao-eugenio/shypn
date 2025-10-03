@@ -15,10 +15,10 @@ import sys
 
 try:
     import gi
-    gi.require_version('Gtk', '4.0')
+    gi.require_version('Gtk', '3.0')
     from gi.repository import Gtk, Pango
 except Exception as e:
-    print('ERROR: GTK4 not available in predefined_zoom:', e, file=sys.stderr)
+    print('ERROR: GTK3 not available in predefined_zoom:', e, file=sys.stderr)
     sys.exit(1)
 
 
@@ -124,7 +124,6 @@ class PredefinedZoom:
         # Apply custom CSS styling
         self._apply_styling()
         
-        print(f"✓ Zoom control palette loaded from: {os.path.basename(self.ui_path)}")
         return self.zoom_control_container
     
     def _calculate_target_size(self):
@@ -146,11 +145,9 @@ class PredefinedZoom:
             if self.target_height < 24:
                 self.target_height = 24
             
-            print(f"  Calculated button size: {self.target_height}px (1.3× 'W' height: {w_height}px)")
         else:
             # Fallback if layout not available
             self.target_height = 28
-            print(f"  Using fallback button size: {self.target_height}px")
     
     def _apply_styling(self):
         """Apply custom CSS styling to the zoom palette."""
@@ -235,13 +232,14 @@ class PredefinedZoom:
         """
         
         self.css_provider = Gtk.CssProvider()
-        self.css_provider.load_from_string(css)
+        # GTK3 uses load_from_data instead of load_from_string
+        self.css_provider.load_from_data(css.encode('utf-8'))
         
-        # Apply to display (application-wide)
+        # Apply to screen (GTK3 uses Screen instead of Display)
         from gi.repository import Gdk
-        display = Gdk.Display.get_default()
-        Gtk.StyleContext.add_provider_for_display(
-            display,
+        screen = Gdk.Screen.get_default()
+        Gtk.StyleContext.add_provider_for_screen(
+            screen,
             self.css_provider,
             Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
         )

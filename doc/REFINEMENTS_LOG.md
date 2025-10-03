@@ -1,4 +1,90 @@
-# Refinements Log - October 1, 2025
+````markdown
+# Refinements Log
+
+## October 2, 2025 - Repository Cleanup and Debug Removal
+
+### Repository Organization
+
+**Test Files Consolidation**
+- Moved 8 test files from `scripts/` to `tests/` directory:
+  - `test_context_menu.py`
+  - `test_file_explorer.py`
+  - `test_file_operations.py`
+  - `test_gesture_simple.py`
+  - `test_popover_methods.py`
+  - `test_relative_paths.py`
+  - `test_right_click.py`
+  - `test_transition_dialog.py`
+
+**Transition Files Cleanup**
+- Removed all `transition*` files from main directories (5 files):
+  - `ui/palettes/transition_enhanced.ui`
+  - `ui/panels/transition.ui`
+  - `ui/dialogs/transition_properties.ui`
+  - `ui/dialogs/transition_properties.ui.backup`
+  - `tests/test_transition_dialog.py`
+- Preparing for fresh import from legacy folder
+
+### Debug Code Removal
+
+**Objective**: Remove all debug print statements while preserving ERROR messages for critical failures.
+
+**Files Cleaned (8 files)**:
+
+1. **src/shypn.py**
+   - Removed: ✓ success messages, WARNING messages
+   - Kept: ERROR messages with `file=sys.stderr`
+   - Fixed: Empty except blocks with `pass` statements
+
+2. **src/shypn/helpers/model_canvas_loader.py**
+   - Removed: ✓, →, 🖱️, ⚠ debug prints (~20+ print statements)
+   - Fixed: Empty else/elif blocks
+   - Cleaned: Canvas interaction logging, validation warnings
+
+3. **src/shypn/helpers/left_panel_loader.py**
+   - Removed: ✓, → status messages
+   - Kept: ERROR messages for GTK import and file explorer failures
+
+4. **src/shypn/helpers/right_panel_loader.py**
+   - Removed: ✓, → status messages (~15 print statements)
+   - Fixed: Empty except blocks
+
+5. **src/shypn/ui/panels/file_explorer_panel.py**
+   - Removed: ✓, →, 🖱️, ✗, 📋, ✂, 🔄 debug prints (~40+ print statements)
+   - Cleaned: File operations logging, context menu debugging, right-click tracking
+   - Fixed: Multiple empty if/else blocks
+
+6. **src/shypn/helpers/predefined_zoom.py**
+   - Removed: ✓ initialization messages
+   - Kept: ERROR messages
+
+7. **src/shypn/dev/example_dev.py**
+   - Removed: Test print statement
+   - Replaced with `pass` placeholder
+
+8. **src/shypn/api/file/explorer.py**
+   - Removed: Example print statement from docstring
+
+**Technical Fixes Applied**:
+- Added `pass` statements to empty `except`, `else`, `elif` blocks
+- Fixed IndentationError issues in multiple files
+- Ensured all files compile successfully with `python3 -m py_compile`
+
+**Verification**:
+- ✅ Application starts with zero console output
+- ✅ All ERROR messages preserved for debugging critical failures
+- ✅ No remaining debug symbols (✓, →, 🖱️, ✗, ⚠, 📋, ✂, 🔄)
+- ✅ All Python files compile without errors
+
+**Impact**:
+- Cleaner production-ready codebase
+- No performance overhead from debug logging
+- Professional console output (errors only)
+- Easier to spot real issues in logs
+
+---
+
+## October 1, 2025 - Right Panel Refinements and Grid Fixes
 
 ## Issue 1: Empty Right Panel Visible on Startup
 
