@@ -1,64 +1,66 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- GTK4 main window skeleton with dock/undock architecture -->
+<!-- GTK3 main window skeleton with dock/undock architecture -->
 <interface>
-  <requires lib="gtk" version="4.0"/>
+  <requires lib="gtk+" version="3.0"/>
 
   <object class="GtkApplicationWindow" id="main_window">
     <property name="title">Shypn</property>
     <property name="default-width">800</property>
     <property name="default-height">600</property>
+    <property name="visible">True</property>
 
     <!-- Header Bar with panel toggle buttons -->
     <child type="titlebar">
       <object class="GtkHeaderBar" id="header_bar">
-        <property name="show-title-buttons">true</property>
-        <child type="start">
+        <property name="show-close-button">True</property>
+        <property name="visible">True</property>
+        <property name="title">Shypn</property>
+        <child>
           <object class="GtkToggleButton" id="left_panel_toggle">
             <property name="label">File Ops</property>
-            <property name="active">false</property>
+            <property name="active">False</property>
             <property name="tooltip-text">Toggle File Operations panel (attach/detach)</property>
+            <property name="visible">True</property>
           </object>
+          <packing>
+            <property name="pack-type">start</property>
+          </packing>
         </child>
-        <child type="end">
+        <child>
           <object class="GtkToggleButton" id="right_panel_toggle">
             <property name="label">Analyses</property>
-            <property name="active">false</property>
+            <property name="active">False</property>
             <property name="tooltip-text">Toggle Dynamic Analyses panel (attach/detach)</property>
+            <property name="visible">True</property>
           </object>
-        </child>
-        <child type="title">
-          <object class="GtkLabel" id="header_title">
-            <property name="label">Shypn</property>
-            <style>
-              <class name="title"/>
-            </style>
-          </object>
+          <packing>
+            <property name="pack-type">end</property>
+          </packing>
         </child>
       </object>
     </child>
 
-    <!-- Main content area: horizontal layout with left dock + workspace -->
     <!-- Main content area: paned layout with left dock + workspace + right dock -->
     <child>
       <object class="GtkPaned" id="left_paned">
         <property name="orientation">horizontal</property>
         <property name="position">0</property>
-        <property name="shrink-start-child">false</property>
-        <property name="resize-start-child">false</property>
-        <property name="shrink-end-child">false</property>
-        <property name="resize-end-child">true</property>
-        <property name="vexpand">true</property>
-        <property name="hexpand">true</property>
+        <property name="visible">True</property>
+        <property name="can-focus">True</property>
         
-        <!-- Left dock area for attachable panels (extreme left) - resizable with curtain effect -->
+        <!-- Left dock area for attachable panels (extreme left) -->
         <child>
           <object class="GtkBox" id="left_dock_area">
             <property name="orientation">vertical</property>
             <property name="spacing">0</property>
             <property name="width-request">0</property>
-            <property name="visible">false</property>
+            <property name="visible">False</property>
             <!-- Panel content will be attached here dynamically -->
           </object>
+          <packing>
+            <property name="resize">False</property>
+            <property name="shrink">False</property>
+          </packing>
         </child>
         
         <!-- Right side: another paned for workspace + right dock -->
@@ -66,35 +68,44 @@
           <object class="GtkPaned" id="right_paned">
             <property name="orientation">horizontal</property>
             <property name="position">10000</property>
-            <property name="shrink-start-child">false</property>
-            <property name="resize-start-child">true</property>
-            <property name="shrink-end-child">false</property>
-            <property name="resize-end-child">false</property>
-            <property name="vexpand">true</property>
-            <property name="hexpand">true</property>
+            <property name="visible">True</property>
+            <property name="can-focus">True</property>
             
             <!-- Main workspace area -->
             <child>
               <object class="GtkBox" id="main_workspace">
                 <property name="orientation">vertical</property>
-                <property name="hexpand">true</property>
-                <property name="vexpand">true</property>
+                <property name="hexpand">True</property>
+                <property name="vexpand">True</property>
+                <property name="visible">True</property>
                 <!-- Empty workspace - canvas/content will be added later -->
               </object>
+              <packing>
+                <property name="resize">True</property>
+                <property name="shrink">False</property>
+              </packing>
             </child>
             
-            <!-- Right dock area for attachable panels (extreme right) - resizable with curtain effect -->
+            <!-- Right dock area for attachable panels (extreme right) -->
             <child>
               <object class="GtkBox" id="right_dock_area">
                 <property name="orientation">vertical</property>
                 <property name="spacing">0</property>
                 <property name="width-request">0</property>
-                <property name="visible">false</property>
+                <property name="visible">False</property>
                 <!-- Panel content will be attached here dynamically -->
               </object>
+              <packing>
+                <property name="resize">False</property>
+                <property name="shrink">False</property>
+              </packing>
             </child>
             
           </object>
+          <packing>
+            <property name="resize">True</property>
+            <property name="shrink">False</property>
+          </packing>
         </child>
         
       </object>

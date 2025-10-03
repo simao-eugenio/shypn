@@ -20,10 +20,11 @@ import sys
 
 try:
     import gi
-    gi.require_version('Gtk', '4.0')
-    from gi.repository import Gtk, Gdk
+    gi.require_version('Gtk', '3.0')
+    gi.require_version('Gdk', '3.0')
+    from gi.repository import Gtk, Gdk, Gio
 except Exception as e:
-    print('ERROR: GTK4 not available in model_canvas loader:', e, file=sys.stderr)
+    print('ERROR: GTK3 not available in model_canvas loader:', e, file=sys.stderr)
     sys.exit(1)
 
 # Import canvas manager from data layer
@@ -73,13 +74,9 @@ class ModelCanvasLoader:
         # Parent window reference (for zoom window transient behavior)
         self.parent_window = None
         
-        # Track pan state for incremental drag updates
-        self.pan_last_offset_x = {}  # {drawing_area: last_offset_x}
-        self.pan_last_offset_y = {}  # {drawing_area: last_offset_y}
-        self.is_panning = {}  # {drawing_area: is_panning_bool}
-        
-        # Track document filenames for tab labels
-        self.document_filenames = {}  # {drawing_area: filename_without_extension}
+                # Internal tracking
+        self.canvas_managers = {}  # {drawing_area: ModelCanvasManager}
+        self.document_count = 0
     
     def load(self):
         """Load the canvas UI and return the container.
@@ -138,199 +135,28 @@ class ModelCanvasLoader:
                 if drawing_area and isinstance(drawing_area, Gtk.DrawingArea):
                     self._setup_canvas_manager(drawing_area)
             
-            # Update initial tab label to editable format [default.shy]
+            # Set tab label to empty (no filename display)
             if drawing_area:
-                tab_label = self._create_editable_tab_label("default", drawing_area)
+                # Create simple empty label for tab
+                tab_label = Gtk.Label(label="")
                 self.notebook.set_tab_label(page, tab_label)
-                self.document_filenames[drawing_area] = "default"
-                # Mark initial tab as active
-                tab_label.add_css_class("active-tab")
+                tab_label.show()
         
         # Connect switch-page signal to update active tab styling
         self.notebook.connect('switch-page', self._on_notebook_page_changed)
         
-        print(f"✓ Model canvas loaded from: {os.path.basename(self.ui_path)}")
-        print(f"  └─ {self.document_count} document(s) initialized")
         return self.container
     
-    def _create_editable_tab_label(self, filename="default", drawing_area=None):
-        """Create an editable tab label with format filename.shy.
-        
-        Args:
-            filename: Base filename without extension (default: "default").
-            drawing_area: Associated drawing area for tracking.
-            
-        Returns:
-            GtkBox: Tab label widget with editable filename.
-        """
-        # Apply CSS for seamless tab entry (only once)
-        if not hasattr(self, '_tab_css_applied'):
-            css_provider = Gtk.CssProvider()
-            css = """
-            .tab-container {
-                padding: 4px 8px;
-                background: transparent;
-            }
-            
-            .tab-container:hover {
-                background: alpha(currentColor, 0.05);
-            }
-            
-            .tab-container.active-tab {
-                background: alpha(currentColor, 0.12);
-            }
-            
-            .tab-filename-entry {
-                background: rgba(255, 255, 255, 0.9);
-                border: none;
-                box-shadow: none;
-                padding: 2px 0px 2px 6px;
-                margin: 0;
-                min-height: 0;
-                font-size: 13px;
-                min-width: 60px;
-                border-radius: 3px 0 0 3px;
-            }
-            
-            .tab-filename-entry.final-name {
-                background: transparent;
-            }
-            
-            .tab-filename-entry text {
-                text-align: right;
-            }
-            
-            .tab-filename-entry:focus {
-                background: rgba(255, 255, 255, 0.95);
-                border-radius: 3px 0 0 3px;
-            }
-            
-            .tab-filename-entry selection {
-                background-color: rgba(74, 144, 226, 0.3);
-                color: inherit;
-            }
-            
-            .tab-extension-label {
-                font-size: 13px;
-                color: alpha(currentColor, 0.6);
-                padding-left: 0;
-                padding-right: 4px;
-                margin-left: 0;
-                background: rgba(255, 255, 255, 0.9);
-                border-radius: 0 3px 3px 0;
-                padding: 2px 4px 2px 0px;
-            }
-            """
-            css_provider.load_from_string(css)
-            Gdk.Display.get_default()
-            Gtk.StyleContext.add_provider_for_display(
-                Gdk.Display.get_default(),
-                css_provider,
-                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
-            )
-            self._tab_css_applied = True
-        
-        # Create horizontal box for tab label with border
-        tab_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
-        tab_box.add_css_class("tab-container")
-        
-        # Editable filename entry (without extension)
-        filename_entry = Gtk.Entry()
-        filename_entry.set_text(filename)
-        filename_entry.set_width_chars(len(filename) + 2)
-        filename_entry.set_max_width_chars(40)
-        filename_entry.set_has_frame(False)
-        filename_entry.set_alignment(1.0)  # Right-align text (1.0 = right, 0.0 = left)
-        filename_entry.add_css_class("tab-filename-entry")
-        
-        # Add white background class if it's a default name
-        if filename.startswith('default'):
-            # Keep white background for default names
-            pass
-        else:
-            # Use transparent background for final/custom names
-            filename_entry.add_css_class("final-name")
-        
-        # Add focus controller to select all text when focused
-        focus_controller = Gtk.EventControllerFocus.new()
-        
-        def on_entry_focus_enter(controller):
-            # Select all text in the entry
-            filename_entry.select_region(0, -1)
-        
-        focus_controller.connect('enter', on_entry_focus_enter)
-        filename_entry.add_controller(focus_controller)
-        
-        # Connect signal to update filename when changed
-        if drawing_area:
-            filename_entry.connect('changed', self._on_filename_changed, drawing_area)
-        
-        tab_box.append(filename_entry)
-        
-        # Extension label (.shy - visible but outside entry)
-        extension_label = Gtk.Label(label=".shy")
-        extension_label.set_selectable(False)
-        extension_label.add_css_class("tab-extension-label")
-        tab_box.append(extension_label)
-        
-        # Store filename entry as a Python attribute
-        tab_box.filename_entry = filename_entry
-        
-        return tab_box
-    
-    def _on_filename_changed(self, entry, drawing_area):
-        """Handle filename entry changes.
-        
-        Args:
-            entry: GtkEntry widget for filename (without extension).
-            drawing_area: Associated drawing area.
-        """
-        new_filename = entry.get_text()
-        
-        # Remove any .shy extension if user typed it
-        if new_filename.endswith('.shy'):
-            new_filename = new_filename[:-4]
-            entry.set_text(new_filename)
-        
-        # Store updated filename (without extension)
-        self.document_filenames[drawing_area] = new_filename
-        
-        # Update entry width to fit content
-        entry.set_width_chars(max(len(new_filename) + 2, 8))
-        
-        # Update CSS class based on whether it's still a default name
-        if new_filename.startswith('default'):
-            # Keep white background for default names
-            entry.remove_css_class("final-name")
-        else:
-            # Switch to transparent background for custom names
-            if not entry.has_css_class("final-name"):
-                entry.add_css_class("final-name")
-        
-        # Mark document as modified if canvas manager exists
-        if drawing_area in self.canvas_managers:
-            manager = self.canvas_managers[drawing_area]
-            if hasattr(manager, 'mark_modified'):
-                manager.mark_modified()
-    
     def _on_notebook_page_changed(self, notebook, page, page_num):
-        """Handle notebook page switch to update active tab styling.
+        """Handle notebook page switch.
         
         Args:
             notebook: GtkNotebook instance.
             page: The new page widget.
             page_num: The index of the new page.
         """
-        # Remove active-tab class from all tabs
-        for i in range(notebook.get_n_pages()):
-            tab_widget = notebook.get_tab_label(notebook.get_nth_page(i))
-            if tab_widget and hasattr(tab_widget, 'remove_css_class'):
-                tab_widget.remove_css_class("active-tab")
-        
-        # Add active-tab class to the current tab
-        current_tab = notebook.get_tab_label(page)
-        if current_tab and hasattr(current_tab, 'add_css_class'):
-            current_tab.add_css_class("active-tab")
+        # Simple page change handler - no special styling needed
+        pass
     
     def add_document(self, title=None, filename=None):
         """Add a new document (tab) to the canvas.
@@ -365,16 +191,13 @@ class ModelCanvasLoader:
         drawing = Gtk.DrawingArea()
         drawing.set_hexpand(True)
         drawing.set_vexpand(True)
-        drawing.set_content_width(2000)
-        drawing.set_content_height(2000)
+        # GTK3: Use set_size_request instead of set_content_width/height
+        drawing.set_size_request(2000, 2000)
         
-        scrolled.set_child(drawing)
+        scrolled.add(drawing)  # GTK3 uses add() instead of set_child()
         
-        # Create editable tab label [filename.shy]
-        tab_label = self._create_editable_tab_label(filename, drawing)
-        
-        # Store filename
-        self.document_filenames[drawing] = filename
+        # Create simple empty tab label (no filename display)
+        tab_label = Gtk.Label(label="")
         
         # Add page to notebook
         page_index = self.notebook.append_page(scrolled, tab_label)
@@ -383,7 +206,6 @@ class ModelCanvasLoader:
         # Setup canvas manager for the new drawing area
         self._setup_canvas_manager(drawing)
         
-        print(f"✓ Added document: [{filename}.shy] (page {page_index})")
         return page_index, drawing
     
     def _setup_canvas_manager(self, drawing_area, overlay_box=None):
@@ -393,22 +215,23 @@ class ModelCanvasLoader:
             drawing_area: GtkDrawingArea widget to setup.
             overlay_box: Optional GtkBox for overlay widgets (zoom control).
         """
-        # Get filename for this drawing area
-        filename = self.document_filenames.get(drawing_area, "default")
         
-        # Create canvas manager for this drawing area
-        manager = ModelCanvasManager(canvas_width=2000, canvas_height=2000, filename=filename)
+        # Create canvas manager for this drawing area (no filename needed)
+        manager = ModelCanvasManager(canvas_width=2000, canvas_height=2000)
         self.canvas_managers[drawing_area] = manager
         
         # Initialize new document and validate
-        validation = manager.create_new_document(filename)
-        if not validation['valid']:
-            print(f"  ⚠ Document validation warnings:")
-            for error in validation['errors']:
-                print(f"    - {error}")
+        validation = manager.create_new_document()
+        # Silently ignore validation errors on initialization
         
-        # Set draw function
-        drawing_area.set_draw_func(self._on_draw, manager)
+        # GTK3: Connect 'draw' signal (receives widget and Cairo context)
+        def on_draw_wrapper(widget, cr):
+            # Get widget's allocated size for viewport dimensions
+            allocation = widget.get_allocation()
+            self._on_draw(widget, cr, allocation.width, allocation.height, manager)
+            return False
+        
+        drawing_area.connect('draw', on_draw_wrapper)
         
         # Setup event controllers for mouse and scroll
         self._setup_event_controllers(drawing_area, manager)
@@ -418,12 +241,10 @@ class ModelCanvasLoader:
             zoom_palette = create_zoom_palette()
             zoom_widget = zoom_palette.get_widget()
             if zoom_widget:
-                overlay_box.append(zoom_widget)
+                overlay_box.pack_start(zoom_widget, False, False, 0)  # GTK3 uses pack_start
                 zoom_palette.set_canvas_manager(manager, drawing_area, self.parent_window)
                 self.zoom_palettes[drawing_area] = zoom_palette
-                print(f"  ✓ Zoom palette attached to canvas")
         
-        print(f"  ✓ Canvas manager attached to drawing area")
     
     def _setup_event_controllers(self, drawing_area, manager):
         """Setup mouse and keyboard event controllers.
@@ -432,48 +253,131 @@ class ModelCanvasLoader:
             drawing_area: GtkDrawingArea widget.
             manager: ModelCanvasManager instance.
         """
-        # Click controller to hide revealer when clicking on canvas
-        click_controller = Gtk.GestureClick.new()
-        click_controller.connect('pressed', self._on_canvas_clicked, drawing_area)
-        drawing_area.add_controller(click_controller)
-        
-        # Scroll controller for zoom (mouse wheel)
-        scroll_controller = Gtk.EventControllerScroll.new(
-            Gtk.EventControllerScrollFlags.VERTICAL
+        # GTK3: Enable events we need
+        drawing_area.set_events(
+            Gdk.EventMask.BUTTON_PRESS_MASK |
+            Gdk.EventMask.BUTTON_RELEASE_MASK |
+            Gdk.EventMask.POINTER_MOTION_MASK |
+            Gdk.EventMask.SCROLL_MASK |
+            Gdk.EventMask.KEY_PRESS_MASK
         )
-        scroll_controller.connect('scroll', self._on_scroll, manager, drawing_area)
-        drawing_area.add_controller(scroll_controller)
         
-        # Motion controller for pointer tracking and pan
-        motion_controller = Gtk.EventControllerMotion.new()
-        motion_controller.connect('motion', self._on_motion, manager, drawing_area)
-        drawing_area.add_controller(motion_controller)
+        # Make drawing area focusable for keyboard events
+        drawing_area.set_can_focus(True)
         
-        # Drag gesture for pan (middle button or primary button with ctrl)
-        drag_gesture = Gtk.GestureDrag.new()
-        drag_gesture.set_button(2)  # Middle mouse button
-        drag_gesture.connect('drag-begin', self._on_drag_begin, manager, drawing_area)
-        drag_gesture.connect('drag-update', self._on_drag_update, manager, drawing_area)
-        drag_gesture.connect('drag-end', self._on_drag_end, manager, drawing_area)
-        drawing_area.add_controller(drag_gesture)
+        # Connect GTK3 signals instead of controllers
+        drawing_area.connect('button-press-event', self._on_button_press, manager)
+        drawing_area.connect('button-release-event', self._on_button_release, manager)
+        drawing_area.connect('motion-notify-event', self._on_motion_notify, manager)
+        drawing_area.connect('scroll-event', self._on_scroll_event, manager)
+        drawing_area.connect('key-press-event', self._on_key_press_event, manager)
         
-        # Pan with right mouse button
-        drag_gesture_right = Gtk.GestureDrag.new()
-        drag_gesture_right.set_button(3)  # Right mouse button
-        drag_gesture_right.connect('drag-begin', self._on_drag_begin, manager, drawing_area)
-        drag_gesture_right.connect('drag-update', self._on_drag_update, manager, drawing_area)
-        drag_gesture_right.connect('drag-end', self._on_drag_end, manager, drawing_area)
-        drawing_area.add_controller(drag_gesture_right)
+        # Store drag state per drawing area
+        if not hasattr(self, '_drag_state'):
+            self._drag_state = {}
+        self._drag_state[drawing_area] = {
+            'active': False,
+            'button': 0,
+            'start_x': 0,
+            'start_y': 0,
+            'is_panning': False
+        }
         
-        # Also support ctrl+left-drag for pan
-        drag_gesture_ctrl = Gtk.GestureDrag.new()
-        drag_gesture_ctrl.set_button(1)  # Primary button
-        drag_gesture_ctrl.connect('drag-begin', self._on_drag_begin_ctrl, manager, drawing_area)
-        drag_gesture_ctrl.connect('drag-update', self._on_drag_update, manager, drawing_area)
-        drag_gesture_ctrl.connect('drag-end', self._on_drag_end, manager, drawing_area)
-        drawing_area.add_controller(drag_gesture_ctrl)
+        # Setup context menu
+        self._setup_canvas_context_menu(drawing_area, manager)
     
-    # ==================== Event Handlers ====================
+    # ==================== GTK3 Event Handlers ====================
+    
+    def _on_button_press(self, widget, event, manager):
+        """Handle button press events (GTK3)."""
+        state = self._drag_state[widget]
+        
+        # All buttons can start drag (including right-click for pan)
+        state['active'] = True
+        state['button'] = event.button
+        state['start_x'] = event.x
+        state['start_y'] = event.y
+        state['is_panning'] = False
+        
+        widget.grab_focus()
+        
+        # Return True to prevent default handling (especially for right-click)
+        return True
+    
+    def _on_button_release(self, widget, event, manager):
+        """Handle button release events (GTK3)."""
+        state = self._drag_state[widget]
+        
+        # Right-click: show context menu ONLY if no panning occurred
+        if event.button == 3 and not state['is_panning']:
+            # Double-check: only show menu if it was a click (< 5px movement), not a drag
+            dx = event.x - state['start_x']
+            dy = event.y - state['start_y']
+            distance = (dx * dx + dy * dy) ** 0.5
+            
+            if distance < 5:
+                self._show_canvas_context_menu(event.x, event.y, widget)
+        
+        # Reset all drag state
+        state['active'] = False
+        state['button'] = 0
+        state['is_panning'] = False  # IMPORTANT: Reset panning flag
+        
+        # Return True to prevent default handling
+        return True
+    
+    def _on_motion_notify(self, widget, event, manager):
+        """Handle motion events (GTK3)."""
+        state = self._drag_state[widget]
+        
+        # Update cursor position always (for zoom centering)
+        manager.set_pointer_position(event.x, event.y)
+        
+        # Handle dragging only if button is pressed
+        if state['active'] and state['button'] > 0:
+            dx = event.x - state['start_x']
+            dy = event.y - state['start_y']
+            
+            # Start panning if movement detected (5px threshold)
+            if not state['is_panning'] and (abs(dx) >= 5 or abs(dy) >= 5):
+                state['is_panning'] = True
+            
+            # Pan with right button (3) or middle button (2) or Shift+left (1)
+            is_shift_pressed = event.state & Gdk.ModifierType.SHIFT_MASK
+            should_pan = state['button'] in [2, 3] or (state['button'] == 1 and is_shift_pressed)
+            
+            if should_pan and state['is_panning']:
+                # Pan by the incremental delta
+                manager.pan_relative(dx, dy)
+                state['start_x'] = event.x
+                state['start_y'] = event.y
+                widget.queue_draw()
+        
+        # Return True to prevent default handling
+        return True
+    
+    def _on_scroll_event(self, widget, event, manager):
+        """Handle scroll events for zoom (GTK3)."""
+        if event.direction == Gdk.ScrollDirection.UP:
+            manager.zoom_at_point(1.1, event.x, event.y)
+            widget.queue_draw()
+        elif event.direction == Gdk.ScrollDirection.DOWN:
+            manager.zoom_at_point(0.9, event.x, event.y)
+            widget.queue_draw()
+        return True
+    
+    def _on_key_press_event(self, widget, event, manager):
+        """Handle key press events (GTK3)."""
+        # Escape key to dismiss context menu
+        if event.keyval == Gdk.KEY_Escape:
+            if hasattr(self, '_canvas_context_menu') and self._canvas_context_menu:
+                # GTK3 Menu: use popdown()
+                if isinstance(self._canvas_context_menu, Gtk.Menu):
+                    self._canvas_context_menu.popdown()
+                    return True
+        return False
+    
+    # ==================== Event Handlers (Legacy - will be cleaned up) ====================
     
     def _on_draw(self, drawing_area, cr, width, height, manager):
         """Draw callback for the canvas.
@@ -501,146 +405,21 @@ class ModelCanvasLoader:
         # Mark as clean after drawing
         manager.mark_clean()
     
-    def _on_canvas_clicked(self, gesture, n_press, x, y, drawing_area):
-        """Handle click events on canvas - hide zoom revealer.
+    def _show_canvas_context_menu(self, x, y, drawing_area):
+        """Show the canvas context menu at the given position.
         
         Args:
-            gesture: GestureClick controller.
-            n_press: Number of presses (1=single, 2=double, etc).
-            x: X coordinate of click.
-            y: Y coordinate of click.
-            drawing_area: GtkDrawingArea widget.
+            x, y: Position to show menu (widget-relative coordinates)
+            drawing_area: GtkDrawingArea widget
         """
-        # Hide zoom revealer when clicking on canvas
-        if drawing_area in self.zoom_palettes:
-            zoom_palette = self.zoom_palettes[drawing_area]
-            if zoom_palette.zoom_revealer:
-                zoom_palette.zoom_revealer.set_reveal_child(False)
-    
-    def _on_scroll(self, controller, dx, dy, manager, drawing_area):
-        """Handle scroll events for zooming.
         
-        Args:
-            controller: EventControllerScroll.
-            dx: Horizontal scroll delta (unused).
-            dy: Vertical scroll delta (negative = scroll up = zoom in).
-            manager: ModelCanvasManager instance.
-            drawing_area: GtkDrawingArea widget.
-        """
-        # Get pointer position for centered zoom
-        pointer_x = manager.pointer_x
-        pointer_y = manager.pointer_y
-        
-        # Scroll up (dy < 0) = zoom in, scroll down (dy > 0) = zoom out
-        if dy < 0:
-            manager.zoom_in(pointer_x, pointer_y)
-        else:
-            manager.zoom_out(pointer_x, pointer_y)
-        
-        # Update zoom palette display if available
-        if drawing_area in self.zoom_palettes:
-            self.zoom_palettes[drawing_area].update_zoom_display()
-        
-        # Request redraw
-        drawing_area.queue_draw()
-        
-        return True  # Event handled
-    
-    def _on_motion(self, controller, x, y, manager, drawing_area):
-        """Handle motion events for pointer tracking.
-        
-        Args:
-            controller: EventControllerMotion.
-            x: Pointer X coordinate.
-            y: Pointer Y coordinate.
-            manager: ModelCanvasManager instance.
-            drawing_area: GtkDrawingArea widget.
-        """
-        # Update pointer position in manager
-        manager.set_pointer_position(x, y)
-    
-    def _on_drag_begin(self, gesture, start_x, start_y, manager, drawing_area):
-        """Handle drag begin for panning (middle button or right button).
-        
-        Args:
-            gesture: GestureDrag.
-            start_x: Starting X coordinate.
-            start_y: Starting Y coordinate.
-            manager: ModelCanvasManager instance.
-            drawing_area: GtkDrawingArea widget.
-        """
-        self.is_panning[drawing_area] = True
-        self.pan_last_offset_x[drawing_area] = 0.0
-        self.pan_last_offset_y[drawing_area] = 0.0
-    
-    def _on_drag_begin_ctrl(self, gesture, start_x, start_y, manager, drawing_area):
-        """Handle drag begin for panning (ctrl+left button).
-        
-        Args:
-            gesture: GestureDrag.
-            start_x: Starting X coordinate.
-            start_y: Starting Y coordinate.
-            manager: ModelCanvasManager instance.
-            drawing_area: GtkDrawingArea widget.
-        """
-        # Only pan if ctrl is pressed
-        state = gesture.get_current_event_state()
-        if state & Gdk.ModifierType.CONTROL_MASK:
-            self.is_panning[drawing_area] = True
-            self.pan_last_offset_x[drawing_area] = 0.0
-            self.pan_last_offset_y[drawing_area] = 0.0
-    
-    def _on_drag_update(self, gesture, offset_x, offset_y, manager, drawing_area):
-        """Handle drag update for panning.
-        
-        Args:
-            gesture: GestureDrag.
-            offset_x: X offset from drag start (cumulative).
-            offset_y: Y offset from drag start (cumulative).
-            manager: ModelCanvasManager instance.
-            drawing_area: GtkDrawingArea widget.
-        """
-        if self.is_panning.get(drawing_area, False):
-            # Calculate incremental delta since last update
-            last_x = self.pan_last_offset_x.get(drawing_area, 0.0)
-            last_y = self.pan_last_offset_y.get(drawing_area, 0.0)
-            delta_x = offset_x - last_x
-            delta_y = offset_y - last_y
-            
-            # Pan by the incremental delta
-            manager.pan(-delta_x, -delta_y)
-            
-            # Store current offset for next update
-            self.pan_last_offset_x[drawing_area] = offset_x
-            self.pan_last_offset_y[drawing_area] = offset_y
-            
-            # Request redraw
-            drawing_area.queue_draw()
-    
-    def _on_drag_end(self, gesture, offset_x, offset_y, manager, drawing_area):
-        """Handle drag end for panning.
-        
-        Args:
-            gesture: GestureDrag.
-            offset_x: Final X offset from drag start.
-            offset_y: Final Y offset from drag start.
-            manager: ModelCanvasManager instance.
-            drawing_area: GtkDrawingArea widget.
-        """
-        if self.is_panning.get(drawing_area, False):
-            # Final incremental pan update
-            last_x = self.pan_last_offset_x.get(drawing_area, 0.0)
-            last_y = self.pan_last_offset_y.get(drawing_area, 0.0)
-            delta_x = offset_x - last_x
-            delta_y = offset_y - last_y
-            
-            manager.pan(-delta_x, -delta_y)
-            drawing_area.queue_draw()
-            
-        # Clear pan state
-        self.is_panning[drawing_area] = False
-        self.pan_last_offset_x[drawing_area] = 0.0
-        self.pan_last_offset_y[drawing_area] = 0.0
+        # Get the menu
+        if hasattr(self, 'canvas_context_menus'):
+            menu = self.canvas_context_menus.get(drawing_area)
+            if menu:
+                # GTK3: popup menu at pointer position
+                # popup(parent_menu_shell, parent_menu_item, func, data, button, activate_time)
+                menu.popup(None, None, None, None, 3, Gtk.get_current_event_time())
     
     # ==================== Public API ====================
     
@@ -716,6 +495,108 @@ class ModelCanvasLoader:
             current_index = styles.index(manager.grid_style)
             next_style = styles[(current_index + 1) % len(styles)]
             self.set_grid_style(next_style, drawing_area)
+    
+    # ==================== Context Menu ====================
+    
+    def _setup_canvas_context_menu(self, drawing_area, manager):
+        """Setup context menu for canvas operations using Gtk.Menu.
+        
+        Args:
+            drawing_area: GtkDrawingArea widget.
+            manager: ModelCanvasManager instance.
+        """
+        # Create GTK3 Menu (more stable than Window approach)
+        menu = Gtk.Menu()
+        
+        # Add menu items
+        menu_items = [
+            ("Reset Zoom (100%)", lambda: self._on_reset_zoom_clicked(menu, drawing_area, manager)),
+            ("Zoom In", lambda: self._on_zoom_in_clicked(menu, drawing_area, manager)),
+            ("Zoom Out", lambda: self._on_zoom_out_clicked(menu, drawing_area, manager)),
+            ("Fit to Window", lambda: self._on_fit_to_window_clicked(menu, drawing_area, manager)),
+            None,  # Separator
+            ("Grid: Line Style", lambda: self._on_grid_line_clicked(menu, drawing_area, manager)),
+            ("Grid: Dot Style", lambda: self._on_grid_dot_clicked(menu, drawing_area, manager)),
+            ("Grid: Cross Style", lambda: self._on_grid_cross_clicked(menu, drawing_area, manager)),
+            None,  # Separator
+            ("Center View", lambda: self._on_center_view_clicked(menu, drawing_area, manager)),
+            ("Clear Canvas", lambda: self._on_clear_canvas_clicked(menu, drawing_area, manager)),
+        ]
+        
+        for item_data in menu_items:
+            if item_data is None:
+                # Add separator
+                menu_item = Gtk.SeparatorMenuItem()
+            else:
+                label, callback = item_data
+                menu_item = Gtk.MenuItem(label=label)
+                menu_item.connect("activate", lambda w, cb=callback: cb())
+            
+            menu_item.show()
+            menu.append(menu_item)
+        
+        # Store for later use
+        self._canvas_context_menu = menu
+        
+        # Store menu per drawing area
+        if not hasattr(self, 'canvas_context_menus'):
+            self.canvas_context_menus = {}
+        self.canvas_context_menus[drawing_area] = menu
+        
+
+    
+    def _on_zoom_in_clicked(self, menu, drawing_area, manager):
+        """Zoom in action."""
+        manager.zoom_in(manager.viewport_width / 2, manager.viewport_height / 2)
+        drawing_area.queue_draw()
+    
+    def _on_zoom_out_clicked(self, menu, drawing_area, manager):
+        """Zoom out action."""
+        manager.zoom_out(manager.viewport_width / 2, manager.viewport_height / 2)
+        drawing_area.queue_draw()
+    
+    def _on_fit_to_window_clicked(self, menu, drawing_area, manager):
+        """Fit canvas to window."""
+        # Calculate zoom to fit canvas in viewport
+        zoom_x = manager.viewport_width / manager.canvas_width
+        zoom_y = manager.viewport_height / manager.canvas_height
+        fit_zoom = min(zoom_x, zoom_y) * 0.95  # 95% to add margin
+        manager.set_zoom(fit_zoom, manager.viewport_width / 2, manager.viewport_height / 2)
+        # Center the canvas
+        manager.pan_x = 0
+        manager.pan_y = 0
+        drawing_area.queue_draw()
+    
+    def _on_grid_line_clicked(self, menu, drawing_area, manager):
+        """Set grid to line style."""
+        manager.set_grid_style('line')
+        drawing_area.queue_draw()
+    
+    def _on_grid_dot_clicked(self, menu, drawing_area, manager):
+        """Set grid to dot style."""
+        manager.set_grid_style('dot')
+        drawing_area.queue_draw()
+    
+    def _on_grid_cross_clicked(self, menu, drawing_area, manager):
+        """Set grid to cross style."""
+        manager.set_grid_style('cross')
+        drawing_area.queue_draw()
+    
+    def _on_clear_canvas_clicked(self, menu, drawing_area, manager):
+        """Clear the canvas."""
+        # TODO: Implement canvas clearing when we have objects
+        drawing_area.queue_draw()
+    
+    def _on_reset_zoom_clicked(self, menu, drawing_area, manager):
+        """Reset zoom to 100%."""
+        manager.set_zoom(1.0, manager.viewport_width / 2, manager.viewport_height / 2)
+        drawing_area.queue_draw()
+    
+    def _on_center_view_clicked(self, menu, drawing_area, manager):
+        """Center the view."""
+        manager.pan_x = 0
+        manager.pan_y = 0
+        drawing_area.queue_draw()
 
 
 def create_model_canvas(ui_path=None):

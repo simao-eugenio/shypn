@@ -11,10 +11,10 @@ import sys
 
 try:
     import gi
-    gi.require_version('Gtk', '4.0')
+    gi.require_version('Gtk', '3.0')
     from gi.repository import Gtk, GLib
 except Exception as e:
-    print('ERROR: GTK4 not available in right_panel loader:', e, file=sys.stderr)
+    print('ERROR: GTK3 not available in right_panel loader:', e, file=sys.stderr)
     sys.exit(1)
 
 
@@ -83,7 +83,6 @@ class RightPanelLoader:
         # Hide window by default (will be shown when toggled)
         self.window.set_visible(False)
         
-        print(f"✓ Right panel window loaded from: {os.path.basename(self.ui_path)}")
         return self.window
     
     def _on_float_toggled(self, button):
@@ -93,7 +92,6 @@ class RightPanelLoader:
             return
             
         is_active = button.get_active()
-        print(f"→ Right panel float button toggled: active={is_active}, is_attached={self.is_attached}")
         if is_active:
             # Button is now active -> float the panel
             self.float(self.parent_window)
@@ -108,21 +106,16 @@ class RightPanelLoader:
         Args:
             parent_window: Optional parent window to set as transient.
         """
-        # Recreate window if it was destroyed during attach
+        # If window doesn't exist, load the UI
         if self.window is None:
-            # Reload the UI to recreate the window
-            self.builder = Gtk.Builder.new_from_file(self.ui_path)
-            self.window = self.builder.get_object('right_panel_window')
-            # Get float button and reconnect callback
-            float_button = self.builder.get_object('float_button')
-            if float_button:
-                float_button.connect('toggled', self._on_float_toggled)
-                self.float_button = float_button
-            # Content reference is still valid, just needs to be reparented
+            self.load()
         
-        # If currently attached, unattach first
+        # If currently attached, unattach first (moves content back to window)
         if self.is_attached:
             self.unattach()
+            # Hide the container after unattaching
+            if self.parent_container:
+                self.parent_container.set_visible(False)
         
         # Set as transient for parent if provided
         if parent_window:
@@ -138,8 +131,8 @@ class RightPanelLoader:
         if self.on_float_callback:
             self.on_float_callback()
         
-        self.window.present()
-        print("✓ Right panel: floating")
+        # GTK3: use show_all() instead of present() to ensure all widgets are visible
+        self.window.show_all()
     
     def detach(self, parent_window=None):
         """Detach panel to show as a floating window.
@@ -157,7 +150,7 @@ class RightPanelLoader:
             container: Gtk.Box or other container to embed content into.
             parent_window: Optional parent window (stored for float button).
         """
-        print(f"  → attach_to called: container={container}, parent_container={self.parent_container}")
+        
         if self.window is None:
             self.load()
         
@@ -167,27 +160,30 @@ class RightPanelLoader:
         self.parent_container = container
         
         # Extract content from window first
-        if self.content.get_parent() == self.window:
-            self.window.set_child(None)
+        current_parent = self.content.get_parent()
+        if current_parent == self.window:
+            self.window.remove(self.content)  # GTK3 uses remove()
+        elif current_parent and current_parent != container:
+            current_parent.remove(self.content)
         
-        # Destroy the window to prevent phantom windows (especially on WSL/X11)
-        # We'll recreate it when floating again
-        if self.window:
-            self.window.destroy()
-            self.window = None
+        # Hide the window but DON'T destroy it - we need it to float again
+        if self.window and self.window.get_visible():
+            self.window.hide()
         
-        # Only append if not already in container
+        # Only add if not already in container
         if self.content.get_parent() != container:
-            container.append(self.content)
+            container.add(self.content)  # GTK3 uses add() instead of append()
+        else:
+            pass
         
         # Make container visible when panel is attached
         container.set_visible(True)
         
         # Make sure content is visible
         self.content.set_visible(True)
+        self.content.show_all()  # Ensure all child widgets are visible
         
         # Update float button state
-        print(f"  → Updating button: current={self.float_button.get_active() if self.float_button else 'none'}")
         if self.float_button and self.float_button.get_active():
             self._updating_button = True
             self.float_button.set_active(False)
@@ -199,23 +195,25 @@ class RightPanelLoader:
         if self.on_attach_callback:
             self.on_attach_callback()
         
-        print("✓ Right panel: attached (extreme right)")
     
     def unattach(self):
         """Unattach panel from container (return content to window)."""
         if not self.is_attached:
             return
         
+        
         # Remove from container
         if self.parent_container and self.content.get_parent() == self.parent_container:
             self.parent_container.remove(self.content)
         
         # Return content to window
-        self.window.set_child(self.content)
+        self.window.add(self.content)  # GTK3 uses add() instead of set_child()
+        
+        # Make sure content is visible in window
+        self.content.show_all()
         
         self.is_attached = False
         # Don't clear parent_container - we need it to dock back
-        print("✓ Right panel: unattached")
     
     def hide(self):
         """Hide panel (works for both attached and detached states)."""
@@ -226,7 +224,6 @@ class RightPanelLoader:
                 self.parent_container.set_visible(False)
         elif self.window:
             self.window.set_visible(False)
-        print("✓ Right panel: hidden")
 
 
 def create_right_panel(ui_path=None):

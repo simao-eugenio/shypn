@@ -166,6 +166,16 @@ class ModelCanvasManager:
         factor = zoom_level / self.zoom
         self.zoom_by_factor(factor, center_x, center_y)
     
+    def zoom_at_point(self, factor, center_x, center_y):
+        """Zoom by a factor at a specific point (alias for zoom_by_factor).
+        
+        Args:
+            factor: Multiplicative zoom factor.
+            center_x: X coordinate of zoom center (screen space).
+            center_y: Y coordinate of zoom center (screen space).
+        """
+        self.zoom_by_factor(factor, center_x, center_y)
+    
     # ==================== Pan Operations ====================
     
     def pan(self, dx, dy):
@@ -195,6 +205,17 @@ class ModelCanvasManager:
         self.pan_x = world_x - (self.viewport_width / 2) / self.zoom
         self.pan_y = world_y - (self.viewport_height / 2) / self.zoom
         self._needs_redraw = True
+    
+    def pan_relative(self, dx, dy):
+        """Pan the viewport by incremental deltas (for drag updates).
+        
+        This is an alias for pan() but with clearer intent for incremental updates.
+        
+        Args:
+            dx: Pan delta X in screen pixels (positive = pan right).
+            dy: Pan delta Y in screen pixels (positive = pan down).
+        """
+        self.pan(dx, dy)
     
     # ==================== Grid Rendering ====================
     

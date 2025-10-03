@@ -1,0 +1,37 @@
+{
+  "model_name": "Test Petri Net Model",
+  "description": "A sample Petri net model for testing the file browser",
+  "version": "1.0",
+  "created": "2025-10-02",
+  "places": [
+    {
+      "id": "p1",
+      "name": "Place 1",
+      "tokens": 1
+    },
+    {
+      "id": "p2",
+      "name": "Place 2",
+      "tokens": 0
+    },
+    {
+      "id": "p3",
+      "name": "Place 3",
+      "tokens": 0
+    }
+  ],
+  "transitions": [
+    {
+      "id": "t1",
+      "name": "Transition 1",
+      "input_places": ["p1"],
+      "output_places": ["p2"]
+    },
+    {
+      "id": "t2",
+      "name": "Transition 2",
+      "input_places": ["p2"],
+      "output_places": ["p3"]
+    }
+  ]
+}

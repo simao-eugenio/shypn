@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""GTK4 Main Application Loader.
+"""GTK3 Main Application Loader.
 
 This script loads the main window and orchestrates panel loading via their
 individual loaders. Each panel is responsible for loading its own UI.
@@ -19,10 +19,10 @@ UI_PATH = os.path.join(REPO_ROOT, 'ui', 'main', 'main_window.ui')
 
 try:
 	import gi
-	gi.require_version('Gtk', '4.0')
+	gi.require_version('Gtk', '3.0')
 	from gi.repository import Gtk
 except Exception as e:
-	print('ERROR: GTK4 (PyGObject) not available:', e, file=sys.stderr)
+	print('ERROR: GTK3 (PyGObject) not available:', e, file=sys.stderr)
 	sys.exit(1)
 
 # Import panel loaders from src/shypn/helpers/
@@ -53,8 +53,6 @@ def main(argv=None):
 			print('ERROR: `main_window` object not found in UI file.', file=sys.stderr)
 			sys.exit(3)
 
-		print('✓ Main window loaded')
-
 		# Load model canvas
 		try:
 			model_canvas_loader = create_model_canvas()
@@ -72,26 +70,22 @@ def main(argv=None):
 		
 		# Add canvas to workspace
 		canvas_container = model_canvas_loader.container
-		main_workspace.append(canvas_container)
-		print('✓ Model canvas integrated into workspace')
+		main_workspace.pack_start(canvas_container, True, True, 0)  # GTK3 uses pack_start
 
 		# Load left panel via its loader
 		try:
-			left_panel_loader = create_left_panel()
+			left_panel_loader = create_left_panel()  # Will default to models directory
 		except Exception as e:
 			print(f'ERROR: Failed to load left panel: {e}', file=sys.stderr)
 			sys.exit(4)
 		
-		# Connect new document button to create new tabs
-		new_doc_button = left_panel_loader.builder.get_object('new_document_button')
+		# Connect new document button from toolbar to create new tabs
+		new_doc_button = left_panel_loader.builder.get_object('file_new_button')
 		if new_doc_button:
 			def on_new_document(button):
 				"""Create a new document tab."""
 				model_canvas_loader.add_document()
 			new_doc_button.connect('clicked', on_new_document)
-			print('✓ New document button connected')
-		else:
-			print('WARNING: new_document_button not found in left panel')
 
 		# Load right panel via its loader
 		try:
@@ -116,22 +110,86 @@ def main(argv=None):
 		left_paned = main_builder.get_object('left_paned')
 		right_paned = main_builder.get_object('right_paned')
 
+		# Get toggle buttons first (needed for callbacks)
+		left_toggle = main_builder.get_object('left_panel_toggle')
+		right_toggle = main_builder.get_object('right_panel_toggle')
+
+		# Define toggle handlers (needed for callbacks to reference)
+		def on_left_toggle(button):
+			is_active = button.get_active()
+			if is_active:
+				# Attach to extreme left of main window
+				left_panel_loader.attach_to(left_dock_area, parent_window=window)
+				# Adjust paned position to show panel (250px default)
+				if left_paned:
+					try:
+						left_paned.set_position(250)
+					except Exception:
+						pass  # Ignore paned errors
+				# If right panel is hidden, ensure its paned is collapsed
+				if right_toggle and not right_toggle.get_active() and right_paned:
+					try:
+						paned_width = right_paned.get_width()
+						right_paned.set_position(paned_width)
+					except Exception:
+						pass  # Ignore paned errors
+			else:
+				# Detach and hide
+				left_panel_loader.hide()
+				# Reset paned position to hide panel
+				if left_paned:
+					try:
+						left_paned.set_position(0)
+					except Exception:
+						pass  # Ignore paned errors
+
+		def on_right_toggle(button):
+			is_active = button.get_active()
+			if is_active:
+				# Attach to extreme right of main window
+				right_panel_loader.attach_to(right_dock_area, parent_window=window)
+				# Adjust paned position to show panel (show last 280px for right panel)
+				if right_paned:
+					try:
+						# Get current paned width and set position to leave space for panel
+						paned_width = right_paned.get_width()
+						if paned_width > 280:
+							right_paned.set_position(paned_width - 280)
+					except Exception:
+						pass  # Ignore paned errors
+				# If left panel is hidden, ensure its paned is collapsed
+				if left_toggle and not left_toggle.get_active() and left_paned:
+					try:
+						left_paned.set_position(0)
+					except Exception:
+						pass  # Ignore paned errors
+			else:
+				# Detach and hide
+				right_panel_loader.hide()
+				# Reset paned position to hide panel (full width)
+				if right_paned:
+					try:
+						paned_width = right_paned.get_width()
+						right_paned.set_position(paned_width)
+					except Exception:
+						pass  # Ignore paned errors
+
 		# Set up callbacks to manage paned position when panels float/attach
 		def on_left_float():
 			"""Collapse left paned when panel floats."""
 			if left_paned:
 				try:
 					left_paned.set_position(0)
-				except Exception as e:
-					print(f"Warning: Could not collapse left paned: {e}")
+				except Exception:
+					pass  # Ignore paned errors
 		
 		def on_left_attach():
 			"""Expand left paned when panel attaches."""
 			if left_paned:
 				try:
 					left_paned.set_position(250)
-				except Exception as e:
-					print(f"Warning: Could not expand left paned: {e}")
+				except Exception:
+					pass  # Ignore paned errors
 		
 		def on_right_float():
 			"""Collapse right paned when panel floats."""
@@ -139,8 +197,13 @@ def main(argv=None):
 				try:
 					paned_width = right_paned.get_width()
 					right_paned.set_position(paned_width)
-				except Exception as e:
-					print(f"Warning: Could not collapse right paned: {e}")
+				except Exception:
+					pass  # Ignore paned errors
+			# Sync header toggle button to off when panel floats
+			if right_toggle and right_toggle.get_active():
+				right_toggle.handler_block_by_func(on_right_toggle)
+				right_toggle.set_active(False)
+				right_toggle.handler_unblock_by_func(on_right_toggle)
 		
 		def on_right_attach():
 			"""Expand right paned when panel attaches."""
@@ -149,8 +212,13 @@ def main(argv=None):
 					paned_width = right_paned.get_width()
 					if paned_width > 280:
 						right_paned.set_position(paned_width - 280)
-				except Exception as e:
-					print(f"Warning: Could not expand right paned: {e}")
+				except Exception:
+					pass  # Ignore paned errors
+			# Sync header toggle button to on when panel attaches
+			if right_toggle and not right_toggle.get_active():
+				right_toggle.handler_block_by_func(on_right_toggle)
+				right_toggle.set_active(True)
+				right_toggle.handler_unblock_by_func(on_right_toggle)
 		
 		# Wire up callbacks
 		left_panel_loader.on_float_callback = on_left_float
@@ -158,82 +226,12 @@ def main(argv=None):
 		right_panel_loader.on_float_callback = on_right_float
 		right_panel_loader.on_attach_callback = on_right_attach
 
-		# Get toggle button and wire it to attach/detach behavior
-		left_toggle = main_builder.get_object('left_panel_toggle')
-		right_toggle = main_builder.get_object('right_panel_toggle')
-		
+		# Connect toggle buttons to handlers
 		if left_toggle is not None:
-			def on_left_toggle(button):
-				is_active = button.get_active()
-				if is_active:
-					# Attach to extreme left of main window
-					left_panel_loader.attach_to(left_dock_area, parent_window=window)
-					# Adjust paned position to show panel (250px default)
-					if left_paned:
-						try:
-							left_paned.set_position(250)
-						except Exception:
-							pass  # Ignore paned errors
-					# If right panel is hidden, ensure its paned is collapsed
-					if right_toggle and not right_toggle.get_active() and right_paned:
-						try:
-							paned_width = right_paned.get_width()
-							right_paned.set_position(paned_width)
-						except Exception:
-							pass  # Ignore paned errors
-				else:
-					# Detach and hide
-					left_panel_loader.hide()
-					# Reset paned position to hide panel
-					if left_paned:
-						try:
-							left_paned.set_position(0)
-						except Exception:
-							pass  # Ignore paned errors
-			
 			left_toggle.connect('toggled', on_left_toggle)
-			print('✓ Left panel toggle connected for attach/detach')
-		else:
-			print('WARNING: left_panel_toggle button not found in HeaderBar')
 
-		# Get right toggle button and wire it to attach/detach behavior
-		# Get right toggle button and wire it to attach/detach behavior
 		if right_toggle is not None:
-			def on_right_toggle(button):
-				is_active = button.get_active()
-				if is_active:
-					# Attach to extreme right of main window
-					right_panel_loader.attach_to(right_dock_area, parent_window=window)
-					# Adjust paned position to show panel (show last 280px for right panel)
-					if right_paned:
-						try:
-							# Get current paned width and set position to leave space for panel
-							paned_width = right_paned.get_width()
-							if paned_width > 280:
-								right_paned.set_position(paned_width - 280)
-						except Exception:
-							pass  # Ignore paned errors
-					# If left panel is hidden, ensure its paned is collapsed
-					if left_toggle and not left_toggle.get_active() and left_paned:
-						try:
-							left_paned.set_position(0)
-						except Exception:
-							pass  # Ignore paned errors
-				else:
-					# Detach and hide
-					right_panel_loader.hide()
-					# Reset paned position to hide panel (full width)
-					if right_paned:
-						try:
-							paned_width = right_paned.get_width()
-							right_paned.set_position(paned_width)
-						except Exception:
-							pass  # Ignore paned errors
-			
 			right_toggle.connect('toggled', on_right_toggle)
-			print('✓ Right panel toggle connected for attach/detach')
-		else:
-			print('WARNING: right_panel_toggle button not found in HeaderBar')
 
 		# Set up and present the window
 		if isinstance(window, Gtk.ApplicationWindow):
@@ -241,10 +239,8 @@ def main(argv=None):
 			window.present()
 		else:
 			w = Gtk.ApplicationWindow(application=a)
-			w.set_child(window)
+			w.add(window)  # GTK3 uses add() instead of set_child()
 			w.present()
-
-		print('✓ Attach/detach architecture ready')
 
 	app.connect('activate', on_activate)
 	app.run(argv)
