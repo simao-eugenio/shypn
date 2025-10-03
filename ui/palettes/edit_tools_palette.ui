@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Edit Tools Palette - Place, Transition, Arc Buttons -->
+<interface>
+  <requires lib="gtk+" version="3.0"/>
+
+  <!-- Revealer container for tools palette -->
+  <object class="GtkRevealer" id="edit_tools_revealer">
+    <property name="visible">True</property>
+    <property name="reveal-child">False</property>
+    <property name="transition-type">slide-up</property>
+    <property name="transition-duration">200</property>
+    <property name="halign">center</property>
+    <property name="valign">end</property>
+    <property name="margin_bottom">78</property>
+
+    <child>
+      <object class="GtkBox" id="edit_tools_container">
+        <property name="visible">True</property>
+        <property name="orientation">horizontal</property>
+        <property name="spacing">2</property>
+        <style>
+          <class name="edit-tools-palette"/>
+        </style>
+
+        <!-- Place Tool Button [P] -->
+        <child>
+          <object class="GtkToggleButton" id="place_tool_button">
+            <property name="visible">True</property>
+            <property name="label">P</property>
+            <property name="tooltip-text">Place Tool - Create Places</property>
+            <property name="width-request">40</property>
+            <property name="height-request">40</property>
+            <style>
+              <class name="tool-button"/>
+            </style>
+          </object>
+        </child>
+
+        <!-- Transition Tool Button [T] -->
+        <child>
+          <object class="GtkToggleButton" id="transition_tool_button">
+            <property name="visible">True</property>
+            <property name="label">T</property>
+            <property name="tooltip-text">Transition Tool - Create Transitions</property>
+            <property name="width-request">40</property>
+            <property name="height-request">40</property>
+            <style>
+              <class name="tool-button"/>
+            </style>
+          </object>
+        </child>
+
+        <!-- Arc Tool Button [A] -->
+        <child>
+          <object class="GtkToggleButton" id="arc_tool_button">
+            <property name="visible">True</property>
+            <property name="label">A</property>
+            <property name="tooltip-text">Arc Tool - Create Arcs</property>
+            <property name="width-request">40</property>
+            <property name="height-request">40</property>
+            <style>
+              <class name="tool-button"/>
+            </style>
+          </object>
+        </child>
+
+      </object>
+    </child>
+
+  </object>
+
+</interface>
