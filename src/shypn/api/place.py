@@ -15,10 +15,10 @@ class Place(PetriNetObject):
     Rendered as a circle with optional label and token display.
     """
     
-    # Default styling (from legacy renderer)
-    DEFAULT_RADIUS = 25.0
+    # Default styling (proportional metrics at 1:1 scale)
+    DEFAULT_RADIUS = 25.0  # 25px radius = 50px diameter at 100% zoom
     DEFAULT_BORDER_COLOR = (0.0, 0.0, 0.0)  # Black border
-    DEFAULT_BORDER_WIDTH = 3.0  # Legacy uses 3.0px for better visibility
+    DEFAULT_BORDER_WIDTH = 3.0  # 3px for better visibility
     
     def __init__(self, x: float, y: float, id: int, name: str, 
                  radius: float = None, label: str = ""):
