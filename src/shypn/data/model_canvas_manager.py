@@ -19,7 +19,7 @@ import math
 import json
 import os
 from datetime import datetime
-from shypn.api import Place, Arc, Transition
+from shypn.netobjs import Place, Arc, Transition
 from shypn.edit import SelectionManager, ObjectEditingTransforms, RectangleSelection
 
 

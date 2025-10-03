@@ -9,10 +9,10 @@ This package contains the core Petri net modeling primitives:
 
 All classes are exported at the package level for convenient importing.
 """
-from shypn.api.netobjs.petri_net_object import PetriNetObject
-from shypn.api.netobjs.place import Place
-from shypn.api.netobjs.transition import Transition
-from shypn.api.netobjs.arc import Arc
-from shypn.api.netobjs.inhibitor_arc import InhibitorArc
+from shypn.netobjs.petri_net_object import PetriNetObject
+from shypn.netobjs.place import Place
+from shypn.netobjs.transition import Transition
+from shypn.netobjs.arc import Arc
+from shypn.netobjs.inhibitor_arc import InhibitorArc
 
 __all__ = ['PetriNetObject', 'Place', 'Transition', 'Arc', 'InhibitorArc']

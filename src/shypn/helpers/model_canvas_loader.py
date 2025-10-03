@@ -37,7 +37,7 @@ except ImportError as e:
 
 # Import Petri net object types for isinstance checks
 try:
-    from shypn.api import Place, Transition, Arc
+    from shypn.netobjs import Place, Transition, Arc
 except ImportError as e:
     print(f'ERROR: Cannot import Petri net objects: {e}', file=sys.stderr)
     sys.exit(1)
@@ -911,7 +911,7 @@ class ModelCanvasLoader:
             manager: ModelCanvasManager instance
             obj: Selected object (Place, Transition, or Arc)
         """
-        from shypn.api import Place, Transition, Arc
+        from shypn.netobjs import Place, Transition, Arc
         
         # Create context menu
         menu = Gtk.Menu()
@@ -1150,7 +1150,7 @@ class ModelCanvasLoader:
             manager: ModelCanvasManager instance
             drawing_area: GtkDrawingArea widget
         """
-        from shypn.api import Place, Transition, Arc
+        from shypn.netobjs import Place, Transition, Arc
         
         # Remove from appropriate list
         if isinstance(obj, Place):
@@ -1202,7 +1202,7 @@ class ModelCanvasLoader:
             manager: ModelCanvasManager instance
             drawing_area: GtkDrawingArea widget
         """
-        from shypn.api import Place, Transition, Arc
+        from shypn.netobjs import Place, Transition, Arc
         
         # Create properties dialog
         dialog = Gtk.Dialog(

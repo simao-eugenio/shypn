@@ -5,7 +5,7 @@ Places represent conditions or states and can contain tokens.
 Rendered as a circle with optional label and token display.
 """
 import math
-from shypn.api.netobjs.petri_net_object import PetriNetObject
+from shypn.netobjs.petri_net_object import PetriNetObject
 
 
 class Place(PetriNetObject):
