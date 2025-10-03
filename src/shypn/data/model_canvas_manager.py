@@ -23,14 +23,16 @@ class ModelCanvasManager:
     """Manages canvas properties, transformations, and rendering for Petri Net models."""
     
     # Zoom configuration
-    MIN_ZOOM = 0.1
-    MAX_ZOOM = 10.0
+    MIN_ZOOM = 0.3   # 30% minimum (practical engineering range)
+    MAX_ZOOM = 3.0   # 300% maximum (practical engineering range)
     ZOOM_STEP = 1.1  # Multiplicative zoom factor (10% per step)
     
+    # Canvas extent for infinite canvas (half-extent in logical units)
+    CANVAS_EXTENT = 10000.0  # ±10,000 units = 20,000×20,000 total canvas
+    
     # Grid configuration
-    # At 100% zoom (1.0), grid should be ~5mm
-    # Assuming 96 DPI: 5mm = 5/25.4 inches = 0.1969 inches = 18.9 pixels ≈ 20 pixels
-    BASE_GRID_SPACING = 20  # Base grid spacing at zoom=1.0 (~5mm on 96 DPI screen)
+    # DPI-aware grid: 1mm physical spacing at all screen resolutions
+    BASE_GRID_SPACING = 1.0  # 1mm physical spacing (DPI-aware)
     GRID_SUBDIVISION_LEVELS = [1, 2, 5, 10]  # Grid adapts at these zoom thresholds
     GRID_MAJOR_EVERY = 5  # Every 5th line is a major line (legacy-compatible)
     GRID_STYLE_LINE = 'line'  # Standard grid lines
@@ -66,6 +68,9 @@ class ModelCanvasManager:
         self.viewport_width = 800
         self.viewport_height = 600
         
+        # DPI detection (defaults to 96.0, updated from widget)
+        self.screen_dpi = 96.0
+        
         # Pointer position (for pointer-centered zoom)
         self.pointer_x = 0
         self.pointer_y = 0
@@ -90,6 +95,24 @@ class ModelCanvasManager:
         
         # Dirty flag for redraw optimization
         self._needs_redraw = True
+    
+    # ==================== DPI and Physical Units ====================
+    
+    def set_screen_dpi(self, dpi):
+        """Update screen DPI from widget.
+        
+        Args:
+            dpi: Screen resolution in dots per inch.
+        """
+        self.screen_dpi = dpi if dpi and dpi > 0 else 96.0
+    
+    def get_mm_to_pixels(self):
+        """Convert millimeters to pixels based on screen DPI.
+        
+        Returns:
+            float: Pixels per millimeter.
+        """
+        return self.screen_dpi / 25.4
     
     # ==================== Coordinate Transformations ====================
     
@@ -400,6 +423,10 @@ class ModelCanvasManager:
         self.pan_y = (center_y / new_zoom) - world_y
         
         self.zoom = new_zoom
+        
+        # Clamp pan to maintain infinite canvas bounds
+        self.clamp_pan()
+        
         self._needs_redraw = True
     
     def set_zoom(self, zoom_level, center_x=None, center_y=None):
@@ -424,22 +451,60 @@ class ModelCanvasManager:
         """
         self.zoom_by_factor(factor, center_x, center_y)
     
+    def clamp_pan(self):
+        """Clamp pan to keep canvas bounds within viewport.
+        
+        Creates infinite canvas feeling while preventing blank space.
+        Grid always fills viewport regardless of pan/zoom by clamping
+        the pan values to ensure the canvas extent covers the screen.
+        
+        Canvas extent: ±CANVAS_EXTENT in world space
+        Viewport: viewport_width × viewport_height in screen space
+        
+        The constraint is: canvas bounds must fully cover viewport.
+        - Left edge: (-extent + pan) * zoom <= 0  →  pan <= extent
+        - Right edge: (extent + pan) * zoom >= width  →  pan >= width/zoom - extent
+        """
+        extent_x = self.CANVAS_EXTENT
+        extent_y = self.CANVAS_EXTENT
+        
+        # Ensure extent is large enough to cover viewport at current zoom
+        min_half_x = (self.viewport_width / self.zoom) / 2.0
+        min_half_y = (self.viewport_height / self.zoom) / 2.0
+        extent_x = max(extent_x, min_half_x)
+        extent_y = max(extent_y, min_half_y)
+        
+        # Calculate pan limits
+        # Grid bounds: [-extent, +extent] in world space
+        # Screen bounds: [0, viewport] in screen space
+        min_pan_x = (self.viewport_width / self.zoom) - extent_x
+        max_pan_x = extent_x
+        min_pan_y = (self.viewport_height / self.zoom) - extent_y
+        max_pan_y = extent_y
+        
+        # Clamp pan values
+        self.pan_x = max(min_pan_x, min(max_pan_x, self.pan_x))
+        self.pan_y = max(min_pan_y, min(max_pan_y, self.pan_y))
+    
     # ==================== Pan Operations ====================
     
     def pan(self, dx, dy):
         """Pan the viewport by a delta in screen coordinates.
         
         Args:
-            dx: Pan delta X in screen pixels (positive = pan right).
-            dy: Pan delta Y in screen pixels (positive = pan down).
+            dx: Pan delta X in screen pixels (positive = drag right = pan increases).
+            dy: Pan delta Y in screen pixels (positive = drag down = pan increases).
         """
         # Convert screen delta to world delta
         world_dx = dx / self.zoom
         world_dy = dy / self.zoom
         
-        # Update pan (note: screen drag right = pan left in world coords)
-        self.pan_x -= world_dx
-        self.pan_y -= world_dy
+        # Update pan (drag right = pan increases, matching legacy behavior)
+        self.pan_x += world_dx
+        self.pan_y += world_dy
+        
+        # Clamp pan to canvas bounds
+        self.clamp_pan()
         
         self._needs_redraw = True
     
@@ -452,6 +517,10 @@ class ModelCanvasManager:
         """
         self.pan_x = world_x - (self.viewport_width / 2) / self.zoom
         self.pan_y = world_y - (self.viewport_height / 2) / self.zoom
+        
+        # Clamp pan to canvas bounds
+        self.clamp_pan()
+        
         self._needs_redraw = True
     
     def pan_relative(self, dx, dy):
@@ -470,36 +539,44 @@ class ModelCanvasManager:
     def get_grid_spacing(self):
         """Get adaptive grid spacing based on current zoom level.
         
+        Uses DPI-aware physical spacing (1mm base) that adapts at zoom thresholds.
+        Target at 100% zoom: 1mm minor cell, 5mm major cell (every 5th line).
+        
         Returns:
             float: Grid spacing in world coordinates.
         """
-        # Adapt grid spacing based on zoom to prevent too dense or too sparse grids
-        base_spacing = self.BASE_GRID_SPACING
+        # Convert base spacing from mm to pixels
+        px_per_mm = self.get_mm_to_pixels()
+        base_px = self.BASE_GRID_SPACING * px_per_mm  # 1mm → pixels
         
-        # Find appropriate subdivision level - use smallest spacing that gives at least 10px on screen
-        # When zoomed out, we want larger spacing to avoid clutter
-        # When zoomed in, we want smaller spacing (subdivisions) for precision
-        for level in self.GRID_SUBDIVISION_LEVELS:  # [1, 2, 5, 10] - ascending
-            spacing = base_spacing * level
-            screen_spacing = spacing * self.zoom
-            # Use this spacing if screen spacing is at least 10 pixels
-            # This ensures grid lines are never too close together
-            if screen_spacing >= 10:
-                return spacing
-        
-        # Fallback to base spacing (shouldn't reach here with proper levels)
-        return base_spacing
+        # Adaptive grid: spacing adapts based on zoom level
+        # At high zoom (zoomed in), use smaller subdivisions for precision
+        # At low zoom (zoomed out), use larger spacing to avoid clutter
+        # Target: at zoom=1.0, grid spacing = 1mm (major cell = 5mm with GRID_MAJOR_EVERY=5)
+        if self.zoom >= 5.0:
+            return base_px / 5   # Very fine grid (0.2mm, major = 1mm)
+        elif self.zoom >= 2.0:
+            return base_px / 2   # Fine grid (0.5mm, major = 2.5mm)
+        elif self.zoom >= 0.5:
+            return base_px       # Normal grid (1mm, major = 5mm) ← TARGET at zoom=1.0
+        elif self.zoom >= 0.2:
+            return base_px * 2   # Coarse grid (2mm, major = 10mm)
+        else:
+            return base_px * 5   # Very coarse grid (5mm, major = 25mm)
     
     def get_visible_bounds(self):
         """Calculate the visible area in world coordinates.
         
+        Uses screen_to_world transform to correctly map viewport corners.
+        This ensures grid is regenerated for current view, creating infinite canvas illusion.
+        
         Returns:
             tuple: (min_x, min_y, max_x, max_y) in world coordinates.
         """
-        min_x = self.pan_x
-        min_y = self.pan_y
-        max_x = self.pan_x + (self.viewport_width / self.zoom)
-        max_y = self.pan_y + (self.viewport_height / self.zoom)
+        # Top-left corner of viewport (screen origin)
+        min_x, min_y = self.screen_to_world(0, 0)
+        # Bottom-right corner of viewport
+        max_x, max_y = self.screen_to_world(self.viewport_width, self.viewport_height)
         return min_x, min_y, max_x, max_y
     
     def draw_grid(self, cr):

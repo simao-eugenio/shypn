@@ -14,12 +14,13 @@ class Transition(PetriNetObject):
     Rendered as a filled black rectangle.
     """
     
-    # Default styling (from legacy renderer)
-    DEFAULT_WIDTH = 50.0
-    DEFAULT_HEIGHT = 25.0
+    # Default styling (proportional to Place circle)
+    # Width = Place diameter (50.0), Height = Place radius (25.0)
+    DEFAULT_WIDTH = 50.0   # Equal to Place diameter
+    DEFAULT_HEIGHT = 25.0  # Equal to Place radius
     DEFAULT_COLOR = (0.0, 0.0, 0.0)  # Black fill
     DEFAULT_BORDER_COLOR = (0.0, 0.0, 0.0)  # Black border
-    DEFAULT_BORDER_WIDTH = 3.0  # Legacy uses 3.0px for better visibility
+    DEFAULT_BORDER_WIDTH = 3.0  # 3px for better visibility
     
     def __init__(self, x: float, y: float, id: int, name: str,
                  width: float = None, height: float = None, 

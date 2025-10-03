@@ -20,7 +20,11 @@ UI_PATH = os.path.join(REPO_ROOT, 'ui', 'main', 'main_window.ui')
 try:
 	import gi
 	gi.require_version('Gtk', '3.0')
-	from gi.repository import Gtk
+	gi.require_version('Gdk', '3.0')
+	from gi.repository import Gtk, Gdk
+	
+	# Initialize Gdk early to avoid initialization issues in imports
+	Gdk.init(sys.argv)
 except Exception as e:
 	print('ERROR: GTK3 (PyGObject) not available:', e, file=sys.stderr)
 	sys.exit(1)

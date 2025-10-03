@@ -242,6 +242,19 @@ class ModelCanvasLoader:
         manager = ModelCanvasManager(canvas_width=2000, canvas_height=2000)
         self.canvas_managers[drawing_area] = manager
         
+        # Detect and set screen DPI
+        try:
+            screen = drawing_area.get_screen()
+            if screen:
+                dpi = screen.get_resolution()
+                if dpi and dpi > 0:
+                    manager.set_screen_dpi(dpi)
+                    print(f"[DPI] Detected screen DPI: {dpi}")
+                else:
+                    print("[DPI] Using default DPI: 96.0")
+        except Exception as e:
+            print(f"[DPI] Could not detect DPI: {e}, using default 96.0")
+        
         # Initialize new document and validate
         validation = manager.create_new_document()
         # Silently ignore validation errors on initialization
@@ -450,6 +463,8 @@ class ModelCanvasLoader:
         state['button'] = event.button
         state['start_x'] = event.x
         state['start_y'] = event.y
+        state['start_pan_x'] = manager.pan_x  # Store initial pan offset
+        state['start_pan_y'] = manager.pan_y
         state['is_panning'] = False
         
         widget.grab_focus()
@@ -507,10 +522,14 @@ class ModelCanvasLoader:
             should_pan = state['button'] in [2, 3] or (state['button'] == 1 and is_shift_pressed)
             
             if should_pan and state['is_panning']:
-                # Pan by the incremental delta
-                manager.pan_relative(dx, dy)
-                state['start_x'] = event.x
-                state['start_y'] = event.y
+                # Calculate total delta from start (legacy approach)
+                # Pan is set to initial offset + screen delta / zoom
+                dx = event.x - state['start_x']
+                dy = event.y - state['start_y']
+                manager.pan_x = state['start_pan_x'] + dx / manager.zoom
+                manager.pan_y = state['start_pan_y'] + dy / manager.zoom
+                manager.clamp_pan()
+                manager._needs_redraw = True
                 widget.queue_draw()
         
         # Return True to prevent default handling
