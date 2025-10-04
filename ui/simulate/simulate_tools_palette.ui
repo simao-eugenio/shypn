@@ -12,7 +12,6 @@
     <property name="halign">center</property>
     <property name="valign">end</property>
     <property name="margin_bottom">78</property>
-    <property name="margin_start">140</property> <!-- Offset to align with simulate button (3×36px + 4×8px = 140px) -->
 
     <child>
       <object class="GtkBox" id="simulate_tools_container">
@@ -34,6 +33,21 @@
             <style>
               <class name="sim-tool-button"/>
               <class name="run-button"/>
+            </style>
+          </object>
+        </child>
+
+        <!-- Step Button [P] -->
+        <child>
+          <object class="GtkButton" id="step_simulation_button">
+            <property name="visible">True</property>
+            <property name="label">P</property>
+            <property name="tooltip-text">Step Simulation - Execute one simulation step</property>
+            <property name="width-request">40</property>
+            <property name="height-request">40</property>
+            <style>
+              <class name="sim-tool-button"/>
+              <class name="step-button"/>
             </style>
           </object>
         </child>

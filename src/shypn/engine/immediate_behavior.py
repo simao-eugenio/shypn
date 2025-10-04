@@ -64,14 +64,14 @@ class ImmediateBehavior(TransitionBehavior):
             if kind != 'normal':
                 continue
             
-            # Get source place
-            source_place = self._get_place(arc.source_id)
+            # Get source place directly from arc reference
+            source_place = arc.source
             if source_place is None:
-                return False, f"missing-source-place-{arc.source_id}"
+                return False, f"missing-source-place-{arc.name}"
             
             # Check sufficient tokens
             if source_place.tokens < arc.weight:
-                return False, f"insufficient-tokens-P{arc.source_id}"
+                return False, f"insufficient-tokens-{source_place.name}"
         
         return True, "enabled"
     
@@ -116,11 +116,12 @@ class ImmediateBehavior(TransitionBehavior):
                 if kind != 'normal':
                     continue
                 
-                source_place = self._get_place(arc.source_id)
+                # Get source place directly from arc reference
+                source_place = arc.source
                 if source_place is None:
                     return False, {
                         'reason': 'missing-source-place',
-                        'place_id': arc.source_id,
+                        'place_name': arc.name,
                         'immediate_mode': True
                     }
                 
@@ -128,7 +129,7 @@ class ImmediateBehavior(TransitionBehavior):
                 if source_place.tokens < arc.weight:
                     return False, {
                         'reason': 'insufficient-tokens',
-                        'place_id': arc.source_id,
+                        'place_name': source_place.name,
                         'required': arc.weight,
                         'available': source_place.tokens,
                         'immediate_mode': True
@@ -137,7 +138,7 @@ class ImmediateBehavior(TransitionBehavior):
                 # Consume exactly arc_weight tokens (discrete semantics)
                 old_tokens = source_place.tokens
                 source_place.set_tokens(source_place.tokens - arc.weight)
-                consumed_map[arc.source_id] = float(arc.weight)
+                consumed_map[source_place.id] = float(arc.weight)
                 
                 # Debug validation
                 assert source_place.tokens == old_tokens - arc.weight, \
@@ -145,7 +146,8 @@ class ImmediateBehavior(TransitionBehavior):
             
             # Phase 2: Produce tokens to output places
             for arc in output_arcs:
-                target_place = self._get_place(arc.target_id)
+                # Get target place directly from arc reference
+                target_place = arc.target
                 if target_place is None:
                     # Skip if target place missing (shouldn't happen in valid net)
                     continue
@@ -153,7 +155,7 @@ class ImmediateBehavior(TransitionBehavior):
                 # Produce exactly arc_weight tokens (discrete semantics)
                 old_tokens = target_place.tokens
                 target_place.set_tokens(target_place.tokens + arc.weight)
-                produced_map[arc.target_id] = float(arc.weight)
+                produced_map[target_place.id] = float(arc.weight)
                 
                 # Debug validation
                 assert target_place.tokens == old_tokens + arc.weight, \

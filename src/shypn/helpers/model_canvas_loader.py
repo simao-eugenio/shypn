@@ -65,6 +65,13 @@ except ImportError as e:
     print(f'ERROR: Cannot import simulation palettes: {e}', file=sys.stderr)
     sys.exit(1)
 
+# Import mode palette
+try:
+    from ui.palettes.mode.mode_palette_loader import ModePaletteLoader
+except ImportError as e:
+    print(f'ERROR: Cannot import mode palette: {e}', file=sys.stderr)
+    sys.exit(1)
+
 
 class ModelCanvasLoader:
     """Loader and controller for the model canvas (multi-document Petri Net editor)."""
@@ -102,6 +109,9 @@ class ModelCanvasLoader:
         # Dictionary to map drawing areas to their simulation palettes
         self.simulate_palettes = {}  # {drawing_area: SimulatePaletteLoader}
         self.simulate_tools_palettes = {}  # {drawing_area: SimulateToolsPaletteLoader}
+        
+        # Dictionary to map drawing areas to their mode palettes
+        self.mode_palettes = {}  # {drawing_area: ModePaletteLoader}
         
         # Parent window reference (for zoom window transient behavior)
         self.parent_window = None
@@ -501,8 +511,12 @@ class ModelCanvasLoader:
                 
                 # Create and add simulation palettes (positioned beside edit palette)
                 # Create simulation tools palette first (so simulate palette can reference it)
-                simulate_tools_palette = create_simulate_tools_palette()
+                # Pass the manager (which contains places, transitions, arcs) as the model
+                simulate_tools_palette = create_simulate_tools_palette(model=manager)
                 simulate_tools_widget = simulate_tools_palette.get_widget()
+                
+                # Connect step-executed signal for canvas redraw
+                simulate_tools_palette.connect('step-executed', self._on_simulation_step, drawing_area)
                 
                 # Create simulation palette (main [S] button)
                 simulate_palette = create_simulate_palette()
@@ -520,7 +534,86 @@ class ModelCanvasLoader:
                 if simulate_widget:
                     overlay_widget.add_overlay(simulate_widget)
                     self.simulate_palettes[drawing_area] = simulate_palette
+                
+                # Create and add mode palette (Edit/Sim buttons)
+                # Positioned at bottom center, acts as mode switcher
+                mode_palette = ModePaletteLoader()
+                mode_widget = mode_palette.get_widget()
+                
+                if mode_widget:
+                    overlay_widget.add_overlay(mode_widget)
+                    self.mode_palettes[drawing_area] = mode_palette
+                    
+                    # Connect mode-changed signal to show/hide appropriate palettes
+                    mode_palette.connect('mode-changed', self._on_mode_changed, 
+                                        drawing_area, edit_palette, edit_tools_palette,
+                                        simulate_palette, simulate_tools_palette)
+                    
+                    # Initialize: show edit palettes, hide simulation palettes
+                    self._update_palette_visibility(drawing_area, 'edit', edit_palette, edit_tools_palette,
+                                                    simulate_palette, simulate_tools_palette)
         
+    
+    def _on_simulation_step(self, palette, time, drawing_area):
+        """Handle simulation step - redraw canvas to show updated token state.
+        
+        Args:
+            palette: SimulateToolsPaletteLoader that emitted the signal
+            time: Current simulation time
+            drawing_area: GtkDrawingArea widget to redraw
+        """
+        # Queue redraw to show updated tokens
+        drawing_area.queue_draw()
+    
+    def _on_mode_changed(self, mode_palette, mode, drawing_area, edit_palette, edit_tools_palette,
+                         simulate_palette, simulate_tools_palette):
+        """Handle mode change between edit and simulation.
+        
+        Args:
+            mode_palette: ModePaletteLoader that emitted the signal
+            mode: New mode ('edit' or 'sim')
+            drawing_area: GtkDrawingArea widget
+            edit_palette: EditPaletteLoader instance
+            edit_tools_palette: EditToolsLoader instance
+            simulate_palette: SimulatePaletteLoader instance
+            simulate_tools_palette: SimulateToolsPaletteLoader instance
+        """
+        self._update_palette_visibility(drawing_area, mode, edit_palette, edit_tools_palette,
+                                       simulate_palette, simulate_tools_palette)
+    
+    def _update_palette_visibility(self, drawing_area, mode, edit_palette, edit_tools_palette,
+                                   simulate_palette, simulate_tools_palette):
+        """Update palette visibility based on current mode.
+        
+        Args:
+            drawing_area: GtkDrawingArea widget
+            mode: Current mode ('edit' or 'sim')
+            edit_palette: EditPaletteLoader instance
+            edit_tools_palette: EditToolsLoader instance
+            simulate_palette: SimulatePaletteLoader instance
+            simulate_tools_palette: SimulateToolsPaletteLoader instance
+        """
+        if mode == 'edit':
+            # Show edit palettes, hide simulation palettes
+            if edit_palette:
+                edit_palette.get_widget().show()
+            if edit_tools_palette:
+                edit_tools_palette.get_widget().show()  # Show the container, revealer state controls visibility
+            if simulate_palette:
+                simulate_palette.get_widget().hide()
+            if simulate_tools_palette:
+                simulate_tools_palette.get_widget().hide()
+        else:  # mode == 'sim'
+            # Show simulation palettes, hide edit palettes
+            if edit_palette:
+                edit_palette.get_widget().hide()
+            if edit_tools_palette:
+                edit_tools_palette.get_widget().hide()
+            if simulate_palette:
+                simulate_palette.get_widget().show()
+            if simulate_tools_palette:
+                simulate_tools_palette.get_widget().show()  # Show the container, revealer state controls visibility
+    
     
     def _on_tool_changed(self, tools_palette, tool_name, manager, drawing_area):
         """Handle tool selection change from edit tools palette.
@@ -1217,7 +1310,10 @@ class ModelCanvasLoader:
             else:
                 label, callback = item_data
                 menu_item = Gtk.MenuItem(label=label)
-                menu_item.connect("activate", lambda w, cb=callback: cb())
+                def on_activate(widget, cb):
+                    print(f"[ModelCanvasLoader] Menu item '{label}' activated")
+                    cb()
+                menu_item.connect("activate", on_activate, callback)
             
             menu_item.show()
             menu.append(menu_item)
@@ -1501,6 +1597,8 @@ class ModelCanvasLoader:
             manager: ModelCanvasManager instance
             drawing_area: GtkDrawingArea widget
         """
+        print(f"[ModelCanvasLoader] _on_object_properties called for {type(obj).__name__}: {obj.name}")
+        
         from shypn.netobjs import Place, Transition, Arc
         from shypn.helpers.place_prop_dialog_loader import create_place_prop_dialog
         from shypn.helpers.transition_prop_dialog_loader import create_transition_prop_dialog
@@ -1510,20 +1608,48 @@ class ModelCanvasLoader:
         dialog_loader = None
         
         if isinstance(obj, Place):
-            dialog_loader = create_place_prop_dialog(obj, parent_window=self.parent_window)
+            dialog_loader = create_place_prop_dialog(
+                obj, 
+                parent_window=self.parent_window,
+                persistency_manager=self.persistency
+            )
         elif isinstance(obj, Transition):
-            dialog_loader = create_transition_prop_dialog(obj, parent_window=self.parent_window)
+            dialog_loader = create_transition_prop_dialog(
+                obj, 
+                parent_window=self.parent_window,
+                persistency_manager=self.persistency
+            )
         elif isinstance(obj, Arc):
-            dialog_loader = create_arc_prop_dialog(obj, parent_window=self.parent_window)
+            dialog_loader = create_arc_prop_dialog(
+                obj, 
+                parent_window=self.parent_window,
+                persistency_manager=self.persistency
+            )
         else:
             print(f"[ModelCanvasLoader] Unknown object type: {type(obj)}")
             return
         
+        # Debug: log arc count before dialog
+        if isinstance(obj, Arc):
+            print(f"[ModelCanvasLoader] Before dialog - Arc count: {len(manager.arcs)}, Arc IDs: {[id(a) for a in manager.arcs]}")
+        
+        # Connect to properties-changed signal for canvas redraw
+        def on_properties_changed(_):
+            if isinstance(obj, Arc):
+                print(f"[ModelCanvasLoader] properties-changed signal - Arc count: {len(manager.arcs)}, Arc IDs: {[id(a) for a in manager.arcs]}")
+            print(f"[ModelCanvasLoader] Queueing canvas redraw...")
+            drawing_area.queue_draw()
+        
+        dialog_loader.connect('properties-changed', on_properties_changed)
+        
         # Run dialog and handle response
         response = dialog_loader.run()
         
-        # Redraw canvas to reflect any changes
-        # Redraw canvas to reflect any changes
+        # Debug: log arc count after dialog
+        if isinstance(obj, Arc):
+            print(f"[ModelCanvasLoader] After dialog - Arc count: {len(manager.arcs)}, Arc IDs: {[id(a) for a in manager.arcs]}")
+        
+        # Redraw canvas to reflect any changes (in case signal didn't fire)
         if response == Gtk.ResponseType.OK:
             drawing_area.queue_draw()
     
