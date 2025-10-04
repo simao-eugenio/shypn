@@ -495,6 +495,19 @@ class ModelCanvasLoader:
                     click_state['pending_timeout'] = None
                     click_state['pending_click_data'] = None
                 
+                # Check if clicking on already-selected object (potential drag start)
+                if clicked_obj.selected and not is_double_click:
+                    # Start potential drag (will activate after movement threshold)
+                    manager.selection_manager.start_drag(clicked_obj, event.x, event.y, manager)
+                    
+                    # IMPORTANT: Set drag state so motion handler can update drag
+                    state['active'] = True
+                    state['button'] = event.button
+                    state['start_x'] = event.x
+                    state['start_y'] = event.y
+                    state['is_panning'] = False
+                    state['is_rect_selecting'] = False
+                
                 if is_double_click:
                     # Double-click detected: enter EDIT mode (only if already selected)
                     if clicked_obj.selected:
@@ -530,6 +543,12 @@ class ModelCanvasLoader:
                         ctrl = data['is_ctrl']
                         w = data['widget']
                         mgr = data['manager']
+                        
+                        # Check if drag started (if so, don't process single-click)
+                        if mgr.selection_manager.is_dragging():
+                            click_state['pending_timeout'] = None
+                            click_state['pending_click_data'] = None
+                            return False
                         
                         # Check if we entered EDIT mode (via double-click) before this callback fired
                         # If so, don't process the single-click - it's already handled
@@ -611,6 +630,10 @@ class ModelCanvasLoader:
         """Handle button release events (GTK3)."""
         state = self._drag_state[widget]
         
+        # End object dragging if active
+        if manager.selection_manager.end_drag():
+            widget.queue_draw()
+        
         # Handle rectangle selection finish
         if state.get('is_rect_selecting', False):
             # Check for Ctrl key (multi-select)
@@ -690,6 +713,21 @@ class ModelCanvasLoader:
                 widget.queue_draw()
                 return True
             
+            # Check if dragging objects (via SelectionManager)
+            # Only check if NOT doing rectangle selection
+            if manager.selection_manager.update_drag(event.x, event.y, manager):
+                # Cancel any pending single-click processing
+                # This prevents selection change when dragging starts
+                click_state = self._click_state.get(widget)
+                if click_state and click_state.get('pending_timeout'):
+                    from gi.repository import GLib
+                    GLib.source_remove(click_state['pending_timeout'])
+                    click_state['pending_timeout'] = None
+                    click_state['pending_click_data'] = None
+                
+                widget.queue_draw()
+                return True
+            
             # Pan with right button (3) or middle button (2) or Shift+left (1)
             is_shift_pressed = event.state & Gdk.ModifierType.SHIFT_MASK
             should_pan = state['button'] in [2, 3] or (state['button'] == 1 and is_shift_pressed)
@@ -742,16 +780,22 @@ class ModelCanvasLoader:
     
     def _on_key_press_event(self, widget, event, manager):
         """Handle key press events (GTK3)."""
-        # Escape key: exit edit mode OR dismiss context menu
+        # Escape key: cancel drag OR exit edit mode OR dismiss context menu
         if event.keyval == Gdk.KEY_Escape:
-            # First priority: exit edit mode if active
+            # First priority: cancel drag if active
+            if manager.selection_manager.cancel_drag():
+                print("Drag cancelled - positions restored")
+                widget.queue_draw()
+                return True
+            
+            # Second priority: exit edit mode if active
             if manager.selection_manager.is_edit_mode():
                 manager.selection_manager.exit_edit_mode()
                 print("Exited EDIT mode → NORMAL mode")
                 widget.queue_draw()
                 return True
             
-            # Second priority: dismiss context menu
+            # Third priority: dismiss context menu
             if hasattr(self, '_canvas_context_menu') and self._canvas_context_menu:
                 # GTK3 Menu: use popdown()
                 if isinstance(self._canvas_context_menu, Gtk.Menu):
