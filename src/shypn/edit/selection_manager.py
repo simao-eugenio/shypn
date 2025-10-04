@@ -221,3 +221,93 @@ class SelectionManager:
             Object in edit mode, or None if not in edit mode
         """
         return self.edit_target if self.is_edit_mode() else None
+    
+    # ==================== Drag Support ====================
+    
+    def __init_drag_controller(self):
+        """Lazy initialize drag controller."""
+        if not hasattr(self, '_drag_controller'):
+            from shypn.edit.drag_controller import DragController
+            self._drag_controller = DragController()
+    
+    def start_drag(self, clicked_obj, screen_x: float, screen_y: float, manager):
+        """Start dragging selected objects if clicking on a selected object.
+        
+        Args:
+            clicked_obj: The object that was clicked
+            screen_x: Screen X coordinate
+            screen_y: Screen Y coordinate  
+            manager: Canvas manager for getting selected objects
+            
+        Returns:
+            True if drag started, False otherwise
+        """
+        # Only drag if clicking on a selected object
+        if clicked_obj and clicked_obj.selected:
+            self.__init_drag_controller()
+            selected_objs = self.get_selected_objects(manager)
+            
+            # Filter to only draggable objects (Places and Transitions)
+            # Arcs don't have x,y coordinates - they follow their source/target
+            from shypn.netobjs.place import Place
+            from shypn.netobjs.transition import Transition
+            draggable_objs = [obj for obj in selected_objs 
+                            if isinstance(obj, (Place, Transition))]
+            
+            print(f"DEBUG start_drag: clicked={clicked_obj.name if hasattr(clicked_obj, 'name') else clicked_obj}")
+            print(f"DEBUG start_drag: selected_objs count={len(selected_objs)}, draggable count={len(draggable_objs)}")
+            print(f"DEBUG start_drag: IDs={[id(o) for o in draggable_objs]}")
+            if hasattr(clicked_obj, 'name'):
+                print(f"DEBUG start_drag: names={[o.name for o in draggable_objs if hasattr(o, 'name')]}")
+            
+            # Only start drag if there are draggable objects
+            if draggable_objs:
+                self._drag_controller.start_drag(draggable_objs, screen_x, screen_y)
+                return True
+        return False
+    
+    def update_drag(self, screen_x: float, screen_y: float, canvas):
+        """Update drag positions during motion.
+        
+        Args:
+            screen_x: Current screen X coordinate
+            screen_y: Current screen Y coordinate
+            canvas: Canvas/manager with screen_to_world method
+            
+        Returns:
+            True if drag was updated, False if not dragging
+        """
+        if hasattr(self, '_drag_controller') and self._drag_controller.is_dragging():
+            self._drag_controller.update_drag(screen_x, screen_y, canvas)
+            return True
+        return False
+    
+    def end_drag(self):
+        """End the current drag operation.
+        
+        Returns:
+            True if drag was ended, False if wasn't dragging
+        """
+        if hasattr(self, '_drag_controller') and self._drag_controller.is_dragging():
+            self._drag_controller.end_drag()
+            return True
+        return False
+    
+    def cancel_drag(self):
+        """Cancel drag and restore original positions.
+        
+        Returns:
+            True if drag was cancelled, False if wasn't dragging
+        """
+        if hasattr(self, '_drag_controller') and self._drag_controller.is_dragging():
+            self._drag_controller.cancel_drag()
+            return True
+        return False
+    
+    def is_dragging(self) -> bool:
+        """Check if currently dragging objects.
+        
+        Returns:
+            True if dragging, False otherwise
+        """
+        return hasattr(self, '_drag_controller') and self._drag_controller.is_dragging()
