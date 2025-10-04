@@ -21,11 +21,12 @@ except Exception as e:
 class RightPanelLoader:
     """Loader and controller for the right Dynamic Analyses panel (attachable window)."""
     
-    def __init__(self, ui_path=None):
+    def __init__(self, ui_path=None, data_collector=None):
         """Initialize the right panel loader.
         
         Args:
             ui_path: Optional path to right_panel.ui. If None, uses default location.
+            data_collector: Optional SimulationDataCollector for plotting panels
         """
         if ui_path is None:
             # Default: ui/panels/right_panel.ui
@@ -36,6 +37,7 @@ class RightPanelLoader:
             ui_path = os.path.join(repo_root, 'ui', 'panels', 'right_panel.ui')
         
         self.ui_path = ui_path
+        self.data_collector = data_collector
         self.builder = None
         self.window = None
         self.content = None
@@ -45,6 +47,10 @@ class RightPanelLoader:
         self._updating_button = False  # Flag to prevent recursive toggle events
         self.on_float_callback = None  # Callback to notify when panel floats
         self.on_attach_callback = None  # Callback to notify when panel attaches
+        
+        # Plotting panels (will be instantiated in load())
+        self.place_panel = None
+        self.transition_panel = None
     
     def load(self):
         """Load the panel UI and return the window.
@@ -80,10 +86,74 @@ class RightPanelLoader:
         else:
             self.float_button = None
         
+        # Initialize plotting panels if data_collector is available
+        if self.data_collector is not None:
+            self._setup_plotting_panels()
+        
         # Hide window by default (will be shown when toggled)
         self.window.set_visible(False)
         
         return self.window
+    
+    def _setup_plotting_panels(self):
+        """Set up plotting panels in canvas containers.
+        
+        This method ONLY instantiates panel modules and attaches them to containers.
+        All business logic is in the panel modules themselves.
+        """
+        # Import panel modules
+        from shypn.analyses import PlaceRatePanel, TransitionRatePanel
+        
+        # === Places Panel ===
+        places_container = self.builder.get_object('places_canvas_container')
+        if places_container:
+            # Remove placeholder label if it exists
+            for child in places_container.get_children():
+                places_container.remove(child)
+            
+            # Instantiate and add place rate panel
+            self.place_panel = PlaceRatePanel(self.data_collector)
+            places_container.add(self.place_panel)
+            
+            print("[RightPanelLoader] Place rate panel attached to places_canvas_container")
+        else:
+            print("[RightPanelLoader] Warning: places_canvas_container not found in UI")
+        
+        # === Transitions Panel ===
+        transitions_container = self.builder.get_object('transitions_canvas_container')
+        if transitions_container:
+            # Remove placeholder label if it exists
+            for child in transitions_container.get_children():
+                transitions_container.remove(child)
+            
+            # Instantiate and add transition rate panel
+            self.transition_panel = TransitionRatePanel(self.data_collector)
+            transitions_container.add(self.transition_panel)
+            
+            print("[RightPanelLoader] Transition rate panel attached to transitions_canvas_container")
+        else:
+            print("[RightPanelLoader] Warning: transitions_canvas_container not found in UI")
+    
+    def set_data_collector(self, data_collector):
+        """Set or update the data collector for plotting panels.
+        
+        This allows setting the data collector after initialization,
+        useful when the right panel is created before the simulation controller.
+        
+        Args:
+            data_collector: SimulationDataCollector instance
+        """
+        self.data_collector = data_collector
+        
+        # If panels don't exist yet, create them
+        if self.place_panel is None or self.transition_panel is None:
+            if self.builder is not None:  # UI must be loaded first
+                self._setup_plotting_panels()
+        else:
+            # Update existing panels
+            self.place_panel.data_collector = data_collector
+            self.transition_panel.data_collector = data_collector
+            print("[RightPanelLoader] Data collector updated for plotting panels")
     
     def _on_float_toggled(self, button):
         """Internal callback when float toggle button is clicked."""
@@ -226,21 +296,23 @@ class RightPanelLoader:
             self.window.set_visible(False)
 
 
-def create_right_panel(ui_path=None):
+def create_right_panel(ui_path=None, data_collector=None):
     """Convenience function to create and load the right panel loader.
     
     Args:
         ui_path: Optional path to right_panel.ui.
+        data_collector: Optional SimulationDataCollector for plotting panels.
         
     Returns:
         RightPanelLoader: The loaded right panel loader instance.
         
     Example:
-        loader = create_right_panel()
+        # With data collector for plotting
+        loader = create_right_panel(data_collector=collector)
         loader.detach(main_window)  # Show as floating
         # or
         loader.attach_to(container)  # Attach to extreme right
     """
-    loader = RightPanelLoader(ui_path)
+    loader = RightPanelLoader(ui_path, data_collector)
     loader.load()
     return loader
