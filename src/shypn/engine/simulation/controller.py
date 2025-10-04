@@ -144,8 +144,6 @@ class SimulationController:
         # Conflict resolution policy
         self.conflict_policy = DEFAULT_POLICY
         self._round_robin_index = 0  # For ROUND_ROBIN policy
-        
-        print("[SimulationController] Initialized")
     
     def _get_behavior(self, transition):
         """Get or create behavior instance for a transition.
@@ -221,11 +219,10 @@ class SimulationController:
                     # Notify behavior (for stochastic sampling and timed tracking)
                     if hasattr(behavior, 'set_enablement_time'):
                         behavior.set_enablement_time(self.time)
-                        print(f"[SimulationController] Transition {transition.name} enabled at time {self.time:.2f}")
             else:
                 # Disabled: clear state
                 if state.enablement_time is not None:
-                    print(f"[SimulationController] Transition {transition.name} disabled at time {self.time:.2f}")
+                    pass  # State cleared below
                 
                 state.enablement_time = None
                 state.scheduled_time = None  # Clear stochastic schedule
@@ -241,7 +238,6 @@ class SimulationController:
         """
         self.conflict_policy = policy
         self._round_robin_index = 0  # Reset round-robin counter
-        print(f"[SimulationController] Conflict policy set to: {policy}")
     
     def add_step_listener(self, callback: Callable):
         """Register a callback to be notified on each simulation step.
@@ -322,7 +318,6 @@ class SimulationController:
             transition = self._select_transition(enabled_discrete)
             self._fire_transition(transition)
             discrete_fired = True
-            print(f"[SimulationController] Discrete: fired {transition.name}")
         
         # === PHASE 3: CONTINUOUS TRANSITIONS (integrate all pre-identified) ===
         continuous_active = 0
@@ -336,8 +331,6 @@ class SimulationController:
             
             if success:
                 continuous_active += 1
-                rate = details.get('rate', 0.0)
-                print(f"[SimulationController] Continuous: {transition.name} integrated (rate={rate:.3f})")
         
         # Advance time
         self.time += time_step
@@ -345,33 +338,7 @@ class SimulationController:
         # Notify listeners
         self._notify_step_listeners()
         
-        if discrete_fired or continuous_active > 0:
-            print(f"[SimulationController] Step complete: time={self.time:.2f}, discrete={discrete_fired}, continuous={continuous_active}")
-            return True
-        else:
-            print(f"[SimulationController] No activity at time {self.time:.2f}")
-            return False
-        
-        # Find all enabled transitions (behavior decides based on global time + local state)
-        enabled_transitions = self._find_enabled_transitions()
-        
-        if not enabled_transitions:
-            print(f"[SimulationController] No enabled transitions at time {self.time:.2f}")
-            # Still notify listeners (time advanced even if no firing)
-            self._notify_step_listeners()
-            return False
-        
-        # Select a transition to fire based on conflict resolution policy
-        transition = self._select_transition(enabled_transitions)
-        
-        # Fire the transition
-        self._fire_transition(transition)
-        
-        # Notify listeners
-        self._notify_step_listeners()
-        
-        print(f"[SimulationController] Step complete: fired {transition.name}, time={self.time:.2f}")
-        return True
+        return discrete_fired or continuous_active > 0
     
     def _find_enabled_transitions(self) -> List:
         """Find all transitions that are enabled (can fire).
@@ -427,12 +394,7 @@ class SimulationController:
         output_arcs = behavior.get_output_arcs()
         
         # Fire using behavior
-        success, details = behavior.fire(input_arcs, output_arcs)
-        
-        if success:
-            print(f"[SimulationController] Fired transition: {transition.name} (type={transition.transition_type})")
-        else:
-            print(f"[SimulationController] Failed to fire {transition.name}: {details.get('reason', 'unknown')}")
+        behavior.fire(input_arcs, output_arcs)
     
     def _select_transition(self, enabled_transitions: List) -> Any:
         """Select one transition from enabled set based on conflict resolution policy.
@@ -485,11 +447,9 @@ class SimulationController:
             bool: True if started successfully, False if already running
         """
         if not GLIB_AVAILABLE:
-            print("[SimulationController] GLib not available - cannot run continuous simulation")
             return False
         
         if self._running:
-            print("[SimulationController] Already running")
             return False
         
         self._running = True
@@ -501,7 +461,6 @@ class SimulationController:
         # Start the simulation loop using GLib timeout
         self._timeout_id = GLib.timeout_add(100, self._simulation_loop)
         
-        print(f"[SimulationController] Simulation started (time_step={time_step})")
         return True
     
     def _simulation_loop(self) -> bool:
@@ -514,14 +473,12 @@ class SimulationController:
         if self._stop_requested:
             self._running = False
             self._timeout_id = None
-            print("[SimulationController] Simulation stopped")
             return False
         
         # Check max steps
         if self._max_steps is not None and self._steps_executed >= self._max_steps:
             self._running = False
             self._timeout_id = None
-            print(f"[SimulationController] Max steps ({self._max_steps}) reached")
             return False
         
         # Execute one step
@@ -531,7 +488,6 @@ class SimulationController:
             # Deadlock detected - stop simulation
             self._running = False
             self._timeout_id = None
-            print("[SimulationController] Simulation deadlocked")
             return False
         
         self._steps_executed += 1
@@ -546,10 +502,8 @@ class SimulationController:
         after the current step completes.
         """
         if not self._running:
-            print("[SimulationController] Not running")
             return
         
-        print("[SimulationController] Stop requested")
         self._stop_requested = True
     
     def reset(self):
@@ -587,8 +541,6 @@ class SimulationController:
         
         # Notify listeners
         self._notify_step_listeners()
-        
-        print("[SimulationController] Simulation reset to initial marking")
     
     def is_running(self) -> bool:
         """Check if simulation is currently running.
