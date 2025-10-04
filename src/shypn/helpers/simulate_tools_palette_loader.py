@@ -14,6 +14,7 @@ gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, GObject
 
 from shypn.engine.simulation import SimulationController
+from shypn.analyses import SimulationDataCollector
 
 
 class SimulateToolsPaletteLoader(GObject.GObject):
@@ -58,6 +59,10 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         # Simulation controller
         self.simulation = None
         self._model = model
+        
+        # Data collector for analysis/plotting
+        self.data_collector = SimulationDataCollector()
+        
         if model is not None:
             self._init_simulation_controller()
         
@@ -115,10 +120,16 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         
         self.simulation = SimulationController(self._model)
         
+        # Attach data collector to controller
+        self.simulation.data_collector = self.data_collector
+        
         # Register step listener to emit signal for canvas redraw
         self.simulation.add_step_listener(self._on_simulation_step)
         
-        print("[SimulateToolsPaletteLoader] SimulationController initialized")
+        # Register data collector as step listener
+        self.simulation.add_step_listener(self.data_collector.on_simulation_step)
+        
+        print("[SimulateToolsPaletteLoader] SimulationController initialized with data collector")
     
     def set_model(self, model):
         """Set the Petri net model for simulation.
