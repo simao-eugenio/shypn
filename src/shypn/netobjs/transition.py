@@ -157,3 +157,58 @@ class Transition(PetriNetObject):
         """
         self.horizontal = horizontal
         self._trigger_redraw()
+    
+    def to_dict(self) -> dict:
+        """Serialize transition to dictionary for persistence.
+        
+        Returns:
+            dict: Dictionary containing all transition properties
+        """
+        data = super().to_dict()  # Get base properties (id, name, label)
+        data.update({
+            "type": "transition",
+            "x": self.x,
+            "y": self.y,
+            "width": self.width,
+            "height": self.height,
+            "horizontal": self.horizontal,
+            "enabled": self.enabled,
+            "fill_color": list(self.fill_color),
+            "border_color": list(self.border_color),
+            "border_width": self.border_width
+        })
+        return data
+    
+    @classmethod
+    def from_dict(cls, data: dict) -> 'Transition':
+        """Create transition from dictionary (deserialization).
+        
+        Args:
+            data: Dictionary containing transition properties
+            
+        Returns:
+            Transition: New transition instance with restored properties
+        """
+        # Extract required properties
+        transition = cls(
+            x=data["x"],
+            y=data["y"],
+            id=data["id"],
+            name=data["name"],
+            width=data.get("width", cls.DEFAULT_WIDTH),
+            height=data.get("height", cls.DEFAULT_HEIGHT),
+            label=data.get("label", ""),
+            horizontal=data.get("horizontal", True)
+        )
+        
+        # Restore optional properties
+        if "enabled" in data:
+            transition.enabled = data["enabled"]
+        if "fill_color" in data:
+            transition.fill_color = tuple(data["fill_color"])
+        if "border_color" in data:
+            transition.border_color = tuple(data["border_color"])
+        if "border_width" in data:
+            transition.border_width = data["border_width"]
+        
+        return transition

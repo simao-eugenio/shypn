@@ -109,6 +109,9 @@ class ModelCanvasLoader:
                 # Internal tracking
         self.canvas_managers = {}  # {drawing_area: ModelCanvasManager}
         self.document_count = 0
+        
+        # Persistency manager reference (set by main app)
+        self.persistency = None
     
     def load(self):
         """Load the canvas UI and return the container.
@@ -168,12 +171,25 @@ class ModelCanvasLoader:
                 if drawing_area and isinstance(drawing_area, Gtk.DrawingArea):
                     self._setup_canvas_manager(drawing_area)
             
-            # Set tab label to empty (no filename display)
+            # Set tab label with close button
             if drawing_area:
-                # Create simple empty label for tab
+                # Create tab label with close button (same as add_document)
+                tab_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
                 tab_label = Gtk.Label(label="")
-                self.notebook.set_tab_label(page, tab_label)
-                tab_label.show()
+                tab_label.set_ellipsize(3)  # PANGO_ELLIPSIZE_END
+                tab_box.pack_start(tab_label, True, True, 0)
+                
+                # Create close button
+                close_button = Gtk.Button()
+                close_button.set_relief(Gtk.ReliefStyle.NONE)
+                close_button.set_focus_on_click(False)
+                close_icon = Gtk.Image.new_from_icon_name("window-close-symbolic", Gtk.IconSize.BUTTON)
+                close_button.set_image(close_icon)
+                close_button.connect('clicked', self._on_tab_close_clicked, page)
+                tab_box.pack_start(close_button, False, False, 0)
+                
+                self.notebook.set_tab_label(page, tab_box)
+                tab_box.show_all()
         
         # Connect switch-page signal to update active tab styling
         self.notebook.connect('switch-page', self._on_notebook_page_changed)
@@ -188,8 +204,124 @@ class ModelCanvasLoader:
             page: The new page widget.
             page_num: The index of the new page.
         """
-        # Simple page change handler - no special styling needed
-        pass
+        # Sync persistency manager with the newly active tab
+        if self.persistency:
+            # Find the drawing area for this page
+            drawing_area = None
+            if isinstance(page, Gtk.Overlay):
+                scrolled = page.get_child()
+                if isinstance(scrolled, Gtk.ScrolledWindow):
+                    drawing_area = scrolled.get_child()
+                    if hasattr(drawing_area, 'get_child'):
+                        drawing_area = drawing_area.get_child()
+            
+            # Update persistency state to match this tab's canvas manager
+            if drawing_area and drawing_area in self.canvas_managers:
+                manager = self.canvas_managers[drawing_area]
+                # Get the manager's current filename (might be "default" or actual filename)
+                filename = manager.get_filename()
+                
+                # Update persistency to reflect this tab's state
+                # Note: This is a simplified sync - a full multi-tab architecture
+                # would track dirty state per-tab
+                if manager.is_default_filename():
+                    self.persistency.set_filepath(None)
+                else:
+                    # Check if this filename has a filepath
+                    # For now, we don't have per-tab filepath tracking,
+                    # so we'll just mark as potentially dirty if not default
+                    pass
+                
+                print(f"[Loader] Switched to tab {page_num} (filename: {filename})")
+    
+    def _on_tab_close_clicked(self, button, page_widget):
+        """Handle tab close button click.
+        
+        Args:
+            button: The close button that was clicked.
+            page_widget: The page widget (overlay) to close.
+        """
+        # Find the page index
+        page_num = self.notebook.page_num(page_widget)
+        if page_num == -1:
+            return
+        
+        # Close the tab (with unsaved changes check)
+        self.close_tab(page_num)
+    
+    def close_tab(self, page_num):
+        """Close a tab after checking for unsaved changes.
+        
+        Args:
+            page_num: Index of the tab to close.
+            
+        Returns:
+            bool: True if tab was closed, False if user cancelled.
+        """
+        if page_num < 0 or page_num >= self.notebook.get_n_pages():
+            return False
+        
+        # Get the page widget
+        page = self.notebook.get_nth_page(page_num)
+        
+        # Find the drawing area for this page
+        drawing_area = None
+        if isinstance(page, Gtk.Overlay):
+            scrolled = page.get_child()
+            if isinstance(scrolled, Gtk.ScrolledWindow):
+                drawing_area = scrolled.get_child()
+                if hasattr(drawing_area, 'get_child'):
+                    drawing_area = drawing_area.get_child()
+        
+        # Check for unsaved changes if we have persistency manager
+        if self.persistency and drawing_area:
+            manager = self.canvas_managers.get(drawing_area)
+            if manager:
+                # Get current active drawing area to restore later if needed
+                current_page = self.notebook.get_current_page()
+                current_widget = self.notebook.get_nth_page(current_page)
+                
+                # Switch to the tab we're trying to close (so persistency shows correct filename)
+                self.notebook.set_current_page(page_num)
+                
+                # Check for unsaved changes
+                if not self.persistency.check_unsaved_changes():
+                    # User cancelled - restore previous tab
+                    self.notebook.set_current_page(current_page)
+                    print(f"[Loader] Tab close cancelled by user")
+                    return False
+        
+        # Remove tab
+        self.notebook.remove_page(page_num)
+        
+        # Clean up resources for this tab
+        if drawing_area and drawing_area in self.canvas_managers:
+            del self.canvas_managers[drawing_area]
+            print(f"[Loader] Removed canvas manager for closed tab")
+        
+        if drawing_area and drawing_area in self.zoom_palettes:
+            del self.zoom_palettes[drawing_area]
+        
+        if drawing_area and drawing_area in self.edit_palettes:
+            del self.edit_palettes[drawing_area]
+            
+        if drawing_area and drawing_area in self.edit_tools_palettes:
+            del self.edit_tools_palettes[drawing_area]
+        
+        if drawing_area and drawing_area in self.simulate_palettes:
+            del self.simulate_palettes[drawing_area]
+            
+        if drawing_area and drawing_area in self.simulate_tools_palettes:
+            del self.simulate_tools_palettes[drawing_area]
+        
+        print(f"[Loader] Closed tab {page_num}, {self.notebook.get_n_pages()} tabs remaining")
+        
+        # If we closed the last tab, create a new default one
+        if self.notebook.get_n_pages() == 0:
+            print("[Loader] No tabs remaining, creating new default tab")
+            self.add_document(filename="default")
+        
+        return True
     
     def add_document(self, title=None, filename=None):
         """Add a new document (tab) to the canvas.
@@ -214,6 +346,11 @@ class ModelCanvasLoader:
             else:
                 filename = f"default{self.document_count if self.document_count > 1 else ''}"
         
+        # Create overlay structure (like the initial tab)
+        overlay = Gtk.Overlay()
+        overlay.set_hexpand(True)
+        overlay.set_vexpand(True)
+        
         # Create scrolled window
         scrolled = Gtk.ScrolledWindow()
         scrolled.set_hexpand(True)
@@ -229,29 +366,69 @@ class ModelCanvasLoader:
         
         scrolled.add(drawing)  # GTK3 uses add() instead of set_child()
         
-        # Create simple empty tab label (no filename display)
+        # Add scrolled window as base child of overlay
+        overlay.add(scrolled)
+        
+        # Create overlay box for zoom control (positioned at bottom-right, like initial tab)
+        overlay_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        overlay_box.set_halign(Gtk.Align.END)  # Right side
+        overlay_box.set_valign(Gtk.Align.END)  # Bottom
+        overlay_box.set_margin_end(10)
+        overlay_box.set_margin_bottom(10)
+        overlay.add_overlay(overlay_box)
+        
+        # Create tab label with close button
+        tab_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
         tab_label = Gtk.Label(label="")
+        tab_label.set_ellipsize(3)  # PANGO_ELLIPSIZE_END
+        tab_box.pack_start(tab_label, True, True, 0)
         
-        # Add page to notebook
-        page_index = self.notebook.append_page(scrolled, tab_label)
+        # Create close button
+        close_button = Gtk.Button()
+        close_button.set_relief(Gtk.ReliefStyle.NONE)
+        close_button.set_focus_on_click(False)
+        close_icon = Gtk.Image.new_from_icon_name("window-close-symbolic", Gtk.IconSize.BUTTON)
+        close_button.set_image(close_icon)
+        close_button.connect('clicked', self._on_tab_close_clicked, overlay)
+        tab_box.pack_start(close_button, False, False, 0)
+        
+        tab_box.show_all()
+        
+        # Add overlay (not scrolled) as page to notebook
+        page_index = self.notebook.append_page(overlay, tab_box)
+        
+        print(f"[Loader] Created tab {page_index} with filename '{filename}'")
+        print(f"[Loader] Notebook has {self.notebook.get_n_pages()} pages total")
+        
+        # Show all new widgets (GTK3 requires this) BEFORE switching pages
+        overlay.show_all()
+        print(f"[Loader] Called show_all() on overlay")
+        
+        # Setup canvas manager for the new drawing area with filename and overlay support
+        self._setup_canvas_manager(drawing, overlay_box, overlay, filename=filename)
+        print(f"[Loader] Canvas manager setup complete with palettes")
+        
+        # Switch to the new page AFTER everything is set up and shown
         self.notebook.set_current_page(page_index)
-        
-        # Setup canvas manager for the new drawing area
-        self._setup_canvas_manager(drawing)
+        print(f"[Loader] Switched to page {page_index}, current page: {self.notebook.get_current_page()}")
         
         return page_index, drawing
     
-    def _setup_canvas_manager(self, drawing_area, overlay_box=None, overlay_widget=None):
+    def _setup_canvas_manager(self, drawing_area, overlay_box=None, overlay_widget=None, filename=None):
         """Setup canvas manager and wire up callbacks for a drawing area.
         
         Args:
             drawing_area: GtkDrawingArea widget to setup.
             overlay_box: Optional GtkBox for overlay widgets (zoom control).
             overlay_widget: Optional GtkOverlay for adding overlays directly.
+            filename: Base filename without extension (default: "default").
         """
         
-        # Create canvas manager for this drawing area (no filename needed)
-        manager = ModelCanvasManager(canvas_width=2000, canvas_height=2000)
+        # Create canvas manager for this drawing area with the specified filename
+        # ModelCanvasManager handles filename logic (including default state)
+        if filename is None:
+            filename = "default"
+        manager = ModelCanvasManager(canvas_width=2000, canvas_height=2000, filename=filename)
         self.canvas_managers[drawing_area] = manager
         
         # Detect and set screen DPI
@@ -270,8 +447,8 @@ class ModelCanvasLoader:
         # Load saved view state if it exists
         manager.load_view_state_from_file()
         
-        # Initialize new document and validate
-        validation = manager.create_new_document()
+        # Initialize new document and validate (preserve filename set in constructor)
+        validation = manager.create_new_document(filename=filename)
         # Silently ignore validation errors on initialization
         
         # GTK3: Connect 'draw' signal (receives widget and Cairo context)
@@ -873,7 +1050,14 @@ class ModelCanvasLoader:
         
         # Draw Petri Net objects in world coordinates
         # Objects are rendered in order: arcs (behind), then places, then transitions
-        for obj in manager.get_all_objects():
+        all_objects = manager.get_all_objects()
+        # Debug: Log rendering info when objects exist
+        if all_objects and len(all_objects) > 0:
+            print(f"[Draw] Rendering {len(all_objects)} objects: "
+                  f"{len(manager.places)} places, {len(manager.transitions)} transitions, "
+                  f"{len(manager.arcs)} arcs")
+        
+        for obj in all_objects:
             obj.render(cr, zoom=manager.zoom)  # Pass zoom for line width compensation
         
         # Draw selection layer (selection highlights, bounding box, transform handles)
@@ -1071,7 +1255,19 @@ class ModelCanvasLoader:
             return None
         
         page = self.notebook.get_nth_page(page_index)
-        if isinstance(page, Gtk.ScrolledWindow):
+        
+        # Handle new structure: GtkOverlay -> GtkScrolledWindow -> GtkDrawingArea
+        if isinstance(page, Gtk.Overlay):
+            scrolled = page.get_child()
+            if isinstance(scrolled, Gtk.ScrolledWindow):
+                child = scrolled.get_child()
+                # ScrolledWindow may wrap child in Viewport
+                if hasattr(child, 'get_child'):
+                    child = child.get_child()
+                if isinstance(child, Gtk.DrawingArea):
+                    return child
+        # Fallback for old structure: GtkScrolledWindow -> GtkDrawingArea
+        elif isinstance(page, Gtk.ScrolledWindow):
             child = page.get_child()
             # ScrolledWindow may wrap child in Viewport
             if hasattr(child, 'get_child'):
@@ -1115,6 +1311,17 @@ class ModelCanvasLoader:
             current_index = styles.index(manager.grid_style)
             next_style = styles[(current_index + 1) % len(styles)]
             self.set_grid_style(next_style, drawing_area)
+    
+    def set_persistency_manager(self, persistency):
+        """Set the persistency manager for file operations integration.
+        
+        This allows canvas operations (like clear canvas) to properly reset
+        the persistency state when creating a new document.
+        
+        Args:
+            persistency: NetObjPersistency instance from main application
+        """
+        self.persistency = persistency
     
     # ==================== Context Menu ====================
     
@@ -1203,8 +1410,22 @@ class ModelCanvasLoader:
         drawing_area.queue_draw()
     
     def _on_clear_canvas_clicked(self, menu, drawing_area, manager):
-        """Clear the canvas."""
-        # TODO: Implement canvas clearing when we have objects
+        """Clear the canvas and reset to default state.
+        
+        This removes all objects and resets the document to "default" filename
+        state (unsaved), as if creating a new document. Also resets the
+        persistency manager so the next save will prompt for a new filename.
+        """
+        # Check for unsaved changes if persistency is available
+        if self.persistency:
+            if not self.persistency.check_unsaved_changes():
+                return  # User cancelled
+            
+            # Reset persistency state (filepath and dirty flag)
+            self.persistency.new_document()
+        
+        # Clear canvas manager state
+        manager.clear_all_objects()
         drawing_area.queue_draw()
     
     def _on_reset_zoom_clicked(self, menu, drawing_area, manager):

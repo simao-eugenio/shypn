@@ -161,3 +161,51 @@ class Place(PetriNetObject):
         """
         self.tokens = max(0, count)
         self._trigger_redraw()
+    
+    def to_dict(self) -> dict:
+        """Serialize place to dictionary for persistence.
+        
+        Returns:
+            dict: Dictionary containing all place properties
+        """
+        data = super().to_dict()  # Get base properties (id, name, label)
+        data.update({
+            "type": "place",
+            "x": self.x,
+            "y": self.y,
+            "radius": self.radius,
+            "marking": self.tokens,  # Use 'marking' for compatibility
+            "border_color": list(self.border_color),
+            "border_width": self.border_width
+        })
+        return data
+    
+    @classmethod
+    def from_dict(cls, data: dict) -> 'Place':
+        """Create place from dictionary (deserialization).
+        
+        Args:
+            data: Dictionary containing place properties
+            
+        Returns:
+            Place: New place instance with restored properties
+        """
+        # Extract required properties
+        place = cls(
+            x=data["x"],
+            y=data["y"],
+            id=data["id"],
+            name=data["name"],
+            radius=data.get("radius", cls.DEFAULT_RADIUS),
+            label=data.get("label", "")
+        )
+        
+        # Restore optional properties
+        if "marking" in data:
+            place.tokens = data["marking"]
+        if "border_color" in data:
+            place.border_color = tuple(data["border_color"])
+        if "border_width" in data:
+            place.border_width = data["border_width"]
+        
+        return place

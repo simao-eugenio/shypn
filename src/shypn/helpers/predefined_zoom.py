@@ -153,81 +153,95 @@ class PredefinedZoom:
         """Apply custom CSS styling to the zoom palette."""
         css = f"""
         .zoom-palette {{
-            background: linear-gradient(to bottom, #f0f0f5, #e8e8ee);
-            border: 1px solid #b0b0b8;
-            border-radius: 6px;
-            padding: 2px;
-            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3),
-                        0 1px 3px rgba(0, 0, 0, 0.2);
+            background: linear-gradient(to bottom, #667eea 0%, #764ba2 100%);
+            border: 2px solid #5568d3;
+            border-radius: 8px;
+            padding: 3px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4),
+                        0 2px 4px rgba(0, 0, 0, 0.3),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.2);
         }}
         
         .zoom-button {{
-            background: #ffffff;
-            border: 1px solid #c0c0c8;
-            border-radius: 4px;
-            font-size: 16px;
+            background: linear-gradient(to bottom, #ffffff 0%, #f0f0f5 100%);
+            border: 2px solid #5568d3;
+            border-radius: 5px;
+            font-size: 18px;
             font-weight: bold;
-            color: #2a2a3a;
+            color: #667eea;
             min-width: {self.target_height}px;
             min-height: {self.target_height}px;
             padding: 0;
             margin: 0;
+            transition: all 200ms ease;
         }}
         
         .zoom-button:hover {{
-            background: #e8f0ff;
-            border-color: #6090d0;
+            background: linear-gradient(to bottom, #e8f0ff 0%, #d5e5ff 100%);
+            border-color: #667eea;
+            color: #5568d3;
+            box-shadow: 0 0 8px rgba(102, 126, 234, 0.5);
         }}
         
         .zoom-button:active {{
-            background: #d0e0ff;
+            background: linear-gradient(to bottom, #d0e0ff 0%, #c0d5ff 100%);
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
         }}
         
         .zoom-display {{
-            background: #ffffff;
-            border: 1px solid #c0c0c8;
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: 600;
-            color: #2a2a3a;
+            background: linear-gradient(to bottom, #ffffff 0%, #f8f8fc 100%);
+            border: 2px solid #5568d3;
+            border-radius: 5px;
+            font-size: 13px;
+            font-weight: bold;
+            color: #667eea;
             min-width: {int(self.target_height * 1.8)}px;
             min-height: {self.target_height}px;
             padding: 0;
             margin: 0;
+            transition: all 200ms ease;
         }}
         
         .zoom-display:hover {{
-            background: #e8f0ff;
-            border-color: #6090d0;
+            background: linear-gradient(to bottom, #e8f0ff 0%, #dce8ff 100%);
+            border-color: #667eea;
+            color: #5568d3;
+            box-shadow: 0 0 8px rgba(102, 126, 234, 0.5);
         }}
         
         .zoom-revealer-content {{
-            background: linear-gradient(to bottom, #f0f0f5, #e8e8ee);
-            border: 1px solid #b0b0b8;
-            border-radius: 6px;
-            padding: 4px;
-            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3),
-                        0 1px 3px rgba(0, 0, 0, 0.2);
+            background: linear-gradient(to bottom, #667eea 0%, #764ba2 100%);
+            border: 2px solid #5568d3;
+            border-radius: 8px;
+            padding: 6px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4),
+                        0 2px 4px rgba(0, 0, 0, 0.3),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.2);
         }}
         
         .zoom-level-button {{
-            background: #ffffff;
-            border: 1px solid #c0c0c8;
-            border-radius: 3px;
-            font-size: 11px;
-            color: #2a2a3a;
+            background: linear-gradient(to bottom, #ffffff 0%, #f0f0f5 100%);
+            border: 2px solid #5568d3;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #667eea;
             min-height: {int(self.target_height * 0.85)}px;
-            padding: 2px 6px;
-            margin: 1px;
+            padding: 3px 8px;
+            margin: 2px;
+            transition: all 200ms ease;
         }}
         
         .zoom-level-button:hover {{
-            background: #e8f0ff;
-            border-color: #6090d0;
+            background: linear-gradient(to bottom, #e8f0ff 0%, #d5e5ff 100%);
+            border-color: #667eea;
+            color: #5568d3;
+            box-shadow: 0 0 6px rgba(102, 126, 234, 0.4);
         }}
         
         .zoom-level-button:active {{
-            background: #d0e0ff;
+            background: linear-gradient(to bottom, #d0e0ff 0%, #c0d5ff 100%);
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
         }}
         """
         

@@ -369,3 +369,132 @@ class DocumentModel:
             True if model is empty
         """
         return len(self.places) == 0 and len(self.transitions) == 0 and len(self.arcs) == 0
+    
+    # ============================================================================
+    # Persistence (Serialization/Deserialization)
+    # ============================================================================
+    
+    def to_dict(self) -> dict:
+        """Serialize entire document to dictionary.
+        
+        Returns:
+            Dictionary containing all document data in JSON-compatible format
+        """
+        from datetime import datetime
+        
+        return {
+            "version": "2.0",
+            "metadata": {
+                "created": datetime.now().isoformat(),
+                "object_counts": {
+                    "places": len(self.places),
+                    "transitions": len(self.transitions),
+                    "arcs": len(self.arcs)
+                }
+            },
+            "places": [place.to_dict() for place in self.places],
+            "transitions": [transition.to_dict() for transition in self.transitions],
+            "arcs": [arc.to_dict() for arc in self.arcs]
+        }
+    
+    @classmethod
+    def from_dict(cls, data: dict) -> 'DocumentModel':
+        """Deserialize document from dictionary.
+        
+        Args:
+            data: Dictionary containing document data
+            
+        Returns:
+            DocumentModel instance with all objects restored
+            
+        Raises:
+            ValueError: If data format is invalid
+        """
+        # Create empty document
+        document = cls()
+        
+        # Check version (for future compatibility)
+        version = data.get("version", "1.0")
+        if not version.startswith("2."):
+            print(f"Warning: Loading document version {version}, expected 2.x")
+        
+        # Restore places first (they have no dependencies)
+        places_dict = {}
+        for place_data in data.get("places", []):
+            place = Place.from_dict(place_data)
+            document.places.append(place)
+            places_dict[place.id] = place
+            # Update next ID counter
+            document._next_place_id = max(document._next_place_id, place.id + 1)
+        
+        # Restore transitions second (they have no dependencies)
+        transitions_dict = {}
+        for transition_data in data.get("transitions", []):
+            transition = Transition.from_dict(transition_data)
+            document.transitions.append(transition)
+            transitions_dict[transition.id] = transition
+            # Update next ID counter
+            document._next_transition_id = max(document._next_transition_id, transition.id + 1)
+        
+        # Restore arcs last (they depend on places and transitions)
+        for arc_data in data.get("arcs", []):
+            arc = Arc.from_dict(arc_data, places=places_dict, transitions=transitions_dict)
+            document.arcs.append(arc)
+            # Update next ID counter
+            document._next_arc_id = max(document._next_arc_id, arc.id + 1)
+        
+        return document
+    
+    def save_to_file(self, filepath: str) -> None:
+        """Save document to JSON file.
+        
+        Args:
+            filepath: Path to save file (should already have extension like .shy)
+            
+        Raises:
+            IOError: If file cannot be written
+        """
+        import json
+        import os
+        
+        # Don't modify filepath - it should already have the correct extension (.shy)
+        # The .shy extension is used for SHYpn Petri net files (which are JSON internally)
+        
+        # Create directory if needed
+        directory = os.path.dirname(filepath)
+        if directory and not os.path.exists(directory):
+            os.makedirs(directory)
+        
+        # Serialize and save
+        data = self.to_dict()
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2)
+        
+        print(f"[DocumentModel] Saved to {filepath}")
+    
+    @classmethod
+    def load_from_file(cls, filepath: str) -> 'DocumentModel':
+        """Load document from JSON file.
+        
+        Args:
+            filepath: Path to file to load
+            
+        Returns:
+            DocumentModel instance loaded from file
+            
+        Raises:
+            IOError: If file cannot be read
+            ValueError: If file format is invalid
+        """
+        import json
+        
+        with open(filepath, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
+        document = cls.from_dict(data)
+        print(f"[DocumentModel] Loaded from {filepath}")
+        print(f"  - {len(document.places)} places")
+        print(f"  - {len(document.transitions)} transitions")
+        print(f"  - {len(document.arcs)} arcs")
+        
+        return document

@@ -21,6 +21,16 @@ try:
 	import gi
 	gi.require_version('Gtk', '3.0')
 	gi.require_version('Gdk', '3.0')
+	
+	# Import gi.repository.cairo to register foreign struct converters
+	# This fixes "Couldn't find foreign struct converter for 'cairo.Context'" error
+	# which occurs in conda environments with pygobject
+	try:
+		gi.require_version('cairo', '1.0')
+		from gi.repository import cairo as _gi_cairo  # noqa: F401
+	except (ImportError, ValueError):
+		pass  # Cairo integration may not be available
+	
 	from gi.repository import Gtk, Gdk
 	
 	# Initialize Gdk early to avoid initialization issues in imports
@@ -34,6 +44,7 @@ try:
 	from shypn.helpers.left_panel_loader import create_left_panel
 	from shypn.helpers.right_panel_loader import create_right_panel
 	from shypn.helpers.model_canvas_loader import create_model_canvas
+	from shypn.file import create_persistency_manager
 except ImportError as e:
 	print(f'ERROR: Cannot import loaders: {e}', file=sys.stderr)
 	sys.exit(1)
@@ -66,6 +77,17 @@ def main(argv=None):
 			print(f'ERROR: Failed to load model canvas: {e}', file=sys.stderr)
 			sys.exit(8)
 
+		# Create file persistency manager
+		try:
+			persistency = create_persistency_manager(parent_window=window)
+		except Exception as e:
+			print(f'ERROR: Failed to create persistency manager: {e}', file=sys.stderr)
+			sys.exit(11)
+		
+		# Wire persistency manager to canvas loader
+		# This allows canvas operations (like clear canvas) to reset persistency state
+		model_canvas_loader.set_persistency_manager(persistency)
+		
 		# Get main workspace and add canvas
 		main_workspace = main_builder.get_object('main_workspace')
 		if main_workspace is None:
@@ -83,13 +105,38 @@ def main(argv=None):
 			print(f'ERROR: Failed to load left panel: {e}', file=sys.stderr)
 			sys.exit(4)
 		
-		# Connect new document button from toolbar to create new tabs
-		new_doc_button = left_panel_loader.builder.get_object('file_new_button')
-		if new_doc_button:
-			def on_new_document(button):
-				"""Create a new document tab."""
-				model_canvas_loader.add_document()
-			new_doc_button.connect('clicked', on_new_document)
+		# ====================================================================
+		# Wire File Explorer to Canvas Loader and Persistency Manager
+		# ====================================================================
+		
+		# Get file explorer instance from left panel
+		file_explorer = left_panel_loader.file_explorer
+		
+		if file_explorer:
+			# Wire persistency manager to file explorer for UI updates and file operations
+			file_explorer.set_persistency_manager(persistency)
+			
+			# Wire canvas loader to file explorer for document operations
+			# This allows file explorer to access canvas managers and their is_default_filename() flag
+			file_explorer.set_canvas_loader(model_canvas_loader)
+			
+			print("[Main] File explorer wired to canvas loader and persistency manager")
+			print("[Main] File operations now handled by FileExplorerPanel")
+			
+			# Wire file explorer's open request to load into canvas
+			def on_file_open_requested(filepath):
+				"""Handle file open request from file explorer (double-click or context menu).
+				
+				This callback just delegates to FileExplorerPanel which has all the
+				file loading logic. This keeps shypn.py as a simple launcher/wiring file.
+				
+				Args:
+					filepath: Full path to the file to open
+				"""
+				# Delegate to FileExplorerPanel which handles all file loading logic
+				file_explorer._open_file_from_path(filepath)
+			
+			file_explorer.on_file_open_requested = on_file_open_requested
 
 		# Load right panel via its loader
 		try:

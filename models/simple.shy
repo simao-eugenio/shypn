@@ -1,0 +1,74 @@
+{
+  "version": "2.0",
+  "metadata": {
+    "created": "2025-10-04T13:03:27.089340",
+    "object_counts": {
+      "places": 1,
+      "transitions": 1,
+      "arcs": 1
+    }
+  },
+  "places": [
+    {
+      "id": 1,
+      "name": "P1",
+      "label": "",
+      "type": "place",
+      "x": 1605.0,
+      "y": 1025.0,
+      "radius": 25.0,
+      "marking": 0,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "id": 1,
+      "name": "T1",
+      "label": "",
+      "type": "transition",
+      "x": 1603.0,
+      "y": 873.0,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    }
+  ],
+  "arcs": [
+    {
+      "id": 1,
+      "name": "A1",
+      "label": "",
+      "type": "arc",
+      "source_id": 1,
+      "source_type": "place",
+      "target_id": 1,
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    }
+  ]
+}
