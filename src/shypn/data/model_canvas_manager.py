@@ -360,7 +360,10 @@ class ModelCanvasManager:
         self.mark_dirty()
     
     def clear_all_objects(self):
-        """Remove all Petri net objects from the model."""
+        """Remove all Petri net objects from the model and reset to new document state.
+        
+        This resets the canvas to a fresh "default" state as if creating a new document.
+        """
         self.places.clear()
         self.transitions.clear()
         self.arcs.clear()
@@ -370,7 +373,12 @@ class ModelCanvasManager:
         self._next_transition_id = 1
         self._next_arc_id = 1
         
-        self.mark_modified()
+        # Reset to default filename (unsaved document state)
+        self.filename = "default"
+        self.modified = False
+        self.created_at = datetime.now()
+        self.modified_at = None
+        
         self.mark_dirty()
     
     def _on_object_changed(self):
@@ -948,6 +956,40 @@ class ModelCanvasManager:
         if filename != self.filename:
             self.filename = filename
             self.mark_modified()
+    
+    def is_default_filename(self) -> bool:
+        """Check if document has the default filename (unsaved state).
+        
+        This is a flag that indicates the document is in an unsaved/new state
+        and should trigger file chooser dialogs in save operations.
+        
+        Returns:
+            bool: True if filename is "default", False otherwise
+        """
+        return self.filename == "default"
+    
+    def to_document_model(self):
+        """Convert canvas manager's Petri net objects to a DocumentModel.
+        
+        This creates a DocumentModel instance that can be saved/loaded by
+        the persistency manager.
+        
+        Returns:
+            DocumentModel: Document model containing all Petri net objects
+        """
+        from shypn.data.canvas import DocumentModel
+        
+        document = DocumentModel()
+        document.places = list(self.places)
+        document.transitions = list(self.transitions)
+        document.arcs = list(self.arcs)
+        
+        # Sync ID counters
+        document._next_place_id = self._next_place_id
+        document._next_transition_id = self._next_transition_id
+        document._next_arc_id = self._next_arc_id
+        
+        return document
     
     # ==================== View State Persistence ====================
     

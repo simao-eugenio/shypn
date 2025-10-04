@@ -1,4 +1,10 @@
-# Add your project dependencies here
+# SHYpn - Petri Net Editor
+# Python dependencies
+
+# GTK3 bindings for Python (install via system package manager first)
+# PyGObject>=3.42.0
+
+# Additional dependencies can be added here as the project grows
 # Example:
-# numpy==1.26.0
-# pandas==2.1.0
+# numpy>=1.24.0
+# matplotlib>=3.7.0

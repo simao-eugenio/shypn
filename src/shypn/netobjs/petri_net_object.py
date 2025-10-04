@@ -108,6 +108,21 @@ class PetriNetObject:
         """
         raise NotImplementedError("Subclasses must implement set_position()")
     
+    def to_dict(self) -> dict:
+        """Serialize object to dictionary for persistence.
+        
+        This base implementation serializes common properties.
+        Subclasses should override and call super().to_dict() to extend.
+        
+        Returns:
+            dict: Dictionary containing object properties
+        """
+        return {
+            "id": self.id,
+            "name": self.name,
+            "label": self.label if self.label else ""
+        }
+    
     def __repr__(self):
         """String representation for debugging.
         

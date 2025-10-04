@@ -26,7 +26,7 @@ Example:
 
 import os
 import sys
-from typing import Optional
+from typing import Optional, Callable
 
 try:
     import gi
@@ -87,6 +87,9 @@ class FileExplorerPanel:
         # Clipboard for cut/copy operations
         self.clipboard_path: Optional[str] = None
         self.clipboard_operation: Optional[str] = None  # 'cut' or 'copy'
+        
+        # Callback for opening files (set by main app to integrate with canvas)
+        self.on_file_open_requested: Optional[Callable[[str], None]] = None
         
         # Get UI widgets from builder (View)
         self._get_widgets()
@@ -156,6 +159,9 @@ class FileExplorerPanel:
         # Set model
         self.tree_view.set_model(self.store)
         
+        # Apply CSS styling to TreeView
+        self._apply_tree_view_css()
+        
         # Name column (icon + text) - the only column now
         name_column = Gtk.TreeViewColumn()
         name_column.set_title("Name")
@@ -168,41 +174,129 @@ class FileExplorerPanel:
         name_column.pack_start(icon_renderer, False)
         name_column.add_attribute(icon_renderer, "icon-name", 0)
         
-        # Text renderer
+        # Text renderer - editable for inline file/folder creation
         text_renderer = Gtk.CellRendererText()
         text_renderer.set_property("ellipsize", Pango.EllipsizeMode.END)
+        text_renderer.set_property("editable", False)  # Only editable when explicitly set
+        text_renderer.connect("edited", self._on_cell_edited)
+        text_renderer.connect("editing-canceled", self._on_cell_editing_canceled)
         name_column.pack_start(text_renderer, True)
         name_column.add_attribute(text_renderer, "text", 1)
         
+        # Store reference to text renderer for enabling/disabling editing
+        self.text_renderer = text_renderer
+        
         self.tree_view.append_column(name_column)
+    
+    def _apply_tree_view_css(self):
+        """Apply CSS styling to improve TreeView appearance."""
+        css_provider = Gtk.CssProvider()
+        
+        # Modern, clean TreeView styling
+        css = b"""
+        /* File explorer TreeView styling */
+        treeview {
+            background-color: #fafafa;
+            color: #2e3436;
+        }
+        
+        /* Row styling */
+        treeview.view {
+            padding: 2px;
+        }
+        
+        /* Selected row */
+        treeview.view:selected {
+            background-color: #4a90d9;
+            color: #ffffff;
+        }
+        
+        /* Hover effect */
+        treeview.view:hover {
+            background-color: #e8e8e8;
+        }
+        
+        /* Selected and focused */
+        treeview.view:selected:focus {
+            background-color: #2a76c6;
+            color: #ffffff;
+        }
+        
+        /* Cell padding and spacing */
+        treeview.view cell {
+            padding-top: 4px;
+            padding-bottom: 4px;
+            padding-left: 6px;
+            padding-right: 6px;
+        }
+        
+        /* Header styling */
+        treeview header button {
+            background-color: #e8e8e8;
+            border: 1px solid #d0d0d0;
+            padding: 4px 8px;
+            font-weight: bold;
+        }
+        
+        /* Separator lines */
+        treeview.view.separator {
+            min-height: 2px;
+            color: #d0d0d0;
+        }
+        
+        /* Expander arrow for tree hierarchy */
+        treeview.view.expander {
+            color: #5a5a5a;
+        }
+        
+        treeview.view.expander:hover {
+            color: #2a76c6;
+        }
+        """
+        
+        try:
+            css_provider.load_from_data(css)
+            
+            # Apply to the TreeView widget
+            style_context = self.tree_view.get_style_context()
+            style_context.add_provider(css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+            
+            print("[FileExplorer] CSS styling applied to TreeView")
+        except Exception as e:
+            print(f"[FileExplorer] Warning: Could not apply CSS styling: {e}")
+    
         
     
     def _setup_context_menu(self):
         """Setup context menu as a proper GTK3 Gtk.Menu.
         
+        Organized into groups:
+        - File Operations: Open, New File, New Folder
+        - File Modifications: Rename, Delete
+        - View: Refresh, Properties
+        
         GTK3 menus automatically handle:
         - Dismiss on Escape key
         - Dismiss on click outside
         - Focus management
-        
-        GTK3 Gtk.Menu handles all dismiss behavior automatically!
         """
         # Create a proper GTK3 Menu
         self.context_menu = Gtk.Menu()
         
-        # Add menu items
+        # Add menu items organized by groups
         menu_items = [
-            ("Open", self._on_open_clicked),
-            ("New Folder", self._on_new_folder_clicked),
+            # Group 1: File Operations
+            ("Open", self._on_context_open_clicked),
+            ("New File", self._on_context_new_file_clicked),
+            ("New Folder", self._on_context_new_folder_clicked),
             ("---", None),  # Separator
-            ("Cut", self._on_cut_clicked),
-            ("Copy", self._on_copy_clicked),
-            ("Paste", self._on_paste_clicked),
-            ("Duplicate", self._on_duplicate_clicked),
-            ("---", None),  # Separator
+            
+            # Group 2: File Modifications
             ("Rename", self._on_rename_clicked),
             ("Delete", self._on_delete_clicked),
             ("---", None),  # Separator
+            
+            # Group 3: View Operations
             ("Refresh", self._on_refresh_clicked),
             ("Properties", self._on_properties_clicked),
         ]
@@ -229,14 +323,19 @@ class FileExplorerPanel:
         This is the Controller's main job - connecting UI events to business logic.
         """
         # File operations toolbar buttons
+        # These are now handled by FileExplorerPanel itself, cooperating with
+        # ModelCanvasLoader and NetObjPersistency (wired via set_canvas_loader
+        # and set_persistency_manager methods)
         if self.new_button:
-            self.new_button.connect("clicked", self._on_file_new_clicked)
+            self.new_button.connect("clicked", lambda btn: self.new_document())
         if self.open_button:
-            self.open_button.connect("clicked", self._on_file_open_clicked)
+            self.open_button.connect("clicked", lambda btn: self.open_document())
         if self.save_button:
-            self.save_button.connect("clicked", self._on_file_save_clicked)
+            self.save_button.connect("clicked", lambda btn: self.save_current_document())
         if self.save_as_button:
-            self.save_as_button.connect("clicked", self._on_file_save_as_clicked)
+            self.save_as_button.connect("clicked", lambda btn: self.save_current_document_as())
+        
+        # New Folder button (file explorer specific)
         if self.new_folder_button:
             self.new_folder_button.connect("clicked", self._on_file_new_folder_clicked)
         
@@ -440,37 +539,9 @@ class FileExplorerPanel:
     # File Operations Toolbar Signal Handlers (UI events)
     # ========================================================================
     
-    def _on_file_new_clicked(self, button: Gtk.Button):
-        """Handle New File button click.
-        
-        Note: The main application (shypn.py) connects its own handler
-        to this button to create new documents. This handler just updates
-        the current file display.
-        """
-        # The main app will handle document creation
-        # We just update the display
-        # self.set_current_file("untitled.shy")
-    
-    def _on_file_open_clicked(self, button: Gtk.Button):
-        """Handle Open File button click."""
-        # TODO: Show file chooser dialog or use selected file from tree
-        # For now, use the selected item if it's a file
-        if self.selected_item_path and not self.selected_item_is_dir:
-            self.set_current_file(self.selected_item_name)
-    
-    def _on_file_save_clicked(self, button: Gtk.Button):
-        """Handle Save button click."""
-        # TODO: Save current file to disk
-        if self.current_opened_file:
-            pass
-        else:
-            pass
-    
-    def _on_file_save_as_clicked(self, button: Gtk.Button):
-        """Handle Save As button click."""
-        # TODO: Show save as dialog
-        if self.current_opened_file:
-            pass
+    # NOTE: File operation toolbar buttons (New/Open/Save/Save As) are handled
+    # in shypn.py main app to integrate with NetObjPersistency and ModelCanvasLoader.
+    # Only the New Folder button is handled here for file explorer-specific operations.
     
     def _on_file_new_folder_clicked(self, button: Gtk.Button):
         """Handle New Folder button click."""
@@ -496,9 +567,17 @@ class FileExplorerPanel:
             # Navigate into directory (API call)
             self.explorer.navigate_to(full_path)
         else:
-            # File activated - set as current file with full path for relative path calculation
-            self.set_current_file(full_path)
-            # TODO: Emit signal or call callback for file opening in canvas
+            # File activated - open it in canvas
+            if full_path.endswith('.shy'):
+                # Request main app to open this Petri net file
+                if self.on_file_open_requested:
+                    self.on_file_open_requested(full_path)
+                else:
+                    # Fallback: Load file using document operations
+                    self._open_file_from_path(full_path)
+            else:
+                # Not a Petri net file, just update display
+                self.set_current_file(full_path)
     
     def _on_tree_view_button_press(self, widget, event):
         """Handle button press on tree view to show context menu.
@@ -573,19 +652,6 @@ class FileExplorerPanel:
     # ========================================================================
     # Context Menu Handlers (GTK3 Gtk.Menu)
     # ========================================================================
-    
-    def _on_open_clicked(self, button):
-        """Handle 'Open' context menu button."""
-        # Menu automatically dismisses in GTK3
-        if self.selected_item_path and not self.selected_item_is_dir:
-            # Open the file (for now, just set as current file)
-            self.set_current_file(self.selected_item_path)
-            # TODO: Integrate with document management to actually open file in editor
-    
-    def _on_new_folder_clicked(self, button):
-        """Handle 'New Folder' context menu button."""
-        # Menu automatically dismisses in GTK3
-        self._show_new_folder_dialog()
     
     def _on_cut_clicked(self, button):
         """Handle 'Cut' context menu button."""
@@ -693,6 +759,227 @@ class FileExplorerPanel:
         # Menu automatically dismisses in GTK3
         if self.selected_item_path:
             self._show_properties_dialog()
+    
+    # ========================================================================
+    # New Context Menu Handlers (File Operations Group)
+    # ========================================================================
+    
+    def _on_context_open_clicked(self, button):
+        """Handle 'Open' from context menu - opens file in canvas."""
+        # Menu automatically dismisses in GTK3
+        if self.selected_item_path and not self.selected_item_is_dir:
+            # Check if file is a .shy file (Petri net file)
+            if not self.selected_item_path.endswith('.shy'):
+                if self.explorer.on_error:
+                    self.explorer.on_error("Can only open .shy Petri net files")
+                return
+            
+            # Open the file in canvas
+            if self.on_file_open_requested:
+                self.on_file_open_requested(self.selected_item_path)
+            else:
+                # Fallback: Load file using document operations
+                self._open_file_from_path(self.selected_item_path)
+    
+    def _on_context_new_file_clicked(self, button):
+        """Handle 'New File' from context menu - creates new .shy file inline."""
+        # Menu automatically dismisses in GTK3
+        self._start_inline_edit_new_file()
+    
+    def _on_context_new_folder_clicked(self, button):
+        """Handle 'New Folder' from context menu - creates new folder inline."""
+        # Menu automatically dismisses in GTK3
+        self._start_inline_edit_new_folder()
+    
+    def _on_context_save_clicked(self, button):
+        """Handle 'Save' from context menu - saves current document."""
+        # Menu automatically dismisses in GTK3
+        self.save_current_document()
+    
+    def _on_context_save_as_clicked(self, button):
+        """Handle 'Save As' from context menu - saves with new name."""
+        # Menu automatically dismisses in GTK3
+        self.save_current_document_as()
+    
+    # ========================================================================
+    # Inline Editing for New Files/Folders
+    # ========================================================================
+    
+    def _start_inline_edit_new_file(self):
+        """Start inline editing to create a new .shy file at cursor position."""
+        # Determine where to insert: in selected directory or current directory
+        if self.selected_item_is_dir:
+            parent_dir = self.selected_item_path
+            parent_iter = self._find_iter_for_path(self.selected_item_path)
+        else:
+            parent_dir = self.explorer.current_path
+            parent_iter = None
+        
+        # Insert a new temporary row
+        icon_name = "text-x-generic"  # Generic file icon
+        temp_name = "new_file.shy"
+        temp_path = os.path.join(parent_dir, temp_name)
+        
+        # Add temporary row to store
+        new_iter = self.store.append(parent_iter, [icon_name, temp_name, temp_path, False])
+        
+        # Get path to the new row
+        tree_path = self.store.get_path(new_iter)
+        
+        # Expand parent if needed
+        if parent_iter:
+            self.tree_view.expand_to_path(tree_path)
+        
+        # Make text renderer editable temporarily
+        self.text_renderer.set_property("editable", True)
+        
+        # Store context for editing
+        self.editing_iter = new_iter
+        self.editing_parent_dir = parent_dir
+        self.editing_is_folder = False
+        
+        # Set cursor and start editing
+        column = self.tree_view.get_column(0)
+        self.tree_view.set_cursor(tree_path, column, True)
+    
+    def _start_inline_edit_new_folder(self):
+        """Start inline editing to create a new folder at cursor position."""
+        # Determine where to insert: in selected directory or current directory
+        if self.selected_item_is_dir:
+            parent_dir = self.selected_item_path
+            parent_iter = self._find_iter_for_path(self.selected_item_path)
+        else:
+            parent_dir = self.explorer.current_path
+            parent_iter = None
+        
+        # Insert a new temporary row
+        icon_name = "folder"
+        temp_name = "New Folder"
+        temp_path = os.path.join(parent_dir, temp_name)
+        
+        # Add temporary row to store
+        new_iter = self.store.append(parent_iter, [icon_name, temp_name, temp_path, True])
+        
+        # Get path to the new row
+        tree_path = self.store.get_path(new_iter)
+        
+        # Expand parent if needed
+        if parent_iter:
+            self.tree_view.expand_to_path(tree_path)
+        
+        # Make text renderer editable temporarily
+        self.text_renderer.set_property("editable", True)
+        
+        # Store context for editing
+        self.editing_iter = new_iter
+        self.editing_parent_dir = parent_dir
+        self.editing_is_folder = True
+        
+        # Set cursor and start editing
+        column = self.tree_view.get_column(0)
+        self.tree_view.set_cursor(tree_path, column, True)
+    
+    def _find_iter_for_path(self, path):
+        """Find TreeIter for given file path.
+        
+        Args:
+            path: File system path to find
+            
+        Returns:
+            TreeIter if found, None otherwise
+        """
+        def search_tree(model, iter_node):
+            while iter_node:
+                iter_path = model.get_value(iter_node, 2)  # Column 2 is path
+                if iter_path == path:
+                    return iter_node
+                
+                # Check children
+                if model.iter_has_child(iter_node):
+                    child_iter = model.iter_children(iter_node)
+                    result = search_tree(model, child_iter)
+                    if result:
+                        return result
+                
+                iter_node = model.iter_next(iter_node)
+            return None
+        
+        return search_tree(self.store, self.store.get_iter_first())
+    
+    def _on_cell_edited(self, renderer, path, new_text):
+        """Handle cell editing completion - create the file/folder.
+        
+        Args:
+            renderer: CellRendererText
+            path: Tree path (string)
+            new_text: New text entered by user
+        """
+        # Disable editing
+        self.text_renderer.set_property("editable", False)
+        
+        if not new_text or new_text.strip() == "":
+            # User entered empty name - cancel
+            if hasattr(self, 'editing_iter') and self.editing_iter:
+                self.store.remove(self.editing_iter)
+            return
+        
+        # Clean up the name
+        new_text = new_text.strip()
+        
+        # Add .shy extension if creating a file and not already present
+        if not self.editing_is_folder and not new_text.endswith('.shy'):
+            new_text += '.shy'
+        
+        # Build full path
+        full_path = os.path.join(self.editing_parent_dir, new_text)
+        
+        # Check if already exists
+        if os.path.exists(full_path):
+            if self.explorer.on_error:
+                self.explorer.on_error(f"'{new_text}' already exists")
+            # Remove temporary row
+            if hasattr(self, 'editing_iter') and self.editing_iter:
+                self.store.remove(self.editing_iter)
+            return
+        
+        try:
+            if self.editing_is_folder:
+                # Create directory
+                os.makedirs(full_path, exist_ok=True)
+            else:
+                # Create empty .shy file with minimal JSON structure
+                from shypn.data.canvas.document_model import DocumentModel
+                doc = DocumentModel()
+                doc.save_to_file(full_path)
+            
+            # Refresh the tree view
+            self._load_current_directory()
+            
+        except Exception as e:
+            if self.explorer.on_error:
+                self.explorer.on_error(f"Failed to create: {e}")
+            # Remove temporary row
+            if hasattr(self, 'editing_iter') and self.editing_iter:
+                self.store.remove(self.editing_iter)
+        
+        # Clean up editing context
+        if hasattr(self, 'editing_iter'):
+            delattr(self, 'editing_iter')
+    
+    def _on_cell_editing_canceled(self, renderer):
+        """Handle cell editing cancellation - remove temporary row.
+        
+        Args:
+            renderer: CellRendererText
+        """
+        # Disable editing
+        self.text_renderer.set_property("editable", False)
+        
+        # Remove temporary row
+        if hasattr(self, 'editing_iter') and self.editing_iter:
+            self.store.remove(self.editing_iter)
+            delattr(self, 'editing_iter')
+
     
     # ========================================================================
     # Old Action Handlers (kept for backwards compatibility, now call button handlers)
@@ -814,8 +1101,8 @@ class FileExplorerPanel:
     
     def _show_new_folder_dialog(self):
         """Show dialog to create a new folder."""
-        # Get the window for parent
-        window = self.tree_view.get_root()
+        # Get the toplevel window for parent (GTK3)
+        window = self.tree_view.get_toplevel()
         
         dialog = Gtk.Dialog()
         dialog.set_title("New Folder")
@@ -864,7 +1151,7 @@ class FileExplorerPanel:
     
     def _show_rename_dialog(self):
         """Show dialog to rename selected item."""
-        window = self.tree_view.get_root()
+        window = self.tree_view.get_toplevel()
         
         dialog = Gtk.Dialog()
         dialog.set_title("Rename")
@@ -910,7 +1197,7 @@ class FileExplorerPanel:
     
     def _show_delete_confirmation(self):
         """Show confirmation dialog for delete operation."""
-        window = self.tree_view.get_root()
+        window = self.tree_view.get_toplevel()
         
         dialog = Gtk.MessageDialog(
             transient_for=window,
@@ -936,7 +1223,13 @@ class FileExplorerPanel:
             if self.selected_item_path:
                 success = self.explorer.delete_item(self.selected_item_path)
                 if success:
-                    pass
+                    # Refresh tree view to show deletion
+                    self._load_current_directory()
+                    print(f"[FileExplorer] Deleted: {self.selected_item_path}")
+                else:
+                    # Show error if deletion failed
+                    if self.explorer.on_error:
+                        self.explorer.on_error(f"Failed to delete '{self.selected_item_name}'")
         
         dialog.close()
     
@@ -946,7 +1239,7 @@ class FileExplorerPanel:
         if not info:
             return
         
-        window = self.tree_view.get_root()
+        window = self.tree_view.get_toplevel()
         
         dialog = Gtk.Dialog()
         dialog.set_title(f"Properties - {info['name']}")
@@ -1033,6 +1326,314 @@ class FileExplorerPanel:
             Current path string
         """
         return self.explorer.current_path
+    
+    def set_persistency_manager(self, persistency):
+        """Wire file explorer to persistency manager for file operations integration.
+        
+        This connects the file explorer to receive notifications about file operations
+        (save, load, dirty state changes) so the UI can stay synchronized with the
+        actual state of the document.
+        
+        Args:
+            persistency: NetObjPersistency instance from main application
+        """
+        from shypn.file import NetObjPersistency
+        
+        self.persistency = persistency
+        
+        # Wire callbacks to receive notifications from persistency manager
+        persistency.on_file_saved = self._on_file_saved_callback
+        persistency.on_file_loaded = self._on_file_loaded_callback
+        persistency.on_dirty_changed = self._on_dirty_changed_callback
+    
+    def set_canvas_loader(self, canvas_loader):
+        """Wire file explorer to canvas loader for document operations integration.
+        
+        This allows file explorer to access the current canvas manager and its
+        is_default_filename() flag for proper save operation behavior.
+        
+        Args:
+            canvas_loader: ModelCanvasLoader instance from main application
+        """
+        self.canvas_loader = canvas_loader
+    
+    # ========================================================================
+    # File Operations (cooperating with ModelCanvasManager and NetObjPersistency)
+    # ========================================================================
+    
+    def save_current_document(self):
+        """Save the current document using the persistency manager.
+        
+        This method properly checks the ModelCanvasManager's is_default_filename()
+        flag to determine if a file chooser should be shown.
+        """
+        print("[FileExplorer] save_current_document() called")
+        
+        if not hasattr(self, 'canvas_loader') or self.canvas_loader is None:
+            print("[FileExplorer] Error: Canvas loader not wired")
+            return
+        
+        if not hasattr(self, 'persistency') or self.persistency is None:
+            print("[FileExplorer] Error: Persistency manager not wired")
+            return
+        
+        # Get current document from canvas loader
+        drawing_area = self.canvas_loader.get_current_document()
+        if drawing_area is None:
+            print("[FileExplorer] No document to save")
+            return
+        
+        # Get canvas manager for the current document
+        manager = self.canvas_loader.get_canvas_manager(drawing_area)
+        if manager is None:
+            print("[FileExplorer] No canvas manager found")
+            return
+        
+        # Debug: Print manager state
+        print(f"[FileExplorer] Manager filename: '{manager.filename}'")
+        print(f"[FileExplorer] is_default_filename(): {manager.is_default_filename()}")
+        print(f"[FileExplorer] Calling save_document with is_default_filename={manager.is_default_filename()}")
+        
+        # Convert manager's Petri net objects to DocumentModel for saving
+        document = manager.to_document_model()
+        
+        # Save using persistency manager with is_default_filename flag
+        # This ensures file chooser is shown for documents with "default" filename
+        self.persistency.save_document(
+            document,
+            save_as=False,
+            is_default_filename=manager.is_default_filename()
+        )
+    
+    def save_current_document_as(self):
+        """Save the current document with a new name (Save As).
+        
+        Always shows file chooser regardless of filename state.
+        """
+        print("[FileExplorer] save_current_document_as() called")
+        
+        if not hasattr(self, 'canvas_loader') or self.canvas_loader is None:
+            print("[FileExplorer] Error: Canvas loader not wired")
+            return
+        
+        if not hasattr(self, 'persistency') or self.persistency is None:
+            print("[FileExplorer] Error: Persistency manager not wired")
+            return
+        
+        # Get current document from canvas loader
+        drawing_area = self.canvas_loader.get_current_document()
+        if drawing_area is None:
+            print("[FileExplorer] No document to save")
+            return
+        
+        # Get canvas manager for the current document
+        manager = self.canvas_loader.get_canvas_manager(drawing_area)
+        if manager is None:
+            print("[FileExplorer] No canvas manager found")
+            return
+        
+        print(f"[FileExplorer] Current filename: '{manager.filename}'")
+        print("[FileExplorer] Calling save_document with save_as=True")
+        
+        # Convert manager's Petri net objects to DocumentModel for saving
+        document = manager.to_document_model()
+        
+        # Save As always prompts for new filename
+        self.persistency.save_document(
+            document,
+            save_as=True,
+            is_default_filename=manager.is_default_filename()
+        )
+    
+    def open_document(self):
+        """Open a document from file using the persistency manager.
+        
+        Creates a new tab with the loaded document and sets the manager's filename
+        correctly so is_default_filename() returns False.
+        """
+        if not hasattr(self, 'canvas_loader') or self.canvas_loader is None:
+            print("[FileExplorer] Error: Canvas loader not wired")
+            return
+        
+        if not hasattr(self, 'persistency') or self.persistency is None:
+            print("[FileExplorer] Error: Persistency manager not wired")
+            return
+        
+        # Load using persistency manager
+        document, filepath = self.persistency.load_document()
+        
+        if document and filepath:
+            self._load_document_into_canvas(document, filepath)
+    
+    def _open_file_from_path(self, filepath: str):
+        """Open a specific file from path into canvas.
+        
+        Used by double-click and context menu Open operations.
+        
+        Args:
+            filepath: Full path to .shy file to open
+        """
+        if not hasattr(self, 'canvas_loader') or self.canvas_loader is None:
+            print("[FileExplorer] Error: Canvas loader not wired")
+            return
+        
+        if not hasattr(self, 'persistency') or self.persistency is None:
+            print("[FileExplorer] Error: Persistency manager not wired")
+            return
+        
+        try:
+            # Load document from file
+            from shypn.data.canvas.document_model import DocumentModel
+            document = DocumentModel.load_from_file(filepath)
+            
+            # Load into canvas
+            self._load_document_into_canvas(document, filepath)
+            
+            print(f"[FileExplorer] Opened file: {filepath}")
+            
+        except Exception as e:
+            print(f"[FileExplorer] Error opening file: {e}")
+            import traceback
+            traceback.print_exc()
+            if self.explorer.on_error:
+                self.explorer.on_error(f"Failed to open file: {e}")
+    
+    def _load_document_into_canvas(self, document, filepath: str):
+        """Load a document model into the canvas.
+        
+        Helper method shared by open_document() and _open_file_from_path().
+        
+        Args:
+            document: DocumentModel instance
+            filepath: Full path to the file
+        """
+        if not document or not filepath:
+            return
+        
+        # Create new tab with loaded document
+        import os
+        filename = os.path.basename(filepath)
+        base_name = os.path.splitext(filename)[0]
+        
+        # Add document with the base filename (without extension)
+        # This ensures ModelCanvasManager gets initialized with the correct filename
+        page_index, drawing_area = self.canvas_loader.add_document(filename=base_name)
+        print(f"[FileExplorer] add_document returned: page_index={page_index}, drawing_area={drawing_area}")
+        
+        # Get the canvas manager
+        manager = self.canvas_loader.get_canvas_manager(drawing_area)
+        print(f"[FileExplorer] Retrieved canvas manager: {manager}")
+        if manager:
+            # Load object lists from document into manager
+            manager.places = list(document.places)
+            manager.transitions = list(document.transitions)
+            manager.arcs = list(document.arcs)
+            
+            # Sync ID counters to prevent ID conflicts
+            manager._next_place_id = document._next_place_id
+            manager._next_transition_id = document._next_transition_id
+            manager._next_arc_id = document._next_arc_id
+            
+            # Update persistency manager state
+            if hasattr(self, 'persistency') and self.persistency:
+                self.persistency.set_filepath(filepath)
+                self.persistency.mark_clean()
+                print(f"[FileExplorer] Persistency state updated: filepath={filepath}, dirty=False")
+            
+            # Trigger redraw - signals all canvas instances to draw the model
+            drawing_area.queue_draw()
+            
+            print(f"[FileExplorer] Document loaded into canvas: {base_name}")
+            print(f"[FileExplorer] Objects: {len(manager.places)} places, "
+                  f"{len(manager.transitions)} transitions, {len(manager.arcs)} arcs")
+            print(f"[FileExplorer] is_default_filename() = {manager.is_default_filename()}")
+        else:
+            print("[FileExplorer] Error: Could not get canvas manager")
+    
+    def new_document(self):
+        """Create a new document.
+        
+        Checks for unsaved changes and creates a new tab with "default" filename.
+        """
+        print("[FileExplorer] new_document() called")
+        
+        if not hasattr(self, 'canvas_loader') or self.canvas_loader is None:
+            print("[FileExplorer] Error: Canvas loader not wired")
+            return
+        
+        if not hasattr(self, 'persistency') or self.persistency is None:
+            print("[FileExplorer] Error: Persistency manager not wired")
+            return
+        
+        # Check for unsaved changes
+        if not self.persistency.check_unsaved_changes():
+            print("[FileExplorer] User cancelled new document")
+            return
+        
+        # Create new document
+        if self.persistency.new_document():
+            print("[FileExplorer] Creating new document tab with default filename")
+            self.canvas_loader.add_document()  # Uses "default" filename
+    
+    # ========================================================================
+    # Persistency Callbacks (for integration with file operations)
+    # ========================================================================
+    
+    def _on_file_saved_callback(self, filepath: str):
+        """Called by NetObjPersistency when a file is saved.
+        
+        Updates the current file display and refreshes the file explorer tree
+        to show the newly saved file.
+        
+        Args:
+            filepath: Full path to the saved file
+        """
+        # Update current file display
+        self.set_current_file(filepath)
+        
+        # Refresh tree view to show the saved file
+        self._load_current_directory()
+    
+    def _on_file_loaded_callback(self, filepath: str, document):
+        """Called by NetObjPersistency when a file is loaded.
+        
+        Updates the current file display to show the loaded file.
+        
+        Args:
+            filepath: Full path to the loaded file
+            document: The loaded DocumentModel instance
+        """
+        # Update current file display
+        self.set_current_file(filepath)
+        
+        # Optionally navigate to the directory containing the loaded file
+        # (commented out to avoid unexpected navigation)
+        # directory = os.path.dirname(filepath)
+        # if directory and os.path.isdir(directory):
+        #     self.explorer.navigate_to(directory)
+    
+    def _on_dirty_changed_callback(self, is_dirty: bool):
+        """Called by NetObjPersistency when dirty state changes.
+        
+        Updates the current file display to show dirty state indicator (asterisk).
+        
+        Args:
+            is_dirty: True if document has unsaved changes, False otherwise
+        """
+        if not self.current_opened_file:
+            return
+        
+        # Update current file label with dirty indicator
+        if self.current_file_label:
+            display = self.current_opened_file
+            
+            # Add or remove asterisk for dirty state
+            if is_dirty and not display.endswith(' *'):
+                display = display + ' *'
+            elif not is_dirty and display.endswith(' *'):
+                display = display[:-2]  # Remove ' *'
+            
+            self.current_file_label.set_text(display)
     
     def set_current_file(self, filename_or_path: Optional[str]):
         """Set the currently opened file to display in toolbar.

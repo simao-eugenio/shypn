@@ -405,3 +405,81 @@ class Arc(PetriNetObject):
         """
         self.weight = max(1, weight)
         self._trigger_redraw()
+    
+    def to_dict(self) -> dict:
+        """Serialize arc to dictionary for persistence.
+        
+        Note: Arcs store references to source/target by ID, not the object itself.
+        The actual object references must be restored during deserialization.
+        
+        Returns:
+            dict: Dictionary containing all arc properties
+        """
+        from shypn.netobjs.place import Place
+        
+        data = super().to_dict()  # Get base properties (id, name, label)
+        data.update({
+            "type": "arc",
+            "source_id": self.source.id,
+            "source_type": "place" if isinstance(self.source, Place) else "transition",
+            "target_id": self.target.id,
+            "target_type": "place" if isinstance(self.target, Place) else "transition",
+            "weight": self.weight,
+            "color": list(self.color),
+            "width": self.width,
+            "control_points": self.control_points
+        })
+        return data
+    
+    @classmethod
+    def from_dict(cls, data: dict, places: dict, transitions: dict) -> 'Arc':
+        """Create arc from dictionary (deserialization).
+        
+        Args:
+            data: Dictionary containing arc properties
+            places: Dictionary mapping place IDs to Place instances
+            transitions: Dictionary mapping transition IDs to Transition instances
+            
+        Returns:
+            Arc: New arc instance with restored properties
+            
+        Raises:
+            ValueError: If source or target objects not found
+        """
+        # Resolve source and target references
+        source_id = data["source_id"]
+        target_id = data["target_id"]
+        
+        if data["source_type"] == "place":
+            source = places.get(source_id)
+        else:
+            source = transitions.get(source_id)
+            
+        if data["target_type"] == "place":
+            target = places.get(target_id)
+        else:
+            target = transitions.get(target_id)
+        
+        if source is None:
+            raise ValueError(f"Source object not found: {data['source_type']} ID {source_id}")
+        if target is None:
+            raise ValueError(f"Target object not found: {data['target_type']} ID {target_id}")
+        
+        # Create arc
+        arc = cls(
+            source=source,
+            target=target,
+            id=data["id"],
+            name=data["name"],
+            weight=data.get("weight", 1)
+        )
+        
+        # Restore optional properties
+        if "color" in data:
+            arc.color = tuple(data["color"])
+        if "width" in data:
+            arc.width = data["width"]
+        if "control_points" in data:
+            arc.control_points = data["control_points"]
+        
+        return arc

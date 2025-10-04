@@ -335,7 +335,10 @@ class FileExplorer:
         
         # Map extensions to icon names
         icon_map = {
-            # Petri net files
+            # SHYpn Petri net files (use application icon)
+            '.shy': 'application-x-executable-symbolic',
+            
+            # Other Petri net files
             '.pn': 'application-x-executable-symbolic',
             '.pnml': 'application-x-executable-symbolic',
             
