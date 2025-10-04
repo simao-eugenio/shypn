@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Simulation Tools Palette - Run, Stop, Reset Buttons -->
+<interface>
+  <requires lib="gtk+" version="3.0"/>
+
+  <!-- Revealer container for simulation tools palette -->
+  <object class="GtkRevealer" id="simulate_tools_revealer">
+    <property name="visible">True</property>
+    <property name="reveal-child">False</property>
+    <property name="transition-type">slide-up</property>
+    <property name="transition-duration">200</property>
+    <property name="halign">center</property>
+    <property name="valign">end</property>
+    <property name="margin_bottom">78</property>
+    <property name="margin_start">140</property> <!-- Offset to align with simulate button (3×36px + 4×8px = 140px) -->
+
+    <child>
+      <object class="GtkBox" id="simulate_tools_container">
+        <property name="visible">True</property>
+        <property name="orientation">horizontal</property>
+        <property name="spacing">2</property>
+        <style>
+          <class name="simulate-tools-palette"/>
+        </style>
+
+        <!-- Run Button [R] -->
+        <child>
+          <object class="GtkButton" id="run_simulation_button">
+            <property name="visible">True</property>
+            <property name="label">R</property>
+            <property name="tooltip-text">Run Simulation - Start executing the Petri net</property>
+            <property name="width-request">40</property>
+            <property name="height-request">40</property>
+            <style>
+              <class name="sim-tool-button"/>
+              <class name="run-button"/>
+            </style>
+          </object>
+        </child>
+
+        <!-- Stop Button [S] -->
+        <child>
+          <object class="GtkButton" id="stop_simulation_button">
+            <property name="visible">True</property>
+            <property name="label">S</property>
+            <property name="tooltip-text">Stop Simulation - Pause execution</property>
+            <property name="width-request">40</property>
+            <property name="height-request">40</property>
+            <property name="sensitive">False</property> <!-- Disabled until simulation starts -->
+            <style>
+              <class name="sim-tool-button"/>
+              <class name="stop-button"/>
+            </style>
+          </object>
+        </child>
+
+        <!-- Reset Button [T] -->
+        <child>
+          <object class="GtkButton" id="reset_simulation_button">
+            <property name="visible">True</property>
+            <property name="label">T</property>
+            <property name="tooltip-text">Reset Simulation - Reset to initial marking</property>
+            <property name="width-request">40</property>
+            <property name="height-request">40</property>
+            <style>
+              <class name="sim-tool-button"/>
+              <class name="reset-button"/>
+            </style>
+          </object>
+        </child>
+
+      </object>
+    </child>
+
+  </object>
+
+</interface>

@@ -57,6 +57,14 @@ except ImportError as e:
     print(f'ERROR: Cannot import edit palettes: {e}', file=sys.stderr)
     sys.exit(1)
 
+# Import simulation palettes
+try:
+    from shypn.helpers.simulate_palette_loader import create_simulate_palette
+    from shypn.helpers.simulate_tools_palette_loader import create_simulate_tools_palette
+except ImportError as e:
+    print(f'ERROR: Cannot import simulation palettes: {e}', file=sys.stderr)
+    sys.exit(1)
+
 
 class ModelCanvasLoader:
     """Loader and controller for the model canvas (multi-document Petri Net editor)."""
@@ -90,6 +98,10 @@ class ModelCanvasLoader:
         # Dictionary to map drawing areas to their edit palettes
         self.edit_palettes = {}  # {drawing_area: EditPaletteLoader}
         self.edit_tools_palettes = {}  # {drawing_area: EditToolsLoader}
+        
+        # Dictionary to map drawing areas to their simulation palettes
+        self.simulate_palettes = {}  # {drawing_area: SimulatePaletteLoader}
+        self.simulate_tools_palettes = {}  # {drawing_area: SimulateToolsPaletteLoader}
         
         # Parent window reference (for zoom window transient behavior)
         self.parent_window = None
@@ -309,6 +321,28 @@ class ModelCanvasLoader:
                 
                 # Connect tool-changed signal to update canvas manager
                 edit_tools_palette.connect('tool-changed', self._on_tool_changed, manager, drawing_area)
+                
+                # Create and add simulation palettes (positioned beside edit palette)
+                # Create simulation tools palette first (so simulate palette can reference it)
+                simulate_tools_palette = create_simulate_tools_palette()
+                simulate_tools_widget = simulate_tools_palette.get_widget()
+                
+                # Create simulation palette (main [S] button)
+                simulate_palette = create_simulate_palette()
+                simulate_widget = simulate_palette.get_widget()
+                
+                # Link the two palettes
+                simulate_palette.set_tools_palette_loader(simulate_tools_palette)
+                
+                # Add widgets as independent overlays
+                # Tools palette added first (appears above [S] button when revealed)
+                if simulate_tools_widget:
+                    overlay_widget.add_overlay(simulate_tools_widget)
+                    self.simulate_tools_palettes[drawing_area] = simulate_tools_palette
+                
+                if simulate_widget:
+                    overlay_widget.add_overlay(simulate_widget)
+                    self.simulate_palettes[drawing_area] = simulate_palette
         
     
     def _on_tool_changed(self, tools_palette, tool_name, manager, drawing_area):
@@ -1247,105 +1281,30 @@ class ModelCanvasLoader:
             drawing_area: GtkDrawingArea widget
         """
         from shypn.netobjs import Place, Transition, Arc
+        from shypn.helpers.place_prop_dialog_loader import create_place_prop_dialog
+        from shypn.helpers.transition_prop_dialog_loader import create_transition_prop_dialog
+        from shypn.helpers.arc_prop_dialog_loader import create_arc_prop_dialog
         
-        # Create properties dialog
-        dialog = Gtk.Dialog(
-            title=f"{type(obj).__name__} Properties",
-            parent=self.parent_window,
-            flags=Gtk.DialogFlags.MODAL | Gtk.DialogFlags.DESTROY_WITH_PARENT
-        )
-        dialog.add_buttons(
-            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
-            Gtk.STOCK_OK, Gtk.ResponseType.OK
-        )
+        # Create appropriate dialog based on object type
+        dialog_loader = None
         
-        content_area = dialog.get_content_area()
-        content_area.set_spacing(10)
-        content_area.set_border_width(10)
-        
-        # Add property fields
-        grid = Gtk.Grid()
-        grid.set_column_spacing(10)
-        grid.set_row_spacing(5)
-        
-        row = 0
-        
-        # Name (read-only)
-        label = Gtk.Label(label="Name:")
-        label.set_halign(Gtk.Align.END)
-        grid.attach(label, 0, row, 1, 1)
-        
-        name_label = Gtk.Label(label=obj.name)
-        name_label.set_halign(Gtk.Align.START)
-        grid.attach(name_label, 1, row, 1, 1)
-        row += 1
-        
-        # Label (editable)
-        label = Gtk.Label(label="Label:")
-        label.set_halign(Gtk.Align.END)
-        grid.attach(label, 0, row, 1, 1)
-        
-        label_entry = Gtk.Entry()
-        label_entry.set_text(obj.label or "")
-        label_entry.set_hexpand(True)
-        grid.attach(label_entry, 1, row, 1, 1)
-        row += 1
-        
-        # Type-specific properties
         if isinstance(obj, Place):
-            # Initial marking
-            label = Gtk.Label(label="Marking:")
-            label.set_halign(Gtk.Align.END)
-            grid.attach(label, 0, row, 1, 1)
-            
-            marking_spin = Gtk.SpinButton()
-            marking_spin.set_adjustment(Gtk.Adjustment(value=obj.marking, lower=0, upper=999, step_increment=1))
-            marking_spin.set_digits(0)
-            grid.attach(marking_spin, 1, row, 1, 1)
-            row += 1
-            
+            dialog_loader = create_place_prop_dialog(obj, parent_window=self.parent_window)
+        elif isinstance(obj, Transition):
+            dialog_loader = create_transition_prop_dialog(obj, parent_window=self.parent_window)
         elif isinstance(obj, Arc):
-            # Arc weight
-            label = Gtk.Label(label="Weight:")
-            label.set_halign(Gtk.Align.END)
-            grid.attach(label, 0, row, 1, 1)
-            
-            weight_spin = Gtk.SpinButton()
-            weight_spin.set_adjustment(Gtk.Adjustment(value=obj.weight, lower=1, upper=999, step_increment=1))
-            weight_spin.set_digits(0)
-            grid.attach(weight_spin, 1, row, 1, 1)
-            row += 1
+            dialog_loader = create_arc_prop_dialog(obj, parent_window=self.parent_window)
+        else:
+            print(f"[ModelCanvasLoader] Unknown object type: {type(obj)}")
+            return
         
-        grid.show_all()
-        content_area.pack_start(grid, True, True, 0)
+        # Run dialog and handle response
+        response = dialog_loader.run()
         
-        # Show dialog and get response
-        response = dialog.run()
-        
+        # Redraw canvas to reflect any changes
+        # Redraw canvas to reflect any changes
         if response == Gtk.ResponseType.OK:
-            # Update object properties
-            new_label = label_entry.get_text()
-            if new_label != obj.label:
-                obj.label = new_label
-                print(f"Updated {obj.name} label: '{new_label}'")
-            
-            # Update type-specific properties
-            if isinstance(obj, Place):
-                new_marking = int(marking_spin.get_value())
-                if new_marking != obj.marking:
-                    obj.set_marking(new_marking)
-                    print(f"Updated {obj.name} marking: {new_marking}")
-            
-            elif isinstance(obj, Arc):
-                new_weight = int(weight_spin.get_value())
-                if new_weight != obj.weight:
-                    obj.set_weight(new_weight)
-                    print(f"Updated {obj.name} weight: {new_weight}")
-            
-            manager.mark_modified()
             drawing_area.queue_draw()
-        
-        dialog.destroy()
     
     def _on_arc_edit_weight(self, arc, manager, drawing_area):
         """Quick edit arc weight.

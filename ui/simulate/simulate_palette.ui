@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Simulate Palette - Floating [S] Button to Toggle Simulation Tools -->
+<interface>
+  <requires lib="gtk+" version="3.0"/>
+
+  <!-- Main container for simulate palette -->
+  <object class="GtkBox" id="simulate_palette_container">
+    <property name="visible">True</property>
+    <property name="orientation">vertical</property>
+    <property name="spacing">0</property>
+    <property name="halign">center</property>
+    <property name="valign">end</property>
+    <property name="margin_bottom">24</property>
+    <property name="margin_start">140</property> <!-- Offset for 3 button widths gap (3×36px + 4×8px = 140px) -->
+
+    <!-- Simulate Button [S] - Toggles the simulation tools palette -->
+    <child>
+      <object class="GtkToggleButton" id="simulate_toggle_button">
+        <property name="visible">True</property>
+        <property name="label">S</property>
+        <property name="tooltip-text">Toggle Simulation Tools (Run, Stop, Reset)</property>
+        <property name="width-request">36</property>
+        <property name="height-request">36</property>
+        <style>
+          <class name="simulate-button"/>
+        </style>
+      </object>
+    </child>
+
+  </object>
+
+</interface>

@@ -360,7 +360,8 @@
                                     <property name="shadow-type">in</property>
                                     <property name="min-content-height">80</property>
                                     <property name="max-content-height">150</property>
-                                    <property name="policy">automatic</property>
+                                    <property name="hscrollbar-policy">automatic</property>
+                                    <property name="vscrollbar-policy">automatic</property>
                                     <child>
                                       <object class="GtkTextView" id="guard_textview">
                                         <property name="visible">True</property>
@@ -443,7 +444,8 @@
                                     <property name="shadow-type">in</property>
                                     <property name="min-content-height">80</property>
                                     <property name="max-content-height">150</property>
-                                    <property name="policy">automatic</property>
+                                    <property name="hscrollbar-policy">automatic</property>
+                                    <property name="vscrollbar-policy">automatic</property>
                                     <child>
                                       <object class="GtkTextView" id="rate_textview">
                                         <property name="visible">True</property>
@@ -628,7 +630,8 @@
                         <property name="can-focus">True</property>
                         <property name="shadow-type">in</property>
                         <property name="min-content-height">200</property>
-                        <property name="policy">automatic</property>
+                        <property name="hscrollbar-policy">automatic</property>
+                        <property name="vscrollbar-policy">automatic</property>
                         <child>
                           <object class="GtkTextView" id="diagnostic_report_textview">
                             <property name="visible">True</property>
