@@ -144,6 +144,9 @@ class SimulationController:
         # Conflict resolution policy
         self.conflict_policy = DEFAULT_POLICY
         self._round_robin_index = 0  # For ROUND_ROBIN policy
+        
+        # Optional data collector for analysis/plotting
+        self.data_collector = None
     
     def _get_behavior(self, transition):
         """Get or create behavior instance for a transition.
@@ -395,6 +398,10 @@ class SimulationController:
         
         # Fire using behavior
         behavior.fire(input_arcs, output_arcs)
+        
+        # Notify data collector if attached
+        if self.data_collector is not None:
+            self.data_collector.on_transition_fired(transition, self.time)
     
     def _select_transition(self, enabled_transitions: List) -> Any:
         """Select one transition from enabled set based on conflict resolution policy.
