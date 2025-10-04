@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Floating Mode Palette: Edit/Sim Buttons -->
+<interface>
+  <requires lib="gtk+" version="3.0"/>
+  <object class="GtkBox" id="mode_palette_container">
+    <property name="visible">True</property>
+    <property name="orientation">horizontal</property>
+    <property name="spacing">12</property>
+    <property name="halign">start</property>
+    <property name="valign">end</property>
+    <property name="margin_bottom">24</property>
+    <property name="margin_left">24</property>
+    <style>
+      <class name="mode-palette"/>
+    </style>
+    <child>
+      <object class="GtkButton" id="edit_mode_button">
+        <property name="visible">True</property>
+        <property name="label">Edit</property>
+        <property name="tooltip-text">Switch to Editing Mode</property>
+        <property name="width-request">64</property>
+        <property name="height-request">40</property>
+        <style>
+          <class name="mode-button"/>
+          <class name="edit-button"/>
+        </style>
+      </object>
+    </child>
+    <child>
+      <object class="GtkButton" id="sim_mode_button">
+        <property name="visible">True</property>
+        <property name="label">Sim</property>
+        <property name="tooltip-text">Switch to Simulation Mode</property>
+        <property name="width-request">64</property>
+        <property name="height-request">40</property>
+        <style>
+          <class name="mode-button"/>
+          <class name="simulate-button"/>
+        </style>
+      </object>
+    </child>
+  </object>
+</interface>

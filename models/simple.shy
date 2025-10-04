@@ -1,11 +1,11 @@
 {
   "version": "2.0",
   "metadata": {
-    "created": "2025-10-04T13:03:27.089340",
+    "created": "2025-10-04T19:24:44.276782",
     "object_counts": {
-      "places": 1,
+      "places": 2,
       "transitions": 1,
-      "arcs": 1
+      "arcs": 2
     }
   },
   "places": [
@@ -14,10 +14,28 @@
       "name": "P1",
       "label": "",
       "type": "place",
-      "x": 1605.0,
-      "y": 1025.0,
+      "x": 1742.0,
+      "y": 1029.0,
+      "radius": 25.0,
+      "marking": 25,
+      "initial_marking": 0,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": 2,
+      "name": "P2",
+      "label": "",
+      "type": "place",
+      "x": 2016.0,
+      "y": 1039.0,
       "radius": 25.0,
       "marking": 0,
+      "initial_marking": 0,
       "border_color": [
         0.0,
         0.0,
@@ -32,8 +50,8 @@
       "name": "T1",
       "label": "",
       "type": "transition",
-      "x": 1603.0,
-      "y": 873.0,
+      "x": 1876.0,
+      "y": 803.0,
       "width": 50.0,
       "height": 25.0,
       "horizontal": true,
@@ -61,6 +79,24 @@
       "source_type": "place",
       "target_id": 1,
       "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": 2,
+      "name": "A2",
+      "label": "",
+      "type": "arc",
+      "source_id": 1,
+      "source_type": "transition",
+      "target_id": 2,
+      "target_type": "place",
       "weight": 1,
       "color": [
         0.0,

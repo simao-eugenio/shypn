@@ -176,6 +176,47 @@
                         </child>
                         
                         <child>
+                          <object class="GtkBox" id="label_box">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="spacing">10</property>
+                            <child>
+                              <object class="GtkLabel" id="label_label">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="label" translatable="yes">Label:</property>
+                                <property name="width-chars">12</property>
+                                <property name="xalign">1</property>
+                              </object>
+                              <packing>
+                                <property name="expand">False</property>
+                                <property name="fill">True</property>
+                                <property name="position">0</property>
+                              </packing>
+                            </child>
+                            <child>
+                              <object class="GtkEntry" id="transition_label_entry">
+                                <property name="visible">True</property>
+                                <property name="can-focus">True</property>
+                                <property name="hexpand">True</property>
+                                <property name="invisible-char">●</property>
+                                <property name="placeholder-text">Optional display label</property>
+                              </object>
+                              <packing>
+                                <property name="expand">True</property>
+                                <property name="fill">True</property>
+                                <property name="position">1</property>
+                              </packing>
+                            </child>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">True</property>
+                            <property name="position">1</property>
+                          </packing>
+                        </child>
+                        
+                        <child>
                           <object class="GtkBox" id="type_combo_box">
                             <property name="visible">True</property>
                             <property name="can-focus">False</property>
@@ -199,11 +240,13 @@
                                 <property name="visible">True</property>
                                 <property name="can-focus">False</property>
                                 <property name="hexpand">True</property>
+                                <property name="active">2</property>
                                 <property name="tooltip-text">Select the timing behavior for this transition</property>
                                 <items>
-                                  <item translatable="yes">stochastic</item>
                                   <item translatable="yes">immediate</item>
-                                  <item translatable="yes">deterministic</item>
+                                  <item translatable="yes">timed</item>
+                                  <item translatable="yes">stochastic</item>
+                                  <item translatable="yes">continuous</item>
                                 </items>
                               </object>
                               <packing>
@@ -249,11 +292,123 @@
                         <property name="visible">True</property>
                         <property name="can-focus">False</property>
                         <property name="orientation">vertical</property>
-                        <property name="spacing">5</property>
+                        <property name="spacing">8</property>
                         <property name="margin-top">10</property>
                         <property name="margin-bottom">10</property>
                         <property name="margin-left">15</property>
                         <property name="margin-right">15</property>
+                        
+                        <!-- Priority Field -->
+                        <child>
+                          <object class="GtkBox" id="priority_box">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="spacing">10</property>
+                            <child>
+                              <object class="GtkLabel" id="priority_label">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="label" translatable="yes">Priority:</property>
+                                <property name="width-chars">12</property>
+                                <property name="xalign">1</property>
+                                <property name="tooltip-text">Priority for conflict resolution (higher = higher priority)</property>
+                              </object>
+                              <packing>
+                                <property name="expand">False</property>
+                                <property name="fill">True</property>
+                                <property name="position">0</property>
+                              </packing>
+                            </child>
+                            <child>
+                              <object class="GtkSpinButton" id="priority_spin">
+                                <property name="visible">True</property>
+                                <property name="can-focus">True</property>
+                                <property name="hexpand">True</property>
+                                <property name="adjustment">priority_adjustment</property>
+                                <property name="digits">0</property>
+                                <property name="tooltip-text">Priority for conflict resolution when multiple transitions are enabled (0-100, default=0)</property>
+                              </object>
+                              <packing>
+                                <property name="expand">True</property>
+                                <property name="fill">True</property>
+                                <property name="position">1</property>
+                              </packing>
+                            </child>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">True</property>
+                            <property name="position">0</property>
+                          </packing>
+                        </child>
+                        
+                        <!-- Rate Field -->
+                        <child>
+                          <object class="GtkBox" id="rate_simple_box">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="spacing">10</property>
+                            <child>
+                              <object class="GtkLabel" id="rate_simple_label">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="label" translatable="yes">Rate (λ):</property>
+                                <property name="width-chars">12</property>
+                                <property name="xalign">1</property>
+                                <property name="tooltip-text">Rate parameter for stochastic/timed transitions</property>
+                              </object>
+                              <packing>
+                                <property name="expand">False</property>
+                                <property name="fill">True</property>
+                                <property name="position">0</property>
+                              </packing>
+                            </child>
+                            <child>
+                              <object class="GtkEntry" id="rate_entry">
+                                <property name="visible">True</property>
+                                <property name="can-focus">True</property>
+                                <property name="hexpand">True</property>
+                                <property name="tooltip-text">Numeric rate value or expression (e.g., '1.0', '0.5 * tokens(P1)'). For complex functions, use the Behavior tab.</property>
+                                <property name="placeholder-text">Enter rate value or expression</property>
+                              </object>
+                              <packing>
+                                <property name="expand">True</property>
+                                <property name="fill">True</property>
+                                <property name="position">1</property>
+                              </packing>
+                            </child>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">True</property>
+                            <property name="position">1</property>
+                          </packing>
+                        </child>
+                        
+                        <!-- Help Text -->
+                        <child>
+                          <object class="GtkLabel" id="type_parameters_help">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="label">• Priority: Used for conflict resolution (PRIORITY policy)
+• Rate: Basic numeric value or expression
+• For complex rate functions, use the Behavior tab</property>
+                            <property name="use-markup">True</property>
+                            <property name="xalign">0</property>
+                            <property name="wrap">True</property>
+                            <property name="margin-top">5</property>
+                            <attributes>
+                              <attribute name="style" value="italic"/>
+                              <attribute name="scale" value="0.8"/>
+                            </attributes>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">True</property>
+                            <property name="position">2</property>
+                          </packing>
+                        </child>
+                        
                       </object>
                     </child>
                     <child type="label">

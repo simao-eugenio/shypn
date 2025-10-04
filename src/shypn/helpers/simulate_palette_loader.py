@@ -26,7 +26,9 @@ class SimulatePaletteLoader(GObject.GObject):
     Links to SimulateToolsPaletteLoader for the tools revealer.
     """
     
-    __gsignals__ = {}
+    __gsignals__ = {
+        'tools-toggled': (GObject.SignalFlags.RUN_FIRST, None, (bool,))
+    }
     
     def __init__(self, ui_path: Optional[str] = None):
         """Initialize the simulation palette loader.

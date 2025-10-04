@@ -52,8 +52,12 @@ class Transition(PetriNetObject):
         self.border_color = self.DEFAULT_BORDER_COLOR
         self.border_width = self.DEFAULT_BORDER_WIDTH
         
-        # State
+        # Behavioral properties
+        self.transition_type = 'immediate'  # Transition type: immediate, timed, stochastic, continuous
         self.enabled = True  # Can this transition fire?
+        self.guard = None  # Guard function/expression (enables/disables transition)
+        self.rate = None  # Rate function for consumption/production dynamics
+        self.priority = 0  # Priority for conflict resolution (higher = higher priority)
     
     def render(self, cr, transform=None, zoom=1.0):
         """Render the transition using Cairo.
@@ -80,6 +84,22 @@ class Transition(PetriNetObject):
         # Calculate rectangle corners (center-based)
         half_w = width / 2
         half_h = height / 2
+        
+        # Add glow effect for colored objects (CSS-like styling)
+        if self.border_color != self.DEFAULT_BORDER_COLOR or self.fill_color != self.DEFAULT_COLOR:
+            # Draw outer glow (subtle shadow effect)
+            cr.rectangle(self.x - half_w - 2 / zoom, self.y - half_h - 2 / zoom, 
+                        width + 4 / zoom, height + 4 / zoom)
+            
+            # Use border color for glow if different from default, otherwise use fill color
+            if self.border_color != self.DEFAULT_BORDER_COLOR:
+                r, g, b = self.border_color
+            else:
+                r, g, b = self.fill_color
+            
+            cr.set_source_rgba(r, g, b, 0.3)  # Semi-transparent color
+            cr.set_line_width((self.border_width + 2) / max(zoom, 1e-6))
+            cr.stroke()
         
         # Draw rectangle (legacy style: fill_preserve then stroke)
         cr.rectangle(self.x - half_w, self.y - half_h, width, height)

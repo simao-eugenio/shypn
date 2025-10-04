@@ -11,7 +11,6 @@
     <property name="halign">center</property>
     <property name="valign">end</property>
     <property name="margin_bottom">24</property>
-    <property name="margin_start">140</property> <!-- Offset for 3 button widths gap (3×36px + 4×8px = 140px) -->
 
     <!-- Simulate Button [S] - Toggles the simulation tools palette -->
     <child>

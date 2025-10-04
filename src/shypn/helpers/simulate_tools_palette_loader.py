@@ -1,8 +1,11 @@
 """
 Simulate Tools Palette Loader
 
-Loads and manages the simulation tools palette UI (Run, Stop, Reset buttons).
+Loads and manages the simulation tools palette UI (Run, Step, Stop, Reset buttons).
 This palette appears below the main [S] simulate button when toggled.
+
+The palette directly manages the SimulationController - buttons call controller
+methods directly rather than emitting signals for external handling.
 """
 
 import os
@@ -10,29 +13,35 @@ import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, GObject
 
+from shypn.engine.simulation import SimulationController
+
 
 class SimulateToolsPaletteLoader(GObject.GObject):
-    """Loader for simulation tools palette - manages [R][S][T] button panel.
+    """Loader for simulation tools palette - manages [R][P][S][T] button panel.
     
     This class loads and manages the simulation tools palette UI from
-    simulate_tools_palette.ui. The palette contains three buttons:
-    - Run [R]: Start simulation execution
+    simulate_tools_palette.ui. The palette contains four buttons:
+    - Run [R]: Start continuous simulation execution
+    - Step [P]: Execute one simulation step
     - Stop [S]: Pause simulation
     - Reset [T]: Reset to initial marking
+    
+    The palette directly owns and operates the SimulationController.
+    Buttons call controller methods directly (no external wiring needed).
     
     The palette is revealed/hidden by the main simulate button via show()/hide().
     """
     
     __gsignals__ = {
-        'run-clicked': (GObject.SignalFlags.RUN_FIRST, None, ()),
-        'stop-clicked': (GObject.SignalFlags.RUN_FIRST, None, ()),
-        'reset-clicked': (GObject.SignalFlags.RUN_FIRST, None, ()),
+        # Signal emitted after each simulation step (for canvas redraw)
+        'step-executed': (GObject.SignalFlags.RUN_FIRST, None, (float,)),  # time
     }
     
-    def __init__(self, ui_dir: str = None):
+    def __init__(self, model=None, ui_dir: str = None):
         """Initialize the simulate tools palette loader.
         
         Args:
+            model: PetriNetModel instance for simulation (can be set later)
             ui_dir: Directory containing UI files. Defaults to project ui/simulate/.
         """
         super().__init__()
@@ -46,17 +55,20 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         self.ui_dir = ui_dir
         self.ui_path = os.path.join(ui_dir, 'simulate_tools_palette.ui')
         
+        # Simulation controller
+        self.simulation = None
+        self._model = model
+        if model is not None:
+            self._init_simulation_controller()
+        
         # Widget references
         self.builder = None
         self.simulate_tools_revealer = None  # Revealer container
         self.simulate_tools_container = None
         self.run_button = None
+        self.step_button = None
         self.stop_button = None
         self.reset_button = None
-        
-        # State tracking
-        self._simulation_running = False
-        self._initial_marking = None
         
         # Load UI
         self._load_ui()
@@ -74,6 +86,7 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         self.simulate_tools_revealer = self.builder.get_object('simulate_tools_revealer')
         self.simulate_tools_container = self.builder.get_object('simulate_tools_container')
         self.run_button = self.builder.get_object('run_simulation_button')
+        self.step_button = self.builder.get_object('step_simulation_button')
         self.stop_button = self.builder.get_object('stop_simulation_button')
         self.reset_button = self.builder.get_object('reset_simulation_button')
         
@@ -81,11 +94,12 @@ class SimulateToolsPaletteLoader(GObject.GObject):
             raise ValueError("Object 'simulate_tools_revealer' not found in simulate_tools_palette.ui")
         
         # Verify all buttons exist
-        if not all([self.run_button, self.stop_button, self.reset_button]):
+        if not all([self.run_button, self.step_button, self.stop_button, self.reset_button]):
             raise ValueError("One or more simulation buttons not found in simulate_tools_palette.ui")
         
         # Connect button signals
         self.run_button.connect('clicked', self._on_run_clicked)
+        self.step_button.connect('clicked', self._on_step_clicked)
         self.stop_button.connect('clicked', self._on_stop_clicked)
         self.reset_button.connect('clicked', self._on_reset_clicked)
         
@@ -93,6 +107,39 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         self._apply_styling()
         
         print(f"[SimulateToolsPaletteLoader] UI loaded successfully from {self.ui_path}")
+    
+    def _init_simulation_controller(self):
+        """Initialize the simulation controller with the model."""
+        if self._model is None:
+            return
+        
+        self.simulation = SimulationController(self._model)
+        
+        # Register step listener to emit signal for canvas redraw
+        self.simulation.add_step_listener(self._on_simulation_step)
+        
+        print("[SimulateToolsPaletteLoader] SimulationController initialized")
+    
+    def set_model(self, model):
+        """Set the Petri net model for simulation.
+        
+        Args:
+            model: PetriNetModel instance
+        """
+        self._model = model
+        self._init_simulation_controller()
+    
+    def _on_simulation_step(self, controller, time):
+        """Callback from SimulationController after each step.
+        
+        Emits 'step-executed' signal for canvas redraw.
+        
+        Args:
+            controller: The SimulationController instance
+            time: Current simulation time
+        """
+        # Emit signal so canvas can redraw
+        self.emit('step-executed', time)
     
     def _apply_styling(self):
         """Apply custom CSS styling to the simulation tools palette."""
@@ -151,6 +198,20 @@ class SimulateToolsPaletteLoader(GObject.GObject):
             background: linear-gradient(to bottom, #1e8449, #196f3d);
         }
         
+        /* Step button - cyan/teal theme */
+        .step-button {
+            background: linear-gradient(to bottom, #16a085, #138d75);
+            border-color: #117864;
+        }
+        
+        .step-button:hover {
+            background: linear-gradient(to bottom, #1abc9c, #16a085);
+        }
+        
+        .step-button:active {
+            background: linear-gradient(to bottom, #138d75, #117864);
+        }
+        
         /* Stop button - red theme */
         .stop-button {
             background: linear-gradient(to bottom, #e74c3c, #c0392b);
@@ -189,49 +250,75 @@ class SimulateToolsPaletteLoader(GObject.GObject):
             style_context.add_provider(css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         
         # Apply to each button
-        for button in [self.run_button, self.stop_button, self.reset_button]:
+        for button in [self.run_button, self.step_button, self.stop_button, self.reset_button]:
             if button:
                 style_context = button.get_style_context()
                 style_context.add_provider(css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
     
     def _on_run_clicked(self, button):
-        """Handle Run button click - start simulation."""
+        """Handle Run button click - start continuous simulation."""
+        if self.simulation is None:
+            print("[SimulateToolsPaletteLoader] No simulation controller - model not set")
+            return
+        
         print("[SimulateToolsPaletteLoader] Run clicked")
-        self._simulation_running = True
+        
+        # Start continuous simulation
+        self.simulation.run(time_step=0.1)
         
         # Update button states
         self.run_button.set_sensitive(False)
+        self.step_button.set_sensitive(False)
         self.stop_button.set_sensitive(True)
         self.reset_button.set_sensitive(False)
+    
+    def _on_step_clicked(self, button):
+        """Handle Step button click - execute one simulation step."""
+        if self.simulation is None:
+            print("[SimulateToolsPaletteLoader] No simulation controller - model not set")
+            return
         
-        # Emit signal
-        self.emit('run-clicked')
+        print("[SimulateToolsPaletteLoader] Step clicked")
+        
+        # Execute single step
+        success = self.simulation.step(time_step=0.1)
+        
+        if not success:
+            print("[SimulateToolsPaletteLoader] Step failed - no enabled transitions")
     
     def _on_stop_clicked(self, button):
         """Handle Stop button click - pause simulation."""
+        if self.simulation is None:
+            print("[SimulateToolsPaletteLoader] No simulation controller - model not set")
+            return
+        
         print("[SimulateToolsPaletteLoader] Stop clicked")
-        self._simulation_running = False
+        
+        # Stop continuous simulation
+        self.simulation.stop()
         
         # Update button states
         self.run_button.set_sensitive(True)
+        self.step_button.set_sensitive(True)
         self.stop_button.set_sensitive(False)
         self.reset_button.set_sensitive(True)
-        
-        # Emit signal
-        self.emit('stop-clicked')
     
     def _on_reset_clicked(self, button):
         """Handle Reset button click - reset to initial marking."""
+        if self.simulation is None:
+            print("[SimulateToolsPaletteLoader] No simulation controller - model not set")
+            return
+        
         print("[SimulateToolsPaletteLoader] Reset clicked")
-        self._simulation_running = False
+        
+        # Reset simulation
+        self.simulation.reset()
         
         # Update button states
         self.run_button.set_sensitive(True)
+        self.step_button.set_sensitive(True)
         self.stop_button.set_sensitive(False)
         self.reset_button.set_sensitive(True)
-        
-        # Emit signal
-        self.emit('reset-clicked')
     
     def show(self):
         """Show the tools palette with animation."""
@@ -261,32 +348,26 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         """
         return self.simulate_tools_revealer
     
-    def set_initial_marking(self, marking):
-        """Set the initial marking for reset functionality.
-        
-        Args:
-            marking: The initial marking state to restore on reset.
-        """
-        self._initial_marking = marking
-        print(f"[SimulateToolsPaletteLoader] Initial marking set")
-    
     def is_simulation_running(self):
         """Check if simulation is currently running.
         
         Returns:
             bool: True if simulation is active, False otherwise.
         """
-        return self._simulation_running
+        if self.simulation is None:
+            return False
+        return self.simulation.is_running()
 
 
 # Factory function for convenience
-def create_simulate_tools_palette(ui_dir: str = None):
+def create_simulate_tools_palette(model=None, ui_dir: str = None):
     """Factory function to create a simulate tools palette loader.
     
     Args:
+        model: PetriNetModel instance for simulation (optional)
         ui_dir: Directory containing UI files. Defaults to project ui/simulate/.
     
     Returns:
         SimulateToolsPaletteLoader: Configured palette loader instance.
     """
-    return SimulateToolsPaletteLoader(ui_dir=ui_dir)
+    return SimulateToolsPaletteLoader(model=model, ui_dir=ui_dir)

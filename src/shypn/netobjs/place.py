@@ -46,6 +46,7 @@ class Place(PetriNetObject):
         
         # State
         self.tokens = 0  # Number of tokens in this place
+        self.initial_marking = 0  # Initial marking for simulation reset
     
     def render(self, cr, transform=None, zoom=1.0):
         """Render the place using Cairo.
@@ -63,6 +64,15 @@ class Place(PetriNetObject):
         """
         # Use world coordinates directly (Cairo transform handles conversion)
         # Legacy approach: cr.scale() is already applied, so we draw in world space
+        
+        # Add glow effect for colored objects (CSS-like styling)
+        if self.border_color != self.DEFAULT_BORDER_COLOR:
+            # Draw outer glow (subtle shadow effect)
+            cr.arc(self.x, self.y, self.radius + 2 / zoom, 0, 2 * math.pi)
+            r, g, b = self.border_color
+            cr.set_source_rgba(r, g, b, 0.3)  # Semi-transparent color
+            cr.set_line_width((self.border_width + 2) / max(zoom, 1e-6))
+            cr.stroke()
         
         # Draw hollow circle (legacy style: stroke only, no fill)
         cr.arc(self.x, self.y, self.radius, 0, 2 * math.pi)
@@ -162,6 +172,19 @@ class Place(PetriNetObject):
         self.tokens = max(0, count)
         self._trigger_redraw()
     
+    def set_initial_marking(self, count: int):
+        """Set the initial marking for this place (for simulation reset).
+        
+        Args:
+            count: Initial token count (non-negative)
+        """
+        self.initial_marking = max(0, count)
+    
+    def reset_to_initial_marking(self):
+        """Reset the current marking to the initial marking."""
+        self.tokens = self.initial_marking
+        self._trigger_redraw()
+    
     def to_dict(self) -> dict:
         """Serialize place to dictionary for persistence.
         
@@ -175,6 +198,7 @@ class Place(PetriNetObject):
             "y": self.y,
             "radius": self.radius,
             "marking": self.tokens,  # Use 'marking' for compatibility
+            "initial_marking": self.initial_marking,  # Store initial marking for reset
             "border_color": list(self.border_color),
             "border_width": self.border_width
         })
@@ -203,6 +227,11 @@ class Place(PetriNetObject):
         # Restore optional properties
         if "marking" in data:
             place.tokens = data["marking"]
+        if "initial_marking" in data:
+            place.initial_marking = data["initial_marking"]
+        else:
+            # If no initial_marking stored, use current marking as initial
+            place.initial_marking = place.tokens
         if "border_color" in data:
             place.border_color = tuple(data["border_color"])
         if "border_width" in data:

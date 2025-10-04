@@ -148,8 +148,8 @@ class TransitionBehavior(ABC):
             if kind != 'normal':
                 continue
             
-            # Get source place
-            source_place = self._get_place(arc.source_id)
+            # Get source place directly from arc reference
+            source_place = arc.source
             if source_place is None:
                 return False
             
@@ -168,8 +168,9 @@ class TransitionBehavior(ABC):
         if not hasattr(self.model, 'arcs'):
             return []
         
+        # Use object reference comparison, not ID
         return [arc for arc in self.model.arcs.values() 
-                if getattr(arc, 'target_id', None) == self.transition.id]
+                if arc.target == self.transition]
     
     def get_output_arcs(self) -> List:
         """Get all output arcs from this transition.
@@ -180,8 +181,9 @@ class TransitionBehavior(ABC):
         if not hasattr(self.model, 'arcs'):
             return []
         
+        # Use object reference comparison, not ID
         return [arc for arc in self.model.arcs.values() 
-                if getattr(arc, 'source_id', None) == self.transition.id]
+                if arc.source == self.transition]
     
     def _get_place(self, place_id: int):
         """Get place object by ID.
