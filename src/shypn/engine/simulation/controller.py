@@ -401,11 +401,11 @@ class SimulationController:
         output_arcs = behavior.get_output_arcs()
         
         # Fire using behavior
-        behavior.fire(input_arcs, output_arcs)
+        success, details = behavior.fire(input_arcs, output_arcs)
         
-        # Notify data collector if attached
+        # Notify data collector if attached (pass details for consistency)
         if self.data_collector is not None:
-            self.data_collector.on_transition_fired(transition, self.time)
+            self.data_collector.on_transition_fired(transition, self.time, details)
     
     def _select_transition(self, enabled_transitions: List) -> Any:
         """Select one transition from enabled set based on conflict resolution policy.
