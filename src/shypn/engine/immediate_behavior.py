@@ -42,18 +42,25 @@ class ImmediateBehavior(TransitionBehavior):
     def can_fire(self) -> Tuple[bool, str]:
         """Check if transition can fire (sufficient tokens in input places).
         
-        For immediate transitions, the only constraint is structural enablement:
-        all input places must have at least arc_weight tokens.
+        For immediate transitions, constraints are:
+        1. Guard condition must pass (if defined)
+        2. All input places must have at least arc_weight tokens
         
         Returns:
             Tuple of (can_fire: bool, reason: str)
             - (True, "enabled") if can fire
+            - (False, "guard-fails") if guard condition not met
             - (False, "insufficient-tokens") if any input place lacks tokens
             - (False, "no-input-arcs") if transition has no inputs (always fires)
         """
+        # Check guard first
+        guard_passes, guard_reason = self._evaluate_guard()
+        if not guard_passes:
+            return False, guard_reason
+        
         input_arcs = self.get_input_arcs()
         
-        # Transition with no inputs is always enabled
+        # Transition with no inputs is always enabled (if guard passes)
         if not input_arcs:
             return True, "enabled-no-inputs"
         

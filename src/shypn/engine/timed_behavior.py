@@ -60,8 +60,41 @@ class TimedBehavior(TransitionBehavior):
         
         # Extract timing window from transition properties
         props = getattr(transition, 'properties', {})
-        self.earliest = float(props.get('earliest', 0.0))
-        self.latest = float(props.get('latest', float('inf')))
+        
+        # Support both explicit [earliest, latest] window AND simple 'rate' as delay
+        if 'earliest' in props or 'latest' in props:
+            # Explicit timing window specified
+            self.earliest = float(props.get('earliest', 0.0))
+            self.latest = float(props.get('latest', float('inf')))
+        else:
+            # Fallback: Use 'rate' property as deterministic delay
+            # For timed transitions, rate = 1/delay, so delay = 1/rate
+            # OR rate can be interpreted directly as delay time
+            rate = getattr(transition, 'rate', None)
+            if rate is not None:
+                try:
+                    delay = float(rate) if isinstance(rate, (int, float)) else 1.0
+                    # Ensure delay is positive (rate=0 would mean instant firing, use default instead)
+                    if delay > 0:
+                        # Interpret rate as delay time (e.g., rate=2.0 means 2 second delay)
+                        self.earliest = delay
+                        self.latest = delay  # Deterministic: must fire exactly at delay time
+                        print(f"[TimedBehavior] Transition {transition.name} (id={transition.id}): delay={delay}")
+                    else:
+                        # Rate is 0 or negative - use default delay of 1.0
+                        print(f"[TimedBehavior] WARNING: Transition {transition.name} has rate={rate}, using default delay=1.0")
+                        self.earliest = 1.0
+                        self.latest = 1.0
+                except (ValueError, TypeError) as e:
+                    # If rate can't be converted, use default delay
+                    print(f"[TimedBehavior] WARNING: Transition {transition.name} rate conversion error: {e}, using default delay=1.0")
+                    self.earliest = 1.0
+                    self.latest = 1.0
+            else:
+                # No timing info: use default delay of 1.0 (don't fire immediately)
+                print(f"[TimedBehavior] WARNING: Transition {transition.name} has no rate, using default delay=1.0")
+                self.earliest = 1.0
+                self.latest = 1.0
         
         # Validation
         if self.earliest < 0:
@@ -99,21 +132,28 @@ class TimedBehavior(TransitionBehavior):
         self._enablement_time = None
     
     def can_fire(self) -> Tuple[bool, str]:
-        """Check if transition can fire (timing window and tokens).
+        """Check if transition can fire (guard, timing window, and tokens).
         
         Timed transitions require:
-        1. Structural enablement (sufficient tokens)
-        2. Current time within [t_enable + earliest, t_enable + latest]
+        1. Guard condition must pass (if defined)
+        2. Structural enablement (sufficient tokens)
+        3. Current time within [t_enable + earliest, t_enable + latest]
         
         Returns:
             Tuple of (can_fire: bool, reason: str)
             - (True, "enabled-in-window") if can fire now
+            - (False, "guard-fails") if guard condition not met
             - (False, "insufficient-tokens") if not structurally enabled
             - (False, "too-early") if current_time < t_enable + earliest
             - (False, "too-late") if current_time > t_enable + latest
             - (False, "not-enabled-yet") if enablement time not set
         """
-        # Check structural enablement first
+        # Check guard first
+        guard_passes, guard_reason = self._evaluate_guard()
+        if not guard_passes:
+            return False, guard_reason
+        
+        # Check structural enablement
         input_arcs = self.get_input_arcs()
         
         for arc in input_arcs:
@@ -135,15 +175,27 @@ class TimedBehavior(TransitionBehavior):
         current_time = self._get_current_time()
         elapsed = current_time - self._enablement_time
         
-        # Check earliest constraint
-        if elapsed < self.earliest:
+        # Floating-point tolerance for time comparisons (to handle 0.1 + 0.1 + ... != 1.0)
+        EPSILON = 1e-9
+        
+        # Debug output (can be disabled by setting DEBUG = False)
+        DEBUG = False  # Set to True to enable timing debug output
+        if DEBUG and hasattr(self.transition, 'name'):
+            print(f"[TimedBehavior] {self.transition.name}: current_time={current_time:.3f}, "
+                  f"enablement_time={self._enablement_time:.3f}, elapsed={elapsed:.3f}, "
+                  f"earliest={self.earliest}, latest={self.latest}")
+        
+        # Check earliest constraint - must wait until elapsed >= earliest (with tolerance)
+        # Use (elapsed + EPSILON < earliest) instead of (elapsed < earliest) to handle floating point
+        if elapsed + EPSILON < self.earliest:
             return False, f"too-early (elapsed={elapsed:.3f}, earliest={self.earliest})"
         
-        # Check latest constraint
-        if elapsed > self.latest:
+        # Check latest constraint - must fire before elapsed > latest (with tolerance)
+        # Use (elapsed > latest + EPSILON) to allow small floating point errors
+        if elapsed > self.latest + EPSILON:
             return False, f"too-late (elapsed={elapsed:.3f}, latest={self.latest})"
         
-        # Within timing window and structurally enabled
+        # Within timing window [earliest, latest] and structurally enabled
         return True, f"enabled-in-window (elapsed={elapsed:.3f})"
     
     def fire(self, input_arcs: List, output_arcs: List) -> Tuple[bool, Dict[str, Any]]:

@@ -15,7 +15,9 @@ Extracted from: legacy/shypnpy/core/petri.py:1691-1900
 
 from typing import Dict, Tuple, List, Any, Callable, Optional
 import math
+import numpy as np
 from .transition_behavior import TransitionBehavior
+from .function_catalog import FUNCTION_CATALOG
 
 
 class ContinuousBehavior(TransitionBehavior):
@@ -60,7 +62,34 @@ class ContinuousBehavior(TransitionBehavior):
         
         # Extract continuous parameters
         props = getattr(transition, 'properties', {})
-        rate_expr = props.get('rate_function', '1.0')
+        
+        # Support multiple formats:
+        # 1. properties['rate_function'] = string expression
+        # 2. properties['rate_function'] = callable
+        # 3. properties = {'rate': lambda places, t: ...}  (dict format)
+        # 4. transition.rate attribute (UI simple value)
+        
+        rate_expr = None
+        
+        if 'rate_function' in props:
+            # Explicit rate function in properties
+            rate_expr = props.get('rate_function')
+        elif 'rate' in props and callable(props['rate']):
+            # Dict format with callable: {'rate': lambda ...}
+            rate_expr = props['rate']
+        else:
+            # Fallback: Use transition.rate attribute (UI stores simple rate here)
+            rate = getattr(transition, 'rate', None)
+            if rate is not None:
+                # Check if it's a dict with 'rate' key
+                if isinstance(rate, dict) and 'rate' in rate:
+                    rate_expr = rate['rate']
+                else:
+                    # Convert simple rate to rate function string
+                    rate_expr = str(rate) if isinstance(rate, (int, float)) else '1.0'
+            else:
+                rate_expr = '1.0'  # Default constant rate
+        
         self.max_rate = float(props.get('max_rate', float('inf')))
         self.min_rate = float(props.get('min_rate', 0.0))
         
@@ -92,39 +121,60 @@ class ContinuousBehavior(TransitionBehavior):
             pass
         
         # Parse expression with place references (simple parser)
-        # Format: "a * P1 + b * P2" or "min(c, P1)" etc.
+        # Format: "a * P1 + b * P2" or "min(c, P1)" or "sigmoid(time, 10, 0.5)" etc.
         def evaluate_rate(places: Dict[int, Any], time: float) -> float:
             try:
-                # Build evaluation context
-                context = {'time': time, 'min': min, 'max': max, 'math': math}
+                # Build evaluation context with full support
+                context = {
+                    'time': time,
+                    't': time,  # Alias
+                    'min': min,
+                    'max': max,
+                    'abs': abs,
+                    'math': math,
+                    'np': np,
+                    'numpy': np,
+                }
                 
-                # Add place tokens
+                # Add all catalog functions to context
+                context.update(FUNCTION_CATALOG)
+                
+                # Add place tokens as P1, P2, ...
                 for place_id, place in places.items():
                     context[f'P{place_id}'] = place.tokens
                 
-                # Evaluate expression
+                # Evaluate expression safely
                 result = eval(expr, {"__builtins__": {}}, context)
                 return float(result)
-            except Exception:
-                # Default to 0 if evaluation fails
-                return 0.0
+            except Exception as e:
+                # Log error for debugging
+                print(f"[ContinuousBehavior] Rate function evaluation error: {e}")
+                print(f"[ContinuousBehavior] Expression: {expr}")
+                return 0.0  # Safe fallback
         
         return evaluate_rate
     
     def can_fire(self) -> Tuple[bool, str]:
         """Check if continuous transition is enabled.
         
-        Continuous transitions are enabled if all input places have
-        positive token counts (> 0, not >= weight like discrete).
+        Continuous transitions are enabled if:
+        1. Guard condition passes (if defined)
+        2. All input places have positive token counts (> 0, not >= weight like discrete)
         
         Returns:
             Tuple of (can_fire: bool, reason: str)
             - (True, "enabled-continuous") if all inputs positive
+            - (False, "guard-fails") if guard condition not met
             - (False, "input-place-empty") if any input has zero tokens
         """
+        # Check guard first
+        guard_passes, guard_reason = self._evaluate_guard()
+        if not guard_passes:
+            return False, guard_reason
+        
         input_arcs = self.get_input_arcs()
         
-        # No inputs means always enabled
+        # No inputs means always enabled (if guard passes)
         if not input_arcs:
             return True, "enabled-continuous-no-inputs"
         
