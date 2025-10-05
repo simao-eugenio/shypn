@@ -334,6 +334,10 @@ class SimulationController:
             
             if success:
                 continuous_active += 1
+                
+                # Notify data collector about continuous transition activity
+                if self.data_collector is not None:
+                    self.data_collector.on_transition_fired(transition, self.time, details)
         
         # Advance time
         self.time += time_step
