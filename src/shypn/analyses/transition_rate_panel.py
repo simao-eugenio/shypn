@@ -300,6 +300,178 @@ class TransitionRatePanel(AnalysisPlotPanel):
         # Trigger plot update
         self.needs_update = True
     
+    def _update_objects_list(self):
+        """Update the UI list of selected objects with locality information.
+        
+        Overrides parent method to show transition and all its locality places.
+        """
+        # Import GTK here to avoid issues
+        import gi
+        gi.require_version('Gtk', '3.0')
+        from gi.repository import Gtk
+        
+        # Clear existing list
+        for child in self.objects_listbox.get_children():
+            self.objects_listbox.remove(child)
+        
+        # Add rows for each selected object
+        if not self.selected_objects:
+            # Show empty message
+            row = Gtk.ListBoxRow()
+            label = Gtk.Label(label="No objects selected")
+            label.get_style_context().add_class('dim-label')
+            row.add(label)
+            self.objects_listbox.add(row)
+        else:
+            for i, obj in enumerate(self.selected_objects):
+                color = self._get_color(i)
+                obj_name = getattr(obj, 'name', f'Transition{obj.id}')
+                transition_type = getattr(obj, 'transition_type', 'immediate')
+                
+                # Short type names for compact display
+                type_abbrev = {
+                    'immediate': 'IMM',
+                    'timed': 'TIM',
+                    'stochastic': 'STO',
+                    'continuous': 'CON'
+                }.get(transition_type, transition_type[:3].upper())
+                
+                # Add transition row
+                row = Gtk.ListBoxRow()
+                hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+                hbox.set_margin_start(6)
+                hbox.set_margin_end(6)
+                hbox.set_margin_top(3)
+                hbox.set_margin_bottom(3)
+                
+                # Color indicator
+                color_box = Gtk.DrawingArea()
+                color_box.set_size_request(20, 20)
+                color_box.connect('draw', self._draw_color_box, color)
+                hbox.pack_start(color_box, False, False, 0)
+                
+                # Transition label
+                label_text = f"{obj_name} [{type_abbrev}] (T{obj.id})"
+                label = Gtk.Label(label=label_text)
+                label.set_xalign(0)
+                hbox.pack_start(label, True, True, 0)
+                
+                # Remove button
+                remove_btn = Gtk.Button(label="✕")
+                remove_btn.set_relief(Gtk.ReliefStyle.NONE)
+                remove_btn.connect('clicked', self._on_remove_clicked, obj)
+                hbox.pack_start(remove_btn, False, False, 0)
+                
+                row.add(hbox)
+                self.objects_listbox.add(row)
+                
+                # Add locality places if available
+                if obj.id in self._locality_places:
+                    locality_data = self._locality_places[obj.id]
+                    
+                    # Add input places
+                    for place in locality_data['input_places']:
+                        place_row = Gtk.ListBoxRow()
+                        place_hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+                        place_hbox.set_margin_start(40)  # Indent to show hierarchy
+                        place_hbox.set_margin_end(6)
+                        place_hbox.set_margin_top(1)
+                        place_hbox.set_margin_bottom(1)
+                        
+                        # Lighter color box for places
+                        place_color_box = Gtk.DrawingArea()
+                        place_color_box.set_size_request(16, 16)
+                        # Derive lighter color for input places
+                        import matplotlib.colors as mcolors
+                        rgb = mcolors.hex2color(color)
+                        lighter_rgb = tuple(min(1.0, c + 0.2) for c in rgb)
+                        lighter_color = mcolors.rgb2hex(lighter_rgb)
+                        place_color_box.connect('draw', self._draw_color_box, lighter_color)
+                        place_hbox.pack_start(place_color_box, False, False, 0)
+                        
+                        # Place label with arrow
+                        place_name = getattr(place, 'name', f'Place{place.id}')
+                        tokens = getattr(place, 'tokens', 0)
+                        place_label = Gtk.Label(label=f"↓ {place_name} ({tokens} tokens)")
+                        place_label.set_xalign(0)
+                        place_label.get_style_context().add_class('dim-label')
+                        place_hbox.pack_start(place_label, True, True, 0)
+                        
+                        place_row.add(place_hbox)
+                        self.objects_listbox.add(place_row)
+                    
+                    # Add output places
+                    for place in locality_data['output_places']:
+                        place_row = Gtk.ListBoxRow()
+                        place_hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+                        place_hbox.set_margin_start(40)  # Indent to show hierarchy
+                        place_hbox.set_margin_end(6)
+                        place_hbox.set_margin_top(1)
+                        place_hbox.set_margin_bottom(1)
+                        
+                        # Darker color box for places
+                        place_color_box = Gtk.DrawingArea()
+                        place_color_box.set_size_request(16, 16)
+                        # Derive darker color for output places
+                        import matplotlib.colors as mcolors
+                        rgb = mcolors.hex2color(color)
+                        darker_rgb = tuple(max(0.0, c - 0.2) for c in rgb)
+                        darker_color = mcolors.rgb2hex(darker_rgb)
+                        place_color_box.connect('draw', self._draw_color_box, darker_color)
+                        place_hbox.pack_start(place_color_box, False, False, 0)
+                        
+                        # Place label with arrow
+                        place_name = getattr(place, 'name', f'Place{place.id}')
+                        tokens = getattr(place, 'tokens', 0)
+                        place_label = Gtk.Label(label=f"↑ {place_name} ({tokens} tokens)")
+                        place_label.set_xalign(0)
+                        place_label.get_style_context().add_class('dim-label')
+                        place_hbox.pack_start(place_label, True, True, 0)
+                        
+                        place_row.add(place_hbox)
+                        self.objects_listbox.add(place_row)
+        
+        self.objects_listbox.show_all()
+    
+    def _show_waiting_state(self):
+        """Show message when objects are selected but simulation hasn't started."""
+        # Build message with locality information
+        message_lines = ['Objects ready for analysis:', '']
+        
+        for i, obj in enumerate(self.selected_objects):
+            obj_name = getattr(obj, 'name', f'Transition{obj.id}')
+            transition_type = getattr(obj, 'transition_type', 'immediate')
+            type_abbrev = {
+                'immediate': 'IMM',
+                'timed': 'TIM',
+                'stochastic': 'STO',
+                'continuous': 'CON'
+            }.get(transition_type, transition_type[:3].upper())
+            
+            # Check locality
+            if obj.id in self._locality_places:
+                locality_data = self._locality_places[obj.id]
+                n_inputs = len(locality_data['input_places'])
+                n_outputs = len(locality_data['output_places'])
+                message_lines.append(f"• {obj_name} [{type_abbrev}]")
+                message_lines.append(f"  with locality: {n_inputs} inputs → {n_outputs} outputs")
+            else:
+                message_lines.append(f"• {obj_name} [{type_abbrev}]")
+        
+        message_lines.append('')
+        message_lines.append('▶ Start simulation to see plots')
+        
+        message = '\n'.join(message_lines)
+        
+        self.axes.text(0.5, 0.5, message,
+                      ha='center', va='center',
+                      transform=self.axes.transAxes,
+                      fontsize=11, color='#555',
+                      family='monospace')
+        self.axes.set_xticks([])
+        self.axes.set_yticks([])
+        self.canvas.draw()
+    
     def update_plot(self):
         """Update the plot with current data including locality places.
         
@@ -316,6 +488,18 @@ class TransitionRatePanel(AnalysisPlotPanel):
             if DEBUG_UPDATE_PLOT:
                 print(f"[TransitionRatePanel]   No objects selected - showing empty state")
             self._show_empty_state()
+            return
+        
+        # Check if we have any data at all
+        has_any_data = False
+        for obj in self.selected_objects:
+            if self._get_rate_data(obj.id):
+                has_any_data = True
+                break
+        
+        # If no data yet, show waiting message with locality info
+        if not has_any_data:
+            self._show_waiting_state()
             return
         
         # Plot rate for each selected transition

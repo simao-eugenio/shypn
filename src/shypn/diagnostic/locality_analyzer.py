@@ -136,7 +136,7 @@ class LocalityAnalyzer:
         """
         return sum(place.tokens for place in locality.output_places)
     
-    def _calculate_token_balance(self, locality: Locality) -> int:
+    def _calculate_token_balance(self, locality: Locality) -> float:
         """Calculate token balance (inputs - outputs).
         
         A positive balance indicates more tokens in input places,
@@ -148,9 +148,9 @@ class LocalityAnalyzer:
         Returns:
             Token balance (input_tokens - output_tokens)
         """
-        return self._count_input_tokens(locality) - self._count_output_tokens(locality)
+        return float(self._count_input_tokens(locality) - self._count_output_tokens(locality))
     
-    def _calculate_total_weight(self, locality: Locality) -> int:
+    def _calculate_total_weight(self, locality: Locality) -> float:
         """Calculate total arc weight.
         
         Sums the weights of all arcs (input and output) in the locality.
@@ -161,9 +161,9 @@ class LocalityAnalyzer:
         Returns:
             Sum of all arc weights
         """
-        total = 0
+        total = 0.0
         for arc in locality.input_arcs + locality.output_arcs:
-            total += getattr(arc, 'weight', 1)
+            total += float(getattr(arc, 'weight', 1))
         return total
     
     def _check_firing_potential(self, locality: Locality) -> bool:
