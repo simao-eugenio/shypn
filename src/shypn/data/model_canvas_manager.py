@@ -1052,7 +1052,6 @@ class ModelCanvasManager:
                 json.dump(view_state, f, indent=2)
             return True
         except Exception as e:
-            print(f"[View State] Failed to save view state: {e}")
             return False
     
     def load_view_state_from_file(self, filepath=None):
@@ -1077,8 +1076,6 @@ class ModelCanvasManager:
             with open(filepath, 'r') as f:
                 view_state = json.load(f)
             self.set_view_state(view_state)
-            print(f"[View State] Restored view: pan=({self.pan_x:.1f}, {self.pan_y:.1f}), zoom={self.zoom:.2f}")
             return True
         except Exception as e:
-            print(f"[View State] Failed to load view state: {e}")
             return False

@@ -274,7 +274,6 @@ def setup_color_picker_in_dialog(builder, container_id, current_color=None, butt
     # Get the container box where color picker should be inserted
     color_container = builder.get_object(container_id)
     if not color_container:
-        print(f"[ColorPicker] Warning: Container '{container_id}' not found in dialog")
         return None
     
     # Remove placeholder content (labels, etc.)
@@ -288,7 +287,6 @@ def setup_color_picker_in_dialog(builder, container_id, current_color=None, butt
     color_container.pack_start(color_picker, True, True, 0)
     color_container.show_all()
     
-    print(f"[ColorPicker] Inserted into '{container_id}' with color {current_color}")
     
     return color_picker
 

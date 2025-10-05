@@ -148,8 +148,6 @@ class ContinuousBehavior(TransitionBehavior):
                 return float(result)
             except Exception as e:
                 # Log error for debugging
-                print(f"[ContinuousBehavior] Rate function evaluation error: {e}")
-                print(f"[ContinuousBehavior] Expression: {expr}")
                 return 0.0  # Safe fallback
         
         return evaluate_rate
