@@ -19,6 +19,7 @@ class PlaceRatePanel(AnalysisPlotPanel):
     showing rates, as it directly visualizes the state of the Petri net.
     
     Plot interpretation:
+        pass
     - Y-axis shows actual token count in each place
     - Horizontal lines = steady state (no token change)
     - Increasing lines = tokens being added to place
@@ -48,7 +49,6 @@ class PlaceRatePanel(AnalysisPlotPanel):
         """
         super().__init__('place', data_collector)
         
-        print("[PlaceRatePanel] Initialized place marking analysis panel")
     
     def _get_rate_data(self, place_id: Any) -> List[Tuple[float, float]]:
         """Get token count data for a place (marking evolution).
@@ -68,11 +68,9 @@ class PlaceRatePanel(AnalysisPlotPanel):
         raw_data = self.data_collector.get_place_data(place_id)
         
         if DEBUG_PLOT_DATA:
-            print(f"[PlaceRatePanel] _get_rate_data for place_id={place_id}: {len(raw_data)} data points")
             if len(raw_data) > 0:
-                print(f"[PlaceRatePanel]   First point: t={raw_data[0][0]:.3f}, tokens={raw_data[0][1]}")
-                print(f"[PlaceRatePanel]   Last point: t={raw_data[-1][0]:.3f}, tokens={raw_data[-1][1]}")
         
+                pass
         # Return raw data directly - no rate calculation needed!
         # raw_data is already List[Tuple[float, float]] where:
         #   - First element: time (float)
@@ -135,7 +133,6 @@ class PlaceRatePanel(AnalysisPlotPanel):
             if results:
                 summary = SearchHandler.format_result_summary(results, 'place')
                 self.search_result_label.set_text(summary)
-                print(f"[PlaceRatePanel] Search found {len(results)} places")
                 
                 # If exactly one result, add it automatically
                 if len(results) == 1:
@@ -153,4 +150,3 @@ class PlaceRatePanel(AnalysisPlotPanel):
         
         entry.connect('activate', on_entry_activate)
         
-        print("[PlaceRatePanel] Search UI wired successfully")

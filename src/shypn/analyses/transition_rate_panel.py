@@ -16,13 +16,16 @@ class TransitionRatePanel(AnalysisPlotPanel):
     
     This panel adapts its visualization based on transition type:
     
+        pass
     **Continuous Transitions (SHPN)**:
+        pass
     - Plots the **rate function value** over time
     - Shows actual behavior curves (sigmoid, exponential, linear, etc.)
     - Y-axis: Rate (tokens/s) - the instantaneous flow rate
     - Visualizes: r(t) = f(M(t), t) where M(t) is marking, t is time
     
     **Discrete Transitions (Immediate/Timed/Stochastic)**:
+        pass
     - Plots the **cumulative firing count** over time
     - Shows total activity accumulation
     - Y-axis: Cumulative Firings - total number of firings
@@ -30,21 +33,26 @@ class TransitionRatePanel(AnalysisPlotPanel):
     
     Plot interpretation by transition type:
     
+        pass
     **Continuous** (rate function):
+        pass
     - Sigmoid curve: Logistic growth/saturation behavior
     - Exponential: Unlimited growth or decay
     - Linear: Constant rate flow
     - Flat line: Rate = 0 (no flow, transition disabled)
     
     **Immediate** (cumulative):
+        pass
     - Vertical steps: Instant firings when enabled
     - Steep slope: High firing frequency
     
     **Timed** (cumulative):
+        pass
     - Regular staircase: Fixed interval firings
     - Constant slope: Deterministic periodic behavior
     
     **Stochastic** (cumulative):
+        pass
     - Irregular staircase: Random interval firings
     - Variable slope: Exponentially distributed delays
     
@@ -73,12 +81,12 @@ class TransitionRatePanel(AnalysisPlotPanel):
         # Locality plotting support
         self._locality_places = {}  # Maps transition_id -> {input_places, output_places}
         
-        print("[TransitionRatePanel] Initialized transition behavior analysis panel")
     
     def _get_rate_data(self, transition_id: Any) -> List[Tuple[float, float]]:
         """Get behavior-specific data for a transition.
         
         The data plotted depends on transition type:
+            pass
         - Continuous: Rate function value over time (shows sigmoid, exponential curves, etc.)
         - Discrete (immediate/timed/stochastic): Cumulative firing count
         
@@ -95,7 +103,7 @@ class TransitionRatePanel(AnalysisPlotPanel):
         
         if not raw_events:
             if DEBUG_PLOT_DATA:
-                print(f"[TransitionRatePanel] No firing events for transition {transition_id}")
+                pass
             return []
         
         # Determine transition type by checking if details contain 'rate' field
@@ -109,8 +117,8 @@ class TransitionRatePanel(AnalysisPlotPanel):
         if has_rate_data:
             # CONTINUOUS TRANSITION: Plot rate function value over time
             if DEBUG_PLOT_DATA:
-                print(f"[TransitionRatePanel] Transition {transition_id} is CONTINUOUS - plotting rate function")
             
+                pass
             rate_series = []
             for time, event_type, details in raw_events:
                 if event_type == 'fired' and details and isinstance(details, dict):
@@ -118,22 +126,20 @@ class TransitionRatePanel(AnalysisPlotPanel):
                     rate_series.append((time, rate))
             
             if DEBUG_PLOT_DATA and rate_series:
-                print(f"[TransitionRatePanel]   {len(rate_series)} rate points")
-                print(f"[TransitionRatePanel]   First: t={rate_series[0][0]:.3f}, rate={rate_series[0][1]:.3f}")
-                print(f"[TransitionRatePanel]   Last: t={rate_series[-1][0]:.3f}, rate={rate_series[-1][1]:.3f}")
             
+                pass
             return rate_series
         else:
             # DISCRETE TRANSITION: Plot cumulative firing count
             if DEBUG_PLOT_DATA:
-                print(f"[TransitionRatePanel] Transition {transition_id} is DISCRETE - plotting cumulative count")
             
+                pass
             firing_times = [t for t, event_type, _ in raw_events 
                            if event_type == 'fired']
             
             if len(firing_times) < 1:
                 if DEBUG_PLOT_DATA:
-                    print(f"[TransitionRatePanel] No 'fired' events")
+                    pass
                 return []
             
             # Convert to cumulative count series
@@ -149,15 +155,15 @@ class TransitionRatePanel(AnalysisPlotPanel):
                 cumulative_series.append((time, count))
             
             if DEBUG_PLOT_DATA:
-                print(f"[TransitionRatePanel]   {len(cumulative_series)} cumulative points")
-                print(f"[TransitionRatePanel]   Final count: {cumulative_series[-1][1]} firings")
             
+                pass
             return cumulative_series
     
     def _get_ylabel(self) -> str:
         """Get Y-axis label for transition plot.
         
         The label depends on transition types being plotted:
+            pass
         - If only continuous: "Rate (flow/s)"
         - If only discrete: "Cumulative Firings"
         - If mixed: "Value" (generic)
@@ -240,7 +246,6 @@ class TransitionRatePanel(AnalysisPlotPanel):
             if results:
                 summary = SearchHandler.format_result_summary(results, 'transition')
                 self.search_result_label.set_text(summary)
-                print(f"[TransitionRatePanel] Search found {len(results)} transitions")
                 
                 # If exactly one result, add it with its locality automatically
                 if len(results) == 1:
@@ -260,10 +265,8 @@ class TransitionRatePanel(AnalysisPlotPanel):
                         self.search_result_label.set_text(
                             f"✓ Added {transition.name} with locality ({place_count} places)"
                         )
-                        print(f"[TransitionRatePanel] Added locality: {locality.get_summary()}")
                     else:
                         self.search_result_label.set_text(f"✓ Added {transition.name} to analysis")
-                        print(f"[TransitionRatePanel] No valid locality for {transition.name}")
             else:
                 self.search_result_label.set_text(f"✗ No transitions found for '{query}'")
 
@@ -276,7 +279,6 @@ class TransitionRatePanel(AnalysisPlotPanel):
         
         entry.connect('activate', on_entry_activate)
         
-        print("[TransitionRatePanel] Search UI wired successfully")
     
     def add_locality_places(self, transition, locality):
         """Add locality places for a transition to plot with it.
@@ -294,8 +296,6 @@ class TransitionRatePanel(AnalysisPlotPanel):
             'transition': transition
         }
         
-        print(f"[TransitionRatePanel] Locality registered for {transition.name}: "
-              f"{len(locality.input_places)} inputs, {len(locality.output_places)} outputs")
         
         # Trigger plot update
         self.needs_update = True
@@ -305,7 +305,6 @@ class TransitionRatePanel(AnalysisPlotPanel):
         
         Overrides parent method to show transition and all its locality places.
         """
-        print(f"[TransitionRatePanel] _update_objects_list() called, {len(self.selected_objects)} transitions, {len(self._locality_places)} with localities")
         
         # Import GTK here to avoid issues
         import gi
@@ -371,7 +370,6 @@ class TransitionRatePanel(AnalysisPlotPanel):
                 # Add locality places if available
                 if obj.id in self._locality_places:
                     locality_data = self._locality_places[obj.id]
-                    print(f"[TransitionRatePanel]   Adding locality for {obj_name}: {len(locality_data['input_places'])} inputs, {len(locality_data['output_places'])} outputs")
                     
                     # Add input places
                     for place in locality_data['input_places']:
@@ -482,8 +480,8 @@ class TransitionRatePanel(AnalysisPlotPanel):
         DEBUG_UPDATE_PLOT = False  # Disable verbose logging
         
         if DEBUG_UPDATE_PLOT:
-            print(f"[TransitionRatePanel] update_plot() called, {len(self.selected_objects)} objects selected")
         
+            pass
         self.axes.clear()
         
         # Clear secondary Y-axis for places if it exists
@@ -494,7 +492,7 @@ class TransitionRatePanel(AnalysisPlotPanel):
         
         if not self.selected_objects:
             if DEBUG_UPDATE_PLOT:
-                print(f"[TransitionRatePanel]   No objects selected - showing empty state")
+                pass
             self._show_empty_state()
             return
         
@@ -514,7 +512,6 @@ class TransitionRatePanel(AnalysisPlotPanel):
         for i, obj in enumerate(self.selected_objects):
             if DEBUG_UPDATE_PLOT:
                 obj_name = getattr(obj, 'name', f'transition{obj.id}')
-                print(f"[TransitionRatePanel]   Plotting {obj_name} (id={obj.id})")
             
             rate_data = self._get_rate_data(obj.id)
             
@@ -571,8 +568,8 @@ class TransitionRatePanel(AnalysisPlotPanel):
             self._places_axes.set_ylabel('Place Tokens', color='gray', fontsize=10)
             self._places_axes.tick_params(axis='y', labelcolor='gray')
             if debug:
-                print(f"[TransitionRatePanel]     Created secondary Y-axis for places")
         
+                pass
         # Convert hex color to RGB for manipulation
         rgb = mcolors.hex2color(base_color)
         
@@ -600,8 +597,8 @@ class TransitionRatePanel(AnalysisPlotPanel):
                              zorder=5)  # Behind transitions
                 
                 if debug:
-                    print(f"[TransitionRatePanel]     Plotted input place {place_name} on secondary axis")
         
+                    pass
         # Plot output places (dotted lines, slightly darker) on secondary axis
         for i, place in enumerate(locality_data['output_places']):
             # Get place token data from data collector
@@ -626,8 +623,8 @@ class TransitionRatePanel(AnalysisPlotPanel):
                              zorder=5)  # Behind transitions
                 
                 if debug:
-                    print(f"[TransitionRatePanel]     Plotted output place {place_name} on secondary axis")
     
+                    pass
     def _format_plot(self):
         """Format the plot with labels, grid, and combined legend from both axes.
         

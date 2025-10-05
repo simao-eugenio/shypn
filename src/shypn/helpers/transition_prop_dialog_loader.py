@@ -99,7 +99,6 @@ class TransitionPropDialogLoader(GObject.GObject):
         # Connect signals
         self.dialog.connect('response', self._on_response)
         
-        print(f"[TransitionPropDialogLoader] UI loaded successfully from {self.ui_path}")
     
     def _setup_color_picker(self):
         """Setup color picker in the dialog."""
@@ -117,7 +116,6 @@ class TransitionPropDialogLoader(GObject.GObject):
         # Connect to color selection signal if picker was created
         if self.color_picker:
             self.color_picker.connect('color-selected', self._on_color_selected)
-            print("[TransitionPropDialogLoader] Color picker setup complete")
     
     def _on_color_selected(self, picker, color_rgb):
         """Callback when color is selected.
@@ -126,12 +124,12 @@ class TransitionPropDialogLoader(GObject.GObject):
             picker: The ColorPickerRow widget
             color_rgb: Selected color as RGB tuple (0.0-1.0)
         """
-        print(f"[TransitionPropDialogLoader] Color selected: {color_rgb}")
     
     def _format_formula_for_display(self, formula):
         """Format formula value for display in UI TextView.
         
         Supports guard/rate formulas which can be:
+            pass
         - None → empty string
         - dict → JSON formatted
         - number → string representation
@@ -158,6 +156,7 @@ class TransitionPropDialogLoader(GObject.GObject):
         """Parse formula text from UI into appropriate format.
         
         Supports multiple formats:
+            pass
         - Empty string → None
         - Number string → numeric value
         - Dictionary string → parsed dict
@@ -238,7 +237,6 @@ class TransitionPropDialogLoader(GObject.GObject):
                     rate_func = self.transition_obj.properties.get('rate_function')
                     if rate_func:
                         rate_value = rate_func
-                        print(f"[TransitionPropDialogLoader] Loading continuous rate function: {rate_func}")
             
             rate_text = self._format_formula_for_display(rate_value)
             rate_entry.set_text(rate_text)
@@ -254,7 +252,6 @@ class TransitionPropDialogLoader(GObject.GObject):
                 guard_func = self.transition_obj.properties.get('guard_function')
                 if guard_func is not None:
                     guard_value = guard_func
-                    print(f"[TransitionPropDialogLoader] Loading guard function: {guard_func}")
             
             guard_text = self._format_formula_for_display(guard_value)
             buffer.set_text(guard_text)
@@ -271,7 +268,6 @@ class TransitionPropDialogLoader(GObject.GObject):
                     rate_func = self.transition_obj.properties.get('rate_function')
                     if rate_func:
                         rate_value = rate_func
-                        print(f"[TransitionPropDialogLoader] Loading continuous rate function (textview): {rate_func}")
             
             rate_text = self._format_formula_for_display(rate_value)
             buffer.set_text(rate_text)
@@ -300,12 +296,11 @@ class TransitionPropDialogLoader(GObject.GObject):
             locality_container.pack_start(self.locality_widget, True, True, 0)
             locality_container.show_all()
             
-            print("[TransitionPropDialogLoader] Locality widget initialized")
         elif not locality_container:
-            print("[TransitionPropDialogLoader] Warning: locality_info_container not found in UI")
+            pass
         elif not self.model:
-            print("[TransitionPropDialogLoader] Warning: No model provided, locality widget not created")
     
+            pass
     def _on_response(self, dialog, response_id):
         """Handle dialog response (OK/Cancel).
         
@@ -319,7 +314,6 @@ class TransitionPropDialogLoader(GObject.GObject):
             # Mark document as dirty if persistency manager is available
             if self.persistency_manager:
                 self.persistency_manager.mark_dirty()
-                print(f"[TransitionPropDialogLoader] Document marked as dirty")
             
             # Emit signal to notify observers (for canvas redraw)
             self.emit('properties-changed')
@@ -345,14 +339,12 @@ class TransitionPropDialogLoader(GObject.GObject):
             if 0 <= type_index < len(type_list):
                 old_type = self.transition_obj.transition_type
                 self.transition_obj.transition_type = type_list[type_index]
-                print(f"[TransitionPropDialogLoader] Type changed: {old_type} -> {self.transition_obj.transition_type}")
         
         # Priority spin button
         priority_spin = self.builder.get_object('priority_spin')
         if priority_spin and hasattr(self.transition_obj, 'priority'):
             old_priority = self.transition_obj.priority
             self.transition_obj.priority = int(priority_spin.get_value())
-            print(f"[TransitionPropDialogLoader] Priority changed: {old_priority} -> {self.transition_obj.priority}")
         
         # Rate entry (simple value - takes precedence over rate_textview if both exist)
         rate_entry = self.builder.get_object('rate_entry')
@@ -370,9 +362,7 @@ class TransitionPropDialogLoader(GObject.GObject):
                         self.transition_obj.properties = {}
                     # Store the string expression for continuous behavior
                     self.transition_obj.properties['rate_function'] = rate_text
-                    print(f"[TransitionPropDialogLoader] Continuous rate function stored: {rate_text}")
                 
-                print(f"[TransitionPropDialogLoader] Rate changed (from entry): {old_rate} -> {self.transition_obj.rate}")
         
         # Guard function (TextView) - parse with formula parser
         guard_textview = self.builder.get_object('guard_textview')
@@ -390,8 +380,6 @@ class TransitionPropDialogLoader(GObject.GObject):
             # Store the string expression for dynamic evaluation
             self.transition_obj.properties['guard_function'] = guard_text
             
-            print(f"[TransitionPropDialogLoader] Guard changed: {old_guard} -> {self.transition_obj.guard}")
-            print(f"[TransitionPropDialogLoader] Guard function stored: {guard_text}")
         
         # Rate function (TextView) - parse with formula parser (only if rate_entry is empty)
         rate_textview = self.builder.get_object('rate_textview')
@@ -413,23 +401,18 @@ class TransitionPropDialogLoader(GObject.GObject):
                         self.transition_obj.properties = {}
                     # Store the string expression for continuous behavior
                     self.transition_obj.properties['rate_function'] = rate_text.strip()
-                    print(f"[TransitionPropDialogLoader] Continuous rate function stored (from textview): {rate_text.strip()}")
                 
-                print(f"[TransitionPropDialogLoader] Rate changed (from textview): {old_rate} -> {self.transition_obj.rate}")
         
         # Color from color picker
         if self.color_picker and hasattr(self.transition_obj, 'border_color'):
             old_color = self.transition_obj.border_color
             selected_color = self.color_picker.get_selected_color()
             self.transition_obj.border_color = selected_color
-            print(f"[TransitionPropDialogLoader] Border color changed: {old_color} -> {self.transition_obj.border_color}")
         
         # Also update fill_color to match border_color for consistency
         if self.color_picker and hasattr(self.transition_obj, 'fill_color'):
             self.transition_obj.fill_color = self.transition_obj.border_color
-            print(f"[TransitionPropDialogLoader] Fill color updated to match border: {self.transition_obj.fill_color}")
         
-        print(f"[TransitionPropDialogLoader] Applied changes to Transition: {self.transition_obj.name}")
     
     def run(self):
         """Show the dialog and run it modally.

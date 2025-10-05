@@ -121,10 +121,9 @@ class RightPanelLoader:
             self.place_panel = PlaceRatePanel(self.data_collector)
             places_container.pack_start(self.place_panel, True, True, 0)
             
-            print("[RightPanelLoader] Place rate panel attached to places_canvas_container")
         else:
-            print("[RightPanelLoader] Warning: places_canvas_container not found in UI")
         
+            pass
         # === Transitions Panel ===
         transitions_container = self.builder.get_object('transitions_canvas_container')
         if transitions_container:
@@ -136,10 +135,9 @@ class RightPanelLoader:
             self.transition_panel = TransitionRatePanel(self.data_collector)
             transitions_container.pack_start(self.transition_panel, True, True, 0)
             
-            print("[RightPanelLoader] Transition rate panel attached to transitions_canvas_container")
         else:
-            print("[RightPanelLoader] Warning: transitions_canvas_container not found in UI")
         
+            pass
         # === Diagnostics Panel (NEW) ===
         diagnostics_container = self.builder.get_object('diagnostics_content_container')
         diagnostics_selection_label = self.builder.get_object('diagnostics_selection_label')
@@ -154,10 +152,9 @@ class RightPanelLoader:
                 placeholder_label=diagnostics_placeholder
             )
             
-            print("[RightPanelLoader] Diagnostics panel attached to diagnostics_content_container")
         else:
-            print("[RightPanelLoader] Warning: diagnostics_content_container not found in UI")
         
+            pass
         # Wire search UI if model is available
         if self.model is not None:
             self._wire_search_ui()
@@ -171,7 +168,6 @@ class RightPanelLoader:
                 self.model,
                 self.diagnostics_panel  # Pass diagnostics panel
             )
-            print("[RightPanelLoader] Context menu handler created with model and diagnostics support")
     
     def _wire_search_ui(self):
         """Wire search UI controls to panel search functionality.
@@ -191,10 +187,9 @@ class RightPanelLoader:
                 places_result_label,
                 self.model
             )
-            print("[RightPanelLoader] Places search UI wired")
         else:
-            print("[RightPanelLoader] Warning: Could not wire places search UI (missing widgets or panel)")
         
+            pass
         # === Transitions Search UI ===
         transitions_entry = self.builder.get_object('transitions_search_entry')
         transitions_search_btn = self.builder.get_object('transitions_search_button')
@@ -207,10 +202,9 @@ class RightPanelLoader:
                 transitions_result_label,
                 self.model
             )
-            print("[RightPanelLoader] Transitions search UI wired")
         else:
-            print("[RightPanelLoader] Warning: Could not wire transitions search UI (missing widgets or panel)")
     
+            pass
     def set_data_collector(self, data_collector):
         """Set or update the data collector for plotting panels.
         
@@ -236,7 +230,6 @@ class RightPanelLoader:
                         self.model,
                         self.diagnostics_panel  # Pass diagnostics panel
                     )
-                    print("[RightPanelLoader] Context menu handler created with model and diagnostics support")
                     
                     # Notify parent if needed (for wiring to model_canvas_loader)
                     if hasattr(self, '_on_context_menu_handler_ready'):
@@ -245,12 +238,10 @@ class RightPanelLoader:
             # Update existing panels
             self.place_panel.data_collector = data_collector
             self.transition_panel.data_collector = data_collector
-            print("[RightPanelLoader] Data collector updated for plotting panels")
         
         # Update diagnostics panel
         if self.diagnostics_panel:
             self.diagnostics_panel.set_data_collector(data_collector)
-            print("[RightPanelLoader] Data collector updated for diagnostics panel")
     
     def set_model(self, model):
         """Set the model for search functionality.
@@ -266,17 +257,14 @@ class RightPanelLoader:
         # Update context menu handler's model for locality detection
         if self.context_menu_handler:
             self.context_menu_handler.set_model(model)
-            print("[RightPanelLoader] Context menu handler model updated for locality detection")
         
         # Update diagnostics panel's model
         if self.diagnostics_panel:
             self.diagnostics_panel.set_model(model)
-            print("[RightPanelLoader] Diagnostics panel model updated")
         
         # If panels exist and UI is loaded, wire search functionality
         if self.builder is not None and (self.place_panel or self.transition_panel):
             self._wire_search_ui()
-            print("[RightPanelLoader] Model set and search UI wired")
     
     def _on_float_toggled(self, button):
         """Internal callback when float toggle button is clicked."""
