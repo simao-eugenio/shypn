@@ -48,10 +48,9 @@ class ContextMenuHandler:
         if model:
             from shypn.diagnostic import LocalityDetector
             self.locality_detector = LocalityDetector(model)
-            print(f"[ContextMenuHandler] __init__ - Locality detector created with model")
         else:
-            print(f"[ContextMenuHandler] __init__ - No model provided, locality detector is None")
     
+            pass
     def set_panels(self, place_panel, transition_panel):
         """Set or update the analysis panels.
         
@@ -61,7 +60,6 @@ class ContextMenuHandler:
         """
         self.place_panel = place_panel
         self.transition_panel = transition_panel
-        print("[ContextMenuHandler] Analysis panels set")
     
     def set_model(self, model):
         """Set or update the model for locality detection.
@@ -73,7 +71,6 @@ class ContextMenuHandler:
         if model:
             from shypn.diagnostic import LocalityDetector
             self.locality_detector = LocalityDetector(model)
-            print("[ContextMenuHandler] Model and locality detector set")
     
     def add_analysis_menu_items(self, menu, obj):
         """Add analysis-related menu items to an object's context menu.
@@ -84,6 +81,7 @@ class ContextMenuHandler:
         transition_panel for transitions).
         
         For transitions with valid localities, adds a submenu with:
+            pass
         - "Transition Only" option
         - "With Locality (N places)" option
         
@@ -118,13 +116,12 @@ class ContextMenuHandler:
         
         # For transitions with locality support, add submenu
         if isinstance(obj, Transition) and self.locality_detector:
-            print(f"[ContextMenuHandler] Transition detected with locality_detector - calling _add_transition_locality_submenu")
             self._add_transition_locality_submenu(menu, obj, panel)
         else:
             # Simple menu item for places or transitions without locality support
             if isinstance(obj, Transition):
-                print(f"[ContextMenuHandler] Transition detected but locality_detector={self.locality_detector} - using simple menu")
             
+                pass
             menu_item = Gtk.MenuItem(label=f"Add to {obj_type_name}")
             
             def on_add_to_analysis(widget):
@@ -135,7 +132,6 @@ class ContextMenuHandler:
             menu_item.show()
             menu.append(menu_item)
             
-            print(f"[ContextMenuHandler] Added analysis menu item for {obj.name}")
     
     def _add_transition_locality_submenu(self, menu, transition, panel):
         """Add menu item for transition - automatically includes locality if valid.
@@ -149,11 +145,9 @@ class ContextMenuHandler:
             transition: Transition object
             panel: TransitionRatePanel instance
         """
-        print(f"[ContextMenuHandler] Creating menu for transition {transition.name}")
         
         # Detect locality
         locality = self.locality_detector.get_locality_for_transition(transition)
-        print(f"[ContextMenuHandler] Locality detected - valid: {locality.is_valid}, places: {locality.place_count}")
         
         if not locality.is_valid:
             # No valid locality, add simple menu item
@@ -162,7 +156,6 @@ class ContextMenuHandler:
                             lambda w: self._on_add_to_analysis_clicked(transition, panel))
             menu_item.show()
             menu.append(menu_item)
-            print(f"[ContextMenuHandler] Transition {transition.name} has no valid locality - simple menu item added")
             return
         
         # Create menu item that automatically adds transition + locality
@@ -173,7 +166,6 @@ class ContextMenuHandler:
         menu_item.show()
         menu.append(menu_item)
         
-        print(f"[ContextMenuHandler] Menu item created for {transition.name} - will auto-add locality with {locality_count} places")
     
     def _add_transition_only(self, transition, panel):
         """Add transition without locality to analysis.
@@ -183,7 +175,6 @@ class ContextMenuHandler:
             panel: TransitionRatePanel instance
         """
         panel.add_object(transition)
-        print(f"[ContextMenuHandler] Added {transition.name} (transition only) to analysis")
     
     def _add_transition_with_locality(self, transition, locality, panel):
         """Add transition with all locality places to analysis.
@@ -193,25 +184,16 @@ class ContextMenuHandler:
             locality: Locality object with input/output places
             panel: TransitionRatePanel instance
         """
-        print(f"[ContextMenuHandler] _add_transition_with_locality called for {transition.name}")
-        print(f"[ContextMenuHandler]   Locality valid: {locality.is_valid}")
-        print(f"[ContextMenuHandler]   Input places: {len(locality.input_places)}")
-        print(f"[ContextMenuHandler]   Output places: {len(locality.output_places)}")
-        print(f"[ContextMenuHandler]   Panel type: {type(panel).__name__}")
-        print(f"[ContextMenuHandler]   Has add_locality_places: {hasattr(panel, 'add_locality_places')}")
         
         # Add transition
         panel.add_object(transition)
-        print(f"[ContextMenuHandler] Transition {transition.name} added to panel")
         
         # Add locality places if panel supports it
         if hasattr(panel, 'add_locality_places'):
             panel.add_locality_places(transition, locality)
-            print(f"[ContextMenuHandler] Successfully added {transition.name} with locality "
-                  f"({len(locality.input_places)} inputs, {len(locality.output_places)} outputs)")
         else:
-            print(f"[ContextMenuHandler] Warning: Panel does not support add_locality_places()")
     
+            pass
     def _on_add_to_analysis_clicked(self, obj, panel):
         """Handle "Add to Analysis" menu item click.
         
@@ -227,7 +209,5 @@ class ContextMenuHandler:
         # If it's a transition, also update the diagnostics panel
         if isinstance(obj, Transition) and self.diagnostics_panel:
             self.diagnostics_panel.set_transition(obj)
-            print(f"[ContextMenuHandler] Updated diagnostics panel with transition {obj.name}")
         
         obj_type = "place" if isinstance(obj, Place) else "transition"
-        print(f"[ContextMenuHandler] Added {obj_type} {obj.name} to analysis from context menu")

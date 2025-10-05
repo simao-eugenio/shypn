@@ -2,6 +2,7 @@
 """Locality Runtime Analyzer - Runtime execution metrics for localities.
 
 This module provides runtime analysis for locality behavior, including:
+    pass
 - Recent firing events history
 - Throughput calculations over time windows
 - Dynamic enablement state checking
@@ -15,15 +16,13 @@ Example:
     # Get recent firing events
     events = runtime.get_recent_events(locality, window=10)
     for event in events:
-        print(f"{event['time']:.2f}s: {event['type']}")
     
+        pass
     # Get throughput
     rate = runtime.get_throughput(locality, window=10)
-    print(f"Firing rate: {rate:.3f} fires/sec")
     
     # Check if can fire now
     can_fire, reason = runtime.check_enablement(locality)
-    print(f"Can fire: {can_fire} - {reason}")
 """
 
 from typing import Dict, List, Any, Tuple, Optional
@@ -33,6 +32,7 @@ class LocalityRuntimeAnalyzer:
     """Analyzer for runtime execution metrics of localities.
     
     Provides analysis of:
+        pass
     - Transition firing history
     - Throughput/rate calculations
     - Dynamic enablement checking
@@ -50,9 +50,6 @@ class LocalityRuntimeAnalyzer:
         
         # Get diagnostics for a transition
         diag = runtime.get_transition_diagnostics(transition, window=10)
-        print(f"Recent events: {len(diag['recent_events'])}")
-        print(f"Throughput: {diag['throughput']:.3f}")
-        print(f"Enabled: {diag['enabled']}")
     """
     
     def __init__(self, model: Any, data_collector: Any):
@@ -69,6 +66,7 @@ class LocalityRuntimeAnalyzer:
         """Get comprehensive runtime diagnostics for a transition.
         
         Returns a diagnostic bundle with:
+            pass
         - Logical time
         - Enabled state
         - Recent firing events
@@ -95,13 +93,9 @@ class LocalityRuntimeAnalyzer:
         Example:
             diag = runtime.get_transition_diagnostics(transition)
             
-            print(f"Transition: {diag['transition_name']}")
-            print(f"Enabled: {diag['enabled']} - {diag['enablement_reason']}")
-            print(f"Recent fires: {diag['event_count']}")
-            print(f"Rate: {diag['throughput']:.3f} fires/sec")
             
             if diag['last_fired']:
-                print(f"Last fired: {diag['last_fired']:.2f}s ago")
+                pass
         """
         transition_id = transition.id
         transition_name = getattr(transition, 'name', f'T{transition_id}')
@@ -159,7 +153,7 @@ class LocalityRuntimeAnalyzer:
         Example:
             events = runtime.get_recent_events(transition, window=5)
             for event in events:
-                print(f"t={event['time']:.2f}: {event['type']}")
+                pass
         """
         if not self.data_collector:
             return []
@@ -171,10 +165,9 @@ class LocalityRuntimeAnalyzer:
             # Get transition firing data (time, event_type, details format)
             transition_data = self.data_collector.get_transition_data(transition_id)
             
-            print(f"[LocalityRuntime] get_recent_events for transition {transition_id}: found {len(transition_data)} events")
             if transition_data:
-                print(f"[LocalityRuntime] Sample event: {transition_data[-1]}")
             
+                pass
             if not transition_data:
                 return []
             
@@ -220,7 +213,6 @@ class LocalityRuntimeAnalyzer:
         
         Example:
             rate = runtime.get_throughput(transition, window=10.0)
-            print(f"Firing rate: {rate:.3f} fires/second")
         """
         if not self.data_collector:
             return 0.0
@@ -260,6 +252,7 @@ class LocalityRuntimeAnalyzer:
         """Check if transition can fire now and why.
         
         Performs dynamic precondition evaluation including:
+            pass
         - Input place token availability
         - Arc weight requirements
         - Guard conditions (if any)
@@ -276,9 +269,9 @@ class LocalityRuntimeAnalyzer:
         Example:
             can_fire, reason = runtime.check_enablement(transition)
             if can_fire:
-                print(f"✓ Transition enabled: {reason}")
+                pass
             else:
-                print(f"✗ Transition disabled: {reason}")
+                pass
         """
         transition_id = transition.id
         transition_name = getattr(transition, 'name', f'T{transition_id}')

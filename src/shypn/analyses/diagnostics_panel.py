@@ -128,7 +128,6 @@ class DiagnosticsPanel:
         
         # Show initial message and enable auto-tracking
         self._show_auto_tracking_message()
-        print(f"[DiagnosticsPanel] Setup complete. Model: {self.model is not None}, Data collector: {self.data_collector is not None}, Runtime analyzer: {self.runtime_analyzer is not None}")
         self.enable_auto_tracking()
     
     def set_transition(self, transition):
@@ -313,7 +312,6 @@ class DiagnosticsPanel:
         self._stop_updates()
         # Update every 500ms (2 times per second)
         self.update_timer = GLib.timeout_add(500, self._on_update_timer)
-        print(f"[DiagnosticsPanel] Started auto-tracking updates (500ms), auto_tracking_enabled={self.auto_tracking_enabled}")
     
     def enable_auto_tracking(self):
         """Enable automatic tracking of active transitions.
@@ -321,12 +319,9 @@ class DiagnosticsPanel:
         When enabled, the panel will automatically switch to show
         diagnostics for the most recently fired transition.
         """
-        print(f"[DiagnosticsPanel] enable_auto_tracking() called")
         self.auto_tracking_enabled = True
         if not self.update_timer:
             self._start_updates()
-        else:
-            print(f"[DiagnosticsPanel] Timer already running (ID: {self.update_timer})")
         if not self.current_transition:
             self._show_auto_tracking_message()
     
@@ -441,14 +436,11 @@ class DiagnosticsPanel:
             for transition in transitions:
                 try:
                     transition_name = getattr(transition, 'name', f'T{transition.id}')
-                    print(f"[DiagnosticsPanel] _auto_select: Checking {transition_name}...")
                     diag = self.runtime_analyzer.get_transition_diagnostics(transition, window=1)
-                    print(f"[DiagnosticsPanel] _auto_select: {transition_name} diag returned: event_count={diag.get('event_count')}, last_fired={diag.get('last_fired')}")
                     if diag.get('last_fired') is not None:
                         # Found a transition with activity, select it
                         found_any = True
                         transition_name = getattr(transition, 'name', f'T{transition.id}')
-                        print(f"[DiagnosticsPanel] Auto-selected transition: {transition_name}, last_fired={diag['last_fired']:.2f}s")
                         
                         # Set transition directly without calling set_transition()
                         # to avoid disabling auto-tracking
@@ -461,14 +453,12 @@ class DiagnosticsPanel:
                             )
                         break
                 except Exception as e:
-                    print(f"[DiagnosticsPanel] ERROR in _auto_select for transition: {e}")
                     import traceback
                     traceback.print_exc()
                     continue
             
             if not found_any and len(transitions) > 0:
-                # Debug: Show that we're checking but not finding activity
-                print(f"[DiagnosticsPanel] Checked {len(transitions)} transitions, no activity found yet")
+                pass  # No activity found yet
         except Exception:
             pass
     
