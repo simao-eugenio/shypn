@@ -179,8 +179,8 @@ class LocalityInfoWidget(Gtk.Box):
         text_lines.append("")
         text_lines.append(f"  Input Tokens:     {analysis['input_tokens']}")
         text_lines.append(f"  Output Tokens:    {analysis['output_tokens']}")
-        text_lines.append(f"  Token Balance:    {analysis['token_balance']:+d}")
-        text_lines.append(f"  Total Arc Weight: {analysis['total_weight']}")
+        text_lines.append(f"  Token Balance:    {analysis['token_balance']:+.0f}")
+        text_lines.append(f"  Total Arc Weight: {analysis['total_weight']:.0f}")
         text_lines.append("")
         
         # Firing status with icon
