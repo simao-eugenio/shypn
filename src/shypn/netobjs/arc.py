@@ -458,3 +458,37 @@ class Arc(PetriNetObject):
             arc.control_points = data["control_points"]
         
         return arc
+    
+    @staticmethod
+    def create_from_dict(data: dict, places: dict, transitions: dict) -> 'Arc':
+        """Factory method to create appropriate arc subclass from dictionary.
+        
+        This method examines the 'type' field in the data and creates the
+        appropriate Arc subclass (Arc, InhibitorArc, CurvedArc, or CurvedInhibitorArc).
+        
+        Args:
+            data: Dictionary containing arc properties
+            places: Dictionary mapping place IDs to Place instances
+            transitions: Dictionary mapping transition IDs to Transition instances
+            
+        Returns:
+            Arc: Instance of appropriate Arc subclass
+            
+        Raises:
+            ValueError: If source or target objects not found
+        """
+        arc_type = data.get("type", "arc")
+        
+        # Import subclasses here to avoid circular imports
+        if arc_type == "inhibitor_arc":
+            from shypn.netobjs.inhibitor_arc import InhibitorArc
+            return InhibitorArc.from_dict(data, places, transitions)
+        elif arc_type == "curved_arc":
+            from shypn.netobjs.curved_arc import CurvedArc
+            return CurvedArc.from_dict(data, places, transitions)
+        elif arc_type == "curved_inhibitor_arc":
+            from shypn.netobjs.curved_inhibitor_arc import CurvedInhibitorArc
+            return CurvedInhibitorArc.from_dict(data, places, transitions)
+        else:
+            # Default to Arc for backward compatibility
+            return Arc.from_dict(data, places, transitions)
