@@ -144,6 +144,17 @@ def main(argv=None):
 		except Exception as e:
 			print(f'ERROR: Failed to load right panel: {e}', file=sys.stderr)
 			sys.exit(5)
+		
+		# Wire right panel loader to canvas loader
+		# This allows tab switching to update the right panel's data collector
+		model_canvas_loader.set_right_panel_loader(right_panel_loader)
+		print("[Main] Right panel wired to model canvas loader for tab-aware data collector updates")
+		
+		# Wire context menu handler to canvas loader
+		# This allows right-click context menus to include "Add to Analysis" options
+		if hasattr(right_panel_loader, 'context_menu_handler') and right_panel_loader.context_menu_handler:
+			model_canvas_loader.set_context_menu_handler(right_panel_loader.context_menu_handler)
+			print("[Main] Context menu handler wired for analysis menu items")
 
 		# Get left dock area from main window
 		left_dock_area = main_builder.get_object('left_dock_area')

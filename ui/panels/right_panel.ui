@@ -79,22 +79,16 @@
         
         <!-- Main Content Area -->
         <child>
-          <object class="GtkScrolledWindow" id="analyses_scrolled">
+          <object class="GtkBox" id="analyses_content">
             <property name="visible">True</property>
+            <property name="orientation">vertical</property>
+            <property name="spacing">6</property>
+            <property name="margin-start">6</property>
+            <property name="margin-end">6</property>
+            <property name="margin-top">6</property>
+            <property name="margin-bottom">6</property>
             <property name="vexpand">True</property>
             <property name="hexpand">True</property>
-            <property name="hscrollbar-policy">automatic</property>
-            <property name="vscrollbar-policy">automatic</property>
-            
-            <child>
-              <object class="GtkBox" id="analyses_content">
-                <property name="visible">True</property>
-                <property name="orientation">vertical</property>
-                <property name="spacing">6</property>
-                <property name="margin-start">6</property>
-                <property name="margin-end">6</property>
-                <property name="margin-top">6</property>
-                <property name="margin-bottom">6</property>
                 
                 <!-- Topologic Analyses Section -->
                 <child>
@@ -159,6 +153,8 @@
                         <property name="show-border">True</property>
                         <property name="show-tabs">True</property>
                         <property name="scrollable">False</property>
+                        <property name="vexpand">True</property>
+                        <property name="hexpand">True</property>
                         
                         <!-- Transitions Page -->
                         <child>
@@ -198,16 +194,6 @@
                                     <property name="fill">False</property>
                                   </packing>
                                 </child>
-                                <child>
-                                  <object class="GtkButton" id="transitions_clear_button">
-                                    <property name="visible">True</property>
-                                    <property name="label">Clear</property>
-                                  </object>
-                                  <packing>
-                                    <property name="expand">False</property>
-                                    <property name="fill">False</property>
-                                  </packing>
-                                </child>
                               </object>
                             </child>
                             
@@ -215,7 +201,7 @@
                             <child>
                               <object class="GtkLabel" id="transitions_result_label">
                                 <property name="visible">True</property>
-                                <property name="label">Selected: </property>
+                                <property name="label"></property>
                                 <property name="xalign">0</property>
                                 <property name="selectable">True</property>
                                 <property name="ellipsize">end</property>
@@ -294,16 +280,6 @@
                                     <property name="fill">False</property>
                                   </packing>
                                 </child>
-                                <child>
-                                  <object class="GtkButton" id="places_clear_button">
-                                    <property name="visible">True</property>
-                                    <property name="label">Clear</property>
-                                  </object>
-                                  <packing>
-                                    <property name="expand">False</property>
-                                    <property name="fill">False</property>
-                                  </packing>
-                                </child>
                               </object>
                             </child>
                             
@@ -311,7 +287,7 @@
                             <child>
                               <object class="GtkLabel" id="places_result_label">
                                 <property name="visible">True</property>
-                                <property name="label">Selected: </property>
+                                <property name="label"></property>
                                 <property name="xalign">0</property>
                                 <property name="selectable">True</property>
                                 <property name="ellipsize">end</property>
@@ -362,8 +338,6 @@
                 </child>
                 
               </object>
-            </child>
-          </object>
           <packing>
             <property name="expand">True</property>
             <property name="fill">True</property>

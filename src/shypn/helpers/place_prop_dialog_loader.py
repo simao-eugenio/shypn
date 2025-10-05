@@ -172,7 +172,9 @@ class PlacePropDialogLoader(GObject.GObject):
                     else:
                         tokens_value = int(tokens_text)
                     self.place_obj.tokens = max(0, tokens_value)  # Ensure non-negative
-                    print(f"[PlacePropDialogLoader] Set tokens to {self.place_obj.tokens}")
+                    # Also update initial_marking so reset works correctly
+                    self.place_obj.initial_marking = self.place_obj.tokens
+                    print(f"[PlacePropDialogLoader] Set tokens and initial_marking to {self.place_obj.tokens}")
             except ValueError as e:
                 print(f"[PlacePropDialogLoader] Invalid tokens value: {tokens_text}, error: {e}")
         

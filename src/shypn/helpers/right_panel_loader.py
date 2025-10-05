@@ -38,6 +38,7 @@ class RightPanelLoader:
         
         self.ui_path = ui_path
         self.data_collector = data_collector
+        self.model = None  # ModelCanvasManager for search functionality
         self.builder = None
         self.window = None
         self.content = None
@@ -51,6 +52,9 @@ class RightPanelLoader:
         # Plotting panels (will be instantiated in load())
         self.place_panel = None
         self.transition_panel = None
+        
+        # Context menu handler (will be instantiated after panels are created)
+        self.context_menu_handler = None
     
     def load(self):
         """Load the panel UI and return the window.
@@ -111,9 +115,9 @@ class RightPanelLoader:
             for child in places_container.get_children():
                 places_container.remove(child)
             
-            # Instantiate and add place rate panel
+            # Instantiate and add place rate panel with expand=True to fill vertical space
             self.place_panel = PlaceRatePanel(self.data_collector)
-            places_container.add(self.place_panel)
+            places_container.pack_start(self.place_panel, True, True, 0)
             
             print("[RightPanelLoader] Place rate panel attached to places_canvas_container")
         else:
@@ -126,13 +130,61 @@ class RightPanelLoader:
             for child in transitions_container.get_children():
                 transitions_container.remove(child)
             
-            # Instantiate and add transition rate panel
+            # Instantiate and add transition rate panel with expand=True to fill vertical space
             self.transition_panel = TransitionRatePanel(self.data_collector)
-            transitions_container.add(self.transition_panel)
+            transitions_container.pack_start(self.transition_panel, True, True, 0)
             
             print("[RightPanelLoader] Transition rate panel attached to transitions_canvas_container")
         else:
             print("[RightPanelLoader] Warning: transitions_canvas_container not found in UI")
+        
+        # Wire search UI if model is available
+        if self.model is not None:
+            self._wire_search_ui()
+        
+        # Create context menu handler now that panels exist
+        if self.place_panel and self.transition_panel:
+            from shypn.analyses import ContextMenuHandler
+            self.context_menu_handler = ContextMenuHandler(self.place_panel, self.transition_panel)
+            print("[RightPanelLoader] Context menu handler created")
+    
+    def _wire_search_ui(self):
+        """Wire search UI controls to panel search functionality.
+        
+        This method connects the search widgets from the UI to the panel methods.
+        The panels handle all the search logic internally.
+        """
+        # === Places Search UI ===
+        places_entry = self.builder.get_object('places_search_entry')
+        places_search_btn = self.builder.get_object('places_search_button')
+        places_result_label = self.builder.get_object('places_result_label')
+        
+        if self.place_panel and all([places_entry, places_search_btn, places_result_label]):
+            self.place_panel.wire_search_ui(
+                places_entry,
+                places_search_btn,
+                places_result_label,
+                self.model
+            )
+            print("[RightPanelLoader] Places search UI wired")
+        else:
+            print("[RightPanelLoader] Warning: Could not wire places search UI (missing widgets or panel)")
+        
+        # === Transitions Search UI ===
+        transitions_entry = self.builder.get_object('transitions_search_entry')
+        transitions_search_btn = self.builder.get_object('transitions_search_button')
+        transitions_result_label = self.builder.get_object('transitions_result_label')
+        
+        if self.transition_panel and all([transitions_entry, transitions_search_btn, transitions_result_label]):
+            self.transition_panel.wire_search_ui(
+                transitions_entry,
+                transitions_search_btn,
+                transitions_result_label,
+                self.model
+            )
+            print("[RightPanelLoader] Transitions search UI wired")
+        else:
+            print("[RightPanelLoader] Warning: Could not wire transitions search UI (missing widgets or panel)")
     
     def set_data_collector(self, data_collector):
         """Set or update the data collector for plotting panels.
@@ -149,11 +201,37 @@ class RightPanelLoader:
         if self.place_panel is None or self.transition_panel is None:
             if self.builder is not None:  # UI must be loaded first
                 self._setup_plotting_panels()
+                
+                # Create and wire context menu handler after panels are created
+                if self.place_panel and self.transition_panel and not self.context_menu_handler:
+                    from shypn.analyses import ContextMenuHandler
+                    self.context_menu_handler = ContextMenuHandler(self.place_panel, self.transition_panel)
+                    print("[RightPanelLoader] Context menu handler created")
+                    
+                    # Notify parent if needed (for wiring to model_canvas_loader)
+                    if hasattr(self, '_on_context_menu_handler_ready'):
+                        self._on_context_menu_handler_ready(self.context_menu_handler)
         else:
             # Update existing panels
             self.place_panel.data_collector = data_collector
             self.transition_panel.data_collector = data_collector
             print("[RightPanelLoader] Data collector updated for plotting panels")
+    
+    def set_model(self, model):
+        """Set the model for search functionality.
+        
+        This allows setting the model after initialization,
+        useful when the right panel is created before the canvas loader.
+        
+        Args:
+            model: ModelCanvasManager instance for searching places/transitions
+        """
+        self.model = model
+        
+        # If panels exist and UI is loaded, wire search functionality
+        if self.builder is not None and (self.place_panel or self.transition_panel):
+            self._wire_search_ui()
+            print("[RightPanelLoader] Model set and search UI wired")
     
     def _on_float_toggled(self, button):
         """Internal callback when float toggle button is clicked."""
