@@ -554,6 +554,9 @@ class ModelCanvasLoader:
                 # Connect step-executed signal for canvas redraw
                 simulate_tools_palette.connect('step-executed', self._on_simulation_step, drawing_area)
                 
+                # Connect reset-executed signal for plot refresh
+                simulate_tools_palette.connect('reset-executed', self._on_simulation_reset)
+                
                 # Create simulation palette (main [S] button)
                 simulate_palette = create_simulate_palette()
                 simulate_widget = simulate_palette.get_widget()
@@ -600,6 +603,26 @@ class ModelCanvasLoader:
         """
         # Queue redraw to show updated tokens
         drawing_area.queue_draw()
+    
+    def _on_simulation_reset(self, palette):
+        """Handle simulation reset - notify analysis panels to refresh plots.
+        
+        Args:
+            palette: SimulateToolsPaletteLoader that emitted the signal
+        """
+        print("[ModelCanvasLoader] Simulation reset - notifying analysis panels")
+        
+        # Notify analysis panels to refresh their plots showing reset state
+        if self.right_panel_loader:
+            if hasattr(self.right_panel_loader, 'place_panel') and self.right_panel_loader.place_panel:
+                # Mark place panel for update to show reset token values
+                self.right_panel_loader.place_panel.needs_update = True
+                print("[ModelCanvasLoader] Marked place panel for update after reset")
+            
+            if hasattr(self.right_panel_loader, 'transition_panel') and self.right_panel_loader.transition_panel:
+                # Mark transition panel for update to show reset state
+                self.right_panel_loader.transition_panel.needs_update = True
+                print("[ModelCanvasLoader] Marked transition panel for update after reset")
     
     def _on_mode_changed(self, mode_palette, mode, drawing_area, edit_palette, edit_tools_palette,
                          simulate_palette, simulate_tools_palette):
