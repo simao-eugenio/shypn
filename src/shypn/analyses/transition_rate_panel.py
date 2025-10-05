@@ -202,6 +202,9 @@ class TransitionRatePanel(AnalysisPlotPanel):
         This method connects the search entry, buttons, and result label from
         the right panel UI to the SearchHandler for finding transitions to add to analysis.
         
+        When a transition is found, it automatically detects and adds its entire locality
+        (transition + all connected input/output places) to the plot.
+        
         Args:
             entry: GtkEntry for search input
             search_btn: GtkButton for triggering search
@@ -225,10 +228,11 @@ class TransitionRatePanel(AnalysisPlotPanel):
                 self.search_result_label.set_text("⚠ No model loaded. Open or create a Petri net first.")
                 return
             
-            # Import SearchHandler
+            # Import SearchHandler and LocalityDetector
             from shypn.analyses import SearchHandler
+            from shypn.diagnostic import LocalityDetector
             
-            # Perform search
+            # Perform transition search
             results = SearchHandler.search_transitions(self.search_model, query)
             self.search_results = results
             
@@ -238,10 +242,28 @@ class TransitionRatePanel(AnalysisPlotPanel):
                 self.search_result_label.set_text(summary)
                 print(f"[TransitionRatePanel] Search found {len(results)} transitions")
                 
-                # If exactly one result, add it automatically
+                # If exactly one result, add it with its locality automatically
                 if len(results) == 1:
-                    self.add_object(results[0])
-                    self.search_result_label.set_text(f"✓ Added {results[0].name} to analysis")
+                    transition = results[0]
+                    
+                    # Detect locality for this transition
+                    detector = LocalityDetector(self.search_model)
+                    locality = detector.get_locality_for_transition(transition)
+                    
+                    # Add transition to plot
+                    self.add_object(transition)
+                    
+                    # Add locality places if valid
+                    if locality.is_valid:
+                        self.add_locality_places(transition, locality)
+                        place_count = locality.place_count
+                        self.search_result_label.set_text(
+                            f"✓ Added {transition.name} with locality ({place_count} places)"
+                        )
+                        print(f"[TransitionRatePanel] Added locality: {locality.get_summary()}")
+                    else:
+                        self.search_result_label.set_text(f"✓ Added {transition.name} to analysis")
+                        print(f"[TransitionRatePanel] No valid locality for {transition.name}")
             else:
                 self.search_result_label.set_text(f"✗ No transitions found for '{query}'")
 
