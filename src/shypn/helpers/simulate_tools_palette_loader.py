@@ -36,6 +36,8 @@ class SimulateToolsPaletteLoader(GObject.GObject):
     __gsignals__ = {
         # Signal emitted after each simulation step (for canvas redraw)
         'step-executed': (GObject.SignalFlags.RUN_FIRST, None, (float,)),  # time
+        # Signal emitted when simulation is reset to initial marking
+        'reset-executed': (GObject.SignalFlags.RUN_FIRST, None, ()),
     }
     
     def __init__(self, model=None, ui_dir: str = None):
@@ -324,6 +326,9 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         
         # Reset simulation
         self.simulation.reset()
+        
+        # Emit signal to notify listeners (for plot refresh)
+        self.emit('reset-executed')
         
         # Update button states
         self.run_button.set_sensitive(True)

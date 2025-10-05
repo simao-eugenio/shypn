@@ -31,11 +31,17 @@ Extended the `properties-changed` signal handler in `ModelCanvasLoader._on_objec
 1. Clear simulation behavior cache for changed transitions
 2. Mark analysis panels for update when selected objects change
 
+**Additionally**, added reset notification mechanism:
+3. Emit `reset-executed` signal when Reset button is clicked
+4. Mark analysis panels for update to show initial markings after reset
+
 ### Technical Details
 
-**File Modified:** `src/shypn/helpers/model_canvas_loader.py`
+**Files Modified:** 
+- `src/shypn/helpers/model_canvas_loader.py`
+- `src/shypn/helpers/simulate_tools_palette_loader.py`
 
-**Enhanced `on_properties_changed()` callback:**
+**1. Enhanced `on_properties_changed()` callback:**
 
 ```python
 def on_properties_changed(_):
@@ -64,6 +70,37 @@ def on_properties_changed(_):
                 self.right_panel_loader.transition_panel.needs_update = True
 ```
 
+**2. Added Reset Notification (`simulate_tools_palette_loader.py`):**
+
+```python
+# Added new signal
+__gsignals__ = {
+    'step-executed': (GObject.SignalFlags.RUN_FIRST, None, (float,)),
+    'reset-executed': (GObject.SignalFlags.RUN_FIRST, None, ()),  # NEW
+}
+
+# Emit signal in _on_reset_clicked()
+def _on_reset_clicked(self, button):
+    self.simulation.reset()
+    self.emit('reset-executed')  # NEW: Notify listeners
+    # ... button state updates ...
+```
+
+**3. Added Reset Handler (`model_canvas_loader.py`):**
+
+```python
+# Connect reset signal
+simulate_tools_palette.connect('reset-executed', self._on_simulation_reset)
+
+# Handler marks analysis panels for update
+def _on_simulation_reset(self, palette):
+    if self.right_panel_loader:
+        if self.right_panel_loader.place_panel:
+            self.right_panel_loader.place_panel.needs_update = True
+        if self.right_panel_loader.transition_panel:
+            self.right_panel_loader.transition_panel.needs_update = True
+```
+
 ### Architecture Flow
 
 ```
@@ -83,6 +120,21 @@ on_properties_changed() callback
         ↓
     Next simulation step uses fresh behavior
     Next plot update shows new data
+
+User clicks Reset button
+    ↓
+SimulateToolsPaletteLoader._on_reset_clicked()
+    ↓
+simulation.reset() → Restore initial markings
+    ↓
+emit('reset-executed')
+    ↓
+_on_simulation_reset() callback
+    ↓
+    ├─> Set place_panel.needs_update = True (NEW)
+    └─> Set transition_panel.needs_update = True (NEW)
+        ↓
+    Next plot update shows reset state
 ```
 
 ## Benefits
@@ -101,6 +153,7 @@ on_properties_changed() callback
 - ✅ Interactive property editing during simulation pauses
 - ✅ Immediate feedback for property changes
 - ✅ Consistent behavior across canvas, simulation, and analysis views
+- ✅ Reset button updates analysis plots to show initial markings
 
 ## Testing Scenarios
 
@@ -127,6 +180,14 @@ on_properties_changed() callback
 4. Resume simulation
 5. **Expected:** T1 behaves as timed transition (behavior cache cleared)
 
+### Scenario 4: Reset Button Updates Plots
+1. Run simulation, modify place tokens during execution
+2. Stop simulation
+3. Click Reset button
+4. **Expected:** All places return to initial_marking values
+5. **Expected:** Analysis plots immediately refresh to show reset token values
+6. **Expected:** Transition analysis plots also refresh to show reset state
+
 ## Implementation Notes
 
 ### Why Behavior Cache Clearing?
@@ -151,6 +212,14 @@ def _periodic_update(self):
 
 Setting `needs_update = True` ensures the next periodic update will refresh the plot, showing the updated property values.
 
+### Why Reset Signal?
+
+When users click the Reset button, all places are restored to their `initial_marking` values. The analysis plots need to immediately reflect this state change:
+- Place token plots show the reset token counts
+- Transition firing plots show the reset enablement state
+
+Emitting a `reset-executed` signal allows the analysis panels to be notified without tight coupling between the simulation palette and the analysis panels.
+
 ### Thread Safety
 
 All operations occur on the GTK main thread (via GLib.timeout_add), so no locking is required.
@@ -164,7 +233,8 @@ All operations occur on the GTK main thread (via GLib.timeout_add), so no lockin
 
 ## Related Files
 
-- `src/shypn/helpers/model_canvas_loader.py` - Property change notification logic
+- `src/shypn/helpers/model_canvas_loader.py` - Property change and reset notification logic
+- `src/shypn/helpers/simulate_tools_palette_loader.py` - Reset signal emission
 - `src/shypn/helpers/place_prop_dialog_loader.py` - Place properties dialog
 - `src/shypn/helpers/transition_prop_dialog_loader.py` - Transition properties dialog
 - `src/shypn/engine/simulation/controller.py` - Behavior cache management
@@ -172,16 +242,20 @@ All operations occur on the GTK main thread (via GLib.timeout_add), so no lockin
 
 ## Commit
 
-**Title:** Add property change propagation to simulation and analysis panels
+**Title:** Add property change and reset notifications to analysis panels
 
 **Description:**
 - Clear simulation behavior cache when transition properties change
 - Mark analysis panels for update when selected object properties change
+- Add 'reset-executed' signal to SimulateToolsPaletteLoader
+- Notify analysis panels when Reset button is clicked
 - Ensures simulation uses fresh behavior after property edits
-- Ensures analysis plots reflect updated property values
+- Ensures analysis plots reflect updated property values and reset state
 - Improves interactive editing during simulation pauses
 
 **Files Changed:**
 - `src/shypn/helpers/model_canvas_loader.py`
+- `src/shypn/helpers/simulate_tools_palette_loader.py`
+- `doc/PROPERTY_CHANGE_PROPAGATION.md`
 
 **Date:** 2025-10-04
