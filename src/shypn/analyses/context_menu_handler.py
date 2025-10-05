@@ -46,6 +46,9 @@ class ContextMenuHandler:
         if model:
             from shypn.diagnostic import LocalityDetector
             self.locality_detector = LocalityDetector(model)
+            print(f"[ContextMenuHandler] __init__ - Locality detector created with model")
+        else:
+            print(f"[ContextMenuHandler] __init__ - No model provided, locality detector is None")
     
     def set_panels(self, place_panel, transition_panel):
         """Set or update the analysis panels.
@@ -113,9 +116,13 @@ class ContextMenuHandler:
         
         # For transitions with locality support, add submenu
         if isinstance(obj, Transition) and self.locality_detector:
+            print(f"[ContextMenuHandler] Transition detected with locality_detector - calling _add_transition_locality_submenu")
             self._add_transition_locality_submenu(menu, obj, panel)
         else:
             # Simple menu item for places or transitions without locality support
+            if isinstance(obj, Transition):
+                print(f"[ContextMenuHandler] Transition detected but locality_detector={self.locality_detector} - using simple menu")
+            
             menu_item = Gtk.MenuItem(label=f"Add to {obj_type_name}")
             
             def on_add_to_analysis(widget):
@@ -129,19 +136,22 @@ class ContextMenuHandler:
             print(f"[ContextMenuHandler] Added analysis menu item for {obj.name}")
     
     def _add_transition_locality_submenu(self, menu, transition, panel):
-        """Add submenu for transition with locality options.
+        """Add menu item for transition - automatically includes locality if valid.
         
-        Creates a submenu with:
-        - "Transition Only" - adds just the transition
-        - "With Locality (N places)" - adds transition + input/output places
+        Automatically adds transition with locality (if valid), matching the
+        behavior of the search UI where finding a transition also adds its
+        locality places.
         
         Args:
-            menu: Gtk.Menu instance to add submenu to
+            menu: Gtk.Menu instance to add menu item to
             transition: Transition object
             panel: TransitionRatePanel instance
         """
+        print(f"[ContextMenuHandler] Creating menu for transition {transition.name}")
+        
         # Detect locality
         locality = self.locality_detector.get_locality_for_transition(transition)
+        print(f"[ContextMenuHandler] Locality detected - valid: {locality.is_valid}, places: {locality.place_count}")
         
         if not locality.is_valid:
             # No valid locality, add simple menu item
@@ -150,33 +160,18 @@ class ContextMenuHandler:
                             lambda w: self._on_add_to_analysis_clicked(transition, panel))
             menu_item.show()
             menu.append(menu_item)
-            print(f"[ContextMenuHandler] Transition {transition.name} has no valid locality")
+            print(f"[ContextMenuHandler] Transition {transition.name} has no valid locality - simple menu item added")
             return
         
-        # Create submenu for locality options
-        submenu_item = Gtk.MenuItem(label="Add to Transition Analysis")
-        submenu = Gtk.Menu()
-        
-        # Option 1: Transition only
-        transition_only = Gtk.MenuItem(label=f"Transition Only")
-        transition_only.connect("activate",
-                               lambda w: self._add_transition_only(transition, panel))
-        transition_only.show()
-        submenu.append(transition_only)
-        
-        # Option 2: Transition + locality
+        # Create menu item that automatically adds transition + locality
         locality_count = locality.place_count
-        with_locality = Gtk.MenuItem(label=f"With Locality ({locality_count} places)")
-        with_locality.connect("activate",
-                             lambda w: self._add_transition_with_locality(transition, locality, panel))
-        with_locality.show()
-        submenu.append(with_locality)
+        menu_item = Gtk.MenuItem(label=f"Add to Transition Analysis")
+        menu_item.connect("activate",
+                         lambda w: self._add_transition_with_locality(transition, locality, panel))
+        menu_item.show()
+        menu.append(menu_item)
         
-        submenu_item.set_submenu(submenu)
-        submenu_item.show()
-        menu.append(submenu_item)
-        
-        print(f"[ContextMenuHandler] Added locality submenu for {transition.name} ({locality_count} places)")
+        print(f"[ContextMenuHandler] Menu item created for {transition.name} - will auto-add locality with {locality_count} places")
     
     def _add_transition_only(self, transition, panel):
         """Add transition without locality to analysis.
@@ -196,13 +191,21 @@ class ContextMenuHandler:
             locality: Locality object with input/output places
             panel: TransitionRatePanel instance
         """
+        print(f"[ContextMenuHandler] _add_transition_with_locality called for {transition.name}")
+        print(f"[ContextMenuHandler]   Locality valid: {locality.is_valid}")
+        print(f"[ContextMenuHandler]   Input places: {len(locality.input_places)}")
+        print(f"[ContextMenuHandler]   Output places: {len(locality.output_places)}")
+        print(f"[ContextMenuHandler]   Panel type: {type(panel).__name__}")
+        print(f"[ContextMenuHandler]   Has add_locality_places: {hasattr(panel, 'add_locality_places')}")
+        
         # Add transition
         panel.add_object(transition)
+        print(f"[ContextMenuHandler] Transition {transition.name} added to panel")
         
         # Add locality places if panel supports it
         if hasattr(panel, 'add_locality_places'):
             panel.add_locality_places(transition, locality)
-            print(f"[ContextMenuHandler] Added {transition.name} with locality "
+            print(f"[ContextMenuHandler] Successfully added {transition.name} with locality "
                   f"({len(locality.input_places)} inputs, {len(locality.output_places)} outputs)")
         else:
             print(f"[ContextMenuHandler] Warning: Panel does not support add_locality_places()")
