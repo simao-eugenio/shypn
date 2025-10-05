@@ -1766,11 +1766,19 @@ class ModelCanvasLoader:
                 persistency_manager=self.persistency
             )
         elif isinstance(obj, Transition):
+            # Get data collector if available
+            data_collector = None
+            if drawing_area in self.simulate_tools_palettes:
+                simulate_tools = self.simulate_tools_palettes[drawing_area]
+                if hasattr(simulate_tools, 'data_collector'):
+                    data_collector = simulate_tools.data_collector
+            
             dialog_loader = create_transition_prop_dialog(
                 obj, 
                 parent_window=self.parent_window,
                 persistency_manager=self.persistency,
-                model=manager
+                model=manager,
+                data_collector=data_collector
             )
         elif isinstance(obj, Arc):
             dialog_loader = create_arc_prop_dialog(

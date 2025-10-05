@@ -29,16 +29,18 @@ class ContextMenuHandler:
         handler.add_analysis_menu_items(menu, obj)
     """
     
-    def __init__(self, place_panel=None, transition_panel=None, model=None):
+    def __init__(self, place_panel=None, transition_panel=None, model=None, diagnostics_panel=None):
         """Initialize the context menu handler.
         
         Args:
             place_panel: PlaceRatePanel instance (optional, can be set later)
             transition_panel: TransitionRatePanel instance (optional, can be set later)
             model: ModelCanvasManager instance for locality detection (optional)
+            diagnostics_panel: DiagnosticsPanel instance (optional, can be set later)
         """
         self.place_panel = place_panel
         self.transition_panel = transition_panel
+        self.diagnostics_panel = diagnostics_panel
         self.model = model
         self.locality_detector = None
         
@@ -221,6 +223,11 @@ class ContextMenuHandler:
         
         # Add object to the appropriate panel
         panel.add_object(obj)
+        
+        # If it's a transition, also update the diagnostics panel
+        if isinstance(obj, Transition) and self.diagnostics_panel:
+            self.diagnostics_panel.set_transition(obj)
+            print(f"[ContextMenuHandler] Updated diagnostics panel with transition {obj.name}")
         
         obj_type = "place" if isinstance(obj, Place) else "transition"
         print(f"[ContextMenuHandler] Added {obj_type} {obj.name} to analysis from context menu")

@@ -24,10 +24,12 @@ Example:
 from .locality_detector import LocalityDetector, Locality
 from .locality_analyzer import LocalityAnalyzer
 from .locality_info_widget import LocalityInfoWidget
+from .locality_runtime import LocalityRuntimeAnalyzer
 
 __all__ = [
     'LocalityDetector',
     'Locality',
     'LocalityAnalyzer',
     'LocalityInfoWidget',
+    'LocalityRuntimeAnalyzer',
 ]

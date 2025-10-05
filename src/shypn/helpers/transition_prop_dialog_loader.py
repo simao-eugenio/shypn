@@ -17,7 +17,7 @@ from shypn.helpers.color_picker import setup_color_picker_in_dialog
 class TransitionPropDialogLoader(GObject.GObject):
     """Loader for Transition properties dialog.
     
-    This class loads and manages the Transition properties dialog UI from
+    This class loads and manages the Transition properties dialog from
     transition_prop_dialog.ui. The dialog allows editing Transition attributes
     such as name, label, and other properties.
     
@@ -29,7 +29,7 @@ class TransitionPropDialogLoader(GObject.GObject):
         'properties-changed': (GObject.SignalFlags.RUN_FIRST, None, ())
     }
     
-    def __init__(self, transition_obj, parent_window=None, ui_dir: str = None, persistency_manager=None, model=None):
+    def __init__(self, transition_obj, parent_window=None, ui_dir: str = None, persistency_manager=None, model=None, data_collector=None):
         """Initialize the Transition properties dialog loader.
         
         Args:
@@ -38,6 +38,7 @@ class TransitionPropDialogLoader(GObject.GObject):
             ui_dir: Directory containing UI files. Defaults to project ui/dialogs/.
             persistency_manager: NetObjPersistency instance for marking document dirty
             model: ModelCanvasManager instance for accessing Petri net structure
+            data_collector: Optional SimulationDataCollector for runtime diagnostics
         """
         super().__init__()
         
@@ -53,6 +54,7 @@ class TransitionPropDialogLoader(GObject.GObject):
         self.parent_window = parent_window
         self.persistency_manager = persistency_manager
         self.model = model
+        self.data_collector = data_collector
         
         # Widget references
         self.builder = None
@@ -291,6 +293,10 @@ class TransitionPropDialogLoader(GObject.GObject):
             self.locality_widget = LocalityInfoWidget(self.model)
             self.locality_widget.set_transition(self.transition_obj)
             
+            # Wire data collector for runtime diagnostics if available
+            if self.data_collector:
+                self.locality_widget.set_data_collector(self.data_collector)
+            
             locality_container.pack_start(self.locality_widget, True, True, 0)
             locality_container.show_all()
             
@@ -443,7 +449,7 @@ class TransitionPropDialogLoader(GObject.GObject):
 
 
 # Factory function for convenience
-def create_transition_prop_dialog(transition_obj, parent_window=None, ui_dir: str = None, persistency_manager=None, model=None):
+def create_transition_prop_dialog(transition_obj, parent_window=None, ui_dir: str = None, persistency_manager=None, model=None, data_collector=None):
     """Factory function to create a Transition properties dialog loader.
     
     Args:
@@ -452,8 +458,9 @@ def create_transition_prop_dialog(transition_obj, parent_window=None, ui_dir: st
         ui_dir: Directory containing UI files. Defaults to project ui/dialogs/.
         persistency_manager: NetObjPersistency instance for marking document dirty
         model: ModelCanvasManager instance for accessing Petri net structure
+        data_collector: Optional SimulationDataCollector for runtime diagnostics
     
     Returns:
         TransitionPropDialogLoader: Configured dialog loader instance.
     """
-    return TransitionPropDialogLoader(transition_obj, parent_window=parent_window, ui_dir=ui_dir, persistency_manager=persistency_manager, model=model)
+    return TransitionPropDialogLoader(transition_obj, parent_window=parent_window, ui_dir=ui_dir, persistency_manager=persistency_manager, model=model, data_collector=data_collector)
