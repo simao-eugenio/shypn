@@ -145,8 +145,8 @@ class RightPanelLoader:
         # Create context menu handler now that panels exist
         if self.place_panel and self.transition_panel:
             from shypn.analyses import ContextMenuHandler
-            self.context_menu_handler = ContextMenuHandler(self.place_panel, self.transition_panel)
-            print("[RightPanelLoader] Context menu handler created")
+            self.context_menu_handler = ContextMenuHandler(self.place_panel, self.transition_panel, self.model)
+            print("[RightPanelLoader] Context menu handler created with model support")
     
     def _wire_search_ui(self):
         """Wire search UI controls to panel search functionality.
@@ -205,8 +205,8 @@ class RightPanelLoader:
                 # Create and wire context menu handler after panels are created
                 if self.place_panel and self.transition_panel and not self.context_menu_handler:
                     from shypn.analyses import ContextMenuHandler
-                    self.context_menu_handler = ContextMenuHandler(self.place_panel, self.transition_panel)
-                    print("[RightPanelLoader] Context menu handler created")
+                    self.context_menu_handler = ContextMenuHandler(self.place_panel, self.transition_panel, self.model)
+                    print("[RightPanelLoader] Context menu handler created with model support")
                     
                     # Notify parent if needed (for wiring to model_canvas_loader)
                     if hasattr(self, '_on_context_menu_handler_ready'):

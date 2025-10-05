@@ -29,7 +29,7 @@ class TransitionPropDialogLoader(GObject.GObject):
         'properties-changed': (GObject.SignalFlags.RUN_FIRST, None, ())
     }
     
-    def __init__(self, transition_obj, parent_window=None, ui_dir: str = None, persistency_manager=None):
+    def __init__(self, transition_obj, parent_window=None, ui_dir: str = None, persistency_manager=None, model=None):
         """Initialize the Transition properties dialog loader.
         
         Args:
@@ -37,6 +37,7 @@ class TransitionPropDialogLoader(GObject.GObject):
             parent_window: Parent window for modal dialog.
             ui_dir: Directory containing UI files. Defaults to project ui/dialogs/.
             persistency_manager: NetObjPersistency instance for marking document dirty
+            model: ModelCanvasManager instance for accessing Petri net structure
         """
         super().__init__()
         
@@ -51,16 +52,19 @@ class TransitionPropDialogLoader(GObject.GObject):
         self.transition_obj = transition_obj
         self.parent_window = parent_window
         self.persistency_manager = persistency_manager
+        self.model = model
         
         # Widget references
         self.builder = None
         self.dialog = None
         self.color_picker = None
+        self.locality_widget = None
         
         # Load UI
         self._load_ui()
         self._setup_color_picker()
         self._populate_fields()
+        self._setup_locality_widget()
     
     def _load_ui(self):
         """Load the Transition properties dialog UI from file."""
@@ -270,6 +274,32 @@ class TransitionPropDialogLoader(GObject.GObject):
             rate_text = self._format_formula_for_display(rate_value)
             buffer.set_text(rate_text)
     
+    def _setup_locality_widget(self):
+        """Setup locality information widget in diagnostics tab."""
+        # Get locality container from UI file
+        locality_container = self.builder.get_object('locality_info_container')
+        
+        if locality_container and self.model:
+            # Clear existing children
+            for child in locality_container.get_children():
+                locality_container.remove(child)
+            
+            # Import locality widget
+            from shypn.diagnostic import LocalityInfoWidget
+            
+            # Create and add locality widget
+            self.locality_widget = LocalityInfoWidget(self.model)
+            self.locality_widget.set_transition(self.transition_obj)
+            
+            locality_container.pack_start(self.locality_widget, True, True, 0)
+            locality_container.show_all()
+            
+            print("[TransitionPropDialogLoader] Locality widget initialized")
+        elif not locality_container:
+            print("[TransitionPropDialogLoader] Warning: locality_info_container not found in UI")
+        elif not self.model:
+            print("[TransitionPropDialogLoader] Warning: No model provided, locality widget not created")
+    
     def _on_response(self, dialog, response_id):
         """Handle dialog response (OK/Cancel).
         
@@ -413,7 +443,7 @@ class TransitionPropDialogLoader(GObject.GObject):
 
 
 # Factory function for convenience
-def create_transition_prop_dialog(transition_obj, parent_window=None, ui_dir: str = None, persistency_manager=None):
+def create_transition_prop_dialog(transition_obj, parent_window=None, ui_dir: str = None, persistency_manager=None, model=None):
     """Factory function to create a Transition properties dialog loader.
     
     Args:
@@ -421,8 +451,9 @@ def create_transition_prop_dialog(transition_obj, parent_window=None, ui_dir: st
         parent_window: Parent window for modal dialog.
         ui_dir: Directory containing UI files. Defaults to project ui/dialogs/.
         persistency_manager: NetObjPersistency instance for marking document dirty
+        model: ModelCanvasManager instance for accessing Petri net structure
     
     Returns:
         TransitionPropDialogLoader: Configured dialog loader instance.
     """
-    return TransitionPropDialogLoader(transition_obj, parent_window=parent_window, ui_dir=ui_dir, persistency_manager=persistency_manager)
+    return TransitionPropDialogLoader(transition_obj, parent_window=parent_window, ui_dir=ui_dir, persistency_manager=persistency_manager, model=model)

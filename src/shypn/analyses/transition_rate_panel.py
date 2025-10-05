@@ -1,7 +1,7 @@
-"""Transition Rate Analysis Panel.
+"""Transition Behavior Analysis Panel.
 
-This module provides the TransitionRatePanel class for plotting transition
-firing rates in real-time during simulation.
+This module provides the TransitionRatePanel class for plotting transition-specific
+behavior characteristics in real-time during simulation.
 
 This is a SEPARATE MODULE - not implemented in loaders!
 Loaders only instantiate this panel and attach it to the UI.
@@ -12,115 +12,189 @@ from shypn.analyses.plot_panel import AnalysisPlotPanel
 
 
 class TransitionRatePanel(AnalysisPlotPanel):
-    """Panel for plotting transition firing rates.
+    """Panel for plotting transition behavior characteristics over time.
     
-    This panel displays the firing rate (firings per unit time) for selected
-    transitions over simulation time. The rate is calculated using a sliding
-    time window to count firing events.
+    This panel adapts its visualization based on transition type:
     
-    Rate interpretation:
-    - High rate: Transition firing frequently
-    - Low rate: Transition firing occasionally
-    - Zero rate: Transition not firing (may be disabled or in conflict)
+    **Continuous Transitions (SHPN)**:
+    - Plots the **rate function value** over time
+    - Shows actual behavior curves (sigmoid, exponential, linear, etc.)
+    - Y-axis: Rate (tokens/s) - the instantaneous flow rate
+    - Visualizes: r(t) = f(M(t), t) where M(t) is marking, t is time
     
-    The firing rate is measured in Hz (firings per second) and uses a 1-second
-    time window by default for meaningful frequency measurements.
+    **Discrete Transitions (Immediate/Timed/Stochastic)**:
+    - Plots the **cumulative firing count** over time
+    - Shows total activity accumulation
+    - Y-axis: Cumulative Firings - total number of firings
+    - Visualizes: Step functions showing firing events
+    
+    Plot interpretation by transition type:
+    
+    **Continuous** (rate function):
+    - Sigmoid curve: Logistic growth/saturation behavior
+    - Exponential: Unlimited growth or decay
+    - Linear: Constant rate flow
+    - Flat line: Rate = 0 (no flow, transition disabled)
+    
+    **Immediate** (cumulative):
+    - Vertical steps: Instant firings when enabled
+    - Steep slope: High firing frequency
+    
+    **Timed** (cumulative):
+    - Regular staircase: Fixed interval firings
+    - Constant slope: Deterministic periodic behavior
+    
+    **Stochastic** (cumulative):
+    - Irregular staircase: Random interval firings
+    - Variable slope: Exponentially distributed delays
     
     Attributes:
-        time_window: Time window for rate calculation (default: 1.0s)
+        (inherited from AnalysisPlotPanel)
     
     Example:
         # Create panel (in right_panel_loader or similar)
         transition_panel = TransitionRatePanel(data_collector)
         
         # Add transitions for analysis
-        transition_panel.add_object(transition1)
-        transition_panel.add_object(transition2)
+        transition_panel.add_object(continuous_transition)  # Shows rate curve
+        transition_panel.add_object(stochastic_transition)  # Shows cumulative count
         
-        # Panel automatically updates during simulation
+        # Panel automatically adapts visualization per transition type
     """
     
     def __init__(self, data_collector):
-        """Initialize the transition rate analysis panel.
+        """Initialize the transition behavior analysis panel.
         
         Args:
             data_collector: SimulationDataCollector instance
         """
         super().__init__('transition', data_collector)
         
-        # Time window for rate calculation (1 second default for frequency)
-        self.time_window = 1.0  # seconds
+        # Locality plotting support
+        self._locality_places = {}  # Maps transition_id -> {input_places, output_places}
         
-        print("[TransitionRatePanel] Initialized transition rate analysis panel")
+        print("[TransitionRatePanel] Initialized transition behavior analysis panel")
     
     def _get_rate_data(self, transition_id: Any) -> List[Tuple[float, float]]:
-        """Calculate firing rate data for a transition.
+        """Get behavior-specific data for a transition.
         
-        Computes firings/time using the configured time window.
-        Uses RateCalculator utility for consistent rate computation.
+        The data plotted depends on transition type:
+        - Continuous: Rate function value over time (shows sigmoid, exponential curves, etc.)
+        - Discrete (immediate/timed/stochastic): Cumulative firing count
         
         Args:
             transition_id: ID of the transition
             
         Returns:
-            List of (time, rate) tuples where rate is in firings/second (Hz)
+            List of (time, value) tuples where value depends on transition type
         """
+        DEBUG_PLOT_DATA = False  # Disable verbose logging
+        
         # Get raw firing event data from collector
         raw_events = self.data_collector.get_transition_data(transition_id)
         
         if not raw_events:
+            if DEBUG_PLOT_DATA:
+                print(f"[TransitionRatePanel] No firing events for transition {transition_id}")
             return []
         
-        # Extract firing times (filter out non-firing events)
-        firing_times = [t for t, event_type, _ in raw_events 
-                       if event_type == 'fired']
+        # Determine transition type by checking if details contain 'rate' field
+        # Continuous transitions store their rate in details
+        has_rate_data = False
+        if len(raw_events) > 0 and raw_events[0][2] is not None:
+            details = raw_events[0][2]
+            if isinstance(details, dict) and 'rate' in details:
+                has_rate_data = True
         
-        if len(firing_times) < 1:
-            return []
-        
-        # Calculate firing rate time series
-        rate_series = self.rate_calculator.calculate_firing_rate_series(
-            firing_times,
-            time_window=self.time_window,
-            sample_interval=0.1  # Sample every 100ms
-        )
-        
-        return rate_series
+        if has_rate_data:
+            # CONTINUOUS TRANSITION: Plot rate function value over time
+            if DEBUG_PLOT_DATA:
+                print(f"[TransitionRatePanel] Transition {transition_id} is CONTINUOUS - plotting rate function")
+            
+            rate_series = []
+            for time, event_type, details in raw_events:
+                if event_type == 'fired' and details and isinstance(details, dict):
+                    rate = details.get('rate', 0.0)
+                    rate_series.append((time, rate))
+            
+            if DEBUG_PLOT_DATA and rate_series:
+                print(f"[TransitionRatePanel]   {len(rate_series)} rate points")
+                print(f"[TransitionRatePanel]   First: t={rate_series[0][0]:.3f}, rate={rate_series[0][1]:.3f}")
+                print(f"[TransitionRatePanel]   Last: t={rate_series[-1][0]:.3f}, rate={rate_series[-1][1]:.3f}")
+            
+            return rate_series
+        else:
+            # DISCRETE TRANSITION: Plot cumulative firing count
+            if DEBUG_PLOT_DATA:
+                print(f"[TransitionRatePanel] Transition {transition_id} is DISCRETE - plotting cumulative count")
+            
+            firing_times = [t for t, event_type, _ in raw_events 
+                           if event_type == 'fired']
+            
+            if len(firing_times) < 1:
+                if DEBUG_PLOT_DATA:
+                    print(f"[TransitionRatePanel] No 'fired' events")
+                return []
+            
+            # Convert to cumulative count series
+            cumulative_series = []
+            
+            # Start at time 0 with count 0
+            if firing_times[0] > 0:
+                cumulative_series.append((0.0, 0))
+            
+            # Add each firing event with its cumulative count
+            for i, time in enumerate(firing_times):
+                count = i + 1  # Cumulative count (1-indexed)
+                cumulative_series.append((time, count))
+            
+            if DEBUG_PLOT_DATA:
+                print(f"[TransitionRatePanel]   {len(cumulative_series)} cumulative points")
+                print(f"[TransitionRatePanel]   Final count: {cumulative_series[-1][1]} firings")
+            
+            return cumulative_series
     
     def _get_ylabel(self) -> str:
-        """Get Y-axis label for firing rate plot.
+        """Get Y-axis label for transition plot.
+        
+        The label depends on transition types being plotted:
+        - If only continuous: "Rate (flow/s)"
+        - If only discrete: "Cumulative Firings"
+        - If mixed: "Value" (generic)
         
         Returns:
             str: Y-axis label
         """
-        return 'Firing Rate (firings/s)'
+        if not self.selected_objects:
+            return 'Value'
+        
+        # Check if we have any continuous transitions
+        has_continuous = False
+        has_discrete = False
+        
+        for obj in self.selected_objects:
+            raw_events = self.data_collector.get_transition_data(obj.id)
+            if raw_events and len(raw_events) > 0:
+                details = raw_events[0][2]
+                if isinstance(details, dict) and 'rate' in details:
+                    has_continuous = True
+                else:
+                    has_discrete = True
+        
+        if has_continuous and not has_discrete:
+            return 'Rate (tokens/s)'
+        elif has_discrete and not has_continuous:
+            return 'Cumulative Firings'
+        else:
+            return 'Value'  # Mixed types
     
     def _get_title(self) -> str:
-        """Get plot title for firing rate plot.
+        """Get plot title for transition plot.
         
         Returns:
             str: Plot title
         """
-        return 'Transition Firing Rate'
-    
-    def set_time_window(self, window: float):
-        """Set the time window for rate calculation.
-        
-        Larger windows provide smoother rates and better frequency measurement.
-        Smaller windows show rapid changes but may be noisier.
-        
-        For firing rates, 1.0s is recommended for meaningful Hz measurements.
-        
-        Args:
-            window: Time window in seconds (e.g., 1.0 = 1 second)
-        """
-        if window <= 0:
-            print(f"[TransitionRatePanel] Invalid time window: {window}, must be > 0")
-            return
-        
-        self.time_window = window
-        self.needs_update = True
-        print(f"[TransitionRatePanel] Set time window to {window}s")
+        return 'Transition Behavior Evolution'
     
     def wire_search_ui(self, entry, search_btn, result_label, model):
         """Wire search UI controls to transition search functionality.
@@ -181,3 +255,148 @@ class TransitionRatePanel(AnalysisPlotPanel):
         entry.connect('activate', on_entry_activate)
         
         print("[TransitionRatePanel] Search UI wired successfully")
+    
+    def add_locality_places(self, transition, locality):
+        """Add locality places for a transition to plot with it.
+        
+        This stores the locality places so they can be plotted
+        together with the transition, showing the complete P-T-P pattern.
+        
+        Args:
+            transition: Transition object
+            locality: Locality object with input/output places
+        """
+        self._locality_places[transition.id] = {
+            'input_places': list(locality.input_places),
+            'output_places': list(locality.output_places),
+            'transition': transition
+        }
+        
+        print(f"[TransitionRatePanel] Locality registered for {transition.name}: "
+              f"{len(locality.input_places)} inputs, {len(locality.output_places)} outputs")
+        
+        # Trigger plot update
+        self.needs_update = True
+    
+    def update_plot(self):
+        """Update the plot with current data including locality places.
+        
+        Overrides parent method to add locality place plotting.
+        """
+        DEBUG_UPDATE_PLOT = False  # Disable verbose logging
+        
+        if DEBUG_UPDATE_PLOT:
+            print(f"[TransitionRatePanel] update_plot() called, {len(self.selected_objects)} objects selected")
+        
+        self.axes.clear()
+        
+        if not self.selected_objects:
+            if DEBUG_UPDATE_PLOT:
+                print(f"[TransitionRatePanel]   No objects selected - showing empty state")
+            self._show_empty_state()
+            return
+        
+        # Plot rate for each selected transition
+        for i, obj in enumerate(self.selected_objects):
+            if DEBUG_UPDATE_PLOT:
+                obj_name = getattr(obj, 'name', f'transition{obj.id}')
+                print(f"[TransitionRatePanel]   Plotting {obj_name} (id={obj.id})")
+            
+            rate_data = self._get_rate_data(obj.id)
+            
+            if rate_data:
+                times = [t for t, r in rate_data]
+                rates = [r for t, r in rate_data]
+                
+                color = self._get_color(i)
+                obj_name = getattr(obj, 'name', f'Transition{obj.id}')
+                
+                # Include type in legend
+                transition_type = getattr(obj, 'transition_type', 'immediate')
+                type_abbrev = {
+                    'immediate': 'IMM',
+                    'timed': 'TIM',
+                    'stochastic': 'STO',
+                    'continuous': 'CON'
+                }.get(transition_type, transition_type[:3].upper())
+                legend_label = f'{obj_name} [{type_abbrev}]'
+                
+                self.axes.plot(times, rates,
+                              label=legend_label,
+                              color=color,
+                              linewidth=2.5,
+                              zorder=10)  # Transitions on top
+                
+                # Plot locality places if available
+                if obj.id in self._locality_places:
+                    self._plot_locality_places(obj.id, color, DEBUG_UPDATE_PLOT)
+        
+        self._format_plot()
+        self.canvas.draw()
+    
+    def _plot_locality_places(self, transition_id, base_color, debug=False):
+        """Plot input and output places for a transition's locality.
+        
+        Args:
+            transition_id: ID of the transition
+            base_color: Base color for the transition (used to derive place colors)
+            debug: Enable debug logging
+        """
+        locality_data = self._locality_places[transition_id]
+        transition = locality_data['transition']
+        
+        # Import here to avoid circular dependency
+        import matplotlib.colors as mcolors
+        
+        # Convert hex color to RGB for manipulation
+        rgb = mcolors.hex2color(base_color)
+        
+        # Plot input places (dashed lines, slightly lighter)
+        for i, place in enumerate(locality_data['input_places']):
+            # Get place token data from data collector
+            place_data = self.data_collector.get_place_data(place.id)
+            
+            if place_data:
+                times = [t for t, tokens, _ in place_data]
+                tokens = [tok for t, tok, _ in place_data]
+                
+                # Lighten the color for input places
+                lighter_rgb = tuple(min(1.0, c + 0.2) for c in rgb)
+                lighter_hex = mcolors.rgb2hex(lighter_rgb)
+                
+                place_name = getattr(place, 'name', f'P{place.id}')
+                self.axes.plot(times, tokens,
+                             linestyle='--',
+                             linewidth=1.5,
+                             alpha=0.7,
+                             color=lighter_hex,
+                             label=f'  ↓ {place_name} (input)',
+                             zorder=5)  # Behind transitions
+                
+                if debug:
+                    print(f"[TransitionRatePanel]     Plotted input place {place_name}")
+        
+        # Plot output places (dotted lines, slightly darker)
+        for i, place in enumerate(locality_data['output_places']):
+            # Get place token data from data collector
+            place_data = self.data_collector.get_place_data(place.id)
+            
+            if place_data:
+                times = [t for t, tokens, _ in place_data]
+                tokens = [tok for t, tok, _ in place_data]
+                
+                # Darken the color for output places
+                darker_rgb = tuple(max(0.0, c - 0.2) for c in rgb)
+                darker_hex = mcolors.rgb2hex(darker_rgb)
+                
+                place_name = getattr(place, 'name', f'P{place.id}')
+                self.axes.plot(times, tokens,
+                             linestyle=':',
+                             linewidth=1.5,
+                             alpha=0.7,
+                             color=darker_hex,
+                             label=f'  ↑ {place_name} (output)',
+                             zorder=5)  # Behind transitions
+                
+                if debug:
+                    print(f"[TransitionRatePanel]     Plotted output place {place_name}")
