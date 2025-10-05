@@ -225,21 +225,49 @@ class TransitionPropDialogLoader(GObject.GObject):
         # Rate entry (simple numeric/expression field)
         rate_entry = self.builder.get_object('rate_entry')
         if rate_entry and hasattr(self.transition_obj, 'rate'):
-            rate_text = self._format_formula_for_display(self.transition_obj.rate)
+            # For continuous transitions, try to load from properties['rate_function'] first
+            rate_value = self.transition_obj.rate
+            if self.transition_obj.transition_type == 'continuous':
+                if hasattr(self.transition_obj, 'properties') and self.transition_obj.properties:
+                    rate_func = self.transition_obj.properties.get('rate_function')
+                    if rate_func:
+                        rate_value = rate_func
+                        print(f"[TransitionPropDialogLoader] Loading continuous rate function: {rate_func}")
+            
+            rate_text = self._format_formula_for_display(rate_value)
             rate_entry.set_text(rate_text)
         
         # Guard function (TextView) - format as JSON if dict
         guard_textview = self.builder.get_object('guard_textview')
         if guard_textview and hasattr(self.transition_obj, 'guard'):
             buffer = guard_textview.get_buffer()
-            guard_text = self._format_formula_for_display(self.transition_obj.guard)
+            
+            # Try to load from properties['guard_function'] first if it exists
+            guard_value = self.transition_obj.guard
+            if hasattr(self.transition_obj, 'properties') and self.transition_obj.properties:
+                guard_func = self.transition_obj.properties.get('guard_function')
+                if guard_func is not None:
+                    guard_value = guard_func
+                    print(f"[TransitionPropDialogLoader] Loading guard function: {guard_func}")
+            
+            guard_text = self._format_formula_for_display(guard_value)
             buffer.set_text(guard_text)
         
         # Rate function (TextView) - format as JSON if dict
         rate_textview = self.builder.get_object('rate_textview')
         if rate_textview and hasattr(self.transition_obj, 'rate'):
             buffer = rate_textview.get_buffer()
-            rate_text = self._format_formula_for_display(self.transition_obj.rate)
+            
+            # For continuous transitions, try to load from properties['rate_function'] first
+            rate_value = self.transition_obj.rate
+            if self.transition_obj.transition_type == 'continuous':
+                if hasattr(self.transition_obj, 'properties') and self.transition_obj.properties:
+                    rate_func = self.transition_obj.properties.get('rate_function')
+                    if rate_func:
+                        rate_value = rate_func
+                        print(f"[TransitionPropDialogLoader] Loading continuous rate function (textview): {rate_func}")
+            
+            rate_text = self._format_formula_for_display(rate_value)
             buffer.set_text(rate_text)
     
     def _on_response(self, dialog, response_id):
@@ -296,7 +324,18 @@ class TransitionPropDialogLoader(GObject.GObject):
             rate_text = rate_entry.get_text().strip()
             if rate_text:  # Only update if entry has content
                 old_rate = self.transition_obj.rate
-                self.transition_obj.rate = self._parse_formula(rate_text)
+                parsed_rate = self._parse_formula(rate_text)
+                self.transition_obj.rate = parsed_rate
+                
+                # CRITICAL: For continuous transitions, also store in properties['rate_function']
+                # This is what ContinuousBehavior reads!
+                if self.transition_obj.transition_type == 'continuous':
+                    if not hasattr(self.transition_obj, 'properties') or self.transition_obj.properties is None:
+                        self.transition_obj.properties = {}
+                    # Store the string expression for continuous behavior
+                    self.transition_obj.properties['rate_function'] = rate_text
+                    print(f"[TransitionPropDialogLoader] Continuous rate function stored: {rate_text}")
+                
                 print(f"[TransitionPropDialogLoader] Rate changed (from entry): {old_rate} -> {self.transition_obj.rate}")
         
         # Guard function (TextView) - parse with formula parser
@@ -306,8 +345,17 @@ class TransitionPropDialogLoader(GObject.GObject):
             start, end = buffer.get_bounds()
             guard_text = buffer.get_text(start, end, True)
             old_guard = self.transition_obj.guard
-            self.transition_obj.guard = self._parse_formula(guard_text)
+            parsed_guard = self._parse_formula(guard_text)
+            self.transition_obj.guard = parsed_guard
+            
+            # Store in properties['guard_function'] for evaluation
+            if not hasattr(self.transition_obj, 'properties') or self.transition_obj.properties is None:
+                self.transition_obj.properties = {}
+            # Store the string expression for dynamic evaluation
+            self.transition_obj.properties['guard_function'] = guard_text
+            
             print(f"[TransitionPropDialogLoader] Guard changed: {old_guard} -> {self.transition_obj.guard}")
+            print(f"[TransitionPropDialogLoader] Guard function stored: {guard_text}")
         
         # Rate function (TextView) - parse with formula parser (only if rate_entry is empty)
         rate_textview = self.builder.get_object('rate_textview')
@@ -320,7 +368,17 @@ class TransitionPropDialogLoader(GObject.GObject):
                 start, end = buffer.get_bounds()
                 rate_text = buffer.get_text(start, end, True)
                 old_rate = self.transition_obj.rate
-                self.transition_obj.rate = self._parse_formula(rate_text)
+                parsed_rate = self._parse_formula(rate_text)
+                self.transition_obj.rate = parsed_rate
+                
+                # CRITICAL: For continuous transitions, also store in properties['rate_function']
+                if self.transition_obj.transition_type == 'continuous':
+                    if not hasattr(self.transition_obj, 'properties') or self.transition_obj.properties is None:
+                        self.transition_obj.properties = {}
+                    # Store the string expression for continuous behavior
+                    self.transition_obj.properties['rate_function'] = rate_text.strip()
+                    print(f"[TransitionPropDialogLoader] Continuous rate function stored (from textview): {rate_text.strip()}")
+                
                 print(f"[TransitionPropDialogLoader] Rate changed (from textview): {old_rate} -> {self.transition_obj.rate}")
         
         # Color from color picker

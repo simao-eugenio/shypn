@@ -195,8 +195,19 @@ class Transition(PetriNetObject):
             "enabled": self.enabled,
             "fill_color": list(self.fill_color),
             "border_color": list(self.border_color),
-            "border_width": self.border_width
+            "border_width": self.border_width,
+            "transition_type": self.transition_type,
+            "priority": self.priority
         })
+        
+        # Serialize behavioral properties (guard, rate, properties dict)
+        if self.guard is not None:
+            data["guard"] = self.guard
+        if self.rate is not None:
+            data["rate"] = self.rate
+        if hasattr(self, 'properties') and self.properties:
+            data["properties"] = self.properties
+        
         return data
     
     @classmethod
@@ -230,5 +241,17 @@ class Transition(PetriNetObject):
             transition.border_color = tuple(data["border_color"])
         if "border_width" in data:
             transition.border_width = data["border_width"]
+        
+        # Restore behavioral properties
+        if "transition_type" in data:
+            transition.transition_type = data["transition_type"]
+        if "priority" in data:
+            transition.priority = data["priority"]
+        if "guard" in data:
+            transition.guard = data["guard"]
+        if "rate" in data:
+            transition.rate = data["rate"]
+        if "properties" in data:
+            transition.properties = data["properties"]
         
         return transition

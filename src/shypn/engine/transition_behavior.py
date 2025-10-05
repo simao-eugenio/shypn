@@ -207,6 +207,70 @@ class TransitionBehavior(ABC):
         """
         return getattr(self.model, 'logical_time', 0.0)
     
+    def _evaluate_guard(self) -> Tuple[bool, str]:
+        """Evaluate guard condition if present.
+        
+        Guards can be:
+        - None/empty: Always passes (True)
+        - Boolean (True/False): Direct value
+        - Numeric: Treated as threshold (> 0 passes)
+        - String expression: Evaluated with place tokens context
+        
+        Returns:
+            Tuple of (passes: bool, reason: str)
+            - (True, "guard-passes") if condition met
+            - (False, "guard-fails") if condition not met
+            - (True, "no-guard") if no guard defined
+        """
+        # Check if guard exists in properties first (preferred location)
+        guard_expr = None
+        if hasattr(self.transition, 'properties') and self.transition.properties:
+            guard_expr = self.transition.properties.get('guard_function')
+        
+        # Fallback to direct guard attribute
+        if guard_expr is None and hasattr(self.transition, 'guard'):
+            guard_expr = self.transition.guard
+        
+        # No guard means always enabled
+        if guard_expr is None or guard_expr == "":
+            return True, "no-guard"
+        
+        # Boolean guard
+        if isinstance(guard_expr, bool):
+            return guard_expr, f"guard-boolean-{guard_expr}"
+        
+        # Numeric guard (threshold)
+        if isinstance(guard_expr, (int, float)):
+            passes = guard_expr > 0
+            return passes, f"guard-threshold-{passes}"
+        
+        # String expression guard - evaluate with place tokens
+        if isinstance(guard_expr, str):
+            try:
+                from shypn.engine.function_catalog import FUNCTION_CATALOG
+                
+                # Build evaluation context
+                context = {'t': self._get_current_time()}
+                context.update(FUNCTION_CATALOG)
+                
+                # Add place tokens as P1, P2, ...
+                if hasattr(self.model, 'places'):
+                    for place_id, place in self.model.places.items():
+                        context[f'P{place_id}'] = place.tokens
+                
+                # Evaluate expression safely
+                result = eval(guard_expr, {"__builtins__": {}}, context)
+                passes = bool(result)
+                return passes, f"guard-expr-{passes}"
+            except Exception as e:
+                # Guard evaluation error - fail safe (don't fire)
+                print(f"[TransitionBehavior] Guard evaluation error: {e}")
+                print(f"[TransitionBehavior] Expression: {guard_expr}")
+                return False, f"guard-eval-error: {e}"
+        
+        # Unknown guard type - fail safe
+        return False, f"guard-unknown-type: {type(guard_expr)}"
+    
     def _record_event(self, consumed: Dict[int, float], produced: Dict[int, float], 
                      mode: str = 'logical', **kwargs):
         """Record transition firing event in model history.

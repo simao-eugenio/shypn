@@ -61,7 +61,22 @@ class StochasticBehavior(TransitionBehavior):
         
         # Extract stochastic parameters
         props = getattr(transition, 'properties', {})
-        self.rate = float(props.get('rate', 1.0))
+        
+        # Support both properties dict AND transition.rate attribute (for UI compatibility)
+        if 'rate' in props:
+            # Explicit rate in properties
+            self.rate = float(props.get('rate'))
+        else:
+            # Fallback: Use transition.rate attribute (UI stores it here)
+            rate = getattr(transition, 'rate', None)
+            if rate is not None:
+                try:
+                    self.rate = float(rate) if isinstance(rate, (int, float)) else 1.0
+                except (ValueError, TypeError):
+                    self.rate = 1.0  # Safe default
+            else:
+                self.rate = 1.0  # Default rate
+        
         self.max_burst = int(props.get('max_burst', 8))
         
         # Validation
@@ -119,19 +134,26 @@ class StochasticBehavior(TransitionBehavior):
         self._sampled_burst = None
     
     def can_fire(self) -> Tuple[bool, str]:
-        """Check if transition can fire (tokens for burst + scheduled time).
+        """Check if transition can fire (guard, tokens for burst, and scheduled time).
         
         Stochastic transitions require:
-        1. Sufficient tokens for maximum possible burst
-        2. Current time >= scheduled fire time
+        1. Guard condition must pass (if defined)
+        2. Sufficient tokens for maximum possible burst
+        3. Current time >= scheduled fire time
         
         Returns:
             Tuple of (can_fire: bool, reason: str)
             - (True, "enabled-stochastic") if can fire now
+            - (False, "guard-fails") if guard condition not met
             - (False, "insufficient-tokens-for-burst") if not enough tokens
             - (False, "not-scheduled") if no scheduled fire time
             - (False, "too-early") if before scheduled time
         """
+        # Check guard first
+        guard_passes, guard_reason = self._evaluate_guard()
+        if not guard_passes:
+            return False, guard_reason
+        
         if self._scheduled_fire_time is None:
             return False, "not-scheduled"
         
