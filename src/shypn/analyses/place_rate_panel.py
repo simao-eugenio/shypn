@@ -1,7 +1,7 @@
-"""Place Rate Analysis Panel.
+"""Place Marking Analysis Panel.
 
 This module provides the PlaceRatePanel class for plotting place token
-consumption/production rates in real-time during simulation.
+counts (marking evolution) in real-time during simulation.
 
 This is a SEPARATE MODULE - not implemented in loaders!
 Loaders only instantiate this panel and attach it to the UI.
@@ -12,22 +12,22 @@ from shypn.analyses.plot_panel import AnalysisPlotPanel
 
 
 class PlaceRatePanel(AnalysisPlotPanel):
-    """Panel for plotting place token consumption/production rates.
+    """Panel for plotting place token counts over time (marking evolution).
     
-    This panel displays the rate of token change (d(tokens)/dt) for selected places
-    over simulation time. The rate calculation uses a sliding time window to provide
-    smooth, meaningful values.
+    This panel displays the number of tokens in selected places over simulation time,
+    showing how the marking evolves as transitions fire. This is more intuitive than
+    showing rates, as it directly visualizes the state of the Petri net.
     
-    Rate interpretation:
-    - Positive rate: Token production (tokens being added to place)
-    - Negative rate: Token consumption (tokens being removed from place)
-    - Zero rate: Stable state (no net token change)
-    
-    The plot includes a zero reference line to clearly distinguish consumption
-    from production.
+    Plot interpretation:
+    - Y-axis shows actual token count in each place
+    - Horizontal lines = steady state (no token change)
+    - Increasing lines = tokens being added to place
+    - Decreasing lines = tokens being consumed from place
+    - For continuous transitions: smooth curves (continuous flow)
+    - For discrete transitions: step functions (instantaneous changes)
     
     Attributes:
-        time_window: Time window for rate calculation (default: 0.1s)
+        (inherited from AnalysisPlotPanel)
     
     Example:
         # Create panel (in right_panel_loader or similar)
@@ -41,77 +41,59 @@ class PlaceRatePanel(AnalysisPlotPanel):
     """
     
     def __init__(self, data_collector):
-        """Initialize the place rate analysis panel.
+        """Initialize the place marking analysis panel.
         
         Args:
             data_collector: SimulationDataCollector instance
         """
         super().__init__('place', data_collector)
         
-        # Time window for rate calculation (100ms default)
-        self.time_window = 0.1  # seconds
-        
-        print("[PlaceRatePanel] Initialized place rate analysis panel")
+        print("[PlaceRatePanel] Initialized place marking analysis panel")
     
     def _get_rate_data(self, place_id: Any) -> List[Tuple[float, float]]:
-        """Calculate token rate data for a place.
+        """Get token count data for a place (marking evolution).
         
-        Computes d(tokens)/dt using the configured time window.
-        Uses RateCalculator utility for consistent rate computation.
+        Returns the raw token count over time, showing how the marking
+        evolves as transitions fire. This is more intuitive than rates.
         
         Args:
             place_id: ID of the place
             
         Returns:
-            List of (time, rate) tuples where rate is in tokens/second
+            List of (time, token_count) tuples
         """
+        DEBUG_PLOT_DATA = False  # Disable verbose logging
+        
         # Get raw token count data from collector
         raw_data = self.data_collector.get_place_data(place_id)
         
-        if len(raw_data) < 2:
-            return []
+        if DEBUG_PLOT_DATA:
+            print(f"[PlaceRatePanel] _get_rate_data for place_id={place_id}: {len(raw_data)} data points")
+            if len(raw_data) > 0:
+                print(f"[PlaceRatePanel]   First point: t={raw_data[0][0]:.3f}, tokens={raw_data[0][1]}")
+                print(f"[PlaceRatePanel]   Last point: t={raw_data[-1][0]:.3f}, tokens={raw_data[-1][1]}")
         
-        # Calculate rate at each time point using time series method
-        rate_series = self.rate_calculator.calculate_token_rate_series(
-            raw_data,
-            time_window=self.time_window,
-            sample_interval=0.01  # Sample every 10ms for smooth plot
-        )
-        
-        return rate_series
+        # Return raw data directly - no rate calculation needed!
+        # raw_data is already List[Tuple[float, float]] where:
+        #   - First element: time (float)
+        #   - Second element: token count (float, can be fractional for continuous)
+        return raw_data
     
     def _get_ylabel(self) -> str:
-        """Get Y-axis label for token rate plot.
+        """Get Y-axis label for token count plot.
         
         Returns:
             str: Y-axis label
         """
-        return 'Token Rate (tokens/s)'
+        return 'Token Count'
     
     def _get_title(self) -> str:
-        """Get plot title for token rate plot.
+        """Get plot title for token count plot.
         
         Returns:
             str: Plot title
         """
-        return 'Place Token Consumption/Production Rate'
-    
-    def set_time_window(self, window: float):
-        """Set the time window for rate calculation.
-        
-        Larger windows provide smoother rates but less responsiveness.
-        Smaller windows show rapid changes but may be noisier.
-        
-        Args:
-            window: Time window in seconds (e.g., 0.1 = 100ms)
-        """
-        if window <= 0:
-            print(f"[PlaceRatePanel] Invalid time window: {window}, must be > 0")
-            return
-        
-        self.time_window = window
-        self.needs_update = True
-        print(f"[PlaceRatePanel] Set time window to {window}s")
+        return 'Place Marking Evolution'
     
     def wire_search_ui(self, entry, search_btn, result_label, model):
         """Wire search UI controls to place search functionality.

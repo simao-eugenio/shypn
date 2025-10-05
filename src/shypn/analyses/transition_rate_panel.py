@@ -305,10 +305,13 @@ class TransitionRatePanel(AnalysisPlotPanel):
         
         Overrides parent method to show transition and all its locality places.
         """
+        print(f"[TransitionRatePanel] _update_objects_list() called, {len(self.selected_objects)} transitions, {len(self._locality_places)} with localities")
+        
         # Import GTK here to avoid issues
         import gi
         gi.require_version('Gtk', '3.0')
         from gi.repository import Gtk
+        import matplotlib.colors as mcolors
         
         # Clear existing list
         for child in self.objects_listbox.get_children():
@@ -368,6 +371,7 @@ class TransitionRatePanel(AnalysisPlotPanel):
                 # Add locality places if available
                 if obj.id in self._locality_places:
                     locality_data = self._locality_places[obj.id]
+                    print(f"[TransitionRatePanel]   Adding locality for {obj_name}: {len(locality_data['input_places'])} inputs, {len(locality_data['output_places'])} outputs")
                     
                     # Add input places
                     for place in locality_data['input_places']:
@@ -382,7 +386,6 @@ class TransitionRatePanel(AnalysisPlotPanel):
                         place_color_box = Gtk.DrawingArea()
                         place_color_box.set_size_request(16, 16)
                         # Derive lighter color for input places
-                        import matplotlib.colors as mcolors
                         rgb = mcolors.hex2color(color)
                         lighter_rgb = tuple(min(1.0, c + 0.2) for c in rgb)
                         lighter_color = mcolors.rgb2hex(lighter_rgb)
@@ -413,7 +416,6 @@ class TransitionRatePanel(AnalysisPlotPanel):
                         place_color_box = Gtk.DrawingArea()
                         place_color_box.set_size_request(16, 16)
                         # Derive darker color for output places
-                        import matplotlib.colors as mcolors
                         rgb = mcolors.hex2color(color)
                         darker_rgb = tuple(max(0.0, c - 0.2) for c in rgb)
                         darker_color = mcolors.rgb2hex(darker_rgb)

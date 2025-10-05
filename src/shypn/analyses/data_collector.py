@@ -73,10 +73,15 @@ class SimulationDataCollector:
         """
         self.step_count += 1
         
+        DEBUG_DATA_COLLECTOR = False  # Set to True for detailed logging
+        
         # Collect place token counts
         for place in controller.model.places:
             data = self.place_data[place.id]
             data.append((time, place.tokens))
+            
+            if DEBUG_DATA_COLLECTOR and self.step_count <= 5:
+                print(f"[DataCollector] Step {self.step_count}: P{place.id} = {place.tokens} tokens at t={time:.3f}s")
             
             # Downsample if threshold exceeded
             if len(data) > self.downsample_threshold:
