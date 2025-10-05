@@ -122,6 +122,12 @@ class ModelCanvasLoader:
         
         # Persistency manager reference (set by main app)
         self.persistency = None
+        
+        # Right panel loader reference (for updating data collector on tab switch)
+        self.right_panel_loader = None
+        
+        # Context menu handler for adding analysis menu items
+        self.context_menu_handler = None
     
     def load(self):
         """Load the canvas UI and return the container.
@@ -214,22 +220,22 @@ class ModelCanvasLoader:
             page: The new page widget.
             page_num: The index of the new page.
         """
+        # Find the drawing area for this page
+        drawing_area = None
+        if isinstance(page, Gtk.Overlay):
+            scrolled = page.get_child()
+            if isinstance(scrolled, Gtk.ScrolledWindow):
+                drawing_area = scrolled.get_child()
+                if hasattr(drawing_area, 'get_child'):
+                    drawing_area = drawing_area.get_child()
+        
         # Sync persistency manager with the newly active tab
         if self.persistency:
-            # Find the drawing area for this page
-            drawing_area = None
-            if isinstance(page, Gtk.Overlay):
-                scrolled = page.get_child()
-                if isinstance(scrolled, Gtk.ScrolledWindow):
-                    drawing_area = scrolled.get_child()
-                    if hasattr(drawing_area, 'get_child'):
-                        drawing_area = drawing_area.get_child()
-            
             # Update persistency state to match this tab's canvas manager
             if drawing_area and drawing_area in self.canvas_managers:
                 manager = self.canvas_managers[drawing_area]
                 # Get the manager's current filename (might be "default" or actual filename)
-                filename = manager.get_filename()
+                filename = manager.filename  # Direct attribute access
                 
                 # Update persistency to reflect this tab's state
                 # Note: This is a simplified sync - a full multi-tab architecture
@@ -243,6 +249,36 @@ class ModelCanvasLoader:
                     pass
                 
                 print(f"[Loader] Switched to tab {page_num} (filename: {filename})")
+        
+        # Update right panel's data collector to show data for the ACTIVE tab
+        if self.right_panel_loader and drawing_area:
+            # Get the simulate tools palette for this tab
+            if drawing_area in self.simulate_tools_palettes:
+                simulate_tools_palette = self.simulate_tools_palettes[drawing_area]
+                
+                # Get the data collector from the simulate tools palette
+                if hasattr(simulate_tools_palette, 'data_collector'):
+                    data_collector = simulate_tools_palette.data_collector
+                    
+                    # Update the right panel to use this tab's data collector
+                    self.right_panel_loader.set_data_collector(data_collector)
+                    
+                    print(f"[Loader] Updated right panel with data collector from tab {page_num}")
+                else:
+                    print(f"[Loader] Warning: Tab {page_num} simulate tools palette has no data_collector")
+            else:
+                print(f"[Loader] Warning: No simulate tools palette found for tab {page_num}")
+            
+            # Update the right panel's model for search functionality
+            if drawing_area in self.canvas_managers:
+                manager = self.canvas_managers[drawing_area]
+                self.right_panel_loader.set_model(manager)
+                print(f"[Loader] Updated right panel with model from tab {page_num}")
+            
+            # Wire context menu handler if it was just created
+            if self.right_panel_loader.context_menu_handler and not self.context_menu_handler:
+                self.set_context_menu_handler(self.right_panel_loader.context_menu_handler)
+
     
     def _on_tab_close_clicked(self, button, page_widget):
         """Handle tab close button click.
@@ -1318,6 +1354,10 @@ class ModelCanvasLoader:
             menu_item.show()
             menu.append(menu_item)
         
+        # Add analysis menu items if context menu handler is available
+        if self.context_menu_handler:
+            self.context_menu_handler.add_analysis_menu_items(menu, obj)
+        
         # Show menu
         menu.popup(None, None, None, None, 3, Gtk.get_current_event_time())
     
@@ -1418,6 +1458,36 @@ class ModelCanvasLoader:
             persistency: NetObjPersistency instance from main application
         """
         self.persistency = persistency
+    
+    def set_right_panel_loader(self, right_panel_loader):
+        """Set the right panel loader for data collector updates.
+        
+        This allows the notebook to update the right panel's data collector
+        when the user switches between tabs with different simulations.
+        
+        Args:
+            right_panel_loader: RightPanelLoader instance from main application
+        """
+        self.right_panel_loader = right_panel_loader
+        
+        # Initialize the current/first tab's data collector connection
+        # This is necessary because switch-page signal doesn't fire for the initial page
+        if self.notebook and self.notebook.get_n_pages() > 0:
+            current_page_num = self.notebook.get_current_page()
+            current_page = self.notebook.get_nth_page(current_page_num)
+            self._on_notebook_page_changed(self.notebook, current_page, current_page_num)
+            print(f"[Loader] Initialized data collector for initial tab {current_page_num}")
+    
+    def set_context_menu_handler(self, handler):
+        """Set the context menu handler for adding analysis menu items.
+        
+        This allows canvas object context menus to include "Add to Analysis" options.
+        
+        Args:
+            handler: ContextMenuHandler instance
+        """
+        self.context_menu_handler = handler
+        print("[ModelCanvasLoader] Context menu handler set")
     
     # ==================== Context Menu ====================
     

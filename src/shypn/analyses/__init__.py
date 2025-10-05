@@ -9,6 +9,8 @@ Modules:
     plot_panel: Base class for matplotlib-based plotting panels
     place_rate_panel: Place token rate plotting
     transition_rate_panel: Transition firing rate plotting
+    search_handler: Search for places and transitions to add to plots
+    context_menu_handler: Add "Add to Analysis" items to canvas context menus
 """
 
 __all__ = [
@@ -17,6 +19,8 @@ __all__ = [
     'AnalysisPlotPanel',
     'PlaceRatePanel',
     'TransitionRatePanel',
+    'SearchHandler',
+    'ContextMenuHandler',
 ]
 
 # Lazy imports to avoid circular dependencies
@@ -36,4 +40,10 @@ def __getattr__(name):
     elif name == 'TransitionRatePanel':
         from .transition_rate_panel import TransitionRatePanel
         return TransitionRatePanel
+    elif name == 'SearchHandler':
+        from .search_handler import SearchHandler
+        return SearchHandler
+    elif name == 'ContextMenuHandler':
+        from .context_menu_handler import ContextMenuHandler
+        return ContextMenuHandler
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

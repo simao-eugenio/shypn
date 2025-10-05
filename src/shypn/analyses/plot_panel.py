@@ -132,16 +132,75 @@ class AnalysisPlotPanel(Gtk.Box):
         list_frame.add(list_box)
         self.pack_start(list_frame, False, False, 0)
         
+        # === Plot Controls ===
+        controls_frame = Gtk.Frame(label="Plot Controls")
+        controls_frame.set_margin_start(6)
+        controls_frame.set_margin_end(6)
+        controls_frame.set_margin_top(6)
+        
+        # Single horizontal box for all controls
+        controls_hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        controls_hbox.set_margin_start(6)
+        controls_hbox.set_margin_end(6)
+        controls_hbox.set_margin_top(6)
+        controls_hbox.set_margin_bottom(6)
+        
+        # Grid toggle
+        self.grid_toggle = Gtk.CheckButton(label="Show Grid")
+        self.grid_toggle.set_active(True)
+        self.grid_toggle.connect('toggled', self._on_grid_toggled)
+        controls_hbox.pack_start(self.grid_toggle, False, False, 0)
+        
+        # Legend toggle
+        self.legend_toggle = Gtk.CheckButton(label="Show Legend")
+        self.legend_toggle.set_active(True)
+        self.legend_toggle.connect('toggled', self._on_legend_toggled)
+        controls_hbox.pack_start(self.legend_toggle, False, False, 0)
+        
+        # Auto scale toggle
+        self.auto_scale_toggle = Gtk.CheckButton(label="Auto Scale Y-axis")
+        self.auto_scale_toggle.set_active(True)
+        self.auto_scale_toggle.connect('toggled', self._on_auto_scale_toggled)
+        controls_hbox.pack_start(self.auto_scale_toggle, False, False, 0)
+        
+        controls_frame.add(controls_hbox)
+        self.pack_start(controls_frame, False, False, 0)
+        
         # === Matplotlib Canvas ===
+        canvas_frame = Gtk.Frame()
+        canvas_frame.set_margin_start(6)
+        canvas_frame.set_margin_end(6)
+        canvas_frame.set_margin_top(6)
+        canvas_frame.set_margin_bottom(6)
+        
+        canvas_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        
         self.figure = Figure(figsize=(6, 4), dpi=80)
         self.axes = self.figure.add_subplot(111)
         self.canvas = FigureCanvas(self.figure)
-        self.canvas.set_size_request(400, 300)
+        # Set minimum size but allow canvas to expand to fill available space
+        self.canvas.set_size_request(400, 200)  # Minimum size
+        
+        # Add matplotlib navigation toolbar
+        from matplotlib.backends.backend_gtk3 import NavigationToolbar2GTK3
+        self.toolbar = NavigationToolbar2GTK3(self.canvas, None)
+        canvas_box.pack_start(self.toolbar, False, False, 0)
+        
+        # Add canvas with expand=True to fill available vertical space
+        canvas_box.pack_start(self.canvas, True, True, 0)
+        
+        canvas_frame.add(canvas_box)
         
         # Tight layout to avoid label cutoff
         self.figure.tight_layout()
         
-        self.pack_start(self.canvas, True, True, 0)
+        # Pack canvas frame with expand=True to take all remaining space
+        self.pack_start(canvas_frame, True, True, 0)
+        
+        # Control state
+        self.show_grid = True
+        self.show_legend = True
+        self.auto_scale = True
         
         # Initial plot (empty state)
         self._show_empty_state()
@@ -264,13 +323,45 @@ class AnalysisPlotPanel(Gtk.Box):
         self.needs_update = True
         print(f"[{self.__class__.__name__}] Cleared all selections")
     
+    def _on_grid_toggled(self, button):
+        """Handle grid toggle button.
+        
+        Args:
+            button: CheckButton that was toggled
+        """
+        self.show_grid = button.get_active()
+        self.needs_update = True
+        print(f"[{self.__class__.__name__}] Grid toggled: {self.show_grid}")
+    
+    def _on_legend_toggled(self, button):
+        """Handle legend toggle button.
+        
+        Args:
+            button: CheckButton that was toggled
+        """
+        self.show_legend = button.get_active()
+        self.needs_update = True
+        print(f"[{self.__class__.__name__}] Legend toggled: {self.show_legend}")
+    
+    def _on_auto_scale_toggled(self, button):
+        """Handle auto scale toggle button.
+        
+        Args:
+            button: CheckButton that was toggled
+        """
+        self.auto_scale = button.get_active()
+        self.needs_update = True
+        print(f"[{self.__class__.__name__}] Auto scale toggled: {self.auto_scale}")
+    
     def _periodic_update(self) -> bool:
         """Periodic callback to update plot if needed.
         
         Returns:
             bool: True to continue periodic calls
         """
-        if self.needs_update:
+        # Update if explicitly flagged OR if there are selected objects to plot
+        # (this ensures plots update during simulation even without explicit flag)
+        if self.needs_update or self.selected_objects:
             self.update_plot()
             self.needs_update = False
         
@@ -324,15 +415,26 @@ class AnalysisPlotPanel(Gtk.Box):
         self.axes.set_ylabel(self._get_ylabel(), fontsize=11)
         self.axes.set_title(self._get_title(), fontsize=12, fontweight='bold')
         
-        if self.selected_objects:
+        # Apply control settings
+        if self.show_legend and self.selected_objects:
             self.axes.legend(loc='best', fontsize=9)
         
-        self.axes.grid(True, alpha=0.3, linestyle='--')
+        if self.show_grid:
+            self.axes.grid(True, alpha=0.3, linestyle='--')
         
         # Add zero line for place panels (consumption vs production)
         if self.object_type == 'place':
             self.axes.axhline(y=0, color='gray', linestyle='-', 
                             linewidth=0.8, alpha=0.5)
+        
+        # Apply auto scale or use fixed scale
+        if not self.auto_scale and self.selected_objects:
+            # Get current limits
+            ylim = self.axes.get_ylim()
+            # Extend limits by 10% for better visibility
+            y_range = ylim[1] - ylim[0]
+            if y_range > 0:
+                self.axes.set_ylim(ylim[0] - y_range * 0.1, ylim[1] + y_range * 0.1)
         
         self.figure.tight_layout()
     

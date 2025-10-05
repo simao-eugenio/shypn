@@ -121,3 +121,63 @@ class TransitionRatePanel(AnalysisPlotPanel):
         self.time_window = window
         self.needs_update = True
         print(f"[TransitionRatePanel] Set time window to {window}s")
+    
+    def wire_search_ui(self, entry, search_btn, result_label, model):
+        """Wire search UI controls to transition search functionality.
+        
+        This method connects the search entry, buttons, and result label from
+        the right panel UI to the SearchHandler for finding transitions to add to analysis.
+        
+        Args:
+            entry: GtkEntry for search input
+            search_btn: GtkButton for triggering search
+            result_label: GtkLabel for displaying search results
+            model: ModelCanvasManager instance to search
+        """
+        self.search_entry = entry
+        self.search_result_label = result_label
+        self.search_model = model
+        self.search_results = []  # Store current search results
+        
+        # Connect search button
+        def on_search_clicked(button):
+            query = self.search_entry.get_text().strip()
+            if not query:
+                self.search_result_label.set_text("⚠ Enter search text")
+                return
+            
+            # Check if model is available
+            if not self.search_model:
+                self.search_result_label.set_text("⚠ No model loaded. Open or create a Petri net first.")
+                return
+            
+            # Import SearchHandler
+            from shypn.analyses import SearchHandler
+            
+            # Perform search
+            results = SearchHandler.search_transitions(self.search_model, query)
+            self.search_results = results
+            
+            # Display results
+            if results:
+                summary = SearchHandler.format_result_summary(results, 'transition')
+                self.search_result_label.set_text(summary)
+                print(f"[TransitionRatePanel] Search found {len(results)} transitions")
+                
+                # If exactly one result, add it automatically
+                if len(results) == 1:
+                    self.add_object(results[0])
+                    self.search_result_label.set_text(f"✓ Added {results[0].name} to analysis")
+            else:
+                self.search_result_label.set_text(f"✗ No transitions found for '{query}'")
+
+        
+        search_btn.connect('clicked', on_search_clicked)
+        
+        # Allow Enter key in search entry
+        def on_entry_activate(entry):
+            on_search_clicked(search_btn)
+        
+        entry.connect('activate', on_entry_activate)
+        
+        print("[TransitionRatePanel] Search UI wired successfully")

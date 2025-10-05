@@ -395,6 +395,7 @@ class ModelCanvasManager:
         p1 = self.add_place(-100, 0, label="P1")
         p2 = self.add_place(100, 0, label="P2")
         p1.set_tokens(2)
+        p1.set_initial_marking(2)  # Set initial marking for proper reset
         
         # Create transition
         t1 = self.add_transition(0, 0, label="T1")
