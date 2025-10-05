@@ -71,6 +71,16 @@ class InhibitorArc(Arc):
         cr.set_line_width(self.width / max(zoom, 1e-6))  # Compensate for zoom
         cr.stroke()
     
+    def to_dict(self) -> dict:
+        """Serialize inhibitor arc to dictionary for persistence.
+        
+        Returns:
+            dict: Dictionary containing all arc properties with type 'inhibitor_arc'
+        """
+        data = super().to_dict()
+        data["type"] = "inhibitor_arc"  # Override type to distinguish from Arc
+        return data
+    
     def __repr__(self):
         """String representation of the inhibitor arc."""
         return (f"InhibitorArc(id={self.id}, source={self.source.id}, "
