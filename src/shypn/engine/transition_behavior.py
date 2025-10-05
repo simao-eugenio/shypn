@@ -264,8 +264,6 @@ class TransitionBehavior(ABC):
                 return passes, f"guard-expr-{passes}"
             except Exception as e:
                 # Guard evaluation error - fail safe (don't fire)
-                print(f"[TransitionBehavior] Guard evaluation error: {e}")
-                print(f"[TransitionBehavior] Expression: {guard_expr}")
                 return False, f"guard-eval-error: {e}"
         
         # Unknown guard type - fail safe

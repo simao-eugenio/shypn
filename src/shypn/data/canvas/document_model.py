@@ -470,7 +470,6 @@ class DocumentModel:
         with open(filepath, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2)
         
-        print(f"[DocumentModel] Saved to {filepath}")
     
     @classmethod
     def load_from_file(cls, filepath: str) -> 'DocumentModel':
@@ -492,7 +491,6 @@ class DocumentModel:
             data = json.load(f)
         
         document = cls.from_dict(data)
-        print(f"[DocumentModel] Loaded from {filepath}")
         print(f"  - {len(document.places)} places")
         print(f"  - {len(document.transitions)} transitions")
         print(f"  - {len(document.arcs)} arcs")
