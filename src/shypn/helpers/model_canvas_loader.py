@@ -1703,12 +1703,37 @@ class ModelCanvasLoader:
         if isinstance(obj, Arc):
             print(f"[ModelCanvasLoader] Before dialog - Arc count: {len(manager.arcs)}, Arc IDs: {[id(a) for a in manager.arcs]}")
         
-        # Connect to properties-changed signal for canvas redraw
+        # Connect to properties-changed signal for canvas redraw and simulation/analysis updates
         def on_properties_changed(_):
             if isinstance(obj, Arc):
                 print(f"[ModelCanvasLoader] properties-changed signal - Arc count: {len(manager.arcs)}, Arc IDs: {[id(a) for a in manager.arcs]}")
             print(f"[ModelCanvasLoader] Queueing canvas redraw...")
             drawing_area.queue_draw()
+            
+            # Notify simulation controller about property changes (clears behavior cache)
+            if isinstance(obj, Transition) and drawing_area in self.simulate_tools_palettes:
+                simulate_tools = self.simulate_tools_palettes[drawing_area]
+                if simulate_tools.simulation:
+                    # Clear behavior cache for this transition to pick up new properties
+                    if obj.id in simulate_tools.simulation.behavior_cache:
+                        del simulate_tools.simulation.behavior_cache[obj.id]
+                        print(f"[ModelCanvasLoader] Cleared behavior cache for transition {obj.id}")
+            
+            # Notify analysis panels to refresh plots (marks needs_update)
+            if isinstance(obj, (Place, Transition)) and self.right_panel_loader:
+                if hasattr(self.right_panel_loader, 'place_panel') and self.right_panel_loader.place_panel:
+                    if isinstance(obj, Place):
+                        # Mark place panel for update if this place is selected
+                        if obj in self.right_panel_loader.place_panel.selected_objects:
+                            self.right_panel_loader.place_panel.needs_update = True
+                            print(f"[ModelCanvasLoader] Marked place panel for update (place {obj.id} changed)")
+                
+                if hasattr(self.right_panel_loader, 'transition_panel') and self.right_panel_loader.transition_panel:
+                    if isinstance(obj, Transition):
+                        # Mark transition panel for update if this transition is selected
+                        if obj in self.right_panel_loader.transition_panel.selected_objects:
+                            self.right_panel_loader.transition_panel.needs_update = True
+                            print(f"[ModelCanvasLoader] Marked transition panel for update (transition {obj.id} changed)")
         
         dialog_loader.connect('properties-changed', on_properties_changed)
         
