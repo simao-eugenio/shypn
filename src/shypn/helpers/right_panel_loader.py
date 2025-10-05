@@ -228,6 +228,11 @@ class RightPanelLoader:
         """
         self.model = model
         
+        # Update context menu handler's model for locality detection
+        if self.context_menu_handler:
+            self.context_menu_handler.set_model(model)
+            print("[RightPanelLoader] Context menu handler model updated for locality detection")
+        
         # If panels exist and UI is loaded, wire search functionality
         if self.builder is not None and (self.place_panel or self.transition_panel):
             self._wire_search_ui()

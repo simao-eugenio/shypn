@@ -486,6 +486,12 @@ class TransitionRatePanel(AnalysisPlotPanel):
         
         self.axes.clear()
         
+        # Clear secondary Y-axis for places if it exists
+        if hasattr(self, '_places_axes'):
+            self._places_axes.clear()
+            self._places_axes.set_ylabel('Place Tokens', color='gray', fontsize=10)
+            self._places_axes.tick_params(axis='y', labelcolor='gray')
+        
         if not self.selected_objects:
             if DEBUG_UPDATE_PLOT:
                 print(f"[TransitionRatePanel]   No objects selected - showing empty state")
@@ -545,6 +551,9 @@ class TransitionRatePanel(AnalysisPlotPanel):
     def _plot_locality_places(self, transition_id, base_color, debug=False):
         """Plot input and output places for a transition's locality.
         
+        Uses a secondary Y-axis (right side) for place token counts to avoid
+        scale domination issues when token counts are much larger than rates.
+        
         Args:
             transition_id: ID of the transition
             base_color: Base color for the transition (used to derive place colors)
@@ -556,24 +565,33 @@ class TransitionRatePanel(AnalysisPlotPanel):
         # Import here to avoid circular dependency
         import matplotlib.colors as mcolors
         
+        # Create secondary Y-axis for places if it doesn't exist yet
+        if not hasattr(self, '_places_axes'):
+            self._places_axes = self.axes.twinx()
+            self._places_axes.set_ylabel('Place Tokens', color='gray', fontsize=10)
+            self._places_axes.tick_params(axis='y', labelcolor='gray')
+            if debug:
+                print(f"[TransitionRatePanel]     Created secondary Y-axis for places")
+        
         # Convert hex color to RGB for manipulation
         rgb = mcolors.hex2color(base_color)
         
-        # Plot input places (dashed lines, slightly lighter)
+        # Plot input places (dashed lines, slightly lighter) on secondary axis
         for i, place in enumerate(locality_data['input_places']):
             # Get place token data from data collector
             place_data = self.data_collector.get_place_data(place.id)
             
             if place_data:
-                times = [t for t, tokens, _ in place_data]
-                tokens = [tok for t, tok, _ in place_data]
+                # Place data format: (time, tokens) - only 2 values
+                times = [t for t, tokens in place_data]
+                tokens = [tok for t, tok in place_data]
                 
                 # Lighten the color for input places
                 lighter_rgb = tuple(min(1.0, c + 0.2) for c in rgb)
                 lighter_hex = mcolors.rgb2hex(lighter_rgb)
                 
                 place_name = getattr(place, 'name', f'P{place.id}')
-                self.axes.plot(times, tokens,
+                self._places_axes.plot(times, tokens,
                              linestyle='--',
                              linewidth=1.5,
                              alpha=0.7,
@@ -582,23 +600,24 @@ class TransitionRatePanel(AnalysisPlotPanel):
                              zorder=5)  # Behind transitions
                 
                 if debug:
-                    print(f"[TransitionRatePanel]     Plotted input place {place_name}")
+                    print(f"[TransitionRatePanel]     Plotted input place {place_name} on secondary axis")
         
-        # Plot output places (dotted lines, slightly darker)
+        # Plot output places (dotted lines, slightly darker) on secondary axis
         for i, place in enumerate(locality_data['output_places']):
             # Get place token data from data collector
             place_data = self.data_collector.get_place_data(place.id)
             
             if place_data:
-                times = [t for t, tokens, _ in place_data]
-                tokens = [tok for t, tok, _ in place_data]
+                # Place data format: (time, tokens) - only 2 values
+                times = [t for t, tokens in place_data]
+                tokens = [tok for t, tok in place_data]
                 
                 # Darken the color for output places
                 darker_rgb = tuple(max(0.0, c - 0.2) for c in rgb)
                 darker_hex = mcolors.rgb2hex(darker_rgb)
                 
                 place_name = getattr(place, 'name', f'P{place.id}')
-                self.axes.plot(times, tokens,
+                self._places_axes.plot(times, tokens,
                              linestyle=':',
                              linewidth=1.5,
                              alpha=0.7,
@@ -607,4 +626,30 @@ class TransitionRatePanel(AnalysisPlotPanel):
                              zorder=5)  # Behind transitions
                 
                 if debug:
-                    print(f"[TransitionRatePanel]     Plotted output place {place_name}")
+                    print(f"[TransitionRatePanel]     Plotted output place {place_name} on secondary axis")
+    
+    def _format_plot(self):
+        """Format the plot with labels, grid, and combined legend from both axes.
+        
+        Overrides parent method to handle dual Y-axes for transitions and places.
+        """
+        # Call parent formatting for main axis
+        super()._format_plot()
+        
+        # If we have a secondary axis for places, combine legends
+        if hasattr(self, '_places_axes') and self.show_legend and self.selected_objects:
+            # Get handles and labels from both axes
+            handles1, labels1 = self.axes.get_legend_handles_labels()
+            handles2, labels2 = self._places_axes.get_legend_handles_labels()
+            
+            # Combine them
+            if handles1 or handles2:
+                # Remove any existing legends first
+                if self.axes.get_legend():
+                    self.axes.get_legend().remove()
+                if self._places_axes.get_legend():
+                    self._places_axes.get_legend().remove()
+                
+                # Create combined legend on the main axes
+                self.axes.legend(handles1 + handles2, labels1 + labels2, 
+                               loc='best', fontsize=9)
