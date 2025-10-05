@@ -52,6 +52,7 @@ class RightPanelLoader:
         # Plotting panels (will be instantiated in load())
         self.place_panel = None
         self.transition_panel = None
+        self.diagnostics_panel = None  # NEW: Diagnostics panel for runtime metrics
         
         # Context menu handler (will be instantiated after panels are created)
         self.context_menu_handler = None
@@ -107,6 +108,7 @@ class RightPanelLoader:
         """
         # Import panel modules
         from shypn.analyses import PlaceRatePanel, TransitionRatePanel
+        from shypn.analyses.diagnostics_panel import DiagnosticsPanel
         
         # === Places Panel ===
         places_container = self.builder.get_object('places_canvas_container')
@@ -138,6 +140,24 @@ class RightPanelLoader:
         else:
             print("[RightPanelLoader] Warning: transitions_canvas_container not found in UI")
         
+        # === Diagnostics Panel (NEW) ===
+        diagnostics_container = self.builder.get_object('diagnostics_content_container')
+        diagnostics_selection_label = self.builder.get_object('diagnostics_selection_label')
+        diagnostics_placeholder = self.builder.get_object('diagnostics_placeholder')
+        
+        if diagnostics_container:
+            # Instantiate diagnostics panel
+            self.diagnostics_panel = DiagnosticsPanel(self.model, self.data_collector)
+            self.diagnostics_panel.setup(
+                diagnostics_container,
+                selection_label=diagnostics_selection_label,
+                placeholder_label=diagnostics_placeholder
+            )
+            
+            print("[RightPanelLoader] Diagnostics panel attached to diagnostics_content_container")
+        else:
+            print("[RightPanelLoader] Warning: diagnostics_content_container not found in UI")
+        
         # Wire search UI if model is available
         if self.model is not None:
             self._wire_search_ui()
@@ -145,8 +165,13 @@ class RightPanelLoader:
         # Create context menu handler now that panels exist
         if self.place_panel and self.transition_panel:
             from shypn.analyses import ContextMenuHandler
-            self.context_menu_handler = ContextMenuHandler(self.place_panel, self.transition_panel, self.model)
-            print("[RightPanelLoader] Context menu handler created with model support")
+            self.context_menu_handler = ContextMenuHandler(
+                self.place_panel, 
+                self.transition_panel, 
+                self.model,
+                self.diagnostics_panel  # Pass diagnostics panel
+            )
+            print("[RightPanelLoader] Context menu handler created with model and diagnostics support")
     
     def _wire_search_ui(self):
         """Wire search UI controls to panel search functionality.
@@ -205,8 +230,13 @@ class RightPanelLoader:
                 # Create and wire context menu handler after panels are created
                 if self.place_panel and self.transition_panel and not self.context_menu_handler:
                     from shypn.analyses import ContextMenuHandler
-                    self.context_menu_handler = ContextMenuHandler(self.place_panel, self.transition_panel, self.model)
-                    print("[RightPanelLoader] Context menu handler created with model support")
+                    self.context_menu_handler = ContextMenuHandler(
+                        self.place_panel, 
+                        self.transition_panel, 
+                        self.model,
+                        self.diagnostics_panel  # Pass diagnostics panel
+                    )
+                    print("[RightPanelLoader] Context menu handler created with model and diagnostics support")
                     
                     # Notify parent if needed (for wiring to model_canvas_loader)
                     if hasattr(self, '_on_context_menu_handler_ready'):
@@ -216,6 +246,11 @@ class RightPanelLoader:
             self.place_panel.data_collector = data_collector
             self.transition_panel.data_collector = data_collector
             print("[RightPanelLoader] Data collector updated for plotting panels")
+        
+        # Update diagnostics panel
+        if self.diagnostics_panel:
+            self.diagnostics_panel.set_data_collector(data_collector)
+            print("[RightPanelLoader] Data collector updated for diagnostics panel")
     
     def set_model(self, model):
         """Set the model for search functionality.
@@ -232,6 +267,11 @@ class RightPanelLoader:
         if self.context_menu_handler:
             self.context_menu_handler.set_model(model)
             print("[RightPanelLoader] Context menu handler model updated for locality detection")
+        
+        # Update diagnostics panel's model
+        if self.diagnostics_panel:
+            self.diagnostics_panel.set_model(model)
+            print("[RightPanelLoader] Diagnostics panel model updated")
         
         # If panels exist and UI is loaded, wire search functionality
         if self.builder is not None and (self.place_panel or self.transition_panel):

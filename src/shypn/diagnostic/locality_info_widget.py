@@ -17,6 +17,7 @@ from gi.repository import Gtk, Pango
 
 from .locality_detector import Locality, LocalityDetector
 from .locality_analyzer import LocalityAnalyzer
+from .locality_runtime import LocalityRuntimeAnalyzer
 
 
 class LocalityInfoWidget(Gtk.Box):
@@ -63,7 +64,9 @@ class LocalityInfoWidget(Gtk.Box):
         self.model = model
         self.detector = LocalityDetector(model)
         self.analyzer = LocalityAnalyzer(model)
+        self.runtime_analyzer = None  # Set via set_data_collector()
         self.locality = None
+        self.current_transition = None
         
         self._build_ui()
     
@@ -127,11 +130,34 @@ class LocalityInfoWidget(Gtk.Box):
         """
         if transition is None:
             self.locality = None
+            self.current_transition = None
             self._show_no_transition()
             return
         
+        self.current_transition = transition
         self.locality = self.detector.get_locality_for_transition(transition)
         self._update_display()
+    
+    def set_data_collector(self, data_collector):
+        """Set data collector for runtime metrics.
+        
+        Must be called to enable runtime diagnostics display.
+        
+        Args:
+            data_collector: SimulationDataCollector instance
+        
+        Example:
+            widget.set_data_collector(collector)
+            widget.set_transition(transition)  # Will now show runtime metrics
+        """
+        if data_collector:
+            self.runtime_analyzer = LocalityRuntimeAnalyzer(self.model, data_collector)
+        else:
+            self.runtime_analyzer = None
+        
+        # Refresh display if we have a transition
+        if self.current_transition:
+            self._update_display()
     
     def _update_display(self):
         """Update widget display with locality info.
@@ -188,6 +214,30 @@ class LocalityInfoWidget(Gtk.Box):
         fire_icon = "✓" if can_fire else "✗"
         fire_status = "Yes (sufficient tokens)" if can_fire else "No (insufficient tokens)"
         text_lines.append(f"  Can Fire:         {fire_icon} {fire_status}")
+        
+        # Add runtime diagnostics if available
+        if self.runtime_analyzer and self.current_transition:
+            text_lines.append("")
+            text_lines.append("═" * 60)
+            text_lines.append("Runtime Diagnostics:")
+            
+            diag = self.runtime_analyzer.get_transition_diagnostics(self.current_transition, window=10)
+            
+            # Current state
+            text_lines.append(f"  Simulation Time:  {diag['logical_time']:.2f}s")
+            enabled_icon = "✓" if diag['enabled'] else "✗"
+            text_lines.append(f"  Enabled Now:      {enabled_icon} {diag['enabled']}")
+            text_lines.append(f"  Reason:           {diag['enablement_reason']}")
+            text_lines.append("")
+            
+            # Activity metrics
+            if diag['last_fired'] is not None:
+                text_lines.append(f"  Last Fired:       {diag['last_fired']:.2f}s")
+                text_lines.append(f"  Time Since:       {diag['time_since_fire']:.2f}s ago")
+                text_lines.append(f"  Recent Events:    {diag['event_count']}")
+                text_lines.append(f"  Throughput:       {diag['throughput']:.3f} fires/sec")
+            else:
+                text_lines.append(f"  Status:           No firing events recorded")
         
         # Set text
         buffer = self.textview.get_buffer()
