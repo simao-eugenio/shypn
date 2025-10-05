@@ -605,24 +605,45 @@ class ModelCanvasLoader:
         drawing_area.queue_draw()
     
     def _on_simulation_reset(self, palette):
-        """Handle simulation reset - notify analysis panels to refresh plots.
+        """Handle simulation reset - blank analysis plots and prepare for new data.
         
         Args:
             palette: SimulateToolsPaletteLoader that emitted the signal
         """
-        print("[ModelCanvasLoader] Simulation reset - notifying analysis panels")
+        print("[ModelCanvasLoader] Simulation reset - blanking analysis panels")
         
-        # Notify analysis panels to refresh their plots showing reset state
+        # Blank analysis panels immediately since data collector was cleared
         if self.right_panel_loader:
             if hasattr(self.right_panel_loader, 'place_panel') and self.right_panel_loader.place_panel:
-                # Mark place panel for update to show reset token values
-                self.right_panel_loader.place_panel.needs_update = True
-                print("[ModelCanvasLoader] Marked place panel for update after reset")
+                panel = self.right_panel_loader.place_panel
+                
+                # Reset data length tracking
+                panel.last_data_length.clear()
+                
+                # If objects are selected, show them with blank (no data) state
+                # The next simulation step will populate data
+                if panel.selected_objects:
+                    panel.needs_update = True
+                    print("[ModelCanvasLoader] Place panel will update with reset state")
+                else:
+                    # No objects selected, just ensure empty state is shown
+                    panel._show_empty_state()
+                    print("[ModelCanvasLoader] Place panel showing empty state")
             
             if hasattr(self.right_panel_loader, 'transition_panel') and self.right_panel_loader.transition_panel:
-                # Mark transition panel for update to show reset state
-                self.right_panel_loader.transition_panel.needs_update = True
-                print("[ModelCanvasLoader] Marked transition panel for update after reset")
+                panel = self.right_panel_loader.transition_panel
+                
+                # Reset data length tracking
+                panel.last_data_length.clear()
+                
+                # If objects are selected, show them with blank (no data) state
+                if panel.selected_objects:
+                    panel.needs_update = True
+                    print("[ModelCanvasLoader] Transition panel will update with reset state")
+                else:
+                    # No objects selected, just ensure empty state is shown
+                    panel._show_empty_state()
+                    print("[ModelCanvasLoader] Transition panel showing empty state")
     
     def _on_mode_changed(self, mode_palette, mode, drawing_area, edit_palette, edit_tools_palette,
                          simulate_palette, simulate_tools_palette):
@@ -1359,6 +1380,41 @@ class ModelCanvasLoader:
             ("Delete", lambda: self._on_object_delete(obj, manager, drawing_area)),
         ]
         
+        # Add transition-specific options
+        if isinstance(obj, Transition):
+            # Insert transition type submenu after "Edit Mode"
+            type_submenu_item = Gtk.MenuItem(label="Change Type ►")
+            type_submenu = Gtk.Menu()
+            
+            # Get current type
+            current_type = getattr(obj, 'transition_type', 'immediate')
+            
+            # Add type options with checkmark for current type
+            transition_types = [
+                ('immediate', 'Immediate (zero delay)'),
+                ('timed', 'Timed (TPN)'),
+                ('stochastic', 'Stochastic (GSPN)'),
+                ('continuous', 'Continuous (SHPN)')
+            ]
+            
+            for type_value, type_label in transition_types:
+                # Add checkmark if this is the current type
+                if type_value == current_type:
+                    label = f"✓ {type_label}"
+                else:
+                    label = f"   {type_label}"
+                
+                type_item = Gtk.MenuItem(label=label)
+                type_item.connect("activate", 
+                                lambda w, t=type_value: self._on_transition_type_change(
+                                    obj, t, manager, drawing_area))
+                type_item.show()
+                type_submenu.append(type_item)
+            
+            type_submenu_item.set_submenu(type_submenu)
+            type_submenu_item.show()
+            menu_items.insert(2, ("__SUBMENU__", type_submenu_item))  # Insert after "Edit Mode"
+        
         # Add arc-specific options
         if isinstance(obj, Arc):
             menu_items.insert(2, ("Edit Weight...", lambda: self._on_arc_edit_weight(obj, manager, drawing_area)))
@@ -1366,6 +1422,9 @@ class ModelCanvasLoader:
         for item_data in menu_items:
             if item_data is None:
                 menu_item = Gtk.SeparatorMenuItem()
+            elif item_data[0] == "__SUBMENU__":
+                # This is a submenu item, add it directly
+                menu_item = item_data[1]
             else:
                 label, callback = item_data
                 menu_item = Gtk.MenuItem(label=label)
@@ -1710,7 +1769,8 @@ class ModelCanvasLoader:
             dialog_loader = create_transition_prop_dialog(
                 obj, 
                 parent_window=self.parent_window,
-                persistency_manager=self.persistency
+                persistency_manager=self.persistency,
+                model=manager
             )
         elif isinstance(obj, Arc):
             dialog_loader = create_arc_prop_dialog(
@@ -1770,6 +1830,54 @@ class ModelCanvasLoader:
         # Redraw canvas to reflect any changes (in case signal didn't fire)
         if response == Gtk.ResponseType.OK:
             drawing_area.queue_draw()
+    
+    def _on_transition_type_change(self, transition, new_type, manager, drawing_area):
+        """Handle transition type change from context menu.
+        
+        Args:
+            transition: Transition object
+            new_type: New transition type ('immediate', 'timed', 'stochastic', 'continuous')
+            manager: ModelCanvasManager instance
+            drawing_area: GtkDrawingArea widget
+        """
+        from shypn.netobjs import Transition
+        
+        old_type = getattr(transition, 'transition_type', 'immediate')
+        
+        if old_type == new_type:
+            print(f"[ModelCanvasLoader] Transition {transition.id} already type '{new_type}'")
+            return
+        
+        print(f"[ModelCanvasLoader] Changing transition {transition.id} type: {old_type} → {new_type}")
+        
+        # Update transition type
+        transition.transition_type = new_type
+        
+        # Mark document as dirty
+        if self.persistency:
+            self.persistency.mark_dirty()
+            print(f"[ModelCanvasLoader] Document marked as dirty")
+        
+        # Notify simulation controller (clear behavior cache)
+        if drawing_area in self.simulate_tools_palettes:
+            simulate_tools = self.simulate_tools_palettes[drawing_area]
+            if simulate_tools.simulation:
+                # Clear behavior cache for this transition
+                if transition.id in simulate_tools.simulation.behavior_cache:
+                    del simulate_tools.simulation.behavior_cache[transition.id]
+                    print(f"[ModelCanvasLoader] Cleared behavior cache for transition {transition.id}")
+        
+        # Notify analysis panels (mark for update if this transition is selected)
+        if self.right_panel_loader:
+            if hasattr(self.right_panel_loader, 'transition_panel') and self.right_panel_loader.transition_panel:
+                if transition in self.right_panel_loader.transition_panel.selected_objects:
+                    self.right_panel_loader.transition_panel.needs_update = True
+                    print(f"[ModelCanvasLoader] Marked transition panel for update (transition {transition.id} type changed)")
+        
+        # Redraw canvas to reflect change (visual representation might differ by type)
+        drawing_area.queue_draw()
+        
+        print(f"[ModelCanvasLoader] Transition {transition.id} type changed to '{new_type}' successfully")
     
     def _on_arc_edit_weight(self, arc, manager, drawing_area):
         """Quick edit arc weight.
