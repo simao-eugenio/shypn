@@ -91,6 +91,7 @@ class AnalysisPlotPanel(Gtk.Box):
         # Plot update throttling
         self.needs_update = False
         self.update_interval = 100  # milliseconds
+        self.last_data_length = {}  # Track data length per object to detect changes
         
         # Build UI
         self._setup_ui()
@@ -219,7 +220,9 @@ class AnalysisPlotPanel(Gtk.Box):
             return
         
         self.selected_objects.append(obj)
-        self._update_objects_list()
+        # Don't call _update_objects_list() directly - it calls show_all() which can
+        # cause GTK event processing hangs when called from context menu callbacks.
+        # Instead, just set needs_update flag and let periodic update handle it safely.
         self.needs_update = True
         
         print(f"[{self.__class__.__name__}] Added {self.object_type} {obj.id} to analysis")
@@ -231,7 +234,7 @@ class AnalysisPlotPanel(Gtk.Box):
             obj: Place or Transition object to remove
         """
         self.selected_objects = [o for o in self.selected_objects if o.id != obj.id]
-        self._update_objects_list()
+        # Don't call _update_objects_list() directly - defer to periodic update
         self.needs_update = True
         
         print(f"[{self.__class__.__name__}] Removed {self.object_type} {obj.id} from analysis")
@@ -266,9 +269,24 @@ class AnalysisPlotPanel(Gtk.Box):
                 color_box.connect('draw', self._draw_color_box, color)
                 hbox.pack_start(color_box, False, False, 0)
                 
-                # Object label
+                # Object label with type information (for transitions)
                 obj_name = getattr(obj, 'name', f'{self.object_type.title()}{obj.id}')
-                label = Gtk.Label(label=f"{obj_name} ({self.object_type[0].upper()}{obj.id})")
+                
+                # For transitions, include the transition type in the label
+                if self.object_type == 'transition':
+                    transition_type = getattr(obj, 'transition_type', 'immediate')
+                    # Short type names for compact display
+                    type_abbrev = {
+                        'immediate': 'IMM',
+                        'timed': 'TIM',
+                        'stochastic': 'STO',
+                        'continuous': 'CON'
+                    }.get(transition_type, transition_type[:3].upper())
+                    label_text = f"{obj_name} [{type_abbrev}] ({self.object_type[0].upper()}{obj.id})"
+                else:
+                    label_text = f"{obj_name} ({self.object_type[0].upper()}{obj.id})"
+                
+                label = Gtk.Label(label=label_text)
                 label.set_xalign(0)
                 hbox.pack_start(label, True, True, 0)
                 
@@ -317,11 +335,17 @@ class AnalysisPlotPanel(Gtk.Box):
         self.remove_object(obj)
     
     def _on_clear_clicked(self, button):
-        """Handle clear button click."""
+        """Handle clear button click - clear selection and blank canvas."""
         self.selected_objects.clear()
+        self.last_data_length.clear()  # Reset data length tracking
+        
+        # Immediately blank the canvas - don't wait for periodic update
+        self._show_empty_state()
+        
+        # Also update the objects list UI
         self._update_objects_list()
-        self.needs_update = True
-        print(f"[{self.__class__.__name__}] Cleared all selections")
+        
+        print(f"[{self.__class__.__name__}] Cleared all selections and blanked canvas")
     
     def _on_grid_toggled(self, button):
         """Handle grid toggle button.
@@ -354,14 +378,38 @@ class AnalysisPlotPanel(Gtk.Box):
         print(f"[{self.__class__.__name__}] Auto scale toggled: {self.auto_scale}")
     
     def _periodic_update(self) -> bool:
-        """Periodic callback to update plot if needed.
+        """Periodic callback to update plot and UI list if needed.
         
         Returns:
             bool: True to continue periodic calls
         """
-        # Update if explicitly flagged OR if there are selected objects to plot
-        # (this ensures plots update during simulation even without explicit flag)
-        if self.needs_update or self.selected_objects:
+        # Only update if there are selected objects to plot
+        # This prevents expensive matplotlib rendering when nothing is selected
+        if not self.selected_objects:
+            return True  # Keep timer running but do nothing
+        
+        # Check if data has changed for any selected object
+        data_changed = False
+        for obj in self.selected_objects:
+            # Get current data length
+            if self.object_type == 'place':
+                current_length = len(self.data_collector.get_place_data(obj.id))
+            else:  # transition
+                current_length = len(self.data_collector.get_transition_data(obj.id))
+            
+            # Compare with last known length
+            last_length = self.last_data_length.get(obj.id, 0)
+            if current_length != last_length:
+                data_changed = True
+                self.last_data_length[obj.id] = current_length
+        
+        # Only update if data changed OR explicit flag set
+        if data_changed or self.needs_update:
+            if self.needs_update:
+                # Explicit flag means UI structure changed (objects added/removed)
+                self._update_objects_list()
+            
+            # Update plot with new data
             self.update_plot()
             self.needs_update = False
         
@@ -373,14 +421,25 @@ class AnalysisPlotPanel(Gtk.Box):
         This is the main plotting method that subclasses should call
         or override to customize plotting behavior.
         """
+        DEBUG_UPDATE_PLOT = False  # Disable verbose logging
+        
+        if DEBUG_UPDATE_PLOT:
+            print(f"[{self.__class__.__name__}] update_plot() called, {len(self.selected_objects)} objects selected")
+        
         self.axes.clear()
         
         if not self.selected_objects:
+            if DEBUG_UPDATE_PLOT:
+                print(f"[{self.__class__.__name__}]   No objects selected - showing empty state")
             self._show_empty_state()
             return
         
         # Plot rate for each selected object
         for i, obj in enumerate(self.selected_objects):
+            if DEBUG_UPDATE_PLOT:
+                obj_name = getattr(obj, 'name', f'{self.object_type}{obj.id}')
+                print(f"[{self.__class__.__name__}]   Plotting {obj_name} (id={obj.id})")
+            
             rate_data = self._get_rate_data(obj.id)
             
             if rate_data:
@@ -390,8 +449,21 @@ class AnalysisPlotPanel(Gtk.Box):
                 color = self._get_color(i)
                 obj_name = getattr(obj, 'name', f'{self.object_type.title()}{obj.id}')
                 
+                # For transitions, include type in legend
+                if self.object_type == 'transition':
+                    transition_type = getattr(obj, 'transition_type', 'immediate')
+                    type_abbrev = {
+                        'immediate': 'IMM',
+                        'timed': 'TIM',
+                        'stochastic': 'STO',
+                        'continuous': 'CON'
+                    }.get(transition_type, transition_type[:3].upper())
+                    legend_label = f'{obj_name} [{type_abbrev}]'
+                else:
+                    legend_label = f'{obj_name} ({self.object_type[0].upper()}{obj.id})'
+                
                 self.axes.plot(times, rates,
-                              label=f'{obj_name} ({self.object_type[0].upper()}{obj.id})',
+                              label=legend_label,
                               color=color,
                               linewidth=2)
         
@@ -416,16 +488,18 @@ class AnalysisPlotPanel(Gtk.Box):
         self.axes.set_title(self._get_title(), fontsize=12, fontweight='bold')
         
         # Apply control settings
+        # Only show legend if enabled, objects selected, AND there are labeled artists
         if self.show_legend and self.selected_objects:
-            self.axes.legend(loc='best', fontsize=9)
+            # Check if there are any labeled artists before calling legend()
+            handles, labels = self.axes.get_legend_handles_labels()
+            if handles:
+                self.axes.legend(loc='best', fontsize=9)
         
         if self.show_grid:
             self.axes.grid(True, alpha=0.3, linestyle='--')
         
-        # Add zero line for place panels (consumption vs production)
-        if self.object_type == 'place':
-            self.axes.axhline(y=0, color='gray', linestyle='-', 
-                            linewidth=0.8, alpha=0.5)
+        # Note: Zero reference line removed - not meaningful for token counts
+        # (Places show actual marking, not rates)
         
         # Apply auto scale or use fixed scale
         if not self.auto_scale and self.selected_objects:
