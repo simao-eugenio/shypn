@@ -189,6 +189,9 @@ class CurvedArc(Arc):
             transform: Optional function (deprecated, for backward compatibility)
             zoom: Current zoom level for line width compensation
         """
+        # Ensure clean Cairo context state
+        cr.new_path()
+        
         # Get source and target positions in world space
         src_world_x, src_world_y = self.source.x, self.source.y
         tgt_world_x, tgt_world_y = self.target.x, self.target.y
@@ -284,6 +287,9 @@ class CurvedArc(Arc):
             self._render_weight_curved(cr, start_world_x, start_world_y, 
                                       end_world_x, end_world_y, 
                                       cp_x, cp_y, offset_distance, zoom)
+        
+        # Ensure clean state for next rendering operation
+        cr.new_path()
         
         # Selection rendering moved to ObjectEditingTransforms in src/shypn/api/edit/
     
