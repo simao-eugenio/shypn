@@ -104,6 +104,9 @@ class ModelCanvasManager:
         
         # Dirty flag for redraw optimization
         self._needs_redraw = True
+        
+        # Ensure all arcs have proper manager references
+        self.ensure_arc_references()
     
     # ==================== DPI and Physical Units ====================
     
@@ -252,7 +255,11 @@ class ModelCanvasManager:
         
         arc = Arc(source, target, arc_id, arc_name, **kwargs)
         arc.on_changed = self._on_object_changed
+        arc._manager = self  # Store reference to manager for parallel detection
         self.arcs.append(arc)
+        
+        # Check if this arc creates a parallel situation and auto-convert to curved
+        self._auto_convert_parallel_arcs_to_curved(arc)
         
         self.mark_modified()
         self.mark_dirty()
@@ -302,6 +309,189 @@ class ModelCanvasManager:
             self.arcs.remove(arc)
             self.mark_modified()
             self.mark_dirty()
+    
+    def detect_parallel_arcs(self, arc):
+        """Find arcs parallel to the given arc (same source/target or reversed).
+        
+        Parallel arcs are arcs that connect the same two nodes, either in the
+        same direction or opposite direction. These need visual offset to
+        avoid overlapping.
+        
+        Args:
+            arc: Arc to check for parallels
+            
+        Returns:
+            list: List of parallel arcs (excluding the given arc)
+        """
+        parallels = []
+        
+        for other in self.arcs:
+            if other == arc:
+                continue
+            
+            # Same direction: same source and target
+            if (other.source == arc.source and other.target == arc.target):
+                parallels.append(other)
+                print(f"[ParallelDetect] Found same-direction parallel: {arc.name} and {other.name}")
+            
+            # Opposite direction: reversed source and target
+            elif (other.source == arc.target and other.target == arc.source):
+                parallels.append(other)
+                print(f"[ParallelDetect] Found opposite-direction parallel: {arc.name} and {other.name}")
+        
+        if not parallels:
+            print(f"[ParallelDetect] No parallels found for {arc.name}")
+        
+        return parallels
+    
+    def _auto_convert_parallel_arcs_to_curved(self, new_arc):
+        """Automatically convert parallel arcs to curved arcs.
+        
+        When a new arc creates a parallel situation (same source/target or opposite),
+        convert all involved arcs to curved arcs for better visualization.
+        
+        Args:
+            new_arc: The newly added arc that may create parallels
+        """
+        from shypn.netobjs import CurvedArc, CurvedInhibitorArc, InhibitorArc
+        from shypn.utils.arc_transform import make_curved
+        
+        parallels = self.detect_parallel_arcs(new_arc)
+        
+        if parallels:
+            # Convert the new arc if it's straight
+            if isinstance(new_arc, Arc) and not isinstance(new_arc, (CurvedArc, CurvedInhibitorArc)):
+                curved_arc = make_curved(new_arc)
+                index = self.arcs.index(new_arc)
+                self.arcs[index] = curved_arc
+                curved_arc._manager = self
+                curved_arc.on_changed = self._on_object_changed
+                # Update the reference in the arcs list to return the new curved arc
+                new_arc = curved_arc
+            
+            # Convert all parallel arcs if they're straight
+            for i, parallel in enumerate(parallels):
+                if isinstance(parallel, (Arc, InhibitorArc)) and not isinstance(parallel, (CurvedArc, CurvedInhibitorArc)):
+                    curved_arc = make_curved(parallel)
+                    index = self.arcs.index(parallel)
+                    self.arcs[index] = curved_arc
+                    curved_arc._manager = self
+                    curved_arc.on_changed = self._on_object_changed
+                    # Update parallels list with new reference
+                    parallels[i] = curved_arc
+            
+            # Mark dirty to trigger redraw
+            self.mark_dirty()
+    
+    def calculate_arc_offset(self, arc, parallels):
+        """Calculate offset for arc to avoid overlapping parallels.
+        
+        For parallel arcs between same nodes, we offset them perpendicular
+        to the line connecting the nodes. The offset is calculated to
+        distribute arcs evenly on both sides of the center line.
+        
+        For opposite direction arcs (A→B, B→A), they curve in opposite
+        directions to create mirror symmetry.
+        
+        Args:
+            arc: Arc to calculate offset for
+            parallels: List of parallel arcs (from detect_parallel_arcs)
+            
+        Returns:
+            float: Offset distance in pixels (positive = counterclockwise,
+                   negative = clockwise, 0 = no offset)
+        """
+        if not parallels:
+            return 0.0  # No offset needed for single arc
+        
+        # Separate same-direction and opposite-direction arcs
+        same_direction = []
+        opposite_direction = []
+        
+        for other in parallels:
+            if other.source == arc.source and other.target == arc.target:
+                same_direction.append(other)
+            elif other.source == arc.target and other.target == arc.source:
+                opposite_direction.append(other)
+        
+        # For opposite direction arcs (most common case: A→B, B→A)
+        if len(opposite_direction) == 1 and len(same_direction) == 0:
+            # Two arcs in opposite directions - mirror each other
+            # Use a deterministic rule: arc with lower ID gets positive offset
+            other = opposite_direction[0]
+            if arc.id < other.id:
+                return 50.0  # Curve counterclockwise (increased from 25)
+            else:
+                return -50.0  # Curve clockwise (mirror, increased from -25)
+        
+        # For same-direction arcs or mixed cases, use stable ordering
+        all_arcs = [arc] + parallels
+        all_arcs.sort(key=lambda a: a.id)  # Stable ordering by ID
+        
+        index = all_arcs.index(arc)
+        total = len(all_arcs)
+        
+        # Calculate offset based on number of parallel arcs
+        # For 2 arcs: offsets are +15, -15
+        # For 3 arcs: offsets are +20, 0, -20
+        # For 4 arcs: offsets are +30, +10, -10, -30
+        # Pattern: distribute evenly around center (0)
+        
+        if total == 1:
+            return 0.0
+        elif total == 2:
+            # Simple case: ±15 pixels
+            return 15.0 if index == 0 else -15.0
+        else:
+            # General case: distribute evenly with 10px spacing
+            spacing = 10.0
+            center = (total - 1) / 2.0
+            return (index - center) * spacing
+    
+    def replace_arc(self, old_arc, new_arc):
+        """Replace an arc with a different type (for arc transformations).
+        
+        Used when transforming arcs via context menu:
+        - Straight ↔ Curved
+        - Normal ↔ Inhibitor
+        
+        The new arc maintains the same ID and properties but has a different
+        class type (Arc, InhibitorArc, CurvedArc, or CurvedInhibitorArc).
+        
+        Args:
+            old_arc: Arc instance to replace
+            new_arc: New arc instance (different class, same ID/properties)
+        """
+        try:
+            index = self.arcs.index(old_arc)
+            print(f'[Manager] Replacing arc at index {index}: {type(old_arc).__name__} -> {type(new_arc).__name__}')
+            self.arcs[index] = new_arc
+            
+            # Ensure new arc has manager reference and change callback
+            new_arc._manager = self
+            new_arc.on_changed = self._on_object_changed
+            
+            self.mark_modified()
+            self.mark_dirty()
+            print(f'[Manager] Arc replaced successfully, _manager and on_changed set')
+        except ValueError:
+            # Arc not found in list - may have been deleted
+            print(f'[Manager] ERROR: Arc not found in list!')
+            pass
+    
+    def ensure_arc_references(self):
+        """Ensure all arcs have proper manager and callback references.
+        
+        This is useful after loading files or batch operations to ensure
+        all arcs can be transformed and detected for parallel positioning.
+        """
+        for arc in self.arcs:
+            if not hasattr(arc, '_manager') or arc._manager is None:
+                arc._manager = self
+                print(f'[Manager] Fixed missing _manager reference for {arc.name}')
+            if not hasattr(arc, 'on_changed') or arc.on_changed is None:
+                arc.on_changed = self._on_object_changed
+                print(f'[Manager] Fixed missing on_changed callback for {arc.name}')
     
     def get_all_objects(self):
         """Get all Petri net objects in rendering order.

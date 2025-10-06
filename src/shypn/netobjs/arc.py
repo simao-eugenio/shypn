@@ -65,6 +65,53 @@ class Arc(PetriNetObject):
         """Get target object ID (for behavior compatibility)."""
         return self.target.id
     
+    @property
+    def arc_type(self) -> str:
+        """Get the arc type identifier.
+        
+        Returns:
+            str: Arc type - "normal", "inhibitor", "test"
+        """
+        from shypn.netobjs.inhibitor_arc import InhibitorArc
+        if isinstance(self, InhibitorArc):
+            return "inhibitor"
+        # Future: add "test" arc support
+        return "normal"
+    
+    def set_arc_type(self, arc_type: str):
+        """Set the arc type by converting to appropriate class.
+        
+        This method should be called by the dialog to trigger transformation.
+        The actual transformation is handled by arc_transform utilities and
+        the manager's replace_arc method.
+        
+        Args:
+            arc_type: "normal", "inhibitor", or "test"
+        
+        Raises:
+            ValueError: If arc_type is invalid or transformation fails validation
+        """
+        if arc_type == self.arc_type:
+            return  # No change needed
+        
+        from shypn.utils.arc_transform import convert_to_inhibitor, convert_to_normal
+        
+        if arc_type == "inhibitor":
+            # Will raise ValueError if Transition→Place
+            new_arc = convert_to_inhibitor(self)
+        elif arc_type == "normal":
+            new_arc = convert_to_normal(self)
+        elif arc_type == "test":
+            raise NotImplementedError("Test arcs not yet implemented")
+        else:
+            raise ValueError(f"Unknown arc type: {arc_type}")
+        
+        # Replace self with new arc in manager
+        if hasattr(self, '_manager') and self._manager:
+            self._manager.replace_arc(self, new_arc)
+        else:
+            raise RuntimeError("Arc has no manager reference - cannot perform transformation")
+    
     @staticmethod
     def _validate_connection(source, target):
         """Validate that connection follows bipartite property.
@@ -128,6 +175,24 @@ class Arc(PetriNetObject):
         # Normalize direction
         dx_world /= length_world
         dy_world /= length_world
+        
+        # Check for parallel arcs and apply offset
+        offset_distance = 0.0
+        if hasattr(self, '_manager') and self._manager:
+            parallels = self._manager.detect_parallel_arcs(self)
+            if parallels:
+                offset_distance = self._manager.calculate_arc_offset(self, parallels)
+        
+        if abs(offset_distance) > 1e-6:
+            # Apply perpendicular offset to line endpoints
+            # Perpendicular vector (90° counterclockwise rotation)
+            perp_x = -dy_world
+            perp_y = dx_world
+            
+            src_world_x += perp_x * offset_distance
+            src_world_y += perp_y * offset_distance
+            tgt_world_x += perp_x * offset_distance
+            tgt_world_y += perp_y * offset_distance
         
         # Get boundary points in world space
         start_world_x, start_world_y = self._get_boundary_point(
@@ -287,6 +352,9 @@ class Arc(PetriNetObject):
             x2, y2: End point (world coords)
             zoom: Current zoom level for font/offset compensation
         """
+        # Save context to avoid interfering with other rendering
+        cr.save()
+        
         # Calculate midpoint
         mid_x = (x1 + x2) / 2
         mid_y = (y1 + y2) / 2
@@ -321,6 +389,12 @@ class Arc(PetriNetObject):
         cr.move_to(text_x, text_y)
         cr.set_source_rgb(0, 0, 0)  # Black text
         cr.show_text(text)
+        
+        # Clear the current path to avoid artifacts
+        cr.new_path()
+        
+        # Restore context (clear any paths/state)
+        cr.restore()
     
     def contains_point(self, x: float, y: float) -> bool:
         """Check if a point is near this arc.

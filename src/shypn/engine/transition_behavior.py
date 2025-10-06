@@ -137,23 +137,28 @@ class TransitionBehavior(ABC):
     def _check_enablement_manual(self) -> bool:
         """Manual enablement check (fallback if model doesn't provide method).
         
+        SHYPN uses "living systems" cooperation semantics:
+        - ALL input arcs (normal and inhibitor) check: tokens >= weight
+        - Normal arc meaning: "I need weight tokens to function" (necessity)
+        - Inhibitor arc meaning: "I need weight tokens surplus to share" (cooperation)
+        
+        Both prevent firing when tokens < weight, but for different reasons:
+        - Normal: insufficient resources
+        - Inhibitor: insufficient surplus (starvation prevention)
+        
         Returns:
             bool: True if enabled, False otherwise
         """
         input_arcs = self.get_input_arcs()
         
         for arc in input_arcs:
-            # Skip inhibitor arcs
-            kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
-            if kind != 'normal':
-                continue
-            
             # Get source place directly from arc reference
             source_place = arc.source
             if source_place is None:
                 return False
             
-            # Check sufficient tokens
+            # Living systems semantics: ALL arcs check for sufficient tokens
+            # The semantic meaning differs (need vs. surplus) but check is same
             if source_place.tokens < arc.weight:
                 return False
         

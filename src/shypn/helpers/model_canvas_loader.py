@@ -766,11 +766,12 @@ class ModelCanvasLoader:
         cr.translate(manager.pan_x * manager.zoom, manager.pan_y * manager.zoom)
         cr.scale(manager.zoom, manager.zoom)
         manager.draw_grid(cr)
+        
+        # Render all objects
         all_objects = manager.get_all_objects()
-        if all_objects and len(all_objects) > 0:
-            pass
         for obj in all_objects:
             obj.render(cr, zoom=manager.zoom)
+        
         manager.editing_transforms.render_selection_layer(cr, manager, manager.zoom)
         manager.rectangle_selection.render(cr, manager.zoom)
         cr.restore()
@@ -884,7 +885,38 @@ class ModelCanvasLoader:
             type_submenu_item.show()
             menu_items.insert(2, ('__SUBMENU__', type_submenu_item))
         if isinstance(obj, Arc):
-            menu_items.insert(2, ('Edit Weight...', lambda: self._on_arc_edit_weight(obj, manager, drawing_area)))
+            # Add arc transformation submenu
+            from shypn.utils.arc_transform import is_straight, is_curved, is_inhibitor, is_normal
+            
+            transform_submenu_item = Gtk.MenuItem(label='Transform Arc ►')
+            transform_submenu = Gtk.Menu()
+            
+            # Curve/Straight options
+            if is_straight(obj):
+                curve_item = Gtk.MenuItem(label='Make Curved')
+                curve_item.connect('activate', lambda w: self._on_arc_make_curved(obj, manager, drawing_area))
+            else:
+                curve_item = Gtk.MenuItem(label='Make Straight')
+                curve_item.connect('activate', lambda w: self._on_arc_make_straight(obj, manager, drawing_area))
+            curve_item.show()
+            transform_submenu.append(curve_item)
+            
+            # Normal/Inhibitor options
+            if is_normal(obj):
+                inhibitor_item = Gtk.MenuItem(label='Convert to Inhibitor Arc')
+                inhibitor_item.connect('activate', lambda w: self._on_arc_convert_to_inhibitor(obj, manager, drawing_area))
+            else:
+                inhibitor_item = Gtk.MenuItem(label='Convert to Normal Arc')
+                inhibitor_item.connect('activate', lambda w: self._on_arc_convert_to_normal(obj, manager, drawing_area))
+            inhibitor_item.show()
+            transform_submenu.append(inhibitor_item)
+            
+            transform_submenu_item.set_submenu(transform_submenu)
+            transform_submenu_item.show()
+            menu_items.insert(2, ('__SUBMENU__', transform_submenu_item))
+            
+            # Add weight editing option
+            menu_items.insert(3, ('Edit Weight...', lambda: self._on_arc_edit_weight(obj, manager, drawing_area)))
         for item_data in menu_items:
             if item_data is None:
                 menu_item = Gtk.SeparatorMenuItem()
@@ -1253,6 +1285,98 @@ class ModelCanvasLoader:
                 print(f'Updated {arc.name} weight: {new_weight}')
                 manager.mark_modified()
                 drawing_area.queue_draw()
+        dialog.destroy()
+
+    def _on_arc_make_curved(self, arc, manager, drawing_area):
+        """Transform arc to curved.
+        
+        Args:
+            arc: Arc object
+            manager: ModelCanvasManager instance
+            drawing_area: GtkDrawingArea widget
+        """
+        from shypn.utils.arc_transform import make_curved
+        
+        print(f'[Transform] Making {arc.name} curved (type={type(arc).__name__})')
+        new_arc = make_curved(arc)
+        print(f'[Transform] Created new arc: type={type(new_arc).__name__}')
+        manager.replace_arc(arc, new_arc)
+        print(f'[Transform] Replaced arc in manager, triggering redraw')
+        drawing_area.queue_draw()
+
+    def _on_arc_make_straight(self, arc, manager, drawing_area):
+        """Transform arc to straight.
+        
+        Args:
+            arc: Arc object
+            manager: ModelCanvasManager instance
+            drawing_area: GtkDrawingArea widget
+        """
+        from shypn.utils.arc_transform import make_straight
+        
+        print(f'[Transform] Making {arc.name} straight (type={type(arc).__name__})')
+        new_arc = make_straight(arc)
+        print(f'[Transform] Created new arc: type={type(new_arc).__name__}')
+        manager.replace_arc(arc, new_arc)
+        print(f'[Transform] Replaced arc in manager, triggering redraw')
+        drawing_area.queue_draw()
+
+    def _on_arc_convert_to_inhibitor(self, arc, manager, drawing_area):
+        """Convert arc to inhibitor type.
+        
+        Args:
+            arc: Arc object
+            manager: ModelCanvasManager instance
+            drawing_area: GtkDrawingArea widget
+        """
+        from shypn.utils.arc_transform import convert_to_inhibitor
+        
+        print(f'[Transform] Converting {arc.name} to inhibitor (type={type(arc).__name__})')
+        
+        try:
+            new_arc = convert_to_inhibitor(arc)
+            print(f'[Transform] Created new arc: type={type(new_arc).__name__}')
+            manager.replace_arc(arc, new_arc)
+            print(f'[Transform] Replaced arc in manager, triggering redraw')
+            drawing_area.queue_draw()
+        except ValueError as e:
+            # Invalid transformation (e.g., Transition → Place)
+            print(f'[Transform] ERROR: {e}')
+            self._show_error_dialog(str(e))
+            return
+
+    def _on_arc_convert_to_normal(self, arc, manager, drawing_area):
+        """Convert arc to normal type.
+        
+        Args:
+            arc: Arc object
+            manager: ModelCanvasManager instance
+            drawing_area: GtkDrawingArea widget
+        """
+        from shypn.utils.arc_transform import convert_to_normal
+        
+        print(f'[Transform] Converting {arc.name} to normal (type={type(arc).__name__})')
+        new_arc = convert_to_normal(arc)
+        print(f'[Transform] Created new arc: type={type(new_arc).__name__}')
+        manager.replace_arc(arc, new_arc)
+        print(f'[Transform] Replaced arc in manager, triggering redraw')
+        drawing_area.queue_draw()
+    
+    def _show_error_dialog(self, message):
+        """Show an error dialog to the user.
+        
+        Args:
+            message: Error message to display
+        """
+        dialog = Gtk.MessageDialog(
+            transient_for=None,
+            flags=0,
+            message_type=Gtk.MessageType.ERROR,
+            buttons=Gtk.ButtonsType.OK,
+            text="Invalid Operation"
+        )
+        dialog.format_secondary_text(message)
+        dialog.run()
         dialog.destroy()
 
 def create_model_canvas(ui_path=None):
