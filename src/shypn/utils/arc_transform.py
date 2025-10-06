@@ -158,25 +158,47 @@ def convert_to_normal(arc):
 def is_straight(arc):
     """Check if arc is straight (not curved).
     
-    Args:
-        arc: Arc instance to check
-        
-    Returns:
-        bool: True if arc is straight (Arc or InhibitorArc)
-    """
-    return not isinstance(arc, (CurvedArc, CurvedInhibitorArc))
-
-
-def is_curved(arc):
-    """Check if arc is curved.
+    Checks both the arc class type (CurvedArc) and the is_curved flag
+    for regular Arc instances that have been transformed via the handle.
     
     Args:
         arc: Arc instance to check
         
     Returns:
-        bool: True if arc is curved (CurvedArc or CurvedInhibitorArc)
+        bool: True if arc is straight (not curved)
     """
-    return isinstance(arc, (CurvedArc, CurvedInhibitorArc))
+    # Check if it's a CurvedArc class (legacy system)
+    if isinstance(arc, (CurvedArc, CurvedInhibitorArc)):
+        return False
+    
+    # Check if regular Arc has is_curved flag set (new system)
+    if hasattr(arc, 'is_curved') and arc.is_curved:
+        return False
+    
+    return True
+
+
+def is_curved(arc):
+    """Check if arc is curved.
+    
+    Checks both the arc class type (CurvedArc) and the is_curved flag
+    for regular Arc instances that have been transformed via the handle.
+    
+    Args:
+        arc: Arc instance to check
+        
+    Returns:
+        bool: True if arc is curved
+    """
+    # Check if it's a CurvedArc class (legacy system)
+    if isinstance(arc, (CurvedArc, CurvedInhibitorArc)):
+        return True
+    
+    # Check if regular Arc has is_curved flag set (new system)
+    if hasattr(arc, 'is_curved') and arc.is_curved:
+        return True
+    
+    return False
 
 
 def is_inhibitor(arc):

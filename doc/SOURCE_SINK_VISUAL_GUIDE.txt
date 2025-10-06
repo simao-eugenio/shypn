@@ -1,0 +1,150 @@
+```
+SOURCE/SINK TRANSITION MARKER VISUALIZATION
+
+═══════════════════════════════════════════════════════════════════════════
+
+HORIZONTAL TRANSITIONS
+═══════════════════════════════════════════════════════════════════════════
+
+1. Normal Transition (no markers):
+   
+                  ┌─────┐
+                  │█████│
+                  └─────┘
+
+
+2. Source Transition (incoming arrow from left):
+   
+      ────────►   ┌─────┐
+                  │█████│
+                  └─────┘
+   
+   Meaning: Generates tokens from external source
+   Example: Customer arrivals, new job creation
+
+
+3. Sink Transition (outgoing arrow to right):
+   
+                  ┌─────┐   ────────►
+                  │█████│
+                  └─────┘
+   
+   Meaning: Consumes tokens to external sink
+   Example: Customer departures, job completion
+
+
+4. Source + Sink Transition (both arrows):
+   
+      ────────►   ┌─────┐   ────────►
+                  │█████│
+                  └─────┘
+   
+   Meaning: Both generates and consumes externally
+   Example: Pass-through, exchange point
+
+
+═══════════════════════════════════════════════════════════════════════════
+
+VERTICAL TRANSITIONS
+═══════════════════════════════════════════════════════════════════════════
+
+1. Normal Transition:
+   
+              ┌───┐
+              │███│
+              │███│
+              │███│
+              └───┘
+
+
+2. Source Transition (incoming arrow from top):
+   
+                ▼
+              ┌───┐
+              │███│
+              │███│
+              │███│
+              └───┘
+
+
+3. Sink Transition (outgoing arrow from bottom):
+   
+              ┌───┐
+              │███│
+              │███│
+              │███│
+              └───┘
+                ▼
+
+
+4. Source + Sink Transition:
+   
+                ▼
+              ┌───┐
+              │███│
+              │███│
+              │███│
+              └───┘
+                ▼
+
+
+═══════════════════════════════════════════════════════════════════════════
+
+COMPLETE EXAMPLE: QUEUEING SYSTEM
+═══════════════════════════════════════════════════════════════════════════
+
+External   ────────►  ┌───────┐      ┌─────┐      ┌─────────┐      ┌───────┐  ────────►  External
+Arrivals              │ Queue │ ───► │  T  │ ───► │ Service │ ───► │   T   │             Departures
+                      └───────┘      └─────┘      └─────────┘      └───────┘
+                         (0)                          (1)              Sink
+                       T_Arrive                                     T_Depart
+                        Source
+
+Legend:
+  ◯ Place (circle) - Token storage
+  ■ Transition (rectangle) - Event/action
+  → Arc - Token flow
+  ────────► Arrow marker - External interface
+
+
+═══════════════════════════════════════════════════════════════════════════
+
+RENDERING DETAILS
+═══════════════════════════════════════════════════════════════════════════
+
+Arrow Specifications:
+  • Length: 20 pixels (zoom-compensated)
+  • Head size: 6 pixels (equilateral triangle)
+  • Line width: 2 pixels (zoom-compensated)
+  • Color: Matches transition border color
+  
+Positioning:
+  • Source: Extends from left/top edge
+  • Sink: Extends from right/bottom edge
+  • Both: No overlap, clear separation
+
+Zoom Behavior:
+  • Arrows maintain visual size at all zoom levels
+  • Scale with 1/zoom factor
+  • Always clearly visible
+
+
+═══════════════════════════════════════════════════════════════════════════
+
+COLOR VARIATIONS
+═══════════════════════════════════════════════════════════════════════════
+
+Black Transition (default):
+      ────────►   ┌─────┐   ────────►
+                  │█████│  (black)
+                  └─────┘
+
+Colored Transition (user-set):
+      ────────►   ┌─────┐   ────────►
+                  │█████│  (blue/red/etc)
+                  └─────┘
+  (arrows match border color)
+
+
+═══════════════════════════════════════════════════════════════════════════
+```

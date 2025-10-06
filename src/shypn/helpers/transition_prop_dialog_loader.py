@@ -227,6 +227,16 @@ class TransitionPropDialogLoader(GObject.GObject):
         if priority_spin and hasattr(self.transition_obj, 'priority'):
             priority_spin.set_value(float(self.transition_obj.priority))
         
+        # Source checkbox
+        is_source_check = self.builder.get_object('is_source_check')
+        if is_source_check and hasattr(self.transition_obj, 'is_source'):
+            is_source_check.set_active(self.transition_obj.is_source)
+        
+        # Sink checkbox
+        is_sink_check = self.builder.get_object('is_sink_check')
+        if is_sink_check and hasattr(self.transition_obj, 'is_sink'):
+            is_sink_check.set_active(self.transition_obj.is_sink)
+        
         # Rate entry (simple numeric/expression field)
         rate_entry = self.builder.get_object('rate_entry')
         if rate_entry and hasattr(self.transition_obj, 'rate'):
@@ -345,6 +355,16 @@ class TransitionPropDialogLoader(GObject.GObject):
         if priority_spin and hasattr(self.transition_obj, 'priority'):
             old_priority = self.transition_obj.priority
             self.transition_obj.priority = int(priority_spin.get_value())
+        
+        # Source checkbox
+        is_source_check = self.builder.get_object('is_source_check')
+        if is_source_check and hasattr(self.transition_obj, 'is_source'):
+            self.transition_obj.is_source = is_source_check.get_active()
+        
+        # Sink checkbox
+        is_sink_check = self.builder.get_object('is_sink_check')
+        if is_sink_check and hasattr(self.transition_obj, 'is_sink'):
+            self.transition_obj.is_sink = is_sink_check.get_active()
         
         # Rate entry (simple value - takes precedence over rate_textview if both exist)
         rate_entry = self.builder.get_object('rate_entry')

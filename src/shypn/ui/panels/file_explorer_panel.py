@@ -1005,12 +1005,21 @@ class FileExplorerPanel:
         page_index, drawing_area = self.canvas_loader.add_document(filename=base_name)
         manager = self.canvas_loader.get_canvas_manager(drawing_area)
         if manager:
+            # Restore objects
             manager.places = list(document.places)
             manager.transitions = list(document.transitions)
             manager.arcs = list(document.arcs)
             manager._next_place_id = document._next_place_id
             manager._next_transition_id = document._next_transition_id
             manager._next_arc_id = document._next_arc_id
+            
+            # Restore view state (zoom and pan)
+            if hasattr(document, 'view_state') and document.view_state:
+                manager.zoom = document.view_state.get('zoom', 1.0)
+                manager.pan_x = document.view_state.get('pan_x', 0.0)
+                manager.pan_y = document.view_state.get('pan_y', 0.0)
+                manager._initial_pan_set = True  # Mark as set to prevent auto-centering
+            
             if hasattr(self, 'persistency') and self.persistency:
                 self.persistency.set_filepath(filepath)
                 self.persistency.mark_clean()

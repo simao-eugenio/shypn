@@ -58,6 +58,10 @@ class Transition(PetriNetObject):
         self.guard = None  # Guard function/expression (enables/disables transition)
         self.rate = None  # Rate function for consumption/production dynamics
         self.priority = 0  # Priority for conflict resolution (higher = higher priority)
+        
+        # Source/Sink markers
+        self.is_source = False  # Source transition (generates tokens without input)
+        self.is_sink = False    # Sink transition (consumes tokens without output)
     
     def render(self, cr, transform=None, zoom=1.0):
         """Render the transition using Cairo.
@@ -111,11 +115,134 @@ class Transition(PetriNetObject):
         cr.set_line_width(self.border_width / max(zoom, 1e-6))
         cr.stroke()
         
+        # Draw source/sink markers
+        self._render_source_sink_markers(cr, self.x, self.y, width, height, zoom)
+        
         # Selection rendering moved to ObjectEditingTransforms in src/shypn/api/edit/
         
         # Draw label if provided
         if self.label:
             self._render_label(cr, self.x, self.y, height, self.horizontal, zoom)
+    
+    def _render_source_sink_markers(self, cr, x: float, y: float, width: float, height: float, zoom: float = 1.0):
+        """Render source/sink markers on the transition.
+        
+        Source transitions get an incoming arrow from the left (or top if vertical).
+        Sink transitions get an outgoing arrow to the right (or bottom if vertical).
+        
+        Args:
+            cr: Cairo context
+            x, y: Center position (world coords)
+            width, height: Rectangle dimensions (already swapped if vertical)
+            zoom: Current zoom level (not used - markers scale with zoom)
+        """
+        # Markers scale with zoom (world space) to match transition size
+        arrow_length = 20.0  # Length of arrow in world units
+        arrow_head_size = 6.0  # Size of arrow head in world units
+        line_width = 2.0  # Line width for arrow in world units
+        
+        # Use border color for marker, or black if default
+        if self.border_color != self.DEFAULT_BORDER_COLOR:
+            r, g, b = self.border_color
+        else:
+            r, g, b = (0.0, 0.0, 0.0)  # Black
+        
+        cr.set_source_rgb(r, g, b)
+        cr.set_line_width(line_width)
+        
+        # Source marker (incoming arrow)
+        if self.is_source:
+            if self.horizontal:
+                # Arrow pointing right into left side of transition
+                start_x = x - width / 2 - arrow_length
+                start_y = y
+                end_x = x - width / 2
+                end_y = y
+                
+                # Draw arrow shaft
+                cr.save()
+                cr.move_to(start_x, start_y)
+                cr.line_to(end_x, end_y)
+                cr.stroke()
+                cr.restore()
+                
+                # Draw arrow head (filled triangle)
+                cr.save()
+                cr.move_to(end_x, end_y)
+                cr.line_to(end_x - arrow_head_size, end_y - arrow_head_size / 2)
+                cr.line_to(end_x - arrow_head_size, end_y + arrow_head_size / 2)
+                cr.close_path()
+                cr.fill()
+                cr.restore()
+            else:
+                # Vertical: Arrow pointing down into top side of transition
+                start_x = x
+                start_y = y - height / 2 - arrow_length
+                end_x = x
+                end_y = y - height / 2
+                
+                # Draw arrow shaft
+                cr.save()
+                cr.move_to(start_x, start_y)
+                cr.line_to(end_x, end_y)
+                cr.stroke()
+                cr.restore()
+                
+                # Draw arrow head (filled triangle)
+                cr.save()
+                cr.move_to(end_x, end_y)
+                cr.line_to(end_x - arrow_head_size / 2, end_y - arrow_head_size)
+                cr.line_to(end_x + arrow_head_size / 2, end_y - arrow_head_size)
+                cr.close_path()
+                cr.fill()
+                cr.restore()
+        
+        # Sink marker (outgoing arrow)
+        if self.is_sink:
+            if self.horizontal:
+                # Arrow pointing right from right side of transition
+                start_x = x + width / 2
+                start_y = y
+                end_x = x + width / 2 + arrow_length
+                end_y = y
+                
+                # Draw arrow shaft
+                cr.save()
+                cr.move_to(start_x, start_y)
+                cr.line_to(end_x, end_y)
+                cr.stroke()
+                cr.restore()
+                
+                # Draw arrow head (filled triangle)
+                cr.save()
+                cr.move_to(end_x, end_y)
+                cr.line_to(end_x - arrow_head_size, end_y - arrow_head_size / 2)
+                cr.line_to(end_x - arrow_head_size, end_y + arrow_head_size / 2)
+                cr.close_path()
+                cr.fill()
+                cr.restore()
+            else:
+                # Vertical: Arrow pointing down from bottom side of transition
+                start_x = x
+                start_y = y + height / 2
+                end_x = x
+                end_y = y + height / 2 + arrow_length
+                
+                # Draw arrow shaft
+                cr.save()
+                cr.move_to(start_x, start_y)
+                cr.line_to(end_x, end_y)
+                cr.stroke()
+                cr.restore()
+                
+                # Draw arrow head (filled triangle)
+                cr.save()
+                cr.move_to(end_x, end_y)
+                cr.line_to(end_x - arrow_head_size / 2, end_y - arrow_head_size)
+                cr.line_to(end_x + arrow_head_size / 2, end_y - arrow_head_size)
+                cr.close_path()
+                cr.fill()
+                cr.restore()
     
     def _render_label(self, cr, x: float, y: float, height: float, horizontal: bool, zoom: float = 1.0):
         """Render text label next to the transition.
@@ -197,7 +324,9 @@ class Transition(PetriNetObject):
             "border_color": list(self.border_color),
             "border_width": self.border_width,
             "transition_type": self.transition_type,
-            "priority": self.priority
+            "priority": self.priority,
+            "is_source": self.is_source,
+            "is_sink": self.is_sink
         })
         
         # Serialize behavioral properties (guard, rate, properties dict)
@@ -253,5 +382,11 @@ class Transition(PetriNetObject):
             transition.rate = data["rate"]
         if "properties" in data:
             transition.properties = data["properties"]
+        
+        # Restore source/sink markers
+        if "is_source" in data:
+            transition.is_source = data["is_source"]
+        if "is_sink" in data:
+            transition.is_sink = data["is_sink"]
         
         return transition

@@ -1,7 +1,7 @@
 {
   "version": "2.0",
   "metadata": {
-    "created": "2025-10-05T13:44:14.199057",
+    "created": "2025-10-05T23:55:30.460095",
     "object_counts": {
       "places": 2,
       "transitions": 1,
@@ -17,7 +17,7 @@
       "x": 1683.0,
       "y": 1083.0,
       "radius": 25.0,
-      "marking": 25,
+      "marking": 1,
       "initial_marking": 25,
       "border_color": [
         0.0,
@@ -34,7 +34,7 @@
       "x": 1956.0,
       "y": 1087.0,
       "radius": 25.0,
-      "marking": 0,
+      "marking": 24,
       "initial_marking": 0,
       "border_color": [
         0.0,
@@ -67,7 +67,7 @@
         0.0
       ],
       "border_width": 3.0,
-      "transition_type": "continuous",
+      "transition_type": "stochastic",
       "priority": 0,
       "guard": 1,
       "rate": "sigmoid(t, 10, 0.5)",

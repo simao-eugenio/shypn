@@ -52,7 +52,12 @@ class Arc(PetriNetObject):
         # Behavioral properties (formula support)
         self.threshold = None  # Threshold formula (can be dict, expression, or value)
         
-        # Control points for curved arcs (optional)
+        # Curved arc support
+        self.is_curved = False  # Whether arc is curved or straight
+        self.control_offset_x = 0.0  # X offset from midpoint for control point
+        self.control_offset_y = 0.0  # Y offset from midpoint for control point
+        
+        # Control points for curved arcs (optional, legacy)
         self.control_points: List[Tuple[float, float]] = []
     
     @property
@@ -203,25 +208,55 @@ class Arc(PetriNetObject):
         end_world_x, end_world_y = self._get_boundary_point(
             self.target, tgt_world_x, tgt_world_y, -dx_world, -dy_world)
         
+        # Calculate control point for curved arcs
+        if self.is_curved:
+            mid_x = (start_world_x + end_world_x) / 2
+            mid_y = (start_world_y + end_world_y) / 2
+            control_x = mid_x + self.control_offset_x
+            control_y = mid_y + self.control_offset_y
+        
         # Add glow effect for colored arcs (CSS-like styling)
         if self.color != self.DEFAULT_COLOR:
             # Draw outer glow (subtle shadow effect)
-            cr.move_to(start_world_x, start_world_y)
-            cr.line_to(end_world_x, end_world_y)
+            if self.is_curved:
+                cr.move_to(start_world_x, start_world_y)
+                cr.curve_to(control_x, control_y, control_x, control_y, end_world_x, end_world_y)
+            else:
+                cr.move_to(start_world_x, start_world_y)
+                cr.line_to(end_world_x, end_world_y)
             r, g, b = self.color
             cr.set_source_rgba(r, g, b, 0.3)  # Semi-transparent color
             cr.set_line_width((self.width + 2) / max(zoom, 1e-6))
             cr.stroke()
         
-        # Draw line in world coordinates
-        cr.move_to(start_world_x, start_world_y)
-        cr.line_to(end_world_x, end_world_y)
+        # Draw line in world coordinates (straight or curved)
+        if self.is_curved:
+            cr.move_to(start_world_x, start_world_y)
+            cr.curve_to(control_x, control_y, control_x, control_y, end_world_x, end_world_y)
+        else:
+            cr.move_to(start_world_x, start_world_y)
+            cr.line_to(end_world_x, end_world_y)
         cr.set_source_rgb(*self.color)
         cr.set_line_width(self.width / max(zoom, 1e-6))  # Compensate for zoom
         cr.stroke()
         
+        # Calculate direction at end point for arrowhead
+        if self.is_curved:
+            # For curved arc, calculate tangent at end point
+            # Using simple approximation: direction from control point to end
+            arrow_dx = end_world_x - control_x
+            arrow_dy = end_world_y - control_y
+            arrow_length = math.sqrt(arrow_dx * arrow_dx + arrow_dy * arrow_dy)
+            if arrow_length > 1e-6:
+                arrow_dx /= arrow_length
+                arrow_dy /= arrow_length
+            else:
+                arrow_dx, arrow_dy = dx_world, dy_world
+        else:
+            arrow_dx, arrow_dy = dx_world, dy_world
+        
         # Draw arrowhead at target (with zoom compensation)
-        self._render_arrowhead(cr, end_world_x, end_world_y, dx_world, dy_world, zoom)
+        self._render_arrowhead(cr, end_world_x, end_world_y, arrow_dx, arrow_dy, zoom)
         
         # Draw weight label if > 1
         if self.weight > 1:
@@ -406,6 +441,7 @@ class Arc(PetriNetObject):
         """Check if a point is near this arc.
         
         Arcs are thin and harder to click, so this uses a tolerance distance.
+        Takes into account parallel arc offsets for accurate hit detection.
         
         Args:
             x, y: Point coordinates (world space)
@@ -417,30 +453,89 @@ class Arc(PetriNetObject):
         src_x, src_y = self.source.x, self.source.y
         tgt_x, tgt_y = self.target.x, self.target.y
         
-        # Calculate line segment parameters
-        dx = tgt_x - src_x
-        dy = tgt_y - src_y
-        length_sq = dx * dx + dy * dy
-        
-        if length_sq < 1e-6:
-            return False  # Degenerate arc
-        
-        # Calculate closest point on line segment to (x, y)
-        # Parameter t represents position along line: 0=start, 1=end
-        t = max(0.0, min(1.0, ((x - src_x) * dx + (y - src_y) * dy) / length_sq))
-        
-        # Closest point on segment
-        closest_x = src_x + t * dx
-        closest_y = src_y + t * dy
-        
-        # Distance from point to line segment
-        dist_sq = (x - closest_x) ** 2 + (y - closest_y) ** 2
-        
         # Tolerance: 10 pixels in world space (generous for clicking)
-        # This should be adjusted based on zoom, but for now use fixed tolerance
         tolerance = 10.0
         
-        return dist_sq <= (tolerance * tolerance)
+        # Check if this arc has parallel arcs and get offset
+        offset_distance = 0.0
+        if hasattr(self, '_manager') and self._manager:
+            try:
+                parallels = self._manager.detect_parallel_arcs(self)
+                if parallels:
+                    offset_distance = self._manager.calculate_arc_offset(self, parallels)
+            except (AttributeError, Exception):
+                pass
+        
+        # Apply parallel arc offset to source and target positions
+        # Important: Use the original (non-normalized) direction to calculate perpendicular
+        # This ensures consistent offset direction regardless of arc direction
+        if abs(offset_distance) > 1e-6:
+            # Calculate perpendicular direction (same as in render())
+            dx = tgt_x - src_x
+            dy = tgt_y - src_y
+            length = (dx * dx + dy * dy) ** 0.5
+            
+            if length > 1e-6:
+                # Perpendicular vector (90° counterclockwise rotation)
+                perp_x = -dy / length
+                perp_y = dx / length
+                
+                # Apply offset
+                src_x += perp_x * offset_distance
+                src_y += perp_y * offset_distance
+                tgt_x += perp_x * offset_distance
+                tgt_y += perp_y * offset_distance
+        
+        # Handle curved arcs differently
+        if self.is_curved:
+            # Calculate control point for quadratic Bezier curve
+            mid_x = (src_x + tgt_x) / 2
+            mid_y = (src_y + tgt_y) / 2
+            control_x = mid_x + self.control_offset_x
+            control_y = mid_y + self.control_offset_y
+            
+            # Sample points along the Bezier curve and find minimum distance
+            min_dist_sq = float('inf')
+            num_samples = 20  # More samples for better accuracy
+            
+            for i in range(num_samples + 1):
+                t = i / num_samples
+                # Quadratic Bezier formula: B(t) = (1-t)^2 * P0 + 2(1-t)t * P1 + t^2 * P2
+                one_minus_t = 1.0 - t
+                curve_x = (one_minus_t * one_minus_t * src_x + 
+                          2 * one_minus_t * t * control_x + 
+                          t * t * tgt_x)
+                curve_y = (one_minus_t * one_minus_t * src_y + 
+                          2 * one_minus_t * t * control_y + 
+                          t * t * tgt_y)
+                
+                # Distance from point to this sample point on curve
+                dist_sq = (x - curve_x) ** 2 + (y - curve_y) ** 2
+                min_dist_sq = min(min_dist_sq, dist_sq)
+            
+            return min_dist_sq <= (tolerance * tolerance)
+        else:
+            # Straight arc: use line segment distance
+            # Calculate line segment parameters
+            dx = tgt_x - src_x
+            dy = tgt_y - src_y
+            length_sq = dx * dx + dy * dy
+            
+            if length_sq < 1e-6:
+                return False  # Degenerate arc
+            
+            # Calculate closest point on line segment to (x, y)
+            # Parameter t represents position along line: 0=start, 1=end
+            t = max(0.0, min(1.0, ((x - src_x) * dx + (y - src_y) * dy) / length_sq))
+            
+            # Closest point on segment
+            closest_x = src_x + t * dx
+            closest_y = src_y + t * dy
+            
+            # Distance from point to line segment
+            dist_sq = (x - closest_x) ** 2 + (y - closest_y) ** 2
+            
+            return dist_sq <= (tolerance * tolerance)
     
     def set_position(self, x: float, y: float):
         """Arcs don't have a direct position (they connect other objects).
