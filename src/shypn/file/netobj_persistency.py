@@ -202,7 +202,6 @@ class NetObjPersistency:
             document = DocumentModel.load_from_file(filepath)
             self.set_filepath(filepath)
             self.mark_clean()
-            print(f'[Persistency] Places: {len(document.places)}, ' + f'Transitions: {len(document.transitions)}, ' + f'Arcs: {len(document.arcs)}')
             if self.on_file_loaded:
                 self.on_file_loaded(filepath, document)
             self._show_success_dialog('File loaded successfully', f'Loaded from:\n{filepath}\n\n' + f'Places: {len(document.places)}\n' + f'Transitions: {len(document.transitions)}\n' + f'Arcs: {len(document.arcs)}')

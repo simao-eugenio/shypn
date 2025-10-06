@@ -8,14 +8,10 @@ Example:
     analyzer = LocalityAnalyzer(model)
     analysis = analyzer.analyze_locality(locality)
     
-    print(f"Total places: {analysis['place_count']}")
-    print(f"Input tokens: {analysis['input_tokens']}")
-    print(f"Can fire: {analysis['can_fire']}")
     
     # Get detailed description
     description = analyzer.get_token_flow_description(locality)
     for line in description:
-        print(line)
 """
 
 from typing import Dict, List, Any, Tuple
@@ -45,13 +41,9 @@ class LocalityAnalyzer:
         locality = detector.get_locality_for_transition(transition)
         analysis = analyzer.analyze_locality(locality)
         
-        print(f"Place count: {analysis['place_count']}")
-        print(f"Token balance: {analysis['token_balance']}")
-        print(f"Can fire: {analysis['can_fire']}")
         
         # Get detailed flow description
         flow = analyzer.get_token_flow_description(locality)
-        print("\n".join(flow))
     """
     
     def __init__(self, model: Any):
@@ -95,10 +87,6 @@ class LocalityAnalyzer:
             analysis = analyzer.analyze_locality(locality)
             
             if analysis['is_valid']:
-                print(f"Summary: {analysis['summary']}")
-                print(f"Tokens: {analysis['input_tokens']} → {analysis['output_tokens']}")
-                print(f"Balance: {analysis['token_balance']}")
-                print(f"Can fire: {analysis['can_fire']}")
         """
         return {
             'is_valid': locality.is_valid,
@@ -209,7 +197,6 @@ class LocalityAnalyzer:
         Example:
             lines = analyzer.get_token_flow_description(locality)
             for line in lines:
-                print(line)
             
             # Output:
             # Locality for T1:

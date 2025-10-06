@@ -416,7 +416,6 @@ class DocumentModel:
         # Check version (for future compatibility)
         version = data.get("version", "1.0")
         if not version.startswith("2."):
-            print(f"Warning: Loading document version {version}, expected 2.x")
         
         # Restore places first (they have no dependencies)
         places_dict = {}
@@ -491,8 +490,5 @@ class DocumentModel:
             data = json.load(f)
         
         document = cls.from_dict(data)
-        print(f"  - {len(document.places)} places")
-        print(f"  - {len(document.transitions)} transitions")
-        print(f"  - {len(document.arcs)} arcs")
         
         return document

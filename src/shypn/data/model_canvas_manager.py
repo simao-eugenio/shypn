@@ -332,15 +332,13 @@ class ModelCanvasManager:
             # Same direction: same source and target
             if (other.source == arc.source and other.target == arc.target):
                 parallels.append(other)
-                print(f"[ParallelDetect] Found same-direction parallel: {arc.name} and {other.name}")
             
             # Opposite direction: reversed source and target
             elif (other.source == arc.target and other.target == arc.source):
                 parallels.append(other)
-                print(f"[ParallelDetect] Found opposite-direction parallel: {arc.name} and {other.name}")
         
         if not parallels:
-            print(f"[ParallelDetect] No parallels found for {arc.name}")
+            pass  # No parallels found
         
         return parallels
     
@@ -464,7 +462,6 @@ class ModelCanvasManager:
         """
         try:
             index = self.arcs.index(old_arc)
-            print(f'[Manager] Replacing arc at index {index}: {type(old_arc).__name__} -> {type(new_arc).__name__}')
             self.arcs[index] = new_arc
             
             # Ensure new arc has manager reference and change callback
@@ -473,10 +470,8 @@ class ModelCanvasManager:
             
             self.mark_modified()
             self.mark_dirty()
-            print(f'[Manager] Arc replaced successfully, _manager and on_changed set')
         except ValueError:
             # Arc not found in list - may have been deleted
-            print(f'[Manager] ERROR: Arc not found in list!')
             pass
     
     def ensure_arc_references(self):
@@ -488,10 +483,8 @@ class ModelCanvasManager:
         for arc in self.arcs:
             if not hasattr(arc, '_manager') or arc._manager is None:
                 arc._manager = self
-                print(f'[Manager] Fixed missing _manager reference for {arc.name}')
             if not hasattr(arc, 'on_changed') or arc.on_changed is None:
                 arc.on_changed = self._on_object_changed
-                print(f'[Manager] Fixed missing on_changed callback for {arc.name}')
     
     def get_all_objects(self):
         """Get all Petri net objects in rendering order.
@@ -594,8 +587,6 @@ class ModelCanvasManager:
         a1 = self.add_arc(p1, t1, weight=1)
         a2 = self.add_arc(t1, p2, weight=1)
         
-        print(f"Created test network: {p1.name} → {t1.name} → {p2.name}")
-        print(f"Total objects: {len(self.places)} places, {len(self.transitions)} transitions, {len(self.arcs)} arcs")
     
     # ==================== Zoom Operations ====================
     

@@ -498,7 +498,6 @@ class ModelCanvasLoader:
             if arc_state['source'] is None:
                 if isinstance(clicked_obj, (Place, Transition)):
                     arc_state['source'] = clicked_obj
-                    print(f'Arc creation: source {clicked_obj.name} selected')
                     widget.queue_draw()
                 return True
             else:
@@ -508,10 +507,9 @@ class ModelCanvasLoader:
                     return True
                 try:
                     arc = manager.add_arc(source, target)
-                    print(f'Created {arc.name}: {source.name} → {target.name}')
                     widget.queue_draw()
                 except ValueError as e:
-                    print(f'Cannot create arc: {e}')
+                    pass  # Silently ignore arc creation errors
                 finally:
                     arc_state['source'] = None
                     widget.queue_draw()
@@ -522,11 +520,9 @@ class ModelCanvasLoader:
                 world_x, world_y = manager.screen_to_world(event.x, event.y)
                 if tool == 'place':
                     place = manager.add_place(world_x, world_y)
-                    print(f'Created {place.name} at ({world_x:.1f}, {world_y:.1f})')
                     widget.queue_draw()
                 elif tool == 'transition':
                     transition = manager.add_transition(world_x, world_y)
-                    print(f'Created {transition.name} at ({world_x:.1f}, {world_y:.1f})')
                     widget.queue_draw()
                 return True
         tool = manager.get_tool() if manager.is_tool_active() else None
@@ -557,11 +553,9 @@ class ModelCanvasLoader:
                 if is_double_click:
                     if clicked_obj.selected:
                         manager.selection_manager.enter_edit_mode(clicked_obj, manager=manager)
-                        print(f'{clicked_obj.name} entered EDIT mode (transform handles visible)')
                     else:
                         manager.selection_manager.toggle_selection(clicked_obj, multi=is_ctrl, manager=manager)
                         manager.selection_manager.enter_edit_mode(clicked_obj, manager=manager)
-                        print(f'{clicked_obj.name} selected and entered EDIT mode')
                     click_state['last_click_time'] = 0.0
                     click_state['last_click_obj'] = None
                     widget.queue_draw()
@@ -589,7 +583,6 @@ class ModelCanvasLoader:
                             current_edit_target = mgr.selection_manager.edit_target
                             if current_edit_target != obj:
                                 mgr.selection_manager.exit_edit_mode()
-                                print(f'Exited EDIT mode (selected different object)')
                         mgr.selection_manager.toggle_selection(obj, multi=ctrl, manager=mgr)
                         status = 'selected' if obj.selected else 'deselected'
                         multi_str = ' (multi)' if ctrl else ''
@@ -606,7 +599,6 @@ class ModelCanvasLoader:
                 manager.rectangle_selection.start(world_x, world_y)
                 if manager.selection_manager.is_edit_mode():
                     manager.selection_manager.exit_edit_mode()
-                    print('Exited EDIT mode (clicked empty space)')
                 state['active'] = True
                 state['button'] = event.button
                 state['start_x'] = event.x
@@ -639,7 +631,6 @@ class ModelCanvasLoader:
             if bounds:
                 count = manager.rectangle_selection.select_objects(manager, multi=is_ctrl)
                 multi_str = ' (multi)' if is_ctrl else ''
-                print(f'Rectangle selection: {count} objects selected{multi_str}')
             state['is_rect_selecting'] = False
             widget.queue_draw()
         if event.button == 3 and (not state['is_panning']):
@@ -728,12 +719,10 @@ class ModelCanvasLoader:
         """Handle key press events (GTK3)."""
         if event.keyval == Gdk.KEY_Escape:
             if manager.selection_manager.cancel_drag():
-                print('Drag cancelled - positions restored')
                 widget.queue_draw()
                 return True
             if manager.selection_manager.is_edit_mode():
                 manager.selection_manager.exit_edit_mode()
-                print('Exited EDIT mode → NORMAL mode')
                 widget.queue_draw()
                 return True
             if hasattr(self, '_canvas_context_menu') and self._canvas_context_menu:
@@ -1143,15 +1132,12 @@ class ModelCanvasLoader:
         if isinstance(obj, Place):
             if obj in manager.places:
                 manager.places.remove(obj)
-                print(f'Deleted {obj.name}')
         elif isinstance(obj, Transition):
             if obj in manager.transitions:
                 manager.transitions.remove(obj)
-                print(f'Deleted {obj.name}')
         elif isinstance(obj, Arc):
             if obj in manager.arcs:
                 manager.arcs.remove(obj)
-                print(f'Deleted {obj.name}')
         if obj.selected:
             manager.selection_manager.deselect(obj)
         if manager.selection_manager.is_edit_mode() and manager.selection_manager.edit_target == obj:
@@ -1170,7 +1156,6 @@ class ModelCanvasLoader:
         if not obj.selected:
             manager.selection_manager.select(obj, multi=False, manager=manager)
         manager.selection_manager.enter_edit_mode(obj, manager=manager)
-        print(f'{obj.name} entered EDIT mode')
         drawing_area.queue_draw()
 
     def _on_object_properties(self, obj, manager, drawing_area):
@@ -1282,7 +1267,6 @@ class ModelCanvasLoader:
             new_weight = int(weight_spin.get_value())
             if new_weight != arc.weight:
                 arc.set_weight(new_weight)
-                print(f'Updated {arc.name} weight: {new_weight}')
                 manager.mark_modified()
                 drawing_area.queue_draw()
         dialog.destroy()
@@ -1297,11 +1281,8 @@ class ModelCanvasLoader:
         """
         from shypn.utils.arc_transform import make_curved
         
-        print(f'[Transform] Making {arc.name} curved (type={type(arc).__name__})')
         new_arc = make_curved(arc)
-        print(f'[Transform] Created new arc: type={type(new_arc).__name__}')
         manager.replace_arc(arc, new_arc)
-        print(f'[Transform] Replaced arc in manager, triggering redraw')
         drawing_area.queue_draw()
 
     def _on_arc_make_straight(self, arc, manager, drawing_area):
@@ -1314,11 +1295,8 @@ class ModelCanvasLoader:
         """
         from shypn.utils.arc_transform import make_straight
         
-        print(f'[Transform] Making {arc.name} straight (type={type(arc).__name__})')
         new_arc = make_straight(arc)
-        print(f'[Transform] Created new arc: type={type(new_arc).__name__}')
         manager.replace_arc(arc, new_arc)
-        print(f'[Transform] Replaced arc in manager, triggering redraw')
         drawing_area.queue_draw()
 
     def _on_arc_convert_to_inhibitor(self, arc, manager, drawing_area):
@@ -1331,17 +1309,13 @@ class ModelCanvasLoader:
         """
         from shypn.utils.arc_transform import convert_to_inhibitor
         
-        print(f'[Transform] Converting {arc.name} to inhibitor (type={type(arc).__name__})')
         
         try:
             new_arc = convert_to_inhibitor(arc)
-            print(f'[Transform] Created new arc: type={type(new_arc).__name__}')
             manager.replace_arc(arc, new_arc)
-            print(f'[Transform] Replaced arc in manager, triggering redraw')
             drawing_area.queue_draw()
         except ValueError as e:
             # Invalid transformation (e.g., Transition → Place)
-            print(f'[Transform] ERROR: {e}')
             self._show_error_dialog(str(e))
             return
 
@@ -1355,11 +1329,8 @@ class ModelCanvasLoader:
         """
         from shypn.utils.arc_transform import convert_to_normal
         
-        print(f'[Transform] Converting {arc.name} to normal (type={type(arc).__name__})')
         new_arc = convert_to_normal(arc)
-        print(f'[Transform] Created new arc: type={type(new_arc).__name__}')
         manager.replace_arc(arc, new_arc)
-        print(f'[Transform] Replaced arc in manager, triggering redraw')
         drawing_area.queue_draw()
     
     def _show_error_dialog(self, message):

@@ -295,7 +295,6 @@ def setup_color_picker_in_dialog(builder, container_id, current_color=None, butt
 if __name__ == '__main__':
     def on_color_selected(picker, color_rgb):
         r, g, b = color_rgb
-        print(f"Selected color: RGB({r:.2f}, {g:.2f}, {b:.2f}) = ({int(r*255)}, {int(g*255)}, {int(b*255)})")
     
     window = Gtk.Window(title="Color Picker Test")
     window.set_default_size(600, 100)
