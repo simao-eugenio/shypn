@@ -581,6 +581,24 @@ class ModelCanvasLoader:
                     state['is_panning'] = False
                     state['is_rect_selecting'] = False
                 if is_double_click:
+                    # Check if this is an arc with parallel arcs (legacy parallel arc system)
+                    from shypn.netobjs import Arc
+                    is_parallel_arc = False
+                    if isinstance(clicked_obj, Arc):
+                        parallels = manager.detect_parallel_arcs(clicked_obj)
+                        is_parallel_arc = len(parallels) > 0
+                    
+                    # Prevent double-click edit mode for parallel arcs
+                    if is_parallel_arc:
+                        # Just select the arc, don't enter edit mode
+                        if not clicked_obj.selected:
+                            manager.selection_manager.toggle_selection(clicked_obj, multi=is_ctrl, manager=manager)
+                        click_state['last_click_time'] = 0.0
+                        click_state['last_click_obj'] = None
+                        widget.queue_draw()
+                        return True
+                    
+                    # Normal double-click behavior for non-parallel objects
                     if clicked_obj.selected:
                         manager.selection_manager.enter_edit_mode(clicked_obj, manager=manager)
                     else:
@@ -916,7 +934,20 @@ class ModelCanvasLoader:
         separator = Gtk.SeparatorMenuItem()
         separator.show()
         menu.append(separator)
-        menu_items = [('Edit Properties...', lambda: self._on_object_properties(obj, manager, drawing_area)), ('Edit Mode (Double-click)', lambda: self._on_object_edit_mode(obj, manager, drawing_area)), None, ('Delete', lambda: self._on_object_delete(obj, manager, drawing_area))]
+        
+        # Check if this is a parallel arc (for disabling edit mode)
+        is_parallel_arc = False
+        if isinstance(obj, Arc):
+            parallels = manager.detect_parallel_arcs(obj)
+            is_parallel_arc = len(parallels) > 0
+        
+        # Build menu items list
+        if is_parallel_arc:
+            # For parallel arcs, don't include "Edit Mode" option
+            menu_items = [('Edit Properties...', lambda: self._on_object_properties(obj, manager, drawing_area)), None, ('Delete', lambda: self._on_object_delete(obj, manager, drawing_area))]
+        else:
+            # For normal objects, include "Edit Mode" option
+            menu_items = [('Edit Properties...', lambda: self._on_object_properties(obj, manager, drawing_area)), ('Edit Mode (Double-click)', lambda: self._on_object_edit_mode(obj, manager, drawing_area)), None, ('Delete', lambda: self._on_object_delete(obj, manager, drawing_area))]
         if isinstance(obj, Transition):
             type_submenu_item = Gtk.MenuItem(label='Change Type ►')
             type_submenu = Gtk.Menu()
