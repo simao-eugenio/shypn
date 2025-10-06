@@ -282,6 +282,7 @@ class PredefinedZoom:
             center_x = self.canvas_manager.viewport_width / 2
             center_y = self.canvas_manager.viewport_height / 2
             self.canvas_manager.zoom_in(center_x, center_y)
+            self.canvas_manager.save_view_state_to_file()
             self._update_zoom_display()
             if self.drawing_area:
                 self.drawing_area.queue_draw()
@@ -293,6 +294,7 @@ class PredefinedZoom:
             center_x = self.canvas_manager.viewport_width / 2
             center_y = self.canvas_manager.viewport_height / 2
             self.canvas_manager.zoom_out(center_x, center_y)
+            self.canvas_manager.save_view_state_to_file()
             self._update_zoom_display()
             if self.drawing_area:
                 self.drawing_area.queue_draw()
@@ -316,6 +318,7 @@ class PredefinedZoom:
             center_x = self.canvas_manager.viewport_width / 2
             center_y = self.canvas_manager.viewport_height / 2
             self.canvas_manager.set_zoom(level, center_x, center_y)
+            self.canvas_manager.save_view_state_to_file()
             self._update_zoom_display()
             if self.drawing_area:
                 self.drawing_area.queue_draw()
