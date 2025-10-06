@@ -61,12 +61,39 @@ def main(argv=None):
 	app = Gtk.Application(application_id='org.shypn.dockdemo')
 
 	def on_activate(a):
+		# Load workspace settings
+		from shypn.workspace_settings import WorkspaceSettings
+		workspace_settings = WorkspaceSettings()
+		
 		# Load main window
 		main_builder = Gtk.Builder.new_from_file(UI_PATH)
 		window = main_builder.get_object('main_window')
 		if window is None:
 			print('ERROR: `main_window` object not found in UI file.', file=sys.stderr)
 			sys.exit(3)
+		
+		# Restore window geometry
+		geom = workspace_settings.get_window_geometry()
+		window.set_default_size(geom.get('width', 1200), geom.get('height', 800))
+		if geom.get('x') is not None and geom.get('y') is not None:
+			window.move(geom['x'], geom['y'])
+		if geom.get('maximized', False):
+			window.maximize()
+		
+		# Add double-click on header bar to toggle maximize
+		header_bar = main_builder.get_object('header_bar')
+		if header_bar:
+			def on_header_bar_button_press(widget, event):
+				"""Handle double-click on header bar to toggle maximize."""
+				if event.type == Gdk.EventType.DOUBLE_BUTTON_PRESS and event.button == 1:
+					if window.is_maximized():
+						window.unmaximize()
+					else:
+						window.maximize()
+					return True
+				return False
+			
+			header_bar.connect('button-press-event', on_header_bar_button_press)
 
 		# Load model canvas
 		try:
@@ -94,9 +121,37 @@ def main(argv=None):
 			print('ERROR: main_workspace not found in main window', file=sys.stderr)
 			sys.exit(9)
 		
-		# Add canvas to workspace
+		# Add canvas to workspace (expands to fill space)
 		canvas_container = model_canvas_loader.container
 		main_workspace.pack_start(canvas_container, True, True, 0)  # GTK3 uses pack_start
+		
+		# Create and add status bar at bottom (after canvas)
+		status_bar = Gtk.Statusbar()
+		status_bar.set_visible(True)
+		status_bar.set_margin_start(6)
+		status_bar.set_margin_end(6)
+		status_bar.set_margin_top(3)
+		status_bar.set_margin_bottom(3)
+		main_workspace.pack_start(status_bar, False, True, 0)  # Non-expanding, stays at bottom
+		
+		# Initialize status bar context
+		status_context_id = status_bar.get_context_id("main")
+		
+		# Helper function to update status bar
+		def update_status(message):
+			"""Update the status bar with a message."""
+			if status_bar and status_context_id:
+				status_bar.pop(status_context_id)
+				if message:
+					status_bar.push(status_context_id, message)
+		
+		# Set initial status
+		update_status("Ready")
+		
+		# Wire status bar to canvas loader
+		model_canvas_loader.status_bar = status_bar
+		model_canvas_loader.status_context_id = status_context_id
+		model_canvas_loader.update_status = update_status
 
 		# Load left panel via its loader
 		try:
@@ -133,8 +188,10 @@ def main(argv=None):
 				Args:
 					filepath: Full path to the file to open
 				"""
+				update_status(f"Opening {os.path.basename(filepath)}...")
 				# Delegate to FileExplorerPanel which handles all file loading logic
 				file_explorer._open_file_from_path(filepath)
+				update_status(f"Opened {os.path.basename(filepath)}")
 			
 			file_explorer.on_file_open_requested = on_file_open_requested
 
@@ -294,6 +351,126 @@ def main(argv=None):
 
 		if right_toggle is not None:
 			right_toggle.connect('toggled', on_right_toggle)
+		
+		# Get minimize/maximize buttons
+		minimize_button = main_builder.get_object('minimize_button')
+		maximize_button = main_builder.get_object('maximize_button')
+		maximize_image = main_builder.get_object('maximize_image')
+		
+		# Define minimize handler
+		def on_minimize_clicked(button):
+			"""Minimize (iconify) the window."""
+			window.iconify()
+		
+		# Define maximize/restore handler
+		def on_maximize_clicked(button):
+			"""Toggle between maximized and normal window state."""
+			if window.is_maximized():
+				window.unmaximize()
+				# Update icon to maximize
+				if maximize_image:
+					maximize_image.set_from_icon_name('window-maximize-symbolic', Gtk.IconSize.BUTTON)
+				button.set_tooltip_text('Maximize window')
+			else:
+				window.maximize()
+				# Update icon to restore
+				if maximize_image:
+					maximize_image.set_from_icon_name('window-restore-symbolic', Gtk.IconSize.BUTTON)
+				button.set_tooltip_text('Restore window')
+		
+		# Connect minimize/maximize buttons
+		if minimize_button is not None:
+			minimize_button.connect('clicked', on_minimize_clicked)
+		
+		if maximize_button is not None:
+			maximize_button.connect('clicked', on_maximize_clicked)
+		
+		# Save window geometry on close and check for unsaved changes
+		def on_window_delete(window, event):
+			"""Handle window close event.
+			
+			1. Check for unsaved changes in all open document tabs
+			2. Prompt user to save if needed for each dirty document
+			3. Save window geometry if closing is allowed
+			
+			Returns:
+				bool: True to prevent closing, False to allow closing
+			"""
+			# Check for unsaved changes in all tabs
+			if model_canvas_loader and hasattr(model_canvas_loader, 'notebook'):
+				notebook = model_canvas_loader.notebook
+				num_pages = notebook.get_n_pages()
+				
+				# Check each tab for unsaved changes
+				for page_num in range(num_pages):
+					# Switch to this tab to make it active (so persistency tracks the right document)
+					notebook.set_current_page(page_num)
+					
+					# Use the canvas loader's existing check logic
+					# This will prompt the user for each dirty document
+					if persistency and persistency.is_dirty:
+						# Prompt user about unsaved changes
+						dialog = Gtk.MessageDialog(
+							parent=window,
+							flags=Gtk.DialogFlags.MODAL,
+							message_type=Gtk.MessageType.WARNING,
+							buttons=Gtk.ButtonsType.NONE,
+							text='Unsaved changes'
+						)
+						dialog.format_secondary_text(
+							f"Document '{persistency.get_display_name()}' has unsaved changes.\n"
+							"Do you want to save before closing?"
+						)
+						dialog.add_button('Cancel', Gtk.ResponseType.CANCEL)
+						dialog.add_button('Close Without Saving', Gtk.ResponseType.NO)
+						dialog.add_button('Save', Gtk.ResponseType.YES)
+						dialog.set_default_response(Gtk.ResponseType.YES)
+						
+						response = dialog.run()
+						dialog.destroy()
+						
+						if response == Gtk.ResponseType.YES:
+							# Get the current page and its manager
+							page_widget = notebook.get_nth_page(page_num)
+							drawing_area = None
+							if isinstance(page_widget, Gtk.Overlay):
+								scrolled = page_widget.get_child()
+								if isinstance(scrolled, Gtk.ScrolledWindow):
+									drawing_area = scrolled.get_child()
+									if hasattr(drawing_area, 'get_child'):
+										drawing_area = drawing_area.get_child()
+							
+							if drawing_area and drawing_area in model_canvas_loader.canvas_managers:
+								manager = model_canvas_loader.canvas_managers[drawing_area]
+								document = manager.to_document_model() if hasattr(manager, 'to_document_model') else None
+								
+								if document:
+									# Check if it's using default filename
+									is_default_filename = getattr(manager, '_is_default_filename', False)
+									
+									# Attempt to save
+									success = persistency.save_document(
+										document,
+										save_as=False,
+										is_default_filename=is_default_filename
+									)
+									if not success:
+										# Save failed or was cancelled - prevent closing
+										return True
+						elif response == Gtk.ResponseType.CANCEL:
+							# User cancelled - prevent closing
+							return True
+						# else: response == NO, discard changes for this document and continue
+			
+			# No unsaved changes or user chose to discard/save all - save window geometry
+			width, height = window.get_size()
+			x, y = window.get_position()
+			maximized = window.is_maximized()
+			workspace_settings.set_window_geometry(width, height, x, y, maximized)
+			
+			return False  # Allow window to close
+		
+		window.connect('delete-event', on_window_delete)
 
 		# Set up and present the window
 		if isinstance(window, Gtk.ApplicationWindow):

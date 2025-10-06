@@ -34,6 +34,13 @@ class DocumentModel:
         self._next_place_id = 1
         self._next_transition_id = 1
         self._next_arc_id = 1
+        
+        # View state (zoom and pan position)
+        self.view_state = {
+            "zoom": 1.0,
+            "pan_x": 0.0,
+            "pan_y": 0.0
+        }
     
     # ============================================================================
     # Object Creation
@@ -392,6 +399,7 @@ class DocumentModel:
                     "arcs": len(self.arcs)
                 }
             },
+            "view_state": self.view_state,
             "places": [place.to_dict() for place in self.places],
             "transitions": [transition.to_dict() for transition in self.transitions],
             "arcs": [arc.to_dict() for arc in self.arcs]
@@ -442,6 +450,10 @@ class DocumentModel:
             document.arcs.append(arc)
             # Update next ID counter
             document._next_arc_id = max(document._next_arc_id, arc.id + 1)
+        
+        # Restore view state if present
+        if "view_state" in data:
+            document.view_state = data["view_state"]
         
         return document
     

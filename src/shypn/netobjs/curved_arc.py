@@ -196,15 +196,20 @@ class CurvedArc(Arc):
         src_world_x, src_world_y = self.source.x, self.source.y
         tgt_world_x, tgt_world_y = self.target.x, self.target.y
         
-        # Check for parallel arcs and calculate offset for control point
-        offset_distance = None  # None = use default 20% offset
-        if hasattr(self, '_manager') and self._manager:
-            parallels = self._manager.detect_parallel_arcs(self)
-            if parallels:
-                offset_distance = self._manager.calculate_arc_offset(self, parallels)
-        
-        # Calculate control point with optional offset
-        control_point = self._calculate_curve_control_point(offset=offset_distance)
+        # Check if manual control point is set (from transformation)
+        if hasattr(self, 'manual_control_point') and self.manual_control_point is not None:
+            # Use manual control point directly
+            control_point = self.manual_control_point
+        else:
+            # Check for parallel arcs and calculate offset for control point
+            offset_distance = None  # None = use default 20% offset
+            if hasattr(self, '_manager') and self._manager:
+                parallels = self._manager.detect_parallel_arcs(self)
+                if parallels:
+                    offset_distance = self._manager.calculate_arc_offset(self, parallels)
+            
+            # Calculate control point with optional offset
+            control_point = self._calculate_curve_control_point(offset=offset_distance)
         
         if control_point is None:
             # Degenerate case: fall back to straight line
@@ -408,15 +413,20 @@ class CurvedArc(Arc):
             bool: True if point is near the arc curve
         """
         try:
-            # Calculate offset for parallel arcs (same as rendering)
-            offset_distance = None
-            if hasattr(self, '_manager') and self._manager:
-                parallels = self._manager.detect_parallel_arcs(self)
-                if parallels:
-                    offset_distance = self._manager.calculate_arc_offset(self, parallels)
-            
-            # Calculate control point with offset (same as rendering)
-            control_point = self._calculate_curve_control_point(offset=offset_distance)
+            # Check if manual control point is set (from transformation)
+            if hasattr(self, 'manual_control_point') and self.manual_control_point is not None:
+                # Use manual control point directly
+                control_point = self.manual_control_point
+            else:
+                # Calculate offset for parallel arcs (same as rendering)
+                offset_distance = None
+                if hasattr(self, '_manager') and self._manager:
+                    parallels = self._manager.detect_parallel_arcs(self)
+                    if parallels:
+                        offset_distance = self._manager.calculate_arc_offset(self, parallels)
+                
+                # Calculate control point with offset (same as rendering)
+                control_point = self._calculate_curve_control_point(offset=offset_distance)
             
             if control_point is None:
                 # Degenerate case: use straight line check

@@ -477,7 +477,7 @@ class ModelCanvasLoader:
         self._drag_state[drawing_area] = {'active': False, 'button': 0, 'start_x': 0, 'start_y': 0, 'is_panning': False}
         if not hasattr(self, '_arc_state'):
             self._arc_state = {}
-        self._arc_state[drawing_area] = {'source': None, 'cursor_pos': (0, 0)}
+        self._arc_state[drawing_area] = {'source': None, 'cursor_pos': (0, 0), 'ignore_next_release': False}
         if not hasattr(self, '_click_state'):
             self._click_state = {}
         self._click_state[drawing_area] = {'last_click_time': 0.0, 'last_click_obj': None, 'double_click_threshold': 0.3, 'pending_timeout': None, 'pending_click_data': None}
@@ -487,6 +487,12 @@ class ModelCanvasLoader:
         """Handle button press events (GTK3)."""
         state = self._drag_state[widget]
         arc_state = self._arc_state[widget]
+        
+        # Check if we should ignore this click (after dialog close)
+        if arc_state.get('ignore_next_release', False):
+            arc_state['ignore_next_release'] = False
+            return True  # Consume the event without doing anything
+        
         if event.button == 1 and manager.is_tool_active() and (manager.get_tool() == 'arc'):
             world_x, world_y = manager.screen_to_world(event.x, event.y)
             clicked_obj = manager.find_object_at_position(world_x, world_y)
@@ -529,6 +535,30 @@ class ModelCanvasLoader:
         is_selection_mode = tool is None or tool == 'select'
         if event.button == 1 and is_selection_mode:
             world_x, world_y = manager.screen_to_world(event.x, event.y)
+            
+            # Check if clicking on a transform handle in edit mode
+            if manager.selection_manager.is_edit_mode():
+                edit_target = manager.selection_manager.get_edit_target()
+                if edit_target:
+                    handle = manager.editing_transforms.check_handle_at_position(
+                        edit_target, world_x, world_y, manager.zoom
+                    )
+                    
+                    if handle:
+                        # Start transformation instead of normal drag
+                        if manager.editing_transforms.start_transformation(
+                            edit_target, handle, world_x, world_y
+                        ):
+                            state['active'] = True
+                            state['button'] = event.button
+                            state['start_x'] = event.x
+                            state['start_y'] = event.y
+                            state['is_panning'] = False
+                            state['is_rect_selecting'] = False
+                            state['is_transforming'] = True
+                            widget.queue_draw()
+                            return True
+            
             clicked_obj = manager.find_object_at_position(world_x, world_y)
             is_ctrl = event.state & Gdk.ModifierType.CONTROL_MASK
             if clicked_obj is not None:
@@ -596,9 +626,16 @@ class ModelCanvasLoader:
                     click_state['last_click_obj'] = clicked_obj
                     return True
             else:
-                manager.rectangle_selection.start(world_x, world_y)
+                # Clicked on empty space
+                # If in edit mode, just exit edit mode (keep selection)
                 if manager.selection_manager.is_edit_mode():
                     manager.selection_manager.exit_edit_mode()
+                    widget.queue_draw()
+                    # Don't start rectangle selection if just exiting edit mode
+                    return True
+                
+                # Otherwise, start rectangle selection
+                manager.rectangle_selection.start(world_x, world_y)
                 state['active'] = True
                 state['button'] = event.button
                 state['start_x'] = event.x
@@ -623,6 +660,17 @@ class ModelCanvasLoader:
     def _on_button_release(self, widget, event, manager):
         """Handle button release events (GTK3)."""
         state = self._drag_state[widget]
+        
+        # End transformation if active
+        if state.get('is_transforming', False):
+            if manager.editing_transforms.end_transformation():
+                # Transformation was committed successfully
+                widget.queue_draw()
+            state['is_transforming'] = False
+            state['active'] = False
+            state['button'] = 0
+            return True
+        
         if manager.selection_manager.end_drag():
             widget.queue_draw()
         if state.get('is_rect_selecting', False):
@@ -662,6 +710,12 @@ class ModelCanvasLoader:
         if manager.is_tool_active() and manager.get_tool() == 'arc' and (arc_state['source'] is not None):
             widget.queue_draw()
         if state['active'] and state['button'] > 0:
+            # Handle transformation drag
+            if state.get('is_transforming', False):
+                manager.editing_transforms.update_transformation(world_x, world_y)
+                widget.queue_draw()
+                return True
+            
             dx = event.x - state['start_x']
             dy = event.y - state['start_y']
             if not state['is_panning'] and (abs(dx) >= 5 or abs(dy) >= 5):
@@ -719,6 +773,12 @@ class ModelCanvasLoader:
     def _on_key_press_event(self, widget, event, manager):
         """Handle key press events (GTK3)."""
         if event.keyval == Gdk.KEY_Escape:
+            # Cancel transformation if active
+            if manager.editing_transforms.is_transforming():
+                manager.editing_transforms.cancel_transformation()
+                widget.queue_draw()
+                return True
+            
             if manager.selection_manager.cancel_drag():
                 widget.queue_draw()
                 return True
@@ -1154,6 +1214,12 @@ class ModelCanvasLoader:
             manager: ModelCanvasManager instance
             drawing_area: GtkDrawingArea widget
         """
+        # Clear arc creation state to prevent spurious arc creation
+        arc_state = self._arc_state.get(drawing_area)
+        if arc_state:
+            arc_state['source'] = None
+            arc_state['ignore_next_release'] = True  # Ignore any queued mouse events
+        
         if not obj.selected:
             manager.selection_manager.select(obj, multi=False, manager=manager)
         manager.selection_manager.enter_edit_mode(obj, manager=manager)
@@ -1167,6 +1233,20 @@ class ModelCanvasLoader:
             manager: ModelCanvasManager instance
             drawing_area: GtkDrawingArea widget
         """
+        # CRITICAL: Clear ALL arc creation state before opening dialog
+        # This prevents spurious arc creation when dialog closes
+        arc_state = self._arc_state.get(drawing_area)
+        if arc_state:
+            arc_state['source'] = None
+            arc_state['cursor_pos'] = (0, 0)
+            arc_state['ignore_next_release'] = True
+        
+        # Also temporarily switch tool if arc tool is active
+        original_tool = None
+        if manager.is_tool_active() and manager.get_tool() == 'arc':
+            original_tool = 'arc'
+            manager.set_tool('select')  # Force to select mode during dialog
+        
         from shypn.netobjs import Place, Transition, Arc
         from shypn.helpers.place_prop_dialog_loader import create_place_prop_dialog
         from shypn.helpers.transition_prop_dialog_loader import create_transition_prop_dialog
@@ -1209,6 +1289,18 @@ class ModelCanvasLoader:
                             self.right_panel_loader.transition_panel.needs_update = True
         dialog_loader.connect('properties-changed', on_properties_changed)
         response = dialog_loader.run()
+        
+        # Restore original tool if we switched it
+        if original_tool == 'arc':
+            manager.set_tool('arc')
+        
+        # Clear arc creation state again after dialog closes to prevent spurious arc creation
+        # This handles the case where mouse release happens after dialog closes
+        arc_state = self._arc_state.get(drawing_area)
+        if arc_state:
+            arc_state['source'] = None
+            arc_state['cursor_pos'] = (0, 0)
+        
         if isinstance(obj, Arc):
             pass
         if response == Gtk.ResponseType.OK:

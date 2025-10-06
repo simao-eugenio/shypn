@@ -1171,6 +1171,13 @@ class ModelCanvasManager:
         document._next_transition_id = self._next_transition_id
         document._next_arc_id = self._next_arc_id
         
+        # Sync view state (zoom and pan)
+        document.view_state = {
+            "zoom": self.zoom,
+            "pan_x": self.pan_x,
+            "pan_y": self.pan_y
+        }
+        
         return document
     
     # ==================== View State Persistence ====================

@@ -27,6 +27,42 @@
           </packing>
         </child>
         <child>
+          <object class="GtkButton" id="maximize_button">
+            <property name="visible">True</property>
+            <property name="can-focus">False</property>
+            <property name="tooltip-text">Maximize window</property>
+            <child>
+              <object class="GtkImage" id="maximize_image">
+                <property name="visible">True</property>
+                <property name="icon-name">window-maximize-symbolic</property>
+                <property name="icon-size">1</property>
+              </object>
+            </child>
+          </object>
+          <packing>
+            <property name="pack-type">end</property>
+            <property name="position">0</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkButton" id="minimize_button">
+            <property name="visible">True</property>
+            <property name="can-focus">False</property>
+            <property name="tooltip-text">Minimize window</property>
+            <child>
+              <object class="GtkImage">
+                <property name="visible">True</property>
+                <property name="icon-name">window-minimize-symbolic</property>
+                <property name="icon-size">1</property>
+              </object>
+            </child>
+          </object>
+          <packing>
+            <property name="pack-type">end</property>
+            <property name="position">1</property>
+          </packing>
+        </child>
+        <child>
           <object class="GtkToggleButton" id="right_panel_toggle">
             <property name="label">Analyses</property>
             <property name="active">False</property>
@@ -35,6 +71,7 @@
           </object>
           <packing>
             <property name="pack-type">end</property>
+            <property name="position">2</property>
           </packing>
         </child>
       </object>
@@ -78,7 +115,7 @@
                 <property name="hexpand">True</property>
                 <property name="vexpand">True</property>
                 <property name="visible">True</property>
-                <!-- Empty workspace - canvas/content will be added later -->
+                <!-- Canvas and status bar will be added programmatically -->
               </object>
               <packing>
                 <property name="resize">True</property>

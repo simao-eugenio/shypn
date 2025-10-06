@@ -2,7 +2,7 @@
 
 This directory contains UI component loaders and controllers that bridge the GTK4 interface layer with the data/business logic layer.
 
-## Current Modules
+## Panel Loaders
 
 ### `left_panel_loader.py`
 **Left Panel (File Operations) Loader**
@@ -14,6 +14,7 @@ Manages the attachable/detachable File Operations panel:
 - Maintain panel state across attach/detach cycles
 - Float button for panel detachment
 - Callbacks for attach/float events
+- Integration with file explorer
 
 **Key Class:** `LeftPanelLoader`
 
@@ -27,8 +28,11 @@ Manages the attachable/detachable Dynamic Analyses panel:
 - Maintain panel state across attach/detach cycles
 - Float button for panel detachment
 - Callbacks for attach/float events
+- Integration with analysis modules
 
 **Key Class:** `RightPanelLoader`
+
+## Canvas and Document Loaders
 
 ### `model_canvas_loader.py`
 **Multi-Document Canvas Loader**
@@ -43,6 +47,7 @@ Manages the main canvas area with multi-document support:
 - Active tab visual feedback (relief effect)
 - Canvas click handlers for revealer auto-hide
 - Integration with zoom palettes per document
+- View state persistence on tab switches
 
 **Key Class:** `ModelCanvasLoader`
 
@@ -52,6 +57,8 @@ Manages the main canvas area with multi-document support:
 - Static `.shy` extension label
 - Active tab indication with shadow
 - Auto-focus text selection
+
+## Tool Palettes
 
 ### `predefined_zoom.py`
 **Zoom Control Palette with Revealer**
@@ -66,10 +73,101 @@ Floating zoom control overlay for canvas:
 - Font metric-based sizing (1.3× 'W' character height)
 - CSS styling with gradients and shadows
 - Auto-hide on zoom selection or canvas click
+- **View state persistence**: Saves pan/zoom on all operations
 
 **Key Class:** `PredefinedZoom`
-
 **Factory Function:** `create_zoom_palette()`
+
+### `edit_palette_loader.py`
+**Edit Tools Palette Loader**
+
+Loads and manages the edit tools palette:
+- Tool selection for creating/editing Petri Net objects
+- Place creation tool
+- Transition creation tools (immediate, timed, stochastic, continuous)
+- Arc creation tools (normal, inhibitor, curved)
+- Selection and pan tools
+- Tool state management
+
+### `edit_tools_loader.py`
+**Edit Toolbar Loader**
+
+Loads the main edit toolbar with common editing operations:
+- Cut, copy, paste operations
+- Undo/redo operations
+- Alignment tools
+- Distribution tools
+- Object deletion
+
+### `simulate_palette_loader.py`
+**Simulation Palette Loader**
+
+Loads and manages the simulation control palette:
+- Start/stop simulation
+- Step through simulation
+- Reset to initial marking
+- Simulation speed control
+- Simulation state display
+
+### `simulate_tools_palette_loader.py`
+**Simulation Tools Palette Loader**
+
+Additional simulation tools and controls:
+- Token game visualization
+- Transition firing controls
+- Marking exploration
+- Simulation statistics
+
+## Properties Dialog Loaders
+
+### `place_prop_dialog_loader.py`
+**Place Properties Dialog**
+
+Dialog for editing place properties:
+- Load UI from properties dialog template
+- Edit place name and label
+- Set tokens (current marking)
+- Set initial marking (simulation baseline)
+- Set capacity (optional)
+- Color selection
+- Apply/Cancel buttons
+- **Token persistence**: Updates both `tokens` and `initial_marking` when user edits
+
+**Key Feature:** When user manually sets tokens, both current marking and initial marking are updated, making the new value the baseline for simulation resets.
+
+### `transition_prop_dialog_loader.py`
+**Transition Properties Dialog**
+
+Dialog for editing transition properties:
+- Edit transition name and label
+- Set transition type (immediate, timed, stochastic, continuous)
+- Set priority (for immediate transitions)
+- Set delay (for timed transitions)
+- Set rate function (for stochastic/continuous transitions)
+- Color selection
+- Apply/Cancel buttons
+
+### `arc_prop_dialog_loader.py`
+**Arc Properties Dialog**
+
+Dialog for editing arc properties:
+- Edit arc weight/multiplicity
+- Set arc type (normal, inhibitor, test)
+- Configure curved arcs (control points)
+- Color and style selection
+- Apply/Cancel buttons
+
+## UI Widgets
+
+### `color_picker.py`
+**Color Picker Widget**
+
+Reusable color picker component:
+- GTK4 ColorButton integration
+- RGBA color selection
+- Color preview
+- Recent colors palette
+- Used by properties dialogs for object coloring
 
 ### `example_helper.py`
 Example helper utilities and patterns for development reference.

@@ -138,17 +138,23 @@ class StochasticBehavior(TransitionBehavior):
         
         Stochastic transitions require:
         1. Guard condition must pass (if defined)
-        2. Sufficient tokens for maximum possible burst
+        2. Sufficient tokens for maximum possible burst (unless source transition)
         3. Current time >= scheduled fire time
+        
+        Source transitions are always structurally enabled.
         
         Returns:
             Tuple of (can_fire: bool, reason: str)
             - (True, "enabled-stochastic") if can fire now
+            - (True, "enabled-source") if source transition at scheduled time
             - (False, "guard-fails") if guard condition not met
             - (False, "insufficient-tokens-for-burst") if not enough tokens
             - (False, "not-scheduled") if no scheduled fire time
             - (False, "too-early") if before scheduled time
         """
+        # Check if this is a source transition
+        is_source = getattr(self.transition, 'is_source', False)
+        
         # Check guard first
         guard_passes, guard_reason = self._evaluate_guard()
         if not guard_passes:
@@ -162,24 +168,27 @@ class StochasticBehavior(TransitionBehavior):
             remaining = self._scheduled_fire_time - current_time
             return False, f"too-early (remaining={remaining:.3f})"
         
-        # Check sufficient tokens for burst firing
-        input_arcs = self.get_input_arcs()
-        burst = self._sampled_burst if self._sampled_burst else self.max_burst
-        
-        for arc in input_arcs:
-            kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
-            if kind != 'normal':
-                continue
+        # Check sufficient tokens for burst firing (skip if source transition)
+        if not is_source:
+            input_arcs = self.get_input_arcs()
+            burst = self._sampled_burst if self._sampled_burst else self.max_burst
             
-            source_place = self._get_place(arc.source_id)
-            if source_place is None:
-                return False, f"missing-source-place-{arc.source_id}"
-            
-            required = arc.weight * burst
-            if source_place.tokens < required:
-                return False, f"insufficient-tokens-for-burst-P{arc.source_id}"
+            for arc in input_arcs:
+                kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
+                if kind != 'normal':
+                    continue
+                
+                source_place = self._get_place(arc.source_id)
+                if source_place is None:
+                    return False, f"missing-source-place-{arc.source_id}"
+                
+                required = arc.weight * burst
+                if source_place.tokens < required:
+                    return False, f"insufficient-tokens-for-burst-P{arc.source_id}"
         
-        return True, f"enabled-stochastic (burst={burst})"
+        if is_source:
+            return True, f"enabled-source (burst={self._sampled_burst if self._sampled_burst else self.max_burst})"
+        return True, f"enabled-stochastic (burst={self._sampled_burst if self._sampled_burst else self.max_burst})"
     
     def fire(self, input_arcs: List, output_arcs: List) -> Tuple[bool, Dict[str, Any]]:
         """Execute stochastic burst firing.
@@ -225,52 +234,58 @@ class StochasticBehavior(TransitionBehavior):
                     'rate': self.rate
                 }
             
+            # Check if this is a source or sink transition
+            is_source = getattr(self.transition, 'is_source', False)
+            is_sink = getattr(self.transition, 'is_sink', False)
+            
             consumed_map = {}
             produced_map = {}
             current_time = self._get_current_time()
             burst = self._sampled_burst if self._sampled_burst else 1
             delay = current_time - self._enablement_time if self._enablement_time else 0.0
             
-            # Phase 1: Consume tokens with burst multiplier
-            for arc in input_arcs:
-                kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
-                if kind != 'normal':
-                    continue
-                
-                source_place = self._get_place(arc.source_id)
-                if source_place is None:
-                    return False, {
-                        'reason': 'missing-source-place',
-                        'place_id': arc.source_id,
-                        'stochastic_mode': True
-                    }
-                
-                amount = arc.weight * burst
-                if source_place.tokens < amount:
-                    return False, {
-                        'reason': 'insufficient-tokens-for-burst',
-                        'place_id': arc.source_id,
-                        'required': amount,
-                        'available': source_place.tokens,
-                        'burst': burst,
-                        'stochastic_mode': True
-                    }
-                
-                # Burst consumption
-                source_place.set_tokens(source_place.tokens - amount)
-                consumed_map[arc.source_id] = float(amount)
+            # Phase 1: Consume tokens with burst multiplier (skip if source transition)
+            if not is_source:
+                for arc in input_arcs:
+                    kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
+                    if kind != 'normal':
+                        continue
+                    
+                    source_place = self._get_place(arc.source_id)
+                    if source_place is None:
+                        return False, {
+                            'reason': 'missing-source-place',
+                            'place_id': arc.source_id,
+                            'stochastic_mode': True
+                        }
+                    
+                    amount = arc.weight * burst
+                    if source_place.tokens < amount:
+                        return False, {
+                            'reason': 'insufficient-tokens-for-burst',
+                            'place_id': arc.source_id,
+                            'required': amount,
+                            'available': source_place.tokens,
+                            'burst': burst,
+                            'stochastic_mode': True
+                        }
+                    
+                    # Burst consumption (INSIDE the loop, not outside!)
+                    source_place.set_tokens(source_place.tokens - amount)
+                    consumed_map[arc.source_id] = float(amount)
             
-            # Phase 2: Produce tokens with burst multiplier
-            for arc in output_arcs:
-                target_place = self._get_place(arc.target_id)
-                if target_place is None:
-                    continue
-                
-                amount = arc.weight * burst
-                
-                # Burst production
-                target_place.set_tokens(target_place.tokens + amount)
-                produced_map[arc.target_id] = float(amount)
+            # Phase 2: Produce tokens with burst multiplier (skip if sink transition)
+            if not is_sink:
+                for arc in output_arcs:
+                    target_place = self._get_place(arc.target_id)
+                    if target_place is None:
+                        continue
+                    
+                    amount = arc.weight * burst
+                    
+                    # Burst production
+                    target_place.set_tokens(target_place.tokens + amount)
+                    produced_map[arc.target_id] = float(amount)
             
             # Phase 3: Clear scheduling state
             self.clear_enablement()

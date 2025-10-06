@@ -159,12 +159,20 @@ class ContinuousBehavior(TransitionBehavior):
         1. Guard condition passes (if defined)
         2. All input places have positive token counts (> 0, not >= weight like discrete)
         
+        Source transitions are always enabled (they generate tokens externally).
+        
         Returns:
             Tuple of (can_fire: bool, reason: str)
             - (True, "enabled-continuous") if all inputs positive
+            - (True, "enabled-source") if source transition
             - (False, "guard-fails") if guard condition not met
             - (False, "input-place-empty") if any input has zero tokens
         """
+        # Check if this is a source transition (always enabled)
+        is_source = getattr(self.transition, 'is_source', False)
+        if is_source:
+            return True, "enabled-source"
+        
         # Check guard first
         guard_passes, guard_reason = self._evaluate_guard()
         if not guard_passes:
@@ -267,6 +275,10 @@ class ContinuousBehavior(TransitionBehavior):
                     'method': 'rk4'
                 }
             
+            # Check if this is a source or sink transition
+            is_source = getattr(self.transition, 'is_source', False)
+            is_sink = getattr(self.transition, 'is_sink', False)
+            
             consumed_map = {}
             produced_map = {}
             
@@ -274,38 +286,40 @@ class ContinuousBehavior(TransitionBehavior):
             # For continuous Petri nets, we approximate: flow = rate * dt
             # Full RK4 would require multiple rate evaluations at different points
             
-            # Phase 1: Consume tokens continuously from input places
-            for arc in input_arcs:
-                kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
-                if kind != 'normal':
-                    continue
-                
-                source_place = self._get_place(arc.source_id)
-                if source_place is None:
-                    continue
-                
-                # Continuous consumption: arc_weight * rate * dt
-                consumption = arc.weight * rate * dt
-                
-                # Clamp to available tokens (can't go negative)
-                actual_consumption = min(consumption, source_place.tokens)
-                
-                if actual_consumption > 0:
-                    source_place.set_tokens(source_place.tokens - actual_consumption)
-                    consumed_map[arc.source_id] = actual_consumption
+            # Phase 1: Consume tokens continuously from input places (skip if source)
+            if not is_source:
+                for arc in input_arcs:
+                    kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
+                    if kind != 'normal':
+                        continue
+                    
+                    source_place = self._get_place(arc.source_id)
+                    if source_place is None:
+                        continue
+                    
+                    # Continuous consumption: arc_weight * rate * dt
+                    consumption = arc.weight * rate * dt
+                    
+                    # Clamp to available tokens (can't go negative)
+                    actual_consumption = min(consumption, source_place.tokens)
+                    
+                    if actual_consumption > 0:
+                        source_place.set_tokens(source_place.tokens - actual_consumption)
+                        consumed_map[arc.source_id] = actual_consumption
             
-            # Phase 2: Produce tokens continuously to output places
-            for arc in output_arcs:
-                target_place = self._get_place(arc.target_id)
-                if target_place is None:
-                    continue
-                
-                # Continuous production: arc_weight * rate * dt
-                production = arc.weight * rate * dt
-                
-                if production > 0:
-                    target_place.set_tokens(target_place.tokens + production)
-                    produced_map[arc.target_id] = production
+            # Phase 2: Produce tokens continuously to output places (skip if sink)
+            if not is_sink:
+                for arc in output_arcs:
+                    target_place = self._get_place(arc.target_id)
+                    if target_place is None:
+                        continue
+                    
+                    # Continuous production: arc_weight * rate * dt
+                    production = arc.weight * rate * dt
+                    
+                    if production > 0:
+                        target_place.set_tokens(target_place.tokens + production)
+                        produced_map[arc.target_id] = production
             
             # Phase 3: Record continuous flow event
             self._record_event(

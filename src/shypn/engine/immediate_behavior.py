@@ -44,15 +44,23 @@ class ImmediateBehavior(TransitionBehavior):
         
         For immediate transitions, constraints are:
         1. Guard condition must pass (if defined)
-        2. All input places must have at least arc_weight tokens
+        2. All input places must have at least arc_weight tokens (unless source transition)
+        
+        Source transitions are always enabled (they generate tokens externally).
         
         Returns:
             Tuple of (can_fire: bool, reason: str)
             - (True, "enabled") if can fire
+            - (True, "enabled-source") if source transition
             - (False, "guard-fails") if guard condition not met
             - (False, "insufficient-tokens") if any input place lacks tokens
             - (False, "no-input-arcs") if transition has no inputs (always fires)
         """
+        # Check if this is a source transition (always enabled)
+        is_source = getattr(self.transition, 'is_source', False)
+        if is_source:
+            return True, "enabled-source"
+        
         # Check guard first
         guard_passes, guard_reason = self._evaluate_guard()
         if not guard_passes:
@@ -87,9 +95,12 @@ class ImmediateBehavior(TransitionBehavior):
         
         Firing process:
         1. Validate enablement (sufficient tokens)
-        2. Consume exactly arc_weight tokens from each input place
-        3. Produce exactly arc_weight tokens to each output place
+        2. Consume exactly arc_weight tokens from each input place (unless source transition)
+        3. Produce exactly arc_weight tokens to each output place (unless sink transition)
         4. Record firing event
+        
+        Source transitions: Skip token consumption (generate tokens externally)
+        Sink transitions: Skip token production (consume tokens externally)
         
         Args:
             input_arcs: List of incoming Arc objects
@@ -116,57 +127,63 @@ class ImmediateBehavior(TransitionBehavior):
             consumed_map = {}
             produced_map = {}
             
-            # Phase 1: Consume tokens from input places
-            for arc in input_arcs:
-                # Skip inhibitor arcs (they don't consume)
-                kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
-                if kind != 'normal':
-                    continue
-                
-                # Get source place directly from arc reference
-                source_place = arc.source
-                if source_place is None:
-                    return False, {
-                        'reason': 'missing-source-place',
-                        'place_name': arc.name,
-                        'immediate_mode': True
-                    }
-                
-                # Check sufficient tokens for immediate firing
-                if source_place.tokens < arc.weight:
-                    return False, {
-                        'reason': 'insufficient-tokens',
-                        'place_name': source_place.name,
-                        'required': arc.weight,
-                        'available': source_place.tokens,
-                        'immediate_mode': True
-                    }
-                
-                # Consume exactly arc_weight tokens (discrete semantics)
-                old_tokens = source_place.tokens
-                source_place.set_tokens(source_place.tokens - arc.weight)
-                consumed_map[source_place.id] = float(arc.weight)
-                
-                # Debug validation
-                assert source_place.tokens == old_tokens - arc.weight, \
-                    f"Token consumption error: expected {old_tokens - arc.weight}, got {source_place.tokens}"
+            # Check if this is a source or sink transition
+            is_source = getattr(self.transition, 'is_source', False)
+            is_sink = getattr(self.transition, 'is_sink', False)
             
-            # Phase 2: Produce tokens to output places
-            for arc in output_arcs:
-                # Get target place directly from arc reference
-                target_place = arc.target
-                if target_place is None:
-                    # Skip if target place missing (shouldn't happen in valid net)
-                    continue
-                
-                # Produce exactly arc_weight tokens (discrete semantics)
-                old_tokens = target_place.tokens
-                target_place.set_tokens(target_place.tokens + arc.weight)
-                produced_map[target_place.id] = float(arc.weight)
-                
-                # Debug validation
-                assert target_place.tokens == old_tokens + arc.weight, \
-                    f"Token production error: expected {old_tokens + arc.weight}, got {target_place.tokens}"
+            # Phase 1: Consume tokens from input places (skip if source transition)
+            if not is_source:
+                for arc in input_arcs:
+                    # Skip inhibitor arcs (they don't consume)
+                    kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
+                    if kind != 'normal':
+                        continue
+                    
+                    # Get source place directly from arc reference
+                    source_place = arc.source
+                    if source_place is None:
+                        return False, {
+                            'reason': 'missing-source-place',
+                            'place_name': arc.name,
+                            'immediate_mode': True
+                        }
+                    
+                    # Check sufficient tokens for immediate firing
+                    if source_place.tokens < arc.weight:
+                        return False, {
+                            'reason': 'insufficient-tokens',
+                            'place_name': source_place.name,
+                            'required': arc.weight,
+                            'available': source_place.tokens,
+                            'immediate_mode': True
+                        }
+                    
+                    # Consume exactly arc_weight tokens (discrete semantics)
+                    old_tokens = source_place.tokens
+                    source_place.set_tokens(source_place.tokens - arc.weight)
+                    consumed_map[source_place.id] = float(arc.weight)
+                    
+                    # Debug validation
+                    assert source_place.tokens == old_tokens - arc.weight, \
+                        f"Token consumption error: expected {old_tokens - arc.weight}, got {source_place.tokens}"
+            
+            # Phase 2: Produce tokens to output places (skip if sink transition)
+            if not is_sink:
+                for arc in output_arcs:
+                    # Get target place directly from arc reference
+                    target_place = arc.target
+                    if target_place is None:
+                        # Skip if target place missing (shouldn't happen in valid net)
+                        continue
+                    
+                    # Produce exactly arc_weight tokens (discrete semantics)
+                    old_tokens = target_place.tokens
+                    target_place.set_tokens(target_place.tokens + arc.weight)
+                    produced_map[target_place.id] = float(arc.weight)
+                    
+                    # Debug validation
+                    assert target_place.tokens == old_tokens + arc.weight, \
+                        f"Token production error: expected {old_tokens + arc.weight}, got {target_place.tokens}"
             
             # Phase 3: Record the immediate firing event
             self._record_event(
