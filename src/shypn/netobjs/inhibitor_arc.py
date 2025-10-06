@@ -133,6 +133,9 @@ class InhibitorArc(Arc):
             transform: Optional function (deprecated, for backward compatibility)
             zoom: Current zoom level for line width compensation
         """
+        # Ensure clean Cairo context state
+        cr.new_path()
+        
         # Get source and target positions in world space
         src_world_x, src_world_y = self.source.x, self.source.y
         tgt_world_x, tgt_world_y = self.target.x, self.target.y
@@ -209,6 +212,9 @@ class InhibitorArc(Arc):
         # Draw weight label if > 1
         if self.weight > 1:
             self._render_weight(cr, start_world_x, start_world_y, marker_x, marker_y, zoom)
+        
+        # Ensure clean state for next rendering operation
+        cr.new_path()
     
     def to_dict(self) -> dict:
         """Serialize inhibitor arc to dictionary for persistence.
