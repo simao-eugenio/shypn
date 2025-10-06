@@ -941,17 +941,7 @@ class ModelCanvasLoader:
             transform_submenu_item = Gtk.MenuItem(label='Transform Arc ►')
             transform_submenu = Gtk.Menu()
             
-            # Curve/Straight options
-            if is_straight(obj):
-                curve_item = Gtk.MenuItem(label='Make Curved')
-                curve_item.connect('activate', lambda w: self._on_arc_make_curved(obj, manager, drawing_area))
-            else:
-                curve_item = Gtk.MenuItem(label='Make Straight')
-                curve_item.connect('activate', lambda w: self._on_arc_make_straight(obj, manager, drawing_area))
-            curve_item.show()
-            transform_submenu.append(curve_item)
-            
-            # Normal/Inhibitor options
+            # Normal/Inhibitor options only (Curve/Straight options removed)
             if is_normal(obj):
                 inhibitor_item = Gtk.MenuItem(label='Convert to Inhibitor Arc')
                 inhibitor_item.connect('activate', lambda w: self._on_arc_convert_to_inhibitor(obj, manager, drawing_area))
