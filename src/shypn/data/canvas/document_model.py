@@ -416,6 +416,7 @@ class DocumentModel:
         # Check version (for future compatibility)
         version = data.get("version", "1.0")
         if not version.startswith("2."):
+            pass  # Version check - could add migration logic here
         
         # Restore places first (they have no dependencies)
         places_dict = {}
