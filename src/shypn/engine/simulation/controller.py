@@ -151,8 +151,6 @@ class SimulationController:
             type_name_map = {'Immediate': 'immediate', 'Timed (TPN)': 'timed', 'Stochastic (FSPN)': 'stochastic', 'Continuous (SHPN)': 'continuous'}
             cached_type_normalized = type_name_map.get(cached_type, cached_type.lower())
             if cached_type_normalized != current_type:
-                print(f'⚠️  [BEHAVIOR CHANGE] {transition.name} type changed: {cached_type_normalized} → {current_type}')
-                print(f'   Invalidating cached behavior and creating new {current_type} behavior')
                 if hasattr(cached_behavior, 'clear_enablement'):
                     cached_behavior.clear_enablement()
                 del self.behavior_cache[transition.id]
@@ -161,7 +159,6 @@ class SimulationController:
         if transition.id not in self.behavior_cache:
             behavior = behavior_factory.create_behavior(transition, self.model_adapter)
             self.behavior_cache[transition.id] = behavior
-            print(f'✅ [BEHAVIOR CREATED] {transition.name}: {behavior.get_type_name()}')
         return self.behavior_cache[transition.id]
 
     def _get_or_create_state(self, transition) -> TransitionState:
@@ -213,10 +210,8 @@ class SimulationController:
                         behavior.set_enablement_time(self.time)
                         if DEBUG_ENABLEMENT and hasattr(behavior, 'get_stochastic_info'):
                             info = behavior.get_stochastic_info()
-                            print(f"  → Stochastic: scheduled_fire={info.get('scheduled_fire_time'):.3f}, burst={info.get('sampled_burst')}")
                         elif DEBUG_ENABLEMENT and hasattr(behavior, 'get_timing_info'):
                             info = behavior.get_timing_info()
-                            print(f'  → Timed: earliest={behavior.earliest}, latest={behavior.latest}')
             else:
                 if state.enablement_time is not None:
                     pass
@@ -321,14 +316,11 @@ class SimulationController:
             transition = self._select_transition(enabled_immediate)
             self._fire_transition(transition)
             immediate_fired_total += 1
-            print(f'⚡ [IMMEDIATE] {transition.name} fired instantly at t={self.time:.3f}')
             self._update_enablement_states()
+        
         if iteration >= max_immediate_iterations - 1:
-            print(f'⚠️  [WARNING] Immediate transition loop limit reached ({max_immediate_iterations} iterations)')
-            print(f'   This may indicate an infinite firing loop in your model!')
-        if iteration >= max_immediate_iterations - 1:
-            print(f'⚠️  [WARNING] Immediate transition loop limit reached ({max_immediate_iterations} iterations)')
-            print(f'   This may indicate an infinite firing loop in your model!')
+            pass  # Max iterations reached, continue to next phase
+        
         continuous_transitions = [t for t in self.model.transitions if t.transition_type == 'continuous']
         DEBUG_CONTINUOUS = True
         if DEBUG_CONTINUOUS and continuous_transitions:
@@ -352,17 +344,16 @@ class SimulationController:
                 state = self._get_or_create_state(t)
                 can_fire, reason = behavior.can_fire()
                 status = 'CAN FIRE' if can_fire else f'BLOCKED: {reason}'
-                print(f'  - {t.name} (type={t.transition_type}): {status}, enablement_time={state.enablement_time}')
         discrete_fired = False
         if enabled_discrete:
             transition = self._select_transition(enabled_discrete)
             self._fire_transition(transition)
             discrete_fired = True
-            print(f'🔥 [FIRED] {transition.name} at t={self.time:.3f}')
             if DEBUG_CONTROLLER:
-                print(f'  >>> FIRED: {transition.name}')
+                pass  # Debug info removed
         elif DEBUG_CONTROLLER:
-            print(f'  >>> No timed/stochastic transitions fired this step')
+            pass  # Debug info removed
+        
         continuous_active = 0
         for transition, behavior, input_arcs, output_arcs in continuous_to_integrate:
             success, details = behavior.integrate_step(dt=time_step, input_arcs=input_arcs, output_arcs=output_arcs)
@@ -392,17 +383,19 @@ class SimulationController:
             if can_fire:
                 ready_count += 1
                 if DEBUG_CONTROLLER:
-                    print(f'  -> {transition.name} is READY to fire')
+                    pass  # Debug info removed
             elif reason and 'too-early' in str(reason):
                 waiting_count += 1
                 if DEBUG_CONTROLLER:
-                    print(f'  -> {transition.name} is WAITING (too-early)')
+                    pass  # Debug info removed
+        
         if waiting_count > 0 or ready_count > 0:
             if DEBUG_CONTROLLER:
-                print(f'  -> {waiting_count} waiting + {ready_count} ready = NOT DEADLOCKED')
+                pass  # Debug info removed
             return True
+        
         if DEBUG_CONTROLLER:
-            print(f'  -> TRUE DEADLOCK: No transitions fired and none waiting')
+            pass  # Debug info removed
         return False
 
     def _find_enabled_transitions(self) -> List:
@@ -498,11 +491,9 @@ class SimulationController:
             return False
         if self._running:
             return False
-        print(f'\n▶️  [RUN] Starting simulation at t={self.time:.3f}')
         for transition in self.model.transitions:
             state = self.transition_states.get(transition.id)
             behavior = self._get_behavior(transition)
-            print(f"  {transition.name} (type={transition.transition_type}): enablement_time={(state.enablement_time if state else 'None')}")
         self._running = True
         self._stop_requested = False
         self._max_steps = max_steps
@@ -514,12 +505,11 @@ class SimulationController:
             behavior = self._get_behavior(transition)
             if hasattr(behavior, 'get_timing_info'):
                 info = behavior.get_timing_info()
-                print(f"  {transition.name}: enablement={(state.enablement_time if state else 'None')}, {info}")
             elif hasattr(behavior, 'get_stochastic_info'):
                 info = behavior.get_stochastic_info()
-                print(f"  {transition.name}: scheduled={info.get('scheduled_fire_time')}, burst={info.get('sampled_burst')}")
             else:
-                print(f"  {transition.name}: enablement={(state.enablement_time if state else 'None')}")
+                pass  # No timing info available
+        
         self._timeout_id = GLib.timeout_add(100, self._simulation_loop)
         return True
 
@@ -546,7 +536,6 @@ class SimulationController:
             return False
         success = self.step(self._time_step)
         if not success:
-            print(f'⏸️  [DEADLOCK] Simulation stopped at t={self.time:.3f} - no enabled transitions')
             self._running = False
             self._timeout_id = None
             return False
@@ -566,7 +555,6 @@ class SimulationController:
         """
         if not self._running:
             return
-        print(f'⏸️  [STOP] Stopping simulation at t={self.time:.3f}')
         self._stop_requested = True
         for state in self.transition_states.values():
             state.enablement_time = None

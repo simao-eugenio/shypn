@@ -98,7 +98,6 @@ class DragController:
         if not objects:
             return False
         
-        print(f"DEBUG DragController.start_drag: Received {len(objects)} objects, IDs={[id(o) for o in objects]}")
         
         # Store drag state
         self._dragging = True
@@ -111,8 +110,6 @@ class DragController:
         for obj in self._drag_objects:
             self._initial_positions[id(obj)] = (obj.x, obj.y)
         
-        print(f"DEBUG DragController.start_drag: Stored {len(self._initial_positions)} initial positions")
-        print(f"DEBUG DragController.start_drag: Position IDs={list(self._initial_positions.keys())}")
         
         # Notify callback
         if self._on_drag_start:
@@ -159,9 +156,6 @@ class DragController:
             obj_id = id(obj)
             if obj_id not in self._initial_positions:
                 # This should never happen - it means the object list changed during drag
-                print(f"WARNING: Object {obj.name if hasattr(obj, 'name') else obj} (ID: {obj_id}) not in initial positions!")
-                print(f"  Initial positions keys: {list(self._initial_positions.keys())}")
-                print(f"  Drag objects: {[id(o) for o in self._drag_objects]}")
                 # Skip this object to prevent crash
                 continue
             

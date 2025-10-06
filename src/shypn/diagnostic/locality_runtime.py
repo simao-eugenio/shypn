@@ -187,14 +187,12 @@ class LocalityRuntimeAnalyzer:
                         event['details'] = details
                     events.append(event)
                 except Exception as e:
-                    print(f"[LocalityRuntime] ERROR unpacking event: {e}, entry={entry}")
                     continue
             
             return events
             
         except (AttributeError, KeyError) as e:
             # Fallback: no data available
-            print(f"[LocalityRuntime] ERROR in get_recent_events: {e}")
             return []
     
     def get_throughput(self, transition: Any, window: int = 10) -> float:

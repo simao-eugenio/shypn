@@ -254,11 +254,8 @@ class SelectionManager:
             draggable_objs = [obj for obj in selected_objs 
                             if isinstance(obj, (Place, Transition))]
             
-            print(f"DEBUG start_drag: clicked={clicked_obj.name if hasattr(clicked_obj, 'name') else clicked_obj}")
-            print(f"DEBUG start_drag: selected_objs count={len(selected_objs)}, draggable count={len(draggable_objs)}")
-            print(f"DEBUG start_drag: IDs={[id(o) for o in draggable_objs]}")
             if hasattr(clicked_obj, 'name'):
-                print(f"DEBUG start_drag: names={[o.name for o in draggable_objs if hasattr(o, 'name')]}")
+                pass  # Debug info removed
             
             # Only start drag if there are draggable objects
             if draggable_objs:

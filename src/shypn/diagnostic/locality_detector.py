@@ -17,9 +17,6 @@ Example:
     locality = detector.get_locality_for_transition(transition)
     
     if locality.is_valid:
-        print(f"Locality: {locality.get_summary()}")
-        print(f"Input places: {[p.name for p in locality.input_places]}")
-        print(f"Output places: {[p.name for p in locality.output_places]}")
 """
 
 from typing import Dict, List, Any, Optional
@@ -55,7 +52,6 @@ class Locality:
         )
         
         assert locality.is_valid  # True (has inputs AND outputs)
-        print(locality.get_summary())  # "1 inputs → T1 → 1 outputs"
     """
     transition: Any
     input_places: List[Any] = field(default_factory=list)
@@ -117,18 +113,14 @@ class LocalityDetector:
         locality = detector.get_locality_for_transition(transition)
         if locality.is_valid:
             for place in locality.input_places:
-                print(f"  Input: {place.name}")
             for place in locality.output_places:
-                print(f"  Output: {place.name}")
         
         # Detect all valid localities in model
         all_localities = detector.get_all_localities()
-        print(f"Found {len(all_localities)} valid localities")
         
         # Find shared places
         shared = detector.find_shared_places()
         for place_id, transitions in shared.items():
-            print(f"Place {place_id} shared by {len(transitions)} transitions")
     """
     
     def __init__(self, model: Any):
@@ -158,9 +150,7 @@ class LocalityDetector:
             locality = detector.get_locality_for_transition(t1)
             
             if locality.is_valid:
-                print(f"✓ Valid: {locality.get_summary()}")
             else:
-                print(f"✗ Invalid: {len(locality.input_places)} inputs, "
                       f"{len(locality.output_places)} outputs")
         """
         locality = Locality(transition=transition)
@@ -198,8 +188,6 @@ class LocalityDetector:
             localities = detector.get_all_localities()
             
             for locality in localities:
-                print(f"Locality: {locality.get_summary()}")
-                print(f"  Places: {locality.place_count}")
         """
         localities = []
         
