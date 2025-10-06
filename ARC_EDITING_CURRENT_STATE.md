@@ -58,6 +58,8 @@ The arc editing system is now in a stable and acceptable state for production us
 
 ### Why Parallel Arcs Are Not Editable
 
+**Current Status:** ⚠️ TEMPORARY DESIGN - TO BE CHANGED
+
 **Rationale:**
 - Parallel arcs are automatically curved by the system to avoid visual overlap
 - Their curvature is calculated algorithmically based on:
@@ -72,6 +74,13 @@ The arc editing system is now in a stable and acceptable state for production us
 - Double-click on parallel arc only selects, doesn't enter edit mode
 - Context menu hides "Edit Mode (Double-click)" option
 - System maintains full control over parallel arc curves
+
+**Future Change:**
+> **User Request (Oct 6, 2025):** Remove automatic parallel arc calculation entirely.
+> Let users manually curve each arc independently. No automatic behavior.
+> User draws arc → User curves it → User draws opposite arc → User curves it.
+> 
+> This provides full control and eliminates "magic" automatic behavior.
 
 ### Why "Make Straight/Curved" Was Removed
 
@@ -174,6 +183,47 @@ parallels = manager.detect_parallel_arcs(arc)
 ## Future Enhancement Ideas
 
 ### Potential Improvements (Not Currently Planned)
+
+### ⚠️ PRIORITY: Remove Automatic Parallel Arc Curving
+
+**Current Behavior:**
+- System automatically detects parallel arcs (opposite directions: A→B, B→A)
+- Automatically curves them with mirror offsets
+- User cannot override or manually control
+- Arcs become non-editable once parallel detected
+
+**Proposed Change:**
+- **Remove automatic curve calculation for parallel opposite arcs**
+- User draws Place → Transition arc (straight by default)
+- User manually curves it via drag handle
+- User draws opposite arc Transition → Place (straight by default)
+- User manually curves it via drag handle
+- Both arcs remain independently editable
+
+**Benefits:**
+- ✅ Full user control over arc appearance
+- ✅ No automatic "magic" behavior
+- ✅ Simpler mental model: draw, then edit
+- ✅ Each arc curve is intentional and explicit
+- ✅ Removes parallel arc detection complexity
+- ✅ All arcs become editable (no special cases)
+
+**Implementation Notes:**
+- Remove or disable `_auto_convert_parallel_arcs_to_curved()`
+- Remove parallel arc blocking in double-click handler
+- Remove parallel arc checks in context menu
+- Keep `calculate_arc_offset()` for rendering only (visual separation)
+- Let user create curves manually as needed
+
+**Migration Path:**
+1. Keep automatic system as fallback option (preferences?)
+2. Default to manual mode for new users
+3. Allow toggle: "Auto-curve parallel arcs" checkbox
+
+**Priority:** HIGH - User has explicitly requested this change
+**Rationale:** Manual control preferred over automatic behavior
+
+---
 
 #### 1. **Advanced Curve Editing**
    - Multiple control points
@@ -290,12 +340,20 @@ The current implementation uses a **hybrid approach**:
 
 The current arc editing implementation is **stable and acceptable** for production use. It provides essential functionality for creating curved arcs while preventing common user errors (parallel arc confusion, invalid inhibitor directions).
 
-Future enhancements should focus on:
-1. Advanced curve control (if user demand exists)
-2. Automated routing intelligence
-3. Better visual feedback
+### Next Steps (Priority Order):
 
-**Current Priority**: Monitor user feedback to identify most valuable improvements.
+**1. Remove Automatic Parallel Arc Curving (HIGH PRIORITY)**
+   - User has explicitly requested this change
+   - Current automatic behavior to be replaced with manual control
+   - Users will draw and curve each arc independently
+   - Simpler, more intuitive workflow
+
+**2. Future Enhancements (Lower Priority)**
+   - Advanced curve control (if user demand exists)
+   - Automated routing intelligence
+   - Better visual feedback
+
+**Current Priority**: Implement manual parallel arc editing to replace automatic system.
 
 ---
 
