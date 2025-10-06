@@ -712,6 +712,7 @@ class ModelCanvasLoader:
         if factor is None:
             return False
         manager.zoom_at_point(factor, event.x, event.y)
+        manager.save_view_state_to_file()
         widget.queue_draw()
         return True
 
