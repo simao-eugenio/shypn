@@ -968,23 +968,35 @@ class ModelCanvasLoader:
         if isinstance(obj, Arc):
             # Add arc transformation submenu
             from shypn.utils.arc_transform import is_straight, is_curved, is_inhibitor, is_normal
+            from shypn.netobjs.place import Place
+            from shypn.netobjs.transition import Transition
             
             transform_submenu_item = Gtk.MenuItem(label='Transform Arc ►')
             transform_submenu = Gtk.Menu()
             
+            # Check if arc can be converted to inhibitor (Place → Transition only)
+            can_be_inhibitor = isinstance(obj.source, Place) and isinstance(obj.target, Transition)
+            
             # Normal/Inhibitor options only (Curve/Straight options removed)
             if is_normal(obj):
-                inhibitor_item = Gtk.MenuItem(label='Convert to Inhibitor Arc')
-                inhibitor_item.connect('activate', lambda w: self._on_arc_convert_to_inhibitor(obj, manager, drawing_area))
+                if can_be_inhibitor:
+                    inhibitor_item = Gtk.MenuItem(label='Convert to Inhibitor Arc')
+                    inhibitor_item.connect('activate', lambda w: self._on_arc_convert_to_inhibitor(obj, manager, drawing_area))
+                    inhibitor_item.show()
+                    transform_submenu.append(inhibitor_item)
+                # If arc is Transition → Place, don't show inhibitor option at all
             else:
+                # Already an inhibitor arc, show option to convert back to normal
                 inhibitor_item = Gtk.MenuItem(label='Convert to Normal Arc')
                 inhibitor_item.connect('activate', lambda w: self._on_arc_convert_to_normal(obj, manager, drawing_area))
-            inhibitor_item.show()
-            transform_submenu.append(inhibitor_item)
+                inhibitor_item.show()
+                transform_submenu.append(inhibitor_item)
             
-            transform_submenu_item.set_submenu(transform_submenu)
-            transform_submenu_item.show()
-            menu_items.insert(2, ('__SUBMENU__', transform_submenu_item))
+            # Only show Transform submenu if there are options
+            if transform_submenu.get_children():
+                transform_submenu_item.set_submenu(transform_submenu)
+                transform_submenu_item.show()
+                menu_items.insert(2, ('__SUBMENU__', transform_submenu_item))
             
             # Add weight editing option
             menu_items.insert(3, ('Edit Weight...', lambda: self._on_arc_edit_weight(obj, manager, drawing_area)))
