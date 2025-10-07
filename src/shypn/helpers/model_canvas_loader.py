@@ -42,6 +42,13 @@ try:
 except ImportError as e:
     print(f'ERROR: Cannot import CanvasOverlayManager: {e}', file=sys.stderr)
     sys.exit(1)
+try:
+    from shypn.edit.palette_manager import PaletteManager
+    from shypn.edit.tools_palette_new import ToolsPalette
+    from shypn.edit.operations_palette_new import OperationsPalette
+except ImportError as e:
+    print(f'ERROR: Cannot import new OOP palettes: {e}', file=sys.stderr)
+    sys.exit(1)
 
 
 class ModelCanvasLoader:
@@ -64,6 +71,7 @@ class ModelCanvasLoader:
         self.document_count = 0
         self.canvas_managers = {}
         self.overlay_managers = {}  # Replaces individual palette dictionaries
+        self.palette_managers = {}  # New OOP palette managers
         self.parent_window = None
         self.persistency = None
         self.right_panel_loader = None
@@ -325,6 +333,161 @@ class ModelCanvasLoader:
             overlay_manager.connect_mode_changed_signal(
                 self._on_mode_changed, drawing_area
             )
+            # Old signal removed - mode palette no longer has edit-palettes-toggled
+            # overlay_manager.connect_edit_palettes_toggle_signal(
+            #     self._on_edit_palettes_toggled, drawing_area
+            # )
+            overlay_manager.connect_edit_button_signal(
+                self._on_edit_button_toggled, drawing_area
+            )
+            
+            # Set initial state: Edit mode is default, so show [E] button and hide [S] button
+            if overlay_manager.edit_palette:
+                edit_widget = overlay_manager.edit_palette.get_widget()
+                if edit_widget:
+                    edit_widget.show()
+            if overlay_manager.simulate_palette:
+                sim_widget = overlay_manager.simulate_palette.get_widget()
+                if sim_widget:
+                    sim_widget.hide()
+            print(f"[ModelCanvasLoader] Initial state: Edit mode, [E] shown, [S] hidden")
+            
+            # Setup new OOP palette system
+            self._setup_edit_palettes(overlay_widget, manager, drawing_area, overlay_manager)
+
+    def _setup_edit_palettes(self, overlay_widget, canvas_manager, drawing_area, overlay_manager):
+        """Setup new OOP palette system with tools and operations palettes.
+        
+        Palettes are positioned CENTERED horizontally above the [E] button.
+        [E] button is bottom-center with margin_bottom=24.
+        
+        Args:
+            overlay_widget: GtkOverlay to attach palettes to.
+            canvas_manager: ModelCanvasManager instance for this canvas.
+            drawing_area: GtkDrawingArea widget.
+            overlay_manager: CanvasOverlayManager to get [E] button reference.
+        """
+        # Get [E] button widget as positioning reference
+        edit_button_widget = None
+        if overlay_manager.edit_palette:
+            edit_button_widget = overlay_manager.edit_palette.get_widget()
+        
+        # Create palette manager with [E] button as reference
+        palette_manager = PaletteManager(overlay_widget, reference_widget=edit_button_widget)
+        self.palette_managers[drawing_area] = palette_manager
+        
+        # [E] button is at bottom-center: margin_bottom=24, height=36
+        # Palettes should be centered horizontally, ~18px above [E] button
+        # [E] button top = 24 + 36 = 60px from bottom
+        # Palette bottom should be at: 60 + 18 = 78px from bottom
+        
+        # Tools palette: width 148px
+        # Operations palette: width 194px  
+        # Gap between them: 80px
+        # Virtual combined width: 148 + 80 + 194 = 422px
+        #
+        # Strategy: Use FILL alignment with asymmetric margins to create absolute positioning
+        # This prevents both widgets from competing for the center point.
+        #
+        # Assume screen width ~1920px (typical)
+        # Virtual palette centered: starts at (1920/2 - 422/2) = 960 - 211 = 749
+        #
+        # Tools palette (148px wide):
+        #   Left edge at: 749
+        #   Right edge at: 749 + 148 = 897
+        #   Use FILL with margin_start=749, margin_end=(1920-897)=1023
+        #
+        # Operations palette (194px wide):  
+        #   Left edge at: 897 + 80 = 977
+        #   Right edge at: 977 + 194 = 1171
+        #   Use FILL with margin_start=977, margin_end=(1920-1171)=749
+        
+        # Create and register tools palette
+        tools_palette = ToolsPalette()
+        palette_manager.register_palette(
+            tools_palette,
+            position=(Gtk.Align.FILL, Gtk.Align.END)
+        )
+        # Set margins for absolute positioning with FILL alignment
+        tools_revealer = tools_palette.get_widget()
+        tools_revealer.set_margin_bottom(78)  # 18px above [E] button
+        tools_revealer.set_margin_start(749)   # Left edge position
+        tools_revealer.set_margin_end(1023)    # Right padding to prevent expansion
+        tools_revealer.set_hexpand(False)      # Don't expand horizontally
+        
+        # Create and register operations palette
+        operations_palette = OperationsPalette()
+        palette_manager.register_palette(
+            operations_palette,
+            position=(Gtk.Align.FILL, Gtk.Align.END)
+        )
+        # Set margins for absolute positioning
+        operations_revealer = operations_palette.get_widget()
+        operations_revealer.set_margin_bottom(78)  # Same vertical position
+        operations_revealer.set_margin_start(977)  # 749 + 148 + 80
+        operations_revealer.set_margin_end(749)    # Right padding (1920 - 977 - 194)
+        operations_revealer.set_hexpand(False)     # Don't expand horizontally
+        
+        # Wire tool selection signal
+        tools_palette.connect('tool-selected', self._on_palette_tool_selected, canvas_manager, drawing_area)
+        
+        # Wire operations signals
+        operations_palette.connect('operation-triggered', self._on_palette_operation_triggered, canvas_manager, drawing_area)
+        
+        # Ensure overlay and all children are visible
+        overlay_widget.show_all()
+        
+        # IMPORTANT: hide [S] button AFTER show_all() (which makes everything visible)
+        # This must be done after show_all() because show_all() recursively shows all children
+        if drawing_area in self.overlay_managers:
+            overlay_manager = self.overlay_managers[drawing_area]
+            if overlay_manager.simulate_palette:
+                sim_widget = overlay_manager.simulate_palette.get_widget()
+                if sim_widget:
+                    sim_widget.hide()
+                    print(f"[ModelCanvasLoader] [S] button explicitly hidden after show_all()")
+        
+        # DON'T show palettes initially - they should only appear in edit mode
+        # palette_manager.show_all()  # Removed - mode change handler will show them
+    
+    def _on_palette_tool_selected(self, tools_palette, tool_name, canvas_manager, drawing_area):
+        """Handle tool selection from new OOP tools palette.
+        
+        Args:
+            tools_palette: ToolsPalette instance.
+            tool_name: Name of selected tool ('place', 'transition', 'arc', 'select').
+            canvas_manager: ModelCanvasManager instance.
+            drawing_area: GtkDrawingArea widget.
+        """
+        if tool_name == 'select':
+            canvas_manager.clear_tool()
+        else:
+            canvas_manager.set_tool(tool_name)
+        drawing_area.queue_draw()
+    
+    def _on_palette_operation_triggered(self, operations_palette, operation, canvas_manager, drawing_area):
+        """Handle operation trigger from new OOP operations palette.
+        
+        Args:
+            operations_palette: OperationsPalette instance.
+            operation: Operation name ('select', 'lasso', 'undo', 'redo').
+            canvas_manager: ModelCanvasManager instance.
+            drawing_area: GtkDrawingArea widget.
+        """
+        if operation == 'select':
+            canvas_manager.clear_tool()
+            drawing_area.queue_draw()
+        elif operation == 'lasso':
+            # TODO: Implement lasso selection
+            print(f"Lasso selection not yet implemented")
+        elif operation == 'undo':
+            if canvas_manager.undo_manager and canvas_manager.undo_manager.can_undo():
+                canvas_manager.undo_manager.undo()
+                drawing_area.queue_draw()
+        elif operation == 'redo':
+            if canvas_manager.undo_manager and canvas_manager.undo_manager.can_redo():
+                canvas_manager.undo_manager.redo()
+                drawing_area.queue_draw()
 
     def _on_simulation_step(self, palette, time, drawing_area):
         """Handle simulation step - redraw canvas to show updated token state.
@@ -358,17 +521,80 @@ class ModelCanvasLoader:
                 else:
                     panel._show_empty_state()
 
-    def _on_mode_changed(self, mode_palette, mode, drawing_area):
+    def _on_mode_changed(self, mode_palette, mode, drawing_area, *args):
         """Handle mode change between edit and simulation.
         
         Args:
             mode_palette: ModePaletteLoader that emitted the signal
-            mode: New mode ('edit' or 'simulate')
+            mode: New mode ('edit' or 'sim')
             drawing_area: GtkDrawingArea widget
+            *args: Additional arguments from signal (edit_palette, etc. - ignored)
         """
+        print(f"[ModelCanvasLoader] _on_mode_changed called with mode={mode}")
+        
+        # Show/hide [E] and [S] buttons based on mode
         if drawing_area in self.overlay_managers:
             overlay_manager = self.overlay_managers[drawing_area]
-            overlay_manager.update_palette_visibility(mode)
+            
+            if mode == 'edit':
+                # Switching to EDIT mode:
+                # 1. Show [E] button, hide [S] button
+                if overlay_manager.edit_palette:
+                    edit_widget = overlay_manager.edit_palette.get_widget()
+                    if edit_widget:
+                        edit_widget.show()
+                        # Reset [E] button to OFF state (palettes hidden)
+                        overlay_manager.edit_palette.set_tools_visible(False)
+                if overlay_manager.simulate_palette:
+                    sim_widget = overlay_manager.simulate_palette.get_widget()
+                    if sim_widget:
+                        sim_widget.hide()
+                
+                # 2. Hide any open simulation palettes
+                if overlay_manager.simulate_tools_palette:
+                    sim_tools_widget = overlay_manager.simulate_tools_palette.get_widget()
+                    if sim_tools_widget:
+                        sim_tools_widget.hide()
+                
+                print(f"[ModelCanvasLoader] Edit mode: [E] shown, [S] hidden, sim palettes closed")
+                
+            elif mode == 'sim':
+                # Switching to SIM mode:
+                # 1. Hide [E] button, show [S] button
+                if overlay_manager.edit_palette:
+                    edit_widget = overlay_manager.edit_palette.get_widget()
+                    if edit_widget:
+                        edit_widget.hide()
+                if overlay_manager.simulate_palette:
+                    sim_widget = overlay_manager.simulate_palette.get_widget()
+                    if sim_widget:
+                        sim_widget.show()
+                        # Reset [S] button to OFF state (palettes hidden)
+                        overlay_manager.simulate_palette.set_tools_visible(False)
+                
+                # 2. Hide any open edit palettes
+                if drawing_area in self.palette_managers:
+                    palette_manager = self.palette_managers[drawing_area]
+                    palette_manager.hide_all()
+                
+                print(f"[ModelCanvasLoader] Sim mode: [S] shown, [E] hidden, edit palettes closed")
+    
+    def _on_edit_button_toggled(self, edit_palette, show, drawing_area):
+        """Handle [E] button toggle for showing/hiding NEW OOP edit palettes.
+        
+        Args:
+            edit_palette: EditPaletteLoader that emitted the signal
+            show: True to show palettes, False to hide
+            drawing_area: GtkDrawingArea widget
+        """
+        if drawing_area in self.palette_managers:
+            palette_manager = self.palette_managers[drawing_area]
+            if show:
+                palette_manager.show_all()
+                print(f"[ModelCanvasLoader] Edit palettes shown ([E] button toggled ON)")
+            else:
+                palette_manager.hide_all()
+                print(f"[ModelCanvasLoader] Edit palettes hidden ([E] button toggled OFF)")
 
     def _on_tool_changed(self, tools_palette, tool_name, manager, drawing_area):
         """Handle tool selection change from edit tools palette.
