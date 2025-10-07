@@ -103,8 +103,10 @@ class CanvasOverlayManager(BaseOverlayManager):
         
         # Setup all other palettes as overlays
         if self.overlay_widget:
-            self._setup_edit_palettes()          # Create tools and operations palettes
-            self._setup_edit_palette()            # Create [E] button
+            # NOTE: Edit palettes (tools/operations) now handled by model_canvas_loader
+            # via new OOP palette system. Keeping this commented for reference.
+            # self._setup_edit_palettes()          # OLD - Create tools and operations palettes
+            self._setup_edit_palette()            # Create [E] button to toggle NEW OOP palettes
             self._setup_simulate_palettes()
             self._setup_mode_palette()
     
@@ -148,19 +150,23 @@ class CanvasOverlayManager(BaseOverlayManager):
             self.register_palette('operations', self.operations_palette)
     
     def _setup_edit_palette(self):
-        """Create and add edit palette ([E] toggle button)."""
+        """Create and add edit palette ([E] toggle button).
+        
+        The [E] button will be wired to NEW OOP palettes (ToolsPalette, OperationsPalette)
+        by ModelCanvasLoader after palette_manager is created.
+        """
         # Create edit palette
         self.edit_palette = create_edit_palette()
         edit_widget = self.edit_palette.get_widget()
         
-        # Wire edit palette to both palettes
-        if self.tools_palette and self.operations_palette:
-            self.edit_palette.set_edit_palettes(self.tools_palette, self.operations_palette)
+        # NOTE: OLD palette wiring removed. NEW OOP palettes will be wired by
+        # ModelCanvasLoader.connect_edit_button_signal()
         
         # Add to overlay
         if edit_widget:
             self.overlay_widget.add_overlay(edit_widget)
             self.register_palette('edit', self.edit_palette)
+            # [E] button starts VISIBLE (edit mode is default) but palettes start hidden
     
     def _setup_simulate_palettes(self):
         """Create and add simulation mode palettes (simulate + simulate_tools)."""
@@ -172,7 +178,7 @@ class CanvasOverlayManager(BaseOverlayManager):
         # self.simulate_tools_palette.connect('step-executed', callback, drawing_area)
         # self.simulate_tools_palette.connect('reset-executed', callback)
         
-        # Create simulate palette
+        # Create simulate palette ([S] button)
         self.simulate_palette = create_simulate_palette()
         simulate_widget = self.simulate_palette.get_widget()
         
@@ -183,10 +189,12 @@ class CanvasOverlayManager(BaseOverlayManager):
         if simulate_tools_widget:
             self.overlay_widget.add_overlay(simulate_tools_widget)
             self.register_palette('simulate_tools', self.simulate_tools_palette)
+            simulate_tools_widget.hide()  # Start hidden (edit mode is default)
         
         if simulate_widget:
             self.overlay_widget.add_overlay(simulate_widget)
             self.register_palette('simulate', self.simulate_palette)
+            simulate_widget.hide()  # Start hidden ([S] button hidden in edit mode)
     
     def _setup_mode_palette(self):
         """Create and add mode palette (edit/simulate mode switcher)."""
@@ -200,7 +208,8 @@ class CanvasOverlayManager(BaseOverlayManager):
             # Connect mode changed signal (will be wired by ModelCanvasLoader)
             # self.mode_palette.connect('mode-changed', callback, ...)
             
-            # Set initial visibility to 'edit' mode
+            # Set initial visibility to 'edit' mode (hides simulate palettes)
+            # NEW OOP edit palettes start hidden and show via mode-changed signal
             self.update_palette_visibility('edit')
     
     def cleanup_overlays(self):
@@ -225,19 +234,15 @@ class CanvasOverlayManager(BaseOverlayManager):
     def update_palette_visibility(self, mode):
         """Update which palettes are visible based on the current mode.
         
+        NOTE: This method now only handles simulate palettes visibility.
+        Edit palettes (tools/operations) are handled by the NEW OOP PaletteManager
+        system via mode-changed signal in ModelCanvasLoader.
+        
         Args:
             mode: Current mode string ('edit' or 'simulate')
         """
         if mode == 'edit':
-            # Show edit palettes, hide simulate palettes
-            if self.edit_palette:
-                widget = self.edit_palette.get_widget()
-                if widget:
-                    widget.show()
-            
-            # Note: tools_palette and operations_palette visibility is controlled by edit_palette's [E] button
-            # They start hidden and are revealed when [E] is pressed
-            
+            # Hide simulate palettes when in edit mode
             if self.simulate_palette:
                 widget = self.simulate_palette.get_widget()
                 if widget:
@@ -249,18 +254,7 @@ class CanvasOverlayManager(BaseOverlayManager):
                     widget.hide()
         
         elif mode == 'simulate':
-            # Hide edit palettes, show simulate palettes
-            if self.edit_palette:
-                widget = self.edit_palette.get_widget()
-                if widget:
-                    widget.hide()
-            
-            # Hide both edit palettes when switching to simulate mode
-            if self.tools_palette:
-                self.tools_palette.hide()
-            if self.operations_palette:
-                self.operations_palette.hide()
-            
+            # Show simulate palettes when in simulation mode
             if self.simulate_palette:
                 widget = self.simulate_palette.get_widget()
                 if widget:
@@ -318,3 +312,23 @@ class CanvasOverlayManager(BaseOverlayManager):
             self.mode_palette.connect('mode-changed', callback, drawing_area, 
                                      self.edit_palette, self.tools_palette,
                                      self.simulate_palette, self.simulate_tools_palette)
+    
+    def connect_edit_palettes_toggle_signal(self, callback, drawing_area):
+        """Connect the edit-palettes-toggled signal from mode_palette.
+        
+        Args:
+            callback: Callback function to handle edit palettes toggle
+            drawing_area: GtkDrawingArea widget
+        """
+        if self.mode_palette:
+            self.mode_palette.connect('edit-palettes-toggled', callback, drawing_area)
+    
+    def connect_edit_button_signal(self, callback, drawing_area):
+        """Connect the tools-toggled signal from edit_palette [E] button.
+        
+        Args:
+            callback: Callback function to handle [E] button toggle
+            drawing_area: GtkDrawingArea widget
+        """
+        if self.edit_palette:
+            self.edit_palette.connect('tools-toggled', callback, drawing_area)
