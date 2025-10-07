@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Editing Operations Palette - Undo/Redo/Lasso/Clipboard operations -->
+<interface>
+  <requires lib="gtk+" version="3.20"/>
+  
+  <!-- Revealer for floating operations palette -->
+  <object class="GtkRevealer" id="editing_operations_revealer">
+    <property name="visible">True</property>
+    <property name="reveal-child">False</property>
+    <property name="transition-type">none</property>
+    <property name="halign">center</property>
+    <property name="valign">end</property>
+    <property name="margin_bottom">78</property>
+    <property name="margin_start">280</property>
+
+    <child>
+      <object class="GtkBox" id="editing_operations_root">
+        <property name="visible">True</property>
+        <property name="can_focus">False</property>
+        <property name="orientation">horizontal</property>
+        <property name="spacing">4</property>
+        <style>
+          <class name="editing-operations-palette"/>
+        </style>
+    
+        <!-- Undo Button -->
+        <child>
+          <object class="GtkButton" id="btn_undo">
+        <property name="visible">True</property>
+        <property name="can_focus">True</property>
+        <property name="receives_default">True</property>
+        <property name="sensitive">False</property>
+        <property name="tooltip_text">Undo (U or Ctrl+Z)</property>
+        <property name="label">U</property>
+        <property name="width-request">36</property>
+        <property name="height-request">36</property>
+      </object>
+    </child>
+    
+    <!-- Redo Button -->
+    <child>
+      <object class="GtkButton" id="btn_redo">
+        <property name="visible">True</property>
+        <property name="can_focus">True</property>
+        <property name="receives_default">True</property>
+        <property name="sensitive">False</property>
+        <property name="tooltip_text">Redo (R or Ctrl+Y)</property>
+        <property name="label">R</property>
+        <property name="width-request">36</property>
+        <property name="height-request">36</property>
+      </object>
+    </child>
+    
+    <!-- Separator -->
+    <child>
+      <object class="GtkSeparator">
+        <property name="visible">True</property>
+        <property name="can_focus">False</property>
+        <property name="orientation">vertical</property>
+      </object>
+    </child>
+    
+    <!-- Lasso Selection Button -->
+    <child>
+      <object class="GtkButton" id="btn_lasso">
+        <property name="visible">True</property>
+        <property name="can_focus">True</property>
+        <property name="receives_default">True</property>
+        <property name="tooltip_text">Lasso Selection (L)</property>
+        <property name="label">L</property>
+        <property name="width-request">36</property>
+        <property name="height-request">36</property>
+      </object>
+    </child>
+    
+    <!-- Separator -->
+    <child>
+      <object class="GtkSeparator">
+        <property name="visible">True</property>
+        <property name="can_focus">False</property>
+        <property name="orientation">vertical</property>
+      </object>
+    </child>
+    
+    <!-- Duplicate Button -->
+    <child>
+      <object class="GtkButton" id="btn_duplicate">
+        <property name="visible">True</property>
+        <property name="can_focus">True</property>
+        <property name="receives_default">True</property>
+        <property name="tooltip_text">Duplicate Selection (D)</property>
+        <property name="label">D</property>
+        <property name="width-request">36</property>
+        <property name="height-request">36</property>
+      </object>
+    </child>
+    
+    <!-- Align Button -->
+    <child>
+      <object class="GtkButton" id="btn_align">
+        <property name="visible">True</property>
+        <property name="can_focus">True</property>
+        <property name="receives_default">True</property>
+        <property name="tooltip_text">Align Selection (A)</property>
+        <property name="label">A</property>
+        <property name="width-request">36</property>
+        <property name="height-request">36</property>
+      </object>
+    </child>
+    
+    <!-- Separator -->
+    <child>
+      <object class="GtkSeparator">
+        <property name="visible">True</property>
+        <property name="can_focus">False</property>
+        <property name="orientation">vertical</property>
+      </object>
+    </child>
+    
+    <!-- Cut Button -->
+    <child>
+      <object class="GtkButton" id="btn_cut">
+        <property name="visible">True</property>
+        <property name="can_focus">True</property>
+        <property name="receives_default">True</property>
+        <property name="tooltip_text">Cut (X or Ctrl+X)</property>
+        <property name="label">X</property>
+        <property name="width-request">36</property>
+        <property name="height-request">36</property>
+      </object>
+    </child>
+    
+    <!-- Copy Button -->
+    <child>
+      <object class="GtkButton" id="btn_copy">
+        <property name="visible">True</property>
+        <property name="can_focus">True</property>
+        <property name="receives_default">True</property>
+        <property name="tooltip_text">Copy (C or Ctrl+C)</property>
+        <property name="label">C</property>
+        <property name="width-request">36</property>
+        <property name="height-request">36</property>
+      </object>
+    </child>
+    
+    <!-- Paste Button -->
+    <!-- Paste Button -->
+    <child>
+      <object class="GtkButton" id="btn_paste">
+        <property name="visible">True</property>
+        <property name="can_focus">True</property>
+        <property name="receives_default">True</property>
+        <property name="tooltip_text">Paste (V or Ctrl+V)</property>
+        <property name="label">V</property>
+        <property name="width-request">36</property>
+        <property name="height-request">36</property>
+      </object>
+    </child>
+    
+      </object>
+    </child>
+
+  </object>
+
+</interface>

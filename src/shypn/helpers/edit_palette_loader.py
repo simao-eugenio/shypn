@@ -48,8 +48,15 @@ class EditPaletteLoader(GObject.GObject):
         self.edit_palette_container = None  # Main container
         self.edit_toggle_button = None  # [E] button
         
-        # Edit tools palette reference (set externally)
-        self.tools_palette_loader = None
+        # Palette loaders to control
+        self.tools_palette_loader = None              # OLD: Deprecated - for backwards compatibility
+        self.editing_operations_palette_loader = None # OLD: Deprecated - for backwards compatibility
+        self.combined_tools_palette_loader = None     # OLD: Unified combined tools palette (container-based)
+        self.floating_buttons_manager = None          # OLD: Individual floating buttons (no container)
+        
+        # NEW: Two separate palette instances (transparent containers)
+        self.tools_palette = None                     # ToolsPalette instance [P][T][A]
+        self.operations_palette = None                # OperationsPalette instance [S][L][U][R]
         
         # CSS provider for styling
         self.css_provider = None
@@ -136,13 +143,45 @@ class EditPaletteLoader(GObject.GObject):
             Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
         )
     
+    def set_edit_palettes(self, tools_palette, operations_palette):
+        """Set the two edit palettes for show/hide control.
+        
+        Args:
+            tools_palette: ToolsPalette instance [P][T][A]
+            operations_palette: OperationsPalette instance [S][L][U][R]
+        """
+        self.tools_palette = tools_palette
+        self.operations_palette = operations_palette
+    
+    def set_floating_buttons_manager(self, manager):
+        """Set the floating buttons manager for show/hide control (DEPRECATED)."""
+        self.floating_buttons_manager = manager
+    
+    def set_combined_tools_palette_loader(self, combined_tools_palette_loader):
+        """Set the combined tools palette loader (DEPRECATED - use set_edit_palettes)."""
+        self.combined_tools_palette_loader = combined_tools_palette_loader
+    
     def set_tools_palette_loader(self, tools_loader):
         """Set the edit tools palette loader to control.
+        
+        DEPRECATED: Use set_combined_tools_palette_loader() instead.
+        Kept for backwards compatibility.
         
         Args:
             tools_loader: EditToolsLoader instance.
         """
         self.tools_palette_loader = tools_loader
+    
+    def set_editing_operations_palette_loader(self, editing_ops_loader):
+        """Set the editing operations palette loader to control.
+        
+        DEPRECATED: Use set_combined_tools_palette_loader() instead.
+        Kept for backwards compatibility.
+        
+        Args:
+            editing_ops_loader: EditingOperationsPaletteLoader instance.
+        """
+        self.editing_operations_palette_loader = editing_ops_loader
     
     # ==================== Event Handlers ====================
     
@@ -154,12 +193,44 @@ class EditPaletteLoader(GObject.GObject):
         """
         is_active = toggle_button.get_active()
         
-        # Toggle the tools palette visibility
-        if self.tools_palette_loader:
+        # NEW: Control both palettes (transparent containers)
+        if self.tools_palette and self.operations_palette:
             if is_active:
-                self.tools_palette_loader.show()
+                self.tools_palette.show()
+                self.operations_palette.show()
             else:
-                self.tools_palette_loader.hide()
+                self.tools_palette.hide()
+                self.operations_palette.hide()
+        
+        # OLD: Control floating buttons manager (individual buttons, no container)
+        elif self.floating_buttons_manager:
+            if is_active:
+                self.floating_buttons_manager.show_all()
+            else:
+                self.floating_buttons_manager.hide_all()
+        
+        # OLDER: Control combined tools palette (container-based)
+        elif self.combined_tools_palette_loader:
+            if is_active:
+                self.combined_tools_palette_loader.show()
+            else:
+                self.combined_tools_palette_loader.hide()
+        
+        # OLDEST: For backwards compatibility, also control separate palettes if set
+        elif self.tools_palette_loader or self.editing_operations_palette_loader:
+            # Toggle the edit tools palette visibility
+            if self.tools_palette_loader:
+                if is_active:
+                    self.tools_palette_loader.show()
+                else:
+                    self.tools_palette_loader.hide()
+            
+            # Toggle the editing operations palette visibility
+            if self.editing_operations_palette_loader:
+                if is_active:
+                    self.editing_operations_palette_loader.show()
+                else:
+                    self.editing_operations_palette_loader.hide()
         
         # Emit signal for external listeners
         self.emit('tools-toggled', is_active)

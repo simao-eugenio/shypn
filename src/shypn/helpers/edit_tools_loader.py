@@ -54,8 +54,8 @@ class EditToolsLoader(GObject.GObject):
         
         self.ui_path = ui_path
         self.builder = None
-        self.edit_tools_revealer = None  # Revealer container
-        self.edit_tools_container = None  # Tools box
+        self.edit_tools_revealer = None  # Revealer container for floating positioning
+        self.edit_tools_container = None  # Tools box inside revealer
         
         # Tool buttons
         self.select_tool_button = None
@@ -287,12 +287,12 @@ class EditToolsLoader(GObject.GObject):
     # ==================== Public API ====================
     
     def show(self):
-        """Show the tools palette with animation."""
+        """Show the tools palette by revealing it."""
         if self.edit_tools_revealer:
             self.edit_tools_revealer.set_reveal_child(True)
     
     def hide(self):
-        """Hide the tools palette with animation."""
+        """Hide the tools palette by unrevealing it."""
         if self.edit_tools_revealer:
             self.edit_tools_revealer.set_reveal_child(False)
     

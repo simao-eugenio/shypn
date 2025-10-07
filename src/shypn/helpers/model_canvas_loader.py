@@ -38,27 +38,11 @@ except ImportError as e:
     print(f'ERROR: Cannot import Petri net objects: {e}', file=sys.stderr)
     sys.exit(1)
 try:
-    from shypn.helpers.predefined_zoom import create_zoom_palette
+    from shypn.canvas import CanvasOverlayManager
 except ImportError as e:
-    print(f'ERROR: Cannot import zoom palette: {e}', file=sys.stderr)
+    print(f'ERROR: Cannot import CanvasOverlayManager: {e}', file=sys.stderr)
     sys.exit(1)
-try:
-    from shypn.helpers.edit_palette_loader import create_edit_palette
-    from shypn.helpers.edit_tools_loader import create_edit_tools_palette
-except ImportError as e:
-    print(f'ERROR: Cannot import edit palettes: {e}', file=sys.stderr)
-    sys.exit(1)
-try:
-    from shypn.helpers.simulate_palette_loader import create_simulate_palette
-    from shypn.helpers.simulate_tools_palette_loader import create_simulate_tools_palette
-except ImportError as e:
-    print(f'ERROR: Cannot import simulation palettes: {e}', file=sys.stderr)
-    sys.exit(1)
-try:
-    from ui.palettes.mode.mode_palette_loader import ModePaletteLoader
-except ImportError as e:
-    print(f'ERROR: Cannot import mode palette: {e}', file=sys.stderr)
-    sys.exit(1)
+
 
 class ModelCanvasLoader:
     """Loader and controller for the model canvas (multi-document Petri Net editor)."""
@@ -79,15 +63,8 @@ class ModelCanvasLoader:
         self.notebook = None
         self.document_count = 0
         self.canvas_managers = {}
-        self.zoom_palettes = {}
-        self.edit_palettes = {}
-        self.edit_tools_palettes = {}
-        self.simulate_palettes = {}
-        self.simulate_tools_palettes = {}
-        self.mode_palettes = {}
+        self.overlay_managers = {}  # Replaces individual palette dictionaries
         self.parent_window = None
-        self.canvas_managers = {}
-        self.document_count = 0
         self.persistency = None
         self.right_panel_loader = None
         self.context_menu_handler = None
@@ -174,9 +151,11 @@ class ModelCanvasLoader:
                 else:
                     pass
         if self.right_panel_loader and drawing_area:
-            if drawing_area in self.simulate_tools_palettes:
-                simulate_tools_palette = self.simulate_tools_palettes[drawing_area]
-                if hasattr(simulate_tools_palette, 'data_collector'):
+            # Get simulate_tools_palette from overlay manager
+            if drawing_area in self.overlay_managers:
+                overlay_manager = self.overlay_managers[drawing_area]
+                simulate_tools_palette = overlay_manager.get_palette('simulate_tools')
+                if simulate_tools_palette and hasattr(simulate_tools_palette, 'data_collector'):
                     data_collector = simulate_tools_palette.data_collector
                     self.right_panel_loader.set_data_collector(data_collector)
             if drawing_area in self.canvas_managers:
@@ -228,16 +207,11 @@ class ModelCanvasLoader:
         self.notebook.remove_page(page_num)
         if drawing_area and drawing_area in self.canvas_managers:
             del self.canvas_managers[drawing_area]
-        if drawing_area and drawing_area in self.zoom_palettes:
-            del self.zoom_palettes[drawing_area]
-        if drawing_area and drawing_area in self.edit_palettes:
-            del self.edit_palettes[drawing_area]
-        if drawing_area and drawing_area in self.edit_tools_palettes:
-            del self.edit_tools_palettes[drawing_area]
-        if drawing_area and drawing_area in self.simulate_palettes:
-            del self.simulate_palettes[drawing_area]
-        if drawing_area and drawing_area in self.simulate_tools_palettes:
-            del self.simulate_tools_palettes[drawing_area]
+        if drawing_area and drawing_area in self.overlay_managers:
+            # Cleanup overlay manager and all its palettes
+            overlay_manager = self.overlay_managers[drawing_area]
+            overlay_manager.cleanup_overlays()
+            del self.overlay_managers[drawing_area]
         if self.notebook.get_n_pages() == 0:
             self.add_document(filename='default')
         return True
@@ -327,46 +301,30 @@ class ModelCanvasLoader:
             return False
         drawing_area.connect('draw', on_draw_wrapper)
         self._setup_event_controllers(drawing_area, manager)
-        if overlay_box:
-            zoom_palette = create_zoom_palette()
-            zoom_widget = zoom_palette.get_widget()
-            if zoom_widget:
-                overlay_box.pack_start(zoom_widget, False, False, 0)
-                zoom_palette.set_canvas_manager(manager, drawing_area, self.parent_window)
-                self.zoom_palettes[drawing_area] = zoom_palette
-            if overlay_widget:
-                edit_tools_palette = create_edit_tools_palette()
-                edit_tools_widget = edit_tools_palette.get_widget()
-                edit_palette = create_edit_palette()
-                edit_widget = edit_palette.get_widget()
-                edit_palette.set_tools_palette_loader(edit_tools_palette)
-                if edit_tools_widget:
-                    overlay_widget.add_overlay(edit_tools_widget)
-                    self.edit_tools_palettes[drawing_area] = edit_tools_palette
-                if edit_widget:
-                    overlay_widget.add_overlay(edit_widget)
-                    self.edit_palettes[drawing_area] = edit_palette
-                edit_tools_palette.connect('tool-changed', self._on_tool_changed, manager, drawing_area)
-                simulate_tools_palette = create_simulate_tools_palette(model=manager)
-                simulate_tools_widget = simulate_tools_palette.get_widget()
-                simulate_tools_palette.connect('step-executed', self._on_simulation_step, drawing_area)
-                simulate_tools_palette.connect('reset-executed', self._on_simulation_reset)
-                simulate_palette = create_simulate_palette()
-                simulate_widget = simulate_palette.get_widget()
-                simulate_palette.set_tools_palette_loader(simulate_tools_palette)
-                if simulate_tools_widget:
-                    overlay_widget.add_overlay(simulate_tools_widget)
-                    self.simulate_tools_palettes[drawing_area] = simulate_tools_palette
-                if simulate_widget:
-                    overlay_widget.add_overlay(simulate_widget)
-                    self.simulate_palettes[drawing_area] = simulate_palette
-                mode_palette = ModePaletteLoader()
-                mode_widget = mode_palette.get_widget()
-                if mode_widget:
-                    overlay_widget.add_overlay(mode_widget)
-                    self.mode_palettes[drawing_area] = mode_palette
-                    mode_palette.connect('mode-changed', self._on_mode_changed, drawing_area, edit_palette, edit_tools_palette, simulate_palette, simulate_tools_palette)
-                    self._update_palette_visibility(drawing_area, 'edit', edit_palette, edit_tools_palette, simulate_palette, simulate_tools_palette)
+        
+        # Setup overlay manager to handle all palettes
+        if overlay_box and overlay_widget:
+            overlay_manager = CanvasOverlayManager(
+                overlay_widget=overlay_widget,
+                overlay_box=overlay_box,
+                drawing_area=drawing_area,
+                canvas_manager=manager
+            )
+            overlay_manager.setup_overlays(parent_window=self.parent_window)
+            
+            # Store overlay manager for later access
+            self.overlay_managers[drawing_area] = overlay_manager
+            
+            # Connect signals from palettes
+            overlay_manager.connect_tool_changed_signal(
+                self._on_tool_changed, manager, drawing_area
+            )
+            overlay_manager.connect_simulation_signals(
+                self._on_simulation_step, self._on_simulation_reset, drawing_area
+            )
+            overlay_manager.connect_mode_changed_signal(
+                self._on_mode_changed, drawing_area
+            )
 
     def _on_simulation_step(self, palette, time, drawing_area):
         """Handle simulation step - redraw canvas to show updated token state.
@@ -400,49 +358,17 @@ class ModelCanvasLoader:
                 else:
                     panel._show_empty_state()
 
-    def _on_mode_changed(self, mode_palette, mode, drawing_area, edit_palette, edit_tools_palette, simulate_palette, simulate_tools_palette):
+    def _on_mode_changed(self, mode_palette, mode, drawing_area):
         """Handle mode change between edit and simulation.
         
         Args:
             mode_palette: ModePaletteLoader that emitted the signal
-            mode: New mode ('edit' or 'sim')
+            mode: New mode ('edit' or 'simulate')
             drawing_area: GtkDrawingArea widget
-            edit_palette: EditPaletteLoader instance
-            edit_tools_palette: EditToolsLoader instance
-            simulate_palette: SimulatePaletteLoader instance
-            simulate_tools_palette: SimulateToolsPaletteLoader instance
         """
-        self._update_palette_visibility(drawing_area, mode, edit_palette, edit_tools_palette, simulate_palette, simulate_tools_palette)
-
-    def _update_palette_visibility(self, drawing_area, mode, edit_palette, edit_tools_palette, simulate_palette, simulate_tools_palette):
-        """Update palette visibility based on current mode.
-        
-        Args:
-            drawing_area: GtkDrawingArea widget
-            mode: Current mode ('edit' or 'sim')
-            edit_palette: EditPaletteLoader instance
-            edit_tools_palette: EditToolsLoader instance
-            simulate_palette: SimulatePaletteLoader instance
-            simulate_tools_palette: SimulateToolsPaletteLoader instance
-        """
-        if mode == 'edit':
-            if edit_palette:
-                edit_palette.get_widget().show()
-            if edit_tools_palette:
-                edit_tools_palette.get_widget().show()
-            if simulate_palette:
-                simulate_palette.get_widget().hide()
-            if simulate_tools_palette:
-                simulate_tools_palette.get_widget().hide()
-        else:
-            if edit_palette:
-                edit_palette.get_widget().hide()
-            if edit_tools_palette:
-                edit_tools_palette.get_widget().hide()
-            if simulate_palette:
-                simulate_palette.get_widget().show()
-            if simulate_tools_palette:
-                simulate_tools_palette.get_widget().show()
+        if drawing_area in self.overlay_managers:
+            overlay_manager = self.overlay_managers[drawing_area]
+            overlay_manager.update_palette_visibility(mode)
 
     def _on_tool_changed(self, tools_palette, tool_name, manager, drawing_area):
         """Handle tool selection change from edit tools palette.
@@ -790,6 +716,13 @@ class ModelCanvasLoader:
 
     def _on_key_press_event(self, widget, event, manager):
         """Handle key press events (GTK3)."""
+        # First, let editing operations palette handle its shortcuts
+        if widget in self.overlay_managers:
+            overlay_manager = self.overlay_managers[widget]
+            editing_ops_palette = overlay_manager.get_palette('editing_operations')
+            if editing_ops_palette and editing_ops_palette.handle_key_press(event):
+                return True
+        
         if event.keyval == Gdk.KEY_Escape:
             # Cancel transformation if active
             if manager.editing_transforms.is_transforming():
@@ -1289,9 +1222,10 @@ class ModelCanvasLoader:
             dialog_loader = create_place_prop_dialog(obj, parent_window=self.parent_window, persistency_manager=self.persistency)
         elif isinstance(obj, Transition):
             data_collector = None
-            if drawing_area in self.simulate_tools_palettes:
-                simulate_tools = self.simulate_tools_palettes[drawing_area]
-                if hasattr(simulate_tools, 'data_collector'):
+            if drawing_area in self.overlay_managers:
+                overlay_manager = self.overlay_managers[drawing_area]
+                simulate_tools = overlay_manager.get_palette('simulate_tools')
+                if simulate_tools and hasattr(simulate_tools, 'data_collector'):
                     data_collector = simulate_tools.data_collector
             dialog_loader = create_transition_prop_dialog(obj, parent_window=self.parent_window, persistency_manager=self.persistency, model=manager, data_collector=data_collector)
         elif isinstance(obj, Arc):
@@ -1306,9 +1240,10 @@ class ModelCanvasLoader:
             if isinstance(obj, Arc):
                 pass
             drawing_area.queue_draw()
-            if isinstance(obj, Transition) and drawing_area in self.simulate_tools_palettes:
-                simulate_tools = self.simulate_tools_palettes[drawing_area]
-                if simulate_tools.simulation:
+            if isinstance(obj, Transition) and drawing_area in self.overlay_managers:
+                overlay_manager = self.overlay_managers[drawing_area]
+                simulate_tools = overlay_manager.get_palette('simulate_tools')
+                if simulate_tools and simulate_tools.simulation:
                     if obj.id in simulate_tools.simulation.behavior_cache:
                         del simulate_tools.simulation.behavior_cache[obj.id]
             if isinstance(obj, (Place, Transition)) and self.right_panel_loader:
@@ -1355,9 +1290,10 @@ class ModelCanvasLoader:
         transition.transition_type = new_type
         if self.persistency:
             self.persistency.mark_dirty()
-        if drawing_area in self.simulate_tools_palettes:
-            simulate_tools = self.simulate_tools_palettes[drawing_area]
-            if simulate_tools.simulation:
+        if drawing_area in self.overlay_managers:
+            overlay_manager = self.overlay_managers[drawing_area]
+            simulate_tools = overlay_manager.get_palette('simulate_tools')
+            if simulate_tools and simulate_tools.simulation:
                 if transition.id in simulate_tools.simulation.behavior_cache:
                     del simulate_tools.simulation.behavior_cache[transition.id]
         if self.right_panel_loader:

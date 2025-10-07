@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Edit Tools Palette - Place, Transition, Arc Buttons -->
+<!-- Edit Operations Palette - Select, Lasso, Undo, Redo Buttons -->
 <interface>
   <requires lib="gtk+" version="3.0"/>
 
-  <!-- Revealer for floating tools palette -->
-  <object class="GtkRevealer" id="tools_revealer">
+  <!-- Revealer for floating operations palette -->
+  <object class="GtkRevealer" id="operations_revealer">
     <property name="visible">True</property>
     <property name="reveal-child">False</property>
     <property name="transition-type">slide-up</property>
@@ -12,53 +12,66 @@
     <property name="halign">center</property>
     <property name="valign">end</property>
     <property name="margin_bottom">78</property>
-    <property name="margin_end">352</property>
+    <property name="margin_start">202</property>
 
     <child>
-      <object class="GtkFrame" id="tools_frame">
+      <object class="GtkFrame" id="operations_frame">
         <property name="visible">True</property>
         <property name="shadow-type">out</property>
         <style>
           <class name="gray-palette-frame"/>
         </style>
         <child>
-          <object class="GtkBox" id="tools_container">
+          <object class="GtkBox" id="operations_container">
             <property name="visible">True</property>
             <property name="can_focus">False</property>
             <property name="orientation">horizontal</property>
             <property name="spacing">6</property>
             <property name="margin">6</property>
 
-        <!-- Place Tool Button [P] -->
+        <!-- Select Tool Button [S] -->
         <child>
-          <object class="GtkToggleButton" id="btn_place">
+          <object class="GtkToggleButton" id="btn_select">
             <property name="visible">True</property>
-            <property name="label">P</property>
-            <property name="tooltip-text">Place Tool (Ctrl+P)</property>
+            <property name="label">S</property>
+            <property name="tooltip-text">Select Mode (Ctrl+S)</property>
             <property name="width-request">36</property>
             <property name="height-request">36</property>
           </object>
         </child>
 
-        <!-- Transition Tool Button [T] -->
+        <!-- Lasso Selection Button [L] -->
         <child>
-          <object class="GtkToggleButton" id="btn_transition">
+          <object class="GtkButton" id="btn_lasso">
             <property name="visible">True</property>
-            <property name="label">T</property>
-            <property name="tooltip-text">Transition Tool (Ctrl+T)</property>
+            <property name="label">L</property>
+            <property name="tooltip-text">Lasso Selection (Ctrl+L)</property>
             <property name="width-request">36</property>
             <property name="height-request">36</property>
           </object>
         </child>
 
-        <!-- Arc Tool Button [A] -->
+        <!-- Undo Button [U] -->
         <child>
-          <object class="GtkToggleButton" id="btn_arc">
+          <object class="GtkButton" id="btn_undo">
             <property name="visible">True</property>
-            <property name="label">A</property>
-            <property name="tooltip-text">Arc Tool (Ctrl+A)</property>
+            <property name="label">U</property>
+            <property name="tooltip-text">Undo (Ctrl+Z)</property>
             <property name="width-request">36</property>
             <property name="height-request">36</property>
+            <property name="sensitive">False</property>
+          </object>
+        </child>
+
+        <!-- Redo Button [R] -->
+        <child>
+          <object class="GtkButton" id="btn_redo">
+            <property name="visible">True</property>
+            <property name="label">R</property>
+            <property name="tooltip-text">Redo (Ctrl+Shift+Z)</property>
+            <property name="width-request">36</property>
+            <property name="height-request">36</property>
+            <property name="sensitive">False</property>
           </object>
         </child>
 
@@ -66,7 +79,3 @@
         </child>
       </object>
     </child>
-
-  </object>
-
-</interface>
