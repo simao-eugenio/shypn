@@ -1,10 +1,10 @@
 {
   "version": "2.0",
   "metadata": {
-    "created": "2025-10-07T16:43:32.845655",
+    "created": "2025-10-07T17:43:53.388965",
     "object_counts": {
-      "places": 0,
-      "transitions": 0,
+      "places": 3,
+      "transitions": 2,
       "arcs": 0
     }
   },
@@ -13,7 +13,114 @@
     "pan_x": -799.0,
     "pan_y": -366.5
   },
-  "places": [],
-  "transitions": [],
+  "places": [
+    {
+      "id": 1,
+      "name": "P1",
+      "label": "",
+      "type": "place",
+      "x": 1168.0,
+      "y": 743.5,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": 2,
+      "name": "P2",
+      "label": "",
+      "type": "place",
+      "x": 1358.0,
+      "y": 690.5,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": 3,
+      "name": "P3",
+      "label": "",
+      "type": "place",
+      "x": 1187.0,
+      "y": 601.5,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "id": 1,
+      "name": "T1",
+      "label": "",
+      "type": "transition",
+      "x": 1295.0,
+      "y": 560.5,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "immediate",
+      "priority": 0,
+      "is_source": false,
+      "is_sink": false
+    },
+    {
+      "id": 2,
+      "name": "T2",
+      "label": "",
+      "type": "transition",
+      "x": 1379.0,
+      "y": 518.5,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "immediate",
+      "priority": 0,
+      "is_source": false,
+      "is_sink": false
+    }
+  ],
   "arcs": []
 }

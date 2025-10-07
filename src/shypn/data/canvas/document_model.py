@@ -432,8 +432,13 @@ class DocumentModel:
             place = Place.from_dict(place_data)
             document.places.append(place)
             places_dict[place.id] = place
-            # Update next ID counter
-            document._next_place_id = max(document._next_place_id, place.id + 1)
+            # Update next ID counter (extract numeric part from "P1", "P2", etc.)
+            if isinstance(place.id, str) and place.id.startswith('P'):
+                try:
+                    place_num = int(place.id[1:])
+                    document._next_place_id = max(document._next_place_id, place_num + 1)
+                except (ValueError, IndexError):
+                    pass
         
         # Restore transitions second (they have no dependencies)
         transitions_dict = {}
@@ -441,15 +446,25 @@ class DocumentModel:
             transition = Transition.from_dict(transition_data)
             document.transitions.append(transition)
             transitions_dict[transition.id] = transition
-            # Update next ID counter
-            document._next_transition_id = max(document._next_transition_id, transition.id + 1)
+            # Update next ID counter (extract numeric part from "T1", "T2", etc.)
+            if isinstance(transition.id, str) and transition.id.startswith('T'):
+                try:
+                    transition_num = int(transition.id[1:])
+                    document._next_transition_id = max(document._next_transition_id, transition_num + 1)
+                except (ValueError, IndexError):
+                    pass
         
         # Restore arcs last (they depend on places and transitions)
         for arc_data in data.get("arcs", []):
             arc = Arc.from_dict(arc_data, places=places_dict, transitions=transitions_dict)
             document.arcs.append(arc)
-            # Update next ID counter
-            document._next_arc_id = max(document._next_arc_id, arc.id + 1)
+            # Update next ID counter (extract numeric part from "A1", "A2", etc.)
+            if isinstance(arc.id, str) and arc.id.startswith('A'):
+                try:
+                    arc_num = int(arc.id[1:])
+                    document._next_arc_id = max(document._next_arc_id, arc_num + 1)
+                except (ValueError, IndexError):
+                    pass
         
         # Restore view state if present
         if "view_state" in data:

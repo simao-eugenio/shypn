@@ -252,6 +252,44 @@ class DragController:
         """
         return self._drag_objects.copy()
     
+    def get_move_data_for_undo(self) -> Optional[List[Dict]]:
+        """Get move data for undo operation before ending drag.
+        
+        Returns:
+            List of dicts with old/new positions, or None if not dragging
+            Each dict contains: type, id, old_x, old_y, new_x, new_y
+        """
+        if not self._dragging:
+            return None
+        
+        move_data = []
+        for obj in self._drag_objects:
+            if id(obj) not in self._initial_positions:
+                continue
+            
+            old_x, old_y = self._initial_positions[id(obj)]
+            
+            # Determine object type and ID
+            if 'Place' in type(obj).__name__:
+                obj_type = 'place'
+                obj_id = obj.id
+            elif 'Transition' in type(obj).__name__:
+                obj_type = 'transition'
+                obj_id = obj.id
+            else:
+                continue  # Skip unknown object types
+            
+            move_data.append({
+                'type': obj_type,
+                'id': obj_id,
+                'old_x': old_x,
+                'old_y': old_y,
+                'new_x': obj.x,
+                'new_y': obj.y
+            })
+        
+        return move_data if move_data else None
+    
     def get_drag_delta(self, canvas) -> Optional[Tuple[float, float]]:
         """Get current drag delta in world coordinates.
         

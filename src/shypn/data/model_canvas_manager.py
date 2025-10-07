@@ -102,6 +102,10 @@ class ModelCanvasManager:
         self.editing_transforms = ObjectEditingTransforms(self.selection_manager)
         self.rectangle_selection = RectangleSelection()
         
+        # Undo/redo system
+        from shypn.edit.undo_manager import UndoManager
+        self.undo_manager = UndoManager(limit=50)
+        
         # Dirty flag for redraw optimization
         self._needs_redraw = True
         
@@ -211,6 +215,13 @@ class ModelCanvasManager:
         place.on_changed = self._on_object_changed
         self.places.append(place)
         
+        # Record operation for undo
+        if hasattr(self, 'undo_manager'):
+            from shypn.edit.snapshots import snapshot_place
+            from shypn.edit.undo_operations import AddPlaceOperation
+            snapshot = snapshot_place(place)
+            self.undo_manager.push(AddPlaceOperation(place_id, snapshot))
+        
         self.mark_modified()
         self.mark_dirty()
         return place
@@ -233,6 +244,13 @@ class ModelCanvasManager:
         transition = Transition(x, y, transition_id, transition_name, **kwargs)
         transition.on_changed = self._on_object_changed
         self.transitions.append(transition)
+        
+        # Record operation for undo
+        if hasattr(self, 'undo_manager'):
+            from shypn.edit.snapshots import snapshot_transition
+            from shypn.edit.undo_operations import AddTransitionOperation
+            snapshot = snapshot_transition(transition)
+            self.undo_manager.push(AddTransitionOperation(transition_id, snapshot))
         
         self.mark_modified()
         self.mark_dirty()
@@ -260,6 +278,13 @@ class ModelCanvasManager:
         
         # Check if this arc creates a parallel situation and auto-convert to curved
         self._auto_convert_parallel_arcs_to_curved(arc)
+        
+        # Record operation for undo
+        if hasattr(self, 'undo_manager'):
+            from shypn.edit.snapshots import snapshot_arc
+            from shypn.edit.undo_operations import AddArcOperation
+            snapshot = snapshot_arc(arc)
+            self.undo_manager.push(AddArcOperation(arc_id, snapshot))
         
         self.mark_modified()
         self.mark_dirty()
