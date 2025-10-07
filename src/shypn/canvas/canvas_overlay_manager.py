@@ -189,7 +189,10 @@ class CanvasOverlayManager(BaseOverlayManager):
         if simulate_tools_widget:
             self.overlay_widget.add_overlay(simulate_tools_widget)
             self.register_palette('simulate_tools', self.simulate_tools_palette)
-            simulate_tools_widget.hide()  # Start hidden (edit mode is default)
+            # Don't hide the revealer widget - it controls visibility via reveal-child property
+            # simulate_tools_widget.hide()  # REMOVED: This prevents revealer from working
+            # Instead, ensure revealer starts with reveal-child=False (set in UI file)
+            self.simulate_tools_palette.hide()  # Use palette's hide() method which sets reveal-child=False
         
         if simulate_widget:
             self.overlay_widget.add_overlay(simulate_widget)
@@ -198,7 +201,13 @@ class CanvasOverlayManager(BaseOverlayManager):
     
     def _setup_mode_palette(self):
         """Create and add mode palette (edit/simulate mode switcher)."""
+        # Create palette loader instance
         self.mode_palette = ModePaletteLoader()
+        
+        # Load UI file and apply styling (like zoom palette)
+        self.mode_palette.load()
+        
+        # Get the styled container widget
         mode_widget = self.mode_palette.get_widget()
         
         if mode_widget:
