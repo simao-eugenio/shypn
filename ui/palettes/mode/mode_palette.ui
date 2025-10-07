@@ -1,43 +1,61 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Floating Mode Palette: Edit/Sim Buttons -->
+<!-- Floating Mode Palette: Edit/Sim Buttons (Zoom-styled) -->
 <interface>
   <requires lib="gtk+" version="3.0"/>
+  
+  <!-- Main container (outer box) -->
   <object class="GtkBox" id="mode_palette_container">
     <property name="visible">True</property>
     <property name="orientation">horizontal</property>
-    <property name="spacing">12</property>
+    <property name="spacing">0</property>
     <property name="halign">start</property>
     <property name="valign">end</property>
-    <property name="margin_bottom">24</property>
-    <property name="margin_left">24</property>
-    <style>
-      <class name="mode-palette"/>
-    </style>
+    <property name="margin-start">12</property>
+    <property name="margin-bottom">12</property>
+    
+    <!-- Inner styled box (like zoom_control) -->
     <child>
-      <object class="GtkButton" id="edit_mode_button">
+      <object class="GtkBox" id="mode_control">
         <property name="visible">True</property>
-        <property name="label">Edit</property>
-        <property name="tooltip-text">Switch to Editing Mode</property>
-        <property name="width-request">64</property>
-        <property name="height-request">40</property>
+        <property name="orientation">horizontal</property>
+        <property name="spacing">0</property>
         <style>
-          <class name="mode-button"/>
-          <class name="edit-button"/>
+          <class name="mode-palette"/>
         </style>
+        
+        <!-- Edit Mode Button [E] -->
+        <child>
+          <object class="GtkButton" id="edit_mode_button">
+            <property name="visible">True</property>
+            <property name="label">E</property>
+            <property name="tooltip-text">Switch to Editing Mode</property>
+            <property name="width-request">28</property>
+            <property name="height-request">28</property>
+            <style>
+              <class name="mode-button"/>
+              <class name="edit-button"/>
+            </style>
+          </object>
+        </child>
+        
+        <!-- Simulation Mode Button [S] -->
+        <child>
+          <object class="GtkButton" id="sim_mode_button">
+            <property name="visible">True</property>
+            <property name="label">S</property>
+            <property name="tooltip-text">Switch to Simulation Mode</property>
+            <property name="width-request">28</property>
+            <property name="height-request">28</property>
+            <style>
+              <class name="mode-button"/>
+              <class name="simulate-button"/>
+            </style>
+          </object>
+        </child>
+        
       </object>
     </child>
-    <child>
-      <object class="GtkButton" id="sim_mode_button">
-        <property name="visible">True</property>
-        <property name="label">Sim</property>
-        <property name="tooltip-text">Switch to Simulation Mode</property>
-        <property name="width-request">64</property>
-        <property name="height-request">40</property>
-        <style>
-          <class name="mode-button"/>
-          <class name="simulate-button"/>
-        </style>
-      </object>
-    </child>
+    
   </object>
+  
 </interface>

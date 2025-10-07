@@ -377,55 +377,55 @@ class ModelCanvasLoader:
         self.palette_managers[drawing_area] = palette_manager
         
         # [E] button is at bottom-center: margin_bottom=24, height=36
-        # Palettes should be centered horizontally, ~18px above [E] button
-        # [E] button top = 24 + 36 = 60px from bottom
-        # Palette bottom should be at: 60 + 18 = 78px from bottom
+        # Palettes should be centered horizontally, ~18px above edit palette container
+        # Edit palette (refactored with [ ][E][ ] layout):
+        #   - margin_bottom: 12px (changed from 24px)
+        #   - container width: ~100px (3 buttons @ 28px + spacing + padding + border)
+        #   - container height: ~38px (border + padding + button + padding + border)
+        #   - halign: center (follows window center automatically)
+        #   - top from bottom: 12 + 38 = 50px
+        # Palette bottom should be at: 50 + 18 = 68px from bottom
         
-        # Tools palette: width 148px
-        # Operations palette: width 194px  
-        # Gap between them: 80px
-        # Virtual combined width: 148 + 80 + 194 = 422px
-        #
-        # Strategy: Use FILL alignment with asymmetric margins to create absolute positioning
-        # This prevents both widgets from competing for the center point.
-        #
-        # Assume screen width ~1920px (typical)
-        # Virtual palette centered: starts at (1920/2 - 422/2) = 960 - 211 = 749
+        # Virtual palette positioning strategy:
+        # Use CENTER alignment instead of FILL with fixed margins
+        # This makes palettes follow the window center automatically on resize
         #
         # Tools palette (148px wide):
-        #   Left edge at: 749
-        #   Right edge at: 749 + 148 = 897
-        #   Use FILL with margin_start=749, margin_end=(1920-897)=1023
+        #   - halign: CENTER
+        #   - margin_end: (194 + 80) = 274px (operations width + gap)
+        #   - Effect: Positioned to the left of center by 274px
         #
-        # Operations palette (194px wide):  
-        #   Left edge at: 897 + 80 = 977
-        #   Right edge at: 977 + 194 = 1171
-        #   Use FILL with margin_start=977, margin_end=(1920-1171)=749
+        # Operations palette (194px wide):
+        #   - halign: CENTER
+        #   - margin_start: (148 + 80) = 228px (tools width + gap)
+        #   - Effect: Positioned to the right of center by 228px
+        #
+        # Gap between them: 80px (centered on the window)
+        # Total virtual palette width: 148 + 80 + 194 = 422px
+        # This configuration keeps palettes centered above [E] button on any window size!
         
         # Create and register tools palette
         tools_palette = ToolsPalette()
         palette_manager.register_palette(
             tools_palette,
-            position=(Gtk.Align.FILL, Gtk.Align.END)
+            position=(Gtk.Align.CENTER, Gtk.Align.END)  # Changed to CENTER alignment
         )
-        # Set margins for absolute positioning with FILL alignment
+        # Set margins for positioning relative to center
         tools_revealer = tools_palette.get_widget()
-        tools_revealer.set_margin_bottom(78)  # 18px above [E] button
-        tools_revealer.set_margin_start(749)   # Left edge position
-        tools_revealer.set_margin_end(1023)    # Right padding to prevent expansion
+        tools_revealer.set_margin_bottom(68)   # 18px above edit palette (50 + 18)
+        tools_revealer.set_margin_end(194 + 80)  # Offset left: operations width + gap
         tools_revealer.set_hexpand(False)      # Don't expand horizontally
         
         # Create and register operations palette
         operations_palette = OperationsPalette()
         palette_manager.register_palette(
             operations_palette,
-            position=(Gtk.Align.FILL, Gtk.Align.END)
+            position=(Gtk.Align.CENTER, Gtk.Align.END)  # Changed to CENTER alignment
         )
-        # Set margins for absolute positioning
+        # Set margins for positioning relative to center
         operations_revealer = operations_palette.get_widget()
-        operations_revealer.set_margin_bottom(78)  # Same vertical position
-        operations_revealer.set_margin_start(977)  # 749 + 148 + 80
-        operations_revealer.set_margin_end(749)    # Right padding (1920 - 977 - 194)
+        operations_revealer.set_margin_bottom(68)  # Same vertical position (50 + 18)
+        operations_revealer.set_margin_start(148 + 80)  # Offset right: tools width + gap
         operations_revealer.set_hexpand(False)     # Don't expand horizontally
         
         # Wire tool selection signal
@@ -530,8 +530,6 @@ class ModelCanvasLoader:
             drawing_area: GtkDrawingArea widget
             *args: Additional arguments from signal (edit_palette, etc. - ignored)
         """
-        print(f"[ModelCanvasLoader] _on_mode_changed called with mode={mode}")
-        
         # Show/hide [E] and [S] buttons based on mode
         if drawing_area in self.overlay_managers:
             overlay_manager = self.overlay_managers[drawing_area]
@@ -543,20 +541,29 @@ class ModelCanvasLoader:
                     edit_widget = overlay_manager.edit_palette.get_widget()
                     if edit_widget:
                         edit_widget.show()
-                        # Reset [E] button to OFF state (palettes hidden)
-                        overlay_manager.edit_palette.set_tools_visible(False)
+                        # Reset [E] button to OFF state (edit tools hidden)
+                        if overlay_manager.edit_palette.edit_toggle_button:
+                            if overlay_manager.edit_palette.edit_toggle_button.get_active():
+                                overlay_manager.edit_palette.edit_toggle_button.set_active(False)
                 if overlay_manager.simulate_palette:
                     sim_widget = overlay_manager.simulate_palette.get_widget()
                     if sim_widget:
                         sim_widget.hide()
+                        # Reset [S] button to OFF state when hiding it
+                        sim_button = overlay_manager.simulate_palette.get_toggle_button()
+                        if sim_button and sim_button.get_active():
+                            sim_button.set_active(False)
                 
-                # 2. Hide any open simulation palettes
+                # 2. Hide any open simulation tools palette
                 if overlay_manager.simulate_tools_palette:
-                    sim_tools_widget = overlay_manager.simulate_tools_palette.get_widget()
-                    if sim_tools_widget:
-                        sim_tools_widget.hide()
+                    overlay_manager.simulate_tools_palette.hide()  # Use palette's hide() method
                 
-                print(f"[ModelCanvasLoader] Edit mode: [E] shown, [S] hidden, sim palettes closed")
+                # 3. Hide any open edit tools palettes (ensure clean state)
+                if drawing_area in self.palette_managers:
+                    palette_manager = self.palette_managers[drawing_area]
+                    palette_manager.hide_all()
+                
+                print(f"[ModelCanvasLoader] Edit mode: [E] shown, [S] hidden, all tools palettes closed")
                 
             elif mode == 'sim':
                 # Switching to SIM mode:
@@ -569,8 +576,10 @@ class ModelCanvasLoader:
                     sim_widget = overlay_manager.simulate_palette.get_widget()
                     if sim_widget:
                         sim_widget.show()
-                        # Reset [S] button to OFF state (palettes hidden)
-                        overlay_manager.simulate_palette.set_tools_visible(False)
+                        # Reset [S] button to OFF state (simulation tools hidden)
+                        sim_button = overlay_manager.simulate_palette.get_toggle_button()
+                        if sim_button and sim_button.get_active():
+                            sim_button.set_active(False)
                 
                 # 2. Hide any open edit palettes
                 if drawing_area in self.palette_managers:

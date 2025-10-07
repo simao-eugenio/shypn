@@ -182,9 +182,9 @@ class OperationsPalette(BasePalette):
            ============================================ */
         
         .palette-operations {
-            /* Strong white gradient background */
-            background: linear-gradient(to bottom, #f5f5f5 0%, #d8d8d8 100%);
-            border: 2px solid #999999;
+            /* Purple gradient background (match edit/mode/zoom palettes) */
+            background: linear-gradient(to bottom, #667eea 0%, #764ba2 100%);
+            border: 2px solid #5568d3;
             border-radius: 8px;
             padding: 3px;
             /* STRONG shadow like zoom palette */
@@ -195,10 +195,10 @@ class OperationsPalette(BasePalette):
         
         .palette-operations:hover {
             /* Enhanced on hover */
-            border-color: #3584e4;
+            border-color: #5568d3;
             box-shadow: 0 6px 12px rgba(0, 0, 0, 0.45),
                         0 3px 6px rgba(0, 0, 0, 0.35),
-                        0 0 12px rgba(53, 132, 228, 0.3),
+                        0 0 12px rgba(102, 126, 234, 0.3),
                         inset 0 1px 0 rgba(255, 255, 255, 0.3);
         }
         

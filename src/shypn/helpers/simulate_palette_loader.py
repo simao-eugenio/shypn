@@ -48,7 +48,10 @@ class SimulatePaletteLoader(GObject.GObject):
         self.ui_path = ui_path
         self.builder = Gtk.Builder()
         self.simulate_palette_container = None  # Main container
+        self.simulate_control = None  # Inner box with [ ][S][ ] layout
+        self.left_placeholder = None  # Left placeholder box
         self.simulate_toggle_button = None  # [S] button
+        self.right_placeholder = None  # Right placeholder box
         self.tools_palette_loader = None  # SimulateToolsPaletteLoader instance
         
         self._load_ui()
@@ -73,11 +76,19 @@ class SimulatePaletteLoader(GObject.GObject):
         
         # Get widget references
         self.simulate_palette_container = self.builder.get_object('simulate_palette_container')
+        self.simulate_control = self.builder.get_object('simulate_control')
+        self.left_placeholder = self.builder.get_object('left_placeholder')
         self.simulate_toggle_button = self.builder.get_object('simulate_toggle_button')
+        self.right_placeholder = self.builder.get_object('right_placeholder')
         
         if self.simulate_palette_container is None:
             raise ValueError(
                 f"'simulate_palette_container' not found in {self.ui_path}"
+            )
+        
+        if self.simulate_control is None:
+            raise ValueError(
+                f"'simulate_control' not found in {self.ui_path}"
             )
         
         if self.simulate_toggle_button is None:
@@ -94,33 +105,63 @@ class SimulatePaletteLoader(GObject.GObject):
         self._apply_styling()
     
     def _apply_styling(self):
-        """Apply custom CSS styling to the simulate palette."""
+        """Apply custom CSS styling to the simulate palette.
+        
+        Purple container with white button (inactive) and red button (active/checked).
+        Matches edit palette container style while preserving simulation identity.
+        """
         css = """
+        /* Purple gradient container (matches edit/mode/zoom palettes) */
+        .simulate-palette-control {
+            background: linear-gradient(to bottom, #667eea 0%, #764ba2 100%);
+            border: 2px solid #5568d3;
+            border-radius: 8px;
+            padding: 3px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4),
+                        0 2px 4px rgba(0, 0, 0, 0.3),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        }
+        
+        .simulate-palette-control:hover {
+            border-color: #5568d3;
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.45),
+                        0 3px 6px rgba(0, 0, 0, 0.35),
+                        0 0 12px rgba(102, 126, 234, 0.3),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.3);
+        }
+        
+        /* White gradient button (inactive state) */
         .simulate-button {
-            background: linear-gradient(to bottom, #e74c3c, #c0392b);
-            border: 2px solid #a93226;
-            border-radius: 6px;
-            font-size: 16px;
+            background: linear-gradient(to bottom, #ffffff 0%, #f0f0f5 100%);
+            border: 1px solid #b0b0b0;
+            border-radius: 4px;
+            font-size: 14px;
             font-weight: bold;
-            color: white;
-            min-width: 36px;
-            min-height: 36px;
+            color: #333333;
+            min-width: 28px;
+            min-height: 28px;
             padding: 0;
             margin: 0;
-            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3),
-                        0 1px 3px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.8);
         }
         
         .simulate-button:hover {
-            background: linear-gradient(to bottom, #c0392b, #a93226);
-            box-shadow: 0 4px 8px rgba(231, 76, 60, 0.4),
-                        0 2px 4px rgba(0, 0, 0, 0.3);
+            background: linear-gradient(to bottom, #f8f8f8 0%, #e8e8ee 100%);
+            border-color: #999999;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25),
+                        0 0 4px rgba(102, 126, 234, 0.2),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.9);
         }
         
+        /* Red gradient button (active/checked state - simulation mode active) */
         .simulate-button:active,
         .simulate-button:checked {
-            background: linear-gradient(to bottom, #a93226, #922b21);
-            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+            background: linear-gradient(to bottom, #e74c3c 0%, #c0392b 100%);
+            border-color: #a93226;
+            color: white;
+            box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.3),
+                        0 0 6px rgba(231, 76, 60, 0.4);
         }
         
         .simulate-button:checked {
