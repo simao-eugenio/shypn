@@ -284,6 +284,7 @@ class OperationsPalette(BasePalette):
         Args:
             enabled: True to enable, False to disable
         """
+        print(f"[OperationsPalette] Setting undo button enabled={enabled}")
         self.set_button_sensitive('undo', enabled)
     
     def set_redo_enabled(self, enabled: bool):
@@ -292,6 +293,7 @@ class OperationsPalette(BasePalette):
         Args:
             enabled: True to enable, False to disable
         """
+        print(f"[OperationsPalette] Setting redo button enabled={enabled}")
         self.set_button_sensitive('redo', enabled)
     
     def update_undo_redo_state(self, can_undo: bool, can_redo: bool):
@@ -301,6 +303,7 @@ class OperationsPalette(BasePalette):
             can_undo: Whether undo is available
             can_redo: Whether redo is available
         """
+        print(f"[OperationsPalette] update_undo_redo_state called: can_undo={can_undo}, can_redo={can_redo}")
         self.set_undo_enabled(can_undo)
         self.set_redo_enabled(can_redo)
 

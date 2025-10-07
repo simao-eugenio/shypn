@@ -434,6 +434,18 @@ class ModelCanvasLoader:
         # Wire operations signals
         operations_palette.connect('operation-triggered', self._on_palette_operation_triggered, canvas_manager, drawing_area)
         
+        # Wire undo/redo button state updates
+        if hasattr(canvas_manager, 'undo_manager'):
+            def update_undo_redo_buttons(can_undo, can_redo):
+                print(f"[ModelCanvasLoader] Updating undo/redo buttons: undo={can_undo}, redo={can_redo}")
+                operations_palette.update_undo_redo_state(can_undo, can_redo)
+            canvas_manager.undo_manager.set_state_changed_callback(update_undo_redo_buttons)
+            # Initialize button states
+            initial_undo = canvas_manager.undo_manager.can_undo()
+            initial_redo = canvas_manager.undo_manager.can_redo()
+            print(f"[ModelCanvasLoader] Initial undo/redo state: undo={initial_undo}, redo={initial_redo}")
+            update_undo_redo_buttons(initial_undo, initial_redo)
+        
         # Ensure overlay and all children are visible
         overlay_widget.show_all()
         
@@ -478,16 +490,36 @@ class ModelCanvasLoader:
             canvas_manager.clear_tool()
             drawing_area.queue_draw()
         elif operation == 'lasso':
-            # TODO: Implement lasso selection
-            print(f"Lasso selection not yet implemented")
+            # Import LassoSelector
+            from shypn.edit.lasso_selector import LassoSelector
+            
+            # Get or create lasso state
+            if drawing_area not in self._lasso_state:
+                self._lasso_state[drawing_area] = {
+                    'active': False,
+                    'selector': None
+                }
+            
+            lasso_state = self._lasso_state[drawing_area]
+            
+            # Create LassoSelector instance if needed
+            if lasso_state['selector'] is None:
+                lasso_state['selector'] = LassoSelector(canvas_manager)
+            
+            # Activate lasso mode
+            lasso_state['active'] = True
+            canvas_manager.clear_tool()  # Deactivate other tools
+            
+            print(f"[ModelCanvasLoader] Lasso selection activated - draw a shape to select objects")
+            drawing_area.queue_draw()
         elif operation == 'undo':
-            if canvas_manager.undo_manager and canvas_manager.undo_manager.can_undo():
-                canvas_manager.undo_manager.undo()
-                drawing_area.queue_draw()
+            if hasattr(canvas_manager, 'undo_manager') and canvas_manager.undo_manager:
+                if canvas_manager.undo_manager.undo(canvas_manager):
+                    drawing_area.queue_draw()
         elif operation == 'redo':
-            if canvas_manager.undo_manager and canvas_manager.undo_manager.can_redo():
-                canvas_manager.undo_manager.redo()
-                drawing_area.queue_draw()
+            if hasattr(canvas_manager, 'undo_manager') and canvas_manager.undo_manager:
+                if canvas_manager.undo_manager.redo(canvas_manager):
+                    drawing_area.queue_draw()
 
     def _on_simulation_step(self, palette, time, drawing_area):
         """Handle simulation step - redraw canvas to show updated token state.
@@ -642,12 +674,23 @@ class ModelCanvasLoader:
         if not hasattr(self, '_click_state'):
             self._click_state = {}
         self._click_state[drawing_area] = {'last_click_time': 0.0, 'last_click_obj': None, 'double_click_threshold': 0.3, 'pending_timeout': None, 'pending_click_data': None}
+        if not hasattr(self, '_lasso_state'):
+            self._lasso_state = {}
+        self._lasso_state[drawing_area] = {'active': False, 'selector': None}
         self._setup_canvas_context_menu(drawing_area, manager)
 
     def _on_button_press(self, widget, event, manager):
         """Handle button press events (GTK3)."""
         state = self._drag_state[widget]
         arc_state = self._arc_state[widget]
+        lasso_state = self._lasso_state.get(widget, {})
+        
+        # Check if lasso mode is active
+        if lasso_state.get('active', False) and event.button == 1:
+            world_x, world_y = manager.screen_to_world(event.x, event.y)
+            lasso_state['selector'].start_lasso(world_x, world_y)
+            widget.queue_draw()
+            return True
         
         # Check if we should ignore this click (after dialog close)
         if arc_state.get('ignore_next_release', False):
@@ -839,6 +882,15 @@ class ModelCanvasLoader:
     def _on_button_release(self, widget, event, manager):
         """Handle button release events (GTK3)."""
         state = self._drag_state[widget]
+        lasso_state = self._lasso_state.get(widget, {})
+        
+        # Complete lasso selection if active
+        if lasso_state.get('active', False) and lasso_state.get('selector'):
+            if lasso_state['selector'].is_active:
+                lasso_state['selector'].finish_lasso()
+                lasso_state['active'] = False
+                widget.queue_draw()
+                return True
         
         # End transformation if active
         if state.get('is_transforming', False):
@@ -850,7 +902,18 @@ class ModelCanvasLoader:
             state['button'] = 0
             return True
         
+        # Get move data before ending drag (for undo)
+        move_data = None
+        if manager.selection_manager.is_dragging():
+            move_data = manager.selection_manager.get_move_data_for_undo()
+        
+        # End drag
         if manager.selection_manager.end_drag():
+            # Record move operation for undo if objects moved
+            if move_data and hasattr(manager, 'undo_manager'):
+                from shypn.edit.undo_operations import MoveOperation
+                manager.undo_manager.push(MoveOperation(move_data))
+            
             widget.queue_draw()
         if state.get('is_rect_selecting', False):
             is_ctrl = event.state & Gdk.ModifierType.CONTROL_MASK
@@ -883,9 +946,18 @@ class ModelCanvasLoader:
         """Handle motion events (GTK3)."""
         state = self._drag_state[widget]
         arc_state = self._arc_state[widget]
+        lasso_state = self._lasso_state.get(widget, {})
         manager.set_pointer_position(event.x, event.y)
         world_x, world_y = manager.screen_to_world(event.x, event.y)
         arc_state['cursor_pos'] = (world_x, world_y)
+        
+        # Update lasso path if active
+        if lasso_state.get('active', False) and lasso_state.get('selector'):
+            if lasso_state['selector'].is_active:
+                lasso_state['selector'].add_point(world_x, world_y)
+                widget.queue_draw()
+                return True
+        
         if manager.is_tool_active() and manager.get_tool() == 'arc' and (arc_state['source'] is not None):
             widget.queue_draw()
         if state['active'] and state['button'] > 0:
@@ -958,7 +1030,37 @@ class ModelCanvasLoader:
             if editing_ops_palette and editing_ops_palette.handle_key_press(event):
                 return True
         
+        # Check for Ctrl modifier
+        is_ctrl = event.state & Gdk.ModifierType.CONTROL_MASK
+        is_shift = event.state & Gdk.ModifierType.SHIFT_MASK
+        
+        # Undo (Ctrl+Z)
+        if is_ctrl and not is_shift and event.keyval == Gdk.KEY_z:
+            if hasattr(manager, 'undo_manager') and manager.undo_manager:
+                if manager.undo_manager.undo(manager):
+                    widget.queue_draw()
+                    print("[ModelCanvasLoader] Undo triggered by Ctrl+Z")
+                return True
+        
+        # Redo (Ctrl+Shift+Z)
+        if is_ctrl and is_shift and event.keyval == Gdk.KEY_z:
+            if hasattr(manager, 'undo_manager') and manager.undo_manager:
+                if manager.undo_manager.redo(manager):
+                    widget.queue_draw()
+                    print("[ModelCanvasLoader] Redo triggered by Ctrl+Shift+Z")
+                return True
+        
         if event.keyval == Gdk.KEY_Escape:
+            # Cancel lasso if active
+            lasso_state = self._lasso_state.get(widget, {})
+            if lasso_state.get('active', False) and lasso_state.get('selector'):
+                if lasso_state['selector'].is_active:
+                    lasso_state['selector'].cancel_lasso()
+                    lasso_state['active'] = False
+                    widget.queue_draw()
+                    print("[ModelCanvasLoader] Lasso selection cancelled")
+                    return True
+            
             # Cancel transformation if active
             if manager.editing_transforms.is_transforming():
                 manager.editing_transforms.cancel_transformation()
@@ -1005,11 +1107,20 @@ class ModelCanvasLoader:
         
         # Render all objects
         all_objects = manager.get_all_objects()
+        if len(all_objects) > 0 and len(manager.places) > 0:
+            print(f"[ModelCanvasLoader] Drawing {len(manager.places)} places, {len(manager.transitions)} transitions, {len(manager.arcs)} arcs")
         for obj in all_objects:
             obj.render(cr, zoom=manager.zoom)
         
         manager.editing_transforms.render_selection_layer(cr, manager, manager.zoom)
         manager.rectangle_selection.render(cr, manager.zoom)
+        
+        # Render lasso if active
+        if drawing_area in self._lasso_state:
+            lasso_state = self._lasso_state[drawing_area]
+            if lasso_state.get('active', False) and lasso_state.get('selector'):
+                lasso_state['selector'].render_lasso(cr, manager.zoom)
+        
         cr.restore()
         if drawing_area in self._arc_state:
             arc_state = self._arc_state[drawing_area]
@@ -1391,6 +1502,15 @@ class ModelCanvasLoader:
             drawing_area: GtkDrawingArea widget
         """
         from shypn.netobjs import Place, Transition, Arc
+        
+        # Record operation for undo (capture state before deletion)
+        if hasattr(manager, 'undo_manager'):
+            from shypn.edit.snapshots import capture_delete_snapshots
+            from shypn.edit.undo_operations import DeleteOperation
+            snapshots = capture_delete_snapshots(manager, [obj])
+            manager.undo_manager.push(DeleteOperation(snapshots))
+        
+        # Perform deletion
         if isinstance(obj, Place):
             if obj in manager.places:
                 manager.places.remove(obj)
@@ -1400,6 +1520,7 @@ class ModelCanvasLoader:
         elif isinstance(obj, Arc):
             if obj in manager.arcs:
                 manager.arcs.remove(obj)
+        
         if obj.selected:
             manager.selection_manager.deselect(obj)
         if manager.selection_manager.is_edit_mode() and manager.selection_manager.edit_target == obj:

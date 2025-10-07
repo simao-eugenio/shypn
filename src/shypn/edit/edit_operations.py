@@ -23,11 +23,6 @@ class EditOperations:
         """
         self.canvas_manager = canvas_manager
         
-        # Undo/Redo stacks
-        self.undo_stack = []
-        self.redo_stack = []
-        self.max_undo_levels = 50
-        
         # Clipboard
         self.clipboard = []
         
@@ -89,33 +84,25 @@ class EditOperations:
     # History Operations
     def undo(self):
         """Undo the last operation."""
-        if not self.undo_stack:
-            print("[EditOps] Nothing to undo")
-            return
+        # Delegate to UndoManager if available
+        if hasattr(self.canvas_manager, 'undo_manager'):
+            if self.canvas_manager.undo_manager.undo(self.canvas_manager):
+                self._notify_state_changed()
+                return
         
-        operation = self.undo_stack.pop()
-        self.redo_stack.append(operation)
-        
-        # Apply reverse operation
-        operation.undo()
-        
-        print(f"[EditOps] Undone: {operation}")
-        self._notify_state_changed()
+        # Fallback (should not reach here)
+        print("[EditOps] Undo not available (no undo manager)")
     
     def redo(self):
         """Redo the last undone operation."""
-        if not self.redo_stack:
-            print("[EditOps] Nothing to redo")
-            return
+        # Delegate to UndoManager if available
+        if hasattr(self.canvas_manager, 'undo_manager'):
+            if self.canvas_manager.undo_manager.redo(self.canvas_manager):
+                self._notify_state_changed()
+                return
         
-        operation = self.redo_stack.pop()
-        self.undo_stack.append(operation)
-        
-        # Apply forward operation
-        operation.redo()
-        
-        print(f"[EditOps] Redone: {operation}")
-        self._notify_state_changed()
+        # Fallback (should not reach here)
+        print("[EditOps] Redo not available (no undo manager)")
     
     def push_operation(self, operation):
         """Add an operation to the undo stack.
@@ -123,14 +110,12 @@ class EditOperations:
         Args:
             operation: Operation instance with undo/redo methods
         """
-        self.undo_stack.append(operation)
-        self.redo_stack.clear()  # Clear redo when new operation added
-        
-        # Limit stack size
-        if len(self.undo_stack) > self.max_undo_levels:
-            self.undo_stack.pop(0)
-        
-        self._notify_state_changed()
+        # Delegate to UndoManager if available
+        if hasattr(self.canvas_manager, 'undo_manager'):
+            self.canvas_manager.undo_manager.push(operation)
+            self._notify_state_changed()
+        else:
+            print("[EditOps] Cannot push operation (no undo manager)")
     
     def can_undo(self):
         """Check if undo is available.
@@ -138,7 +123,9 @@ class EditOperations:
         Returns:
             bool: True if can undo
         """
-        return len(self.undo_stack) > 0
+        if hasattr(self.canvas_manager, 'undo_manager'):
+            return self.canvas_manager.undo_manager.can_undo()
+        return False
     
     def can_redo(self):
         """Check if redo is available.
@@ -146,7 +133,9 @@ class EditOperations:
         Returns:
             bool: True if can redo
         """
-        return len(self.redo_stack) > 0
+        if hasattr(self.canvas_manager, 'undo_manager'):
+            return self.canvas_manager.undo_manager.can_redo()
+        return False
     
     # Clipboard Operations
     def cut(self):
