@@ -177,7 +177,7 @@ class BasePalette(GObject.GObject, ABC, metaclass=GObjectABCMeta):
                 )
                 
         except Exception as e:
-                  file=sys.stderr)
+            pass
     
     # ==================== Public API ====================
     
@@ -214,7 +214,6 @@ class BasePalette(GObject.GObject, ABC, metaclass=GObjectABCMeta):
             allocation = self.revealer.get_allocation()
             
             self.emit('palette-shown')
-        else:
     
     def hide(self):
         """Hide the palette with animation."""
@@ -248,8 +247,6 @@ class BasePalette(GObject.GObject, ABC, metaclass=GObjectABCMeta):
         button = self.buttons.get(button_id)
         if button:
             button.set_sensitive(sensitive)
-        else:
-                  file=sys.stderr)
     
     def get_button(self, button_id: str) -> Gtk.Widget:
         """Get a button widget by ID.

@@ -1096,8 +1096,8 @@ class ModelCanvasLoader:
         # Render all objects
         all_objects = manager.get_all_objects()
         if len(all_objects) > 0 and len(manager.places) > 0:
-        for obj in all_objects:
-            obj.render(cr, zoom=manager.zoom)
+            for obj in all_objects:
+                obj.render(cr, zoom=manager.zoom)
         
         manager.editing_transforms.render_selection_layer(cr, manager, manager.zoom)
         manager.rectangle_selection.render(cr, manager.zoom)
