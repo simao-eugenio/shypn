@@ -51,7 +51,6 @@ class UndoManager:
         """
         # Skip no-op move operations
         if hasattr(operation, 'is_noop') and operation.is_noop:
-            print(f"[UndoManager] Skipping no-op operation: {operation}")
             return
         
         self.undo_stack.append(operation)
@@ -60,9 +59,7 @@ class UndoManager:
         # Enforce stack size limit
         if len(self.undo_stack) > self.limit:
             removed = self.undo_stack.pop(0)
-            print(f"[UndoManager] Stack limit reached, removed: {removed}")
         
-        print(f"[UndoManager] Pushed: {operation} (stack size: {len(self.undo_stack)})")
         self._notify_state_changed()
     
     def undo(self, canvas_manager) -> bool:
@@ -76,11 +73,9 @@ class UndoManager:
             True if undo was successful, False if nothing to undo
         """
         if not self.undo_stack:
-            print("[UndoManager] Nothing to undo")
             return False
         
         operation = self.undo_stack.pop()
-        print(f"[UndoManager] Undoing: {operation}")
         
         try:
             operation.undo(canvas_manager)
@@ -88,7 +83,6 @@ class UndoManager:
             self._notify_state_changed()
             return True
         except Exception as e:
-            print(f"[UndoManager] Error during undo: {e}")
             # Push back to undo stack on failure
             self.undo_stack.append(operation)
             return False
@@ -104,11 +98,9 @@ class UndoManager:
             True if redo was successful, False if nothing to redo
         """
         if not self.redo_stack:
-            print("[UndoManager] Nothing to redo")
             return False
         
         operation = self.redo_stack.pop()
-        print(f"[UndoManager] Redoing: {operation}")
         
         try:
             operation.redo(canvas_manager)
@@ -116,7 +108,6 @@ class UndoManager:
             self._notify_state_changed()
             return True
         except Exception as e:
-            print(f"[UndoManager] Error during redo: {e}")
             # Push back to redo stack on failure
             self.redo_stack.append(operation)
             return False
@@ -147,7 +138,6 @@ class UndoManager:
         """
         self.undo_stack.clear()
         self.redo_stack.clear()
-        print("[UndoManager] Cleared all undo/redo history")
         self._notify_state_changed()
     
     def set_state_changed_callback(self, callback: Callable[[bool, bool], None]):

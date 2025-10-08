@@ -266,8 +266,6 @@ class KEGGImportPanel:
                 # Get the canvas manager for this tab
                 manager = self.model_canvas.get_canvas_manager(drawing_area)
                 if manager:
-                    print(f"[KEGGImport] Loading pathway into canvas manager")
-                    print(f"[KEGGImport] Pathway has {len(document_model.places)} places, "
                           f"{len(document_model.transitions)} transitions, {len(document_model.arcs)} arcs")
                     
                     # Load the document model into the manager
@@ -286,7 +284,6 @@ class KEGGImportPanel:
                     # Mark as dirty to ensure redraw
                     manager.mark_dirty()
                     
-                    print(f"[KEGGImport] Pathway loaded successfully")
                     self._show_status(f"Pathway imported: {len(document_model.places)} places, "
                                     f"{len(document_model.transitions)} transitions, "
                                     f"{len(document_model.arcs)} arcs")

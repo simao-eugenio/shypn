@@ -350,7 +350,6 @@ class ModelCanvasLoader:
                 sim_widget = overlay_manager.simulate_palette.get_widget()
                 if sim_widget:
                     sim_widget.hide()
-            print(f"[ModelCanvasLoader] Initial state: Edit mode, [E] shown, [S] hidden")
             
             # Setup new OOP palette system
             self._setup_edit_palettes(overlay_widget, manager, drawing_area, overlay_manager)
@@ -437,13 +436,11 @@ class ModelCanvasLoader:
         # Wire undo/redo button state updates
         if hasattr(canvas_manager, 'undo_manager'):
             def update_undo_redo_buttons(can_undo, can_redo):
-                print(f"[ModelCanvasLoader] Updating undo/redo buttons: undo={can_undo}, redo={can_redo}")
                 operations_palette.update_undo_redo_state(can_undo, can_redo)
             canvas_manager.undo_manager.set_state_changed_callback(update_undo_redo_buttons)
             # Initialize button states
             initial_undo = canvas_manager.undo_manager.can_undo()
             initial_redo = canvas_manager.undo_manager.can_redo()
-            print(f"[ModelCanvasLoader] Initial undo/redo state: undo={initial_undo}, redo={initial_redo}")
             update_undo_redo_buttons(initial_undo, initial_redo)
         
         # Ensure overlay and all children are visible
@@ -457,7 +454,6 @@ class ModelCanvasLoader:
                 sim_widget = overlay_manager.simulate_palette.get_widget()
                 if sim_widget:
                     sim_widget.hide()
-                    print(f"[ModelCanvasLoader] [S] button explicitly hidden after show_all()")
         
         # DON'T show palettes initially - they should only appear in edit mode
         # palette_manager.show_all()  # Removed - mode change handler will show them
@@ -510,7 +506,6 @@ class ModelCanvasLoader:
             lasso_state['active'] = True
             canvas_manager.clear_tool()  # Deactivate other tools
             
-            print(f"[ModelCanvasLoader] Lasso selection activated - draw a shape to select objects")
             drawing_area.queue_draw()
         elif operation == 'undo':
             if hasattr(canvas_manager, 'undo_manager') and canvas_manager.undo_manager:
@@ -595,7 +590,6 @@ class ModelCanvasLoader:
                     palette_manager = self.palette_managers[drawing_area]
                     palette_manager.hide_all()
                 
-                print(f"[ModelCanvasLoader] Edit mode: [E] shown, [S] hidden, all tools palettes closed")
                 
             elif mode == 'sim':
                 # Switching to SIM mode:
@@ -618,7 +612,6 @@ class ModelCanvasLoader:
                     palette_manager = self.palette_managers[drawing_area]
                     palette_manager.hide_all()
                 
-                print(f"[ModelCanvasLoader] Sim mode: [S] shown, [E] hidden, edit palettes closed")
     
     def _on_edit_button_toggled(self, edit_palette, show, drawing_area):
         """Handle [E] button toggle for showing/hiding NEW OOP edit palettes.
@@ -632,10 +625,8 @@ class ModelCanvasLoader:
             palette_manager = self.palette_managers[drawing_area]
             if show:
                 palette_manager.show_all()
-                print(f"[ModelCanvasLoader] Edit palettes shown ([E] button toggled ON)")
             else:
                 palette_manager.hide_all()
-                print(f"[ModelCanvasLoader] Edit palettes hidden ([E] button toggled OFF)")
 
     def _on_tool_changed(self, tools_palette, tool_name, manager, drawing_area):
         """Handle tool selection change from edit tools palette.
@@ -1039,7 +1030,6 @@ class ModelCanvasLoader:
             if hasattr(manager, 'undo_manager') and manager.undo_manager:
                 if manager.undo_manager.undo(manager):
                     widget.queue_draw()
-                    print("[ModelCanvasLoader] Undo triggered by Ctrl+Z")
                 return True
         
         # Redo (Ctrl+Shift+Z)
@@ -1047,7 +1037,6 @@ class ModelCanvasLoader:
             if hasattr(manager, 'undo_manager') and manager.undo_manager:
                 if manager.undo_manager.redo(manager):
                     widget.queue_draw()
-                    print("[ModelCanvasLoader] Redo triggered by Ctrl+Shift+Z")
                 return True
         
         if event.keyval == Gdk.KEY_Escape:
@@ -1058,7 +1047,6 @@ class ModelCanvasLoader:
                     lasso_state['selector'].cancel_lasso()
                     lasso_state['active'] = False
                     widget.queue_draw()
-                    print("[ModelCanvasLoader] Lasso selection cancelled")
                     return True
             
             # Cancel transformation if active
@@ -1108,7 +1096,6 @@ class ModelCanvasLoader:
         # Render all objects
         all_objects = manager.get_all_objects()
         if len(all_objects) > 0 and len(manager.places) > 0:
-            print(f"[ModelCanvasLoader] Drawing {len(manager.places)} places, {len(manager.transitions)} transitions, {len(manager.arcs)} arcs")
         for obj in all_objects:
             obj.render(cr, zoom=manager.zoom)
         

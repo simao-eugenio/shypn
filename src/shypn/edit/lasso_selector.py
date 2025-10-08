@@ -76,7 +76,6 @@ class LassoSelector:
                 manager=self.canvas_manager
             )
         
-        print(f"[LassoSelector] Selected {len(selected)} object(s)")
         
         # Reset
         self.is_active = False

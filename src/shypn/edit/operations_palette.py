@@ -67,10 +67,8 @@ class OperationsPalette(BaseEditPalette):
                     self.edit_operations.canvas_manager.clear_tool()
             
             self.emit_tool_changed('select')
-            print("[OperationsPalette] Select mode activated")
         else:
             self.emit_tool_changed('')
-            print("[OperationsPalette] Select mode deactivated")
     
     def _on_lasso_clicked(self, button):
         """Handle lasso button click.
@@ -80,7 +78,6 @@ class OperationsPalette(BaseEditPalette):
         """
         if self.edit_operations:
             self.edit_operations.activate_lasso_mode()
-            print("[OperationsPalette] Lasso mode activated")
         else:
             print("[OperationsPalette] ERROR: edit_operations not set", file=sys.stderr)
     
@@ -92,7 +89,6 @@ class OperationsPalette(BaseEditPalette):
         """
         if self.edit_operations:
             self.edit_operations.undo()
-            print("[OperationsPalette] Undo triggered")
         else:
             print("[OperationsPalette] ERROR: edit_operations not set", file=sys.stderr)
     
@@ -104,7 +100,6 @@ class OperationsPalette(BaseEditPalette):
         """
         if self.edit_operations:
             self.edit_operations.redo()
-            print("[OperationsPalette] Redo triggered")
         else:
             print("[OperationsPalette] ERROR: edit_operations not set", file=sys.stderr)
     
@@ -180,4 +175,3 @@ class OperationsPalette(BaseEditPalette):
         )
         
         self._css_applied = True
-        print("[OperationsPalette] Light gray background with bottom shadow applied")

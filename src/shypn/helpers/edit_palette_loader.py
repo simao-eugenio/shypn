@@ -65,7 +65,6 @@ class EditPaletteLoader(GObject.GObject):
         self.tools_palette = None                     # ToolsPalette instance [P][T][A]
         self.operations_palette = None                # OperationsPalette instance [S][L][U][R]
         
-        print(f"[EditPalette] Initialized (will load UI from {self.ui_path})")
     
     def load(self):
         """Load the edit palette UI, apply zoom-style styling, and return the widget.
@@ -106,7 +105,6 @@ class EditPaletteLoader(GObject.GObject):
         # Connect button signal
         self.edit_toggle_button.connect('toggled', self._on_edit_toggled)
         
-        print(f"[EditPalette] Loaded and initialized with target size: {self.target_height}px")
         
         return self.edit_palette_container
     
@@ -130,10 +128,8 @@ class EditPaletteLoader(GObject.GObject):
             else:
                 self.target_height = 24  # Fallback
         except Exception as e:
-            print(f"[EditPalette] Warning: Font measurement failed, using 24px: {e}")
             self.target_height = 24
         
-        print(f"[EditPalette] Calculated target button size: {self.target_height}px")
     
     def _apply_css(self):
         """Apply zoom-style CSS with purple gradient container and green button.

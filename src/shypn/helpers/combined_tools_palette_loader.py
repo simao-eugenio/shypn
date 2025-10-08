@@ -315,47 +315,39 @@ class CombinedToolsPaletteLoader(GObject.GObject):
         """Handle Undo button click."""
         if self.edit_operations:
             self.edit_operations.undo()
-        print("[CombinedTools] Undo clicked")
     
     def _on_redo_clicked(self):
         """Handle Redo button click."""
         if self.edit_operations:
             self.edit_operations.redo()
-        print("[CombinedTools] Redo clicked")
     
     def _on_lasso_clicked(self):
         """Handle Lasso button click."""
-        print("[CombinedTools] Lasso clicked - TODO: Implement lasso selection")
     
     def _on_duplicate_clicked(self):
         """Handle Duplicate button click."""
         if self.edit_operations:
             self.edit_operations.duplicate_selection()
-        print("[CombinedTools] Duplicate clicked")
     
     def _on_align_clicked(self):
         """Handle Align button click."""
         if self.edit_operations:
             self.edit_operations.align_selected()
-        print("[CombinedTools] Align clicked")
     
     def _on_cut_clicked(self):
         """Handle Cut button click."""
         if self.edit_operations:
             self.edit_operations.cut()
-        print("[CombinedTools] Cut clicked")
     
     def _on_copy_clicked(self):
         """Handle Copy button click."""
         if self.edit_operations:
             self.edit_operations.copy()
-        print("[CombinedTools] Copy clicked")
     
     def _on_paste_clicked(self):
         """Handle Paste button click."""
         if self.edit_operations:
             self.edit_operations.paste()
-        print("[CombinedTools] Paste clicked")
     
     # ==================== Public API ====================
     

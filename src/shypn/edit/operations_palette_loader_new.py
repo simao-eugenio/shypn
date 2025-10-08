@@ -31,7 +31,6 @@ class OperationsPaletteLoader:
             OperationsPalette: Configured palette instance
         """
         self.palette = OperationsPalette()
-        print(f"[OperationsPaletteLoader] Loaded operations palette")
         return self.palette
     
     def get_palette(self) -> OperationsPalette:

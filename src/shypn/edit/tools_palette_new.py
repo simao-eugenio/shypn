@@ -65,7 +65,6 @@ class ToolsPalette(BasePalette):
         for button in self.buttons.values():
             self.content_box.pack_start(button, False, False, 0)
         
-        print(f"[ToolsPalette] Created {len(self.buttons)} tool buttons")
     
     def _create_tool_button(self, label: str, tooltip: str) -> Gtk.ToggleButton:
         """Create a styled tool toggle button.
@@ -116,13 +115,11 @@ class ToolsPalette(BasePalette):
             # Set as current tool
             self.current_tool = tool_name
             self.emit('tool-selected', tool_name)
-            print(f"[ToolsPalette] Tool activated: {tool_name}")
         else:
             # Tool deactivated - return to no tool
             if self.current_tool == tool_name:
                 self.current_tool = None
                 self.emit('tool-selected', '')
-                print(f"[ToolsPalette] Tool deactivated: {tool_name}")
     
     def _get_css(self) -> bytes:
         """Get tools palette CSS styling with dramatic floating effect.

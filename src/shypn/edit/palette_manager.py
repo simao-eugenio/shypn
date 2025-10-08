@@ -51,7 +51,6 @@ class PaletteManager:
         # Apply global palette CSS
         self._apply_global_css()
         
-        print(f"[PaletteManager] Initialized with overlay: {overlay}, reference: {reference_widget}")
     
     def calculate_relative_position(self, offset_x: int, palette_width: int):
         """Calculate positioning to place palette relative to reference widget.
@@ -74,7 +73,6 @@ class PaletteManager:
         ref_alloc = self.reference_widget.get_allocation()
         ref_center_x = ref_alloc.x + ref_alloc.width / 2
         
-        print(f"[PaletteManager] Reference widget at: x={ref_alloc.x}, w={ref_alloc.width}, center={ref_center_x}")
         
         # Calculate palette position:
         # palette_center = ref_center_x + offset_x
@@ -105,7 +103,6 @@ class PaletteManager:
         
         # Check for duplicate ID
         if palette_id in self.palettes:
-            print(f"[PaletteManager] Error: Palette '{palette_id}' already registered", 
                   file=sys.stderr)
             return False
         
@@ -120,7 +117,6 @@ class PaletteManager:
         # Store reference
         self.palettes[palette_id] = palette
         
-        print(f"[PaletteManager] Registered palette: {palette_id} at position {position}")
         return True
     
     def unregister_palette(self, palette_id: str) -> bool:
@@ -134,7 +130,6 @@ class PaletteManager:
         """
         palette = self.palettes.get(palette_id)
         if not palette:
-            print(f"[PaletteManager] Warning: Palette '{palette_id}' not found", 
                   file=sys.stderr)
             return False
         
@@ -148,7 +143,6 @@ class PaletteManager:
         # Remove from registry
         del self.palettes[palette_id]
         
-        print(f"[PaletteManager] Unregistered palette: {palette_id}")
         return True
     
     def get_palette(self, palette_id: str) -> Optional['BasePalette']:
@@ -176,7 +170,6 @@ class PaletteManager:
             palette.show()
             return True
         
-        print(f"[PaletteManager] Warning: Cannot show palette '{palette_id}' - not found", 
               file=sys.stderr)
         return False
     
@@ -194,7 +187,6 @@ class PaletteManager:
             palette.hide()
             return True
         
-        print(f"[PaletteManager] Warning: Cannot hide palette '{palette_id}' - not found", 
               file=sys.stderr)
         return False
     
@@ -212,7 +204,6 @@ class PaletteManager:
             palette.toggle()
             return True
         
-        print(f"[PaletteManager] Warning: Cannot toggle palette '{palette_id}' - not found", 
               file=sys.stderr)
         return False
     
@@ -220,13 +211,11 @@ class PaletteManager:
         """Show all registered palettes."""
         for palette_id, palette in self.palettes.items():
             palette.show()
-        print(f"[PaletteManager] Showing all {len(self.palettes)} palettes")
     
     def hide_all(self):
         """Hide all registered palettes."""
         for palette_id, palette in self.palettes.items():
             palette.hide()
-        print(f"[PaletteManager] Hiding all {len(self.palettes)} palettes")
     
     def is_palette_visible(self, palette_id: str) -> bool:
         """Check if specific palette is visible.
@@ -321,7 +310,5 @@ class PaletteManager:
                 Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
             )
             
-            print("[PaletteManager] Global palette CSS applied with floating effects")
         except Exception as e:
-            print(f"[PaletteManager] Warning: Global CSS styling failed: {e}", 
                   file=sys.stderr)

@@ -132,74 +132,32 @@ class TimedBehavior(TransitionBehavior):
         is_source = getattr(self.transition, 'is_source', False)
         is_sink = getattr(self.transition, 'is_sink', False)
         
-        # Debug for sink and source transitions
-        DEBUG_SINK_CAN_FIRE = True
-        DEBUG_SOURCE_CAN_FIRE = True
-        if DEBUG_SINK_CAN_FIRE and is_sink:
-            print(f"[TIMED CAN_FIRE] Checking sink transition {getattr(self.transition, 'name', '?')}: is_sink={is_sink}")
-        if DEBUG_SOURCE_CAN_FIRE and is_source:
-            print(f"[TIMED CAN_FIRE] Checking source transition {getattr(self.transition, 'name', '?')}: is_source={is_source}")
-        
         guard_passes, guard_reason = self._evaluate_guard()
         if not guard_passes:
-            if DEBUG_SINK_CAN_FIRE and is_sink:
-                print(f"[TIMED CAN_FIRE] Guard failed: {guard_reason}")
-            if DEBUG_SOURCE_CAN_FIRE and is_source:
-                print(f"[TIMED CAN_FIRE] Guard failed: {guard_reason}")
             return (False, guard_reason)
         
         # Check structural enablement (skip if source transition)
         if not is_source:
             input_arcs = self.get_input_arcs()
-            if DEBUG_SINK_CAN_FIRE and is_sink:
-                print(f"[TIMED CAN_FIRE] Checking {len(input_arcs)} input arcs")
             for arc in input_arcs:
                 kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
                 if kind != 'normal':
                     continue
                 source_place = self._get_place(arc.source_id)
                 if source_place is None:
-                    if DEBUG_SINK_CAN_FIRE and is_sink:
-                        print(f"[TIMED CAN_FIRE] Missing source place: P{arc.source_id}")
                     return (False, f'missing-source-place-{arc.source_id}')
                 if source_place.tokens < arc.weight:
-                    if DEBUG_SINK_CAN_FIRE and is_sink:
-                        print(f"[TIMED CAN_FIRE] Insufficient tokens: P{arc.source_id} has {source_place.tokens}, needs {arc.weight}")
                     return (False, f'insufficient-tokens-P{arc.source_id}')
-        else:
-            # Source transition - no input arcs needed
-            if DEBUG_SOURCE_CAN_FIRE:
-                print(f"[TIMED CAN_FIRE] Source transition - skipping input arc checks")
         
         if self._enablement_time is None:
-            if DEBUG_SINK_CAN_FIRE and is_sink:
-                print(f"[TIMED CAN_FIRE] Not enabled yet (enablement_time is None)")
-            if DEBUG_SOURCE_CAN_FIRE and is_source:
-                print(f"[TIMED CAN_FIRE] Not enabled yet (enablement_time is None)")
             return (False, 'not-enabled-yet')
         current_time = self._get_current_time()
         elapsed = current_time - self._enablement_time
         EPSILON = 1e-09
-        DEBUG = False
-        if DEBUG and hasattr(self.transition, 'name'):
-            pass
         if elapsed + EPSILON < self.earliest:
-            if DEBUG_SINK_CAN_FIRE and is_sink:
-                print(f"[TIMED CAN_FIRE] Too early: elapsed={elapsed:.3f}, earliest={self.earliest}")
-            if DEBUG_SOURCE_CAN_FIRE and is_source:
-                print(f"[TIMED CAN_FIRE] Too early: elapsed={elapsed:.3f}, earliest={self.earliest}")
             return (False, f'too-early (elapsed={elapsed:.3f}, earliest={self.earliest})')
         if elapsed > self.latest + EPSILON:
-            if DEBUG_SINK_CAN_FIRE and is_sink:
-                print(f"[TIMED CAN_FIRE] Too late: elapsed={elapsed:.3f}, latest={self.latest}")
-            if DEBUG_SOURCE_CAN_FIRE and is_source:
-                print(f"[TIMED CAN_FIRE] Too late: elapsed={elapsed:.3f}, latest={self.latest}")
             return (False, f'too-late (elapsed={elapsed:.3f}, latest={self.latest})')
-        
-        if DEBUG_SINK_CAN_FIRE and is_sink:
-            print(f"[TIMED CAN_FIRE] CAN FIRE: elapsed={elapsed:.3f}, window=[{self.earliest}, {self.latest}]")
-        if DEBUG_SOURCE_CAN_FIRE and is_source:
-            print(f"[TIMED CAN_FIRE] CAN FIRE: elapsed={elapsed:.3f}, window=[{self.earliest}, {self.latest}]")
         
         if is_source:
             return (True, f'enabled-source (elapsed={elapsed:.3f})')
@@ -248,14 +206,6 @@ class TimedBehavior(TransitionBehavior):
             is_source = getattr(self.transition, 'is_source', False)
             is_sink = getattr(self.transition, 'is_sink', False)
             
-            # Debug output for sink and source transitions
-            DEBUG_SINK = True
-            DEBUG_SOURCE = True
-            if DEBUG_SINK and is_sink:
-                print(f"[TIMED FIRE] Sink transition {getattr(self.transition, 'name', '?')}: is_sink={is_sink}, input_arcs={len(input_arcs)}, output_arcs={len(output_arcs)}")
-            if DEBUG_SOURCE and is_source:
-                print(f"[TIMED FIRE] Source transition {getattr(self.transition, 'name', '?')}: is_source={is_source}, input_arcs={len(input_arcs)}, output_arcs={len(output_arcs)}")
-            
             consumed_map = {}
             produced_map = {}
             current_time = self._get_current_time()
@@ -263,8 +213,6 @@ class TimedBehavior(TransitionBehavior):
             
             # Consume tokens from input places (skip if source transition)
             if not is_source:
-                if DEBUG_SINK and is_sink:
-                    print(f"[TIMED FIRE] Consuming tokens from {len(input_arcs)} input arcs")
                 for arc in input_arcs:
                     kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
                     if kind != 'normal':
@@ -275,50 +223,21 @@ class TimedBehavior(TransitionBehavior):
                     if source_place.tokens < arc.weight:
                         return (False, {'reason': 'insufficient-tokens', 'place_id': arc.source_id, 'required': arc.weight, 'available': source_place.tokens, 'timed_mode': True})
                     
-                    # Debug before consumption
-                    if DEBUG_SINK and is_sink:
-                        print(f"[TIMED FIRE]   Place P{arc.source_id}: {source_place.tokens} tokens -> consuming {arc.weight}")
-                    
                     source_place.set_tokens(source_place.tokens - arc.weight)
                     consumed_map[arc.source_id] = float(arc.weight)
-                    
-                    # Debug after consumption
-                    if DEBUG_SINK and is_sink:
-                        print(f"[TIMED FIRE]   Place P{arc.source_id}: {source_place.tokens} tokens (after consumption)")
-            else:
-                # Source transition - no consumption
-                if DEBUG_SOURCE:
-                    print(f"[TIMED FIRE] Skipping consumption (source transition)")
             
             # Produce tokens to output places (skip if sink transition)
             if not is_sink:
-                if DEBUG_SOURCE and is_source:
-                    print(f"[TIMED FIRE] Producing tokens to {len(output_arcs)} output arcs")
                 for arc in output_arcs:
                     target_place = self._get_place(arc.target_id)
                     if target_place is None:
                         continue
                     
-                    # Debug before production
-                    if DEBUG_SOURCE and is_source:
-                        print(f"[TIMED FIRE]   Place P{arc.target_id}: {target_place.tokens} tokens -> producing {arc.weight}")
-                    
                     target_place.set_tokens(target_place.tokens + arc.weight)
                     produced_map[arc.target_id] = float(arc.weight)
-                    
-                    # Debug after production
-                    if DEBUG_SOURCE and is_source:
-                        print(f"[TIMED FIRE]   Place P{arc.target_id}: {target_place.tokens} tokens (after production)")
-            elif DEBUG_SINK:
-                print(f"[TIMED FIRE] Skipping production (sink transition)")
             
             self.clear_enablement()
             self._record_event(consumed=consumed_map, produced=produced_map, mode='logical', transition_type='timed', elapsed_time=elapsed, timing_window=[self.earliest, self.latest])
-            
-            if DEBUG_SINK and is_sink:
-                print(f"[TIMED FIRE] Fire complete: consumed={consumed_map}, produced={produced_map}")
-            if DEBUG_SOURCE and is_source:
-                print(f"[TIMED FIRE] Fire complete: consumed={consumed_map}, produced={produced_map}")
             
             return (True, {'consumed': consumed_map, 'produced': produced_map, 'timed_mode': True, 'discrete_firing': True, 'transition_type': 'timed', 'elapsed_time': elapsed, 'timing_window': [self.earliest, self.latest], 'time': current_time})
         except Exception as e:
