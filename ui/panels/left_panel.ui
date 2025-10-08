@@ -250,7 +250,7 @@
               <object class="GtkEntry" id="current_file_entry">
                 <property name="visible">True</property>
                 <property name="editable">False</property>
-                <property name="text">models/default.shy</property>
+                <property name="text">workspace/examples/simple.shy</property>
                 <property name="has-frame">True</property>
                 <property name="width-chars">20</property>
                 <style>

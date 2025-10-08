@@ -42,16 +42,17 @@ class FileExplorer:
         sort_ascending: Sort direction (default: True)
     """
     
-    def __init__(self, base_path: Optional[str] = None, show_hidden: bool = False):
+    def __init__(self, base_path: Optional[str] = None, root_boundary: Optional[str] = None, show_hidden: bool = False):
         """Initialize the file explorer.
         
         Args:
             base_path: Starting directory (default: home directory)
+            root_boundary: Root boundary directory - cannot navigate above this (default: same as base_path)
             show_hidden: Whether to show hidden files (default: False)
         """
         self.current_path = base_path or str(Path.home())
         self.home_path = self.current_path  # Store home path for go_home()
-        self.root_boundary = self.home_path  # Don't navigate above this directory
+        self.root_boundary = root_boundary or self.home_path  # Don't navigate above this directory
         self.history_back: List[str] = []
         self.history_forward: List[str] = []
         self.show_hidden = show_hidden
@@ -66,10 +67,11 @@ class FileExplorer:
         if not os.path.isdir(self.current_path):
             self.current_path = str(Path.home())
             self.home_path = self.current_path
-            self.root_boundary = self.current_path
+            if root_boundary is None:
+                self.root_boundary = self.current_path
     
     def _is_within_boundary(self, path: str) -> bool:
-        """Check if path is within the root boundary (models directory).
+        """Check if path is within the root boundary (repository root).
         
         Args:
             path: Path to check
@@ -98,10 +100,10 @@ class FileExplorer:
                 self.on_error(f"Not a directory: {path}")
             return False
         
-        # Check if path is within boundary (models directory and subdirectories)
+        # Check if path is within boundary (repository root and subdirectories)
         if not self._is_within_boundary(path):
             if self.on_error:
-                self.on_error(f"Cannot navigate outside models directory")
+                self.on_error(f"Cannot navigate outside repository root")
             return False
         
         # Update history
@@ -184,7 +186,7 @@ class FileExplorer:
         return self.navigate_to(parent)
     
     def go_home(self) -> bool:
-        """Navigate to home directory (models directory).
+        """Navigate to home directory (repository root by default).
         
         Returns:
             bool: True (always succeeds)

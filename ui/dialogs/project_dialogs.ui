@@ -83,7 +83,7 @@
                 <child>
                   <object class="GtkLabel" id="new_project_location_hint">
                     <property name="visible">True</property>
-                    <property name="label">(Managed by shypn in data/projects/)</property>
+                    <property name="label">(Managed by shypn in workspace/projects/)</property>
                     <property name="xalign">0</property>
                     <style>
                       <class name="dim-label"/>
