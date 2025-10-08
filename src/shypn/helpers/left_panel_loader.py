@@ -6,7 +6,10 @@ The panel can exist in two states:
   - Detached: standalone floating window
   - Attached: content embedded in main window container (extreme left)
 
-The panel now includes a full file explorer powered by FileExplorerPanel controller.
+The panel now includes:
+  - Full file explorer powered by FileExplorerPanel controller
+  - Project management buttons (New Project, Open Project, Project Settings)
+  - Quit button for safe application exit
 """
 import os
 import sys
@@ -21,6 +24,8 @@ except Exception as e:
 
 # Import the FileExplorerPanel controller
 from shypn.helpers.file_explorer_panel import FileExplorerPanel
+from shypn.helpers.project_dialog_manager import ProjectDialogManager
+from shypn.data.project_models import get_project_manager
 
 
 class LeftPanelLoader:
@@ -63,9 +68,14 @@ class LeftPanelLoader:
         self._updating_button = False  # Flag to prevent recursive toggle events
         self.on_float_callback = None  # Callback to notify when panel floats
         self.on_attach_callback = None  # Callback to notify when panel attaches
+        self.on_quit_callback = None  # Callback when quit button is clicked
         
         # File explorer controller (will be instantiated after loading UI)
         self.file_explorer = None
+        
+        # Project management
+        self.project_manager = get_project_manager()
+        self.project_dialog_manager = None  # Will be instantiated after loading UI
     
     def load(self):
         """Load the panel UI and return the window.
@@ -108,10 +118,128 @@ class LeftPanelLoader:
         except Exception as e:
             pass  # Continue anyway - panel will work without file explorer
         
+        # Initialize project dialog manager
+        try:
+            self.project_dialog_manager = ProjectDialogManager(
+                parent_window=self.window,
+                ui_path=None  # Uses default path
+            )
+            # Setup callbacks
+            self.project_dialog_manager.on_project_created = self._on_project_created
+            self.project_dialog_manager.on_project_opened = self._on_project_opened
+            self.project_dialog_manager.on_project_closed = self._on_project_closed
+        except Exception as e:
+            print(f"Warning: Failed to initialize project dialog manager: {e}")
+        
+        # Connect project management buttons
+        self._connect_project_buttons()
+        
         # Hide window by default (will be shown when toggled)
         self.window.set_visible(False)
         
         return self.window
+    
+    def _connect_project_buttons(self):
+        """Connect project management button signals."""
+        if not self.builder:
+            return
+        
+        # New Project button
+        new_project_btn = self.builder.get_object('new_project_button')
+        if new_project_btn:
+            new_project_btn.connect('clicked', self._on_new_project_clicked)
+        
+        # Open Project button
+        open_project_btn = self.builder.get_object('open_project_button')
+        if open_project_btn:
+            open_project_btn.connect('clicked', self._on_open_project_clicked)
+        
+        # Project Settings button
+        project_settings_btn = self.builder.get_object('project_settings_button')
+        if project_settings_btn:
+            project_settings_btn.connect('clicked', self._on_project_settings_clicked)
+            # Store reference to enable/disable based on project state
+            self.project_settings_button = project_settings_btn
+        
+        # Quit button
+        quit_btn = self.builder.get_object('quit_button')
+        if quit_btn:
+            quit_btn.connect('clicked', self._on_quit_clicked)
+    
+    def _on_new_project_clicked(self, button):
+        """Handle New Project button click."""
+        if self.project_dialog_manager:
+            project = self.project_dialog_manager.show_new_project_dialog()
+            if project:
+                print(f"Created project: {project.name} at {project.base_path}")
+    
+    def _on_open_project_clicked(self, button):
+        """Handle Open Project button click."""
+        if self.project_dialog_manager:
+            project = self.project_dialog_manager.show_open_project_dialog()
+            if project:
+                print(f"Opened project: {project.name} from {project.base_path}")
+    
+    def _on_project_settings_clicked(self, button):
+        """Handle Project Settings button click."""
+        if self.project_dialog_manager:
+            saved = self.project_dialog_manager.show_project_properties_dialog()
+            if saved:
+                print("Project properties saved")
+    
+    def _on_quit_clicked(self, button):
+        """Handle Quit button click."""
+        # Check for unsaved changes
+        # TODO: Implement unsaved changes detection
+        
+        # For now, just notify callback if set
+        if self.on_quit_callback:
+            self.on_quit_callback()
+        else:
+            # Default behavior: quit application
+            Gtk.main_quit()
+    
+    def _on_project_created(self, project):
+        """Callback when a project is created.
+        
+        Args:
+            project: The newly created Project instance
+        """
+        # Enable project settings button
+        if hasattr(self, 'project_settings_button'):
+            self.project_settings_button.set_sensitive(True)
+        
+        # Update file browser to show project structure
+        if self.file_explorer:
+            # Navigate to project base path
+            self.file_explorer.navigate_to(project.base_path)
+        
+        print(f"Project created: {project.name}")
+    
+    def _on_project_opened(self, project):
+        """Callback when a project is opened.
+        
+        Args:
+            project: The opened Project instance
+        """
+        # Enable project settings button
+        if hasattr(self, 'project_settings_button'):
+            self.project_settings_button.set_sensitive(True)
+        
+        # Update file browser to show project structure
+        if self.file_explorer:
+            # Navigate to project base path
+            self.file_explorer.navigate_to(project.base_path)
+        
+        print(f"Project opened: {project.name}")
+    
+    def _on_project_closed(self):
+        """Callback when a project is closed."""
+        # Disable project settings button
+        if hasattr(self, 'project_settings_button'):
+            self.project_settings_button.set_sensitive(False)
+        
+        print("Project closed")
     
     def _on_float_toggled(self, button):
         """Internal callback when float toggle button is clicked."""
