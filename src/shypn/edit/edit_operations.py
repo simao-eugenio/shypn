@@ -110,7 +110,6 @@ class EditOperations:
         if hasattr(self.canvas_manager, 'undo_manager'):
             self.canvas_manager.undo_manager.push(operation)
             self._notify_state_changed()
-        else:
     
     def can_undo(self):
         """Check if undo is available.

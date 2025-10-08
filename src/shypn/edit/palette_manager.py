@@ -103,7 +103,6 @@ class PaletteManager:
         
         # Check for duplicate ID
         if palette_id in self.palettes:
-                  file=sys.stderr)
             return False
         
         # Set position
@@ -130,7 +129,6 @@ class PaletteManager:
         """
         palette = self.palettes.get(palette_id)
         if not palette:
-                  file=sys.stderr)
             return False
         
         # Hide first
@@ -170,7 +168,6 @@ class PaletteManager:
             palette.show()
             return True
         
-              file=sys.stderr)
         return False
     
     def hide_palette(self, palette_id: str) -> bool:
@@ -187,7 +184,6 @@ class PaletteManager:
             palette.hide()
             return True
         
-              file=sys.stderr)
         return False
     
     def toggle_palette(self, palette_id: str) -> bool:
@@ -204,7 +200,6 @@ class PaletteManager:
             palette.toggle()
             return True
         
-              file=sys.stderr)
         return False
     
     def show_all(self):
@@ -311,4 +306,4 @@ class PaletteManager:
             )
             
         except Exception as e:
-                  file=sys.stderr)
+            pass
