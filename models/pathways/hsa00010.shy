@@ -1,0 +1,2781 @@
+{
+  "version": "2.0",
+  "metadata": {
+    "created": "2025-10-07T19:35:26.229454",
+    "object_counts": {
+      "places": 31,
+      "transitions": 34,
+      "arcs": 73
+    }
+  },
+  "view_state": {
+    "zoom": 1.0,
+    "pan_x": 0.0,
+    "pan_y": 0.0
+  },
+  "places": [
+    {
+      "id": "P45",
+      "name": 0,
+      "label": "C00033",
+      "type": "place",
+      "x": 365.0,
+      "y": 2395.0,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P87",
+      "name": 0,
+      "label": "C00031",
+      "type": "place",
+      "x": 1502.5,
+      "y": 487.5,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P88",
+      "name": 0,
+      "label": "C00103",
+      "type": "place",
+      "x": 1207.5,
+      "y": 357.5,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P89",
+      "name": 0,
+      "label": "C00631",
+      "type": "place",
+      "x": 1207.5,
+      "y": 1660.0,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P90",
+      "name": 0,
+      "label": "C00267",
+      "type": "place",
+      "x": 432.5,
+      "y": 570.0,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P91",
+      "name": 0,
+      "label": "C00221",
+      "type": "place",
+      "x": 432.5,
+      "y": 757.5,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P92",
+      "name": 0,
+      "label": "C00111",
+      "type": "place",
+      "x": 830.0,
+      "y": 1120.0,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P93",
+      "name": 0,
+      "label": "C01172",
+      "type": "place",
+      "x": 810.0,
+      "y": 757.5,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P94",
+      "name": 0,
+      "label": "C00668",
+      "type": "place",
+      "x": 1207.5,
+      "y": 575.0,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P95",
+      "name": 0,
+      "label": "C00085",
+      "type": "place",
+      "x": 1207.5,
+      "y": 757.5,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P96",
+      "name": 0,
+      "label": "C00074",
+      "type": "place",
+      "x": 1207.5,
+      "y": 1840.0,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P97",
+      "name": 0,
+      "label": "C00197",
+      "type": "place",
+      "x": 1207.5,
+      "y": 1480.0,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P98",
+      "name": 0,
+      "label": "C00236",
+      "type": "place",
+      "x": 1207.5,
+      "y": 1300.0,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P99",
+      "name": 0,
+      "label": "C00186",
+      "type": "place",
+      "x": 1567.5,
+      "y": 2170.0,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P100",
+      "name": 0,
+      "label": "C15972",
+      "type": "place",
+      "x": 785.0,
+      "y": 2277.5,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P101",
+      "name": 0,
+      "label": "C00469",
+      "type": "place",
+      "x": 1375.0,
+      "y": 2395.0,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P102",
+      "name": 0,
+      "label": "C00022",
+      "type": "place",
+      "x": 1207.5,
+      "y": 2170.0,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P103",
+      "name": 0,
+      "label": "C05125",
+      "type": "place",
+      "x": 945.0,
+      "y": 2170.0,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P104",
+      "name": 0,
+      "label": "C00024",
+      "type": "place",
+      "x": 365.0,
+      "y": 2170.0,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P105",
+      "name": 0,
+      "label": "C00084",
+      "type": "place",
+      "x": 945.0,
+      "y": 2395.0,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P106",
+      "name": 0,
+      "label": "C16255",
+      "type": "place",
+      "x": 662.5,
+      "y": 2170.0,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P107",
+      "name": 0,
+      "label": "C15973",
+      "type": "place",
+      "x": 530.0,
+      "y": 2277.5,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P108",
+      "name": 0,
+      "label": "C00354",
+      "type": "place",
+      "x": 1207.5,
+      "y": 932.5,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P109",
+      "name": 0,
+      "label": "C06186",
+      "type": "place",
+      "x": 310.0,
+      "y": 897.5,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P110",
+      "name": 0,
+      "label": "C06187",
+      "type": "place",
+      "x": 577.5,
+      "y": 897.5,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P111",
+      "name": 0,
+      "label": "C06188",
+      "type": "place",
+      "x": 577.5,
+      "y": 985.0,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P112",
+      "name": 0,
+      "label": "C01451",
+      "type": "place",
+      "x": 310.0,
+      "y": 985.0,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P118",
+      "name": 0,
+      "label": "C00036",
+      "type": "place",
+      "x": 365.0,
+      "y": 1840.0,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P134",
+      "name": 0,
+      "label": "C01159",
+      "type": "place",
+      "x": 1420.0,
+      "y": 1390.0,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P139",
+      "name": 0,
+      "label": "C00118",
+      "type": "place",
+      "x": 1207.5,
+      "y": 1120.0,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P146",
+      "name": 0,
+      "label": "C00068",
+      "type": "place",
+      "x": 945.0,
+      "y": 2062.5,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "id": "T42",
+      "name": 0,
+      "label": "ALDH2",
+      "type": "transition",
+      "x": 710.0,
+      "y": 2370.0,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "immediate",
+      "priority": 0,
+      "is_source": false,
+      "is_sink": false
+    },
+    {
+      "id": "T44",
+      "name": 0,
+      "label": "ALDH3A1",
+      "type": "transition",
+      "x": 647.5,
+      "y": 2422.5,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "immediate",
+      "priority": 0,
+      "is_source": false,
+      "is_sink": false
+    },
+    {
+      "id": "T49",
+      "name": 0,
+      "label": "AKR1A1",
+      "type": "transition",
+      "x": 1217.5,
+      "y": 2370.0,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "immediate",
+      "priority": 0,
+      "is_source": false,
+      "is_sink": false
+    },
+    {
+      "id": "T50",
+      "name": 0,
+      "label": "ADH1A",
+      "type": "transition",
+      "x": 1097.5,
+      "y": 2352.5,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "immediate",
+      "priority": 0,
+      "is_source": false,
+      "is_sink": false
+    },
+    {
+      "id": "T52",
+      "name": 0,
+      "label": "PDHA1",
+      "type": "transition",
+      "x": 1077.5,
+      "y": 2145.0,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "immediate",
+      "priority": 0,
+      "is_source": false,
+      "is_sink": false
+    },
+    {
+      "id": "T53",
+      "name": 0,
+      "label": "PDHA1",
+      "type": "transition",
+      "x": 797.5,
+      "y": 2175.0,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "immediate",
+      "priority": 0,
+      "is_source": false,
+      "is_sink": false
+    },
+    {
+      "id": "T54",
+      "name": 0,
+      "label": "DLAT",
+      "type": "transition",
+      "x": 525.0,
+      "y": 2175.0,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "immediate",
+      "priority": 0,
+      "is_source": false,
+      "is_sink": false
+    },
+    {
+      "id": "T55",
+      "name": 0,
+      "label": "LDHAL6A",
+      "type": "transition",
+      "x": 1447.5,
+      "y": 2172.5,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "immediate",
+      "priority": 0,
+      "is_source": false,
+      "is_sink": false
+    },
+    {
+      "id": "T57",
+      "name": 0,
+      "label": "PKLR",
+      "type": "transition",
+      "x": 1207.5,
+      "y": 1927.5,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "immediate",
+      "priority": 0,
+      "is_source": false,
+      "is_sink": false
+    },
+    {
+      "id": "T59",
+      "name": 0,
+      "label": "ENO1",
+      "type": "transition",
+      "x": 1207.5,
+      "y": 1752.5,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "immediate",
+      "priority": 0,
+      "is_source": false,
+      "is_sink": false
+    },
+    {
+      "id": "T60",
+      "name": 0,
+      "label": "PGAM4",
+      "type": "transition",
+      "x": 1145.0,
+      "y": 1580.0,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "immediate",
+      "priority": 0,
+      "is_source": false,
+      "is_sink": false
+    },
+    {
+      "id": "T61",
+      "name": 0,
+      "label": "GAPDH",
+      "type": "transition",
+      "x": 1145.0,
+      "y": 1210.0,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "immediate",
+      "priority": 0,
+      "is_source": false,
+      "is_sink": false
+    },
+    {
+      "id": "T62",
+      "name": 0,
+      "label": "TPI1",
+      "type": "transition",
+      "x": 965.0,
+      "y": 1122.5,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "immediate",
+      "priority": 0,
+      "is_source": false,
+      "is_sink": false
+    },
+    {
+      "id": "T18",
+      "name": 0,
+      "label": "ALDOA",
+      "type": "transition",
+      "x": 1207.5,
+      "y": 1017.5,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "immediate",
+      "priority": 0,
+      "is_source": false,
+      "is_sink": false
+    },
+    {
+      "id": "T63",
+      "name": 0,
+      "label": "PFKL",
+      "type": "transition",
+      "x": 1145.0,
+      "y": 847.5,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "immediate",
+      "priority": 0,
+      "is_source": false,
+      "is_sink": false
+    },
+    {
+      "id": "T64",
+      "name": 0,
+      "label": "FBP1",
+      "type": "transition",
+      "x": 1020.0,
+      "y": 847.5,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "immediate",
+      "priority": 0,
+      "is_source": false,
+      "is_sink": false
+    },
+    {
+      "id": "T66",
+      "name": 0,
+      "label": "GPI",
+      "type": "transition",
+      "x": 1207.5,
+      "y": 670.0,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "immediate",
+      "priority": 0,
+      "is_source": false,
+      "is_sink": false
+    },
+    {
+      "id": "T67",
+      "name": 0,
+      "label": "PGM1",
+      "type": "transition",
+      "x": 1207.5,
+      "y": 445.0,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "immediate",
+      "priority": 0,
+      "is_source": false,
+      "is_sink": false
+    },
+    {
+      "id": "T69",
+      "name": 0,
+      "label": "HK1",
+      "type": "transition",
+      "x": 547.5,
+      "y": 732.5,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "immediate",
+      "priority": 0,
+      "is_source": false,
+      "is_sink": false
+    },
+    {
+      "id": "T70",
+      "name": 0,
+      "label": "GCK",
+      "type": "transition",
+      "x": 547.5,
+      "y": 785.0,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "immediate",
+      "priority": 0,
+      "is_source": false,
+      "is_sink": false
+    },
+    {
+      "id": "T71",
+      "name": 0,
+      "label": "GPI",
+      "type": "transition",
+      "x": 872.5,
+      "y": 670.0,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "immediate",
+      "priority": 0,
+      "is_source": false,
+      "is_sink": false
+    },
+    {
+      "id": "T73",
+      "name": 0,
+      "label": "GALM",
+      "type": "transition",
+      "x": 432.5,
+      "y": 670.0,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "immediate",
+      "priority": 0,
+      "is_source": false,
+      "is_sink": false
+    },
+    {
+      "id": "T74",
+      "name": 0,
+      "label": "GCK",
+      "type": "transition",
+      "x": 547.5,
+      "y": 597.5,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "immediate",
+      "priority": 0,
+      "is_source": false,
+      "is_sink": false
+    },
+    {
+      "id": "T75",
+      "name": 0,
+      "label": "HK1",
+      "type": "transition",
+      "x": 547.5,
+      "y": 545.0,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "immediate",
+      "priority": 0,
+      "is_source": false,
+      "is_sink": false
+    },
+    {
+      "id": "T76",
+      "name": 0,
+      "label": "G6PC1",
+      "type": "transition",
+      "x": 805.0,
+      "y": 482.5,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "immediate",
+      "priority": 0,
+      "is_source": false,
+      "is_sink": false
+    },
+    {
+      "id": "T79",
+      "name": 0,
+      "label": "DLD",
+      "type": "transition",
+      "x": 655.0,
+      "y": 2282.5,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "immediate",
+      "priority": 0,
+      "is_source": false,
+      "is_sink": false
+    },
+    {
+      "id": "T80",
+      "name": 0,
+      "label": "PGK1",
+      "type": "transition",
+      "x": 1207.5,
+      "y": 1392.5,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "immediate",
+      "priority": 0,
+      "is_source": false,
+      "is_sink": false
+    },
+    {
+      "id": "T117",
+      "name": 0,
+      "label": "PCK1",
+      "type": "transition",
+      "x": 597.5,
+      "y": 1815.0,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "immediate",
+      "priority": 0,
+      "is_source": false,
+      "is_sink": false
+    },
+    {
+      "id": "T137",
+      "name": 0,
+      "label": "BPGM",
+      "type": "transition",
+      "x": 1327.5,
+      "y": 1482.5,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "immediate",
+      "priority": 0,
+      "is_source": false,
+      "is_sink": false
+    },
+    {
+      "id": "T138",
+      "name": 0,
+      "label": "BPGM",
+      "type": "transition",
+      "x": 1327.5,
+      "y": 1302.5,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "immediate",
+      "priority": 0,
+      "is_source": false,
+      "is_sink": false
+    },
+    {
+      "id": "T140",
+      "name": 0,
+      "label": "ACSS2",
+      "type": "transition",
+      "x": 240.0,
+      "y": 2290.0,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "immediate",
+      "priority": 0,
+      "is_source": false,
+      "is_sink": false
+    },
+    {
+      "id": "T143",
+      "name": 0,
+      "label": "ADPGK",
+      "type": "transition",
+      "x": 667.5,
+      "y": 597.5,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "immediate",
+      "priority": 0,
+      "is_source": false,
+      "is_sink": false
+    },
+    {
+      "id": "T144",
+      "name": 0,
+      "label": "ADPGK",
+      "type": "transition",
+      "x": 667.5,
+      "y": 785.0,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "immediate",
+      "priority": 0,
+      "is_source": false,
+      "is_sink": false
+    },
+    {
+      "id": "T150",
+      "name": 0,
+      "label": "MINPP1",
+      "type": "transition",
+      "x": 1427.5,
+      "y": 1575.0,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "immediate",
+      "priority": 0,
+      "is_source": false,
+      "is_sink": false
+    }
+  ],
+  "arcs": [
+    {
+      "id": "A1",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P105",
+      "source_type": "place",
+      "target_id": "T42",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A2",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T42",
+      "source_type": "transition",
+      "target_id": "P45",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A3",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P105",
+      "source_type": "place",
+      "target_id": "T44",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A4",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T44",
+      "source_type": "transition",
+      "target_id": "P45",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A5",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P101",
+      "source_type": "place",
+      "target_id": "T49",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A6",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T49",
+      "source_type": "transition",
+      "target_id": "P105",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A7",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P101",
+      "source_type": "place",
+      "target_id": "T50",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A8",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T50",
+      "source_type": "transition",
+      "target_id": "P105",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A9",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P146",
+      "source_type": "place",
+      "target_id": "T52",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A10",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P102",
+      "source_type": "place",
+      "target_id": "T52",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A11",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T52",
+      "source_type": "transition",
+      "target_id": "P103",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A12",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P103",
+      "source_type": "place",
+      "target_id": "T53",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A13",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P100",
+      "source_type": "place",
+      "target_id": "T53",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A14",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T53",
+      "source_type": "transition",
+      "target_id": "P146",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A15",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T53",
+      "source_type": "transition",
+      "target_id": "P106",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A16",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P107",
+      "source_type": "place",
+      "target_id": "T54",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A17",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P104",
+      "source_type": "place",
+      "target_id": "T54",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A18",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T54",
+      "source_type": "transition",
+      "target_id": "P106",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A19",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P99",
+      "source_type": "place",
+      "target_id": "T55",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A20",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T55",
+      "source_type": "transition",
+      "target_id": "P102",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A21",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P96",
+      "source_type": "place",
+      "target_id": "T57",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A22",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T57",
+      "source_type": "transition",
+      "target_id": "P102",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A23",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P89",
+      "source_type": "place",
+      "target_id": "T59",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A24",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T59",
+      "source_type": "transition",
+      "target_id": "P96",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A25",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P89",
+      "source_type": "place",
+      "target_id": "T60",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A26",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T60",
+      "source_type": "transition",
+      "target_id": "P97",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A27",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P139",
+      "source_type": "place",
+      "target_id": "T61",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A28",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T61",
+      "source_type": "transition",
+      "target_id": "P98",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A29",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P139",
+      "source_type": "place",
+      "target_id": "T62",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A30",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T62",
+      "source_type": "transition",
+      "target_id": "P92",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A31",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P108",
+      "source_type": "place",
+      "target_id": "T18",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A32",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T18",
+      "source_type": "transition",
+      "target_id": "P139",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A33",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T18",
+      "source_type": "transition",
+      "target_id": "P92",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A34",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P95",
+      "source_type": "place",
+      "target_id": "T63",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A35",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T63",
+      "source_type": "transition",
+      "target_id": "P108",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A36",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P108",
+      "source_type": "place",
+      "target_id": "T64",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A37",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T64",
+      "source_type": "transition",
+      "target_id": "P95",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A38",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P94",
+      "source_type": "place",
+      "target_id": "T66",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A39",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T66",
+      "source_type": "transition",
+      "target_id": "P95",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A40",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P88",
+      "source_type": "place",
+      "target_id": "T67",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A41",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T67",
+      "source_type": "transition",
+      "target_id": "P94",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A42",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P91",
+      "source_type": "place",
+      "target_id": "T69",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A43",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T69",
+      "source_type": "transition",
+      "target_id": "P93",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A44",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P91",
+      "source_type": "place",
+      "target_id": "T70",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A45",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T70",
+      "source_type": "transition",
+      "target_id": "P93",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A46",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P94",
+      "source_type": "place",
+      "target_id": "T71",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A47",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T71",
+      "source_type": "transition",
+      "target_id": "P93",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A48",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P90",
+      "source_type": "place",
+      "target_id": "T73",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A49",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T73",
+      "source_type": "transition",
+      "target_id": "P91",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A50",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P90",
+      "source_type": "place",
+      "target_id": "T74",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A51",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T74",
+      "source_type": "transition",
+      "target_id": "P94",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A52",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P90",
+      "source_type": "place",
+      "target_id": "T75",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A53",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T75",
+      "source_type": "transition",
+      "target_id": "P94",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A54",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P94",
+      "source_type": "place",
+      "target_id": "T76",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A55",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T76",
+      "source_type": "transition",
+      "target_id": "P90",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A56",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P107",
+      "source_type": "place",
+      "target_id": "T79",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A57",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T79",
+      "source_type": "transition",
+      "target_id": "P100",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A58",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P97",
+      "source_type": "place",
+      "target_id": "T80",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A59",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T80",
+      "source_type": "transition",
+      "target_id": "P98",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A60",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P118",
+      "source_type": "place",
+      "target_id": "T117",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A61",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T117",
+      "source_type": "transition",
+      "target_id": "P96",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A62",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P134",
+      "source_type": "place",
+      "target_id": "T137",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A63",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T137",
+      "source_type": "transition",
+      "target_id": "P97",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A64",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P98",
+      "source_type": "place",
+      "target_id": "T138",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A65",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T138",
+      "source_type": "transition",
+      "target_id": "P134",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A66",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P45",
+      "source_type": "place",
+      "target_id": "T140",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A67",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T140",
+      "source_type": "transition",
+      "target_id": "P104",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A68",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P90",
+      "source_type": "place",
+      "target_id": "T143",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A69",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T143",
+      "source_type": "transition",
+      "target_id": "P94",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A70",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P91",
+      "source_type": "place",
+      "target_id": "T144",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A71",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T144",
+      "source_type": "transition",
+      "target_id": "P93",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A72",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P134",
+      "source_type": "place",
+      "target_id": "T150",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A73",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T150",
+      "source_type": "transition",
+      "target_id": "P89",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    }
+  ]
+}

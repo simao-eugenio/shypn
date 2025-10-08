@@ -43,6 +43,7 @@ except Exception as e:
 try:
 	from shypn.helpers.left_panel_loader import create_left_panel
 	from shypn.helpers.right_panel_loader import create_right_panel
+	from shypn.helpers.pathway_panel_loader import create_pathway_panel
 	from shypn.helpers.model_canvas_loader import create_model_canvas
 	from shypn.file import create_persistency_manager
 except ImportError as e:
@@ -202,6 +203,14 @@ def main(argv=None):
 			print(f'ERROR: Failed to load right panel: {e}', file=sys.stderr)
 			sys.exit(5)
 		
+		# Load pathway panel via its loader
+		try:
+			pathway_panel_loader = create_pathway_panel(model_canvas=model_canvas_loader)
+			print("[Main] Pathway panel loaded successfully")
+		except Exception as e:
+			print(f'WARNING: Failed to load pathway panel: {e}', file=sys.stderr)
+			pathway_panel_loader = None
+		
 		# Wire right panel loader to canvas loader
 		# This allows tab switching to update the right panel's data collector
 		model_canvas_loader.set_right_panel_loader(right_panel_loader)
@@ -232,6 +241,7 @@ def main(argv=None):
 		# Get toggle buttons first (needed for callbacks)
 		left_toggle = main_builder.get_object('left_panel_toggle')
 		right_toggle = main_builder.get_object('right_panel_toggle')
+		pathway_toggle = main_builder.get_object('pathway_panel_toggle')
 
 		# Define toggle handlers (needed for callbacks to reference)
 		def on_left_toggle(button):
@@ -265,6 +275,14 @@ def main(argv=None):
 		def on_right_toggle(button):
 			is_active = button.get_active()
 			if is_active:
+				# Hide pathway panel if visible
+				if pathway_toggle and pathway_toggle.get_active():
+					pathway_toggle.handler_block_by_func(on_pathway_toggle)
+					pathway_toggle.set_active(False)
+					pathway_toggle.handler_unblock_by_func(on_pathway_toggle)
+					if pathway_panel_loader:
+						pathway_panel_loader.hide()
+				
 				# Attach to extreme right of main window
 				right_panel_loader.attach_to(right_dock_area, parent_window=window)
 				# Adjust paned position to show panel (show last 280px for right panel)
@@ -339,6 +357,42 @@ def main(argv=None):
 				right_toggle.set_active(True)
 				right_toggle.handler_unblock_by_func(on_right_toggle)
 		
+		# Define pathway panel toggle handler (if panel loaded)
+		def on_pathway_toggle(button):
+			"""Toggle pathway panel docked in right area (mutually exclusive with Analyses)."""
+			if not pathway_panel_loader:
+				return  # Panel not loaded
+			
+			is_active = button.get_active()
+			if is_active:
+				# Hide analyses panel if visible
+				if right_toggle and right_toggle.get_active():
+					right_toggle.handler_block_by_func(on_right_toggle)
+					right_toggle.set_active(False)
+					right_toggle.handler_unblock_by_func(on_right_toggle)
+					right_panel_loader.hide()
+				
+				# Attach pathway panel to right dock area
+				pathway_panel_loader.attach_to(right_dock_area, parent_window=window)
+				# Adjust paned position to show right panel (show last 320px for pathway panel)
+				if right_paned:
+					try:
+						paned_width = right_paned.get_width()
+						if paned_width > 320:
+							right_paned.set_position(paned_width - 320)
+					except Exception:
+						pass  # Ignore paned errors
+			else:
+				# Detach and hide
+				pathway_panel_loader.hide()
+				# Reset paned position to hide panel (full width)
+				if right_paned:
+					try:
+						paned_width = right_paned.get_width()
+						right_paned.set_position(paned_width)
+					except Exception:
+						pass  # Ignore paned errors
+		
 		# Wire up callbacks
 		left_panel_loader.on_float_callback = on_left_float
 		left_panel_loader.on_attach_callback = on_left_attach
@@ -351,6 +405,9 @@ def main(argv=None):
 
 		if right_toggle is not None:
 			right_toggle.connect('toggled', on_right_toggle)
+		
+		if pathway_toggle is not None and pathway_panel_loader:
+			pathway_toggle.connect('toggled', on_pathway_toggle)
 		
 		# Get minimize/maximize buttons
 		minimize_button = main_builder.get_object('minimize_button')
