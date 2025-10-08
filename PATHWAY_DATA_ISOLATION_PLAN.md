@@ -21,7 +21,7 @@ This mixing can cause:
 ```
 models/
 ├── pathway/
-│   ├── external/          # NEW - Transient external data
+│   ├── external/          # NEW - Transient external data (NOT user-owned)
 │   │   ├── kegg/          # KEGG-fetched pathways (temporary cache)
 │   │   │   ├── hsa00010.xml      # Raw KGML from KEGG
 │   │   │   ├── hsa00010.json     # Parsed pathway metadata
@@ -29,22 +29,39 @@ models/
 │   │   │
 │   │   └── reactome/      # Future: Other pathway databases
 │   │
-│   ├── project/           # NEW - User's project pathways
-│   │   ├── glycolysis_modified.shypn   # User-edited pathway
-│   │   ├── my_custom_pathway.shypn     # User-created pathway
-│   │   └── project_index.json          # Project pathway registry
-│   │
-│   └── templates/         # NEW - Reusable pathway templates
-│       ├── basic_metabolism.shypn
-│       └── signaling_cascade.shypn
+│   └── templates/         # NEW - Application-provided templates
+│       ├── basic_metabolism.shy
+│       └── signaling_cascade.shy
 │
 data/
-├── projects/              # EXISTING - Project files
-│   └── [project_name]/
-│       ├── pathways/      # NEW - Pathways specific to this project
-│       │   ├── pathway1.shypn
-│       │   └── pathway2.shypn
-│       └── metadata.json  # Project metadata including pathway refs
+├── projects/              # NEW - Local project management
+│   ├── project_index.json       # Registry of all local projects
+│   ├── recent_projects.json     # Recently opened projects
+│   │
+│   └── [project_id]/            # Individual project directory
+│       ├── project.shy          # Main project file (metadata)
+│       ├── models/              # Petri net models in this project
+│       │   ├── model1.shy       # Individual model files
+│       │   ├── model2.shy
+│       │   └── model_index.json
+│       │
+│       ├── pathways/            # Imported/edited pathways
+│       │   ├── glycolysis.shy   # Pathway converted to Petri net
+│       │   ├── signaling.shy
+│       │   └── pathway_index.json
+│       │
+│       ├── simulations/         # Simulation results & configs
+│       │   ├── sim1.json
+│       │   └── sim2.json
+│       │
+│       ├── exports/             # Exported files
+│       │   ├── model1.pnml
+│       │   └── pathway1.svg
+│       │
+│       └── metadata/            # Project-level metadata
+│           ├── settings.json    # Project settings
+│           ├── history.json     # Edit history
+│           └── tags.json        # User-defined tags
 │
 └── cache/                 # NEW - Application-wide cache
     ├── kegg/              # KEGG cache (auto-cleaned)
@@ -93,13 +110,13 @@ User Action: Import Pathway
     ↓
 [User Edits] → Modifications applied
     ↓
-[Save] → data/projects/[project]/pathways/glycolysis_v1.shypn
+[Save] → data/projects/[project_id]/pathways/glycolysis_v1.shy
     ↓
 [Project Registry] → Links pathway to project
 ```
 
 **Characteristics:**
-- ✅ Stored in `data/projects/[project]/pathways/`
+- ✅ Stored in `data/projects/[project_id]/pathways/`
 - ✅ Marked as `source: "imported_from_kegg"` + original KEGG ID
 - ✅ Has `import_date` and `modified_date` timestamps
 - ✅ Preserves KEGG metadata as reference
@@ -167,7 +184,7 @@ class ProjectPathway:
     
     # Data
     document_model: DocumentModel  # User's editable Petri net
-    file_path: Path           # data/projects/[project]/pathways/name.shypn
+    file_path: Path           # data/projects/[project_id]/pathways/name.shy
     
     # Version control
     version: int              # Local version number
@@ -197,36 +214,256 @@ class PathwayCache:
     def get_cache_info(self) -> CacheInfo
 ```
 
+### 4. Project (Local Project Management)
+
+```python
+class Project:
+    """Represents a local shypn project"""
+    
+    # Identity
+    project_id: str           # UUID for this project
+    name: str                 # User-defined project name
+    description: str          # Project description
+    
+    # Location
+    project_dir: Path         # data/projects/[project_id]/
+    project_file: Path        # data/projects/[project_id]/project.shy
+    
+    # Metadata
+    created_date: datetime
+    modified_date: datetime
+    author: str               # User name
+    tags: List[str]           # Project tags
+    
+    # Content
+    models: List[str]         # List of model file paths
+    pathways: List[str]       # List of pathway file paths
+    simulations: List[str]    # List of simulation configs
+    
+    # Settings
+    settings: Dict            # Project-specific settings
+    last_opened: datetime     # Last access time
+    
+    # Methods
+    def save(self) -> bool
+    def load(cls, project_path: Path) -> 'Project'
+    def add_model(self, model: DocumentModel, name: str) -> str
+    def add_pathway(self, pathway: ProjectPathway) -> bool
+    def remove_model(self, model_id: str) -> bool
+    def remove_pathway(self, pathway_id: str) -> bool
+    def export_project(self, export_path: Path) -> bool
+    def get_all_models(self) -> List[DocumentModel]
+    def get_all_pathways(self) -> List[ProjectPathway]
+```
+
+### 5. ProjectManager (Global Project Management)
+
+```python
+class ProjectManager:
+    """Manages all local projects"""
+    
+    # Configuration
+    projects_root: Path       # data/projects/
+    index_file: Path          # data/projects/project_index.json
+    recent_projects_file: Path # data/projects/recent_projects.json
+    
+    # State
+    current_project: Optional[Project]
+    projects_index: Dict[str, ProjectInfo]  # All known projects
+    recent_projects: List[str]              # Recent project IDs
+    
+    # Methods
+    def create_project(self, name: str, description: str) -> Project
+    def open_project(self, project_id: str) -> Project
+    def close_project(self) -> bool
+    def delete_project(self, project_id: str) -> bool
+    def list_projects(self) -> List[ProjectInfo]
+    def search_projects(self, query: str) -> List[ProjectInfo]
+    def get_recent_projects(self, limit: int = 10) -> List[ProjectInfo]
+    def import_project(self, archive_path: Path) -> Project
+    def export_project(self, project_id: str, export_path: Path) -> bool
+    def rebuild_index(self) -> bool
+```
+
+### 6. ModelDocument (Individual Petri Net Model)
+
+```python
+class ModelDocument:
+    """Represents a single Petri net model file (.shy)"""
+    
+    # Identity
+    model_id: str             # UUID for this model
+    name: str                 # Model name
+    project_id: str           # Parent project
+    
+    # Metadata
+    created_date: datetime
+    modified_date: datetime
+    model_type: str           # "petri_net", "timed_petri_net", "stochastic"
+    description: str
+    tags: List[str]
+    
+    # Data
+    document_model: DocumentModel  # The actual Petri net
+    file_path: Path           # data/projects/[project_id]/models/name.shy
+    
+    # Analysis results
+    analysis_cache: Dict      # Cached analysis results
+    
+    # Methods
+    def save(self) -> bool
+    def load(cls, file_path: Path) -> 'ModelDocument'
+    def export(self, format: str, output_path: Path) -> bool
+    def duplicate(self, new_name: str) -> 'ModelDocument'
+    def get_statistics(self) -> ModelStats
+```
+
+
 ---
 
 ## Implementation Phases
 
-### Phase 1: Data Structure Setup (Day 1)
+### Phase 1: Data Structure Setup (Days 1-2)
 **Priority: HIGH**
 
 - [ ] Create directory structure
   - [ ] `models/pathway/external/kegg/`
-  - [ ] `models/pathway/project/`
+  - [ ] `models/pathway/templates/`
+  - [ ] `data/projects/` (root)
   - [ ] `data/cache/kegg/`
   
 - [ ] Implement data model classes
   - [ ] `ExternalPathway` class
   - [ ] `ProjectPathway` class
   - [ ] `PathwayCache` class
+  - [ ] `Project` class (NEW)
+  - [ ] `ProjectManager` class (NEW)
+  - [ ] `ModelDocument` class (NEW)
   
 - [ ] Create cache management
   - [ ] Cache index file
   - [ ] Auto-cleanup policy
   - [ ] Cache statistics
 
+- [ ] Create project management (NEW)
+  - [ ] Project index system
+  - [ ] Recent projects tracking
+  - [ ] Project creation/loading logic
+
 **Deliverables:**
 - `src/shypn/models/pathway_models.py`
 - `src/shypn/models/pathway_cache.py`
-- Cache directory structure
+- `src/shypn/models/project_manager.py` (NEW)
+- `src/shypn/models/model_document.py` (NEW)
+- Cache and project directory structure
 
 ---
 
-### Phase 2: KEGG Integration Update (Day 2)
+### Phase 2: File Format & Serialization (Days 3-4)
+**Priority: HIGH**
+
+- [ ] Define `.shy` file format specification
+  - [ ] Project file format (`project.shy`)
+  - [ ] Model file format (`model.shy`)
+  - [ ] Pathway file format (`pathway.shy`)
+  - [ ] Template file format (`template.shy`)
+  
+- [ ] Implement serialization
+  - [ ] JSON serialization/deserialization
+  - [ ] Validation schemas
+  - [ ] Migration from old formats
+  - [ ] Compression support (optional)
+  
+- [ ] Update existing save/load
+  - [ ] Migrate current DocumentModel to `.shy`
+  - [ ] Backward compatibility layer
+  - [ ] Test migration paths
+
+**Deliverables:**
+- `.shy` format specification document
+- `src/shypn/file/shy_format.py`
+- `src/shypn/file/shy_serializer.py`
+- `src/shypn/file/format_migration.py`
+- Unit tests for serialization
+
+---
+
+### Phase 3: Project Management UI (Days 5-6)
+**Priority: HIGH**
+
+- [ ] Extend Left Panel (File Explorer) with Project Management
+  - [ ] Add "Project Actions" section below tree view
+  - [ ] Add "New Project" button
+  - [ ] Add "Open Project" button  
+  - [ ] Add "Project Settings" button
+  - [ ] Add horizontal separator
+  - [ ] Add "Quit" button at bottom
+  - [ ] Update tree view to show project structure
+  
+- [ ] Create project management dialogs
+  - [ ] New Project dialog (name, location, template)
+  - [ ] Open Project dialog (recent, browse, import archive)
+  - [ ] Project Properties dialog (metadata, settings)
+  
+- [ ] Enhance File Browser Tree View
+  - [ ] Show project root node with project name
+  - [ ] Hierarchical display: Models / Pathways / Simulations
+  - [ ] Visual indicators (icons, badges)
+  - [ ] Context menus for project items
+  - [ ] Drag-and-drop support
+  
+- [ ] Implement project operations
+  - [ ] Create project (with templates)
+  - [ ] Open/close project (with recent list)
+  - [ ] Save project state
+  - [ ] Export/import project archive
+  - [ ] Switch between projects
+  - [ ] Application quit with save prompt
+
+**Deliverables:**
+- `ui/panels/left_panel.ui` (updated with project buttons)
+- `ui/dialogs/project_dialogs.ui` (new dialogs)
+- `src/shypn/helpers/left_panel_loader.py` (updated)
+- `src/shypn/helpers/project_dialog_manager.py` (new)
+- `src/shypn/models/project_manager.py` (new)
+
+**UI Layout Design:**
+```
+┌─────────────────────────────┐
+│ File Explorer          [⇱]  │  ← Panel Header
+├─────────────────────────────┤
+│ New Open Save Save As... │  ← File Operations
+│ New Folder               │
+├─────────────────────────────┤
+│ Home | ◀ [path] ▶ Refresh │  ← Navigation
+├─────────────────────────────┤
+│ 📁 My Project           │  ← Tree View
+│  ├─ 📁 Models           │     (expandable)
+│  │   ├─ 📄 model1.shy   │
+│  │   └─ 📄 model2.shy   │
+│  ├─ 📁 Pathways         │
+│  │   └─ 📄 hsa00010.shy │
+│  └─ 📁 Simulations      │
+│      └─ 📄 sim1.json    │
+│                         │
+│  ... (scrollable)       │
+│                         │
+├─────────────────────────────┤
+│ ┌─ Project Actions ───┐ │  ← NEW: Project Section
+│ │ [New Project]        │ │
+│ │ [Open Project]       │ │
+│ │ [Project Settings]   │ │
+│ └─────────────────────┘ │
+├─────────────────────────────┤
+│ [Quit Application]       │  ← NEW: Quit Button
+├─────────────────────────────┤
+│ Ready                    │  ← Status Bar
+└─────────────────────────────┘
+```
+
+---
+
+### Phase 4: KEGG Integration Update (Days 7-8)
 **Priority: HIGH**
 
 - [ ] Modify KEGG importer to use ExternalPathway
@@ -237,47 +474,52 @@ class PathwayCache:
 - [ ] Update preview UI
   - [ ] Show data source indicator
   - [ ] Show cache status
-  - [ ] Add "Import to Project" button
+  - [ ] Add "Import to Current Project" button
   
 - [ ] Implement import workflow
   - [ ] Convert ExternalPathway → ProjectPathway
   - [ ] Prompt for project pathway name
-  - [ ] Save to project directory
+  - [ ] Save to current project's pathways/
+  - [ ] Link to project index
 
 **Deliverables:**
 - Updated `kegg_import_panel.py`
 - New `pathway_importer.py`
-- Import workflow UI
+- Import workflow UI updates
+- Project-aware import logic
 
 ---
 
-### Phase 3: Project Pathway Management (Day 3)
+### Phase 5: Project Pathway Management (Days 9-10)
 **Priority: MEDIUM**
 
-- [ ] Create project pathway panel
-  - [ ] List all pathways in current project
-  - [ ] Show provenance (source, import date)
-  - [ ] Allow renaming, tagging
-  
-- [ ] Implement pathway operations
+- [ ] Enhance pathway operations
   - [ ] Load project pathway
   - [ ] Save modifications
   - [ ] Export to various formats
   - [ ] Delete pathway
+  - [ ] Rename/move pathway
   
 - [ ] Add metadata editor
   - [ ] Edit user notes
   - [ ] Add/remove tags
   - [ ] View original source metadata
+  - [ ] Edit provenance info
+  
+- [ ] Integrate with Project Explorer
+  - [ ] Show pathways in tree view
+  - [ ] Visual indicators (KEGG badge, etc.)
+  - [ ] Quick actions menu
 
 **Deliverables:**
-- `project_pathway_panel.ui`
-- `project_pathway_manager.py`
+- `pathway_operations.py`
 - Metadata editor UI
+- Project Explorer integration
+- Context menu actions
 
 ---
 
-### Phase 4: Data Provenance & Sync (Day 4)
+### Phase 6: Data Provenance & Sync (Days 11-12)
 **Priority: MEDIUM**
 
 - [ ] Implement provenance tracking
@@ -299,55 +541,70 @@ class PathwayCache:
 - `pathway_diff.py`
 - `pathway_sync.py`
 - Sync/merge UI
+- Conflict resolution dialog
 
 ---
 
-### Phase 5: File Format & Persistence (Day 5)
-**Priority: HIGH**
+### Phase 7: Project Backup & Archive (Days 13-14)
+**Priority: MEDIUM**
 
-- [ ] Define `.shypn` pathway format
-  - [ ] Include provenance metadata
-  - [ ] Store original external data reference
-  - [ ] Support versioning
+- [ ] Implement project export
+  - [ ] Create .zip archive
+  - [ ] Include all project files
+  - [ ] Add manifest file
+  - [ ] Compression
   
-- [ ] Implement serialization
-  - [ ] ProjectPathway → .shypn file
-  - [ ] .shypn file → ProjectPathway
-  - [ ] Migration from old format
+- [ ] Implement project import
+  - [ ] Extract archive
+  - [ ] Validate structure
+  - [ ] Resolve conflicts (existing project)
+  - [ ] Import into projects directory
   
-- [ ] Update project save/load
-  - [ ] Include pathway references
-  - [ ] Handle missing pathways
-  - [ ] Validate pathway data
+- [ ] Add automatic backup
+  - [ ] Configurable backup schedule
+  - [ ] Timestamped backups
+  - [ ] Cleanup old backups
+  - [ ] Backup restore
 
 **Deliverables:**
-- `.shypn` format specification
-- `pathway_serializer.py`
-- Migration tools
+- `project_archiver.py`
+- Backup manager
+- Import/export dialogs
+- Backup preferences
 
 ---
 
-### Phase 6: UI/UX Polish (Day 6)
+### Phase 8: UI/UX Polish & Integration (Days 15-16)
 **Priority: LOW**
 
 - [ ] Visual indicators throughout UI
   - [ ] Source badges (KEGG logo, "Local", etc.)
   - [ ] Modified indicator (*)
   - [ ] Cache status indicator
+  - [ ] Project indicator in title bar
   
 - [ ] Improved workflows
   - [ ] Drag-and-drop import
   - [ ] Quick actions menu
   - [ ] Keyboard shortcuts
+  - [ ] Welcome screen with recent projects
   
 - [ ] User preferences
   - [ ] Default cache duration
   - [ ] Auto-cleanup settings
   - [ ] Import preferences
+  - [ ] Project preferences
+  
+- [ ] Integration testing
+  - [ ] Complete workflow tests
+  - [ ] Performance testing
+  - [ ] User acceptance testing
 
 **Deliverables:**
 - Updated UI elements
 - Preferences panel
+- Welcome screen
+- Integration tests
 - User documentation
 
 ---
@@ -443,6 +700,406 @@ class PathwayCache:
 
 ---
 
+## Local Project Management Workflows
+
+### Workflow 5: Create New Project
+**User Goal:** Start a new shypn project with proper structure
+
+**Steps:**
+1. **Click "New Project" button** in File Explorer panel (below tree view)
+   ```
+   [File Explorer Panel]
+   ├─ Tree View (shows current project)
+   ├─────────────────────
+   │ Project Actions    │
+   │ [New Project]  ←── Click here
+   │ [Open Project]     │
+   │ [Project Settings] │
+   ```
+
+2. **Fill New Project Dialog:**
+   - Project Name: `"My Pathway Analysis"`
+   - Location: `~/Documents/shypn-projects/`
+   - Template: `[Empty Project | Basic Petri Net | KEGG Import Template]`
+   - Click "Create"
+
+3. **System Actions:**
+   - Creates `data/projects/[uuid]/` directory structure
+   - Generates `project.shy` with metadata
+   - Creates subdirectories: `models/`, `pathways/`, `simulations/`, `exports/`, `metadata/`
+   - Updates `project_index.json`
+   - Adds to `recent_projects.json`
+   - Loads project into File Explorer tree view
+
+4. **Result:** File Explorer now shows:
+   ```
+   📁 My Pathway Analysis  ← New project loaded
+    ├─ 📁 Models
+    ├─ 📁 Pathways
+    └─ 📁 Simulations
+   ```
+
+**Key Points:**
+- 🎯 Projects are **UUID-based** but displayed with friendly names
+- 📁 Directory structure is **created automatically**
+- 🔄 Tree view updates to show new project immediately
+- 💾 Recent projects list updated for quick access
+
+---
+
+### Workflow 6: Open Existing Project
+**User Goal:** Switch to a different project or open archived project
+
+**Steps:**
+1. **Click "Open Project" button** in File Explorer panel
+   ```
+   [File Explorer Panel]
+   ├─ Tree View
+   ├─────────────────────
+   │ Project Actions    │
+   │ [New Project]      │
+   │ [Open Project] ←── Click here
+   │ [Project Settings] │
+   ```
+
+2. **Choose from Open Project Dialog:**
+   
+   **Option A: Recent Projects Tab**
+   - Shows list of recently opened projects
+   - Display: Name, Path, Last Modified
+   - Click project → Click "Open"
+   
+   **Option B: Browse Tab**
+   - Browse to `data/projects/[project_id]/project.shy`
+   - Select file → Click "Open"
+   
+   **Option C: Import Archive Tab**
+   - Select `.zip` archive created by "Export Project"
+   - Choose import location
+   - Click "Import & Open"
+
+3. **System Actions:**
+   - Saves current project state (if any)
+   - Loads selected `project.shy`
+   - Parses project structure
+   - Updates File Explorer tree view
+   - Restores workspace state (open files, scroll positions)
+   - Updates recent projects list
+
+4. **Result:** File Explorer shows selected project structure
+
+**Key Points:**
+- 💾 Current project is **auto-saved** before switching
+- 🔄 Recent projects provide **quick access**
+- 📦 Can import archived projects from `.zip`
+- 🎯 Tree view updates with new project content
+
+---
+
+### Workflow 7: Manage Project Content via File Explorer
+**User Goal:** Navigate and manage project files using tree view
+
+**Steps:**
+1. **Navigate Project in Tree View:**
+   ```
+   📁 My Project
+    ├─ 📁 Models          ← Right-click for context menu
+    │   ├─ 📄 model1.shy  ← Double-click to open
+    │   └─ 📄 model2.shy  ← Right-click for actions
+    ├─ 📁 Pathways
+    │   └─ 📄 hsa00010.shy (KEGG) ← Badge shows source
+    └─ 📁 Simulations
+        └─ 📄 result1.json
+   ```
+
+2. **Context Menu Actions:**
+   
+   **On Folders (Models/Pathways/Simulations):**
+   - New Model / New Pathway
+   - Import File...
+   - Paste (if copied)
+   - Refresh
+   
+   **On Files:**
+   - Open
+   - Open in New Tab
+   - Rename
+   - Duplicate
+   - Export...
+   - Delete
+   - Properties (shows metadata)
+
+3. **Drag-and-Drop Operations:**
+   - Drag `.shy` file from external location → Import to project
+   - Drag file between folders (Models ↔ Pathways)
+   - Drag to reorder (within same folder)
+
+4. **Tree View Features:**
+   - **Icons:** File type indicators (📄 .shy, 📊 .json, etc.)
+   - **Badges:** Data source (🔵 KEGG, 🟢 Local, 🟡 Modified)
+   - **Expand/Collapse:** Click folder arrows
+   - **Search:** Filter tree view by name
+
+**Key Points:**
+- 🎯 **Single source of truth** - All project content in one tree
+- 🖱️ **Context-aware** - Right-click menus adapt to item type
+- 🔄 **Live updates** - Tree refreshes when files change
+- 📁 **Hierarchical** - Clear organization by content type
+
+---
+
+### Workflow 8: Add Model to Project
+**User Goal:** Create or import a Petri net model
+
+**Steps:**
+1. **Right-click "Models" folder** in tree view
+   ```
+   📁 Models ← Right-click here
+     Context Menu:
+     ─────────────────
+     • New Model...
+     • Import Model...
+     • From Template...
+     • Paste
+   ```
+
+2. **Choose Creation Method:**
+   
+   **Option A: New Model**
+   - Click "New Model..."
+   - Enter name: `"Glycolysis Model"`
+   - System creates empty `glycolysis_model.shy` in `models/`
+   - Opens in canvas for editing
+   
+   **Option B: Import Model**
+   - Click "Import Model..."
+   - Select external `.shy` file
+   - System copies to `models/`
+   - Adds to project index
+   
+   **Option C: From Template**
+   - Click "From Template..."
+   - Choose template (e.g., "Basic Pathway", "Regulatory Network")
+   - Customize name
+   - System creates model from template
+
+3. **System Actions:**
+   - Creates/copies `.shy` file to `data/projects/[project_id]/models/`
+   - Updates `project.shy` content registry
+   - Adds to tree view under "Models"
+   - Opens in canvas (if requested)
+
+4. **Result:** Tree view shows new model
+   ```
+   📁 Models
+    ├─ 📄 glycolysis_model.shy ← New model
+    └─ 📄 model2.shy
+   ```
+
+**Key Points:**
+- 🆕 **Three ways to add**: New, Import, Template
+- 📁 **Auto-organized** - Models go to `models/` folder
+- 🔗 **Linked to project** - Added to content registry
+- 🖊️ **Ready to edit** - Opens in canvas immediately
+
+---
+
+### Workflow 9: Project Export/Backup
+**User Goal:** Create portable archive or backup of project
+
+**Steps:**
+1. **Click "Project Settings" button** in File Explorer panel
+   ```
+   [File Explorer Panel]
+   ├─ Tree View
+   ├─────────────────────
+   │ Project Actions    │
+   │ [New Project]      │
+   │ [Open Project]     │
+   │ [Project Settings] ←── Click here
+   ```
+
+2. **In Project Properties Dialog, choose action:**
+   
+   **Option A: Export Project Archive**
+   - Click "Export..." tab
+   - Choose export options:
+     - ✅ Include all models
+     - ✅ Include pathways
+     - ✅ Include simulation results
+     - ✅ Compress archive
+   - Choose destination: `~/Desktop/my_project_export.zip`
+   - Click "Export"
+   
+   **Option B: Backup Project**
+   - Click "Backup" tab
+   - Automatic backup settings:
+     - Backup frequency: [Daily | Weekly | Manual]
+     - Keep last N backups: `5`
+     - Backup location: `data/projects/[project_id]/metadata/backups/`
+   - Click "Backup Now"
+   
+   **Option C: Export Individual Items**
+   - Right-click file in tree view
+   - Click "Export..."
+   - Choose format (for models: .shy, .pnml, .svg, .png)
+   - Save to location
+
+3. **System Actions:**
+   - Creates `.zip` archive with manifest
+   - Includes all selected content
+   - Timestamps export
+   - Compresses if requested
+   - Or creates timestamped backup in metadata folder
+
+4. **Result:** Archive file created, ready to share or store
+
+**Key Points:**
+- 📦 **Portable archives** - Share entire project as `.zip`
+- 🔄 **Automatic backups** - Configurable schedule
+- 🗜️ **Compressed** - Saves disk space
+- 📋 **Selective export** - Choose what to include
+
+---
+
+### Workflow 10: Application Quit with Project Save
+**User Goal:** Exit application safely with unsaved changes
+
+**Steps:**
+1. **Click "Quit" button** in File Explorer panel (bottom)
+   ```
+   [File Explorer Panel]
+   ├─ Tree View
+   ├─────────────────────
+   │ Project Actions    │
+   │ [New Project]      │
+   │ [Open Project]     │
+   │ [Project Settings] │
+   ├─────────────────────
+   │ [Quit Application] ←── Click here
+   ├─────────────────────
+   │ Ready              │
+   ```
+   
+   **Or:** Close main window with X button
+
+2. **If Unsaved Changes Exist:**
+   
+   **System shows dialog:**
+   ```
+   ┌──────────────────────────────┐
+   │  Unsaved Changes             │
+   ├──────────────────────────────┤
+   │ You have unsaved changes in: │
+   │  • model1.shy                │
+   │  • pathway_edit.shy          │
+   │                              │
+   │ What would you like to do?   │
+   │                              │
+   │ [Save & Quit] [Quit Anyway]  │
+   │             [Cancel]         │
+   └──────────────────────────────┘
+   ```
+
+3. **Choose Action:**
+   - **Save & Quit:** Saves all modified files, then exits
+   - **Quit Anyway:** Discards changes, exits immediately
+   - **Cancel:** Returns to application
+
+4. **System Actions (if saving):**
+   - Saves all modified `.shy` files
+   - Updates `project.shy` metadata
+   - Saves workspace state (open files, positions)
+   - Writes to `recent_projects.json`
+   - Gracefully closes application
+
+5. **Result:** Application exits, project state preserved
+
+**Key Points:**
+- 💾 **Unsaved change detection** - Never lose work
+- 🚪 **Two quit methods** - Button or window close
+- 🔒 **Safe exit** - Prompts before discarding changes
+- 🔄 **State preservation** - Restores session next time
+
+---
+
+## File Format Specifications
+
+### Workflow 8: Add Model to Project
+
+```
+1. User clicks "+" button in Models section
+2. Options appear:
+   a) Create New Model
+      - Opens blank canvas
+      - Prompts for name
+   b) Import from File
+      - Selects .shy or other format
+   c) From Template
+      - Chooses template
+3. Model created/imported
+   → Saved in data/projects/[id]/models/
+   → Added to project.shy index
+   → Opened in canvas
+```
+
+**Key Points:**
+- 🆕 Easy model creation
+- 📥 Import existing work
+- 📋 Templates for common patterns
+
+---
+
+### Workflow 9: Project Export/Backup
+
+```
+1. User clicks "File" → "Export Project"
+2. Options:
+   - Export as Archive (.zip)
+     • Includes all models, pathways, simulations
+     • Includes project metadata
+     • Can share with collaborators
+   
+   - Export Individual Models
+     • Select models to export
+     • Choose format (.shy, .pnml, .svg, etc.)
+   
+   - Backup Project
+     • Creates timestamped backup
+     • Saved to backups/ directory
+3. Export created
+   → User can share or archive
+```
+
+**Key Points:**
+- 📤 Share complete projects
+- 💾 Regular backups recommended
+- 🔄 Multiple export formats
+
+---
+
+### Workflow 10: Switch Between Projects
+
+```
+1. User working in Project A
+2. Clicks "File" → "Switch Project"
+3. Options:
+   a) Recent Projects list
+   b) Open Another Project
+   c) Create New Project
+4. User selects Project B
+   → Project A closes (prompts to save)
+   → Project B opens
+   → Workspace restored to last state
+```
+
+**Key Points:**
+- 🔄 Smooth project switching
+- 💾 Auto-save prompts
+- 📍 Workspace state preserved
+
+---
+
 ## Technical Considerations
 
 ### 1. Cache Management
@@ -513,12 +1170,137 @@ def migrate_legacy_pathway(old_doc: DocumentModel) -> ProjectPathway:
 
 ## File Format Specification
 
-### .shypn File Format (Project Pathway)
+### .shy File Format (Universal shypn Document)
+
+All shypn documents use the `.shy` extension, with the content type differentiated by metadata:
+
+#### 1. Project File (`project.shy`)
 
 ```json
 {
   "format_version": "2.0",
-  "pathway_type": "project",
+  "document_type": "project",
+  
+  "identity": {
+    "project_id": "uuid-here",
+    "name": "My Research Project",
+    "description": "Metabolic pathway analysis for XYZ"
+  },
+  
+  "metadata": {
+    "created_date": "2025-10-08T09:00:00Z",
+    "modified_date": "2025-10-08T15:30:00Z",
+    "author": "Researcher Name",
+    "tags": ["metabolism", "research", "2025"]
+  },
+  
+  "content": {
+    "models": [
+      {
+        "model_id": "uuid-1",
+        "name": "Main Model",
+        "file_path": "models/main_model.shy",
+        "model_type": "petri_net"
+      }
+    ],
+    "pathways": [
+      {
+        "pathway_id": "uuid-2",
+        "name": "Glycolysis",
+        "file_path": "pathways/glycolysis.shy",
+        "source": "imported_from_kegg"
+      }
+    ],
+    "simulations": [
+      {
+        "simulation_id": "uuid-3",
+        "name": "Baseline Simulation",
+        "file_path": "simulations/baseline.json"
+      }
+    ]
+  },
+  
+  "settings": {
+    "default_view": "model_id:uuid-1",
+    "analysis_preferences": {},
+    "export_preferences": {}
+  }
+}
+```
+
+#### 2. Model File (`model.shy`)
+
+```json
+{
+  "format_version": "2.0",
+  "document_type": "model",
+  
+  "identity": {
+    "model_id": "uuid-here",
+    "name": "Main Metabolic Model",
+    "project_id": "uuid-of-project"
+  },
+  
+  "metadata": {
+    "created_date": "2025-10-08T10:00:00Z",
+    "modified_date": "2025-10-08T14:20:00Z",
+    "model_type": "petri_net",
+    "description": "Core metabolic pathways",
+    "tags": ["metabolism", "validated"]
+  },
+  
+  "document_model": {
+    "places": [
+      {
+        "id": 1,
+        "name": "ATP",
+        "tokens": 10,
+        "x": 100,
+        "y": 150,
+        "properties": {}
+      }
+    ],
+    "transitions": [
+      {
+        "id": 1,
+        "name": "Reaction1",
+        "x": 200,
+        "y": 150,
+        "transition_type": "immediate",
+        "properties": {}
+      }
+    ],
+    "arcs": [
+      {
+        "id": 1,
+        "source_id": 1,
+        "target_id": 1,
+        "weight": 1,
+        "kind": "normal",
+        "properties": {}
+      }
+    ],
+    "id_counters": {
+      "next_place_id": 2,
+      "next_transition_id": 2,
+      "next_arc_id": 2
+    }
+  },
+  
+  "analysis_cache": {
+    "last_analysis_date": "2025-10-08T14:00:00Z",
+    "invariants": [],
+    "reachability": {}
+  }
+}
+```
+
+#### 3. Pathway File (`pathway.shy`)
+
+```json
+{
+  "format_version": "2.0",
+  "document_type": "pathway",
   
   "identity": {
     "pathway_id": "uuid-here",
@@ -558,6 +1340,36 @@ def migrate_legacy_pathway(old_doc: DocumentModel) -> ProjectPathway:
     "transitions": [...],
     "arcs": [...]
   }
+}
+```
+
+#### 4. Template File (`template.shy`)
+
+```json
+{
+  "format_version": "2.0",
+  "document_type": "template",
+  
+  "identity": {
+    "template_id": "uuid-here",
+    "name": "Basic Metabolism Template"
+  },
+  
+  "metadata": {
+    "description": "Template for basic metabolic pathways",
+    "category": "metabolism",
+    "tags": ["template", "starter"],
+    "author": "shypn",
+    "created_date": "2025-10-01T00:00:00Z"
+  },
+  
+  "document_model": {
+    "places": [...],
+    "transitions": [...],
+    "arcs": [...]
+  },
+  
+  "usage_instructions": "This template provides basic metabolic reactions..."
 }
 ```
 
