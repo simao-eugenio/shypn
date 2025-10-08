@@ -266,8 +266,6 @@ class KEGGImportPanel:
                 # Get the canvas manager for this tab
                 manager = self.model_canvas.get_canvas_manager(drawing_area)
                 if manager:
-                          f"{len(document_model.transitions)} transitions, {len(document_model.arcs)} arcs")
-                    
                     # Load the document model into the manager
                     manager.places = list(document_model.places)
                     manager.transitions = list(document_model.transitions)

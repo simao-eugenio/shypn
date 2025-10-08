@@ -33,8 +33,6 @@ class StandardConversionStrategy(ConversionStrategy):
         Returns:
             DocumentModel with places, transitions, arcs
         """
-              f"cofactors={options.include_cofactors}, split_rev={options.split_reversible}")
-        
         document = DocumentModel()
         
         # Phase 1: Create places from compounds
