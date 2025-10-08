@@ -63,6 +63,18 @@
           </packing>
         </child>
         <child>
+          <object class="GtkToggleButton" id="pathway_panel_toggle">
+            <property name="label">Pathways</property>
+            <property name="active">False</property>
+            <property name="tooltip-text">Toggle Pathway Operations panel (attach/detach)</property>
+            <property name="visible">True</property>
+          </object>
+          <packing>
+            <property name="pack-type">end</property>
+            <property name="position">3</property>
+          </packing>
+        </child>
+        <child>
           <object class="GtkToggleButton" id="right_panel_toggle">
             <property name="label">Analyses</property>
             <property name="active">False</property>

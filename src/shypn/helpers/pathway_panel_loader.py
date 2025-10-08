@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
-"""Left Panel Loader/Controller.
+"""Pathway Panel Loader/Controller.
 
-This module is responsible for loading and managing the left File Operations panel.
+This module is responsible for loading and managing the Pathway Operations panel.
 The panel can exist in two states:
   - Detached: standalone floating window
-  - Attached: content embedded in main window container (extreme left)
+  - Attached: content embedded in main window container
 
-The panel now includes a full file explorer powered by FileExplorerPanel controller.
+The panel contains a notebook with multiple tabs:
+  - Import: KEGG pathway import interface
+  - Browse: Browse available pathways (future)
+  - History: Recently imported pathways (future)
 """
 import os
 import sys
@@ -16,44 +19,30 @@ try:
     gi.require_version('Gtk', '3.0')
     from gi.repository import Gtk, GLib
 except Exception as e:
-    print('ERROR: GTK3 not available in left_panel loader:', e, file=sys.stderr)
+    print('ERROR: GTK3 not available in pathway_panel loader:', e, file=sys.stderr)
     sys.exit(1)
 
-# Import the FileExplorerPanel controller
-from shypn.helpers.file_explorer_panel import FileExplorerPanel
 
-
-class LeftPanelLoader:
-    """Loader and controller for the left File Operations panel (attachable window)."""
+class PathwayPanelLoader:
+    """Loader and controller for the Pathway Operations panel (attachable window)."""
     
-    def __init__(self, ui_path=None, base_path=None):
-        """Initialize the left panel loader.
+    def __init__(self, ui_path=None, model_canvas=None):
+        """Initialize the pathway panel loader.
         
         Args:
-            ui_path: Optional path to left_panel.ui. If None, uses default location.
-            base_path: Optional base path for file explorer. If None, uses models directory.
+            ui_path: Optional path to pathway_panel.ui. If None, uses default location.
+            model_canvas: Optional ModelCanvasManager for loading imported pathways
         """
         if ui_path is None:
-            # Default: ui/panels/left_panel.ui
-            # This loader file is in: src/shypn/helpers/left_panel_loader.py
-            # UI file is in: ui/panels/left_panel.ui
+            # Default: ui/panels/pathway_panel.ui
+            # This loader file is in: src/shypn/helpers/pathway_panel_loader.py
+            # UI file is in: ui/panels/pathway_panel.ui
             script_dir = os.path.dirname(os.path.abspath(__file__))
             repo_root = os.path.normpath(os.path.join(script_dir, '..', '..', '..'))
-            ui_path = os.path.join(repo_root, 'ui', 'panels', 'left_panel.ui')
-            
-            # If base_path not provided, use models directory as home
-            if base_path is None:
-                base_path = os.path.join(repo_root, 'models')
-                # Create models directory if it doesn't exist
-                if not os.path.exists(base_path):
-                    try:
-                        os.makedirs(base_path)
-                    except Exception as e:
-                        # Fallback to repo root
-                        base_path = repo_root
+            ui_path = os.path.join(repo_root, 'ui', 'panels', 'pathway_panel.ui')
         
         self.ui_path = ui_path
-        self.base_path = base_path
+        self.model_canvas = model_canvas
         self.builder = None
         self.window = None
         self.content = None
@@ -64,14 +53,14 @@ class LeftPanelLoader:
         self.on_float_callback = None  # Callback to notify when panel floats
         self.on_attach_callback = None  # Callback to notify when panel attaches
         
-        # File explorer controller (will be instantiated after loading UI)
-        self.file_explorer = None
+        # Import tab controllers (will be instantiated after loading UI)
+        self.kegg_import_controller = None
     
     def load(self):
         """Load the panel UI and return the window.
         
         Returns:
-            Gtk.Window: The left panel window.
+            Gtk.Window: The pathway panel window.
             
         Raises:
             FileNotFoundError: If UI file doesn't exist.
@@ -79,19 +68,19 @@ class LeftPanelLoader:
         """
         # Validate UI file exists
         if not os.path.exists(self.ui_path):
-            raise FileNotFoundError(f"Left panel UI file not found: {self.ui_path}")
+            raise FileNotFoundError(f"Pathway panel UI file not found: {self.ui_path}")
         
         # Load the UI
         self.builder = Gtk.Builder.new_from_file(self.ui_path)
         
         # Extract window and content
-        self.window = self.builder.get_object('left_panel_window')
-        self.content = self.builder.get_object('left_panel_content')
+        self.window = self.builder.get_object('pathway_panel_window')
+        self.content = self.builder.get_object('pathway_panel_content')
         
         if self.window is None:
-            raise ValueError("Object 'left_panel_window' not found in left_panel.ui")
+            raise ValueError("Object 'pathway_panel_window' not found in pathway_panel.ui")
         if self.content is None:
-            raise ValueError("Object 'left_panel_content' not found in left_panel.ui")
+            raise ValueError("Object 'pathway_panel_content' not found in pathway_panel.ui")
         
         # Get float button and connect callback
         float_button = self.builder.get_object('float_button')
@@ -101,17 +90,48 @@ class LeftPanelLoader:
         else:
             self.float_button = None
         
-        # Initialize the file explorer controller
-        # This connects the FileExplorer API to the UI widgets defined in XML
-        try:
-            self.file_explorer = FileExplorerPanel(self.builder, base_path=self.base_path)
-        except Exception as e:
-            pass  # Continue anyway - panel will work without file explorer
+        # Connect delete-event to prevent window destruction
+        # When X button is clicked, just hide the window instead of destroying it
+        self.window.connect('delete-event', self._on_delete_event)
+        
+        # Initialize tab controllers
+        self._setup_import_tab()
         
         # Hide window by default (will be shown when toggled)
         self.window.set_visible(False)
         
         return self.window
+    
+    def _setup_import_tab(self):
+        """Set up the Import tab controllers.
+        
+        This method instantiates the KEGG import controller and wires it to the UI.
+        """
+        # Import the KEGG import controller (from helpers, not ui)
+        try:
+            from shypn.helpers.kegg_import_panel import KEGGImportPanel
+            
+            # Instantiate controller with builder and model_canvas
+            self.kegg_import_controller = KEGGImportPanel(
+                self.builder,
+                self.model_canvas
+            )
+            
+        except ImportError as e:
+            print(f"Warning: Could not load KEGG import controller: {e}", file=sys.stderr)
+            pass
+    
+    def set_model_canvas(self, model_canvas):
+        """Set or update the model canvas for loading imported pathways.
+        
+        Args:
+            model_canvas: ModelCanvasManager instance
+        """
+        self.model_canvas = model_canvas
+        
+        # Update import controller if it exists
+        if self.kegg_import_controller:
+            self.kegg_import_controller.set_model_canvas(model_canvas)
     
     def _on_float_toggled(self, button):
         """Internal callback when float toggle button is clicked."""
@@ -127,6 +147,35 @@ class LeftPanelLoader:
             # Button is now inactive -> dock the panel back
             if self.parent_container:
                 self.attach_to(self.parent_container, self.parent_window)
+    
+    def _on_delete_event(self, window, event):
+        """Handle window close button (X) - hide instead of destroy.
+        
+        When user clicks X on floating window, we don't want to destroy
+        the window (which causes segfault), just hide it and dock it back.
+        
+        Args:
+            window: The window being closed
+            event: The delete event
+            
+        Returns:
+            bool: True to prevent default destroy behavior
+        """
+        # Hide the window
+        self.hide()
+        
+        # Update float button to inactive state
+        if self.float_button and self.float_button.get_active():
+            self._updating_button = True
+            self.float_button.set_active(False)
+            self._updating_button = False
+        
+        # Dock back if we have a container
+        if self.parent_container:
+            self.attach_to(self.parent_container, self.parent_window)
+        
+        # Return True to prevent window destruction
+        return True
     
     def float(self, parent_window=None):
         """Float panel as a separate window (detach if currently attached).
@@ -172,7 +221,7 @@ class LeftPanelLoader:
         self.float(parent_window)
     
     def attach_to(self, container, parent_window=None):
-        """Attach panel to container (embed content in extreme left, hide window).
+        """Attach panel to container (embed content, hide window).
         
         Args:
             container: Gtk.Box or other container to embed content into.
@@ -215,7 +264,6 @@ class LeftPanelLoader:
         # Notify that panel is attached (to expand paned)
         if self.on_attach_callback:
             self.on_attach_callback()
-        
     
     def unattach(self):
         """Unattach panel from container (return content to window)."""
@@ -243,22 +291,22 @@ class LeftPanelLoader:
             self.window.set_visible(False)
 
 
-def create_left_panel(ui_path=None, base_path=None):
-    """Convenience function to create and load the left panel loader.
+def create_pathway_panel(ui_path=None, model_canvas=None):
+    """Convenience function to create and load the pathway panel loader.
     
     Args:
-        ui_path: Optional path to left_panel.ui.
-        base_path: Optional base path for file explorer (default: models directory).
+        ui_path: Optional path to pathway_panel.ui.
+        model_canvas: Optional ModelCanvasManager for loading imported pathways.
         
     Returns:
-        LeftPanelLoader: The loaded left panel loader instance.
+        PathwayPanelLoader: The loaded pathway panel loader instance.
         
     Example:
-        loader = create_left_panel(base_path="/home/user/projects/models")
+        loader = create_pathway_panel(model_canvas=canvas_manager)
         loader.detach(main_window)  # Show as floating
         # or
-        loader.attach_to(container)  # Attach to extreme left
+        loader.attach_to(container)  # Attach to container
     """
-    loader = LeftPanelLoader(ui_path, base_path)
+    loader = PathwayPanelLoader(ui_path, model_canvas)
     loader.load()
     return loader
