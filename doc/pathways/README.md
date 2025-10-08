@@ -1,6 +1,6 @@
-# KEGG Pathway Import Documentation
+# Pathway Features Documentation
 
-This directory contains comprehensive documentation for the KEGG pathway import feature in shypn.
+This directory contains comprehensive documentation for KEGG pathway import, editing, visualization, and layout features in shypn.
 
 ## Documentation Files
 
@@ -238,13 +238,164 @@ When working on KEGG import features:
 3. **Progress updates** → Update `KEGG_IMPORT_PROGRESS.md`
 4. **New features** → Update `KEGG_PATHWAY_IMPORT_SUMMARY.md`
 
+---
+
+## 🎨 Pathway Editing & Visualization (New!)
+
+### Research & Planning Documents
+
+- **[PATHWAY_EDITING_RESEARCH.md](PATHWAY_EDITING_RESEARCH.md)** - 🔬 Scientific research (20+ pages)
+  - Hierarchical pathway visualization
+  - Source/sink abstraction mechanisms
+  - Graph auto-layout algorithms (Sugiyama, Fruchterman-Reingold, Circular, Orthogonal)
+  - Centrality analysis (betweenness, degree, closeness)
+  - 13+ peer-reviewed paper references
+  - Best for: Understanding the theory and algorithms
+
+- **[PATHWAY_EDITING_SUMMARY.md](PATHWAY_EDITING_SUMMARY.md)** - 📋 Quick research summary
+  - Visual examples
+  - Key insights
+  - Implementation phases
+  - Next actions
+  - Best for: Getting started with pathway editing features
+
+- **[DUAL_EDITING_MODES_PLAN.md](DUAL_EDITING_MODES_PLAN.md)** - 🎯 Dual editing modes plan
+  - CREATE MODE (interactive Petri net building)
+  - PATHWAY EDIT MODE (imported pathway refinement)
+  - Visual guidance system (colors, overlays, effects)
+  - Mode management infrastructure
+  - 7-phase implementation roadmap (16-20 days)
+  - Best for: Implementing the dual editing system
+
+- **[DUAL_EDITING_MODES_COMPARISON.md](DUAL_EDITING_MODES_COMPARISON.md)** - 📊 Side-by-side comparison
+  - Create vs. Pathway Edit modes
+  - When to use each mode
+  - Mode switching behavior
+  - Visual examples and mockups
+  - Best for: Understanding the difference between modes
+
+### Key Concepts
+
+**Hierarchical Visualization**:
+- Classify nodes by importance (main backbone vs. secondary branches)
+- Use centrality metrics to identify critical pathways
+- Color coding by hierarchy level (3 levels)
+
+**Source/Sink Abstraction**:
+- Hide secondary pathways, replace with source/sink transitions
+- Progressive disclosure (show/hide levels)
+- UI slider for detail level control
+
+**Graph Auto-Layout**:
+- Hierarchical (Sugiyama) - for linear pathways
+- Force-Directed (Fruchterman-Reingold) - for complex networks
+- Circular - for cyclic pathways (TCA, Calvin cycle)
+- Orthogonal - for circuit-like structures
+
+**Visual Guidance**:
+- Color coding by hierarchy
+- Visual overlays (bounding boxes, flow arrows, labels, minimap)
+- Visual effect modes (highlight, ghost, heatmap, focus)
+- Keyboard shortcuts (H/G/M/F, 0/1/2)
+
+---
+
+## 📊 Implementation Status
+
+### ✅ Completed Features (KEGG Import)
+
+- [x] KEGG KGML parser (8 backend modules)
+- [x] API client for KEGG REST
+- [x] Pathway to Petri net converter
+- [x] Pathway panel UI (Import/Browse/History tabs)
+- [x] Import workflow (Fetch → Preview → Import)
+- [x] Canvas integration (add_document pattern)
+- [x] 4 critical bugfixes (segfault, iteration, parameters, loading)
+- [x] 13 automated tests passing
+- [x] Documentation and guides
+
+### 📋 Planned Features (Pathway Editing)
+
+- [ ] Hierarchical classification (Phase 1, 2-3 days)
+- [ ] Source/sink abstraction (Phase 2, 3-4 days)
+- [ ] Graph auto-layout algorithms (Phase 3, 4-5 days)
+- [ ] Dual editing modes (Phase 1-7, 16-20 days)
+- [ ] Visual guidance overlays (Phase 3, 3-4 days)
+- [ ] Color coding by hierarchy (Phase 2, 2-3 days)
+- [ ] Pathway edit panel UI (Phase 4, 3-4 days)
+
+---
+
+## 🔬 Scientific Foundation
+
+Pathway editing research is based on 13+ peer-reviewed papers:
+
+**KEGG & Databases**:
+- Kanehisa et al. (2000-2023) - KEGG methodology
+
+**Network Analysis**:
+- Jeong et al. (2000) Nature - Metabolic network organization
+- Schuster et al. (1999) - Elementary flux modes
+
+**Petri Nets for Biology**:
+- Heiner et al. (2008) - Petri nets for biological systems
+- Koch et al. (2011) - Pathway modeling and validation
+- Liu & Heiner (2014) - Colored Petri nets
+
+**Graph Layout Algorithms**:
+- Sugiyama et al. (1981) - Hierarchical layout
+- Fruchterman & Reingold (1991) - Force-directed layout
+- Di Battista et al. (1998) - Graph drawing reference
+
+**Pathway Visualization**:
+- Dogrusoz et al. (2009) - Biological pathway layouts
+- Bourqui et al. (2007) - Network visualization
+
+Full references in: [PATHWAY_EDITING_RESEARCH.md](PATHWAY_EDITING_RESEARCH.md)
+
+---
+
+## 🚀 Next Steps
+
+**For Users**:
+1. Try importing a KEGG pathway (e.g., hsa00010 = Glycolysis)
+2. Explore the imported Petri net on canvas
+3. Wait for pathway editing features (in development)
+4. Provide feedback on what features would help
+
+**For Developers**:
+1. Review implementation plans in pathway editing documents
+2. Start with Phase 1 (Mode Management Infrastructure)
+3. Follow roadmaps in planning documents
+4. Implement features incrementally
+
+---
+
 ## Support
 
 For issues or questions:
 - Check existing documentation in this directory
 - Review test files in `tests/test_kegg_*.py`
 - Examine sample pathways in `models/pathways/`
+- Check behavior documentation in `doc/behaviors/`
 
-## Next Steps
+## Related Documentation
 
-See [KEGG_IMPORT_PROGRESS.md](KEGG_IMPORT_PROGRESS.md) for current status and roadmap.
+**Other directories**:
+- **Behaviors**: `doc/behaviors/` - Transition types, guards, rate functions, formulas
+- **UI Architecture**: `doc/UI_CODE_SEPARATION_ARCHITECTURE.md`
+- **Installation**: `doc/INSTALLATION.md`
+
+**Test files**:
+- `tests/test_kegg_*.py` - Backend tests
+- `test_kegg_automated.py` - Integration tests
+- `test_kegg_end_to_end.md` - Manual test checklist
+
+**Example files**:
+- `models/pathways/*.kgml` - Sample KEGG files
+- `models/pathways/*.shy` - Converted Petri nets
+
+---
+
+**Last Updated**: October 7, 2025  
+**Maintained by**: SHYPN Development Team
