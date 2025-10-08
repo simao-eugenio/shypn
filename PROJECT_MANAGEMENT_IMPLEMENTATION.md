@@ -41,7 +41,7 @@ Successfully implemented the core project management system for shypn, following
 - Automatic directory structure creation
 - Recent projects tracking (max 10)
 - Project index for quick lookup
-- Default location: `data/projects/[uuid]/`
+- Default location: `workspace/projects/[uuid]/`
 
 ---
 
@@ -81,12 +81,12 @@ Successfully implemented the core project management system for shypn, following
 
 **Directory Structure:**
 ```
-data/projects/
+workspace/projects/
 ├── project_index.json          # Global project registry
 ├── recent_projects.json        # Recent projects list
 └── [project-uuid]/             # Individual project
     ├── project.shy             # Project metadata
-    ├── models/                 # Petri net models
+    ├── workspace/examples/                 # Petri net models
     ├── pathways/               # Imported/edited pathways
     ├── simulations/            # Simulation results
     ├── exports/                # Generated outputs
@@ -124,7 +124,7 @@ data/projects/
 3. **Project Properties Dialog**
    - Notebook with 2 tabs:
      - **General:** Name (editable), Location, Created/Modified dates, Description
-     - **Content:** Summary (models/pathways/simulations count), Export/Backup actions
+     - **Content:** Summary (workspace/examples/pathways/simulations count), Export/Backup actions
    - Buttons: Close, Save (suggested-action style)
    - Shows current project information
    - Updates project_index on save
@@ -339,7 +339,7 @@ data/projects/
 - UUID-based project IDs for uniqueness
 - Friendly names for display
 - JSON .shy format for cross-platform compatibility
-- Managed project directory (data/projects/)
+- Managed project directory (workspace/projects/)
 - Recent projects for quick access
 - Project index for fast lookup
 

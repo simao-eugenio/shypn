@@ -19,7 +19,7 @@ This mixing can cause:
 ### Directory Structure
 
 ```
-models/
+workspace/examples/models/
 ├── pathway/
 │   ├── external/          # NEW - Transient external data (NOT user-owned)
 │   │   ├── kegg/          # KEGG-fetched pathways (temporary cache)
@@ -40,7 +40,7 @@ data/
 │   │
 │   └── [project_id]/            # Individual project directory
 │       ├── project.shy          # Main project file (metadata)
-│       ├── models/              # Petri net models in this project
+│       ├── workspace/examples/models/              # Petri net models in this project
 │       │   ├── model1.shy       # Individual model files
 │       │   ├── model2.shy
 │       │   └── model_index.json
@@ -81,7 +81,7 @@ User Action: Fetch KEGG Pathway
     ↓
 [Parser] → PathwayData (in-memory)
     ↓
-[Cache] → models/pathway/external/kegg/hsa00010.json
+[Cache] → workspace/cache/kegg/hsa00010.json
     ↓
 [Preview UI] → User reviews pathway
     ↓
@@ -89,7 +89,7 @@ Decision Point: Import or Discard?
 ```
 
 **Characteristics:**
-- ✅ Stored in `models/pathway/external/kegg/`
+- ✅ Stored in `workspace/cache/kegg/`
 - ✅ Marked as `source: "kegg"` in metadata
 - ✅ Has `fetch_date` timestamp
 - ✅ Can be re-fetched (overwrites cache)
@@ -104,19 +104,19 @@ Decision Point: Import or Discard?
 ```
 User Action: Import Pathway
     ↓
-[External Data] → models/pathway/external/kegg/hsa00010.json
+[External Data] → workspace/cache/kegg/hsa00010.json
     ↓
 [Converter] → Creates ProjectPathway object
     ↓
 [User Edits] → Modifications applied
     ↓
-[Save] → data/projects/[project_id]/pathways/glycolysis_v1.shy
+[Save] → workspace/projects/[project_id]/pathways/glycolysis_v1.shy
     ↓
 [Project Registry] → Links pathway to project
 ```
 
 **Characteristics:**
-- ✅ Stored in `data/projects/[project_id]/pathways/`
+- ✅ Stored in `workspace/projects/[project_id]/pathways/`
 - ✅ Marked as `source: "imported_from_kegg"` + original KEGG ID
 - ✅ Has `import_date` and `modified_date` timestamps
 - ✅ Preserves KEGG metadata as reference
@@ -144,7 +144,7 @@ class ExternalPathway:
     organism: str
     description: str
     fetch_date: datetime
-    cache_path: Path          # models/pathway/external/kegg/hsa00010.json
+    cache_path: Path          # workspace/cache/kegg/hsa00010.json
     
     # Data
     document_model: DocumentModel  # Parsed Petri net structure
@@ -184,7 +184,7 @@ class ProjectPathway:
     
     # Data
     document_model: DocumentModel  # User's editable Petri net
-    file_path: Path           # data/projects/[project_id]/pathways/name.shy
+    file_path: Path           # workspace/projects/[project_id]/pathways/name.shy
     
     # Version control
     version: int              # Local version number
@@ -203,7 +203,7 @@ class ProjectPathway:
 class PathwayCache:
     """Manages external pathway cache"""
     
-    cache_dir: Path           # models/pathway/external/
+    cache_dir: Path           # workspace/cache/
     max_age_days: int         # Default: 30 days
     max_size_mb: int          # Default: 100 MB
     
@@ -226,8 +226,8 @@ class Project:
     description: str          # Project description
     
     # Location
-    project_dir: Path         # data/projects/[project_id]/
-    project_file: Path        # data/projects/[project_id]/project.shy
+    project_dir: Path         # workspace/projects/[project_id]/
+    project_file: Path        # workspace/projects/[project_id]/project.shy
     
     # Metadata
     created_date: datetime
@@ -263,9 +263,9 @@ class ProjectManager:
     """Manages all local projects"""
     
     # Configuration
-    projects_root: Path       # data/projects/
-    index_file: Path          # data/projects/project_index.json
-    recent_projects_file: Path # data/projects/recent_projects.json
+    projects_root: Path       # workspace/projects/
+    index_file: Path          # workspace/projects/project_index.json
+    recent_projects_file: Path # workspace/projects/recent_projects.json
     
     # State
     current_project: Optional[Project]
@@ -305,7 +305,7 @@ class ModelDocument:
     
     # Data
     document_model: DocumentModel  # The actual Petri net
-    file_path: Path           # data/projects/[project_id]/models/name.shy
+    file_path: Path           # workspace/projects/[project_id]/workspace/examples/models/name.shy
     
     # Analysis results
     analysis_cache: Dict      # Cached analysis results
@@ -327,9 +327,9 @@ class ModelDocument:
 **Priority: HIGH**
 
 - [ ] Create directory structure
-  - [ ] `models/pathway/external/kegg/`
-  - [ ] `models/pathway/templates/`
-  - [ ] `data/projects/` (root)
+  - [ ] `workspace/cache/kegg/`
+  - [ ] `workspace/examples/templates/`
+  - [ ] `workspace/projects/` (root)
   - [ ] `data/cache/kegg/`
   
 - [ ] Implement data model classes
@@ -351,10 +351,10 @@ class ModelDocument:
   - [ ] Project creation/loading logic
 
 **Deliverables:**
-- `src/shypn/models/pathway_models.py`
-- `src/shypn/models/pathway_cache.py`
-- `src/shypn/models/project_manager.py` (NEW)
-- `src/shypn/models/model_document.py` (NEW)
+- `src/shypn/workspace/examples/models/pathway_models.py`
+- `src/shypn/workspace/examples/models/pathway_cache.py`
+- `src/shypn/workspace/examples/models/project_manager.py` (NEW)
+- `src/shypn/workspace/examples/models/model_document.py` (NEW)
 - Cache and project directory structure
 
 ---
@@ -425,7 +425,7 @@ class ModelDocument:
 - `ui/dialogs/project_dialogs.ui` (new dialogs)
 - `src/shypn/helpers/left_panel_loader.py` (updated)
 - `src/shypn/helpers/project_dialog_manager.py` (new)
-- `src/shypn/models/project_manager.py` (new)
+- `src/shypn/workspace/examples/models/project_manager.py` (new)
 
 **UI Layout Design:**
 ```
@@ -618,7 +618,7 @@ class ModelDocument:
 2. Opens KEGG Import tab
 3. Enters pathway ID (e.g., "hsa00010")
 4. Clicks "Fetch"
-   → Data stored in models/pathway/external/kegg/
+   → Data stored in workspace/cache/kegg/
    → Preview shown with "KEGG" badge
 5. User reviews pathway structure
 6. Options:
@@ -643,7 +643,7 @@ class ModelDocument:
    - Add tags: [metabolism, core-pathway]
    - Notes: [text area]
 3. User clicks "Import"
-   → Creates data/projects/[current]/pathways/Glycolysis_Human.shypn
+   → Creates workspace/projects/[current]/pathways/Glycolysis_Human.shypn
    → Loads into canvas for editing
    → Shows "Local" badge (imported from KEGG)
 4. User can now modify freely
@@ -724,9 +724,9 @@ class ModelDocument:
    - Click "Create"
 
 3. **System Actions:**
-   - Creates `data/projects/[uuid]/` directory structure
+   - Creates `workspace/projects/[uuid]/` directory structure
    - Generates `project.shy` with metadata
-   - Creates subdirectories: `models/`, `pathways/`, `simulations/`, `exports/`, `metadata/`
+   - Creates subdirectories: `workspace/examples/models/`, `pathways/`, `simulations/`, `exports/`, `metadata/`
    - Updates `project_index.json`
    - Adds to `recent_projects.json`
    - Loads project into File Explorer tree view
@@ -770,7 +770,7 @@ class ModelDocument:
    - Click project → Click "Open"
    
    **Option B: Browse Tab**
-   - Browse to `data/projects/[project_id]/project.shy`
+   - Browse to `workspace/projects/[project_id]/project.shy`
    - Select file → Click "Open"
    
    **Option C: Import Archive Tab**
@@ -868,13 +868,13 @@ class ModelDocument:
    **Option A: New Model**
    - Click "New Model..."
    - Enter name: `"Glycolysis Model"`
-   - System creates empty `glycolysis_model.shy` in `models/`
+   - System creates empty `glycolysis_model.shy` in `workspace/examples/models/`
    - Opens in canvas for editing
    
    **Option B: Import Model**
    - Click "Import Model..."
    - Select external `.shy` file
-   - System copies to `models/`
+   - System copies to `workspace/examples/models/`
    - Adds to project index
    
    **Option C: From Template**
@@ -884,7 +884,7 @@ class ModelDocument:
    - System creates model from template
 
 3. **System Actions:**
-   - Creates/copies `.shy` file to `data/projects/[project_id]/models/`
+   - Creates/copies `.shy` file to `workspace/projects/[project_id]/workspace/examples/models/`
    - Updates `project.shy` content registry
    - Adds to tree view under "Models"
    - Opens in canvas (if requested)
@@ -898,7 +898,7 @@ class ModelDocument:
 
 **Key Points:**
 - 🆕 **Three ways to add**: New, Import, Template
-- 📁 **Auto-organized** - Models go to `models/` folder
+- 📁 **Auto-organized** - Models go to `workspace/examples/models/` folder
 - 🔗 **Linked to project** - Added to content registry
 - 🖊️ **Ready to edit** - Opens in canvas immediately
 
@@ -936,7 +936,7 @@ class ModelDocument:
    - Automatic backup settings:
      - Backup frequency: [Daily | Weekly | Manual]
      - Keep last N backups: `5`
-     - Backup location: `data/projects/[project_id]/metadata/backups/`
+     - Backup location: `workspace/projects/[project_id]/metadata/backups/`
    - Click "Backup Now"
    
    **Option C: Export Individual Items**
@@ -1038,7 +1038,7 @@ class ModelDocument:
    c) From Template
       - Chooses template
 3. Model created/imported
-   → Saved in data/projects/[id]/models/
+   → Saved in workspace/projects/[id]/workspace/examples/models/
    → Added to project.shy index
    → Opened in canvas
 ```
@@ -1199,7 +1199,7 @@ All shypn documents use the `.shy` extension, with the content type differentiat
       {
         "model_id": "uuid-1",
         "name": "Main Model",
-        "file_path": "models/main_model.shy",
+        "file_path": "workspace/examples/models/main_model.shy",
         "model_type": "petri_net"
       }
     ],
