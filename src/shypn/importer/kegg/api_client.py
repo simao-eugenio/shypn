@@ -52,14 +52,14 @@ class KEGGAPIClient:
         try:
             with urllib.request.urlopen(url, timeout=self.timeout) as response:
                 return response.read().decode('utf-8')
-        except urllib.error.HTTPError as e:
-            print(f"[KEGGAPIClient] HTTP Error {e.code}: {e.reason} for {url}")
+        except HTTPError as e:
+            print(f"[KEGGAPIClient] HTTP Error {e.code}: {e.reason} for {url}", file=sys.stderr)
             return None
-        except urllib.error.URLError as e:
-            print(f"[KEGGAPIClient] URL Error: {e.reason} for {url}")
+        except URLError as e:
+            print(f"[KEGGAPIClient] URL Error: {e.reason} for {url}", file=sys.stderr)
             return None
         except Exception as e:
-            print(f"[KEGGAPIClient] Unexpected error: {e} for {url}")
+            print(f"[KEGGAPIClient] Unexpected error: {e} for {url}", file=sys.stderr)
             return None
     
     def fetch_kgml(self, pathway_id: str) -> Optional[str]:
@@ -78,14 +78,8 @@ class KEGGAPIClient:
             ...     print("Fetched glycolysis pathway")
         """
         url = f"{self.BASE_URL}/get/{pathway_id}/kgml"
-        print(f"[KEGGAPIClient] Fetching KGML for {pathway_id}")
         
         kgml = self._make_request(url)
-        
-        if kgml:
-            print(f"[KEGGAPIClient] Successfully fetched KGML ({len(kgml)} bytes)")
-        else:
-            print(f"[KEGGAPIClient] Failed to fetch KGML for {pathway_id}")
         
         return kgml
     
@@ -99,7 +93,6 @@ class KEGGAPIClient:
             Pathway info text or None on error
         """
         url = f"{self.BASE_URL}/get/{pathway_id}"
-        print(f"[KEGGAPIClient] Fetching info for {pathway_id}")
         return self._make_request(url)
     
     def list_pathways(self, organism: Optional[str] = None) -> List[Tuple[str, str]]:
@@ -123,8 +116,6 @@ class KEGGAPIClient:
         else:
             url = f"{self.BASE_URL}/list/pathway"
         
-        print(f"[KEGGAPIClient] Listing pathways" + (f" for {organism}" if organism else ""))
-        
         response = self._make_request(url)
         if not response:
             return []
@@ -137,7 +128,6 @@ class KEGGAPIClient:
                 pathway_id = pathway_id.replace('path:', '')
                 pathways.append((pathway_id, title))
         
-        print(f"[KEGGAPIClient] Found {len(pathways)} pathways")
         return pathways
     
     def list_organisms(self) -> List[Tuple[str, str, str]]:
@@ -154,7 +144,6 @@ class KEGGAPIClient:
             >>> print(human)  # ('hsa', 'Homo sapiens (human)', 'Eukaryotes;Animals;...')
         """
         url = f"{self.BASE_URL}/list/organism"
-        print(f"[KEGGAPIClient] Listing organisms")
         
         response = self._make_request(url)
         if not response:
@@ -170,7 +159,6 @@ class KEGGAPIClient:
                 lineage = parts[3] if len(parts) > 3 else ""
                 organisms.append((code, name, lineage))
         
-        print(f"[KEGGAPIClient] Found {len(organisms)} organisms")
         return organisms
     
     def get_pathway_image_url(self, pathway_id: str) -> str:

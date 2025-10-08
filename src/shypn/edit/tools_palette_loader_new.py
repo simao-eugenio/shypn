@@ -31,7 +31,6 @@ class ToolsPaletteLoader:
             ToolsPalette: Configured palette instance
         """
         self.palette = ToolsPalette()
-        print(f"[ToolsPaletteLoader] Loaded tools palette")
         return self.palette
     
     def get_palette(self) -> ToolsPalette:

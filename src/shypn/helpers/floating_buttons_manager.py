@@ -308,7 +308,6 @@ class FloatingButtonsManager(GObject.GObject):
                     self.edit_operations.canvas_manager.set_tool(tool_name)
             
             self.emit('tool-changed', tool_name)
-            print(f"[FloatingButtons] Tool activated: {tool_name}")
         else:
             # Allow deselection - return to pan mode
             self.current_tool = None
@@ -317,31 +316,24 @@ class FloatingButtonsManager(GObject.GObject):
                 self.edit_operations.canvas_manager.clear_tool()
             
             self.emit('tool-changed', '')
-            print(f"[FloatingButtons] Tool deselected - pan mode")
     
     def _on_lasso_clicked(self, button):
         """Handle Lasso button click."""
         if self.edit_operations:
             self.edit_operations.activate_lasso_mode()
-            print("[FloatingButtons] Lasso mode activated")
         else:
-            print("[FloatingButtons] ERROR: edit_operations not set")
     
     def _on_undo_clicked(self, button):
         """Handle Undo button click."""
         if self.edit_operations:
             self.edit_operations.undo()
-            print("[FloatingButtons] Undo triggered")
         else:
-            print("[FloatingButtons] ERROR: edit_operations not set for undo")
     
     def _on_redo_clicked(self, button):
         """Handle Redo button click."""
         if self.edit_operations:
             self.edit_operations.redo()
-            print("[FloatingButtons] Redo triggered")
         else:
-            print("[FloatingButtons] ERROR: edit_operations not set for redo")
     
     # ==================== Public API ====================
     

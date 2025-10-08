@@ -33,8 +33,6 @@ class StandardConversionStrategy(ConversionStrategy):
         Returns:
             DocumentModel with places, transitions, arcs
         """
-        print(f"[PathwayConverter] Converting '{pathway.title}'")
-        print(f"[PathwayConverter] Options: scale={options.coordinate_scale}, "
               f"cofactors={options.include_cofactors}, split_rev={options.split_reversible}")
         
         document = DocumentModel()
@@ -49,7 +47,6 @@ class StandardConversionStrategy(ConversionStrategy):
                 document.places.append(place)
                 place_map[entry.id] = place
         
-        print(f"[PathwayConverter] Created {len(document.places)} places")
         
         # Phase 2: Create transitions and arcs from reactions
         for reaction in pathway.reactions:
@@ -65,8 +62,6 @@ class StandardConversionStrategy(ConversionStrategy):
                 )
                 document.arcs.extend(arcs)
         
-        print(f"[PathwayConverter] Created {len(document.transitions)} transitions")
-        print(f"[PathwayConverter] Created {len(document.arcs)} arcs")
         
         # Update ID counters
         if document.places:
@@ -76,7 +71,6 @@ class StandardConversionStrategy(ConversionStrategy):
         if document.arcs:
             document._next_arc_id = len(document.arcs) + 1
         
-        print(f"[PathwayConverter] Conversion complete")
         
         return document
 

@@ -82,7 +82,6 @@ class ToolsPalette(BaseEditPalette):
                 self.edit_operations.canvas_manager.set_tool(tool_name)
             
             self.emit_tool_changed(tool_name)
-            print(f"[ToolsPalette] Tool activated: {tool_name}")
         else:
             # Tool deactivated - return to pan mode
             self.current_tool = None
@@ -90,7 +89,6 @@ class ToolsPalette(BaseEditPalette):
                 self.edit_operations.canvas_manager.clear_tool()
             
             self.emit_tool_changed('')
-            print(f"[ToolsPalette] Tool deactivated")
     
     def apply_styling(self):
         """Apply light gray background with shadow styling to tools palette.
@@ -126,7 +124,6 @@ class ToolsPalette(BaseEditPalette):
         )
         
         self._css_applied = True
-        print("[ToolsPalette] Light gray background with bottom shadow applied")
     
     def get_current_tool(self):
         """Get currently active tool.

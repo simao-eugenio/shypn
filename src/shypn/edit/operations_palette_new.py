@@ -71,7 +71,6 @@ class OperationsPalette(BasePalette):
         for button in self.buttons.values():
             self.content_box.pack_start(button, False, False, 0)
         
-        print(f"[OperationsPalette] Created {len(self.buttons)} operation buttons")
     
     def _create_select_button(self) -> Gtk.ToggleButton:
         """Create the Select toggle button.
@@ -135,10 +134,8 @@ class OperationsPalette(BasePalette):
         
         if is_active:
             self.emit('operation-triggered', 'select')
-            print(f"[OperationsPalette] Selection mode activated")
         else:
             self.emit('operation-triggered', 'select-off')
-            print(f"[OperationsPalette] Selection mode deactivated")
     
     def _on_lasso_clicked(self, button: Gtk.Button):
         """Handle lasso button click.
@@ -147,7 +144,6 @@ class OperationsPalette(BasePalette):
             button: The lasso button
         """
         self.emit('operation-triggered', 'lasso')
-        print(f"[OperationsPalette] Lasso selection triggered")
     
     def _on_undo_clicked(self, button: Gtk.Button):
         """Handle undo button click.
@@ -156,7 +152,6 @@ class OperationsPalette(BasePalette):
             button: The undo button
         """
         self.emit('operation-triggered', 'undo')
-        print(f"[OperationsPalette] Undo triggered")
     
     def _on_redo_clicked(self, button: Gtk.Button):
         """Handle redo button click.
@@ -165,7 +160,6 @@ class OperationsPalette(BasePalette):
             button: The redo button
         """
         self.emit('operation-triggered', 'redo')
-        print(f"[OperationsPalette] Redo triggered")
     
     def _get_css(self) -> bytes:
         """Get operations palette CSS styling with dramatic floating effect.
@@ -284,7 +278,6 @@ class OperationsPalette(BasePalette):
         Args:
             enabled: True to enable, False to disable
         """
-        print(f"[OperationsPalette] Setting undo button enabled={enabled}")
         self.set_button_sensitive('undo', enabled)
     
     def set_redo_enabled(self, enabled: bool):
@@ -293,7 +286,6 @@ class OperationsPalette(BasePalette):
         Args:
             enabled: True to enable, False to disable
         """
-        print(f"[OperationsPalette] Setting redo button enabled={enabled}")
         self.set_button_sensitive('redo', enabled)
     
     def update_undo_redo_state(self, can_undo: bool, can_redo: bool):
@@ -303,7 +295,6 @@ class OperationsPalette(BasePalette):
             can_undo: Whether undo is available
             can_redo: Whether redo is available
         """
-        print(f"[OperationsPalette] update_undo_redo_state called: can_undo={can_undo}, can_redo={can_redo}")
         self.set_undo_enabled(can_undo)
         self.set_redo_enabled(can_redo)
 

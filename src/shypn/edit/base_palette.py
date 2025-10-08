@@ -76,7 +76,6 @@ class BasePalette(GObject.GObject, ABC, metaclass=GObjectABCMeta):
         # Apply CSS styling
         self._apply_css()
         
-        print(f"[BasePalette] Created palette: {self.palette_id}")
     
     def _create_structure(self):
         """Create the standard palette widget hierarchy.
@@ -114,7 +113,6 @@ class BasePalette(GObject.GObject, ABC, metaclass=GObjectABCMeta):
         self.event_box.show()     # Show event box explicitly  
         self.revealer.show()      # Show revealer explicitly
         
-        print(f"[BasePalette] Structure created for {self.palette_id}: visible={self.revealer.get_visible()}, reveal_child={self.revealer.get_reveal_child()}")
     
     @abstractmethod
     def _create_content(self):
@@ -178,9 +176,7 @@ class BasePalette(GObject.GObject, ABC, metaclass=GObjectABCMeta):
                     Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
                 )
                 
-                print(f"[BasePalette] CSS applied for {self.palette_id}")
         except Exception as e:
-            print(f"[BasePalette] Warning: CSS styling failed for {self.palette_id}: {e}", 
                   file=sys.stderr)
     
     # ==================== Public API ====================
@@ -208,7 +204,6 @@ class BasePalette(GObject.GObject, ABC, metaclass=GObjectABCMeta):
         """Show the palette with animation."""
         if self.revealer:
             if self._is_visible:
-                print(f"[BasePalette] Palette {self.palette_id} already visible, skipping")
                 return
                 
             current_state = self.revealer.get_reveal_child()
@@ -217,12 +212,9 @@ class BasePalette(GObject.GObject, ABC, metaclass=GObjectABCMeta):
             
             # Debug: Check allocation
             allocation = self.revealer.get_allocation()
-            print(f"[BasePalette] Showing palette: {self.palette_id} (was {current_state}, now True)")
-            print(f"[BasePalette] Revealer allocation: x={allocation.x}, y={allocation.y}, w={allocation.width}, h={allocation.height}")
             
             self.emit('palette-shown')
         else:
-            print(f"[BasePalette] ERROR: No revealer for palette {self.palette_id}!", file=sys.stderr)
     
     def hide(self):
         """Hide the palette with animation."""
@@ -230,7 +222,6 @@ class BasePalette(GObject.GObject, ABC, metaclass=GObjectABCMeta):
             self.revealer.set_reveal_child(False)
             self._is_visible = False
             self.emit('palette-hidden')
-            print(f"[BasePalette] Hiding palette: {self.palette_id}")
     
     def toggle(self):
         """Toggle palette visibility."""
@@ -258,7 +249,6 @@ class BasePalette(GObject.GObject, ABC, metaclass=GObjectABCMeta):
         if button:
             button.set_sensitive(sensitive)
         else:
-            print(f"[BasePalette] Warning: Button '{button_id}' not found", 
                   file=sys.stderr)
     
     def get_button(self, button_id: str) -> Gtk.Widget:

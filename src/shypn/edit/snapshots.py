@@ -211,7 +211,6 @@ def recreate_arc(canvas_manager, snapshot: Dict[str, Any]):
         target = next((t for t in canvas_manager.transitions if t.id == snapshot['target_id']), None)
     
     if not source or not target:
-        print(f"[Snapshots] Warning: Cannot recreate arc - source or target not found")
         return
     
     arc = Arc(
@@ -252,7 +251,6 @@ def recreate_from_snapshot(canvas_manager, snapshot: Dict[str, Any]):
     elif obj_type == 'arc':
         recreate_arc(canvas_manager, snapshot)
     else:
-        print(f"[Snapshots] Warning: Unknown object type '{obj_type}'")
 
 
 def remove_place_by_id(canvas_manager, place_id: int):

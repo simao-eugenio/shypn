@@ -975,16 +975,12 @@ class FileExplorerPanel:
             filepath: Full path to .shy file to open
         """
         if not hasattr(self, 'canvas_loader') or self.canvas_loader is None:
-            print("[FileExplorer] ERROR: No canvas_loader available")
             return
         if not hasattr(self, 'persistency') or self.persistency is None:
-            print("[FileExplorer] ERROR: No persistency available")
             return
         try:
             from shypn.data.canvas.document_model import DocumentModel
-            print(f"[FileExplorer] Loading file: {filepath}")
             document = DocumentModel.load_from_file(filepath)
-            print(f"[FileExplorer] Loaded document with {len(document.places)} places, {len(document.transitions)} transitions")
             self._load_document_into_canvas(document, filepath)
         except Exception as e:
             import traceback
@@ -1007,30 +1003,23 @@ class FileExplorerPanel:
         filename = os.path.basename(filepath)
         base_name = os.path.splitext(filename)[0]
         
-        print(f"[FileExplorer] Loading document from {filepath}")
-        print(f"[FileExplorer] Document has {len(document.places)} places, {len(document.transitions)} transitions, {len(document.arcs)} arcs")
         
         page_index, drawing_area = self.canvas_loader.add_document(filename=base_name)
         manager = self.canvas_loader.get_canvas_manager(drawing_area)
         if manager:
-            print(f"[FileExplorer] Manager before restore: {len(manager.places)} places, {len(manager.transitions)} transitions")
             # Restore objects
             manager.places = list(document.places)
             manager.transitions = list(document.transitions)
             manager.arcs = list(document.arcs)
-            print(f"[FileExplorer] Manager after restore: {len(manager.places)} places, {len(manager.transitions)} transitions, {len(manager.arcs)} arcs")
-            print(f"[FileExplorer] First place: id={manager.places[0].id if manager.places else 'N/A'}")
             manager._next_place_id = document._next_place_id
             manager._next_transition_id = document._next_transition_id
             manager._next_arc_id = document._next_arc_id
             
             # Ensure arc references are properly set
             manager.ensure_arc_references()
-            print(f"[FileExplorer] Arc references updated")
             
             # Mark as dirty to ensure redraw
             manager.mark_dirty()
-            print(f"[FileExplorer] Manager marked dirty for redraw")
             
             # Restore view state (zoom and pan)
             if hasattr(document, 'view_state') and document.view_state:
@@ -1079,8 +1068,6 @@ class FileExplorerPanel:
             filepath: Full path to the loaded file
             document: The loaded DocumentModel instance
         """
-        print(f"[FileExplorer] _on_file_loaded_callback called with {filepath}")
-        print(f"[FileExplorer] Document has {len(document.places)} places, {len(document.transitions)} transitions")
         
         # Load the document into the canvas
         self._load_document_into_canvas(document, filepath)

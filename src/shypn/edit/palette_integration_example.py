@@ -47,12 +47,10 @@ def example_setup_palettes_in_canvas(overlay_widget, canvas_manager):
     def on_tool_selected(palette, tool_name):
         """Handle tool selection."""
         if tool_name:
-            print(f"Tool selected: {tool_name}")
             # Set tool in canvas manager
             if hasattr(canvas_manager, 'set_tool'):
                 canvas_manager.set_tool(tool_name)
         else:
-            print("Tool cleared")
             if hasattr(canvas_manager, 'clear_tool'):
                 canvas_manager.clear_tool()
     
@@ -61,7 +59,6 @@ def example_setup_palettes_in_canvas(overlay_widget, canvas_manager):
     # Operations palette signal
     def on_operation_triggered(palette, operation):
         """Handle operation trigger."""
-        print(f"Operation triggered: {operation}")
         
         if operation == 'select':
             # Activate selection mode
@@ -99,7 +96,8 @@ def example_setup_palettes_in_canvas(overlay_widget, canvas_manager):
     # palette_manager.show_palette('tools')
     # palette_manager.show_palette('operations')
     
-    print("[Example] Palette system integrated successfully!")
+        # All integrations complete
+    pass
     
     return palette_manager
 
@@ -239,8 +237,6 @@ def _setup_canvas_manager(self, drawing_area, overlay_box=None, overlay_widget=N
         manager.palette_manager = palette_manager
         manager.tools_palette = tools_palette
         manager.ops_palette = ops_palette
-        
-        print("[ModelCanvasLoader] Palettes integrated")
     
     # ... rest of setup code ...
 

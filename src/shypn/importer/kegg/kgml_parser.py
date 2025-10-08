@@ -42,10 +42,8 @@ class KGMLParser:
             root = ET.fromstring(kgml_xml)
             return self._parse_pathway(root)
         except ET.ParseError as e:
-            print(f"[KGMLParser] XML parse error: {e}")
             return None
         except Exception as e:
-            print(f"[KGMLParser] Unexpected error: {e}")
             return None
     
     def parse_file(self, filepath: str) -> Optional[KEGGPathway]:
@@ -62,7 +60,6 @@ class KGMLParser:
             root = tree.getroot()
             return self._parse_pathway(root)
         except Exception as e:
-            print(f"[KGMLParser] Error reading file {filepath}: {e}")
             return None
     
     def _parse_pathway(self, root: ET.Element) -> KEGGPathway:
@@ -98,10 +95,6 @@ class KGMLParser:
             relation = self._parse_relation(relation_elem)
             pathway.relations.append(relation)
         
-        print(f"[KGMLParser] Parsed pathway '{pathway.title}'")
-        print(f"[KGMLParser]   Entries: {len(pathway.entries)}")
-        print(f"[KGMLParser]   Reactions: {len(pathway.reactions)}")
-        print(f"[KGMLParser]   Relations: {len(pathway.relations)}")
         
         return pathway
     

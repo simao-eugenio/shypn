@@ -48,7 +48,7 @@ class WorkspaceSettings:
                     # Merge loaded settings with defaults
                     self.settings.update(loaded)
             except Exception as e:
-                print(f"Warning: Could not load workspace settings: {e}")
+                print(f"Warning: Could not load workspace settings: {e}", file=sys.stderr)
     
     def save(self) -> None:
         """Save settings to file."""
@@ -56,7 +56,7 @@ class WorkspaceSettings:
             with open(self.config_file, 'w', encoding='utf-8') as f:
                 json.dump(self.settings, f, indent=2)
         except Exception as e:
-            print(f"Warning: Could not save workspace settings: {e}")
+            print(f"Warning: Could not save workspace settings: {e}", file=sys.stderr)
     
     def get_window_geometry(self) -> Dict[str, Any]:
         """Get window geometry settings.
