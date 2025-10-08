@@ -251,6 +251,7 @@ def recreate_from_snapshot(canvas_manager, snapshot: Dict[str, Any]):
     elif obj_type == 'arc':
         recreate_arc(canvas_manager, snapshot)
     else:
+        pass  # Unknown object type
 
 
 def remove_place_by_id(canvas_manager, place_id: int):
