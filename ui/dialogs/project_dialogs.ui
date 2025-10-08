@@ -1,0 +1,647 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- GTK3 Project Management Dialogs -->
+<interface>
+  <requires lib="gtk+" version="3.0"/>
+
+  <!-- New Project Dialog -->
+  <object class="GtkDialog" id="new_project_dialog">
+    <property name="title">New Project</property>
+    <property name="resizable">False</property>
+    <property name="modal">True</property>
+    <property name="window-position">center-on-parent</property>
+    <property name="default-width">450</property>
+    <property name="type-hint">dialog</property>
+    
+    <child internal-child="vbox">
+      <object class="GtkBox">
+        <property name="visible">True</property>
+        <property name="orientation">vertical</property>
+        <property name="spacing">10</property>
+        <property name="margin">12</property>
+        
+        <child>
+          <object class="GtkGrid" id="new_project_grid">
+            <property name="visible">True</property>
+            <property name="row-spacing">8</property>
+            <property name="column-spacing">10</property>
+            
+            <!-- Project Name -->
+            <child>
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="label">Project Name:</property>
+                <property name="xalign">1</property>
+              </object>
+              <packing>
+                <property name="left-attach">0</property>
+                <property name="top-attach">0</property>
+              </packing>
+            </child>
+            
+            <child>
+              <object class="GtkEntry" id="new_project_name_entry">
+                <property name="visible">True</property>
+                <property name="placeholder-text">My Pathway Analysis</property>
+                <property name="hexpand">True</property>
+                <property name="activates-default">True</property>
+              </object>
+              <packing>
+                <property name="left-attach">1</property>
+                <property name="top-attach">0</property>
+              </packing>
+            </child>
+            
+            <!-- Location -->
+            <child>
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="label">Location:</property>
+                <property name="xalign">1</property>
+                <property name="valign">start</property>
+                <property name="margin-top">6</property>
+              </object>
+              <packing>
+                <property name="left-attach">0</property>
+                <property name="top-attach">1</property>
+              </packing>
+            </child>
+            
+            <child>
+              <object class="GtkBox">
+                <property name="visible">True</property>
+                <property name="orientation">vertical</property>
+                <property name="spacing">4</property>
+                
+                <child>
+                  <object class="GtkEntry" id="new_project_location_entry">
+                    <property name="visible">True</property>
+                    <property name="editable">False</property>
+                    <property name="hexpand">True</property>
+                  </object>
+                </child>
+                
+                <child>
+                  <object class="GtkLabel" id="new_project_location_hint">
+                    <property name="visible">True</property>
+                    <property name="label">(Managed by shypn in data/projects/)</property>
+                    <property name="xalign">0</property>
+                    <style>
+                      <class name="dim-label"/>
+                    </style>
+                    <attributes>
+                      <attribute name="scale" value="0.9"/>
+                    </attributes>
+                  </object>
+                </child>
+              </object>
+              <packing>
+                <property name="left-attach">1</property>
+                <property name="top-attach">1</property>
+              </packing>
+            </child>
+            
+            <!-- Description -->
+            <child>
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="label">Description:</property>
+                <property name="xalign">1</property>
+                <property name="valign">start</property>
+                <property name="margin-top">6</property>
+              </object>
+              <packing>
+                <property name="left-attach">0</property>
+                <property name="top-attach">2</property>
+              </packing>
+            </child>
+            
+            <child>
+              <object class="GtkScrolledWindow">
+                <property name="visible">True</property>
+                <property name="shadow-type">in</property>
+                <property name="min-content-height">60</property>
+                <property name="hexpand">True</property>
+                
+                <child>
+                  <object class="GtkTextView" id="new_project_description_text">
+                    <property name="visible">True</property>
+                    <property name="wrap-mode">word</property>
+                    <property name="accepts-tab">False</property>
+                  </object>
+                </child>
+              </object>
+              <packing>
+                <property name="left-attach">1</property>
+                <property name="top-attach">2</property>
+              </packing>
+            </child>
+            
+            <!-- Template -->
+            <child>
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="label">Template:</property>
+                <property name="xalign">1</property>
+              </object>
+              <packing>
+                <property name="left-attach">0</property>
+                <property name="top-attach">3</property>
+              </packing>
+            </child>
+            
+            <child>
+              <object class="GtkComboBoxText" id="new_project_template_combo">
+                <property name="visible">True</property>
+                <property name="active">0</property>
+                <items>
+                  <item id="empty">Empty Project</item>
+                  <item id="basic">Basic Petri Net</item>
+                  <item id="kegg">KEGG Import Template</item>
+                </items>
+              </object>
+              <packing>
+                <property name="left-attach">1</property>
+                <property name="top-attach">3</property>
+              </packing>
+            </child>
+            
+          </object>
+        </child>
+      </object>
+    </child>
+    
+    <child internal-child="action_area">
+      <object class="GtkBox">
+        <property name="visible">True</property>
+        <child>
+          <object class="GtkButton" id="new_project_cancel_button">
+            <property name="label">Cancel</property>
+            <property name="visible">True</property>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkButton" id="new_project_create_button">
+            <property name="label">Create</property>
+            <property name="visible">True</property>
+            <property name="can-default">True</property>
+            <style>
+              <class name="suggested-action"/>
+            </style>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+          </packing>
+        </child>
+      </object>
+    </child>
+    
+    <action-widgets>
+      <action-widget response="-6">new_project_cancel_button</action-widget>
+      <action-widget response="-5">new_project_create_button</action-widget>
+    </action-widgets>
+  </object>
+
+  <!-- Open Project Dialog -->
+  <object class="GtkDialog" id="open_project_dialog">
+    <property name="title">Open Project</property>
+    <property name="modal">True</property>
+    <property name="window-position">center-on-parent</property>
+    <property name="default-width">550</property>
+    <property name="default-height">400</property>
+    <property name="type-hint">dialog</property>
+    
+    <child internal-child="vbox">
+      <object class="GtkBox">
+        <property name="visible">True</property>
+        <property name="orientation">vertical</property>
+        <property name="spacing">0</property>
+        
+        <child>
+          <object class="GtkNotebook" id="open_project_notebook">
+            <property name="visible">True</property>
+            <property name="hexpand">True</property>
+            <property name="vexpand">True</property>
+            
+            <!-- Recent Projects Tab -->
+            <child>
+              <object class="GtkScrolledWindow">
+                <property name="visible">True</property>
+                <property name="hscrollbar-policy">automatic</property>
+                <property name="vscrollbar-policy">automatic</property>
+                <property name="shadow-type">in</property>
+                <property name="margin">12</property>
+                
+                <child>
+                  <object class="GtkTreeView" id="recent_projects_tree">
+                    <property name="visible">True</property>
+                    <property name="headers-visible">True</property>
+                    <property name="activate-on-single-click">False</property>
+                    <!-- Columns added programmatically: Name, Location, Last Modified -->
+                  </object>
+                </child>
+              </object>
+            </child>
+            <child type="tab">
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="label">Recent Projects</property>
+              </object>
+            </child>
+            
+            <!-- Browse Tab -->
+            <child>
+              <object class="GtkBox">
+                <property name="visible">True</property>
+                <property name="orientation">vertical</property>
+                <property name="spacing">10</property>
+                <property name="margin">12</property>
+                
+                <child>
+                  <object class="GtkLabel">
+                    <property name="visible">True</property>
+                    <property name="label">Browse for a project.shy file:</property>
+                    <property name="xalign">0</property>
+                  </object>
+                </child>
+                
+                <child>
+                  <object class="GtkFileChooserButton" id="browse_project_chooser">
+                    <property name="visible">True</property>
+                    <property name="title">Select Project File</property>
+                    <property name="action">open</property>
+                  </object>
+                </child>
+                
+                <child>
+                  <object class="GtkLabel" id="browse_project_info">
+                    <property name="visible">True</property>
+                    <property name="label">No file selected</property>
+                    <property name="xalign">0</property>
+                    <property name="wrap">True</property>
+                    <property name="vexpand">True</property>
+                    <property name="valign">start</property>
+                    <style>
+                      <class name="dim-label"/>
+                    </style>
+                  </object>
+                </child>
+              </object>
+            </child>
+            <child type="tab">
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="label">Browse</property>
+              </object>
+            </child>
+            
+            <!-- Import Archive Tab -->
+            <child>
+              <object class="GtkBox">
+                <property name="visible">True</property>
+                <property name="orientation">vertical</property>
+                <property name="spacing">10</property>
+                <property name="margin">12</property>
+                
+                <child>
+                  <object class="GtkLabel">
+                    <property name="visible">True</property>
+                    <property name="label">Import a project archive (.zip):</property>
+                    <property name="xalign">0</property>
+                  </object>
+                </child>
+                
+                <child>
+                  <object class="GtkFileChooserButton" id="import_archive_chooser">
+                    <property name="visible">True</property>
+                    <property name="title">Select Archive File</property>
+                    <property name="action">open</property>
+                  </object>
+                </child>
+                
+                <child>
+                  <object class="GtkLabel" id="import_archive_info">
+                    <property name="visible">True</property>
+                    <property name="label">No archive selected</property>
+                    <property name="xalign">0</property>
+                    <property name="wrap">True</property>
+                    <property name="vexpand">True</property>
+                    <property name="valign">start</property>
+                    <style>
+                      <class name="dim-label"/>
+                    </style>
+                  </object>
+                </child>
+              </object>
+            </child>
+            <child type="tab">
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="label">Import Archive</property>
+              </object>
+            </child>
+            
+          </object>
+        </child>
+      </object>
+    </child>
+    
+    <child internal-child="action_area">
+      <object class="GtkBox">
+        <property name="visible">True</property>
+        <child>
+          <object class="GtkButton" id="open_project_cancel_button">
+            <property name="label">Cancel</property>
+            <property name="visible">True</property>
+          </object>
+        </child>
+        <child>
+          <object class="GtkButton" id="open_project_open_button">
+            <property name="label">Open</property>
+            <property name="visible">True</property>
+            <property name="sensitive">False</property>
+            <property name="can-default">True</property>
+            <style>
+              <class name="suggested-action"/>
+            </style>
+          </object>
+        </child>
+      </object>
+    </child>
+    
+    <action-widgets>
+      <action-widget response="-6">open_project_cancel_button</action-widget>
+      <action-widget response="-5">open_project_open_button</action-widget>
+    </action-widgets>
+  </object>
+
+  <!-- Project Properties Dialog -->
+  <object class="GtkDialog" id="project_properties_dialog">
+    <property name="title">Project Properties</property>
+    <property name="modal">True</property>
+    <property name="window-position">center-on-parent</property>
+    <property name="default-width">500</property>
+    <property name="default-height">450</property>
+    <property name="type-hint">dialog</property>
+    
+    <child internal-child="vbox">
+      <object class="GtkBox">
+        <property name="visible">True</property>
+        <property name="orientation">vertical</property>
+        <property name="spacing">0</property>
+        
+        <child>
+          <object class="GtkNotebook" id="project_properties_notebook">
+            <property name="visible">True</property>
+            <property name="hexpand">True</property>
+            <property name="vexpand">True</property>
+            
+            <!-- General Tab -->
+            <child>
+              <object class="GtkBox">
+                <property name="visible">True</property>
+                <property name="orientation">vertical</property>
+                <property name="spacing">10</property>
+                <property name="margin">12</property>
+                
+                <child>
+                  <object class="GtkGrid">
+                    <property name="visible">True</property>
+                    <property name="row-spacing">8</property>
+                    <property name="column-spacing">10</property>
+                    
+                    <child>
+                      <object class="GtkLabel">
+                        <property name="visible">True</property>
+                        <property name="label">Name:</property>
+                        <property name="xalign">1</property>
+                      </object>
+                      <packing>
+                        <property name="left-attach">0</property>
+                        <property name="top-attach">0</property>
+                      </packing>
+                    </child>
+                    
+                    <child>
+                      <object class="GtkEntry" id="props_project_name_entry">
+                        <property name="visible">True</property>
+                        <property name="hexpand">True</property>
+                      </object>
+                      <packing>
+                        <property name="left-attach">1</property>
+                        <property name="top-attach">0</property>
+                      </packing>
+                    </child>
+                    
+                    <child>
+                      <object class="GtkLabel">
+                        <property name="visible">True</property>
+                        <property name="label">Location:</property>
+                        <property name="xalign">1</property>
+                      </object>
+                      <packing>
+                        <property name="left-attach">0</property>
+                        <property name="top-attach">1</property>
+                      </packing>
+                    </child>
+                    
+                    <child>
+                      <object class="GtkLabel" id="props_project_location_label">
+                        <property name="visible">True</property>
+                        <property name="label">/path/to/project</property>
+                        <property name="xalign">0</property>
+                        <property name="selectable">True</property>
+                        <property name="hexpand">True</property>
+                        <style>
+                          <class name="dim-label"/>
+                        </style>
+                      </object>
+                      <packing>
+                        <property name="left-attach">1</property>
+                        <property name="top-attach">1</property>
+                      </packing>
+                    </child>
+                    
+                    <child>
+                      <object class="GtkLabel">
+                        <property name="visible">True</property>
+                        <property name="label">Created:</property>
+                        <property name="xalign">1</property>
+                      </object>
+                      <packing>
+                        <property name="left-attach">0</property>
+                        <property name="top-attach">2</property>
+                      </packing>
+                    </child>
+                    
+                    <child>
+                      <object class="GtkLabel" id="props_project_created_label">
+                        <property name="visible">True</property>
+                        <property name="label">2025-10-08</property>
+                        <property name="xalign">0</property>
+                        <property name="hexpand">True</property>
+                        <style>
+                          <class name="dim-label"/>
+                        </style>
+                      </object>
+                      <packing>
+                        <property name="left-attach">1</property>
+                        <property name="top-attach">2</property>
+                      </packing>
+                    </child>
+                    
+                    <child>
+                      <object class="GtkLabel">
+                        <property name="visible">True</property>
+                        <property name="label">Modified:</property>
+                        <property name="xalign">1</property>
+                      </object>
+                      <packing>
+                        <property name="left-attach">0</property>
+                        <property name="top-attach">3</property>
+                      </packing>
+                    </child>
+                    
+                    <child>
+                      <object class="GtkLabel" id="props_project_modified_label">
+                        <property name="visible">True</property>
+                        <property name="label">2025-10-08</property>
+                        <property name="xalign">0</property>
+                        <property name="hexpand">True</property>
+                        <style>
+                          <class name="dim-label"/>
+                        </style>
+                      </object>
+                      <packing>
+                        <property name="left-attach">1</property>
+                        <property name="top-attach">3</property>
+                      </packing>
+                    </child>
+                    
+                  </object>
+                </child>
+                
+                <child>
+                  <object class="GtkLabel">
+                    <property name="visible">True</property>
+                    <property name="label">Description:</property>
+                    <property name="xalign">0</property>
+                  </object>
+                </child>
+                
+                <child>
+                  <object class="GtkScrolledWindow">
+                    <property name="visible">True</property>
+                    <property name="shadow-type">in</property>
+                    <property name="vexpand">True</property>
+                    
+                    <child>
+                      <object class="GtkTextView" id="props_project_description_text">
+                        <property name="visible">True</property>
+                        <property name="wrap-mode">word</property>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                
+              </object>
+            </child>
+            <child type="tab">
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="label">General</property>
+              </object>
+            </child>
+            
+            <!-- Content Tab -->
+            <child>
+              <object class="GtkBox">
+                <property name="visible">True</property>
+                <property name="orientation">vertical</property>
+                <property name="spacing">10</property>
+                <property name="margin">12</property>
+                
+                <child>
+                  <object class="GtkLabel" id="props_content_summary_label">
+                    <property name="visible">True</property>
+                    <property name="label">Project contains:\n• 3 models\n• 2 pathways\n• 1 simulation</property>
+                    <property name="xalign">0</property>
+                    <property name="use-markup">True</property>
+                  </object>
+                </child>
+                
+                <child>
+                  <object class="GtkSeparator">
+                    <property name="visible">True</property>
+                  </object>
+                </child>
+                
+                <child>
+                  <object class="GtkLabel">
+                    <property name="visible">True</property>
+                    <property name="label">Actions:</property>
+                    <property name="xalign">0</property>
+                  </object>
+                </child>
+                
+                <child>
+                  <object class="GtkButton" id="props_export_project_button">
+                    <property name="visible">True</property>
+                    <property name="label">Export Project Archive...</property>
+                  </object>
+                </child>
+                
+                <child>
+                  <object class="GtkButton" id="props_backup_project_button">
+                    <property name="visible">True</property>
+                    <property name="label">Backup Project Now</property>
+                  </object>
+                </child>
+                
+              </object>
+            </child>
+            <child type="tab">
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="label">Content</property>
+              </object>
+            </child>
+            
+          </object>
+        </child>
+      </object>
+    </child>
+    
+    <child internal-child="action_area">
+      <object class="GtkBox">
+        <property name="visible">True</property>
+        <child>
+          <object class="GtkButton" id="props_close_button">
+            <property name="label">Close</property>
+            <property name="visible">True</property>
+          </object>
+        </child>
+        <child>
+          <object class="GtkButton" id="props_save_button">
+            <property name="label">Save</property>
+            <property name="visible">True</property>
+            <property name="can-default">True</property>
+            <style>
+              <class name="suggested-action"/>
+            </style>
+          </object>
+        </child>
+      </object>
+    </child>
+    
+    <action-widgets>
+      <action-widget response="-7">props_close_button</action-widget>
+      <action-widget response="-5">props_save_button</action-widget>
+    </action-widgets>
+  </object>
+
+</interface>

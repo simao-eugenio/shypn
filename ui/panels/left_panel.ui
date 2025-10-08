@@ -349,6 +349,136 @@
           </packing>
         </child>
         
+        <child>
+          <object class="GtkSeparator">
+            <property name="visible">True</property>
+            <property name="orientation">horizontal</property>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+          </packing>
+        </child>
+        
+        <!-- Project Actions Section -->
+        <child>
+          <object class="GtkFrame" id="project_actions_frame">
+            <property name="visible">True</property>
+            <property name="label-xalign">0</property>
+            <property name="shadow-type">none</property>
+            <property name="margin-start">6</property>
+            <property name="margin-end">6</property>
+            <property name="margin-top">6</property>
+            <property name="margin-bottom">3</property>
+            
+            <child type="label">
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="label">Project Actions</property>
+                <style>
+                  <class name="dim-label"/>
+                </style>
+              </object>
+            </child>
+            
+            <child>
+              <object class="GtkBox" id="project_actions_box">
+                <property name="visible">True</property>
+                <property name="orientation">vertical</property>
+                <property name="spacing">3</property>
+                <property name="margin-start">12</property>
+                <property name="margin-end">12</property>
+                <property name="margin-top">6</property>
+                <property name="margin-bottom">6</property>
+                
+                <child>
+                  <object class="GtkButton" id="new_project_button">
+                    <property name="visible">True</property>
+                    <property name="label">New Project</property>
+                    <property name="tooltip-text">Create a new shypn project</property>
+                    <property name="always-show-image">True</property>
+                  </object>
+                  <packing>
+                    <property name="expand">False</property>
+                    <property name="fill">True</property>
+                  </packing>
+                </child>
+                
+                <child>
+                  <object class="GtkButton" id="open_project_button">
+                    <property name="visible">True</property>
+                    <property name="label">Open Project</property>
+                    <property name="tooltip-text">Open an existing project or import archive</property>
+                    <property name="always-show-image">True</property>
+                  </object>
+                  <packing>
+                    <property name="expand">False</property>
+                    <property name="fill">True</property>
+                  </packing>
+                </child>
+                
+                <child>
+                  <object class="GtkButton" id="project_settings_button">
+                    <property name="visible">True</property>
+                    <property name="label">Project Settings</property>
+                    <property name="tooltip-text">View and edit project properties</property>
+                    <property name="sensitive">False</property>
+                    <property name="always-show-image">True</property>
+                  </object>
+                  <packing>
+                    <property name="expand">False</property>
+                    <property name="fill">True</property>
+                  </packing>
+                </child>
+                
+              </object>
+            </child>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+          </packing>
+        </child>
+        
+        <child>
+          <object class="GtkSeparator">
+            <property name="visible">True</property>
+            <property name="orientation">horizontal</property>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+          </packing>
+        </child>
+        
+        <!-- Quit Button -->
+        <child>
+          <object class="GtkButton" id="quit_button">
+            <property name="visible">True</property>
+            <property name="label">Quit Application</property>
+            <property name="tooltip-text">Exit shypn (prompts to save unsaved changes)</property>
+            <property name="margin-start">6</property>
+            <property name="margin-end">6</property>
+            <property name="margin-top">3</property>
+            <property name="margin-bottom">3</property>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+          </packing>
+        </child>
+        
+        <child>
+          <object class="GtkSeparator">
+            <property name="visible">True</property>
+            <property name="orientation">horizontal</property>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+          </packing>
+        </child>
+        
         <!-- Status Bar -->
         <child>
           <object class="GtkBox" id="status_bar">
