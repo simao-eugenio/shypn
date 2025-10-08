@@ -52,18 +52,20 @@ class FileExplorerPanel:
         Navigation buttons: All from builder
     """
 
-    def __init__(self, builder: Gtk.Builder, base_path: Optional[str]=None):
+    def __init__(self, builder: Gtk.Builder, base_path: Optional[str]=None, root_boundary: Optional[str]=None):
         """Initialize the file explorer controller.
         
         Args:
             builder: GTK Builder instance with left_panel.ui loaded
             base_path: Starting directory (default: project root or home)
+            root_boundary: Root boundary - cannot navigate above this (default: same as base_path)
         """
         self.builder = builder
-        self.explorer = FileExplorer(base_path=base_path)
+        self.explorer = FileExplorer(base_path=base_path, root_boundary=root_boundary)
         self.explorer.on_path_changed = self._on_path_changed
         self.explorer.on_error = self._on_error
-        self.current_opened_file: Optional[str] = 'models/default.shy'
+        # Default file is now in workspace/examples/
+        self.current_opened_file: Optional[str] = 'workspace/examples/simple.shy'
         self.hierarchical_view = True
         self.selected_item_path: Optional[str] = None
         self.selected_item_name: Optional[str] = None
@@ -1096,8 +1098,8 @@ class FileExplorerPanel:
     def set_current_file(self, filename_or_path: Optional[str]):
         """Set the currently opened file to display in toolbar.
         
-        Shows the file with its relative path from the models directory.
-        For example: 'subfolder1/test.txt' or just 'file.txt' if in root.
+        Shows the file with its relative path from the workspace root.
+        For example: 'workspace/examples/simple.shy' or 'workspace/projects/myproject/network.shy'
         
         This should be called by the main application when a file is opened
         in the canvas/editor to show which file is being worked on.

@@ -293,7 +293,7 @@ class ProjectManager:
             return
         
         self._initialized = True
-        self.projects_root = None  # Will be set to data/projects/
+        self.projects_root = None  # Will be set to workspace/projects/
         self.current_project = None  # Currently active Project
         self.project_index = {}  # project_id -> project_info dict
         self.recent_projects = []  # List of project_ids, most recent first
@@ -303,13 +303,14 @@ class ProjectManager:
         self._setup_default_paths()
     
     def _setup_default_paths(self):
-        """Setup default project paths."""
+        """Setup default project paths in workspace directory."""
         # Try to find repository root
         try:
             # This file is in src/shypn/data/
             current_dir = os.path.dirname(os.path.abspath(__file__))
             repo_root = os.path.normpath(os.path.join(current_dir, '..', '..', '..'))
-            self.projects_root = os.path.join(repo_root, 'data', 'projects')
+            # Use workspace/projects/ to isolate from application code
+            self.projects_root = os.path.join(repo_root, 'workspace', 'projects')
         except Exception:
             # Fallback to user home
             self.projects_root = os.path.expanduser('~/shypn-projects')

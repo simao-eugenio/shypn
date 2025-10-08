@@ -72,3 +72,9 @@ venv.bak/
 # Rope project settings
 .ropeproject
 Token.txt
+
+# Workspace isolation (user-specific content)
+# workspace/examples/ is tracked (demo files)
+# workspace/projects/ and workspace/cache/ are user-specific
+workspace/projects/
+workspace/cache/

@@ -6,13 +6,20 @@ The panel can exist in two states:
   - Detached: standalone floating window
   - Attached: content embedded in main window container (extreme left)
 
-The panel now includes:
-  - Full file explorer powered by FileExplorerPanel controller
-  - Project management buttons (New Project, Open Project, Project Settings)
-  - Quit button for safe application exit
+The panel integrates three sub-controllers (following OOP principles):
+  - FileExplorerPanel: File browser tree view
+  - ProjectActionsController: Project management actions
+  - Built-in: File operations toolbar
+  
+Architecture:
+  LeftPanelLoader: Minimal loader, UI state management, dock/float behavior
+  └── Delegates to:
+      ├── FileExplorerPanel: File browsing logic
+      └── ProjectActionsController: Project actions logic
 """
 import os
 import sys
+from pathlib import Path
 
 try:
     import gi
@@ -22,10 +29,9 @@ except Exception as e:
     print('ERROR: GTK3 not available in left_panel loader:', e, file=sys.stderr)
     sys.exit(1)
 
-# Import the FileExplorerPanel controller
+# Import sub-controllers (OOP: composition over inheritance)
 from shypn.helpers.file_explorer_panel import FileExplorerPanel
-from shypn.helpers.project_dialog_manager import ProjectDialogManager
-from shypn.data.project_models import get_project_manager
+from shypn.helpers.project_actions_controller import ProjectActionsController
 
 
 class LeftPanelLoader:
@@ -36,7 +42,7 @@ class LeftPanelLoader:
         
         Args:
             ui_path: Optional path to left_panel.ui. If None, uses default location.
-            base_path: Optional base path for file explorer. If None, uses models directory.
+            base_path: Optional base path for file explorer. If None, uses examples directory.
         """
         if ui_path is None:
             # Default: ui/panels/left_panel.ui
@@ -46,19 +52,21 @@ class LeftPanelLoader:
             repo_root = os.path.normpath(os.path.join(script_dir, '..', '..', '..'))
             ui_path = os.path.join(repo_root, 'ui', 'panels', 'left_panel.ui')
             
-            # If base_path not provided, use models directory as home
+            # If base_path not provided, start at workspace/ to show examples/, projects/, cache/
+            # This prevents users from accessing application code (src/, tests/, ui/)
             if base_path is None:
-                base_path = os.path.join(repo_root, 'models')
-                # Create models directory if it doesn't exist
+                base_path = os.path.join(repo_root, 'workspace')
+                # Ensure base_path exists
                 if not os.path.exists(base_path):
                     try:
                         os.makedirs(base_path)
                     except Exception as e:
-                        # Fallback to repo root
+                        # Fallback to repo root if workspace creation fails
                         base_path = repo_root
         
         self.ui_path = ui_path
         self.base_path = base_path
+        self.repo_root = repo_root if ui_path is None else os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
         self.builder = None
         self.window = None
         self.content = None
@@ -70,12 +78,9 @@ class LeftPanelLoader:
         self.on_attach_callback = None  # Callback to notify when panel attaches
         self.on_quit_callback = None  # Callback when quit button is clicked
         
-        # File explorer controller (will be instantiated after loading UI)
-        self.file_explorer = None
-        
-        # Project management
-        self.project_manager = get_project_manager()
-        self.project_dialog_manager = None  # Will be instantiated after loading UI
+        # Sub-controllers (following OOP: composition pattern)
+        self.file_explorer = None  # FileExplorerPanel controller
+        self.project_controller = None  # ProjectActionsController
     
     def load(self):
         """Load the panel UI and return the window.
@@ -113,133 +118,72 @@ class LeftPanelLoader:
         
         # Initialize the file explorer controller
         # This connects the FileExplorer API to the UI widgets defined in XML
+        # Set root_boundary to workspace/ so users can only access examples/, projects/, cache/
+        # This prevents accidental corruption of application code (src/, tests/, ui/)
         try:
-            self.file_explorer = FileExplorerPanel(self.builder, base_path=self.base_path)
+            workspace_boundary = os.path.join(self.repo_root, 'workspace')
+            self.file_explorer = FileExplorerPanel(
+                self.builder, 
+                base_path=self.base_path,  # Start in workspace/
+                root_boundary=workspace_boundary  # Cannot navigate above workspace/
+            )
         except Exception as e:
             pass  # Continue anyway - panel will work without file explorer
         
-        # Initialize project dialog manager
+        # Initialize project actions controller (handles all project management)
         try:
-            self.project_dialog_manager = ProjectDialogManager(
-                parent_window=self.window,
-                ui_path=None  # Uses default path
-            )
-            # Setup callbacks
-            self.project_dialog_manager.on_project_created = self._on_project_created
-            self.project_dialog_manager.on_project_opened = self._on_project_opened
-            self.project_dialog_manager.on_project_closed = self._on_project_closed
+            self.project_controller = ProjectActionsController(self.builder, parent_window=self.window)
+            # Set integration callbacks (minimal - just update file explorer navigation)
+            self.project_controller.on_project_created = self._on_project_created
+            self.project_controller.on_project_opened = self._on_project_opened
+            self.project_controller.on_project_closed = self._on_project_closed
         except Exception as e:
-            print(f"Warning: Failed to initialize project dialog manager: {e}")
-        
-        # Connect project management buttons
-        self._connect_project_buttons()
+            print(f"Warning: Failed to initialize project controller: {e}")
+            self.project_controller = None
         
         # Hide window by default (will be shown when toggled)
         self.window.set_visible(False)
         
         return self.window
     
-    def _connect_project_buttons(self):
-        """Connect project management button signals."""
-        if not self.builder:
-            return
-        
-        # New Project button
-        new_project_btn = self.builder.get_object('new_project_button')
-        if new_project_btn:
-            new_project_btn.connect('clicked', self._on_new_project_clicked)
-        
-        # Open Project button
-        open_project_btn = self.builder.get_object('open_project_button')
-        if open_project_btn:
-            open_project_btn.connect('clicked', self._on_open_project_clicked)
-        
-        # Project Settings button
-        project_settings_btn = self.builder.get_object('project_settings_button')
-        if project_settings_btn:
-            project_settings_btn.connect('clicked', self._on_project_settings_clicked)
-            # Store reference to enable/disable based on project state
-            self.project_settings_button = project_settings_btn
-        
-        # Quit button
-        quit_btn = self.builder.get_object('quit_button')
-        if quit_btn:
-            quit_btn.connect('clicked', self._on_quit_clicked)
-    
-    def _on_new_project_clicked(self, button):
-        """Handle New Project button click."""
-        if self.project_dialog_manager:
-            project = self.project_dialog_manager.show_new_project_dialog()
-            if project:
-                print(f"Created project: {project.name} at {project.base_path}")
-    
-    def _on_open_project_clicked(self, button):
-        """Handle Open Project button click."""
-        if self.project_dialog_manager:
-            project = self.project_dialog_manager.show_open_project_dialog()
-            if project:
-                print(f"Opened project: {project.name} from {project.base_path}")
-    
-    def _on_project_settings_clicked(self, button):
-        """Handle Project Settings button click."""
-        if self.project_dialog_manager:
-            saved = self.project_dialog_manager.show_project_properties_dialog()
-            if saved:
-                print("Project properties saved")
-    
-    def _on_quit_clicked(self, button):
-        """Handle Quit button click."""
-        # Check for unsaved changes
-        # TODO: Implement unsaved changes detection
-        
-        # For now, just notify callback if set
-        if self.on_quit_callback:
-            self.on_quit_callback()
-        else:
-            # Default behavior: quit application
-            Gtk.main_quit()
+    # ===============================
+    # Project Integration Callbacks (Minimal - just navigation)
+    # ===============================
     
     def _on_project_created(self, project):
-        """Callback when a project is created.
+        """Handle project creation - update file explorer to project location.
         
         Args:
             project: The newly created Project instance
         """
-        # Enable project settings button
-        if hasattr(self, 'project_settings_button'):
-            self.project_settings_button.set_sensitive(True)
-        
-        # Update file browser to show project structure
-        if self.file_explorer:
-            # Navigate to project base path
+        if self.file_explorer and project:
+            # Navigate file explorer to new project directory
             self.file_explorer.navigate_to(project.base_path)
-        
-        print(f"Project created: {project.name}")
     
     def _on_project_opened(self, project):
-        """Callback when a project is opened.
+        """Handle project open - update file explorer to project location.
         
         Args:
             project: The opened Project instance
         """
-        # Enable project settings button
-        if hasattr(self, 'project_settings_button'):
-            self.project_settings_button.set_sensitive(True)
-        
-        # Update file browser to show project structure
-        if self.file_explorer:
-            # Navigate to project base path
+        if self.file_explorer and project:
+            # Navigate file explorer to opened project directory
             self.file_explorer.navigate_to(project.base_path)
-        
-        print(f"Project opened: {project.name}")
     
     def _on_project_closed(self):
-        """Callback when a project is closed."""
-        # Disable project settings button
-        if hasattr(self, 'project_settings_button'):
-            self.project_settings_button.set_sensitive(False)
-        
-        print("Project closed")
+        """Handle project closed event.
+
+        When a project is closed, navigate back to workspace root.
+        """
+        logger.debug("Left panel handling project closed")
+        if self.file_explorer:
+            # Navigate to workspace root (safe user directory)
+            workspace_root = os.path.join(self.repo_root, 'workspace')
+            self.file_explorer.navigate_to(workspace_root)
+    
+    # ===============================
+    # Float/Attach (Dock) Behavior
+    # ===============================
     
     def _on_float_toggled(self, button):
         """Internal callback when float toggle button is clicked."""
@@ -312,6 +256,9 @@ class LeftPanelLoader:
         # Store parent window and container for float button callback
         if parent_window:
             self.parent_window = parent_window
+            # CRITICAL: Update project controller's parent window so dialogs attach to main window
+            if self.project_controller:
+                self.project_controller.set_parent_window(parent_window)
         self.parent_container = container
         
         # Extract content from window first

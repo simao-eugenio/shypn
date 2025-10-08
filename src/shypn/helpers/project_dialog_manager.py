@@ -60,75 +60,108 @@ class ProjectDialogManager:
         Returns:
             Project instance if created, None if cancelled
         """
-        self._load_builder()
-        
-        dialog = self.builder.get_object('new_project_dialog')
-        if self.parent_window:
-            dialog.set_transient_for(self.parent_window)
-        
-        # Get widgets
-        name_entry = self.builder.get_object('new_project_name_entry')
-        location_entry = self.builder.get_object('new_project_location_entry')
-        description_text = self.builder.get_object('new_project_description_text')
-        template_combo = self.builder.get_object('new_project_template_combo')
-        create_button = self.builder.get_object('new_project_create_button')
-        
-        # Set default location
-        location_entry.set_text(self.project_manager.projects_root)
-        
-        # Set create button as default
-        create_button.grab_default()
-        
-        # Focus on name entry
-        name_entry.grab_focus()
-        
-        # Run dialog
-        response = dialog.run()
-        
-        project = None
-        if response == Gtk.ResponseType.OK:
-            # Get values
-            name = name_entry.get_text().strip()
+        print("[ProjectDialogManager] Loading new project dialog...")
+        try:
+            self._load_builder()
+            print("[ProjectDialogManager] Builder loaded successfully")
             
-            description_buffer = description_text.get_buffer()
-            start, end = description_buffer.get_bounds()
-            description = description_buffer.get_text(start, end, False).strip()
+            dialog = self.builder.get_object('new_project_dialog')
+            if not dialog:
+                print("[ProjectDialogManager] ERROR: Could not find 'new_project_dialog' in UI file!")
+                return None
+                
+            print(f"[ProjectDialogManager] Dialog object retrieved: {dialog}")
             
-            template = template_combo.get_active_id()
+            if self.parent_window:
+                dialog.set_transient_for(self.parent_window)
+                dialog.set_modal(True)
+                print(f"[ProjectDialogManager] Set transient for: {self.parent_window}")
             
-            if not name:
-                name = "Untitled Project"
+            # Ensure dialog is realized before showing (Wayland fix)
+            dialog.realize()
+            dialog.show_all()
             
-            # Create project
+            # Get widgets
+            name_entry = self.builder.get_object('new_project_name_entry')
+            location_entry = self.builder.get_object('new_project_location_entry')
+            description_text = self.builder.get_object('new_project_description_text')
+            template_combo = self.builder.get_object('new_project_template_combo')
+            create_button = self.builder.get_object('new_project_create_button')
+            
+            print(f"[ProjectDialogManager] Widgets retrieved successfully")
+            
+            # Set default location
+            location_entry.set_text(self.project_manager.projects_root)
+            print(f"[ProjectDialogManager] Set location to: {self.project_manager.projects_root}")
+            
+            # Set create button as default
+            create_button.grab_default()
+            
+            # Focus on name entry
+            name_entry.grab_focus()
+            
+            print("[ProjectDialogManager] Running dialog...")
+            # Run dialog
             try:
-                project = self.project_manager.create_project(
-                    name=name,
-                    description=description,
-                    template=template
-                )
-                
-                # Set as current project
-                self.project_manager.current_project = project
-                
-                # Notify callback
-                if self.on_project_created:
-                    self.on_project_created(project)
-                    
+                response = dialog.run()
+                print(f"[ProjectDialogManager] Dialog returned response: {response}")
             except Exception as e:
-                # Show error dialog
-                error_dialog = Gtk.MessageDialog(
-                    transient_for=dialog,
-                    message_type=Gtk.MessageType.ERROR,
-                    buttons=Gtk.ButtonsType.OK,
-                    text="Failed to create project"
-                )
-                error_dialog.format_secondary_text(str(e))
-                error_dialog.run()
-                error_dialog.destroy()
-                project = None
-        
-        dialog.hide()
-        return project
+                print(f"[ProjectDialogManager] ERROR during dialog.run(): {e}")
+                import traceback
+                traceback.print_exc()
+                dialog.hide()
+                raise
+            
+            project = None
+            if response == Gtk.ResponseType.OK:
+                # Get values
+                name = name_entry.get_text().strip()
+                
+                description_buffer = description_text.get_buffer()
+                start, end = description_buffer.get_bounds()
+                description = description_buffer.get_text(start, end, False).strip()
+                
+                template = template_combo.get_active_id()
+                
+                if not name:
+                    name = "Untitled Project"
+                
+                # Create project
+                try:
+                    project = self.project_manager.create_project(
+                        name=name,
+                        description=description,
+                        template=template
+                    )
+                    
+                    # Set as current project
+                    self.project_manager.current_project = project
+                    
+                    # Notify callback
+                    if self.on_project_created:
+                        self.on_project_created(project)
+                        
+                except Exception as e:
+                    # Show error dialog
+                    error_dialog = Gtk.MessageDialog(
+                        transient_for=dialog,
+                        message_type=Gtk.MessageType.ERROR,
+                        buttons=Gtk.ButtonsType.OK,
+                        text="Failed to create project"
+                    )
+                    error_dialog.format_secondary_text(str(e))
+                    error_dialog.run()
+                    error_dialog.destroy()
+                    project = None
+            
+            dialog.hide()
+            return project
+            
+        except Exception as e:
+            print(f"[ProjectDialogManager] ERROR: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
     
     def show_open_project_dialog(self):
         """Show the Open Project dialog.
