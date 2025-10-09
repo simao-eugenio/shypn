@@ -1614,9 +1614,36 @@ class ModelCanvasLoader:
                 self._show_layout_message("No objects to layout", drawing_area)
                 return
             
+            # Calculate current center of objects (to preserve relative position)
+            all_objs = list(manager.places) + list(manager.transitions)
+            if all_objs:
+                center_x = sum(obj.x for obj in all_objs) / len(all_objs)
+                center_y = sum(obj.y for obj in all_objs) / len(all_objs)
+            else:
+                # Default to canvas center
+                center_x = manager.canvas_width / 2
+                center_y = manager.canvas_height / 2
+            
             # Create engine and apply layout
             engine = LayoutEngine(manager)
             result = engine.apply_layout('auto')
+            
+            # The layout algorithms center at (0, 0), so we need to offset
+            # back to the original center or canvas center
+            all_objs = list(manager.places) + list(manager.transitions)
+            if all_objs:
+                # Calculate new center after layout
+                new_center_x = sum(obj.x for obj in all_objs) / len(all_objs)
+                new_center_y = sum(obj.y for obj in all_objs) / len(all_objs)
+                
+                # Calculate offset needed
+                offset_x = center_x - new_center_x
+                offset_y = center_y - new_center_y
+                
+                # Apply offset to all objects
+                for obj in all_objs:
+                    obj.x += offset_x
+                    obj.y += offset_y
             
             # Show result
             message = (f"Applied {result['algorithm']} layout\n"
@@ -1628,6 +1655,8 @@ class ModelCanvasLoader:
             drawing_area.queue_draw()
             
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             self._show_layout_message(f"Layout error: {str(e)}", drawing_area)
     
     def _on_layout_hierarchical_clicked(self, menu, drawing_area, manager):
@@ -1663,9 +1692,41 @@ class ModelCanvasLoader:
                 self._show_layout_message("No objects to layout", drawing_area)
                 return
             
+            print(f"[Layout] Before: {len(manager.places)} places, {len(manager.transitions)} transitions")
+            
+            # Calculate current center of objects (to preserve relative position)
+            all_objs = list(manager.places) + list(manager.transitions)
+            if all_objs:
+                center_x = sum(obj.x for obj in all_objs) / len(all_objs)
+                center_y = sum(obj.y for obj in all_objs) / len(all_objs)
+            else:
+                # Default to canvas center
+                center_x = manager.canvas_width / 2
+                center_y = manager.canvas_height / 2
+            
             # Create engine and apply layout
             engine = LayoutEngine(manager)
             result = engine.apply_layout(algorithm)
+            
+            # The layout algorithms center at (0, 0), so we need to offset
+            # back to the original center or canvas center
+            all_objs = list(manager.places) + list(manager.transitions)
+            if all_objs:
+                # Calculate new center after layout
+                new_center_x = sum(obj.x for obj in all_objs) / len(all_objs)
+                new_center_y = sum(obj.y for obj in all_objs) / len(all_objs)
+                
+                # Calculate offset needed
+                offset_x = center_x - new_center_x
+                offset_y = center_y - new_center_y
+                
+                # Apply offset to all objects
+                for obj in all_objs:
+                    obj.x += offset_x
+                    obj.y += offset_y
+            
+            print(f"[Layout] After: {len(manager.places)} places, {len(manager.transitions)} transitions")
+            print(f"[Layout] Result: {result}")
             
             # Show result
             message = f"Applied {algorithm_name} layout\nMoved {result['nodes_moved']} objects"
@@ -1675,6 +1736,8 @@ class ModelCanvasLoader:
             drawing_area.queue_draw()
             
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             self._show_layout_message(f"Layout error: {str(e)}", drawing_area)
     
     def _show_layout_message(self, message, drawing_area):
