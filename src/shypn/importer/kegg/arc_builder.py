@@ -57,12 +57,12 @@ class StandardArcBuilder(ArcBuilder):
         """Create input arcs from places to transition.
         
         Args:
-            substrates: List of KEGGSubstrate objects
+            substrates: List of KEGGSubstrate objects (with stoichiometry)
             transition: Target transition
             place_map: Mapping from entry ID to Place
             
         Returns:
-            List of Arc objects (place → transition)
+            List of Arc objects (place → transition) with stoichiometric weights
         """
         arcs = []
         
@@ -76,14 +76,17 @@ class StandardArcBuilder(ArcBuilder):
             arc_id = f"A{self.arc_counter}"
             self.arc_counter += 1
             
-            arc = Arc(place, transition, arc_id, "", weight=1)
+            # Use stoichiometry from substrate as arc weight
+            weight = substrate.stoichiometry
+            arc = Arc(place, transition, arc_id, "", weight=weight)
             
-            # Store KEGG metadata
+            # Store KEGG metadata including stoichiometry
             if not hasattr(arc, 'metadata'):
                 arc.metadata = {}
             arc.metadata['kegg_compound'] = substrate.name
             arc.metadata['source'] = 'KEGG'
             arc.metadata['direction'] = 'input'
+            arc.metadata['stoichiometry'] = substrate.stoichiometry
             
             arcs.append(arc)
         
@@ -94,12 +97,12 @@ class StandardArcBuilder(ArcBuilder):
         """Create output arcs from transition to places.
         
         Args:
-            products: List of KEGGProduct objects
+            products: List of KEGGProduct objects (with stoichiometry)
             transition: Source transition
             place_map: Mapping from entry ID to Place
             
         Returns:
-            List of Arc objects (transition → place)
+            List of Arc objects (transition → place) with stoichiometric weights
         """
         arcs = []
         
@@ -113,14 +116,17 @@ class StandardArcBuilder(ArcBuilder):
             arc_id = f"A{self.arc_counter}"
             self.arc_counter += 1
             
-            arc = Arc(transition, place, arc_id, "", weight=1)
+            # Use stoichiometry from product as arc weight
+            weight = product.stoichiometry
+            arc = Arc(transition, place, arc_id, "", weight=weight)
             
-            # Store KEGG metadata
+            # Store KEGG metadata including stoichiometry
             if not hasattr(arc, 'metadata'):
                 arc.metadata = {}
             arc.metadata['kegg_compound'] = product.name
             arc.metadata['source'] = 'KEGG'
             arc.metadata['direction'] = 'output'
+            arc.metadata['stoichiometry'] = product.stoichiometry
             
             arcs.append(arc)
         

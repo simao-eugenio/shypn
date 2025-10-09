@@ -166,17 +166,33 @@ class KGMLParser:
         
         # Parse substrates
         for substrate_elem in elem.findall('substrate'):
+            # Extract stoichiometry (default to 1 if missing)
+            stoich_str = substrate_elem.attrib.get('stoichiometry', '1')
+            try:
+                stoichiometry = int(stoich_str)
+            except (ValueError, TypeError):
+                stoichiometry = 1  # Default if parsing fails
+            
             substrate = KEGGSubstrate(
                 id=substrate_elem.attrib.get('id', ''),
-                name=substrate_elem.attrib.get('name', '')
+                name=substrate_elem.attrib.get('name', ''),
+                stoichiometry=stoichiometry
             )
             reaction.substrates.append(substrate)
         
         # Parse products
         for product_elem in elem.findall('product'):
+            # Extract stoichiometry (default to 1 if missing)
+            stoich_str = product_elem.attrib.get('stoichiometry', '1')
+            try:
+                stoichiometry = int(stoich_str)
+            except (ValueError, TypeError):
+                stoichiometry = 1  # Default if parsing fails
+            
             product = KEGGProduct(
                 id=product_elem.attrib.get('id', ''),
-                name=product_elem.attrib.get('name', '')
+                name=product_elem.attrib.get('name', ''),
+                stoichiometry=stoichiometry
             )
             reaction.products.append(product)
         

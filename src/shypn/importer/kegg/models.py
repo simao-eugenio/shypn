@@ -85,9 +85,11 @@ class KEGGSubstrate:
     Attributes:
         id: Entry ID of the substrate compound
         name: KEGG compound ID (e.g., "cpd:C00031")
+        stoichiometry: Stoichiometric coefficient (default: 1)
     """
     id: str
     name: str
+    stoichiometry: int = 1
 
 
 @dataclass
@@ -97,9 +99,11 @@ class KEGGProduct:
     Attributes:
         id: Entry ID of the product compound
         name: KEGG compound ID (e.g., "cpd:C00668")
+        stoichiometry: Stoichiometric coefficient (default: 1)
     """
     id: str
     name: str
+    stoichiometry: int = 1
 
 
 @dataclass
