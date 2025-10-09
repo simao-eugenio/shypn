@@ -202,13 +202,18 @@ User clicks [S] button (existing, outside palette)
 
 1. **User clicks category button** (e.g., "Create")
 2. **If another sub-palette is open:**
-   - Current sub-palette slides UP (hide with SLIDE_UP)
+   - Current sub-palette slides DOWN (hide - collapses down)
    - Wait for animation to complete (200ms)
-3. **Selected sub-palette slides DOWN** (reveal with SLIDE_DOWN)
+3. **Selected sub-palette slides UP** (reveal - expands upward from bottom)
 4. **Category button highlights**
 
+**Animation Direction:**
+- **Reveal**: SLIDE_UP (sub-palette grows upward from bottom)
+- **Hide**: Collapses down (sub-palette shrinks downward)
+- This creates a natural "rising from the bottom" effect
+
 **Smooth Transitions:**
-- Use GtkRevealer with SLIDE_UP/SLIDE_DOWN
+- Use GtkRevealer with SLIDE_UP transition type
 - Transition duration: 200ms (fast and fluid)
 - Easing: GTK default (ease-out)
 - Sequential animations: Hide first, then show (no overlap)
@@ -216,17 +221,17 @@ User clicks [S] button (existing, outside palette)
 **Example Timeline:**
 ```
 t=0ms:    User clicks "Edit" category
-t=0ms:    Current sub-palette ("Create") starts sliding UP
+t=0ms:    Current sub-palette ("Create") starts collapsing DOWN
 t=200ms:  "Create" sub-palette fully hidden
-t=200ms:  "Edit" sub-palette starts sliding DOWN
-t=400ms:  "Edit" sub-palette fully visible
+t=200ms:  "Edit" sub-palette starts sliding UP from bottom
+t=400ms:  "Edit" sub-palette fully visible (expanded upward)
 Total:    400ms for complete switch
 ```
 
 **Special Case - Same Category Clicked:**
 ```
 t=0ms:    User clicks already-active "Create" category
-t=0ms:    "Create" sub-palette slides UP (toggle off)
+t=0ms:    "Create" sub-palette collapses DOWN (toggle off)
 t=200ms:  Fully hidden
 No show animation (category deactivated)
 ```
