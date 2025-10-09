@@ -1637,8 +1637,7 @@ class ModelCanvasLoader:
             overlay_manager = self.overlay_managers[drawing_area]
             simulate_tools = overlay_manager.get_palette('simulate_tools')
             if simulate_tools and simulate_tools.simulation:
-                if transition.id in simulate_tools.simulation.behavior_cache:
-                    del simulate_tools.simulation.behavior_cache[transition.id]
+                simulate_tools.simulation.invalidate_behavior_cache(transition.id)
         if self.right_panel_loader:
             if hasattr(self.right_panel_loader, 'transition_panel') and self.right_panel_loader.transition_panel:
                 if transition in self.right_panel_loader.transition_panel.selected_objects:
