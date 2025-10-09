@@ -599,6 +599,15 @@ class SimulationController:
         self._max_steps = max_steps
         self._steps_executed = 0
         self._time_step = time_step
+        
+        # Calculate optimal step batching for smooth animation
+        # Target: Execute multiple steps per GUI update to maintain smooth visualization
+        # For small time steps (e.g., 0.002s), batch many steps together
+        # For large time steps (e.g., 1.0s), execute 1 step per GUI update
+        gui_interval_s = 0.1  # Fixed 100ms GUI update interval
+        self._steps_per_callback = max(1, int(gui_interval_s / time_step))
+        self._steps_per_callback = min(self._steps_per_callback, 100)  # Cap at 100 steps/update
+        
         self._update_enablement_states()
         for transition in self.model.transitions:
             state = self.transition_states.get(transition.id)
@@ -616,6 +625,10 @@ class SimulationController:
     def _simulation_loop(self) -> bool:
         """Internal simulation loop callback.
         
+        Executes multiple simulation steps per GUI update for smooth animation
+        at all time scales. For very small time steps (e.g., 2ms), this batches
+        many steps together to avoid choppy visualization.
+        
         Returns:
             bool: True to continue, False to stop the timeout
         """
@@ -628,20 +641,33 @@ class SimulationController:
             self._running = False
             self._timeout_id = None
             return False
-        if self._max_steps is not None and self._steps_executed >= self._max_steps:
+        
+        # Execute a batch of simulation steps for smooth animation
+        for _ in range(self._steps_per_callback):
+            # Check stop conditions before each step in the batch
+            if self._stop_requested:
+                self._running = False
+                self._timeout_id = None
+                return False
+            if self._max_steps is not None and self._steps_executed >= self._max_steps:
+                if DEBUG_LOOP:
+                    pass
+                self._running = False
+                self._timeout_id = None
+                return False
+            
+            # Execute one simulation step
+            success = self.step(self._time_step)
+            if not success:
+                self._running = False
+                self._timeout_id = None
+                return False
+            self._steps_executed += 1
+            
             if DEBUG_LOOP:
                 pass
-            self._running = False
-            self._timeout_id = None
-            return False
-        success = self.step(self._time_step)
-        if not success:
-            self._running = False
-            self._timeout_id = None
-            return False
-        self._steps_executed += 1
-        if DEBUG_LOOP:
-            pass
+        
+        # All steps in batch completed, GUI will update before next callback
         return True
 
     def stop(self):
