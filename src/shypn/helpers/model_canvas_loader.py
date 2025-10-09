@@ -608,21 +608,18 @@ class ModelCanvasLoader:
             
             drawing_area.queue_draw()
         
-        # Layout tools (to be implemented in Task 8)
+        # Layout tools - call existing layout methods
         elif tool_id == 'layout_auto':
-            print(f"[SwissKnife] Auto layout requested (not yet implemented)")
-            # TODO: canvas_manager.apply_auto_layout()
-            # drawing_area.queue_draw()
+            print(f"[SwissKnife] Auto layout requested")
+            self._on_layout_auto_clicked(None, drawing_area, canvas_manager)
         
         elif tool_id == 'layout_hierarchical':
-            print(f"[SwissKnife] Hierarchical layout requested (not yet implemented)")
-            # TODO: canvas_manager.apply_hierarchical_layout()
-            # drawing_area.queue_draw()
+            print(f"[SwissKnife] Hierarchical layout requested")
+            self._on_layout_hierarchical_clicked(None, drawing_area, canvas_manager)
         
         elif tool_id == 'layout_force':
-            print(f"[SwissKnife] Force-directed layout requested (not yet implemented)")
-            # TODO: canvas_manager.apply_force_directed_layout()
-            # drawing_area.queue_draw()
+            print(f"[SwissKnife] Force-directed layout requested")
+            self._on_layout_force_clicked(None, drawing_area, canvas_manager)
         
         else:
             print(f"[SwissKnife] Unknown tool: {tool_id}")
