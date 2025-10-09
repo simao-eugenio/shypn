@@ -102,30 +102,22 @@ class ProjectActionsController:
     
     def _on_new_project_clicked(self, button):
         """Handle New Project button click."""
-        print("[ProjectActions] New Project button clicked")
         try:
             project = self.dialog_manager.show_new_project_dialog()
-            if project:
-                print(f"[ProjectActions] Created project: {project.name} at {project.base_path}")
         except Exception as e:
-            print(f"[ProjectActions] ERROR: Failed to show new project dialog: {e}")
             import traceback
             traceback.print_exc()
     
     def _on_open_project_clicked(self, button):
         """Handle Open Project button click."""
         project = self.dialog_manager.show_open_project_dialog()
-        if project:
-            print(f"Opened project: {project.name} from {project.base_path}")
     
     def _on_project_settings_clicked(self, button):
         """Handle Project Settings button click."""
         if self.project_manager.current_project:
-            saved = self.dialog_manager.show_project_properties_dialog()
-            if saved:
-                print("Project properties saved")
+            self.dialog_manager.show_project_properties_dialog()
         else:
-            print("Warning: No current project to show settings for")
+            pass  # No current project
     
     def _on_quit_clicked(self, button):
         """Handle Quit button click."""
