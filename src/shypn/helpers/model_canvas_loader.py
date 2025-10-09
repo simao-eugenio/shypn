@@ -575,6 +575,31 @@ class ModelCanvasLoader:
             canvas_manager: ModelCanvasManager instance
             drawing_area: GtkDrawingArea widget
         """
+        # Update tool visual feedback
+        if hasattr(palette, 'tool_registry'):
+            palette.tool_registry.set_active_tool(tool_id)
+        
+        # Set cursor based on tool
+        window = drawing_area.get_window()
+        if window:
+            display = drawing_area.get_display()
+            cursor = None
+            
+            if tool_id == 'place':
+                cursor = Gdk.Cursor.new_from_name(display, 'crosshair')
+            elif tool_id == 'transition':
+                cursor = Gdk.Cursor.new_from_name(display, 'crosshair')
+            elif tool_id == 'arc':
+                cursor = Gdk.Cursor.new_from_name(display, 'cell')
+            elif tool_id == 'select':
+                cursor = Gdk.Cursor.new_from_name(display, 'default')
+            elif tool_id == 'lasso':
+                cursor = Gdk.Cursor.new_from_name(display, 'hand1')
+            elif tool_id.startswith('layout_'):
+                cursor = Gdk.Cursor.new_from_name(display, 'default')
+            
+            window.set_cursor(cursor)
+        
         # Drawing tools (place, transition, arc)
         if tool_id in ('place', 'transition', 'arc'):
             canvas_manager.set_tool(tool_id)
@@ -796,10 +821,10 @@ class ModelCanvasLoader:
         drawing_area.connect('key-press-event', self._on_key_press_event, manager)
         if not hasattr(self, '_drag_state'):
             self._drag_state = {}
-        self._drag_state[drawing_area] = {'active': False, 'button': 0, 'start_x': 0, 'start_y': 0, 'is_panning': False}
+        self._drag_state[drawing_area] = {'active': False, 'button': 0, 'start_x': 0, 'start_y': 0, 'is_panning': False, 'is_rect_selecting': False, 'is_transforming': False}
         if not hasattr(self, '_arc_state'):
             self._arc_state = {}
-        self._arc_state[drawing_area] = {'source': None, 'cursor_pos': (0, 0), 'ignore_next_release': False}
+        self._arc_state[drawing_area] = {'source': None, 'cursor_pos': (0, 0), 'target_valid': None, 'hovered_target': None, 'ignore_next_release': False}
         if not hasattr(self, '_click_state'):
             self._click_state = {}
         self._click_state[drawing_area] = {'last_click_time': 0.0, 'last_click_obj': None, 'double_click_threshold': 0.3, 'pending_timeout': None, 'pending_click_data': None}
@@ -848,9 +873,21 @@ class ModelCanvasLoader:
                     arc = manager.add_arc(source, target)
                     widget.queue_draw()
                 except ValueError as e:
-                    pass  # Silently ignore arc creation errors
+                    # Show error dialog instead of silent failure
+                    dialog = Gtk.MessageDialog(
+                        transient_for=self.parent_window,
+                        flags=0,
+                        message_type=Gtk.MessageType.ERROR,
+                        buttons=Gtk.ButtonsType.OK,
+                        text="Cannot Create Arc"
+                    )
+                    dialog.format_secondary_text(str(e))
+                    dialog.run()
+                    dialog.destroy()
                 finally:
                     arc_state['source'] = None
+                    arc_state['target_valid'] = None
+                    arc_state['hovered_target'] = None
                     widget.queue_draw()
                 return True
         if event.button == 1 and manager.is_tool_active():
@@ -1072,7 +1109,21 @@ class ModelCanvasLoader:
                 widget.queue_draw()
                 return True
         
+        # FIX: Update arc preview with target validation
         if manager.is_tool_active() and manager.get_tool() == 'arc' and (arc_state['source'] is not None):
+            # Check hovered object for target validation
+            hovered = manager.find_object_at_position(world_x, world_y)
+            if hovered and hovered != arc_state['source']:
+                source = arc_state['source']
+                # Valid: Place→Transition or Transition→Place
+                is_valid = (isinstance(source, Place) and isinstance(hovered, Transition)) or \
+                           (isinstance(source, Transition) and isinstance(hovered, Place))
+                arc_state['target_valid'] = is_valid
+                arc_state['hovered_target'] = hovered
+            else:
+                arc_state['target_valid'] = None
+                arc_state['hovered_target'] = None
+            
             widget.queue_draw()
         if state['active'] and state['button'] > 0:
             # Handle transformation drag
@@ -1231,6 +1282,47 @@ class ModelCanvasLoader:
             lasso_state = self._lasso_state[drawing_area]
             if lasso_state.get('active', False) and lasso_state.get('selector'):
                 lasso_state['selector'].render_lasso(cr, manager.zoom)
+        
+        # Highlight source object when creating arc
+        if drawing_area in self._arc_state:
+            arc_state = self._arc_state[drawing_area]
+            source = arc_state.get('source')
+            
+            if source is not None:
+                # Green glow for source
+                cr.set_source_rgba(0.2, 0.9, 0.2, 0.6)
+                cr.set_line_width(4.0 / manager.zoom)
+                
+                if isinstance(source, Place):
+                    cr.arc(source.x, source.y, source.radius + 6, 0, 2 * math.pi)
+                    cr.stroke()
+                elif isinstance(source, Transition):
+                    w = source.width if source.horizontal else source.height
+                    h = source.height if source.horizontal else source.width
+                    cr.rectangle(source.x - w/2 - 6, source.y - h/2 - 6, w + 12, h + 12)
+                    cr.stroke()
+            
+            # Highlight hovered target with validation color
+            hovered = arc_state.get('hovered_target')
+            target_valid = arc_state.get('target_valid')
+            
+            if hovered is not None and target_valid is not None:
+                # Green for valid, red for invalid
+                if target_valid:
+                    cr.set_source_rgba(0.2, 0.9, 0.2, 0.5)
+                else:
+                    cr.set_source_rgba(0.9, 0.2, 0.2, 0.5)
+                
+                cr.set_line_width(3.0 / manager.zoom)
+                
+                if isinstance(hovered, Place):
+                    cr.arc(hovered.x, hovered.y, hovered.radius + 4, 0, 2 * math.pi)
+                    cr.stroke()
+                elif isinstance(hovered, Transition):
+                    w = hovered.width if hovered.horizontal else hovered.height
+                    h = hovered.height if hovered.horizontal else hovered.width
+                    cr.rectangle(hovered.x - w/2 - 4, hovered.y - h/2 - 4, w + 8, h + 8)
+                    cr.stroke()
         
         cr.restore()
         if drawing_area in self._arc_state:
