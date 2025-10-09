@@ -455,6 +455,191 @@ class ProjectDialogManager:
             return 'discard'
         else:
             return 'cancel'
+    
+    def confirm_delete_project(self, project_name: str, delete_files: bool = False) -> str:
+        """Show confirmation dialog for project deletion with safety measures.
+        
+        Args:
+            project_name: Name of project to delete
+            delete_files: Whether files will be permanently deleted
+            
+        Returns:
+            'delete': Confirmed deletion
+            'archive': User chose to archive instead
+            'cancel': User cancelled
+        """
+        if delete_files:
+            # CRITICAL: Multiple confirmations for permanent deletion
+            
+            # First dialog: Offer safer alternatives
+            dialog = Gtk.MessageDialog(
+                transient_for=self.parent_window,
+                message_type=Gtk.MessageType.WARNING,
+                buttons=Gtk.ButtonsType.NONE,
+                text=f"⚠️ Delete Project '{project_name}'?"
+            )
+            
+            dialog.format_secondary_text(
+                "Permanent deletion cannot be undone!\n\n"
+                "What would you like to do?"
+            )
+            
+            dialog.add_button("Cancel", Gtk.ResponseType.CANCEL)
+            dialog.add_button("Archive (Keep Backup)", Gtk.ResponseType.NO)
+            delete_button = dialog.add_button("Delete Forever", Gtk.ResponseType.YES)
+            
+            # Style delete button as dangerous
+            delete_context = delete_button.get_style_context()
+            delete_context.add_class("destructive-action")
+            
+            response = dialog.run()
+            dialog.destroy()
+            
+            if response == Gtk.ResponseType.CANCEL:
+                return 'cancel'
+            elif response == Gtk.ResponseType.NO:
+                return 'archive'  # User chose safer option
+            
+            # Second dialog: Require typing project name to confirm
+            confirm_dialog = Gtk.MessageDialog(
+                transient_for=self.parent_window,
+                message_type=Gtk.MessageType.ERROR,
+                buttons=Gtk.ButtonsType.NONE,
+                text="⚠️ FINAL CONFIRMATION"
+            )
+            
+            confirm_dialog.format_secondary_text(
+                f"You are about to PERMANENTLY DELETE all files in:\n"
+                f"'{project_name}'\n\n"
+                f"This action CANNOT be undone!\n\n"
+                f"Type the project name exactly to confirm:"
+            )
+            
+            # Add entry for name confirmation
+            content_area = confirm_dialog.get_content_area()
+            entry = Gtk.Entry()
+            entry.set_placeholder_text(project_name)
+            entry.set_activates_default(True)
+            content_area.pack_start(entry, False, False, 6)
+            
+            confirm_dialog.add_button("Cancel", Gtk.ResponseType.CANCEL)
+            final_delete_button = confirm_dialog.add_button(
+                "Delete Forever", 
+                Gtk.ResponseType.YES
+            )
+            final_delete_button.get_style_context().add_class("destructive-action")
+            final_delete_button.set_can_default(True)
+            final_delete_button.grab_default()
+            
+            confirm_dialog.show_all()
+            response = confirm_dialog.run()
+            confirmed_name = entry.get_text().strip()
+            confirm_dialog.destroy()
+            
+            # Require exact name match
+            if response == Gtk.ResponseType.YES and confirmed_name == project_name:
+                return 'delete'
+            else:
+                return 'cancel'
+        
+        else:
+            # Simple confirmation for index removal only (files remain)
+            dialog = Gtk.MessageDialog(
+                transient_for=self.parent_window,
+                message_type=Gtk.MessageType.QUESTION,
+                buttons=Gtk.ButtonsType.YES_NO,
+                text=f"Remove '{project_name}' from list?"
+            )
+            
+            dialog.format_secondary_text(
+                "Project files will remain on disk.\n"
+                "You can re-import the project later."
+            )
+            
+            response = dialog.run()
+            dialog.destroy()
+            
+            return 'delete' if response == Gtk.ResponseType.YES else 'cancel'
+    
+    def delete_or_archive_project(self, project_id: str, prefer_archive: bool = True) -> bool:
+        """Delete or archive a project with user confirmation.
+        
+        This is the RECOMMENDED way to remove projects safely.
+        
+        Args:
+            project_id: UUID of project to remove
+            prefer_archive: If True, default to archiving (safer)
+            
+        Returns:
+            True if project was removed, False if cancelled
+        """
+        if project_id not in self.project_manager.project_index:
+            return False
+        
+        project_info = self.project_manager.project_index[project_id]
+        project_name = project_info['name']
+        
+        # Show confirmation dialog
+        action = self.confirm_delete_project(project_name, delete_files=not prefer_archive)
+        
+        if action == 'cancel':
+            return False
+        
+        try:
+            if action == 'archive':
+                # SAFE: Archive project (keep backup)
+                archive_path = self.project_manager.archive_project(project_id)
+                
+                # Show success message
+                success_dialog = Gtk.MessageDialog(
+                    transient_for=self.parent_window,
+                    message_type=Gtk.MessageType.INFO,
+                    buttons=Gtk.ButtonsType.OK,
+                    text="Project Archived Successfully"
+                )
+                success_dialog.format_secondary_text(
+                    f"Project '{project_name}' has been archived to:\n{archive_path}\n\n"
+                    f"You can restore it later by extracting the ZIP file."
+                )
+                success_dialog.run()
+                success_dialog.destroy()
+                return True
+                
+            elif action == 'delete':
+                # DANGEROUS: Permanent deletion
+                self.project_manager.delete_project(project_id, delete_files=True)
+                
+                # Show warning that deletion is complete
+                success_dialog = Gtk.MessageDialog(
+                    transient_for=self.parent_window,
+                    message_type=Gtk.MessageType.WARNING,
+                    buttons=Gtk.ButtonsType.OK,
+                    text="Project Deleted"
+                )
+                success_dialog.format_secondary_text(
+                    f"Project '{project_name}' has been permanently deleted.\n"
+                    f"This action cannot be undone."
+                )
+                success_dialog.run()
+                success_dialog.destroy()
+                return True
+            
+        except Exception as e:
+            # Show error
+            error_dialog = Gtk.MessageDialog(
+                transient_for=self.parent_window,
+                message_type=Gtk.MessageType.ERROR,
+                buttons=Gtk.ButtonsType.OK,
+                text="Operation Failed"
+            )
+            error_dialog.format_secondary_text(
+                f"Failed to remove project '{project_name}':\n{str(e)}"
+            )
+            error_dialog.run()
+            error_dialog.destroy()
+            return False
+        
+        return False
 
 
 def create_project_dialog_manager(parent_window=None, ui_path=None):

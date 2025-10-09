@@ -155,7 +155,12 @@ def create_mixed_net():
 
 
 def test_timed_transition_too_early():
-    """Test that timed transitions cannot fire before earliest time."""
+    """Test that timed transitions cannot fire before earliest time.
+    
+    Note: step() returns True even when transitions don't fire, as long as 
+    there are transitions that might fire in the future (not deadlocked).
+    This is the correct behavior: "waiting" != "deadlocked".
+    """
     print("\n" + "="*60)
     print("TEST: Timed Transition - Too Early")
     print("="*60)
@@ -167,18 +172,22 @@ def test_timed_transition_too_early():
     assert controller.time == 0.0, "Initial time should be 0.0"
     
     # Step 1: t=0.0 -> t=0.1 (too early)
+    p1_before = model.places[0].tokens
     result = controller.step(time_step=0.1)
-    assert not result, "Transition should not fire at t=0.1 (too early)"
-    assert controller.time == 0.1, "Time should advance even if no firing"
-    assert model.places[0].tokens == 1, "P1 should still have 1 token"
+    # step() returns True (transition is waiting, not deadlocked)
+    assert result, "Step should return True (transition waiting, not deadlocked)"
+    assert controller.time == 0.1, "Time should advance"
+    assert model.places[0].tokens == p1_before, "P1 tokens should be unchanged (transition didn't fire)"
     
     # Step 2: t=0.1 -> t=0.2 (still too early)
     result = controller.step(time_step=0.1)
-    assert not result, "Transition should not fire at t=0.2 (too early)"
+    assert result, "Step should return True (still waiting)"
     assert controller.time == 0.2, "Time should be 0.2"
+    assert model.places[0].tokens == p1_before, "P1 still unchanged"
     
     print("✓ Timed transition correctly prevented from firing too early")
-    return True
+    print("✓ step() correctly returns True (waiting, not deadlocked)")
+    # Test complete
 
 
 def test_timed_transition_in_window():
@@ -215,7 +224,7 @@ def test_timed_transition_in_window():
             f"Transition should be fireable or already fired at t={controller.time:.2f}: {reason}"
     
     print("✓ Timed transition correctly fired within timing window")
-    return True
+    # Test complete
 
 
 def test_timed_transition_late_firing():
@@ -246,7 +255,7 @@ def test_timed_transition_late_firing():
     # For this test, we just verify the behavior reports the constraint
     
     print(f"✓ Late firing check: transition state at t=2.5 is {can_fire}")
-    return True
+    # Test complete
 
 
 def test_stochastic_transition_delay():
@@ -287,7 +296,7 @@ def test_stochastic_transition_delay():
     if not fired:
         print("⚠ Stochastic transition did not fire in 100 steps (very unlikely but possible)")
     
-    return True
+    # Test complete
 
 
 def test_mixed_types_coexistence():
@@ -341,7 +350,7 @@ def test_mixed_types_coexistence():
                 break
     
     print("✓ Mixed transition types coexist correctly")
-    return True
+    # Test complete
 
 
 def test_enablement_state_tracking():
@@ -384,7 +393,7 @@ def test_enablement_state_tracking():
     else:
         print(f"⚠ State not cleared: enablement_time={state.enablement_time}")
     
-    return True
+    # Test complete
 
 
 def run_all_tests():

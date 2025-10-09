@@ -1,0 +1,123 @@
+{
+  "version": "2.0",
+  "metadata": {
+    "created": "2025-10-08T20:55:11.548231",
+    "object_counts": {
+      "places": 2,
+      "transitions": 1,
+      "arcs": 2
+    }
+  },
+  "view_state": {
+    "zoom": 1.0,
+    "pan_x": -959.0,
+    "pan_y": -450.5
+  },
+  "places": [
+    {
+      "id": 1,
+      "name": "P1",
+      "label": "",
+      "type": "place",
+      "x": 1621.0,
+      "y": 907.5,
+      "radius": 25.0,
+      "marking": 25,
+      "initial_marking": 25,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": 2,
+      "name": "P2",
+      "label": "",
+      "type": "place",
+      "x": 1870.0,
+      "y": 903.5,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "id": 1,
+      "name": "T1",
+      "label": "",
+      "type": "transition",
+      "x": 1750.0,
+      "y": 762.5,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "is_source": false,
+      "is_sink": false,
+      "properties": {
+        "guard_function": "",
+        "rate_function": ""
+      }
+    }
+  ],
+  "arcs": [
+    {
+      "id": 1,
+      "name": "A1",
+      "label": "",
+      "type": "arc",
+      "source_id": 1,
+      "source_type": "place",
+      "target_id": 1,
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": 2,
+      "name": "A2",
+      "label": "",
+      "type": "arc",
+      "source_id": 1,
+      "source_type": "transition",
+      "target_id": 2,
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    }
+  ]
+}

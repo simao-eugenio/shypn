@@ -28,8 +28,8 @@
 | S-curve growth | `sigmoid(t, 10, 0.5)` |
 | Exponential growth | `math.exp(0.1 * t)` |
 | Exponential decay | `math.exp(-0.1 * t)` |
-| Enzyme kinetics | `michaelis_menten(P1, 10, 5)` |
-| Cooperativity | `hill(P1, 5, 2)` |
+| Enzyme kinetics | `michaelis_menten(P1, vmax=10, km=5)` |
+| Cooperativity | `hill_equation(P1, vmax=10, kd=5, n=2)` |
 
 **Variables available**: `P1`, `P2`, ... (place names), `t` (time)
 

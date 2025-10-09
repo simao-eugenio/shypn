@@ -121,54 +121,68 @@ def test_transition_firing():
 
 
 def test_simulation_step():
-    """Test full simulation step."""
-    print("\n=== Test 4: Simulation Step ===")
+    """Test full simulation step with exhaustive immediate firing.
+    
+    Immediate transitions have zero delay and fire exhaustively (all enabled 
+    firings in one step) until no more are enabled. This is standard Petri net 
+    semantics for immediate transitions.
+    """
+    print("\n=== Test 4: Simulation Step (Exhaustive Firing) ===")
     
     model, p1, t1, p2 = create_simple_net()
     controller = SimulationController(model)
     
     print(f"Initial: P1={p1.tokens}, P2={p2.tokens}, time={controller.time}")
     
-    # Execute one step
+    # Execute one step - immediate transition will fire exhaustively
     success = controller.step(time_step=0.1)
     
     print(f"After step: P1={p1.tokens}, P2={p2.tokens}, time={controller.time}")
     
     assert success, "Step should succeed"
-    assert p1.tokens == 2, f"P1 should have 2 tokens, got {p1.tokens}"
-    assert p2.tokens == 1, f"P2 should have 1 token, got {p2.tokens}"
+    # Immediate transition fires exhaustively: all 3 tokens transferred
+    assert p1.tokens == 0, f"P1 should be empty (exhaustive firing), got {p1.tokens}"
+    assert p2.tokens == 3, f"P2 should have all 3 tokens, got {p2.tokens}"
     assert controller.time == 0.1, f"Time should be 0.1, got {controller.time}"
     
-    print("✓ Step executed successfully")
+    print("✓ Exhaustive firing: all 3 tokens transferred in one step")
     print("✓ Test 4 PASSED")
 
 
 def test_multiple_firings():
-    """Test multiple consecutive firings."""
-    print("\n=== Test 5: Multiple Firings ===")
+    """Test that immediate transitions exhaust in first step.
+    
+    Immediate transitions fire exhaustively (zero delay), so all enabled 
+    firings happen in the first step. Subsequent steps find the transition 
+    disabled (no tokens).
+    """
+    print("\n=== Test 5: Exhaustive Firing Behavior ===")
     
     model, p1, t1, p2 = create_simple_net()
     controller = SimulationController(model)
     
     print(f"Initial: P1={p1.tokens}, P2={p2.tokens}")
     
-    # Fire 3 times (should consume all tokens from P1)
-    for i in range(3):
-        success = controller.step(time_step=0.1)
-        print(f"Step {i+1}: success={success}, P1={p1.tokens}, P2={p2.tokens}")
-        assert success, f"Step {i+1} should succeed"
-    
-    # Try to fire again (should fail - no tokens)
+    # First step: immediate transition fires exhaustively (all 3 tokens)
     success = controller.step(time_step=0.1)
-    print(f"Step 4: success={success}, P1={p1.tokens}, P2={p2.tokens}")
-    assert not success, "Step 4 should fail (P1 empty)"
+    print(f"Step 1: success={success}, P1={p1.tokens}, P2={p2.tokens}")
+    assert success, "Step 1 should succeed"
+    assert p1.tokens == 0, f"P1 should be empty after exhaustive firing, got {p1.tokens}"
+    assert p2.tokens == 3, f"P2 should have all 3 tokens, got {p2.tokens}"
+    
+    # Subsequent steps: transition is disabled (no tokens in P1)
+    for i in range(2, 4):
+        success = controller.step(time_step=0.1)
+        print(f"Step {i}: success={success}, P1={p1.tokens}, P2={p2.tokens}")
+        assert not success, f"Step {i} should fail (no enabled transitions)"
     
     # Final state check
-    assert p1.tokens == 0, f"P1 should be empty, got {p1.tokens}"
-    assert p2.tokens == 3, f"P2 should have 3 tokens, got {p2.tokens}"
+    assert p1.tokens == 0, f"P1 should remain empty, got {p1.tokens}"
+    assert p2.tokens == 3, f"P2 should still have 3 tokens, got {p2.tokens}"
     
-    print("✓ All tokens transferred correctly: P1 (3→0), P2 (0→3)")
-    print("✓ Deadlock detected correctly")
+    print("✓ Exhaustive firing in first step (3 tokens)")
+    print("✓ Subsequent steps correctly detect deadlock")
+    print("✓ Test 5 PASSED")
     print("✓ Test 5 PASSED")
 
 

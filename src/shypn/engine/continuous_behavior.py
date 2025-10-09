@@ -286,7 +286,12 @@ class ContinuousBehavior(TransitionBehavior):
             # For continuous Petri nets, we approximate: flow = rate * dt
             # Full RK4 would require multiple rate evaluations at different points
             
-            # Phase 1: Consume tokens continuously from input places (skip if source)
+            # Calculate intended flow amount
+            intended_flow = rate * dt
+            
+            # Phase 1: Clamp flow to available tokens (skip if source)
+            # Bug fix: Prevent transferring more tokens than available
+            actual_flow = intended_flow
             if not is_source:
                 for arc in input_arcs:
                     kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
@@ -297,39 +302,53 @@ class ContinuousBehavior(TransitionBehavior):
                     if source_place is None:
                         continue
                     
-                    # Continuous consumption: arc_weight * rate * dt
-                    consumption = arc.weight * rate * dt
-                    
-                    # Clamp to available tokens (can't go negative)
-                    actual_consumption = min(consumption, source_place.tokens)
-                    
-                    if actual_consumption > 0:
-                        source_place.set_tokens(source_place.tokens - actual_consumption)
-                        consumed_map[arc.source_id] = actual_consumption
+                    # Calculate max flow possible from this arc
+                    max_flow_from_arc = source_place.tokens / arc.weight if arc.weight > 0 else float('inf')
+                    actual_flow = min(actual_flow, max_flow_from_arc)
             
-            # Phase 2: Produce tokens continuously to output places (skip if sink)
-            if not is_sink:
+            # Phase 2: Consume tokens continuously from input places (skip if source)
+            if not is_source and actual_flow > 0:
+                for arc in input_arcs:
+                    kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
+                    if kind != 'normal':
+                        continue
+                    
+                    source_place = self._get_place(arc.source_id)
+                    if source_place is None:
+                        continue
+                    
+                    # Continuous consumption: arc_weight * actual_flow
+                    consumption = arc.weight * actual_flow
+                    
+                    if consumption > 0:
+                        source_place.set_tokens(source_place.tokens - consumption)
+                        consumed_map[arc.source_id] = consumption
+            
+            # Phase 3: Produce tokens continuously to output places (skip if sink)
+            if not is_sink and actual_flow > 0:
                 for arc in output_arcs:
                     target_place = self._get_place(arc.target_id)
                     if target_place is None:
                         continue
                     
-                    # Continuous production: arc_weight * rate * dt
-                    production = arc.weight * rate * dt
+                    # Continuous production: arc_weight * actual_flow
+                    production = arc.weight * actual_flow
                     
                     if production > 0:
                         target_place.set_tokens(target_place.tokens + production)
                         produced_map[arc.target_id] = production
             
-            # Phase 3: Record continuous flow event
+            # Phase 4: Record continuous flow event
             self._record_event(
                 consumed=consumed_map,
                 produced=produced_map,
                 mode='continuous',
                 transition_type='continuous',
                 rate=rate,
+                actual_rate=actual_flow / dt if dt > 0 else 0.0,
                 dt=dt,
-                method='rk4'
+                method='rk4',
+                clamped=(actual_flow < intended_flow)
             )
             
             return True, {
@@ -337,10 +356,12 @@ class ContinuousBehavior(TransitionBehavior):
                 'produced': produced_map,
                 'continuous_mode': True,
                 'rate': rate,
+                'actual_rate': actual_flow / dt if dt > 0 else 0.0,
                 'dt': dt,
                 'method': 'rk4',
                 'transition_type': 'continuous',
-                'time': current_time
+                'time': current_time,
+                'clamped': (actual_flow < intended_flow)
             }
             
         except Exception as e:

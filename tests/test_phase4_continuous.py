@@ -221,11 +221,15 @@ def test_continuous_integration():
     
     print("✓ Continuous integration working correctly")
     print("✓ Token conservation maintained")
-    return True
+    # Test complete
 
 
 def test_hybrid_discrete_continuous():
-    """Test hybrid net with discrete and continuous transitions."""
+    """Test hybrid net with discrete and continuous transitions.
+    
+    Note: Immediate transitions fire exhaustively (zero delay semantics), 
+    so T1 will consume all available tokens from P1 in the first step.
+    """
     print("\n" + "="*60)
     print("TEST: Hybrid Discrete + Continuous")
     print("="*60)
@@ -238,31 +242,48 @@ def test_hybrid_discrete_continuous():
     assert model.places[1].tokens == 0, "P2 should have 0 tokens"
     assert model.places[2].tokens == 0.0, "P3 should have 0.0 tokens"
     
-    # Step 1: T1 (discrete) should fire, T2 (continuous) cannot (P2 empty)
+    # Step 1: T1 (immediate) fires exhaustively (all 5 tokens)
+    # T2 (continuous) integrates over the step
     result = controller.step(time_step=0.1)
     assert result, "Step should execute"
     
-    assert model.places[0].tokens == 4, "P1 should have 4 tokens after T1 fires"
-    assert model.places[1].tokens == 1, "P2 should have 1 token after T1 fires"
-    print(f"After step 1: P1={model.places[0].tokens}, P2={model.places[1].tokens}, P3={model.places[2].tokens:.2f}")
+    # T1 fires exhaustively: P1=5→0, P2=0→5
+    assert model.places[0].tokens == 0, "P1 should be empty (exhaustive firing)"
+    assert model.places[1].tokens > 0, "P2 should have tokens after T1 fires"
     
-    # Step 2: T1 fires again, T2 starts flowing
+    # T2 should have started flowing during this step
+    # (continuous integration happens in parallel with discrete)
+    p2_after_step1 = model.places[1].tokens
+    p3_after_step1 = model.places[2].tokens
+    
+    print(f"After step 1: P1={model.places[0].tokens}, P2={p2_after_step1:.2f}, P3={p3_after_step1:.2f}")
+    
+    # The actual values depend on integration order, but P2 should have received 
+    # some tokens (possibly less than 5 if T2 flowed some during the step)
+    assert p2_after_step1 + p3_after_step1 == 5.0, "Conservation: P2+P3 should equal original P1"
+    
+    # Step 2: Only T2 active now (T1 disabled, no tokens in P1)
+    p2_before = model.places[1].tokens
+    p3_before = model.places[2].tokens
     controller.step(time_step=0.1)
     
-    # P2 should be losing tokens to T2 now
     p2_val = model.places[1].tokens
     p3_val = model.places[2].tokens
     
     print(f"After step 2: P1={model.places[0].tokens}, P2={p2_val:.2f}, P3={p3_val:.2f}")
     
-    # T2 should have started flowing (rate=1.0, dt=0.1 → 0.1 tokens/step)
-    assert p3_val > 0, "P3 should have received tokens from T2"
+    # T2 flows: P2 decreases, P3 increases (rate=1.0, dt=0.1 → ~0.1 tokens)
+    assert p2_val < p2_before, "P2 should decrease (T2 flowing)"
+    assert p3_val > p3_before, "P3 should increase (T2 flowing)"
     
-    # Continue for several steps
-    for i in range(10):
+    # Continue for several steps - all tokens should eventually reach P3
+    for i in range(50):
         controller.step(time_step=0.1)
     
-    print(f"After 12 steps: P1={model.places[0].tokens}, P2={model.places[1].tokens:.2f}, P3={model.places[2].tokens:.2f}")
+    print(f"After 52 steps: P1={model.places[0].tokens}, P2={model.places[1].tokens:.2f}, P3={model.places[2].tokens:.2f}")
+    
+    # Eventually all tokens reach P3 (with some tolerance for continuous integration)
+    assert model.places[2].tokens > 4.9, "Most tokens should have reached P3"
     
     # Verify both transitions worked
     assert model.places[0].tokens < 5, "T1 should have fired multiple times"
@@ -270,11 +291,14 @@ def test_hybrid_discrete_continuous():
     
     print("✓ Hybrid net execution working correctly")
     print("✓ Discrete and continuous transitions coexist")
-    return True
+    # Test complete
 
 
 def test_parallel_locality_independence():
-    """Test that parallel discrete and continuous paths are independent."""
+    """Test that parallel discrete and continuous paths are independent.
+    
+    Note: Immediate transitions fire exhaustively (zero delay semantics).
+    """
     print("\n" + "="*60)
     print("TEST: Parallel Locality Independence")
     print("="*60)
@@ -286,43 +310,45 @@ def test_parallel_locality_independence():
     assert model.places[0].tokens == 5, "P1 (discrete) should have 5 tokens"
     assert model.places[2].tokens == 10.0, "P3 (continuous) should have 10.0 tokens"
     
-    # Step 1: Both T1 (discrete) and T2 (continuous) should execute
+    # Step 1: T1 (immediate) fires exhaustively, T2 (continuous) integrates
     result = controller.step(time_step=0.1)
     assert result, "Step should execute"
     
-    # Check discrete path
+    # Check discrete path - T1 fires exhaustively
     p1_after = model.places[0].tokens
     p2_after = model.places[1].tokens
-    assert p1_after == 4, f"P1 should have 4 tokens after T1 fires, got {p1_after}"
-    assert p2_after == 1, f"P2 should have 1 token after T1 fires, got {p2_after}"
+    assert p1_after == 0, f"P1 should be empty (exhaustive firing), got {p1_after}"
+    assert p2_after == 5, f"P2 should have all 5 tokens, got {p2_after}"
     
-    # Check continuous path
+    # Check continuous path - T2 integrated over dt=0.1
     p3_after = model.places[2].tokens
     p4_after = model.places[3].tokens
-    expected_transfer = 2.0 * 0.1  # rate * dt
+    expected_transfer = 2.0 * 0.1  # rate * dt = 0.2
     assert abs((10.0 - p3_after) - expected_transfer) < 0.01, \
         f"P3 should have lost ~{expected_transfer} tokens"
     assert abs(p4_after - expected_transfer) < 0.01, \
         f"P4 should have gained ~{expected_transfer} tokens"
     
     print(f"After step 1:")
-    print(f"  Discrete: P1={p1_after}, P2={p2_after}")
+    print(f"  Discrete: P1={p1_after}, P2={p2_after} (exhaustive firing)")
     print(f"  Continuous: P3={p3_after:.2f}, P4={p4_after:.2f}")
     
-    # Run multiple steps
-    for _ in range(4):
+    # Run multiple steps - only continuous now active
+    for _ in range(49):
         controller.step(time_step=0.1)
     
-    print(f"After 5 steps:")
+    print(f"After 50 steps:")
     print(f"  Discrete: P1={model.places[0].tokens}, P2={model.places[1].tokens}")
     print(f"  Continuous: P3={model.places[2].tokens:.2f}, P4={model.places[3].tokens:.2f}")
     
-    # Verify independence: both paths progressed
-    assert model.places[0].tokens == 0, "All tokens should have moved through discrete path"
-    assert model.places[1].tokens == 5, "P2 should have all 5 tokens"
+    # Verify independence: discrete completed in first step
+    assert model.places[0].tokens == 0, "P1 should remain empty"
+    assert model.places[1].tokens == 5, "P2 should still have all 5 tokens"
     
-    # Continuous path should still be flowing
-    assert model.places[3].tokens > 0.5, "P4 should have received tokens from continuous flow"
+    # Continuous path should have transferred most tokens
+    # Total time = 50 steps * 0.1 = 5.0 seconds
+    # Total transfer at rate=2.0 = 10.0 tokens (all of them)
+    assert model.places[3].tokens > 9.9, "P4 should have received almost all tokens"
     
     # Token conservation in each path
     discrete_total = model.places[0].tokens + model.places[1].tokens
@@ -333,9 +359,9 @@ def test_parallel_locality_independence():
         f"Continuous path conservation: should be 10.0, got {continuous_total:.3f}"
     
     print("✓ Parallel paths are independent")
-    print("✓ Discrete and continuous execute simultaneously")
+    print("✓ Discrete (exhaustive) and continuous execute simultaneously")
     print("✓ Token conservation maintained in each path")
-    return True
+    # Test complete
 
 
 def test_continuous_depletion():
@@ -379,7 +405,7 @@ def test_continuous_depletion():
     
     print("✓ Continuous transition stops when source depleted")
     print("✓ Token conservation maintained throughout")
-    return True
+    # Test complete
 
 
 def test_continuous_rate_function():
@@ -418,7 +444,7 @@ def test_continuous_rate_function():
     assert abs(transferred - expected) < 0.01, "Transfer should match rate * dt"
     
     print("✓ Rate function evaluation working correctly")
-    return True
+    # Test complete
 
 
 def run_all_tests():

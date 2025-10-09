@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Simulation Tools Palette - Run, Stop, Reset Buttons -->
+<!-- Simulation Tools Palette - Run, Stop, Reset Buttons with Duration Controls -->
 <interface>
   <requires lib="gtk+" version="3.0"/>
 
@@ -14,13 +14,19 @@
     <property name="margin_bottom">78</property>
 
     <child>
-      <object class="GtkBox" id="simulate_tools_container">
+      <!-- Main Grid Container (replaces horizontal box) -->
+      <object class="GtkGrid" id="simulate_tools_container">
         <property name="visible">True</property>
-        <property name="orientation">horizontal</property>
-        <property name="spacing">2</property>
+        <property name="row-spacing">6</property>
+        <property name="column-spacing">2</property>
+        <property name="halign">center</property>
+        <property name="valign">end</property>
         <style>
           <class name="simulate-tools-palette"/>
         </style>
+        
+        <!-- Row 0: Control Buttons -->
+        <!-- Row 0: Control Buttons -->
 
         <!-- Run Button [R] -->
         <child>
@@ -35,6 +41,10 @@
               <class name="run-button"/>
             </style>
           </object>
+          <packing>
+            <property name="left-attach">0</property>
+            <property name="top-attach">0</property>
+          </packing>
         </child>
 
         <!-- Step Button [P] -->
@@ -50,6 +60,10 @@
               <class name="step-button"/>
             </style>
           </object>
+          <packing>
+            <property name="left-attach">1</property>
+            <property name="top-attach">0</property>
+          </packing>
         </child>
 
         <!-- Stop Button [S] -->
@@ -66,6 +80,10 @@
               <class name="stop-button"/>
             </style>
           </object>
+          <packing>
+            <property name="left-attach">2</property>
+            <property name="top-attach">0</property>
+          </packing>
         </child>
 
         <!-- Reset Button [T] -->
@@ -81,6 +99,134 @@
               <class name="reset-button"/>
             </style>
           </object>
+          <packing>
+            <property name="left-attach">3</property>
+            <property name="top-attach">0</property>
+          </packing>
+        </child>
+
+        <!-- Settings Button [⚙] -->
+        <child>
+          <object class="GtkButton" id="settings_simulation_button">
+            <property name="visible">True</property>
+            <property name="label">⚙</property>
+            <property name="tooltip-text">Simulation Settings - Configure duration, time step, and policies</property>
+            <property name="width-request">40</property>
+            <property name="height-request">40</property>
+            <style>
+              <class name="sim-tool-button"/>
+              <class name="settings-button"/>
+            </style>
+          </object>
+          <packing>
+            <property name="left-attach">4</property>
+            <property name="top-attach">0</property>
+          </packing>
+        </child>
+
+        <!-- Row 1: Duration Controls -->
+
+        <!-- Duration Label -->
+        <child>
+          <object class="GtkLabel" id="duration_label">
+            <property name="visible">True</property>
+            <property name="label">Duration:</property>
+            <property name="xalign">1</property>
+            <style>
+              <class name="sim-control-label"/>
+            </style>
+          </object>
+          <packing>
+            <property name="left-attach">0</property>
+            <property name="top-attach">1</property>
+          </packing>
+        </child>
+
+        <!-- Duration Entry -->
+        <child>
+          <object class="GtkEntry" id="duration_entry">
+            <property name="visible">True</property>
+            <property name="text">60</property>
+            <property name="width-chars">8</property>
+            <property name="max-width-chars">10</property>
+            <property name="tooltip-text">Simulation duration</property>
+            <property name="halign">fill</property>
+            <style>
+              <class name="sim-control-entry"/>
+            </style>
+          </object>
+          <packing>
+            <property name="left-attach">1</property>
+            <property name="top-attach">1</property>
+            <property name="width">2</property>
+          </packing>
+        </child>
+
+        <!-- Time Units Combo -->
+        <child>
+          <object class="GtkComboBoxText" id="time_units_combo">
+            <property name="visible">True</property>
+            <property name="active">1</property> <!-- Default: seconds -->
+            <property name="halign">fill</property>
+            <style>
+              <class name="sim-control-combo"/>
+            </style>
+            <items>
+              <item>milliseconds</item>
+              <item>seconds</item>
+              <item>minutes</item>
+              <item>hours</item>
+              <item>days</item>
+            </items>
+          </object>
+          <packing>
+            <property name="left-attach">3</property>
+            <property name="top-attach">1</property>
+            <property name="width">2</property>
+          </packing>
+        </child>
+
+        <!-- Row 2: Progress Bar -->
+
+        <!-- Progress Bar (spans all columns) -->
+        <child>
+          <object class="GtkProgressBar" id="simulation_progress_bar">
+            <property name="visible">True</property>
+            <property name="show-text">True</property>
+            <property name="text">Ready</property>
+            <property name="fraction">0.0</property>
+            <property name="halign">fill</property>
+            <property name="hexpand">True</property>
+            <style>
+              <class name="sim-progress-bar"/>
+            </style>
+          </object>
+          <packing>
+            <property name="left-attach">0</property>
+            <property name="top-attach">2</property>
+            <property name="width">5</property>
+          </packing>
+        </child>
+
+        <!-- Row 3: Time Display -->
+
+        <!-- Time Display Label (spans all columns) -->
+        <child>
+          <object class="GtkLabel" id="time_display_label">
+            <property name="visible">True</property>
+            <property name="label">Time: 0.0 / 60.0 s</property>
+            <property name="xalign">0.5</property>
+            <property name="halign">center</property>
+            <style>
+              <class name="sim-time-display"/>
+              <class name="dim-label"/>
+            </style>
+          </object>
+          <packing>
+            <property name="left-attach">0</property>
+            <property name="top-attach">3</property>
+            <property name="width">5</property>
+          </packing>
         </child>
 
       </object>

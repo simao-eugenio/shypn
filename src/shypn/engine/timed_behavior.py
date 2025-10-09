@@ -81,6 +81,8 @@ class TimedBehavior(TransitionBehavior):
         if self.latest < self.earliest:
             raise ValueError(f'Latest ({self.latest}) must be >= earliest ({self.earliest})')
         self._enablement_time = None
+        self._was_too_early = False  # Track if we've been checked while too early
+        self._was_in_window = False  # Track if we've been in the firing window
 
     def set_enablement_time(self, time: float):
         """Set the time when transition became enabled.
@@ -107,6 +109,8 @@ class TimedBehavior(TransitionBehavior):
         This should be called when input places no longer have sufficient tokens.
         """
         self._enablement_time = None
+        self._was_too_early = False
+        self._was_in_window = False
 
     def can_fire(self) -> Tuple[bool, str]:
         """Check if transition can fire (guard, timing window, and tokens).
@@ -151,13 +155,31 @@ class TimedBehavior(TransitionBehavior):
         
         if self._enablement_time is None:
             return (False, 'not-enabled-yet')
+        
         current_time = self._get_current_time()
         elapsed = current_time - self._enablement_time
         EPSILON = 1e-09
+        
+        # Check if too early
         if elapsed + EPSILON < self.earliest:
+            self._was_too_early = True  # Remember we were too early
             return (False, f'too-early (elapsed={elapsed:.3f}, earliest={self.earliest})')
+        
+        # Check if too late - but detect window crossing
         if elapsed > self.latest + EPSILON:
+            # If we were too early before and now we're too late,
+            # but we've never been in the window, then we crossed it!
+            if self._was_too_early and not self._was_in_window:
+                # Window was crossed - allow firing this once
+                self._was_in_window = True  # Mark as handled
+                if is_source:
+                    return (True, f'enabled-source-window-crossed (elapsed={elapsed:.3f})')
+                return (True, f'window-crossed-during-step (elapsed={elapsed:.3f})')
+            # Genuinely too late
             return (False, f'too-late (elapsed={elapsed:.3f}, latest={self.latest})')
+        
+        # In the window - can fire
+        self._was_in_window = True  # Remember we were in window
         
         if is_source:
             return (True, f'enabled-source (elapsed={elapsed:.3f})')
