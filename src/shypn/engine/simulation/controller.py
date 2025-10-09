@@ -208,15 +208,8 @@ class SimulationController:
             if locally_enabled:
                 if state.enablement_time is None:
                     state.enablement_time = self.time
-                    DEBUG_ENABLEMENT = True
-                    if DEBUG_ENABLEMENT:
-                        pass
                     if hasattr(behavior, 'set_enablement_time'):
                         behavior.set_enablement_time(self.time)
-                        if DEBUG_ENABLEMENT and hasattr(behavior, 'get_stochastic_info'):
-                            info = behavior.get_stochastic_info()
-                        elif DEBUG_ENABLEMENT and hasattr(behavior, 'get_timing_info'):
-                            info = behavior.get_timing_info()
             else:
                 if state.enablement_time is not None:
                     pass
@@ -447,53 +440,29 @@ class SimulationController:
                         window_crossing_fired += 1
         
         continuous_transitions = [t for t in self.model.transitions if t.transition_type == 'continuous']
-        DEBUG_CONTINUOUS = True
-        if DEBUG_CONTINUOUS and continuous_transitions:
-            pass
         continuous_to_integrate = []
         for transition in continuous_transitions:
             behavior = self._get_behavior(transition)
             can_flow, reason = behavior.can_fire()
-            if DEBUG_CONTINUOUS:
-                pass
             if can_flow:
                 input_arcs = behavior.get_input_arcs()
                 output_arcs = behavior.get_output_arcs()
                 continuous_to_integrate.append((transition, behavior, input_arcs, output_arcs))
         discrete_transitions = [t for t in self.model.transitions if t.transition_type in ['timed', 'stochastic']]
         enabled_discrete = [t for t in discrete_transitions if self._is_transition_enabled(t)]
-        DEBUG_CONTROLLER = True
-        if DEBUG_CONTROLLER and discrete_transitions:
-            for t in discrete_transitions:
-                behavior = self._get_behavior(t)
-                state = self._get_or_create_state(t)
-                can_fire, reason = behavior.can_fire()
-                status = 'CAN FIRE' if can_fire else f'BLOCKED: {reason}'
         discrete_fired = False
         if enabled_discrete:
             transition = self._select_transition(enabled_discrete)
             self._fire_transition(transition)
             discrete_fired = True
-            if DEBUG_CONTROLLER:
-                pass  # Debug info removed
-        elif DEBUG_CONTROLLER:
-            pass  # Debug info removed
         
         continuous_active = 0
         for transition, behavior, input_arcs, output_arcs in continuous_to_integrate:
             success, details = behavior.integrate_step(dt=time_step, input_arcs=input_arcs, output_arcs=output_arcs)
             if success:
                 continuous_active += 1
-                if DEBUG_CONTINUOUS:
-                    pass
                 if self.data_collector is not None:
                     self.data_collector.on_transition_fired(transition, self.time, details)
-                    if DEBUG_CONTINUOUS:
-                        pass
-                elif DEBUG_CONTINUOUS:
-                    pass
-        if DEBUG_CONTINUOUS and continuous_to_integrate:
-            pass
         self.time += time_step
         self._notify_step_listeners()
         
@@ -508,24 +477,14 @@ class SimulationController:
         for transition in discrete_transitions:
             behavior = self._get_behavior(transition)
             can_fire, reason = behavior.can_fire()
-            if DEBUG_CONTROLLER:
-                pass
             if can_fire:
                 ready_count += 1
-                if DEBUG_CONTROLLER:
-                    pass  # Debug info removed
             elif reason and 'too-early' in str(reason):
                 waiting_count += 1
-                if DEBUG_CONTROLLER:
-                    pass  # Debug info removed
         
         if waiting_count > 0 or ready_count > 0:
-            if DEBUG_CONTROLLER:
-                pass  # Debug info removed
             return True
         
-        if DEBUG_CONTROLLER:
-            pass  # Debug info removed
         return False
 
     def _find_enabled_transitions(self) -> List:

@@ -60,22 +60,16 @@ class ProjectDialogManager:
         Returns:
             Project instance if created, None if cancelled
         """
-        print("[ProjectDialogManager] Loading new project dialog...")
         try:
             self._load_builder()
-            print("[ProjectDialogManager] Builder loaded successfully")
             
             dialog = self.builder.get_object('new_project_dialog')
             if not dialog:
-                print("[ProjectDialogManager] ERROR: Could not find 'new_project_dialog' in UI file!")
                 return None
                 
-            print(f"[ProjectDialogManager] Dialog object retrieved: {dialog}")
-            
             if self.parent_window:
                 dialog.set_transient_for(self.parent_window)
                 dialog.set_modal(True)
-                print(f"[ProjectDialogManager] Set transient for: {self.parent_window}")
             
             # Ensure dialog is realized before showing (Wayland fix)
             dialog.realize()
@@ -88,11 +82,8 @@ class ProjectDialogManager:
             template_combo = self.builder.get_object('new_project_template_combo')
             create_button = self.builder.get_object('new_project_create_button')
             
-            print(f"[ProjectDialogManager] Widgets retrieved successfully")
-            
             # Set default location
             location_entry.set_text(self.project_manager.projects_root)
-            print(f"[ProjectDialogManager] Set location to: {self.project_manager.projects_root}")
             
             # Set create button as default
             create_button.grab_default()
@@ -100,13 +91,10 @@ class ProjectDialogManager:
             # Focus on name entry
             name_entry.grab_focus()
             
-            print("[ProjectDialogManager] Running dialog...")
             # Run dialog
             try:
                 response = dialog.run()
-                print(f"[ProjectDialogManager] Dialog returned response: {response}")
             except Exception as e:
-                print(f"[ProjectDialogManager] ERROR during dialog.run(): {e}")
                 import traceback
                 traceback.print_exc()
                 dialog.hide()
@@ -158,7 +146,6 @@ class ProjectDialogManager:
             return project
             
         except Exception as e:
-            print(f"[ProjectDialogManager] ERROR: {e}")
             import traceback
             traceback.print_exc()
             return None
