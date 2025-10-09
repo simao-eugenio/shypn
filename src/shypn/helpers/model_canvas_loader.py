@@ -906,6 +906,7 @@ class ModelCanvasLoader:
                     click_state['pending_timeout'] = None
                     click_state['pending_click_data'] = None
                 if clicked_obj.selected and (not is_double_click):
+                    # Already selected - start drag immediately
                     manager.selection_manager.start_drag(clicked_obj, event.x, event.y, manager)
                     state['active'] = True
                     state['button'] = event.button
@@ -913,6 +914,25 @@ class ModelCanvasLoader:
                     state['start_y'] = event.y
                     state['is_panning'] = False
                     state['is_rect_selecting'] = False
+                elif not is_double_click:
+                    # Not selected yet - select immediately and start drag
+                    # This makes dragging feel more responsive
+                    if not is_ctrl:
+                        manager.clear_all_selections()
+                    clicked_obj.selected = True
+                    manager.selection_manager.select(clicked_obj, multi=is_ctrl, manager=manager)
+                    manager.selection_manager.start_drag(clicked_obj, event.x, event.y, manager)
+                    state['active'] = True
+                    state['button'] = event.button
+                    state['start_x'] = event.x
+                    state['start_y'] = event.y
+                    state['is_panning'] = False
+                    state['is_rect_selecting'] = False
+                    widget.queue_draw()
+                    # Record for double-click detection
+                    click_state['last_click_time'] = current_time
+                    click_state['last_click_obj'] = clicked_obj
+                    return True
                 if is_double_click:
                     # Check if this is an arc with parallel arcs (legacy parallel arc system)
                     from shypn.netobjs import Arc
@@ -940,41 +960,6 @@ class ModelCanvasLoader:
                     click_state['last_click_time'] = 0.0
                     click_state['last_click_obj'] = None
                     widget.queue_draw()
-                    return True
-                else:
-                    click_state['pending_click_data'] = {'obj': clicked_obj, 'is_ctrl': is_ctrl, 'widget': widget, 'manager': manager}
-
-                    def process_single_click():
-                        data = click_state['pending_click_data']
-                        if data is None:
-                            return False
-                        obj = data['obj']
-                        ctrl = data['is_ctrl']
-                        w = data['widget']
-                        mgr = data['manager']
-                        if mgr.selection_manager.is_dragging():
-                            click_state['pending_timeout'] = None
-                            click_state['pending_click_data'] = None
-                            return False
-                        if mgr.selection_manager.is_edit_mode() and mgr.selection_manager.edit_target == obj:
-                            click_state['pending_timeout'] = None
-                            click_state['pending_click_data'] = None
-                            return False
-                        if mgr.selection_manager.is_edit_mode():
-                            current_edit_target = mgr.selection_manager.edit_target
-                            if current_edit_target != obj:
-                                mgr.selection_manager.exit_edit_mode()
-                        mgr.selection_manager.toggle_selection(obj, multi=ctrl, manager=mgr)
-                        status = 'selected' if obj.selected else 'deselected'
-                        multi_str = ' (multi)' if ctrl else ''
-                        w.queue_draw()
-                        click_state['pending_timeout'] = None
-                        click_state['pending_click_data'] = None
-                        return False
-                    timeout_ms = int(click_state['double_click_threshold'] * 1000)
-                    click_state['pending_timeout'] = GLib.timeout_add(timeout_ms, process_single_click)
-                    click_state['last_click_time'] = current_time
-                    click_state['last_click_obj'] = clicked_obj
                     return True
             else:
                 # Clicked on empty space
@@ -1098,7 +1083,8 @@ class ModelCanvasLoader:
             
             dx = event.x - state['start_x']
             dy = event.y - state['start_y']
-            if not state['is_panning'] and (abs(dx) >= 5 or abs(dy) >= 5):
+            # Reduced threshold for more responsive drag (was 5 pixels)
+            if not state['is_panning'] and (abs(dx) >= 2 or abs(dy) >= 2):
                 state['is_panning'] = True
             if state.get('is_rect_selecting', False):
                 world_x, world_y = manager.screen_to_world(event.x, event.y)
