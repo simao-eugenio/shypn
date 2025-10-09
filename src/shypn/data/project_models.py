@@ -127,6 +127,14 @@ class Project:
             'keep_backups': 5
         }
     
+    def __str__(self) -> str:
+        """String representation showing project name (user-friendly)."""
+        return self.name
+    
+    def __repr__(self) -> str:
+        """Detailed representation for debugging."""
+        return f"Project(name='{self.name}', id='{self.id[:8]}...', models={len(self.models)})"
+    
     def get_project_file_path(self) -> Optional[str]:
         """Get the path to project.shy file."""
         if self.base_path:
@@ -366,6 +374,22 @@ class ProjectManager:
         with open(recent_file, 'w', encoding='utf-8') as f:
             json.dump(self.recent_projects[:self.max_recent], f, indent=2)
     
+    def _sanitize_directory_name(self, name: str) -> str:
+        """Convert project name to valid directory name.
+        
+        Args:
+            name: Project name
+            
+        Returns:
+            Sanitized directory name
+        """
+        # Replace spaces and invalid characters with underscores
+        import re
+        sanitized = re.sub(r'[^\w\s-]', '_', name)
+        sanitized = re.sub(r'[\s]+', '_', sanitized)
+        sanitized = sanitized.strip('_')
+        return sanitized if sanitized else "Project"
+    
     def create_project(self, name: str, description: str = "",
                       template: str = None) -> Project:
         """Create a new project.
@@ -373,15 +397,24 @@ class ProjectManager:
         Args:
             name: Project name
             description: Optional description
-            template: Optional template name ('basic', 'kegg', etc.)
+            template: Optional template name ('basic', 'kegg', etc.')
             
         Returns:
             Created Project instance
         """
         project = Project(name=name, description=description)
         
-        # Set base path: data/projects/[uuid]/
-        project.base_path = os.path.join(self.projects_root, project.id)
+        # Set base path using sanitized project name (not UUID)
+        base_name = self._sanitize_directory_name(name)
+        
+        # Handle naming conflicts by appending counter
+        counter = 1
+        dir_name = base_name
+        while os.path.exists(os.path.join(self.projects_root, dir_name)):
+            counter += 1
+            dir_name = f"{base_name}_{counter}"
+        
+        project.base_path = os.path.join(self.projects_root, dir_name)
         
         # Create directory structure
         project.create_directory_structure()
@@ -493,10 +526,10 @@ class ProjectManager:
         self.save_recent_projects()
     
     def get_recent_projects_info(self) -> List[Dict[str, Any]]:
-        """Get information about recent projects.
+        """Get information about recent projects (with human-friendly names).
         
         Returns:
-            List of project info dicts
+            List of project info dicts with display names
         """
         results = []
         for project_id in self.recent_projects:
@@ -504,20 +537,109 @@ class ProjectManager:
                 results.append(self.project_index[project_id])
         return results
     
+    def get_project_by_name(self, name: str) -> Optional[Project]:
+        """Get a project by its name (alias for UUID).
+        
+        This allows looking up projects by human-friendly name instead of UUID.
+        Case-insensitive search.
+        
+        Args:
+            name: Project name to search for
+            
+        Returns:
+            Project instance if found, None otherwise
+        """
+        name_lower = name.lower()
+        for project_id, info in self.project_index.items():
+            if info['name'].lower() == name_lower:
+                return self.open_project(project_id)
+        return None
+    
+    def find_projects_by_name(self, name_pattern: str) -> List[Dict[str, Any]]:
+        """Find projects matching a name pattern (partial match).
+        
+        Args:
+            name_pattern: Pattern to search for in project names
+            
+        Returns:
+            List of project info dicts matching the pattern
+        """
+        pattern_lower = name_pattern.lower()
+        matches = []
+        for project_id, info in self.project_index.items():
+            if pattern_lower in info['name'].lower():
+                matches.append(info)
+        return matches
+    
+    def get_project_display_name(self, project_id: str) -> str:
+        """Get human-friendly display name for a project.
+        
+        Returns the project name instead of UUID for display purposes.
+        
+        Args:
+            project_id: UUID of the project
+            
+        Returns:
+            Project name, or truncated UUID if not found
+        """
+        if project_id in self.project_index:
+            return self.project_index[project_id]['name']
+        return f"Project {project_id[:8]}..."
+    
+    def list_all_projects(self) -> List[Dict[str, Any]]:
+        """Get list of all projects with display information.
+        
+        Returns sorted list by project name (not UUID).
+        
+        Returns:
+            List of dicts with keys: id, name, path, created_date, modified_date
+        """
+        projects = list(self.project_index.values())
+        # Sort by name (human-friendly)
+        projects.sort(key=lambda p: p['name'].lower())
+        return projects
+    
     def delete_project(self, project_id: str, delete_files: bool = False) -> bool:
         """Delete a project from index.
         
+        SAFETY: Deletion is permanent and cannot be undone! Consider archiving instead.
+        
         Args:
             project_id: UUID of project to delete
-            delete_files: Whether to delete files from disk
+            delete_files: Whether to delete files from disk (DANGEROUS!)
             
         Returns:
             True if deleted, False if not found
+            
+        Raises:
+            ValueError: If attempting to delete files outside projects directory
         """
         if project_id not in self.project_index:
             return False
         
         project_info = self.project_index[project_id]
+        
+        # SAFETY CHECK: Verify path is within projects directory
+        if delete_files:
+            project_path = os.path.abspath(project_info['path'])
+            projects_root_abs = os.path.abspath(self.projects_root)
+            
+            # Ensure path is under projects_root
+            if not project_path.startswith(projects_root_abs + os.sep):
+                raise ValueError(
+                    f"SAFETY ERROR: Project path '{project_path}' is outside "
+                    f"projects directory '{projects_root_abs}'. Deletion blocked."
+                )
+            
+            # Additional safety: Check path contains UUID or project name
+            project_name_sanitized = self._sanitize_directory_name(project_info['name'])
+            path_basename = os.path.basename(project_path)
+            
+            if project_id not in project_path and project_name_sanitized not in path_basename:
+                raise ValueError(
+                    f"SAFETY ERROR: Project path '{project_path}' doesn't contain "
+                    f"expected identifiers. Deletion blocked."
+                )
         
         # Remove from index
         del self.project_index[project_id]
@@ -528,15 +650,84 @@ class ProjectManager:
             self.recent_projects.remove(project_id)
             self.save_recent_projects()
         
-        # Delete files if requested
+        # Delete files if requested (with safety checks passed)
         if delete_files:
             import shutil
             try:
-                shutil.rmtree(project_info['path'])
+                # Final confirmation: path exists and is a directory
+                if os.path.exists(project_path) and os.path.isdir(project_path):
+                    shutil.rmtree(project_path)
+                    print(f"Deleted project files: {project_path}")
+                else:
+                    print(f"Warning: Project path not found or not a directory: {project_path}")
             except Exception as e:
-                print(f"Warning: Failed to delete project files: {e}")
+                print(f"ERROR: Failed to delete project files: {e}")
+                # Re-add to index if file deletion failed
+                self.project_index[project_id] = project_info
+                self.save_index()
+                raise  # Re-raise to let caller handle
         
         return True
+    
+    def archive_project(self, project_id: str, archive_path: str = None) -> str:
+        """Archive a project to a ZIP file (SAFER alternative to deletion).
+        
+        This creates a backup before removing from index, allowing recovery.
+        
+        Args:
+            project_id: UUID of project to archive
+            archive_path: Optional custom path for archive file.
+                         If None, creates in projects_root/archives/
+            
+        Returns:
+            Path to created archive file
+            
+        Raises:
+            FileNotFoundError: If project not found
+            ValueError: If archive operation fails
+        """
+        if project_id not in self.project_index:
+            raise FileNotFoundError(f"Project {project_id} not found")
+        
+        project_info = self.project_index[project_id]
+        project_path = project_info['path']
+        
+        # Create archives directory if needed
+        if archive_path is None:
+            archives_dir = os.path.join(self.projects_root, 'archives')
+            os.makedirs(archives_dir, exist_ok=True)
+            
+            # Use sanitized name + timestamp for archive filename
+            from datetime import datetime
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            safe_name = self._sanitize_directory_name(project_info['name'])
+            archive_filename = f"{safe_name}_{timestamp}.zip"
+            archive_path = os.path.join(archives_dir, archive_filename)
+        
+        # Create ZIP archive
+        import shutil
+        try:
+            # shutil.make_archive expects base name without extension
+            base_name = archive_path.rsplit('.zip', 1)[0] if archive_path.endswith('.zip') else archive_path
+            shutil.make_archive(base_name, 'zip', project_path)
+            
+            # Ensure .zip extension
+            final_archive_path = base_name + '.zip'
+            
+            print(f"Project archived to: {final_archive_path}")
+            
+            # Now safe to remove from index (files preserved in archive)
+            del self.project_index[project_id]
+            self.save_index()
+            
+            if project_id in self.recent_projects:
+                self.recent_projects.remove(project_id)
+                self.save_recent_projects()
+            
+            return final_archive_path
+            
+        except Exception as e:
+            raise ValueError(f"Failed to archive project: {e}")
 
 
 # Global singleton instance

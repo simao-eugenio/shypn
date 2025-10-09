@@ -106,6 +106,7 @@ class SimulationController:
     Attributes:
         model: ModelCanvasManager instance (has places, transitions, arcs lists)
         time: Current simulation time
+        settings: SimulationSettings instance for timing configuration
         step_listeners: List of callbacks to notify on each step
     """
 
@@ -127,6 +128,10 @@ class SimulationController:
         self.conflict_policy = DEFAULT_POLICY
         self._round_robin_index = 0
         self.data_collector = None
+        
+        # Timing configuration (composition pattern)
+        from shypn.engine.simulation.settings import SimulationSettings
+        self.settings = SimulationSettings()
 
     def _get_behavior(self, transition):
         """Get or create behavior instance for a transition.
@@ -228,6 +233,32 @@ class SimulationController:
         """
         self.conflict_policy = policy
         self._round_robin_index = 0
+    
+    # ========== Settings Delegation Methods ==========
+    
+    def get_effective_dt(self) -> float:
+        """Get effective time step (delegates to settings).
+        
+        Returns:
+            float: Time step in seconds
+        """
+        return self.settings.get_effective_dt()
+    
+    def get_progress(self) -> float:
+        """Get simulation progress as fraction [0.0, 1.0].
+        
+        Returns:
+            float: Progress fraction
+        """
+        return self.settings.calculate_progress(self.time)
+    
+    def is_simulation_complete(self) -> bool:
+        """Check if simulation has reached duration limit.
+        
+        Returns:
+            bool: True if time >= duration
+        """
+        return self.settings.is_complete(self.time)
 
     def invalidate_behavior_cache(self, transition_id=None):
         """Invalidate behavior cache for a specific transition or all transitions.
@@ -281,7 +312,7 @@ class SimulationController:
 
                 pass
 
-    def step(self, time_step: float=0.1) -> bool:
+    def step(self, time_step: float = None) -> bool:
         """Execute a single simulation step with hybrid (discrete + continuous) execution.
         
         This performs one iteration of the simulation:
@@ -300,11 +331,25 @@ class SimulationController:
         7. Notify listeners
         
         Args:
-            time_step: Time increment for this step (default: 0.1)
+            time_step: Time increment for this step (None = use effective dt from settings)
         
         Returns:
-            bool: True if any transition fired/integrated, False if deadlocked
+            bool: True if any transition fired/integrated, False if deadlocked/complete
         """
+        # Use effective dt if not specified
+        if time_step is None:
+            time_step = self.get_effective_dt()
+        
+        # Validate time step is non-negative
+        if time_step < 0:
+            raise ValueError(f"time_step must be non-negative, got {time_step}")
+        
+        # Warn about potentially problematic time steps
+        if time_step > 1.0:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Large time step ({time_step}s) may cause timed transitions to miss firing windows")
+        
         self._update_enablement_states()
         immediate_fired_total = 0
         max_immediate_iterations = 1000
@@ -320,6 +365,86 @@ class SimulationController:
         
         if iteration >= max_immediate_iterations - 1:
             pass  # Max iterations reached, continue to next phase
+        
+        # === PHASE: Handle Timed Window Crossings ===
+        # Check for timed transitions whose firing windows will be crossed during this step
+        # These must fire even if the window is narrow or zero-width
+        window_crossing_fired = 0
+        timed_transitions = [t for t in self.model.transitions if t.transition_type == 'timed']
+        for transition in timed_transitions:
+            behavior = self._get_behavior(transition)
+            
+            # Check if this transition's window will be crossed
+            if hasattr(behavior, '_enablement_time') and behavior._enablement_time is not None:
+                elapsed_now = self.time - behavior._enablement_time
+                elapsed_after = (self.time + time_step) - behavior._enablement_time
+                
+                # Window crossing: currently before window, will be after window
+                will_cross = (elapsed_now < behavior.earliest and 
+                             elapsed_after > behavior.latest)
+                
+                if will_cross:
+                    # Check structural enablement (tokens only, ignore timing)
+                    # For sources, always structurally enabled
+                    is_source = hasattr(transition, 'properties') and \
+                                transition.properties.get('is_source', False)
+                    
+                    has_tokens = True
+                    if not is_source:
+                        input_arcs = behavior.get_input_arcs()
+                        for arc in input_arcs:
+                            kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
+                            if kind != 'normal':
+                                continue
+                            source_place = self.model_adapter.places.get(arc.source_id)
+                            if source_place is None or source_place.tokens < arc.weight:
+                                has_tokens = False
+                                break
+                    
+                    if has_tokens:
+                        # Manual token transfer for window crossing (bypass timing checks in fire())
+                        # This is necessary because fire() checks timing, but we KNOW the window is crossed
+                        consumed_map = {}
+                        produced_map = {}
+                        
+                        # Consume tokens from input places
+                        if not is_source:
+                            for arc in behavior.get_input_arcs():
+                                kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
+                                if kind != 'normal':
+                                    continue
+                                source_place = self.model_adapter.places.get(arc.source_id)
+                                source_place.set_tokens(source_place.tokens - arc.weight)
+                                consumed_map[arc.source_id] = arc.weight
+                        
+                        # Produce tokens to output places
+                        is_sink = hasattr(transition, 'properties') and \
+                                  transition.properties.get('is_sink', False)
+                        if not is_sink:
+                            for arc in behavior.get_output_arcs():
+                                kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
+                                if kind != 'normal':
+                                    continue
+                                target_place = self.model_adapter.places.get(arc.target_id)
+                                target_place.set_tokens(target_place.tokens + arc.weight)
+                                produced_map[arc.target_id] = arc.weight
+                        
+                        # Clear enablement state
+                        state = self._get_or_create_state(transition)
+                        state.enablement_time = None
+                        state.scheduled_time = None
+                        
+                        # Notify data collector
+                        if self.data_collector is not None:
+                            details = {
+                                'consumed': consumed_map,
+                                'produced': produced_map,
+                                'window_crossing': True,
+                                'timing_window': [behavior.earliest, behavior.latest]
+                            }
+                            self.data_collector.on_transition_fired(transition, self.time, details)
+                        
+                        window_crossing_fired += 1
         
         continuous_transitions = [t for t in self.model.transitions if t.transition_type == 'continuous']
         DEBUG_CONTINUOUS = True
@@ -371,7 +496,12 @@ class SimulationController:
             pass
         self.time += time_step
         self._notify_step_listeners()
-        if immediate_fired_total > 0 or discrete_fired or continuous_active > 0:
+        
+        # Check if simulation is complete (duration reached)
+        if self.is_simulation_complete():
+            return False  # Simulation complete
+        
+        if immediate_fired_total > 0 or window_crossing_fired > 0 or discrete_fired or continuous_active > 0:
             return True
         waiting_count = 0
         ready_count = 0
@@ -474,15 +604,15 @@ class SimulationController:
         else:
             return random.choice(enabled_transitions)
 
-    def run(self, time_step: float=0.1, max_steps: Optional[int]=None) -> bool:
+    def run(self, time_step: float = None, max_steps: Optional[int] = None) -> bool:
         """Start continuous simulation execution.
         
         Runs the simulation continuously using GLib timeout callbacks.
         Can be stopped by calling stop().
         
         Args:
-            time_step: Time increment per step (default: 0.1)
-            max_steps: Maximum number of steps to run (None = unlimited)
+            time_step: Time increment per step (None = use effective dt from settings)
+            max_steps: Maximum number of steps to run (None = use duration-based or unlimited)
         
         Returns:
             bool: True if started successfully, False if already running
@@ -494,6 +624,17 @@ class SimulationController:
         for transition in self.model.transitions:
             state = self.transition_states.get(transition.id)
             behavior = self._get_behavior(transition)
+        
+        # Use effective dt if not specified
+        if time_step is None:
+            time_step = self.get_effective_dt()
+        
+        # Calculate max_steps from duration if not specified
+        if max_steps is None:
+            estimated_steps = self.settings.estimate_step_count()
+            if estimated_steps is not None:
+                max_steps = estimated_steps
+        
         self._running = True
         self._stop_requested = False
         self._max_steps = max_steps

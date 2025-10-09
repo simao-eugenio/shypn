@@ -62,7 +62,7 @@ class NetObjPersistency:
         
         Args:
             parent_window: Parent window for dialogs (optional)
-            models_directory: Root directory for Petri net models (default: repo_root/models)
+            models_directory: Root directory for Petri net models (default: uses ProjectManager)
         """
         self.parent_window = parent_window
         self.current_filepath: Optional[str] = None
@@ -70,10 +70,26 @@ class NetObjPersistency:
         self.on_file_saved: Optional[Callable[[str], None]] = None
         self.on_file_loaded: Optional[Callable[[str, any], None]] = None
         self.on_dirty_changed: Optional[Callable[[bool], None]] = None
+        
+        # Determine models directory
         if models_directory is None:
-            script_dir = os.path.dirname(os.path.abspath(__file__))
-            repo_root = os.path.normpath(os.path.join(script_dir, '..', '..', '..'))
-            models_directory = os.path.join(repo_root, 'models')
+            # Try to use current project's models directory
+            try:
+                from shypn.data.project_models import ProjectManager
+                manager = ProjectManager()
+                
+                if manager.current_project:
+                    # Use current project's models directory
+                    models_directory = manager.current_project.get_models_dir()
+                else:
+                    # No active project, use projects root
+                    models_directory = manager.projects_root
+            except Exception:
+                # Fallback if ProjectManager not available
+                script_dir = os.path.dirname(os.path.abspath(__file__))
+                repo_root = os.path.normpath(os.path.join(script_dir, '..', '..', '..'))
+                models_directory = os.path.join(repo_root, 'workspace', 'projects')
+        
         self.models_directory = models_directory
         if not os.path.exists(self.models_directory):
             try:
@@ -81,6 +97,33 @@ class NetObjPersistency:
             except Exception as e:
                 pass
         self._last_directory: Optional[str] = self.models_directory
+
+    def update_models_directory_from_project(self) -> None:
+        """Update models directory based on current project.
+        
+        Call this method when the active project changes to ensure
+        save/load dialogs open in the correct project directory.
+        """
+        try:
+            from shypn.data.project_models import ProjectManager
+            manager = ProjectManager()
+            
+            if manager.current_project:
+                # Use current project's models directory
+                new_dir = manager.current_project.get_models_dir()
+                if new_dir and os.path.exists(new_dir):
+                    self.models_directory = new_dir
+                    # Only update last_directory if user hasn't navigated elsewhere
+                    if not self._last_directory or self._last_directory == self.models_directory:
+                        self._last_directory = new_dir
+            else:
+                # No active project, use projects root
+                self.models_directory = manager.projects_root
+                if not self._last_directory:
+                    self._last_directory = self.models_directory
+        except Exception as e:
+            # If ProjectManager not available, keep current directory
+            pass
 
     @property
     def is_dirty(self) -> bool:
@@ -223,7 +266,7 @@ class NetObjPersistency:
         """
         if not self.is_dirty:
             return True
-        dialog = Gtk.MessageDialog(parent=self.parent_window, flags=Gtk.DialogFlags.MODAL, message_type=Gtk.MessageType.WARNING, buttons=Gtk.ButtonsType.NONE, text='Unsaved changes')
+        dialog = Gtk.MessageDialog(parent=self.parent_window, modal=True, message_type=Gtk.MessageType.WARNING, buttons=Gtk.ButtonsType.NONE, text='Unsaved changes')
         dialog.format_secondary_text(f"Document '{self.get_display_name()}' has unsaved changes.\n" + 'Do you want to save before continuing?')
         dialog.add_button('Cancel', Gtk.ResponseType.CANCEL)
         dialog.add_button('Discard Changes', Gtk.ResponseType.NO)
@@ -286,7 +329,7 @@ class NetObjPersistency:
             filepath += '.shy'
         filename = os.path.basename(filepath)
         if filename.lower() == 'default.shy':
-            warning_dialog = Gtk.MessageDialog(parent=self.parent_window, flags=Gtk.DialogFlags.MODAL, type=Gtk.MessageType.WARNING, buttons=Gtk.ButtonsType.YES_NO, text="Save as 'default.shy'?")
+            warning_dialog = Gtk.MessageDialog(parent=self.parent_window, modal=True, message_type=Gtk.MessageType.WARNING, buttons=Gtk.ButtonsType.YES_NO, text="Save as 'default.shy'?")
             warning_dialog.format_secondary_text("You are about to save with the default filename 'default.shy'.\n\nThis may overwrite existing default files or make it hard to identify this model later.\n\nDo you want to continue with this filename?")
             warning_response = warning_dialog.run()
             warning_dialog.destroy()
@@ -331,7 +374,7 @@ class NetObjPersistency:
             title: Dialog title
             message: Message text
         """
-        dialog = Gtk.MessageDialog(parent=self.parent_window, flags=Gtk.DialogFlags.MODAL, message_type=Gtk.MessageType.INFO, buttons=Gtk.ButtonsType.OK, text=title)
+        dialog = Gtk.MessageDialog(parent=self.parent_window, modal=True, message_type=Gtk.MessageType.INFO, buttons=Gtk.ButtonsType.OK, text=title)
         dialog.format_secondary_text(message)
         dialog.run()
         dialog.destroy()
@@ -343,7 +386,7 @@ class NetObjPersistency:
             title: Dialog title
             message: Error message
         """
-        dialog = Gtk.MessageDialog(parent=self.parent_window, flags=Gtk.DialogFlags.MODAL, message_type=Gtk.MessageType.ERROR, buttons=Gtk.ButtonsType.OK, text=title)
+        dialog = Gtk.MessageDialog(parent=self.parent_window, modal=True, message_type=Gtk.MessageType.ERROR, buttons=Gtk.ButtonsType.OK, text=title)
         dialog.format_secondary_text(message)
         dialog.run()
         dialog.destroy()
@@ -351,9 +394,12 @@ class NetObjPersistency:
 def create_persistency_manager(parent_window: Optional[Gtk.Window]=None, models_directory: Optional[str]=None) -> NetObjPersistency:
     """Convenience function to create a persistence manager.
     
+    The manager automatically detects the current project and uses its models directory.
+    If no project is active, it uses the workspace/projects root.
+    
     Args:
         parent_window: Parent window for dialogs
-        models_directory: Root directory for Petri net models (default: repo_root/models)
+        models_directory: Root directory for models (default: auto-detect from ProjectManager)
         
     Returns:
         NetObjPersistency: The persistence manager instance
@@ -361,10 +407,13 @@ def create_persistency_manager(parent_window: Optional[Gtk.Window]=None, models_
     Example:
         persistency = create_persistency_manager(main_window)
         
-        # Save document (will prompt for filename in models directory)
+        # Save dialog opens in current project's models directory
         success = persistency.save_document(document)
         
-        # Load document (will open in models directory)
+        # Load dialog opens in current project's models directory
         document, filepath = persistency.load_document()
+        
+        # Update directory when project changes
+        persistency.update_models_directory_from_project()
     """
     return NetObjPersistency(parent_window, models_directory)
