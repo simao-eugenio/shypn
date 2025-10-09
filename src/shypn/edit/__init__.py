@@ -6,6 +6,7 @@ This package provides:
 - Visual feedback: ObjectEditingTransforms, RectangleSelection
 - TransientArc: Temporary preview arc shown during arc creation
 - Editing Operations Palette: UI and operations for editing (undo/redo/clipboard/lasso)
+- Graph Layout: Automatic layout algorithms for imported pathways
 
 These objects are NOT PetriNetObjects and are not added to the model.
 They exist only for visual feedback during interactive editing.
@@ -20,6 +21,7 @@ from shypn.edit.editing_operations_palette import EditingOperationsPalette
 from shypn.edit.editing_operations_palette_loader import EditingOperationsPaletteLoader
 from shypn.edit.edit_operations import EditOperations
 from shypn.edit.lasso_selector import LassoSelector
+from shypn.edit.graph_layout import LayoutEngine, LayoutAlgorithm
 
 __all__ = [
     'TransientArc',
@@ -32,5 +34,7 @@ __all__ = [
     'EditingOperationsPalette',
     'EditingOperationsPaletteLoader',
     'EditOperations',
-    'LassoSelector'
+    'LassoSelector',
+    'LayoutEngine',
+    'LayoutAlgorithm'
 ]
