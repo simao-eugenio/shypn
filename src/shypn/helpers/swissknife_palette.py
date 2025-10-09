@@ -1,35 +1,39 @@
 #!/usr/bin/env python3
-"""Placeholder SwissKnifePalette for testing.
+"""SwissKnifePalette - Unified multi-mode palette for Petri net editing and simulation.
 
-Simplified version of SwissKnifePalette for testing animations,
-signals, and CSS without full implementation.
+This palette consolidates edit and simulate functionality into a single, 
+mode-aware interface with animated sub-palettes:
+- Edit sub-palette: Place, Transition, Arc, Select, Lasso tools
+- Simulate sub-palette: Full simulation controls (embedded SimulateToolsPaletteLoader)
+- Layout sub-palette: Auto, Hierarchical, Force-Directed layout algorithms
+
+Architecture:
+- Category buttons (Edit, Simulate, Layout) at bottom
+- Sub-palettes reveal upward from bottom with 600ms slide animation
+- Widget palette integration pattern for complex palettes (e.g., simulation)
+- CSS-styled with dark blue-gray theme
 """
 
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, Gdk, GObject, GLib
-import time
-
-from placeholder_tools import (
-    create_tools_for_mode,
-    get_categories_for_mode
-)
 
 
-class PlaceholderPalette(GObject.GObject):
-    """Placeholder SwissKnifePalette for testing.
+class SwissKnifePalette(GObject.GObject):
+    """Unified multi-mode palette for Petri net operations.
     
-    Tests:
-    - Sub-palette animations (slide up/down)
-    - Category button behavior
-    - Tool button signals
-    - CSS styling
+    Provides mode-aware interface with animated sub-palettes.
+    Supports both simple tool buttons and complex widget palettes.
     
     Signals:
         category-selected(str): Category button clicked
-        tool-activated(str): Tool button clicked
+        tool-activated(str): Tool button clicked  
         sub-palette-shown(str): Sub-palette revealed (after animation)
         sub-palette-hidden(str): Sub-palette hidden (after animation)
+        mode-change-requested(str): Mode change requested (edit/simulate)
+        simulation-step-executed(float): Simulation step completed (forwarded)
+        simulation-reset-executed(): Simulation reset (forwarded)
+        simulation-settings-changed(): Simulation settings changed (forwarded)
     """
     
     __gsignals__ = {
@@ -45,19 +49,23 @@ class PlaceholderPalette(GObject.GObject):
         'simulation-settings-changed': (GObject.SignalFlags.RUN_FIRST, None, ()),
     }
     
-    def __init__(self, mode='edit', model=None):
-        """Initialize placeholder palette.
+    def __init__(self, mode='edit', model=None, tool_registry=None):
+        """Initialize SwissKnifePalette.
         
         Args:
-            mode: 'edit' or 'simulate'
-            model: Optional PetriNetModel for widget palettes (e.g., simulation)
+            mode: 'edit' or 'simulate' mode
+            model: PetriNetModel instance for widget palettes (required for simulation)
+            tool_registry: Optional tool registry for custom tools. If None, uses default.
         """
         super().__init__()
         
         self.mode = mode
         self.model = model  # Store model for widget palettes
-        self.categories = get_categories_for_mode(mode)
-        self.tools = create_tools_for_mode(mode)
+        self.tool_registry = tool_registry or self._create_default_tool_registry()
+        
+        # Get configuration from tool registry
+        self.categories = self.tool_registry.get_categories(mode)
+        self.tools = self.tool_registry.get_all_tools()
         
         self.category_buttons = {}
         self.sub_palettes = {}
@@ -75,12 +83,21 @@ class PlaceholderPalette(GObject.GObject):
         # Apply CSS
         self._apply_css()
     
+    def _create_default_tool_registry(self):
+        """Create default tool registry.
+        
+        Returns:
+            ToolRegistry: Default tool registry with standard tools
+        """
+        # Import here to avoid circular dependency
+        from shypn.ui.swissknife_tool_registry import ToolRegistry
+        return ToolRegistry()
+    
     def _create_structure(self):
         """Create palette widget hierarchy."""
         # Main container (vertical: sub-palette area FIRST, then categories at bottom)
         self.main_container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         self.main_container.get_style_context().add_class('swissknife-container')
-        self.main_container.get_style_context().add_class('placeholder-palette')
         
         # Sub-palette area (stack of revealers) - FIRST (on top, toward canvas)
         self.sub_palette_area = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
@@ -128,7 +145,7 @@ class PlaceholderPalette(GObject.GObject):
         # Revealer for animation (SLIDE_UP = reveals upward from bottom)
         revealer = Gtk.Revealer()
         revealer.set_transition_type(Gtk.RevealerTransitionType.SLIDE_UP)
-        revealer.set_transition_duration(600)  # 600ms - slower animation
+        revealer.set_transition_duration(600)  # 600ms animation
         revealer.set_reveal_child(False)  # Hidden by default
         
         # Check if this is a widget palette (e.g., Simulate)
@@ -161,15 +178,11 @@ class PlaceholderPalette(GObject.GObject):
                     # Remove from loader's revealer and add to ours
                     loader_revealer.remove(container)
                     revealer.add(container)
-                    
-                    print(f"[PlaceholderPalette] Created widget palette for {cat_id}")
                 else:
-                    print(f"[PlaceholderPalette] ERROR: No container in SimulateToolsPaletteLoader")
                     # Fallback to empty box
                     revealer.add(Gtk.Box())
                     
             except Exception as e:
-                print(f"[PlaceholderPalette] ERROR: Failed to create widget palette for {cat_id}: {e}")
                 import traceback
                 traceback.print_exc()
                 # Fallback to empty box
@@ -217,10 +230,8 @@ class PlaceholderPalette(GObject.GObject):
             cat_id: Category ID
         """
         if self.animation_in_progress:
-            print("[PlaceholderPalette] Animation in progress, ignoring click")
             return
         
-        print(f"[PlaceholderPalette] Category clicked: {cat_id}")
         self.emit('category-selected', cat_id)
         
         # Emit mode change signal for Edit and Simulate categories
@@ -235,22 +246,18 @@ class PlaceholderPalette(GObject.GObject):
         
         requested_mode = mode_for_category.get(cat_id)
         if requested_mode and requested_mode != self.mode:
-            print(f"[PlaceholderPalette] Requesting mode change to: {requested_mode}")
             self.emit('mode-change-requested', requested_mode)
         
         # Toggle if clicking active category
         if self.active_category == cat_id:
-            print(f"[PlaceholderPalette] Toggling off active category: {cat_id}")
             self._hide_sub_palette(cat_id)
             self._deactivate_category_button(cat_id)
             self.active_category = None
         else:
             # Switch to new category
             if self.active_category:
-                print(f"[PlaceholderPalette] Switching from {self.active_category} to {cat_id}")
                 self._switch_sub_palette(self.active_category, cat_id)
             else:
-                print(f"[PlaceholderPalette] Showing sub-palette: {cat_id}")
                 self._show_sub_palette(cat_id)
             
             # Update active category
@@ -270,7 +277,6 @@ class PlaceholderPalette(GObject.GObject):
             return
         
         self.animation_in_progress = True
-        print(f"[ANIMATION] Showing sub-palette: {cat_id} (slide UP from bottom, 600ms)")
         
         revealer = sub_palette['revealer']
         revealer.set_reveal_child(True)
@@ -289,7 +295,6 @@ class PlaceholderPalette(GObject.GObject):
             return
         
         self.animation_in_progress = True
-        print(f"[ANIMATION] Hiding sub-palette: {cat_id} (slide DOWN to hide, 600ms)")
         
         revealer = sub_palette['revealer']
         revealer.set_reveal_child(False)
@@ -305,7 +310,6 @@ class PlaceholderPalette(GObject.GObject):
             to_cat: Category to show
         """
         self.animation_in_progress = True
-        print(f"[ANIMATION] Switching: {from_cat} → {to_cat} (hide 600ms, show 600ms)")
         
         # Hide current
         from_palette = self.sub_palettes.get(from_cat)
@@ -321,7 +325,6 @@ class PlaceholderPalette(GObject.GObject):
         Args:
             cat_id: Category ID
         """
-        print(f"[ANIMATION] Show animation complete: {cat_id}")
         self.active_sub_palette = cat_id
         self.animation_in_progress = False
         self.emit('sub-palette-shown', cat_id)
@@ -333,7 +336,6 @@ class PlaceholderPalette(GObject.GObject):
         Args:
             cat_id: Category ID
         """
-        print(f"[ANIMATION] Hide animation complete: {cat_id}")
         self.active_sub_palette = None
         self.animation_in_progress = False
         self.emit('sub-palette-hidden', cat_id)
@@ -346,7 +348,6 @@ class PlaceholderPalette(GObject.GObject):
             from_cat: Hidden category
             to_cat: Category to show next
         """
-        print(f"[ANIMATION] Hide complete: {from_cat}, now showing: {to_cat}")
         self.emit('sub-palette-hidden', from_cat)
         
         # Now show new sub-palette
@@ -382,10 +383,9 @@ class PlaceholderPalette(GObject.GObject):
         """Handle tool activation signal.
         
         Args:
-            tool: PlaceholderTool instance
+            tool: Tool instance
             tool_id: Tool ID
         """
-        print(f"[PlaceholderPalette] Tool activated: {tool_id}")
         self.emit('tool-activated', tool_id)
     
     def _on_simulation_step(self, sim_palette, time):
@@ -395,7 +395,6 @@ class PlaceholderPalette(GObject.GObject):
             sim_palette: SimulateToolsPaletteLoader instance
             time: Current simulation time
         """
-        print(f"[SIMULATION] Step executed at time: {time:.3f}")
         self.emit('simulation-step-executed', time)
     
     def _on_simulation_reset(self, sim_palette):
@@ -404,7 +403,6 @@ class PlaceholderPalette(GObject.GObject):
         Args:
             sim_palette: SimulateToolsPaletteLoader instance
         """
-        print(f"[SIMULATION] Reset executed")
         self.emit('simulation-reset-executed')
     
     def _on_simulation_settings_changed(self, sim_palette):
@@ -413,19 +411,22 @@ class PlaceholderPalette(GObject.GObject):
         Args:
             sim_palette: SimulateToolsPaletteLoader instance
         """
-        print(f"[SIMULATION] Settings changed")
         self.emit('simulation-settings-changed')
     
     def get_widget(self):
-        """Get main container widget."""
+        """Get main container widget.
+        
+        Returns:
+            Gtk.Box: Main palette container
+        """
         return self.main_container
     
     def _apply_css(self):
         """Apply CSS styling."""
         css = b"""
-        /* SwissKnifePalette Test Bed CSS */
+        /* SwissKnifePalette CSS */
         
-        /* Main Palette Container - Blue theme */
+        /* Main Palette Container - Dark blue-gray theme */
         .swissknife-container {
             background: linear-gradient(to bottom, 
                 rgba(52, 73, 94, 0.92) 0%, 
@@ -437,14 +438,14 @@ class PlaceholderPalette(GObject.GObject):
                         0 2px 4px rgba(0, 0, 0, 0.3);
         }
         
-        /* Category Buttons Container - Darker background */
+        /* Category Buttons Container */
         .category-buttons {
             padding: 4px;
             background: rgba(0, 0, 0, 0.15);
             border-radius: 6px;
         }
         
-        /* Category Buttons - Light gray */
+        /* Category Buttons */
         .category-button {
             min-width: 80px;
             min-height: 36px;
@@ -472,7 +473,7 @@ class PlaceholderPalette(GObject.GObject):
             box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
         }
         
-        /* Sub-Palette Container - Light blue/white theme */
+        /* Sub-Palette Container - Light theme default */
         .sub-palette {
             margin: 4px 8px 8px 8px;
             padding: 8px;
@@ -502,7 +503,7 @@ class PlaceholderPalette(GObject.GObject):
             box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4);
         }
         
-        /* Tool Buttons - Keep minimal styling */
+        /* Tool Buttons */
         .tool-button {
             min-width: 50px;
             min-height: 40px;
@@ -518,7 +519,7 @@ class PlaceholderPalette(GObject.GObject):
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
         }
         
-        /* Edit Sub-Palette Tool Buttons - Dark Blue accent */
+        /* Edit Sub-Palette Tool Buttons - Blue accent */
         .sub-palette-edit .tool-button {
             background: linear-gradient(to bottom, 
                 rgba(255, 255, 255, 1) 0%, 
@@ -534,12 +535,12 @@ class PlaceholderPalette(GObject.GObject):
             box-shadow: 0 2px 4px rgba(52, 152, 219, 0.4);
         }
         
-        .tool-button.placeholder-tool {
+        .tool-button.swissknife-tool {
             border-left: 3px solid #3498db;
         }
         
         /* Edit buttons - Dark Blue left border */
-        .sub-palette-edit .tool-button.placeholder-tool {
+        .sub-palette-edit .tool-button.swissknife-tool {
             border-left: 4px solid rgba(41, 128, 185, 1);
         }
         """
@@ -554,4 +555,4 @@ class PlaceholderPalette(GObject.GObject):
                 Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
             )
         except Exception as e:
-            print(f"[PlaceholderPalette] CSS error: {e}")
+            print(f"[SwissKnifePalette] CSS error: {e}")
