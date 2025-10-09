@@ -1405,7 +1405,7 @@ class ModelCanvasLoader:
             manager: ModelCanvasManager instance.
         """
         menu = Gtk.Menu()
-        menu_items = [('Reset Zoom (100%)', lambda: self._on_reset_zoom_clicked(menu, drawing_area, manager)), ('Zoom In', lambda: self._on_zoom_in_clicked(menu, drawing_area, manager)), ('Zoom Out', lambda: self._on_zoom_out_clicked(menu, drawing_area, manager)), ('Fit to Window', lambda: self._on_fit_to_window_clicked(menu, drawing_area, manager)), None, ('Grid: Line Style', lambda: self._on_grid_line_clicked(menu, drawing_area, manager)), ('Grid: Dot Style', lambda: self._on_grid_dot_clicked(menu, drawing_area, manager)), ('Grid: Cross Style', lambda: self._on_grid_cross_clicked(menu, drawing_area, manager)), None, ('Center View', lambda: self._on_center_view_clicked(menu, drawing_area, manager)), ('Clear Canvas', lambda: self._on_clear_canvas_clicked(menu, drawing_area, manager))]
+        menu_items = [('Reset Zoom (100%)', lambda: self._on_reset_zoom_clicked(menu, drawing_area, manager)), ('Zoom In', lambda: self._on_zoom_in_clicked(menu, drawing_area, manager)), ('Zoom Out', lambda: self._on_zoom_out_clicked(menu, drawing_area, manager)), ('Fit to Window', lambda: self._on_fit_to_window_clicked(menu, drawing_area, manager)), None, ('Grid: Line Style', lambda: self._on_grid_line_clicked(menu, drawing_area, manager)), ('Grid: Dot Style', lambda: self._on_grid_dot_clicked(menu, drawing_area, manager)), ('Grid: Cross Style', lambda: self._on_grid_cross_clicked(menu, drawing_area, manager)), None, ('Layout: Auto (Best)', lambda: self._on_layout_auto_clicked(menu, drawing_area, manager)), ('Layout: Hierarchical', lambda: self._on_layout_hierarchical_clicked(menu, drawing_area, manager)), ('Layout: Force-Directed', lambda: self._on_layout_force_clicked(menu, drawing_area, manager)), ('Layout: Circular', lambda: self._on_layout_circular_clicked(menu, drawing_area, manager)), ('Layout: Orthogonal', lambda: self._on_layout_orthogonal_clicked(menu, drawing_area, manager)), None, ('Center View', lambda: self._on_center_view_clicked(menu, drawing_area, manager)), ('Clear Canvas', lambda: self._on_clear_canvas_clicked(menu, drawing_area, manager))]
         for item_data in menu_items:
             if item_data is None:
                 menu_item = Gtk.SeparatorMenuItem()
@@ -1479,6 +1479,90 @@ class ModelCanvasLoader:
         manager.pan_x = 0
         manager.pan_y = 0
         drawing_area.queue_draw()
+
+    def _on_layout_auto_clicked(self, menu, drawing_area, manager):
+        """Apply automatic layout (best algorithm for graph topology)."""
+        try:
+            from shypn.edit.graph_layout import LayoutEngine
+            
+            # Check if there are nodes to layout
+            if not manager.places and not manager.transitions:
+                self._show_layout_message("No objects to layout", drawing_area)
+                return
+            
+            # Create engine and apply layout
+            engine = LayoutEngine(manager)
+            result = engine.apply_layout('auto')
+            
+            # Show result
+            message = (f"Applied {result['algorithm']} layout\n"
+                      f"Moved {result['nodes_moved']} objects\n"
+                      f"Reason: {result['reason']}")
+            self._show_layout_message(message, drawing_area)
+            
+            # Redraw
+            drawing_area.queue_draw()
+            
+        except Exception as e:
+            self._show_layout_message(f"Layout error: {str(e)}", drawing_area)
+    
+    def _on_layout_hierarchical_clicked(self, menu, drawing_area, manager):
+        """Apply hierarchical (Sugiyama) layout."""
+        self._apply_specific_layout(manager, drawing_area, 'hierarchical', 'Hierarchical (Sugiyama)')
+    
+    def _on_layout_force_clicked(self, menu, drawing_area, manager):
+        """Apply force-directed (Fruchterman-Reingold) layout."""
+        self._apply_specific_layout(manager, drawing_area, 'force_directed', 'Force-Directed')
+    
+    def _on_layout_circular_clicked(self, menu, drawing_area, manager):
+        """Apply circular layout."""
+        self._apply_specific_layout(manager, drawing_area, 'circular', 'Circular')
+    
+    def _on_layout_orthogonal_clicked(self, menu, drawing_area, manager):
+        """Apply orthogonal (grid-aligned) layout."""
+        self._apply_specific_layout(manager, drawing_area, 'orthogonal', 'Orthogonal')
+    
+    def _apply_specific_layout(self, manager, drawing_area, algorithm, algorithm_name):
+        """Apply a specific layout algorithm.
+        
+        Args:
+            manager: ModelCanvasManager instance
+            drawing_area: GtkDrawingArea widget
+            algorithm: Algorithm name ('hierarchical', 'force_directed', etc.)
+            algorithm_name: Human-readable name for messages
+        """
+        try:
+            from shypn.edit.graph_layout import LayoutEngine
+            
+            # Check if there are nodes to layout
+            if not manager.places and not manager.transitions:
+                self._show_layout_message("No objects to layout", drawing_area)
+                return
+            
+            # Create engine and apply layout
+            engine = LayoutEngine(manager)
+            result = engine.apply_layout(algorithm)
+            
+            # Show result
+            message = f"Applied {algorithm_name} layout\nMoved {result['nodes_moved']} objects"
+            self._show_layout_message(message, drawing_area)
+            
+            # Redraw
+            drawing_area.queue_draw()
+            
+        except Exception as e:
+            self._show_layout_message(f"Layout error: {str(e)}", drawing_area)
+    
+    def _show_layout_message(self, message, drawing_area):
+        """Show a temporary message on the status bar or console.
+        
+        Args:
+            message: Message to display
+            drawing_area: GtkDrawingArea widget (for future status bar integration)
+        """
+        # For now, just print to console
+        # Later this can be wired to a status bar
+        print(f"[Graph Layout] {message}")
 
     def _on_object_delete(self, obj, manager, drawing_area):
         """Delete an object from the canvas.
