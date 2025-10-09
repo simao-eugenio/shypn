@@ -77,7 +77,13 @@ class LayoutEngine:
         if self.document_manager is None:
             raise ValueError("Document manager not set")
         
-        doc = self.document_manager.document
+        # Support both ModelCanvasManager (has places/transitions directly)
+        # and DocumentManager (has .document property)
+        if hasattr(self.document_manager, 'document'):
+            doc = self.document_manager.document
+        else:
+            doc = self.document_manager  # ModelCanvasManager IS the document
+        
         graph = nx.DiGraph()
         
         # Add nodes (places and transitions)
@@ -247,7 +253,13 @@ class LayoutEngine:
         Returns:
             Number of nodes moved
         """
-        doc = self.document_manager.document
+        # Support both ModelCanvasManager (has places/transitions directly)
+        # and DocumentManager (has .document property)
+        if hasattr(self.document_manager, 'document'):
+            doc = self.document_manager.document
+        else:
+            doc = self.document_manager  # ModelCanvasManager IS the document
+        
         nodes_moved = 0
         
         # Map node IDs to objects
