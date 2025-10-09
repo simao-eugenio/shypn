@@ -9,7 +9,7 @@ import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk
 from shypn.engine.simulation.settings import SimulationSettings
-from shypn.engine.simulation.conflict import ConflictResolutionPolicy
+from shypn.engine.simulation.conflict_policy import ConflictResolutionPolicy
 from shypn.utils.time_utils import TimeUnits
 
 
