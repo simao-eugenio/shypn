@@ -36,6 +36,7 @@ class SwissKnifeTool(GObject.Object):
         self.tool_id = tool_id
         self.label = label
         self.tooltip = tooltip
+        self._active = False
         
         # Create button
         self._button = Gtk.Button(label=label)
@@ -49,6 +50,26 @@ class SwissKnifeTool(GObject.Object):
     def _on_clicked(self, button):
         """Handle button click - emit activated signal."""
         self.emit('activated', self.tool_id)
+    
+    def set_active(self, active: bool):
+        """Set tool active state and update visual.
+        
+        Args:
+            active: True to activate, False to deactivate
+        """
+        self._active = active
+        if active:
+            self._button.get_style_context().add_class('tool-active')
+        else:
+            self._button.get_style_context().remove_class('tool-active')
+    
+    def is_active(self) -> bool:
+        """Check if tool is active.
+        
+        Returns:
+            bool: True if tool is active
+        """
+        return self._active
     
     def get_button(self):
         """Get the Gtk.Button widget.
@@ -110,6 +131,7 @@ class ToolRegistry:
     def __init__(self):
         """Initialize tool registry."""
         self._tools: Dict[str, SwissKnifeTool] = {}
+        self._active_tool_id: Optional[str] = None
         self._create_tools()
     
     def _create_tools(self):
@@ -117,6 +139,33 @@ class ToolRegistry:
         for tool_id, (label, tooltip) in self.TOOL_DEFINITIONS.items():
             tool = SwissKnifeTool(tool_id, label, tooltip)
             self._tools[tool_id] = tool
+    
+    def set_active_tool(self, tool_id: Optional[str]):
+        """Set active tool and update visuals.
+        
+        Args:
+            tool_id: Tool ID to activate, or None to deactivate all
+        """
+        # Deactivate previous tool
+        if self._active_tool_id:
+            tool = self._tools.get(self._active_tool_id)
+            if tool:
+                tool.set_active(False)
+        
+        # Activate new tool
+        self._active_tool_id = tool_id
+        if tool_id:
+            tool = self._tools.get(tool_id)
+            if tool:
+                tool.set_active(True)
+    
+    def get_active_tool_id(self) -> Optional[str]:
+        """Get currently active tool ID.
+        
+        Returns:
+            str or None: Active tool ID
+        """
+        return self._active_tool_id
     
     def get_tool(self, tool_id: str) -> Optional[SwissKnifeTool]:
         """Get a tool by ID.

@@ -543,6 +543,24 @@ class SwissKnifePalette(GObject.GObject):
         .sub-palette-edit .tool-button.swissknife-tool {
             border-left: 4px solid rgba(41, 128, 185, 1);
         }
+        
+        /* Active Tool Button - Blue highlight with glow */
+        .tool-button.tool-active {
+            background: linear-gradient(to bottom, #3498db 0%, #2980b9 100%);
+            color: white;
+            border-color: #1a5490;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2),
+                        0 0 8px rgba(52, 152, 219, 0.6);
+        }
+        
+        .sub-palette-edit .tool-button.tool-active {
+            background: linear-gradient(to bottom, #3498db 0%, #2980b9 100%);
+            color: white;
+            border-color: #1a5490;
+            border-left: 4px solid #ffffff;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2),
+                        0 0 12px rgba(52, 152, 219, 0.8);
+        }
         """
         
         try:
