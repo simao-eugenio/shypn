@@ -19,7 +19,25 @@ import os
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+# Add shypn to path for model imports
+shypn_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+sys.path.insert(0, shypn_path)
+
 from placeholder_palette import PlaceholderPalette
+
+
+class MockPetriNetModel:
+    """Minimal mock Petri Net model for testing simulation palette.
+    
+    This is a minimal stub to satisfy SimulateToolsPaletteLoader's requirements.
+    It doesn't implement full simulation logic - just enough for the palette to load.
+    """
+    def __init__(self):
+        self.places = []
+        self.transitions = []
+        self.arcs = []
+        self.initial_marking = {}
+        print("[MockModel] Created minimal Petri Net model for testing")
 
 
 class SwissKnifeTestApp(Gtk.Window):
@@ -186,13 +204,25 @@ class SwissKnifeTestApp(Gtk.Window):
         self.log(f"Creating PlaceholderPalette(mode='{self.mode}')")
         
         try:
-            self.palette = PlaceholderPalette(mode=self.mode)
+            # Create mock model for widget palettes (e.g., Simulate)
+            mock_model = MockPetriNetModel()
+            
+            # Create palette with model
+            self.palette = PlaceholderPalette(mode=self.mode, model=mock_model)
             
             # Connect signals
             self.palette.connect('category-selected', self._on_category_selected)
             self.palette.connect('tool-activated', self._on_tool_activated)
             self.palette.connect('sub-palette-shown', self._on_sub_palette_shown)
             self.palette.connect('sub-palette-hidden', self._on_sub_palette_hidden)
+            
+            # Connect mode change signal
+            self.palette.connect('mode-change-requested', self._on_mode_change_requested)
+            
+            # Connect simulation palette signals
+            self.palette.connect('simulation-step-executed', self._on_simulation_step)
+            self.palette.connect('simulation-reset-executed', self._on_simulation_reset)
+            self.palette.connect('simulation-settings-changed', self._on_simulation_settings_changed)
             
             # Attach to overlay
             palette_widget = self.palette.get_widget()
@@ -240,6 +270,22 @@ class SwissKnifeTestApp(Gtk.Window):
         """Log category button click."""
         self.log(f"[SIGNAL] category-selected: '{category_id}'", "signal")
     
+    def _on_mode_change_requested(self, palette, requested_mode):
+        """Handle mode change request from palette.
+        
+        Args:
+            palette: PlaceholderPalette instance
+            requested_mode: 'edit' or 'simulate'
+        """
+        self.log(f"[SIGNAL] mode-change-requested: '{requested_mode}'", "signal")
+        
+        # Check if mode needs to change
+        if requested_mode != self.mode:
+            self.log(f"[MODE CHANGE] Switching from {self.mode} to {requested_mode}", "signal")
+            self._on_switch_mode(None, requested_mode)
+        else:
+            self.log(f"[MODE CHANGE] Already in {requested_mode} mode - showing sub-palette only", "signal")
+    
     def _on_tool_activated(self, palette, tool_id):
         """Log tool activation."""
         self.log(f"[SIGNAL] tool-activated: '{tool_id}'", "tool")
@@ -251,6 +297,18 @@ class SwissKnifeTestApp(Gtk.Window):
     def _on_sub_palette_hidden(self, palette, palette_id):
         """Log sub-palette hide."""
         self.log(f"[SIGNAL] sub-palette-hidden: '{palette_id}'", "signal")
+    
+    def _on_simulation_step(self, palette, time):
+        """Log simulation step."""
+        self.log(f"[SIMULATION] Step executed at time: {time:.3f}s", "animation")
+    
+    def _on_simulation_reset(self, palette):
+        """Log simulation reset."""
+        self.log(f"[SIMULATION] Reset executed", "signal")
+    
+    def _on_simulation_settings_changed(self, palette):
+        """Log simulation settings change."""
+        self.log(f"[SIMULATION] Settings changed", "signal")
     
     def log(self, message, tag=None):
         """Log message to console.

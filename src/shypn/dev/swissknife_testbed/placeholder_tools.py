@@ -81,6 +81,22 @@ def create_edit_mode_tools():
         'undo': PlaceholderTool('undo', 'U', 'Undo (Placeholder)\n\nClick to test signal'),
         'redo': PlaceholderTool('redo', 'R', 'Redo (Placeholder)\n\nClick to test signal'),
         
+        # Simulation Control (Row 0: Buttons)
+        'sim_run': PlaceholderTool('sim_run', 'R', 'Run Button [R]\n\nStart executing the Petri net'),
+        'sim_step': PlaceholderTool('sim_step', 'P', 'Step Button [P]\n\nExecute one simulation step'),
+        'sim_stop': PlaceholderTool('sim_stop', 'S', 'Stop Button [S]\n\nPause execution'),
+        'sim_reset': PlaceholderTool('sim_reset', 'T', 'Reset Button [T]\n\nReset to initial marking'),
+        'sim_settings': PlaceholderTool('sim_settings', '⚙', 'Settings Button [⚙]\n\nConfigure duration, time step, and policies'),
+        
+        # Simulation Controls (Row 1: Duration controls - placeholder representation)
+        'sim_duration_label': PlaceholderTool('sim_duration_label', '[Duration:]', 'Duration Label\n\n(Label widget in real palette)'),
+        'sim_duration_entry': PlaceholderTool('sim_duration_entry', '[60]', 'Duration Entry\n\n(Entry widget in real palette)'),
+        'sim_units_combo': PlaceholderTool('sim_units_combo', '[seconds▼]', 'Time Units Combo\n\n(ComboBoxText in real palette)'),
+        
+        # Simulation Feedback (Row 2 & 3: Progress/Time display - placeholder representation)
+        'sim_progress_bar': PlaceholderTool('sim_progress_bar', '[Progress]', 'Progress Bar\n\n(ProgressBar widget in real palette)'),
+        'sim_time_display': PlaceholderTool('sim_time_display', '[Time: 0.0/60.0s]', 'Time Display\n\n(Label widget in real palette)'),
+        
         # Layout Tools
         'layout_auto': PlaceholderTool('layout_auto', 'Auto', 'Auto Layout (Placeholder)\n\nClick to test signal'),
         'layout_hierarchical': PlaceholderTool('layout_hierarchical', 'Hier', 'Hierarchical Layout (Placeholder)\n\nClick to test signal'),
@@ -135,30 +151,21 @@ def create_simulate_mode_tools():
 # ============================================================================
 
 EDIT_MODE_CATEGORIES = {
-    'create': {
-        'label': 'Create',
-        'tooltip': 'Create Tools\n\nPlace, Transition, Arc',
-        'tools': ['place', 'transition', 'arc']
-    },
     'edit': {
         'label': 'Edit',
-        'tooltip': 'Edit Operations\n\nSelect, Lasso, Undo, Redo',
-        'tools': ['select', 'lasso', 'undo', 'redo']
+        'tooltip': 'Create Tools\n\nPlace, Transition, Arc, Select, Lasso',
+        'tools': ['place', 'transition', 'arc', 'select', 'lasso']
+    },
+    'simulate': {
+        'label': 'Simulate',
+        'tooltip': 'Simulation Tools\n\nReal simulation palette with all controls',
+        'widget_palette': True,  # Flag to indicate this uses a widget palette instead of tool buttons
+        'tools': []  # Empty - will be replaced by SimulateToolsPaletteLoader widget
     },
     'layout': {
         'label': 'Layout',
         'tooltip': 'Layout Tools\n\nAuto, Hierarchical, Force-Directed',
         'tools': ['layout_auto', 'layout_hierarchical', 'layout_force']
-    },
-    'transform': {
-        'label': 'Transform',
-        'tooltip': 'Transform Tools\n\nArc transformations',
-        'tools': ['transform_parallel', 'transform_inhibitor', 'transform_read', 'transform_reset']
-    },
-    'view': {
-        'label': 'View',
-        'tooltip': 'View Tools\n\nZoom, Fit, Center',
-        'tools': ['view_zoom_in', 'view_zoom_out', 'view_fit', 'view_center']
     }
 }
 

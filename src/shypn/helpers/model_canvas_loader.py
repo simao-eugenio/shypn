@@ -46,6 +46,9 @@ try:
     from shypn.edit.palette_manager import PaletteManager
     from shypn.edit.tools_palette_new import ToolsPalette
     from shypn.edit.operations_palette_new import OperationsPalette
+    # SwissKnifePalette - unified palette replacing ToolsPalette + OperationsPalette
+    from shypn.helpers.swissknife_palette import SwissKnifePalette
+    from shypn.helpers.swissknife_tool_registry import ToolRegistry
 except ImportError as e:
     print(f'ERROR: Cannot import new OOP palettes: {e}', file=sys.stderr)
     sys.exit(1)
@@ -341,38 +344,27 @@ class ModelCanvasLoader:
                 self._on_edit_button_toggled, drawing_area
             )
             
-            # Set initial state: Edit mode is default, so show [E] button and hide [S] button
-            if overlay_manager.edit_palette:
-                edit_widget = overlay_manager.edit_palette.get_widget()
-                if edit_widget:
-                    edit_widget.show()
-            if overlay_manager.simulate_palette:
-                sim_widget = overlay_manager.simulate_palette.get_widget()
-                if sim_widget:
-                    sim_widget.hide()
+            # Set initial state: Edit mode is default
+            # Old [E] and [S] buttons no longer exist - removed, replaced by SwissKnifePalette
             
             # Setup new OOP palette system
             self._setup_edit_palettes(overlay_widget, manager, drawing_area, overlay_manager)
 
     def _setup_edit_palettes(self, overlay_widget, canvas_manager, drawing_area, overlay_manager):
-        """Setup new OOP palette system with tools and operations palettes.
+        """Setup new OOP palette system with SwissKnifePalette.
         
-        Palettes are positioned CENTERED horizontally above the [E] button.
-        [E] button is bottom-center with margin_bottom=24.
+        SwissKnifePalette replaces the old ToolsPalette + OperationsPalette + [E] button.
         
         Args:
             overlay_widget: GtkOverlay to attach palettes to.
             canvas_manager: ModelCanvasManager instance for this canvas.
             drawing_area: GtkDrawingArea widget.
-            overlay_manager: CanvasOverlayManager to get [E] button reference.
+            overlay_manager: CanvasOverlayManager instance.
         """
-        # Get [E] button widget as positioning reference
-        edit_button_widget = None
-        if overlay_manager.edit_palette:
-            edit_button_widget = overlay_manager.edit_palette.get_widget()
+        # Old [E] button reference no longer needed - SwissKnifePalette is self-contained
         
-        # Create palette manager with [E] button as reference
-        palette_manager = PaletteManager(overlay_widget, reference_widget=edit_button_widget)
+        # Create palette manager (kept for backward compatibility with old code)
+        palette_manager = PaletteManager(overlay_widget, reference_widget=None)
         self.palette_managers[drawing_area] = palette_manager
         
         # [E] button is at bottom-center: margin_bottom=24, height=36
@@ -403,6 +395,53 @@ class ModelCanvasLoader:
         # Total virtual palette width: 148 + 80 + 194 = 422px
         # This configuration keeps palettes centered above [E] button on any window size!
         
+        # ============================================================
+        # SWISSKNIFE PALETTE - Unified Edit/Simulate/Layout palette
+        # ============================================================
+        # Replaces old ToolsPalette + OperationsPalette
+        # Features:
+        #   - Edit category: P/T/A/S/L tools
+        #   - Simulate category: Widget palette (SimulateToolsPaletteLoader)
+        #   - Layout category: Auto/Hier/Force tools
+        #   - Sub-palettes reveal upward with 600ms animations
+        #   - Dark blue-gray theme matching application style
+        
+        # Create tool registry
+        tool_registry = ToolRegistry()
+        
+        # Create SwissKnifePalette in edit mode
+        # NOTE: canvas_manager IS the model (has places, transitions, arcs attributes)
+        swissknife_palette = SwissKnifePalette(
+            mode='edit',
+            model=canvas_manager,  # canvas_manager itself is the Petri net model
+            tool_registry=tool_registry
+        )
+        
+        # Get palette widget and position it
+        swissknife_widget = swissknife_palette.get_widget()
+        swissknife_widget.set_halign(Gtk.Align.CENTER)
+        swissknife_widget.set_valign(Gtk.Align.END)
+        swissknife_widget.set_margin_bottom(20)  # 20px from bottom
+        swissknife_widget.set_hexpand(False)
+        
+        # Add to overlay
+        overlay_widget.add_overlay(swissknife_widget)
+        
+        # Wire SwissKnifePalette signals
+        swissknife_palette.connect('tool-activated', self._on_swissknife_tool_activated, canvas_manager, drawing_area)
+        swissknife_palette.connect('mode-change-requested', self._on_swissknife_mode_change_requested, canvas_manager, drawing_area)
+        swissknife_palette.connect('simulation-step-executed', self._on_simulation_step, drawing_area)
+        swissknife_palette.connect('simulation-reset-executed', self._on_simulation_reset, drawing_area)
+        swissknife_palette.connect('simulation-settings-changed', self._on_simulation_settings_changed, drawing_area)
+        
+        # Store reference for mode switching
+        if drawing_area not in self.overlay_managers:
+            self.overlay_managers[drawing_area] = type('obj', (object,), {})()
+        self.overlay_managers[drawing_area].swissknife_palette = swissknife_palette
+        
+        # ============================================================
+        # OLD PALETTE CODE - Keeping temporarily for reference
+        # ============================================================
         # Create and register tools palette
         tools_palette = ToolsPalette()
         palette_manager.register_palette(
@@ -414,6 +453,7 @@ class ModelCanvasLoader:
         tools_revealer.set_margin_bottom(68)   # 18px above edit palette (50 + 18)
         tools_revealer.set_margin_end(194 + 80)  # Offset left: operations width + gap
         tools_revealer.set_hexpand(False)      # Don't expand horizontally
+        tools_revealer.hide()  # Hide old palette
         
         # Create and register operations palette
         operations_palette = OperationsPalette()
@@ -426,11 +466,10 @@ class ModelCanvasLoader:
         operations_revealer.set_margin_bottom(68)  # Same vertical position (50 + 18)
         operations_revealer.set_margin_start(148 + 80)  # Offset right: tools width + gap
         operations_revealer.set_hexpand(False)     # Don't expand horizontally
+        operations_revealer.hide()  # Hide old palette
         
-        # Wire tool selection signal
+        # Wire old palette signals (keeping for backward compatibility during transition)
         tools_palette.connect('tool-selected', self._on_palette_tool_selected, canvas_manager, drawing_area)
-        
-        # Wire operations signals
         operations_palette.connect('operation-triggered', self._on_palette_operation_triggered, canvas_manager, drawing_area)
         
         # Wire undo/redo button state updates
@@ -516,6 +555,97 @@ class ModelCanvasLoader:
                 if canvas_manager.undo_manager.redo(canvas_manager):
                     drawing_area.queue_draw()
 
+    # ============================================================
+    # SWISSKNIFE PALETTE SIGNAL HANDLERS - Unified handlers
+    # ============================================================
+    
+    def _on_swissknife_tool_activated(self, palette, tool_id, canvas_manager, drawing_area):
+        """Handle tool activation from SwissKnifePalette.
+        
+        Unified handler for all tool types from SwissKnifePalette:
+        - Drawing tools: place, transition, arc
+        - Selection tools: select, lasso
+        - Layout tools: layout_auto, layout_hierarchical, layout_force
+        
+        This replaces the old _on_palette_tool_selected and _on_palette_operation_triggered handlers.
+        
+        Args:
+            palette: SwissKnifePalette instance
+            tool_id: Tool identifier string
+            canvas_manager: ModelCanvasManager instance
+            drawing_area: GtkDrawingArea widget
+        """
+        # Drawing tools (place, transition, arc)
+        if tool_id in ('place', 'transition', 'arc'):
+            canvas_manager.set_tool(tool_id)
+            drawing_area.queue_draw()
+        
+        # Selection tools
+        elif tool_id == 'select':
+            canvas_manager.clear_tool()
+            drawing_area.queue_draw()
+        
+        elif tool_id == 'lasso':
+            # Lasso selection logic (copied from old _on_palette_operation_triggered)
+            from shypn.edit.lasso_selector import LassoSelector
+            
+            # Get or create lasso state
+            if drawing_area not in self._lasso_state:
+                self._lasso_state[drawing_area] = {
+                    'active': False,
+                    'selector': None
+                }
+            
+            lasso_state = self._lasso_state[drawing_area]
+            
+            # Create LassoSelector instance if needed
+            if lasso_state['selector'] is None:
+                lasso_state['selector'] = LassoSelector(canvas_manager)
+            
+            # Activate lasso mode
+            lasso_state['active'] = True
+            canvas_manager.clear_tool()  # Deactivate other tools
+            
+            drawing_area.queue_draw()
+        
+        # Layout tools (to be implemented in Task 8)
+        elif tool_id == 'layout_auto':
+            print(f"[SwissKnife] Auto layout requested (not yet implemented)")
+            # TODO: canvas_manager.apply_auto_layout()
+            # drawing_area.queue_draw()
+        
+        elif tool_id == 'layout_hierarchical':
+            print(f"[SwissKnife] Hierarchical layout requested (not yet implemented)")
+            # TODO: canvas_manager.apply_hierarchical_layout()
+            # drawing_area.queue_draw()
+        
+        elif tool_id == 'layout_force':
+            print(f"[SwissKnife] Force-directed layout requested (not yet implemented)")
+            # TODO: canvas_manager.apply_force_directed_layout()
+            # drawing_area.queue_draw()
+        
+        else:
+            print(f"[SwissKnife] Unknown tool: {tool_id}")
+    
+    def _on_swissknife_mode_change_requested(self, palette, requested_mode, canvas_manager, drawing_area):
+        """Handle mode change request from SwissKnifePalette.
+        
+        Called when user clicks category buttons that trigger mode changes.
+        Currently, Edit/Simulate/Layout are all in 'edit' mode, so this may not
+        trigger until modes are separated in future.
+        
+        Args:
+            palette: SwissKnifePalette instance
+            requested_mode: 'edit' or 'simulate'
+            canvas_manager: ModelCanvasManager instance
+            drawing_area: GtkDrawingArea widget
+        """
+        print(f"[SwissKnife] Mode change requested: {requested_mode}")
+        # TODO: Implement mode switching logic when needed
+        # current_mode = self._get_current_mode(drawing_area)
+        # if requested_mode != current_mode:
+        #     self._switch_canvas_mode(drawing_area, requested_mode)
+
     def _on_simulation_step(self, palette, time, drawing_area):
         """Handle simulation step - redraw canvas to show updated token state.
         
@@ -547,6 +677,17 @@ class ModelCanvasLoader:
                     panel.needs_update = True
                 else:
                     panel._show_empty_state()
+
+    def _on_simulation_settings_changed(self, palette, drawing_area):
+        """Handle simulation settings change.
+        
+        Args:
+            palette: SimulateToolsPaletteLoader that emitted the signal
+            drawing_area: GtkDrawingArea widget
+        """
+        # Settings changed - may need to update visualization
+        # Currently just redraw the canvas
+        drawing_area.queue_draw()
 
     def _on_mode_changed(self, mode_palette, mode, drawing_area, *args):
         """Handle mode change between edit and simulation.

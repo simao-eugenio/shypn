@@ -103,10 +103,10 @@ class CanvasOverlayManager(BaseOverlayManager):
         
         # Setup all other palettes as overlays
         if self.overlay_widget:
-            # NOTE: Edit palettes (tools/operations) now handled by model_canvas_loader
-            # via new OOP palette system. Keeping this commented for reference.
+            # NOTE: Edit palettes now handled by SwissKnifePalette in model_canvas_loader
+            # Old edit palette ([E] button) no longer needed - replaced by SwissKnifePalette
             # self._setup_edit_palettes()          # OLD - Create tools and operations palettes
-            self._setup_edit_palette()            # Create [E] button to toggle NEW OOP palettes
+            # self._setup_edit_palette()            # OLD - Create [E] button - REPLACED by SwissKnifePalette
             self._setup_simulate_palettes()
             self._setup_mode_palette()
     
@@ -169,8 +169,13 @@ class CanvasOverlayManager(BaseOverlayManager):
             # [E] button starts VISIBLE (edit mode is default) but palettes start hidden
     
     def _setup_simulate_palettes(self):
-        """Create and add simulation mode palettes (simulate + simulate_tools)."""
-        # Create simulate tools palette
+        """Create and add simulation mode palettes (simulate_tools only).
+        
+        NOTE: Old [S] button removed - replaced by SwissKnifePalette's Simulate category.
+        Only the simulate_tools_palette (simulation controls) is kept, as it's used
+        as a widget palette inside SwissKnifePalette.
+        """
+        # Create simulate tools palette - this will be embedded in SwissKnifePalette
         self.simulate_tools_palette = create_simulate_tools_palette(model=self.canvas_manager)
         simulate_tools_widget = self.simulate_tools_palette.get_widget()
         
@@ -178,14 +183,12 @@ class CanvasOverlayManager(BaseOverlayManager):
         # self.simulate_tools_palette.connect('step-executed', callback, drawing_area)
         # self.simulate_tools_palette.connect('reset-executed', callback)
         
-        # Create simulate palette ([S] button)
-        self.simulate_palette = create_simulate_palette()
-        simulate_widget = self.simulate_palette.get_widget()
+        # OLD [S] button removed - now part of SwissKnifePalette
+        # self.simulate_palette = create_simulate_palette()
+        # simulate_widget = self.simulate_palette.get_widget()
+        self.simulate_palette = None  # Set to None to indicate it's not used
         
-        # Wire simulate palette to simulate tools palette
-        self.simulate_palette.set_tools_palette_loader(self.simulate_tools_palette)
-        
-        # Add to overlay
+        # Add simulate tools to overlay (used by SwissKnifePalette as widget palette)
         if simulate_tools_widget:
             self.overlay_widget.add_overlay(simulate_tools_widget)
             self.register_palette('simulate_tools', self.simulate_tools_palette)
@@ -193,11 +196,6 @@ class CanvasOverlayManager(BaseOverlayManager):
             # simulate_tools_widget.hide()  # REMOVED: This prevents revealer from working
             # Instead, ensure revealer starts with reveal-child=False (set in UI file)
             self.simulate_tools_palette.hide()  # Use palette's hide() method which sets reveal-child=False
-        
-        if simulate_widget:
-            self.overlay_widget.add_overlay(simulate_widget)
-            self.register_palette('simulate', self.simulate_palette)
-            simulate_widget.hide()  # Start hidden ([S] button hidden in edit mode)
     
     def _setup_mode_palette(self):
         """Create and add mode palette (edit/simulate mode switcher)."""
