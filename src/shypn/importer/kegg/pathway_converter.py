@@ -155,3 +155,98 @@ def convert_pathway(pathway: KEGGPathway,
     
     converter = PathwayConverter()
     return converter.convert(pathway, options)
+
+
+def convert_pathway_enhanced(pathway: KEGGPathway,
+                            coordinate_scale: float = 2.5,
+                            include_cofactors: bool = True,
+                            split_reversible: bool = False,
+                            add_initial_marking: bool = False,
+                            enhancement_options: 'EnhancementOptions' = None) -> DocumentModel:
+    """Convert pathway with optional post-processing enhancements.
+    
+    This function extends convert_pathway() with an optional enhancement
+    pipeline that applies post-processing to improve the Petri net:
+    - Layout optimization (reduce overlaps)
+    - Arc routing (add curved arcs)
+    - Metadata enrichment (KEGG data)
+    - Visual validation (optional)
+    
+    Args:
+        pathway: Parsed KEGG pathway
+        coordinate_scale: Coordinate scaling factor
+        include_cofactors: Include common cofactors
+        split_reversible: Split reversible reactions into two transitions
+        add_initial_marking: Add initial tokens to places
+        enhancement_options: Options for post-processing pipeline.
+            If None, standard enhancements are applied.
+            Set enable_enhancements=False to skip all enhancements.
+        
+    Returns:
+        DocumentModel (optionally enhanced)
+        
+    Example:
+        >>> from shypn.importer.kegg import fetch_pathway, parse_kgml, convert_pathway_enhanced
+        >>> from shypn.pathway import EnhancementOptions
+        >>> 
+        >>> kgml = fetch_pathway("hsa00010")
+        >>> pathway = parse_kgml(kgml)
+        >>> 
+        >>> # With standard enhancements
+        >>> options = EnhancementOptions.get_standard_options()
+        >>> document = convert_pathway_enhanced(pathway, enhancement_options=options)
+        >>> 
+        >>> # With custom enhancements
+        >>> options = EnhancementOptions(
+        ...     enable_layout_optimization=True,
+        ...     enable_arc_routing=False,
+        ...     layout_min_spacing=80.0
+        ... )
+        >>> document = convert_pathway_enhanced(pathway, enhancement_options=options)
+    """
+    # Standard conversion
+    document = convert_pathway(
+        pathway=pathway,
+        coordinate_scale=coordinate_scale,
+        include_cofactors=include_cofactors,
+        split_reversible=split_reversible,
+        add_initial_marking=add_initial_marking
+    )
+    
+    # Apply enhancements if requested
+    if enhancement_options is None:
+        # Import here to avoid circular dependencies
+        from shypn.pathway.options import EnhancementOptions
+        enhancement_options = EnhancementOptions.get_standard_options()
+    
+    if enhancement_options.enable_enhancements:
+        from shypn.pathway.pipeline import EnhancementPipeline
+        from shypn.pathway.layout_optimizer import LayoutOptimizer
+        from shypn.pathway.arc_router import ArcRouter
+        from shypn.pathway.metadata_enhancer import MetadataEnhancer
+        from shypn.pathway.visual_validator import VisualValidator
+        
+        # Build pipeline
+        pipeline = EnhancementPipeline(enhancement_options)
+        
+        # Add enabled processors
+        if enhancement_options.enable_layout_optimization:
+            pipeline.add_processor(LayoutOptimizer(enhancement_options))
+        
+        if enhancement_options.enable_arc_routing:
+            pipeline.add_processor(ArcRouter(enhancement_options))
+        
+        if enhancement_options.enable_metadata_enhancement:
+            pipeline.add_processor(MetadataEnhancer(enhancement_options))
+        
+        if enhancement_options.enable_visual_validation:
+            pipeline.add_processor(VisualValidator(enhancement_options))
+        
+        # Process document through pipeline
+        document = pipeline.process(document, pathway)
+        
+        # Print report if verbose
+        if enhancement_options.verbose:
+            pipeline.print_report()
+    
+    return document
