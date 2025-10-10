@@ -162,13 +162,21 @@ class ModelCanvasLoader:
                 else:
                     pass
         if self.right_panel_loader and drawing_area:
-            # Get simulate_tools_palette from overlay manager
+            # Get simulate_tools_palette from SwissKnife widget_palette_instances
+            # NOTE: SimulateToolsPaletteLoader is embedded inside SwissKnifePalette,
+            # not stored directly in overlay_manager
             if drawing_area in self.overlay_managers:
                 overlay_manager = self.overlay_managers[drawing_area]
-                simulate_tools_palette = overlay_manager.get_palette('simulate_tools')
-                if simulate_tools_palette and hasattr(simulate_tools_palette, 'data_collector'):
-                    data_collector = simulate_tools_palette.data_collector
-                    self.right_panel_loader.set_data_collector(data_collector)
+                
+                # SwissKnifePalette stores SimulateToolsPaletteLoader in widget_palette_instances
+                if hasattr(overlay_manager, 'swissknife_palette'):
+                    swissknife = overlay_manager.swissknife_palette
+                    if hasattr(swissknife, 'widget_palette_instances'):
+                        simulate_tools_palette = swissknife.widget_palette_instances.get('simulate')
+                        if simulate_tools_palette and hasattr(simulate_tools_palette, 'data_collector'):
+                            data_collector = simulate_tools_palette.data_collector
+                            self.right_panel_loader.set_data_collector(data_collector)
+                            print(f"[DataCollector] Connected to right panel: {data_collector}")
             if drawing_area in self.canvas_managers:
                 manager = self.canvas_managers[drawing_area]
                 self.right_panel_loader.set_model(manager)
@@ -1930,9 +1938,14 @@ class ModelCanvasLoader:
             data_collector = None
             if drawing_area in self.overlay_managers:
                 overlay_manager = self.overlay_managers[drawing_area]
-                simulate_tools = overlay_manager.get_palette('simulate_tools')
-                if simulate_tools and hasattr(simulate_tools, 'data_collector'):
-                    data_collector = simulate_tools.data_collector
+                
+                # Get from SwissKnifePalette widget_palette_instances
+                if hasattr(overlay_manager, 'swissknife_palette'):
+                    swissknife = overlay_manager.swissknife_palette
+                    if hasattr(swissknife, 'widget_palette_instances'):
+                        simulate_tools = swissknife.widget_palette_instances.get('simulate')
+                        if simulate_tools and hasattr(simulate_tools, 'data_collector'):
+                            data_collector = simulate_tools.data_collector
             dialog_loader = create_transition_prop_dialog(obj, parent_window=self.parent_window, persistency_manager=self.persistency, model=manager, data_collector=data_collector)
         elif isinstance(obj, Arc):
             dialog_loader = create_arc_prop_dialog(obj, parent_window=self.parent_window, persistency_manager=self.persistency)
