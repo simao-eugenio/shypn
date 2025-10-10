@@ -92,6 +92,11 @@ class KEGGImportPanel:
         self.scale_spin = self.builder.get_object('scale_spin')
         self.include_relations_check = self.builder.get_object('include_relations_check')
         
+        # Enhancement options widgets
+        self.enhancement_layout_check = self.builder.get_object('enhancement_layout_check')
+        self.enhancement_arcs_check = self.builder.get_object('enhancement_arcs_check')
+        self.enhancement_metadata_check = self.builder.get_object('enhancement_metadata_check')
+        
         # Preview and status
         self.preview_text = self.builder.get_object('preview_text')
         self.import_status_label = self.builder.get_object('import_status_label')
@@ -248,14 +253,27 @@ class KEGGImportPanel:
             filter_cofactors = self.filter_cofactors_check.get_active()
             coordinate_scale = self.scale_spin.get_value()
             
-            # Convert pathway to DocumentModel
-            from shypn.importer.kegg.converter_base import ConversionOptions
-            options = ConversionOptions(
-                include_cofactors=filter_cofactors,  # Note: UI says "filter" but option is "include"
-                coordinate_scale=coordinate_scale
+            # Get enhancement options from UI
+            enable_layout = self.enhancement_layout_check.get_active() if self.enhancement_layout_check else True
+            enable_arcs = self.enhancement_arcs_check.get_active() if self.enhancement_arcs_check else True
+            enable_metadata = self.enhancement_metadata_check.get_active() if self.enhancement_metadata_check else True
+            
+            # Create enhancement options
+            from shypn.pathway.options import EnhancementOptions
+            enhancement_options = EnhancementOptions(
+                enable_layout_optimization=enable_layout,
+                enable_arc_routing=enable_arcs,
+                enable_metadata_enhancement=enable_metadata
             )
             
-            document_model = self.converter.convert(self.current_pathway, options)
+            # Convert pathway to DocumentModel with enhancements
+            from shypn.importer.kegg.pathway_converter import convert_pathway_enhanced
+            document_model = convert_pathway_enhanced(
+                self.current_pathway,
+                coordinate_scale=coordinate_scale,
+                include_cofactors=filter_cofactors,
+                enhancement_options=enhancement_options
+            )
             
             # Load into canvas using the same method as file operations
             if self.model_canvas:
