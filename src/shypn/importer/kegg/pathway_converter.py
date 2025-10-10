@@ -36,14 +36,34 @@ class StandardConversionStrategy(ConversionStrategy):
         document = DocumentModel()
         
         # Phase 1: Create places from compounds
+        # Strategy: Only create places for compounds used in reactions
         place_map: Dict[str, Place] = {}
-        compounds = pathway.get_compounds()
         
-        for entry in compounds:
-            if self.compound_mapper.should_include(entry, options):
-                place = self.compound_mapper.create_place(entry, options)
-                document.places.append(place)
-                place_map[entry.id] = place
+        if options.filter_isolated_compounds:
+            # Build set of compound entry IDs that are actually used in reactions
+            used_compound_ids = set()
+            for reaction in pathway.reactions:
+                for substrate in reaction.substrates:
+                    used_compound_ids.add(substrate.id)
+                for product in reaction.products:
+                    used_compound_ids.add(product.id)
+            
+            # Only create places for compounds used in reactions
+            compounds = pathway.get_compounds()
+            for entry in compounds:
+                if entry.id in used_compound_ids:
+                    if self.compound_mapper.should_include(entry, options):
+                        place = self.compound_mapper.create_place(entry, options)
+                        document.places.append(place)
+                        place_map[entry.id] = place
+        else:
+            # Create places for all compounds (old behavior when filtering disabled)
+            compounds = pathway.get_compounds()
+            for entry in compounds:
+                if self.compound_mapper.should_include(entry, options):
+                    place = self.compound_mapper.create_place(entry, options)
+                    document.places.append(place)
+                    place_map[entry.id] = place
         
         
         # Phase 2: Create transitions and arcs from reactions
@@ -59,25 +79,6 @@ class StandardConversionStrategy(ConversionStrategy):
                     reaction, transition, place_map, pathway, options
                 )
                 document.arcs.extend(arcs)
-        
-        
-        # Phase 3: Filter out isolated places (compounds not involved in any reaction)
-        if options.filter_isolated_compounds:
-            # Build set of place IDs that have at least one arc
-            connected_place_ids = set()
-            for arc in document.arcs:
-                if arc.source_id.startswith('P'):  # Place ID
-                    connected_place_ids.add(arc.source_id)
-                if arc.target_id.startswith('P'):  # Place ID
-                    connected_place_ids.add(arc.target_id)
-            
-            # Keep only connected places
-            original_place_count = len(document.places)
-            document.places = [p for p in document.places if p.id in connected_place_ids]
-            
-            if original_place_count > len(document.places):
-                isolated_count = original_place_count - len(document.places)
-                # Note: Could add logging here if verbose mode is enabled
         
         
         # Update ID counters
