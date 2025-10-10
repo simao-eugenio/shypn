@@ -549,14 +549,6 @@ class ModelCanvasManager:
         
         return None
     
-    def get_all_objects(self):
-        """Get all Petri net objects in the model.
-        
-        Returns:
-            list: All places, transitions, and arcs combined
-        """
-        return self.places + self.transitions + self.arcs
-    
     def clear_all_selections(self):
         """Clear selection state on all objects.
         
