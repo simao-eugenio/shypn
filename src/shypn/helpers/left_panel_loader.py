@@ -131,8 +131,10 @@ class LeftPanelLoader:
             pass  # Continue anyway - panel will work without file explorer
         
         # Initialize project actions controller (handles all project management)
+        # CRITICAL: Don't set parent_window here - it will be set when panel attaches/floats
+        # This prevents dialogs from using the (hidden) panel window as parent
         try:
-            self.project_controller = ProjectActionsController(self.builder, parent_window=self.window)
+            self.project_controller = ProjectActionsController(self.builder, parent_window=None)
             # Set integration callbacks (minimal - just update file explorer navigation)
             self.project_controller.on_project_created = self._on_project_created
             self.project_controller.on_project_opened = self._on_project_opened
@@ -217,9 +219,19 @@ class LeftPanelLoader:
             if self.parent_container:
                 self.parent_container.set_visible(False)
         
-        # Set as transient for parent if provided
-        if parent_window:
-            self.window.set_transient_for(parent_window)
+        # WAYLAND FIX: Set floating window as transient for main window
+        # Use stored parent if not provided
+        parent = parent_window if parent_window else self.parent_window
+        if parent:
+            self.window.set_transient_for(parent)
+        
+        # CRITICAL: Dialogs should use MAIN WINDOW as parent, not floating panel window
+        # This ensures dialogs attach to the main window (which is always visible)
+        # rather than the floating panel window
+        if parent and self.project_controller:
+            self.project_controller.set_parent_window(parent)
+        if parent and self.file_explorer and hasattr(self.file_explorer, 'persistency') and self.file_explorer.persistency:
+            self.file_explorer.persistency.parent_window = parent
         
         # Update float button state
         if self.float_button and not self.float_button.get_active():
@@ -259,6 +271,9 @@ class LeftPanelLoader:
             # CRITICAL: Update project controller's parent window so dialogs attach to main window
             if self.project_controller:
                 self.project_controller.set_parent_window(parent_window)
+            # WAYLAND FIX: Also update file explorer persistency parent window
+            if self.file_explorer and hasattr(self.file_explorer, 'persistency') and self.file_explorer.persistency:
+                self.file_explorer.persistency.parent_window = parent_window
         self.parent_container = container
         
         # Extract content from window first

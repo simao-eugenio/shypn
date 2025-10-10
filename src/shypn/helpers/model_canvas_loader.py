@@ -882,8 +882,10 @@ class ModelCanvasLoader:
                     widget.queue_draw()
                 except ValueError as e:
                     # Show error dialog instead of silent failure
+                    # Defensive check for parent window (Wayland compatibility)
+                    parent = self.parent_window if self.parent_window else None
                     dialog = Gtk.MessageDialog(
-                        transient_for=self.parent_window,
+                        transient_for=parent,
                         flags=0,
                         message_type=Gtk.MessageType.ERROR,
                         buttons=Gtk.ButtonsType.OK,
@@ -1396,7 +1398,8 @@ class ModelCanvasLoader:
         if hasattr(self, 'canvas_context_menus'):
             menu = self.canvas_context_menus.get(drawing_area)
             if menu:
-                menu.popup(None, None, None, None, 3, Gtk.get_current_event_time())
+                # Use popup_at_pointer() instead of deprecated popup() for Wayland compatibility
+                menu.popup_at_pointer(None)
 
     def _show_object_context_menu(self, x, y, drawing_area, manager, obj):
         """Show object-specific context menu.
@@ -1506,7 +1509,10 @@ class ModelCanvasLoader:
             menu.append(menu_item)
         if self.context_menu_handler:
             self.context_menu_handler.add_analysis_menu_items(menu, obj)
-        menu.popup(None, None, None, None, 3, Gtk.get_current_event_time())
+        # Attach menu to drawing_area for proper Wayland parent window handling
+        menu.attach_to_widget(drawing_area, None)
+        # Use popup_at_pointer() instead of deprecated popup() for Wayland compatibility
+        menu.popup_at_pointer(None)
 
     def get_canvas_manager(self, drawing_area=None):
         """Get the canvas manager for a drawing area.
@@ -1629,6 +1635,8 @@ class ModelCanvasLoader:
             manager: ModelCanvasManager instance.
         """
         menu = Gtk.Menu()
+        # Attach menu to drawing_area for proper Wayland parent window handling
+        menu.attach_to_widget(drawing_area, None)
         menu_items = [('Reset Zoom (100%)', lambda: self._on_reset_zoom_clicked(menu, drawing_area, manager)), ('Zoom In', lambda: self._on_zoom_in_clicked(menu, drawing_area, manager)), ('Zoom Out', lambda: self._on_zoom_out_clicked(menu, drawing_area, manager)), ('Fit to Window', lambda: self._on_fit_to_window_clicked(menu, drawing_area, manager)), None, ('Grid: Line Style', lambda: self._on_grid_line_clicked(menu, drawing_area, manager)), ('Grid: Dot Style', lambda: self._on_grid_dot_clicked(menu, drawing_area, manager)), ('Grid: Cross Style', lambda: self._on_grid_cross_clicked(menu, drawing_area, manager)), None, ('Layout: Auto (Best)', lambda: self._on_layout_auto_clicked(menu, drawing_area, manager)), ('Layout: Hierarchical', lambda: self._on_layout_hierarchical_clicked(menu, drawing_area, manager)), ('Layout: Force-Directed', lambda: self._on_layout_force_clicked(menu, drawing_area, manager)), ('Layout: Circular', lambda: self._on_layout_circular_clicked(menu, drawing_area, manager)), ('Layout: Orthogonal', lambda: self._on_layout_orthogonal_clicked(menu, drawing_area, manager)), None, ('Center View', lambda: self._on_center_view_clicked(menu, drawing_area, manager)), ('Clear Canvas', lambda: self._on_clear_canvas_clicked(menu, drawing_area, manager))]
         for item_data in menu_items:
             if item_data is None:

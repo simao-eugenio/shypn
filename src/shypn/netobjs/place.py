@@ -122,6 +122,9 @@ class Place(PetriNetObject):
         cr.move_to(text_x, text_y)
         cr.show_text(text)
         cr.fill()
+        
+        # Clear path to prevent spurious lines to text position
+        cr.new_path()
     
     def _render_label(self, cr, x: float, y: float, radius: float, zoom: float = 1.0):
         """Render text label below the place.
@@ -138,6 +141,9 @@ class Place(PetriNetObject):
         extents = cr.text_extents(self.label)
         cr.move_to(x - extents.width / 2, y + radius + 15 / zoom)
         cr.show_text(self.label)
+        
+        # Clear path to prevent spurious lines to text position
+        cr.new_path()
     
     def contains_point(self, x: float, y: float) -> bool:
         """Check if a point is inside this place.

@@ -72,6 +72,18 @@ class StandardArcBuilder(ArcBuilder):
                 # Substrate place not included (e.g., filtered cofactor)
                 continue
             
+            # VALIDATION: Ensure bipartite property (Place → Transition)
+            if not isinstance(place, Place):
+                raise ValueError(
+                    f"Invalid arc source: {substrate.id} is not a Place. "
+                    f"Got {type(place).__name__} instead."
+                )
+            if not isinstance(transition, Transition):
+                raise ValueError(
+                    f"Invalid arc target: {transition.id} is not a Transition. "
+                    f"Got {type(transition).__name__} instead."
+                )
+            
             # Create arc from place to transition
             arc_id = f"A{self.arc_counter}"
             self.arc_counter += 1
@@ -111,6 +123,18 @@ class StandardArcBuilder(ArcBuilder):
             if place is None:
                 # Product place not included (e.g., filtered cofactor)
                 continue
+            
+            # VALIDATION: Ensure bipartite property (Transition → Place)
+            if not isinstance(transition, Transition):
+                raise ValueError(
+                    f"Invalid arc source: {transition.id} is not a Transition. "
+                    f"Got {type(transition).__name__} instead."
+                )
+            if not isinstance(place, Place):
+                raise ValueError(
+                    f"Invalid arc target: {product.id} is not a Place. "
+                    f"Got {type(place).__name__} instead."
+                )
             
             # Create arc from transition to place
             arc_id = f"A{self.arc_counter}"

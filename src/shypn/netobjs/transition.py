@@ -267,6 +267,9 @@ class Transition(PetriNetObject):
             cr.move_to(x + height / 2 + 5 / zoom, y + extents.height / 2)
         
         cr.show_text(self.label)
+        
+        # Clear path to prevent spurious lines to text position
+        cr.new_path()
     
     def contains_point(self, x: float, y: float) -> bool:
         """Check if a point is inside this transition.

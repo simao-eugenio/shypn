@@ -81,6 +81,11 @@ def main(argv=None):
 		if geom.get('maximized', False):
 			window.maximize()
 		
+		# WAYLAND FIX: Realize window early to establish window surface
+		# This ensures parent window is available for dialogs/menus during initialization
+		window.realize()
+		print("[Main] Window realized (Wayland surface established)")
+		
 		# Add double-click on header bar to toggle maximize
 		header_bar = main_builder.get_object('header_bar')
 		if header_bar:
@@ -242,6 +247,17 @@ def main(argv=None):
 		left_toggle = main_builder.get_object('left_panel_toggle')
 		right_toggle = main_builder.get_object('right_panel_toggle')
 		pathway_toggle = main_builder.get_object('pathway_panel_toggle')
+
+		# WAYLAND FIX: Present window BEFORE defining complex callbacks
+		# This ensures the window is fully shown and its Wayland surface is active
+		# before GTK tries to process any events that might create child widgets
+		if isinstance(window, Gtk.ApplicationWindow):
+			window.set_application(a)
+			window.show_all()  # Show all widgets
+		else:
+			w = Gtk.ApplicationWindow(application=a)
+			w.add(window)  # GTK3 uses add() instead of set_child()
+			window.show_all()  # Show all widgets
 
 		# Define toggle handlers (needed for callbacks to reference)
 		def on_left_toggle(button):
@@ -467,8 +483,10 @@ def main(argv=None):
 					# This will prompt the user for each dirty document
 					if persistency and persistency.is_dirty:
 						# Prompt user about unsaved changes
+						# Defensive check for parent window (Wayland compatibility)
+						parent = window if window else None
 						dialog = Gtk.MessageDialog(
-							parent=window,
+							parent=parent,
 							modal=True,
 							message_type=Gtk.MessageType.WARNING,
 							buttons=Gtk.ButtonsType.NONE,
@@ -529,14 +547,8 @@ def main(argv=None):
 		
 		window.connect('delete-event', on_window_delete)
 
-		# Set up and present the window
-		if isinstance(window, Gtk.ApplicationWindow):
-			window.set_application(a)
-			window.present()
-		else:
-			w = Gtk.ApplicationWindow(application=a)
-			w.add(window)  # GTK3 uses add() instead of set_child()
-			w.present()
+		# Window already presented earlier (before toggle handlers)
+		# This was moved up to fix Wayland initialization timing
 
 	app.connect('activate', on_activate)
 	

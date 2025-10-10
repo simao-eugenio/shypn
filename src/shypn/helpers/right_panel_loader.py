@@ -298,9 +298,13 @@ class RightPanelLoader:
             if self.parent_container:
                 self.parent_container.set_visible(False)
         
-        # Set as transient for parent if provided
-        if parent_window:
-            self.window.set_transient_for(parent_window)
+        # WAYLAND FIX: Always set parent, use stored parent if not provided
+        parent = parent_window if parent_window else self.parent_window
+        if parent:
+            self.window.set_transient_for(parent)
+        else:
+            # No parent available - try to set to None explicitly
+            self.window.set_transient_for(None)
         
         # Update float button state
         if self.float_button and not self.float_button.get_active():
