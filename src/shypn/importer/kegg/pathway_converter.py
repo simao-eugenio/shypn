@@ -1,10 +1,14 @@
 """Main pathway converter implementation."""
 
+import logging
 from typing import Dict
 from shypn.data.canvas.document_model import DocumentModel
-from shypn.netobjs import Place
+from shypn.netobjs import Place, Transition
 from .converter_base import ConversionStrategy, ConversionOptions
 from .models import KEGGPathway
+
+# Set up logging
+logger = logging.getLogger(__name__)
 
 
 class StandardConversionStrategy(ConversionStrategy):
@@ -89,8 +93,88 @@ class StandardConversionStrategy(ConversionStrategy):
         if document.arcs:
             document._next_arc_id = len(document.arcs) + 1
         
+        # VALIDATION: Ensure bipartite property
+        self._validate_bipartite_property(document, pathway)
+        
+        # LOGGING: Log conversion statistics
+        self._log_conversion_statistics(document, pathway)
         
         return document
+    
+    def _validate_bipartite_property(self, document: DocumentModel, pathway: KEGGPathway):
+        """Validate that all arcs satisfy bipartite property.
+        
+        This is a critical validation step to ensure the Petri net structure
+        is correct. All arcs must be either Place→Transition or Transition→Place.
+        
+        Args:
+            document: DocumentModel to validate
+            pathway: Original KEGG pathway (for error messages)
+            
+        Raises:
+            ValueError: If any arc violates bipartite property
+        """
+        invalid_arcs = []
+        
+        for arc in document.arcs:
+            source_type = type(arc.source).__name__
+            target_type = type(arc.target).__name__
+            
+            # Check for place-to-place (INVALID)
+            if isinstance(arc.source, Place) and isinstance(arc.target, Place):
+                invalid_arcs.append((
+                    arc,
+                    "Place→Place",
+                    f"{arc.source.label} → {arc.target.label}"
+                ))
+            
+            # Check for transition-to-transition (INVALID)
+            elif isinstance(arc.source, Transition) and isinstance(arc.target, Transition):
+                invalid_arcs.append((
+                    arc,
+                    "Transition→Transition",
+                    f"{arc.source.label} → {arc.target.label}"
+                ))
+        
+        if invalid_arcs:
+            error_msg = f"Bipartite property violation in pathway {pathway.name}:\n"
+            for arc, violation_type, arc_str in invalid_arcs:
+                error_msg += f"  - {violation_type}: {arc_str} (Arc ID: {arc.id})\n"
+            error_msg += "\nPetri nets must be bipartite: only Place↔Transition connections allowed."
+            
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+    
+    def _log_conversion_statistics(self, document: DocumentModel, pathway: KEGGPathway):
+        """Log conversion statistics for debugging and monitoring.
+        
+        Args:
+            document: Converted DocumentModel
+            pathway: Original KEGG pathway
+        """
+        logger.info(f"Conversion complete for pathway: {pathway.name} ({pathway.title})")
+        logger.info(f"  KEGG entries: {len(pathway.entries)}")
+        logger.info(f"  KEGG reactions: {len(pathway.reactions)}")
+        logger.info(f"  KEGG relations: {len(pathway.relations)} (NOT converted - metadata only)")
+        logger.info(f"  Petri net places: {len(document.places)}")
+        logger.info(f"  Petri net transitions: {len(document.transitions)}")
+        logger.info(f"  Petri net arcs: {len(document.arcs)}")
+        
+        # Log arc breakdown
+        place_to_trans = sum(1 for arc in document.arcs 
+                            if isinstance(arc.source, Place) and isinstance(arc.target, Transition))
+        trans_to_place = sum(1 for arc in document.arcs 
+                            if isinstance(arc.source, Transition) and isinstance(arc.target, Place))
+        
+        logger.info(f"  Arc breakdown:")
+        logger.info(f"    Place→Transition: {place_to_trans}")
+        logger.info(f"    Transition→Place: {trans_to_place}")
+        
+        # Validation check
+        if place_to_trans + trans_to_place != len(document.arcs):
+            logger.warning(f"    ⚠ Arc count mismatch detected!")
+        
+        logger.debug(f"  Bipartite property: ✓ VALID")
 
 
 class PathwayConverter:

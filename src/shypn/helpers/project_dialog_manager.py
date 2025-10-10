@@ -66,9 +66,11 @@ class ProjectDialogManager:
             dialog = self.builder.get_object('new_project_dialog')
             if not dialog:
                 return None
-                
-            if self.parent_window:
-                dialog.set_transient_for(self.parent_window)
+            
+            # Wayland compatibility: Always set parent (explicitly None if not available)
+            parent = self.parent_window if self.parent_window else None
+            if parent:
+                dialog.set_transient_for(parent)
                 dialog.set_modal(True)
             
             # Ensure dialog is realized before showing (Wayland fix)
@@ -159,8 +161,10 @@ class ProjectDialogManager:
         self._load_builder()
         
         dialog = self.builder.get_object('open_project_dialog')
-        if self.parent_window:
-            dialog.set_transient_for(self.parent_window)
+        # Wayland compatibility: Always set parent (explicitly None if not available)
+        parent = self.parent_window if self.parent_window else None
+        if parent:
+            dialog.set_transient_for(parent)
         
         # Get widgets
         notebook = self.builder.get_object('open_project_notebook')
@@ -338,8 +342,10 @@ class ProjectDialogManager:
         self._load_builder()
         
         dialog = self.builder.get_object('project_properties_dialog')
-        if self.parent_window:
-            dialog.set_transient_for(self.parent_window)
+        # Wayland compatibility: Always set parent (explicitly None if not available)
+        parent = self.parent_window if self.parent_window else None
+        if parent:
+            dialog.set_transient_for(parent)
         
         # Get widgets
         name_entry = self.builder.get_object('props_project_name_entry')

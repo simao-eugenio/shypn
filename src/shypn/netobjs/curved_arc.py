@@ -12,16 +12,7 @@ from shypn.netobjs.arc import Arc
 class CurvedArc(Arc):
     """Arc rendered with a bezier curve path.
     
-    Uses quad        # Draw text
-        cr.move_to(text_x, text_y)
-        cr.set_source_rgb(0, 0, 0)
-        cr.show_text(text)
-        
-        # Clear the current path to avoid artifacts
-        cr.new_path()
-        
-        # Restore context (clear any paths/state)
-        cr.restore()ezier curve with automatic control point calculation:
+    Uses quadratic bezier curve with automatic control point calculation:
     - Control point at midpoint perpendicular to straight line
     - Offset is 20% of line length (configurable)
     - Keeps two-line arrowhead from Arc base class
@@ -397,6 +388,9 @@ class CurvedArc(Arc):
         cr.move_to(text_x, text_y)
         cr.set_source_rgb(0, 0, 0)  # Black text
         cr.show_text(text)
+        
+        # Clear the current path to avoid artifacts
+        cr.new_path()
         
         # Restore context (clear any paths/state)
         cr.restore()

@@ -161,6 +161,8 @@ class FileExplorerPanel:
         - Focus management
         """
         self.context_menu = Gtk.Menu()
+        # Attach menu to tree_view for proper Wayland parent window handling
+        self.context_menu.attach_to_widget(self.tree_view, None)
         menu_items = [('Open', self._on_context_open_clicked), ('New File', self._on_context_new_file_clicked), ('New Folder', self._on_context_new_folder_clicked), ('---', None), ('Rename', self._on_rename_clicked), ('Delete', self._on_delete_clicked), ('---', None), ('Refresh', self._on_refresh_clicked), ('Properties', self._on_properties_clicked)]
         for label, callback in menu_items:
             if label == '---':
@@ -374,7 +376,8 @@ class FileExplorerPanel:
                 self.selected_item_name = os.path.basename(self.explorer.current_path)
                 self.selected_item_path = self.explorer.current_path
                 self.selected_item_is_dir = True
-            self.context_menu.popup(None, None, None, None, event.button, event.time)
+            # Use popup_at_pointer() instead of deprecated popup() for Wayland compatibility
+            self.context_menu.popup_at_pointer(event)
             return True
         return False
 
@@ -720,9 +723,9 @@ class FileExplorerPanel:
     def _show_new_folder_dialog(self):
         """Show dialog to create a new folder."""
         window = self.tree_view.get_toplevel()
-        dialog = Gtk.Dialog()
-        dialog.set_title('New Folder')
-        dialog.set_transient_for(window)
+        # Ensure window is valid before use (required for Wayland)
+        parent = window if isinstance(window, Gtk.Window) else None
+        dialog = Gtk.Dialog(title='New Folder', transient_for=parent, modal=True)
         dialog.set_modal(True)
         dialog.set_default_size(300, -1)
         dialog.add_button('Cancel', Gtk.ResponseType.CANCEL)
@@ -759,9 +762,9 @@ class FileExplorerPanel:
     def _show_rename_dialog(self):
         """Show dialog to rename selected item."""
         window = self.tree_view.get_toplevel()
-        dialog = Gtk.Dialog()
-        dialog.set_title('Rename')
-        dialog.set_transient_for(window)
+        # Ensure window is valid before use (required for Wayland)
+        parent = window if isinstance(window, Gtk.Window) else None
+        dialog = Gtk.Dialog(title='Rename', transient_for=parent, modal=True)
         dialog.set_modal(True)
         dialog.set_default_size(300, -1)
         dialog.add_button('Cancel', Gtk.ResponseType.CANCEL)
@@ -798,7 +801,9 @@ class FileExplorerPanel:
     def _show_delete_confirmation(self):
         """Show confirmation dialog for delete operation."""
         window = self.tree_view.get_toplevel()
-        dialog = Gtk.MessageDialog(transient_for=window, modal=True, message_type=Gtk.MessageType.WARNING, buttons=Gtk.ButtonsType.YES_NO, text=f"Delete '{self.selected_item_name}'?")
+        # Ensure window is valid before use (required for Wayland)
+        parent = window if isinstance(window, Gtk.Window) else None
+        dialog = Gtk.MessageDialog(transient_for=parent, modal=True, message_type=Gtk.MessageType.WARNING, buttons=Gtk.ButtonsType.YES_NO, text=f"Delete '{self.selected_item_name}'?")
         if self.selected_item_is_dir:
             dialog.set_property('secondary-text', 'This folder will be deleted. Only empty folders can be deleted.')
         else:
@@ -823,9 +828,9 @@ class FileExplorerPanel:
         if not info:
             return
         window = self.tree_view.get_toplevel()
-        dialog = Gtk.Dialog()
-        dialog.set_title(f"Properties - {info['name']}")
-        dialog.set_transient_for(window)
+        # Ensure window is valid before use (required for Wayland)
+        parent = window if isinstance(window, Gtk.Window) else None
+        dialog = Gtk.Dialog(title=f"Properties - {info['name']}", transient_for=parent, modal=True)
         dialog.set_modal(True)
         dialog.set_default_size(400, -1)
         dialog.add_button('Close', Gtk.ResponseType.CLOSE)
