@@ -2,7 +2,52 @@
 
 **Date**: October 10, 2025  
 **Issue**: User observed direct lines connecting compounds (places) to other compounds (places)  
-**Status**: ✅ RESOLVED - Current code correct, issue was from old/legacy conversion
+**Status**: ✅ **RESOLVED** - Tiny invisible transitions causing visual illusion  
+**Fix Date**: October 10, 2025  
+
+## Final Resolution
+
+### Root Cause: Tiny Invisible Transitions
+
+**The "place-to-place" lines were an optical illusion!**
+
+The lines were **NOT** invalid Place→Place connections. They were valid **Place→Transition→Place** paths where the transitions were so small (< 10×10 pixels) that they were invisible at normal zoom.
+
+**Visual Effect**:
+```
+What exists:     Place → [tiny 10×10px transition] → Place
+What user sees:  Place ─────────────────────────→ Place
+```
+
+**Evidence from User Screenshot**:
+- Lines appeared to go directly between compounds (C00036, etc.)
+- Lines had NO visible rectangles/transitions at connection points
+- Lines were NOT context-sensitive (couldn't right-click)
+- Actually: transitions existed but were too small to see!
+
+### The Fix
+
+**File**: `src/shypn/importer/kegg/reaction_mapper.py`
+
+**Change**: Enforced minimum transition size of 15×15 pixels
+
+```python
+# Ensure minimum size for visibility (fix for tiny invisible transitions)
+MIN_TRANSITION_SIZE = 15.0
+transition.width = max(getattr(transition, 'width', 10.0), MIN_TRANSITION_SIZE)
+transition.height = max(getattr(transition, 'height', 10.0), MIN_TRANSITION_SIZE)
+```
+
+**Applied to**:
+- `_create_single_transition()` - regular reactions
+- `_create_split_reversible()` - both forward and reverse transitions
+
+**Result**:
+- ✅ Transitions now clearly visible at normal zoom
+- ✅ No more "spurious" place-to-place line illusion  
+- ✅ Data model was always correct - purely a visibility issue
+
+---
 
 ## Screenshot Analysis
 

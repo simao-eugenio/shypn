@@ -68,6 +68,11 @@ class StandardReactionMapper(ReactionMapper):
         transition = Transition(x, y, transition_id, 0)
         transition.label = name
         
+        # Ensure minimum size for visibility (fix for tiny invisible transitions)
+        MIN_TRANSITION_SIZE = 15.0
+        transition.width = max(getattr(transition, 'width', 10.0), MIN_TRANSITION_SIZE)
+        transition.height = max(getattr(transition, 'height', 10.0), MIN_TRANSITION_SIZE)
+        
         # Store KEGG metadata
         if not hasattr(transition, 'metadata'):
             transition.metadata = {}
@@ -94,10 +99,15 @@ class StandardReactionMapper(ReactionMapper):
         # Offset positions slightly
         offset = 30.0
         
+        # Ensure minimum size for visibility (fix for tiny invisible transitions)
+        MIN_TRANSITION_SIZE = 15.0
+        
         # Forward transition
         fwd_id = f"T{reaction.id}_fwd"
         fwd = Transition(x - offset, y, fwd_id, 0)
         fwd.label = f"{base_name} →"
+        fwd.width = max(getattr(fwd, 'width', 10.0), MIN_TRANSITION_SIZE)
+        fwd.height = max(getattr(fwd, 'height', 10.0), MIN_TRANSITION_SIZE)
         
         if not hasattr(fwd, 'metadata'):
             fwd.metadata = {}
@@ -110,6 +120,8 @@ class StandardReactionMapper(ReactionMapper):
         rev_id = f"T{reaction.id}_rev"
         rev = Transition(x + offset, y, rev_id, 0)
         rev.label = f"{base_name} ←"
+        rev.width = max(getattr(rev, 'width', 10.0), MIN_TRANSITION_SIZE)
+        rev.height = max(getattr(rev, 'height', 10.0), MIN_TRANSITION_SIZE)
         
         if not hasattr(rev, 'metadata'):
             rev.metadata = {}
