@@ -32,6 +32,7 @@ class ConversionOptions:
         add_initial_marking: Add initial tokens to all places
         initial_tokens: Number of tokens if add_initial_marking is True
         include_relations: Include regulatory relations
+        filter_isolated_compounds: Remove compounds not involved in reactions (default: True)
         center_x: X offset for centering the pathway
         center_y: Y offset for centering the pathway
     """
@@ -41,6 +42,7 @@ class ConversionOptions:
     add_initial_marking: bool = False
     initial_tokens: int = 1
     include_relations: bool = False
+    filter_isolated_compounds: bool = True
     center_x: float = 0.0
     center_y: float = 0.0
 

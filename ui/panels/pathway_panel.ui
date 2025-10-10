@@ -228,6 +228,56 @@
                             <property name="tooltip-text">Convert activation/inhibition to test arcs (not yet implemented)</property>
                           </object>
                         </child>
+                        
+                        <!-- Separator for Enhancement Options -->
+                        <child>
+                          <object class="GtkSeparator">
+                            <property name="visible">True</property>
+                            <property name="margin-top">6</property>
+                            <property name="margin-bottom">6</property>
+                          </object>
+                        </child>
+                        
+                        <!-- Enhancement Options Label -->
+                        <child>
+                          <object class="GtkLabel">
+                            <property name="visible">True</property>
+                            <property name="label" translatable="yes">&lt;b&gt;Post-Processing Enhancements:&lt;/b&gt;</property>
+                            <property name="use-markup">True</property>
+                            <property name="halign">start</property>
+                            <property name="margin-bottom">3</property>
+                          </object>
+                        </child>
+                        
+                        <!-- Layout Optimization -->
+                        <child>
+                          <object class="GtkCheckButton" id="enhancement_layout_check">
+                            <property name="visible">True</property>
+                            <property name="label">Layout Optimization - Resolve overlapping elements</property>
+                            <property name="active">True</property>
+                            <property name="tooltip-text">Apply force-directed layout to eliminate overlapping places and transitions</property>
+                          </object>
+                        </child>
+                        
+                        <!-- Arc Routing -->
+                        <child>
+                          <object class="GtkCheckButton" id="enhancement_arcs_check">
+                            <property name="visible">True</property>
+                            <property name="label">Arc Routing - Create curved arcs for parallel connections</property>
+                            <property name="active">True</property>
+                            <property name="tooltip-text">Generate Bézier curves for parallel arcs to improve visual clarity</property>
+                          </object>
+                        </child>
+                        
+                        <!-- Metadata Enhancement -->
+                        <child>
+                          <object class="GtkCheckButton" id="enhancement_metadata_check">
+                            <property name="visible">True</property>
+                            <property name="label">Metadata Enhancement - Add compound/reaction names from KEGG</property>
+                            <property name="active">True</property>
+                            <property name="tooltip-text">Extract and apply compound names, reaction info, and colors from KEGG data</property>
+                          </object>
+                        </child>
                       </object>
                     </child>
                   </object>

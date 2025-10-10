@@ -61,6 +61,25 @@ class StandardConversionStrategy(ConversionStrategy):
                 document.arcs.extend(arcs)
         
         
+        # Phase 3: Filter out isolated places (compounds not involved in any reaction)
+        if options.filter_isolated_compounds:
+            # Build set of place IDs that have at least one arc
+            connected_place_ids = set()
+            for arc in document.arcs:
+                if arc.source_id.startswith('P'):  # Place ID
+                    connected_place_ids.add(arc.source_id)
+                if arc.target_id.startswith('P'):  # Place ID
+                    connected_place_ids.add(arc.target_id)
+            
+            # Keep only connected places
+            original_place_count = len(document.places)
+            document.places = [p for p in document.places if p.id in connected_place_ids]
+            
+            if original_place_count > len(document.places):
+                isolated_count = original_place_count - len(document.places)
+                # Note: Could add logging here if verbose mode is enabled
+        
+        
         # Update ID counters
         if document.places:
             document._next_place_id = len(document.places) + 1
@@ -127,7 +146,8 @@ def convert_pathway(pathway: KEGGPathway,
                    coordinate_scale: float = 2.5,
                    include_cofactors: bool = True,
                    split_reversible: bool = False,
-                   add_initial_marking: bool = False) -> DocumentModel:
+                   add_initial_marking: bool = False,
+                   filter_isolated_compounds: bool = True) -> DocumentModel:
     """Quick function to convert pathway with common options.
     
     Args:
@@ -136,6 +156,7 @@ def convert_pathway(pathway: KEGGPathway,
         include_cofactors: Include common cofactors
         split_reversible: Split reversible reactions into two transitions
         add_initial_marking: Add initial tokens to places
+        filter_isolated_compounds: Remove compounds not involved in any reaction
         
     Returns:
         DocumentModel
@@ -150,7 +171,8 @@ def convert_pathway(pathway: KEGGPathway,
         coordinate_scale=coordinate_scale,
         include_cofactors=include_cofactors,
         split_reversible=split_reversible,
-        add_initial_marking=add_initial_marking
+        add_initial_marking=add_initial_marking,
+        filter_isolated_compounds=filter_isolated_compounds
     )
     
     converter = PathwayConverter()
@@ -162,6 +184,7 @@ def convert_pathway_enhanced(pathway: KEGGPathway,
                             include_cofactors: bool = True,
                             split_reversible: bool = False,
                             add_initial_marking: bool = False,
+                            filter_isolated_compounds: bool = True,
                             enhancement_options: 'EnhancementOptions' = None) -> DocumentModel:
     """Convert pathway with optional post-processing enhancements.
     
@@ -178,6 +201,7 @@ def convert_pathway_enhanced(pathway: KEGGPathway,
         include_cofactors: Include common cofactors
         split_reversible: Split reversible reactions into two transitions
         add_initial_marking: Add initial tokens to places
+        filter_isolated_compounds: Remove compounds not involved in any reaction
         enhancement_options: Options for post-processing pipeline.
             If None, standard enhancements are applied.
             Set enable_enhancements=False to skip all enhancements.
@@ -210,7 +234,8 @@ def convert_pathway_enhanced(pathway: KEGGPathway,
         coordinate_scale=coordinate_scale,
         include_cofactors=include_cofactors,
         split_reversible=split_reversible,
-        add_initial_marking=add_initial_marking
+        add_initial_marking=add_initial_marking,
+        filter_isolated_compounds=filter_isolated_compounds
     )
     
     # Apply enhancements if requested
