@@ -116,15 +116,35 @@ document = converter.convert(pathway, options)
 
 ### Algorithm
 
-The filtering happens in Phase 3 of pathway conversion:
+The filtering happens in Phase 1 of pathway conversion (upfront filtering):
 
 ```python
-# Phase 1: Create places for all compounds
-for compound in pathway.compounds:
-    if should_include(compound):
-        place = create_place(compound)
-        document.places.append(place)
-        place_map[compound.id] = place
+# Phase 1: Create places from compounds (with upfront filtering)
+place_map: Dict[str, Place] = {}
+
+if options.filter_isolated_compounds:
+    # Build set of compound entry IDs actually used in reactions
+    used_compound_ids = set()
+    for reaction in pathway.reactions:
+        for substrate in reaction.substrates:
+            used_compound_ids.add(substrate.id)
+        for product in reaction.products:
+            used_compound_ids.add(product.id)
+    
+    # Only create places for compounds used in reactions
+    for compound in pathway.compounds:
+        if compound.id in used_compound_ids:
+            if should_include(compound):
+                place = create_place(compound)
+                document.places.append(place)
+                place_map[compound.id] = place
+else:
+    # Create places for all compounds (old behavior)
+    for compound in pathway.compounds:
+        if should_include(compound):
+            place = create_place(compound)
+            document.places.append(place)
+            place_map[compound.id] = place
 
 # Phase 2: Create transitions and arcs from reactions
 for reaction in pathway.reactions:
@@ -132,23 +152,17 @@ for reaction in pathway.reactions:
     arcs = create_arcs(reaction, transition, place_map)
     document.transitions.append(transition)
     document.arcs.extend(arcs)
-
-# Phase 3: Filter isolated places (if enabled)
-if options.filter_isolated_compounds:
-    connected_place_ids = {arc.source_id, arc.target_id 
-                          for arc in document.arcs 
-                          if arc.source_id.startswith('P')}
-    
-    document.places = [p for p in document.places 
-                      if p.id in connected_place_ids]
 ```
+
+**Key improvement**: By filtering in Phase 1 (upfront), we avoid creating unnecessary place objects entirely, rather than creating them and then removing them later.
 
 ### Performance
 
 Filtering is very efficient:
-- **Time complexity**: O(A + P) where A = arcs, P = places
-- **Space overhead**: Minimal (one set for connected IDs)
+- **Time complexity**: O(R + C) where R = reactions, C = compounds
+- **Space overhead**: One set for used compound IDs
 - **Impact**: Negligible (< 1ms even for large pathways)
+- **Memory savings**: Avoids creating unused Place objects
 
 ## Statistics Across Pathways
 
