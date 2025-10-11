@@ -452,10 +452,9 @@ class SimulateToolsPaletteLoader(GObject.GObject):
                 self.emit('settings-changed')
                 
                 # Notify user if simulation was running
-                if was_running:
-                    print("⚠️  Simulation was paused to change settings. Click Run to resume.")
+                pass
         except Exception as e:
-            print(f"❌ Error opening settings dialog: {e}")
+            print(f"❌ Error opening settings dialog: {e}", file=sys.stderr)
             import traceback
             traceback.print_exc()
         finally:
@@ -501,10 +500,6 @@ class SimulateToolsPaletteLoader(GObject.GObject):
                 
                 # Emit signal for data collector/matplotlib updates
                 self.emit('settings-changed')
-                
-                # Log the change for user feedback
-                if old_duration:
-                    print(f"⏱️  Duration updated: {duration} {units.abbreviation} (was {old_duration:.1f}s)")
                     
         except (ValueError, AttributeError) as e:
             # Invalid input or units not set, ignore silently

@@ -76,7 +76,6 @@ class LayoutOptimizer(PostProcessorBase):
         
         # Check if document has objects
         if not document.places and not document.transitions:
-            self.logger.debug("Not applicable: no objects to optimize")
             return False
         
         return True
@@ -205,8 +204,6 @@ class LayoutOptimizer(PostProcessorBase):
         self.reset_stats()
         self.validate_inputs(document, pathway)
         
-        self.logger.info("Starting layout optimization...")
-        
         # Get parameters from options
         min_spacing = self.options.layout_min_spacing if self.options else 60.0
         max_iterations = self.options.layout_max_iterations if self.options else 100
@@ -218,7 +215,6 @@ class LayoutOptimizer(PostProcessorBase):
         all_objects = list(document.places) + list(document.transitions)
         
         if not all_objects:
-            self.logger.info("No objects to optimize")
             self.stats = {'overlaps_before': 0, 'overlaps_after': 0, 'iterations': 0}
             return document
         
@@ -229,8 +225,6 @@ class LayoutOptimizer(PostProcessorBase):
         initial_overlaps = self._detect_overlaps(all_objects, min_spacing)
         overlaps_before = len(initial_overlaps)
         
-        self.logger.info(f"Initial overlaps: {overlaps_before}")
-        
         # Iterative refinement
         iteration = 0
         converged = False
@@ -240,7 +234,6 @@ class LayoutOptimizer(PostProcessorBase):
             overlaps = self._detect_overlaps(all_objects, min_spacing)
             
             if not overlaps:
-                self.logger.info(f"Converged: no overlaps at iteration {iteration}")
                 converged = True
                 break
             
@@ -278,7 +271,6 @@ class LayoutOptimizer(PostProcessorBase):
             
             # Check convergence
             if max_movement < convergence_threshold:
-                self.logger.info(f"Converged: max movement {max_movement:.2f} < {convergence_threshold} at iteration {iteration+1}")
                 converged = True
                 break
         
@@ -315,8 +307,5 @@ class LayoutOptimizer(PostProcessorBase):
             'converged': converged,
             'implemented': True
         }
-        
-        self.logger.info(f"Layout optimization complete: {overlaps_before} → {overlaps_after} overlaps, "
-                        f"{elements_moved} elements moved, {iteration+1} iterations")
         
         return document
