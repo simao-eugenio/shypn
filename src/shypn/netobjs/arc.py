@@ -184,34 +184,42 @@ class Arc(PetriNetObject):
         dx_world /= length_world
         dy_world /= length_world
         
-        # Check for parallel arcs and apply offset
-        offset_distance = 0.0
-        if hasattr(self, '_manager') and self._manager:
-            parallels = self._manager.detect_parallel_arcs(self)
-            if parallels:
-                offset_distance = self._manager.calculate_arc_offset(self, parallels)
-        
-        if abs(offset_distance) > 1e-6:
-            # Apply perpendicular offset to line endpoints
-            # Perpendicular vector (90° counterclockwise rotation)
-            perp_x = -dy_world
-            perp_y = dx_world
-            
-            src_world_x += perp_x * offset_distance
-            src_world_y += perp_y * offset_distance
-            tgt_world_x += perp_x * offset_distance
-            tgt_world_y += perp_y * offset_distance
-        
-        # Get boundary points in world space
+        # Get boundary points using straight-line direction from actual centers
         start_world_x, start_world_y = self._get_boundary_point(
             self.source, src_world_x, src_world_y, dx_world, dy_world)
         end_world_x, end_world_y = self._get_boundary_point(
             self.target, tgt_world_x, tgt_world_y, -dx_world, -dy_world)
         
+        # Check for parallel arcs - offset will be applied to control point only
+        parallel_offset = 0.0
+        if hasattr(self, '_manager') and self._manager:
+            parallels = self._manager.detect_parallel_arcs(self)
+            if parallels:
+                parallel_offset = self._manager.calculate_arc_offset(self, parallels)
+        
+        # Endpoints stay at boundaries (not offset)
+        display_start_x = start_world_x
+        display_start_y = start_world_y
+        display_end_x = end_world_x
+        display_end_y = end_world_y
+        display_start_x = start_world_x
+        display_start_y = start_world_y
+        display_end_x = end_world_x
+        display_end_y = end_world_y
+        
         # Calculate control point for curved arcs
+        # Control point uses offset from the midpoint between boundary points
         if self.is_curved:
             mid_x = (start_world_x + end_world_x) / 2
             mid_y = (start_world_y + end_world_y) / 2
+            
+            # Apply parallel arc offset to the midpoint (perpendicular to arc direction)
+            if abs(parallel_offset) > 1e-6:
+                perp_x = -dy_world
+                perp_y = dx_world
+                mid_x += perp_x * parallel_offset
+                mid_y += perp_y * parallel_offset
+            
             control_x = mid_x + self.control_offset_x
             control_y = mid_y + self.control_offset_y
         
@@ -219,11 +227,11 @@ class Arc(PetriNetObject):
         if self.color != self.DEFAULT_COLOR:
             # Draw outer glow (subtle shadow effect)
             if self.is_curved:
-                cr.move_to(start_world_x, start_world_y)
-                cr.curve_to(control_x, control_y, control_x, control_y, end_world_x, end_world_y)
+                cr.move_to(display_start_x, display_start_y)
+                cr.curve_to(control_x, control_y, control_x, control_y, display_end_x, display_end_y)
             else:
-                cr.move_to(start_world_x, start_world_y)
-                cr.line_to(end_world_x, end_world_y)
+                cr.move_to(display_start_x, display_start_y)
+                cr.line_to(display_end_x, display_end_y)
             r, g, b = self.color
             cr.set_source_rgba(r, g, b, 0.3)  # Semi-transparent color
             cr.set_line_width((self.width + 2) / max(zoom, 1e-6))
@@ -231,11 +239,11 @@ class Arc(PetriNetObject):
         
         # Draw line in world coordinates (straight or curved)
         if self.is_curved:
-            cr.move_to(start_world_x, start_world_y)
-            cr.curve_to(control_x, control_y, control_x, control_y, end_world_x, end_world_y)
+            cr.move_to(display_start_x, display_start_y)
+            cr.curve_to(control_x, control_y, control_x, control_y, display_end_x, display_end_y)
         else:
-            cr.move_to(start_world_x, start_world_y)
-            cr.line_to(end_world_x, end_world_y)
+            cr.move_to(display_start_x, display_start_y)
+            cr.line_to(display_end_x, display_end_y)
         cr.set_source_rgb(*self.color)
         cr.set_line_width(self.width / max(zoom, 1e-6))  # Compensate for zoom
         cr.stroke()
@@ -244,8 +252,8 @@ class Arc(PetriNetObject):
         if self.is_curved:
             # For curved arc, calculate tangent at end point
             # Using simple approximation: direction from control point to end
-            arrow_dx = end_world_x - control_x
-            arrow_dy = end_world_y - control_y
+            arrow_dx = display_end_x - control_x
+            arrow_dy = display_end_y - control_y
             arrow_length = math.sqrt(arrow_dx * arrow_dx + arrow_dy * arrow_dy)
             if arrow_length > 1e-6:
                 arrow_dx /= arrow_length
@@ -256,11 +264,11 @@ class Arc(PetriNetObject):
             arrow_dx, arrow_dy = dx_world, dy_world
         
         # Draw arrowhead at target (with zoom compensation)
-        self._render_arrowhead(cr, end_world_x, end_world_y, arrow_dx, arrow_dy, zoom)
+        self._render_arrowhead(cr, display_end_x, display_end_y, arrow_dx, arrow_dy, zoom)
         
         # Draw weight label if > 1
         if self.weight > 1:
-            self._render_weight(cr, start_world_x, start_world_y, end_world_x, end_world_y, zoom)
+            self._render_weight(cr, display_start_x, display_start_y, display_end_x, display_end_y, zoom)
         
         # Ensure clean state for next rendering operation
         cr.new_path()
@@ -271,9 +279,12 @@ class Arc(PetriNetObject):
                            dx: float, dy: float) -> Tuple[float, float]:
         """Calculate where arc intersects object boundary.
         
-        Uses proper geometric intersection:
-        - For Place (circle): Ray-circle intersection
-        - For Transition (rectangle): Ray-rectangle intersection
+        The border stroke is centered on the mathematical perimeter:
+        - Inner edge at perimeter - border_width/2 (-1.5px for 3px border)
+        - Outer edge at perimeter + border_width/2 (+1.5px for 3px border)
+        
+        For natural appearance, arcs should touch at the OUTER edge of the border,
+        which is the visible boundary of the object.
         
         Args:
             obj: Place or Transition object
@@ -281,24 +292,33 @@ class Arc(PetriNetObject):
             dx, dy: Direction vector (normalized)
             
         Returns:
-            tuple: (x, y) point on object boundary
+            tuple: (x, y) point at outer edge of object border
         """
         # Import here to avoid circular dependency
         from shypn.netobjs.place import Place
         from shypn.netobjs.transition import Transition
         
         if isinstance(obj, Place):
-            # Circle boundary: exact intersection
-            # Point on circle is simply center + radius * direction
-            return (cx + dx * obj.radius, cy + dy * obj.radius)
+            # Circle: radius + half border width to reach outer edge
+            border_width = getattr(obj, 'border_width', 3.0)
+            border_offset = border_width / 2.0  # +1.5px for 3px border
+            effective_radius = obj.radius + border_offset
+            
+            result = (cx + dx * effective_radius, cy + dy * effective_radius)
+            return result
             
         elif isinstance(obj, Transition):
-            # Rectangle boundary: ray-rectangle intersection
+            # Rectangle: dimensions + half border width to reach outer edge
+            border_width = getattr(obj, 'border_width', 3.0)
+            border_offset = border_width / 2.0  # +1.5px for 3px border
+            
             # Rectangle dimensions (accounting for orientation)
             w = obj.width if obj.horizontal else obj.height
             h = obj.height if obj.horizontal else obj.width
-            half_w = w / 2
-            half_h = h / 2
+            
+            # Extend to outer edge of border
+            half_w = w / 2 + border_offset
+            half_h = h / 2 + border_offset
             
             # Calculate intersection with rectangle edges
             # The rectangle is axis-aligned in world space
@@ -332,7 +352,8 @@ class Arc(PetriNetObject):
             intersect_x = max(cx - half_w, min(cx + half_w, intersect_x))
             intersect_y = max(cy - half_h, min(cy + half_h, intersect_y))
             
-            return (intersect_x, intersect_y)
+            result = (intersect_x, intersect_y)
+            return result
         else:
             # Unknown object type: use center
             return (cx, cy)
@@ -453,61 +474,71 @@ class Arc(PetriNetObject):
         src_x, src_y = self.source.x, self.source.y
         tgt_x, tgt_y = self.target.x, self.target.y
         
-        # Tolerance: 10 pixels in world space (generous for clicking)
-        tolerance = 10.0
-        
-        # Check if this arc has parallel arcs and get offset
-        offset_distance = 0.0
+        # Check if this arc has parallel arcs and get offset for control point
+        parallel_offset = 0.0
         if hasattr(self, '_manager') and self._manager:
             try:
                 parallels = self._manager.detect_parallel_arcs(self)
                 if parallels:
-                    offset_distance = self._manager.calculate_arc_offset(self, parallels)
+                    parallel_offset = self._manager.calculate_arc_offset(self, parallels)
             except (AttributeError, Exception):
                 pass
         
-        # Apply parallel arc offset to source and target positions
-        # Important: Use the original (non-normalized) direction to calculate perpendicular
-        # This ensures consistent offset direction regardless of arc direction
-        if abs(offset_distance) > 1e-6:
-            # Calculate perpendicular direction (same as in render())
+        # Tolerance: Account for visual stroke width plus comfortable margin
+        # The arc centerline is measured, but users click on the visible stroke
+        # Stroke width is 3px (self.width), so half-width is 1.5px
+        # Add generous margin for comfortable clicking
+        half_stroke = self.width / 2.0
+        # Treat parallel arcs as curves for hit detection (even if not is_curved)
+        has_parallel = abs(parallel_offset) > 1e-6
+        click_margin = 25.0 if (self.is_curved or has_parallel) else 8.0
+        tolerance = half_stroke + click_margin
+        
+        # Handle curved arcs and parallel "straight" arcs (which render as curves)
+        if self.is_curved or abs(parallel_offset) > 1e-6:
+            # Calculate direction for boundary points
             dx = tgt_x - src_x
             dy = tgt_y - src_y
             length = (dx * dx + dy * dy) ** 0.5
             
-            if length > 1e-6:
-                # Perpendicular vector (90° counterclockwise rotation)
-                perp_x = -dy / length
-                perp_y = dx / length
-                
-                # Apply offset
-                src_x += perp_x * offset_distance
-                src_y += perp_y * offset_distance
-                tgt_x += perp_x * offset_distance
-                tgt_y += perp_y * offset_distance
-        
-        # Handle curved arcs differently
-        if self.is_curved:
-            # Calculate control point for quadratic Bezier curve
-            mid_x = (src_x + tgt_x) / 2
-            mid_y = (src_y + tgt_y) / 2
+            if length < 1e-6:
+                return False  # Degenerate arc
+            
+            dx_norm = dx / length
+            dy_norm = dy / length
+            
+            # Get boundary points from ACTUAL centers (same as rendering)
+            start_x, start_y = self._get_boundary_point(self.source, src_x, src_y, dx_norm, dy_norm)
+            end_x, end_y = self._get_boundary_point(self.target, tgt_x, tgt_y, -dx_norm, -dy_norm)
+            
+            # Calculate control point from BOUNDARY midpoint
+            mid_x = (start_x + end_x) / 2
+            mid_y = (start_y + end_y) / 2
+            
+            # Apply parallel arc offset perpendicular to arc direction
+            if abs(parallel_offset) > 1e-6:
+                perp_x = -dy_norm
+                perp_y = dx_norm
+                mid_x += perp_x * parallel_offset
+                mid_y += perp_y * parallel_offset
+            
             control_x = mid_x + self.control_offset_x
             control_y = mid_y + self.control_offset_y
             
             # Sample points along the Bezier curve and find minimum distance
             min_dist_sq = float('inf')
-            num_samples = 20  # More samples for better accuracy
+            num_samples = 50  # Increase samples for better accuracy (was 20)
             
             for i in range(num_samples + 1):
                 t = i / num_samples
                 # Quadratic Bezier formula: B(t) = (1-t)^2 * P0 + 2(1-t)t * P1 + t^2 * P2
                 one_minus_t = 1.0 - t
-                curve_x = (one_minus_t * one_minus_t * src_x + 
+                curve_x = (one_minus_t * one_minus_t * start_x + 
                           2 * one_minus_t * t * control_x + 
-                          t * t * tgt_x)
-                curve_y = (one_minus_t * one_minus_t * src_y + 
+                          t * t * end_x)
+                curve_y = (one_minus_t * one_minus_t * start_y + 
                           2 * one_minus_t * t * control_y + 
-                          t * t * tgt_y)
+                          t * t * end_y)
                 
                 # Distance from point to this sample point on curve
                 dist_sq = (x - curve_x) ** 2 + (y - curve_y) ** 2
@@ -516,21 +547,45 @@ class Arc(PetriNetObject):
             return min_dist_sq <= (tolerance * tolerance)
         else:
             # Straight arc: use line segment distance
-            # Calculate line segment parameters
+            # Need to account for parallel offset
             dx = tgt_x - src_x
             dy = tgt_y - src_y
-            length_sq = dx * dx + dy * dy
+            length = (dx * dx + dy * dy) ** 0.5
+            
+            if length < 1e-6:
+                return False  # Degenerate arc
+            
+            dx_norm = dx / length
+            dy_norm = dy / length
+            
+            # Get boundary points (same as rendering)
+            start_x, start_y = self._get_boundary_point(self.source, src_x, src_y, dx_norm, dy_norm)
+            end_x, end_y = self._get_boundary_point(self.target, tgt_x, tgt_y, -dx_norm, -dy_norm)
+            
+            # Apply parallel offset to straight line (same as rendering)
+            if abs(parallel_offset) > 1e-6:
+                perp_x = -dy_norm
+                perp_y = dx_norm
+                start_x += perp_x * parallel_offset
+                start_y += perp_y * parallel_offset
+                end_x += perp_x * parallel_offset
+                end_y += perp_y * parallel_offset
+            
+            # Calculate line segment parameters
+            seg_dx = end_x - start_x
+            seg_dy = end_y - start_y
+            length_sq = seg_dx * seg_dx + seg_dy * seg_dy
             
             if length_sq < 1e-6:
-                return False  # Degenerate arc
+                return False
             
             # Calculate closest point on line segment to (x, y)
             # Parameter t represents position along line: 0=start, 1=end
-            t = max(0.0, min(1.0, ((x - src_x) * dx + (y - src_y) * dy) / length_sq))
+            t = max(0.0, min(1.0, ((x - start_x) * seg_dx + (y - start_y) * seg_dy) / length_sq))
             
             # Closest point on segment
-            closest_x = src_x + t * dx
-            closest_y = src_y + t * dy
+            closest_x = start_x + t * seg_dx
+            closest_y = start_y + t * seg_dy
             
             # Distance from point to line segment
             dist_sq = (x - closest_x) ** 2 + (y - closest_y) ** 2

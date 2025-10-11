@@ -221,34 +221,33 @@ class ArcTransformHandler(TransformHandler):
         dy = tgt_y - src_y
         length = (dx * dx + dy * dy) ** 0.5
         
-        # Check for parallel arcs and apply offset (same as rendering)
-        offset_distance = 0.0
+        # Check for parallel arcs - offset will be applied to control point
+        parallel_offset = 0.0
         if hasattr(arc, '_manager') and arc._manager:
             parallels = arc._manager.detect_parallel_arcs(arc)
             if parallels:
-                offset_distance = arc._manager.calculate_arc_offset(arc, parallels)
+                parallel_offset = arc._manager.calculate_arc_offset(arc, parallels)
         
-        # Apply parallel arc offset to endpoints if needed
-        if abs(offset_distance) > 1e-6 and length > 1e-6:
-            # Normalize direction
-            dx_norm = dx / length
-            dy_norm = dy / length
-            
-            # Perpendicular vector (90° counterclockwise rotation)
+        # Get boundary points from ACTUAL centers (same calculation as in arc.render())
+        # This ensures offset is relative to actual arc endpoints, not offset centers
+        dx_norm = dx / length if length > 1e-6 else 1.0
+        dy_norm = dy / length if length > 1e-6 else 0.0
+        
+        start_x, start_y = arc._get_boundary_point(arc.source, src_x, src_y, dx_norm, dy_norm)
+        end_x, end_y = arc._get_boundary_point(arc.target, tgt_x, tgt_y, -dx_norm, -dy_norm)
+        
+        # Calculate midpoint from BOUNDARY points
+        mid_x = (start_x + end_x) / 2
+        mid_y = (start_y + end_y) / 2
+        
+        # Apply parallel arc offset perpendicular to arc direction
+        if abs(parallel_offset) > 1e-6:
             perp_x = -dy_norm
             perp_y = dx_norm
-            
-            # Offset the endpoints
-            src_x += perp_x * offset_distance
-            src_y += perp_y * offset_distance
-            tgt_x += perp_x * offset_distance
-            tgt_y += perp_y * offset_distance
+            mid_x += perp_x * parallel_offset
+            mid_y += perp_y * parallel_offset
         
-        # Calculate midpoint (after parallel offset, matching rendering)
-        mid_x = (src_x + tgt_x) / 2
-        mid_y = (src_y + tgt_y) / 2
-        
-        # Calculate offset from midpoint
+        # Calculate offset from (potentially offset) midpoint
         offset_x = control_x - mid_x
         offset_y = control_y - mid_y
         

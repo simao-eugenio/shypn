@@ -961,6 +961,9 @@ class ModelCanvasLoader:
                     state['start_y'] = event.y
                     state['is_panning'] = False
                     state['is_rect_selecting'] = False
+                    # Record for double-click detection
+                    click_state['last_click_time'] = current_time
+                    click_state['last_click_obj'] = clicked_obj
                 elif not is_double_click:
                     # Not selected yet - select immediately and start drag
                     # This makes dragging feel more responsive
@@ -981,24 +984,10 @@ class ModelCanvasLoader:
                     click_state['last_click_obj'] = clicked_obj
                     return True
                 if is_double_click:
-                    # Check if this is an arc with parallel arcs (legacy parallel arc system)
-                    from shypn.netobjs import Arc
-                    is_parallel_arc = False
-                    if isinstance(clicked_obj, Arc):
-                        parallels = manager.detect_parallel_arcs(clicked_obj)
-                        is_parallel_arc = len(parallels) > 0
+                    # Double-click behavior: enter edit mode
+                    # Note: Legacy block that prevented edit mode for parallel arcs has been removed
+                    # Users now have full manual control over curved arc transformations
                     
-                    # Prevent double-click edit mode for parallel arcs
-                    if is_parallel_arc:
-                        # Just select the arc, don't enter edit mode
-                        if not clicked_obj.selected:
-                            manager.selection_manager.toggle_selection(clicked_obj, multi=is_ctrl, manager=manager)
-                        click_state['last_click_time'] = 0.0
-                        click_state['last_click_obj'] = None
-                        widget.queue_draw()
-                        return True
-                    
-                    # Normal double-click behavior for non-parallel objects
                     if clicked_obj.selected:
                         manager.selection_manager.enter_edit_mode(clicked_obj, manager=manager)
                     else:
@@ -1351,6 +1340,8 @@ class ModelCanvasLoader:
         """
         source = arc_state['source']
         cursor_x, cursor_y = arc_state['cursor_pos']
+        hovered_target = arc_state.get('hovered_target')
+        
         src_x, src_y = (source.x, source.y)
         dx = cursor_x - src_x
         dy = cursor_y - src_y
@@ -1358,6 +1349,8 @@ class ModelCanvasLoader:
         if dist < 1:
             return
         ux, uy = (dx / dist, dy / dist)
+        
+        # Calculate source boundary point
         if isinstance(source, Place):
             src_radius = source.radius
         elif isinstance(source, Transition):
@@ -1368,16 +1361,85 @@ class ModelCanvasLoader:
             src_radius = 20.0
         start_x = src_x + ux * src_radius
         start_y = src_y + uy * src_radius
+        
+        # Calculate end point (cursor or target boundary)
+        end_x = cursor_x
+        end_y = cursor_y
+        
+        # Detect parallel arc and calculate offset
+        parallel_offset = 0.0
+        if hovered_target and hovered_target != source:
+            # Check if this would create a parallel arc
+            existing_arcs = [arc for arc in manager.arcs 
+                           if (arc.source == source and arc.target == hovered_target) or
+                              (arc.source == hovered_target and arc.target == source)]
+            
+            if existing_arcs:
+                # Calculate offset direction based on arc direction
+                # Same direction as existing arc: small offset (±15px)
+                # Opposite direction: large offset (±50px)
+                existing_arc = existing_arcs[0]
+                same_direction = (existing_arc.source == source and existing_arc.target == hovered_target)
+                opposite_direction = (existing_arc.source == hovered_target and existing_arc.target == source)
+                
+                if opposite_direction:
+                    # Opposite direction: offset to opposite sides
+                    parallel_offset = -50.0  # New arc gets negative offset
+                elif same_direction:
+                    # Same direction: both offset to same side (shouldn't happen for new arc, but handle it)
+                    parallel_offset = 15.0
+            
+            # Calculate target boundary point
+            # Only for Place/Transition, not Arc (arcs don't have .x/.y attributes)
+            if isinstance(hovered_target, (Place, Transition)):
+                tgt_x, tgt_y = hovered_target.x, hovered_target.y
+                dx_to_target = tgt_x - src_x
+                dy_to_target = tgt_y - src_y
+                dist_to_target = math.sqrt(dx_to_target * dx_to_target + dy_to_target * dy_to_target)
+                
+                if dist_to_target > 1e-6:
+                    ux_target = dx_to_target / dist_to_target
+                    uy_target = dy_to_target / dist_to_target
+                    
+                    if isinstance(hovered_target, Place):
+                        tgt_radius = hovered_target.radius
+                    elif isinstance(hovered_target, Transition):
+                        w = hovered_target.width if hovered_target.horizontal else hovered_target.height
+                        h = hovered_target.height if hovered_target.horizontal else hovered_target.width
+                        tgt_radius = max(w, h) / 2.0
+                    else:
+                        tgt_radius = 20.0
+                    
+                    end_x = tgt_x - ux_target * tgt_radius
+                    end_y = tgt_y - uy_target * tgt_radius
+        
+        # Apply parallel offset perpendicular to arc direction
+        if abs(parallel_offset) > 1e-6:
+            # Calculate perpendicular direction (rotate 90 degrees)
+            perp_x = -uy
+            perp_y = ux
+            
+            # Apply offset to both start and end points
+            start_x += perp_x * parallel_offset
+            start_y += perp_y * parallel_offset
+            end_x += perp_x * parallel_offset
+            end_y += perp_y * parallel_offset
+        
+        # Convert to screen coordinates
         start_sx, start_sy = manager.world_to_screen(start_x, start_y)
-        end_sx, end_sy = manager.world_to_screen(cursor_x, cursor_y)
+        end_sx, end_sy = manager.world_to_screen(end_x, end_y)
+        
+        # Draw the preview line
         cr.set_source_rgba(0.95, 0.5, 0.1, 0.85)
         cr.set_line_width(2.0)
         cr.move_to(start_sx, start_sy)
         cr.line_to(end_sx, end_sy)
         cr.stroke()
+        
+        # Draw arrowhead
         arrow_len = 11.0
         arrow_width = 6.0
-        angle = math.atan2(dy, dx)
+        angle = math.atan2(end_y - start_y, end_x - start_x)
         left_x = end_sx - arrow_len * math.cos(angle) + arrow_width * math.sin(angle)
         left_y = end_sy - arrow_len * math.sin(angle) - arrow_width * math.cos(angle)
         right_x = end_sx - arrow_len * math.cos(angle) - arrow_width * math.sin(angle)
@@ -1470,7 +1532,27 @@ class ModelCanvasLoader:
             # Check if arc can be converted to inhibitor (Place → Transition only)
             can_be_inhibitor = isinstance(obj.source, Place) and isinstance(obj.target, Transition)
             
-            # Normal/Inhibitor options only (Curve/Straight options removed)
+            # Curve/Straight transformation options
+            if is_curved(obj):
+                # Curved arc can be made straight
+                straight_item = Gtk.MenuItem(label='Transform to Straight')
+                straight_item.connect('activate', lambda w: self._on_arc_make_straight(obj, manager, drawing_area))
+                straight_item.show()
+                transform_submenu.append(straight_item)
+            elif is_straight(obj):
+                # Straight arc can be made curved
+                curved_item = Gtk.MenuItem(label='Transform to Curved')
+                curved_item.connect('activate', lambda w: self._on_arc_make_curved(obj, manager, drawing_area))
+                curved_item.show()
+                transform_submenu.append(curved_item)
+            
+            # Add separator if we have both curve/straight and normal/inhibitor options
+            if transform_submenu.get_children():
+                separator = Gtk.SeparatorMenuItem()
+                separator.show()
+                transform_submenu.append(separator)
+            
+            # Normal/Inhibitor options
             if is_normal(obj):
                 if can_be_inhibitor:
                     inhibitor_item = Gtk.MenuItem(label='Convert to Inhibitor Arc')

@@ -152,9 +152,42 @@ class HandleDetector:
         src_x, src_y = arc.source.x, arc.source.y
         tgt_x, tgt_y = arc.target.x, arc.target.y
         
-        # Calculate midpoint
-        mid_x = (src_x + tgt_x) / 2
-        mid_y = (src_y + tgt_y) / 2
+        # Calculate direction for boundary points
+        dx = tgt_x - src_x
+        dy = tgt_y - src_y
+        length = math.sqrt(dx * dx + dy * dy)
+        
+        if length < 1e-6:
+            # Degenerate arc: handle at midpoint
+            return {'midpoint': ((src_x + tgt_x) / 2, (src_y + tgt_y) / 2)}
+        
+        dx_norm = dx / length
+        dy_norm = dy / length
+        
+        # Get boundary points from ACTUAL centers (not offset)
+        start_x, start_y = arc._get_boundary_point(arc.source, src_x, src_y, dx_norm, dy_norm)
+        end_x, end_y = arc._get_boundary_point(arc.target, tgt_x, tgt_y, -dx_norm, -dy_norm)
+        
+        # Calculate midpoint from boundary points
+        mid_x = (start_x + end_x) / 2
+        mid_y = (start_y + end_y) / 2
+        
+        # Check for parallel arc offset
+        parallel_offset = 0.0
+        if hasattr(arc, '_manager') and arc._manager:
+            try:
+                parallels = arc._manager.detect_parallel_arcs(arc)
+                if parallels:
+                    parallel_offset = arc._manager.calculate_arc_offset(arc, parallels)
+            except (AttributeError, Exception):
+                pass
+        
+        # Apply parallel arc offset perpendicular to arc direction
+        if abs(parallel_offset) > 1e-6:
+            perp_x = -dy_norm
+            perp_y = dx_norm
+            mid_x += perp_x * parallel_offset
+            mid_y += perp_y * parallel_offset
         
         # Check if this is a CurvedArc instance (legacy curved arc class)
         if isinstance(arc, CurvedArc):
@@ -164,18 +197,7 @@ class HandleDetector:
                 handle_x, handle_y = arc.manual_control_point
             else:
                 # Use CurvedArc's own control point calculation
-                # This accounts for parallel arc detection and offset
-                offset_distance = None
-                if hasattr(arc, '_manager') and arc._manager:
-                    try:
-                        parallels = arc._manager.detect_parallel_arcs(arc)
-                        if parallels:
-                            offset_distance = arc._manager.calculate_arc_offset(arc, parallels)
-                    except (AttributeError, Exception):
-                        # If manager methods fail, use default calculation
-                        pass
-                
-                control_point = arc._calculate_curve_control_point(offset=offset_distance)
+                control_point = arc._calculate_curve_control_point(offset=parallel_offset)
                 if control_point:
                     handle_x, handle_y = control_point
                 else:
@@ -189,21 +211,12 @@ class HandleDetector:
             handle_x = mid_x + control_offset_x
             handle_y = mid_y + control_offset_y
         else:
-            # Straight arc: handle at midpoint, but offset perpendicular for visibility
-            dx = tgt_x - src_x
-            dy = tgt_y - src_y
-            length = math.sqrt(dx * dx + dy * dy)
-            
-            if length > 1:
-                # Perpendicular offset (small, just for visibility)
-                perp_x = -dy / length
-                perp_y = dx / length
-                offset = 15.0  # Small offset in world units
-                handle_x = mid_x + perp_x * offset
-                handle_y = mid_y + perp_y * offset
-            else:
-                handle_x = mid_x
-                handle_y = mid_y
+            # Straight arc: handle at (offset) midpoint, but offset perpendicular for visibility
+            perp_x = -dy_norm
+            perp_y = dx_norm
+            offset = 15.0  # Small offset in world units
+            handle_x = mid_x + perp_x * offset
+            handle_y = mid_y + perp_y * offset
         
         return {'midpoint': (handle_x, handle_y)}
     

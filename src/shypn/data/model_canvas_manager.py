@@ -276,7 +276,8 @@ class ModelCanvasManager:
         arc._manager = self  # Store reference to manager for parallel detection
         self.arcs.append(arc)
         
-        # Check if this arc creates a parallel situation and auto-convert to curved
+        # Auto-conversion to curved arcs for visual separation of parallel arcs
+        # The parallel_offset in rendering will handle the separation
         self._auto_convert_parallel_arcs_to_curved(arc)
         
         # Record operation for undo
@@ -373,6 +374,8 @@ class ModelCanvasManager:
         When a new arc creates a parallel situation (same source/target or opposite),
         convert all involved arcs to curved arcs for better visualization.
         
+        The parallel_offset mechanism in arc rendering will handle the separation.
+        
         Args:
             new_arc: The newly added arc that may create parallels
         """
@@ -439,13 +442,17 @@ class ModelCanvasManager:
         
         # For opposite direction arcs (most common case: A→B, B→A)
         if len(opposite_direction) == 1 and len(same_direction) == 0:
-            # Two arcs in opposite directions - mirror each other
-            # Use a deterministic rule: arc with lower ID gets positive offset
-            other = opposite_direction[0]
-            if arc.id < other.id:
-                return 50.0  # Curve counterclockwise (increased from 25)
+            # Two arcs in opposite directions should curve to opposite sides
+            # Determine which arc should curve which way based on arc ID ordering
+            # (consistent assignment so they don't flip on reload)
+            opposite = opposite_direction[0]
+            
+            # Use arc IDs to determine which gets positive/negative offset
+            # This ensures consistent behavior across sessions
+            if arc.id < opposite.id:
+                return -50.0  # This arc curves one way
             else:
-                return -50.0  # Curve clockwise (mirror, increased from -25)
+                return 50.0   # This arc curves the other way
         
         # For same-direction arcs or mixed cases, use stable ordering
         all_arcs = [arc] + parallels

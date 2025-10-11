@@ -928,36 +928,58 @@ class FileExplorerPanel:
         This method properly checks the ModelCanvasManager's is_default_filename()
         flag to determine if a file chooser should be shown.
         """
-        if not hasattr(self, 'canvas_loader') or self.canvas_loader is None:
-            return
-        if not hasattr(self, 'persistency') or self.persistency is None:
-            return
-        drawing_area = self.canvas_loader.get_current_document()
-        if drawing_area is None:
-            return
-        manager = self.canvas_loader.get_canvas_manager(drawing_area)
-        if manager is None:
-            return
-        document = manager.to_document_model()
-        self.persistency.save_document(document, save_as=False, is_default_filename=manager.is_default_filename())
+        try:
+            if not hasattr(self, 'canvas_loader') or self.canvas_loader is None:
+                print("[FileExplorer] save_current_document: canvas_loader not available")
+                return
+            if not hasattr(self, 'persistency') or self.persistency is None:
+                print("[FileExplorer] save_current_document: persistency not available")
+                return
+            drawing_area = self.canvas_loader.get_current_document()
+            if drawing_area is None:
+                print("[FileExplorer] save_current_document: No active document")
+                return
+            manager = self.canvas_loader.get_canvas_manager(drawing_area)
+            if manager is None:
+                print("[FileExplorer] save_current_document: No canvas manager")
+                return
+            print(f"[FileExplorer] save_current_document: Saving document...")
+            document = manager.to_document_model()
+            self.persistency.save_document(document, save_as=False, is_default_filename=manager.is_default_filename())
+            print("[FileExplorer] save_current_document: Success")
+        except Exception as e:
+            print(f"[FileExplorer] save_current_document ERROR: {e}")
+            import traceback
+            traceback.print_exc()
 
     def save_current_document_as(self):
         """Save the current document with a new name (Save As).
         
         Always shows file chooser regardless of filename state.
         """
-        if not hasattr(self, 'canvas_loader') or self.canvas_loader is None:
-            return
-        if not hasattr(self, 'persistency') or self.persistency is None:
-            return
-        drawing_area = self.canvas_loader.get_current_document()
-        if drawing_area is None:
-            return
-        manager = self.canvas_loader.get_canvas_manager(drawing_area)
-        if manager is None:
-            return
-        document = manager.to_document_model()
-        self.persistency.save_document(document, save_as=True, is_default_filename=manager.is_default_filename())
+        try:
+            if not hasattr(self, 'canvas_loader') or self.canvas_loader is None:
+                print("[FileExplorer] save_current_document_as: canvas_loader not available")
+                return
+            if not hasattr(self, 'persistency') or self.persistency is None:
+                print("[FileExplorer] save_current_document_as: persistency not available")
+                return
+            drawing_area = self.canvas_loader.get_current_document()
+            if drawing_area is None:
+                print("[FileExplorer] save_current_document_as: No active document")
+                return
+            manager = self.canvas_loader.get_canvas_manager(drawing_area)
+            if manager is None:
+                print("[FileExplorer] save_current_document_as: No canvas manager")
+                return
+            print(f"[FileExplorer] save_current_document_as: Saving document as...")
+            document = manager.to_document_model()
+            self.persistency.save_document(document, save_as=True)
+            print("[FileExplorer] save_current_document_as: Success")
+        except Exception as e:
+            print(f"[FileExplorer] save_current_document_as ERROR: {e}")
+            import traceback
+            traceback.print_exc()
 
     def open_document(self):
         """Open a document from file using the persistency manager.
@@ -965,13 +987,22 @@ class FileExplorerPanel:
         Creates a new tab with the loaded document and sets the manager's filename
         correctly so is_default_filename() returns False.
         """
-        if not hasattr(self, 'canvas_loader') or self.canvas_loader is None:
-            return
-        if not hasattr(self, 'persistency') or self.persistency is None:
-            return
-        document, filepath = self.persistency.load_document()
-        if document and filepath:
-            self._load_document_into_canvas(document, filepath)
+        try:
+            if not hasattr(self, 'canvas_loader') or self.canvas_loader is None:
+                print("[FileExplorer] open_document: canvas_loader not available")
+                return
+            if not hasattr(self, 'persistency') or self.persistency is None:
+                print("[FileExplorer] open_document: persistency not available")
+                return
+            print(f"[FileExplorer] open_document: Opening file dialog...")
+            document, filepath = self.persistency.load_document()
+            if document and filepath:
+                print(f"[FileExplorer] open_document: Loaded {filepath}")
+                self._load_document_into_canvas(document, filepath)
+        except Exception as e:
+            print(f"[FileExplorer] open_document ERROR: {e}")
+            import traceback
+            traceback.print_exc()
 
     def _open_file_from_path(self, filepath: str):
         """Open a specific file from path into canvas.
@@ -1045,14 +1076,25 @@ class FileExplorerPanel:
         
         Checks for unsaved changes and creates a new tab with "default" filename.
         """
-        if not hasattr(self, 'canvas_loader') or self.canvas_loader is None:
-            return
-        if not hasattr(self, 'persistency') or self.persistency is None:
-            return
-        if not self.persistency.check_unsaved_changes():
-            return
-        if self.persistency.new_document():
-            self.canvas_loader.add_document()
+        try:
+            if not hasattr(self, 'canvas_loader') or self.canvas_loader is None:
+                print("[FileExplorer] new_document: canvas_loader not available")
+                return
+            if not hasattr(self, 'persistency') or self.persistency is None:
+                print("[FileExplorer] new_document: persistency not available")
+                return
+            print(f"[FileExplorer] new_document: Checking unsaved changes...")
+            if not self.persistency.check_unsaved_changes():
+                print("[FileExplorer] new_document: User cancelled due to unsaved changes")
+                return
+            print(f"[FileExplorer] new_document: Creating new document...")
+            if self.persistency.new_document():
+                self.canvas_loader.add_document()
+                print("[FileExplorer] new_document: Success")
+        except Exception as e:
+            print(f"[FileExplorer] new_document ERROR: {e}")
+            import traceback
+            traceback.print_exc()
 
     def _on_file_saved_callback(self, filepath: str):
         """Called by NetObjPersistency when a file is saved.
