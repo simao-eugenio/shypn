@@ -277,17 +277,31 @@ class InhibitorArc(Arc):
             self.source, src_world_x, src_world_y, dx_start, dy_start)
         
         # Get target boundary point for hollow circle placement
+        # Use straight-line direction for boundary calculation (not curve tangent)
+        dx_straight = tgt_world_x - src_world_x
+        dy_straight = tgt_world_y - src_world_y
+        length_straight = math.sqrt(dx_straight*dx_straight + dy_straight*dy_straight)
+        
+        if length_straight < 1e-6:
+            super().render(cr, None, zoom)
+            return
+            
+        dx_straight /= length_straight
+        dy_straight /= length_straight
+        
         boundary_x, boundary_y = self._get_boundary_point(
-            self.target, tgt_world_x, tgt_world_y, -dx_end, -dy_end)
+            self.target, tgt_world_x, tgt_world_y, -dx_straight, -dy_straight)
         
         # For inhibitor arc: hollow circle must be entirely outside target
+        # Position along straight-line direction to ensure edge-to-edge contact
         marker_radius = self.MARKER_RADIUS / zoom
-        marker_x = boundary_x - dx_end * marker_radius
-        marker_y = boundary_y - dy_end * marker_radius
+        marker_x = boundary_x - dx_straight * marker_radius
+        marker_y = boundary_y - dy_straight * marker_radius
         
-        # Curve draws to target center
-        end_world_x = tgt_world_x
-        end_world_y = tgt_world_y
+        # Curve should end at the near edge of the circle (with small gap)
+        gap = 2.0 / zoom  # 2px gap for clean appearance
+        end_world_x = marker_x - dx_end * (marker_radius + gap)
+        end_world_y = marker_y - dy_end * (marker_radius + gap)
         
         # Add glow effect for colored arcs
         if self.color != self.DEFAULT_COLOR:

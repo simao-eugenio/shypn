@@ -340,46 +340,58 @@ class ObjectEditingTransforms:
             src_x, src_y = obj.source.x, obj.source.y
             tgt_x, tgt_y = obj.target.x, obj.target.y
             
+            # Calculate direction for boundary point calculation
+            dx = tgt_x - src_x
+            dy = tgt_y - src_y
+            length = (dx * dx + dy * dy) ** 0.5
+            
+            if length < 1:
+                return  # Too short
+            
+            dx /= length
+            dy /= length
+            
+            # Get boundary points using the arc's own method (from ACTUAL centers)
+            start_x, start_y = obj._get_boundary_point(obj.source, src_x, src_y, dx, dy)
+            end_x, end_y = obj._get_boundary_point(obj.target, tgt_x, tgt_y, -dx, -dy)
+            
+            # Check for parallel arc offset
+            parallel_offset = 0.0
+            if hasattr(obj, '_manager') and obj._manager:
+                try:
+                    parallels = obj._manager.detect_parallel_arcs(obj)
+                    if parallels:
+                        parallel_offset = obj._manager.calculate_arc_offset(obj, parallels)
+                except (AttributeError, Exception):
+                    pass
+            
             # Check if this is a CurvedArc or Arc with is_curved flag
             is_curved = isinstance(obj, CurvedArc) or getattr(obj, 'is_curved', False)
             
             if is_curved:
-                # Draw curved arc outline
-                mid_x = (src_x + tgt_x) / 2
-                mid_y = (src_y + tgt_y) / 2
+                # Draw curved arc outline using boundary points
+                mid_x = (start_x + end_x) / 2
+                mid_y = (start_y + end_y) / 2
                 
-                # Get control point
-                if isinstance(obj, CurvedArc):
-                    # CurvedArc: check for manual control point first
-                    if hasattr(obj, 'manual_control_point') and obj.manual_control_point is not None:
-                        control_x, control_y = obj.manual_control_point
-                    else:
-                        # Use automatic calculation with parallel arc offset
-                        offset_distance = None
-                        if hasattr(obj, '_manager') and obj._manager:
-                            try:
-                                parallels = obj._manager.detect_parallel_arcs(obj)
-                                if parallels:
-                                    offset_distance = obj._manager.calculate_arc_offset(obj, parallels)
-                            except (AttributeError, Exception):
-                                pass
-                        
-                        control_point = obj._calculate_curve_control_point(offset=offset_distance)
-                        if control_point:
-                            control_x, control_y = control_point
-                        else:
-                            control_x, control_y = mid_x, mid_y
-                else:
-                    # Arc with is_curved flag: use control offsets
-                    control_x = mid_x + getattr(obj, 'control_offset_x', 0.0)
-                    control_y = mid_y + getattr(obj, 'control_offset_y', 0.0)
+                # Apply parallel arc offset perpendicular to arc direction
+                if abs(parallel_offset) > 1e-6:
+                    perp_x = -dy
+                    perp_y = dx
+                    mid_x += perp_x * parallel_offset
+                    mid_y += perp_y * parallel_offset
                 
-                cr.move_to(src_x, src_y)
-                cr.curve_to(control_x, control_y, control_x, control_y, tgt_x, tgt_y)
+                # Arc with is_curved flag: use control offsets
+                offset_x = getattr(obj, 'control_offset_x', 0.0)
+                offset_y = getattr(obj, 'control_offset_y', 0.0)
+                control_x = mid_x + offset_x
+                control_y = mid_y + offset_y
+                
+                cr.move_to(start_x, start_y)
+                cr.curve_to(control_x, control_y, control_x, control_y, end_x, end_y)
             else:
-                # Draw straight arc outline
-                cr.move_to(src_x, src_y)
-                cr.line_to(tgt_x, tgt_y)
+                # Draw straight arc outline using boundary points
+                cr.move_to(start_x, start_y)
+                cr.line_to(end_x, end_y)
         
         # Draw dashed bounding box (or arc outline for arcs)
         cr.set_source_rgba(*self.BBOX_COLOR)
