@@ -177,7 +177,6 @@ class LeftPanelLoader:
 
         When a project is closed, navigate back to workspace root.
         """
-        logger.debug("Left panel handling project closed")
         if self.file_explorer:
             # Navigate to workspace root (safe user directory)
             workspace_root = os.path.join(self.repo_root, 'workspace')

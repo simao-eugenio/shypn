@@ -930,25 +930,19 @@ class FileExplorerPanel:
         """
         try:
             if not hasattr(self, 'canvas_loader') or self.canvas_loader is None:
-                print("[FileExplorer] save_current_document: canvas_loader not available")
                 return
             if not hasattr(self, 'persistency') or self.persistency is None:
-                print("[FileExplorer] save_current_document: persistency not available")
                 return
             drawing_area = self.canvas_loader.get_current_document()
             if drawing_area is None:
-                print("[FileExplorer] save_current_document: No active document")
                 return
             manager = self.canvas_loader.get_canvas_manager(drawing_area)
             if manager is None:
-                print("[FileExplorer] save_current_document: No canvas manager")
                 return
-            print(f"[FileExplorer] save_current_document: Saving document...")
             document = manager.to_document_model()
             self.persistency.save_document(document, save_as=False, is_default_filename=manager.is_default_filename())
-            print("[FileExplorer] save_current_document: Success")
         except Exception as e:
-            print(f"[FileExplorer] save_current_document ERROR: {e}")
+            print(f"[FileExplorer] save_current_document ERROR: {e}", file=sys.stderr)
             import traceback
             traceback.print_exc()
 
@@ -959,25 +953,19 @@ class FileExplorerPanel:
         """
         try:
             if not hasattr(self, 'canvas_loader') or self.canvas_loader is None:
-                print("[FileExplorer] save_current_document_as: canvas_loader not available")
                 return
             if not hasattr(self, 'persistency') or self.persistency is None:
-                print("[FileExplorer] save_current_document_as: persistency not available")
                 return
             drawing_area = self.canvas_loader.get_current_document()
             if drawing_area is None:
-                print("[FileExplorer] save_current_document_as: No active document")
                 return
             manager = self.canvas_loader.get_canvas_manager(drawing_area)
             if manager is None:
-                print("[FileExplorer] save_current_document_as: No canvas manager")
                 return
-            print(f"[FileExplorer] save_current_document_as: Saving document as...")
             document = manager.to_document_model()
             self.persistency.save_document(document, save_as=True)
-            print("[FileExplorer] save_current_document_as: Success")
         except Exception as e:
-            print(f"[FileExplorer] save_current_document_as ERROR: {e}")
+            print(f"[FileExplorer] save_current_document_as ERROR: {e}", file=sys.stderr)
             import traceback
             traceback.print_exc()
 

@@ -73,7 +73,6 @@ class MatrixManager:
         # Check if rebuild needed
         current_hash = self._compute_document_hash()
         if not force and current_hash == self._last_build_hash:
-            logger.debug("Matrix build skipped: document unchanged")
             return False
         
         try:
@@ -85,12 +84,6 @@ class MatrixManager:
             )
             
             self._last_build_hash = current_hash
-            
-            # Log statistics
-            stats = self.matrix.get_statistics()
-            logger.info(f"Matrix built: {stats['places']} places, "
-                       f"{stats['transitions']} transitions, "
-                       f"{stats['total_arcs']} arcs")
             
             return True
             

@@ -74,12 +74,10 @@ class MetadataEnhancer(PostProcessorBase):
         
         # Check if pathway is provided
         if pathway is None:
-            self.logger.debug("Not applicable: no pathway data provided")
             return False
         
         # Check minimum elements
         if len(document.places) + len(document.transitions) < 1:
-            self.logger.debug("Not applicable: no elements to enhance")
             return False
         
         return True
@@ -244,8 +242,6 @@ class MetadataEnhancer(PostProcessorBase):
             }
             return document
         
-        self.logger.info("Starting metadata enhancement...")
-        
         # Get configuration
         extract_names = self.options.metadata_extract_names if self.options else True
         extract_colors = self.options.metadata_extract_colors if self.options else True
@@ -362,9 +358,5 @@ class MetadataEnhancer(PostProcessorBase):
             'compartments_detected': len(compartments),
             'implemented': True
         }
-        
-        self.logger.info(
-            f"Metadata enhancement complete: {places_enhanced}/{len(document.places)} places, "
-            f"{transitions_enhanced}/{len(document.transitions)} transitions enhanced")
         
         return document

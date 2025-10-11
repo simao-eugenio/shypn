@@ -79,7 +79,6 @@ class ArcRouter(PostProcessorBase):
         
         # Check minimum arcs
         if len(document.arcs) < 1:
-            self.logger.debug("Not applicable: no arcs to route")
             return False
         
         return True
@@ -339,8 +338,6 @@ class ArcRouter(PostProcessorBase):
         self.reset_stats()
         self.validate_inputs(document, pathway)
         
-        self.logger.info("Starting arc routing...")
-        
         # Get configuration
         curve_style = self.options.arc_curve_style if self.options else 'curved'
         parallel_offset = self.options.arc_parallel_offset if self.options else 30.0
@@ -398,10 +395,6 @@ class ArcRouter(PostProcessorBase):
                     arc.control_offset_y = offset_y
                     arcs_with_curves += 1
                     arcs_with_obstacles += 1
-                    
-                    self.logger.debug(
-                        f"Arc {arc.id} routed around {len(obstacles)} obstacles "
-                        f"with offset ({offset_x:.1f}, {offset_y:.1f})")
         
         # Store statistics
         self.stats = {
@@ -416,10 +409,5 @@ class ArcRouter(PostProcessorBase):
             ),
             'implemented': True
         }
-        
-        self.logger.info(
-            f"Arc routing complete: {arcs_with_curves}/{total_arcs} arcs curved, "
-            f"{parallel_arc_count} in parallel groups, "
-            f"{arcs_with_obstacles} routed around obstacles")
         
         return document

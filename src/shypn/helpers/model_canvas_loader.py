@@ -176,7 +176,6 @@ class ModelCanvasLoader:
                         if simulate_tools_palette and hasattr(simulate_tools_palette, 'data_collector'):
                             data_collector = simulate_tools_palette.data_collector
                             self.right_panel_loader.set_data_collector(data_collector)
-                            print(f"[DataCollector] Connected to right panel: {data_collector}")
             if drawing_area in self.canvas_managers:
                 manager = self.canvas_managers[drawing_area]
                 self.right_panel_loader.set_model(manager)
@@ -643,19 +642,13 @@ class ModelCanvasLoader:
         
         # Layout tools - call existing layout methods
         elif tool_id == 'layout_auto':
-            print(f"[SwissKnife] Auto layout requested")
             self._on_layout_auto_clicked(None, drawing_area, canvas_manager)
         
         elif tool_id == 'layout_hierarchical':
-            print(f"[SwissKnife] Hierarchical layout requested")
             self._on_layout_hierarchical_clicked(None, drawing_area, canvas_manager)
         
         elif tool_id == 'layout_force':
-            print(f"[SwissKnife] Force-directed layout requested")
             self._on_layout_force_clicked(None, drawing_area, canvas_manager)
-        
-        else:
-            print(f"[SwissKnife] Unknown tool: {tool_id}")
     
     def _on_swissknife_mode_change_requested(self, palette, requested_mode, canvas_manager, drawing_area):
         """Handle mode change request from SwissKnifePalette.
@@ -670,11 +663,11 @@ class ModelCanvasLoader:
             canvas_manager: ModelCanvasManager instance
             drawing_area: GtkDrawingArea widget
         """
-        print(f"[SwissKnife] Mode change requested: {requested_mode}")
         # TODO: Implement mode switching logic when needed
         # current_mode = self._get_current_mode(drawing_area)
         # if requested_mode != current_mode:
         #     self._switch_canvas_mode(drawing_area, requested_mode)
+        pass
 
     def _on_simulation_step(self, palette, time, drawing_area):
         """Handle simulation step - redraw canvas to show updated token state.
@@ -1882,8 +1875,6 @@ class ModelCanvasLoader:
                 self._show_layout_message("No objects to layout", drawing_area)
                 return
             
-            print(f"[Layout] Before: {len(manager.places)} places, {len(manager.transitions)} transitions")
-            
             # Calculate current center of objects (to preserve relative position)
             all_objs = list(manager.places) + list(manager.transitions)
             if all_objs:
@@ -1915,9 +1906,6 @@ class ModelCanvasLoader:
                     obj.x += offset_x
                     obj.y += offset_y
             
-            print(f"[Layout] After: {len(manager.places)} places, {len(manager.transitions)} transitions")
-            print(f"[Layout] Result: {result}")
-            
             # Show result
             message = f"Applied {algorithm_name} layout\nMoved {result['nodes_moved']} objects"
             self._show_layout_message(message, drawing_area)
@@ -1937,9 +1925,8 @@ class ModelCanvasLoader:
             message: Message to display
             drawing_area: GtkDrawingArea widget (for future status bar integration)
         """
-        # For now, just print to console
-        # Later this can be wired to a status bar
-        print(f"[Graph Layout] {message}")
+        # Message displayed - could be wired to status bar in future
+        pass
 
     def _on_object_delete(self, obj, manager, drawing_area):
         """Delete an object from the canvas.

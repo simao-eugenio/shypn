@@ -79,7 +79,6 @@ class VisualValidator(PostProcessorBase):
         
         # Check image availability
         if self.options and not self.options.validation_image_url:
-            self.logger.debug("Not applicable: no image URL provided")
             return False
         
         # Check if Pillow is available
@@ -103,8 +102,6 @@ class VisualValidator(PostProcessorBase):
         """
         self.reset_stats()
         self.validate_inputs(document, pathway)
-        
-        self.logger.info("Starting visual validation...")
         
         # TODO: Implement visual validation
         # Phase 5 implementation (optional, experimental)

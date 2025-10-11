@@ -77,7 +77,6 @@ class EnhancementPipeline:
             raise TypeError(f"Processor must inherit from PostProcessorBase, got {type(processor)}")
         
         self.processors.append(processor)
-        self.logger.debug(f"Added processor: {processor.get_name()}")
     
     def remove_processor(self, processor_name: str) -> bool:
         """Remove a processor by name.
@@ -91,14 +90,12 @@ class EnhancementPipeline:
         for i, proc in enumerate(self.processors):
             if proc.get_name() == processor_name:
                 del self.processors[i]
-                self.logger.debug(f"Removed processor: {processor_name}")
                 return True
         return False
     
     def clear_processors(self):
         """Remove all processors from the pipeline."""
         self.processors.clear()
-        self.logger.debug("Cleared all processors")
     
     def get_processor_names(self) -> List[str]:
         """Get names of all processors in the pipeline.
@@ -129,7 +126,6 @@ class EnhancementPipeline:
         
         # Check if enhancements are disabled
         if not self.options.enable_enhancements:
-            self.logger.info("Enhancements disabled, returning document unchanged")
             return document
         
         # Check if any processors registered
@@ -139,8 +135,6 @@ class EnhancementPipeline:
         
         # Start timing
         pipeline_start = time.time()
-        
-        self.logger.info(f"Starting enhancement pipeline with {len(self.processors)} processors")
         
         current_document = document
         
@@ -158,15 +152,10 @@ class EnhancementPipeline:
                 
                 # Check if processor is applicable
                 if not processor.is_applicable(current_document, pathway):
-                    self.logger.info(f"Processor {i+1}/{len(self.processors)}: "
-                                   f"{processor.get_name()} - SKIPPED (not applicable)")
                     self._log_processor_execution(processor, skipped=True)
                     continue
                 
                 # Run processor
-                self.logger.info(f"Processor {i+1}/{len(self.processors)}: "
-                               f"{processor.get_name()} - RUNNING")
-                
                 proc_start = time.time()
                 
                 # Validate inputs
@@ -178,9 +167,6 @@ class EnhancementPipeline:
                 proc_time = time.time() - proc_start
                 
                 # Log execution
-                self.logger.info(f"Processor {i+1}/{len(self.processors)}: "
-                               f"{processor.get_name()} - COMPLETED ({proc_time:.2f}s)")
-                
                 self._log_processor_execution(
                     processor,
                     success=True,
@@ -223,7 +209,6 @@ class EnhancementPipeline:
         
         # Pipeline complete
         pipeline_time = time.time() - pipeline_start
-        self.logger.info(f"Enhancement pipeline completed in {pipeline_time:.2f}s")
         
         return current_document
     

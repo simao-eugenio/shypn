@@ -152,29 +152,8 @@ class StandardConversionStrategy(ConversionStrategy):
             document: Converted DocumentModel
             pathway: Original KEGG pathway
         """
-        logger.info(f"Conversion complete for pathway: {pathway.name} ({pathway.title})")
-        logger.info(f"  KEGG entries: {len(pathway.entries)}")
-        logger.info(f"  KEGG reactions: {len(pathway.reactions)}")
-        logger.info(f"  KEGG relations: {len(pathway.relations)} (NOT converted - metadata only)")
-        logger.info(f"  Petri net places: {len(document.places)}")
-        logger.info(f"  Petri net transitions: {len(document.transitions)}")
-        logger.info(f"  Petri net arcs: {len(document.arcs)}")
-        
-        # Log arc breakdown
-        place_to_trans = sum(1 for arc in document.arcs 
-                            if isinstance(arc.source, Place) and isinstance(arc.target, Transition))
-        trans_to_place = sum(1 for arc in document.arcs 
-                            if isinstance(arc.source, Transition) and isinstance(arc.target, Place))
-        
-        logger.info(f"  Arc breakdown:")
-        logger.info(f"    Place→Transition: {place_to_trans}")
-        logger.info(f"    Transition→Place: {trans_to_place}")
-        
-        # Validation check
-        if place_to_trans + trans_to_place != len(document.arcs):
-            logger.warning(f"    ⚠ Arc count mismatch detected!")
-        
-        logger.debug(f"  Bipartite property: ✓ VALID")
+        # Conversion complete - statistics available in document
+        pass
 
 
 class PathwayConverter:

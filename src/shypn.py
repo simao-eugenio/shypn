@@ -84,7 +84,6 @@ def main(argv=None):
 		# WAYLAND FIX: Realize window early to establish window surface
 		# This ensures parent window is available for dialogs/menus during initialization
 		window.realize()
-		print("[Main] Window realized (Wayland surface established)")
 		
 		# Add double-click on header bar to toggle maximize
 		header_bar = main_builder.get_object('header_bar')
@@ -181,9 +180,6 @@ def main(argv=None):
 			# This allows file explorer to access canvas managers and their is_default_filename() flag
 			file_explorer.set_canvas_loader(model_canvas_loader)
 			
-			print("[Main] File explorer wired to canvas loader and persistency manager")
-			print("[Main] File operations now handled by FileExplorerPanel")
-			
 			# Wire file explorer's open request to load into canvas
 			def on_file_open_requested(filepath):
 				"""Handle file open request from file explorer (double-click or context menu).
@@ -211,7 +207,6 @@ def main(argv=None):
 		# Load pathway panel via its loader
 		try:
 			pathway_panel_loader = create_pathway_panel(model_canvas=model_canvas_loader)
-			print("[Main] Pathway panel loaded successfully")
 		except Exception as e:
 			print(f'WARNING: Failed to load pathway panel: {e}', file=sys.stderr)
 			pathway_panel_loader = None
@@ -219,13 +214,11 @@ def main(argv=None):
 		# Wire right panel loader to canvas loader
 		# This allows tab switching to update the right panel's data collector
 		model_canvas_loader.set_right_panel_loader(right_panel_loader)
-		print("[Main] Right panel wired to model canvas loader for tab-aware data collector updates")
 		
 		# Wire context menu handler to canvas loader
 		# This allows right-click context menus to include "Add to Analysis" options
 		if hasattr(right_panel_loader, 'context_menu_handler') and right_panel_loader.context_menu_handler:
 			model_canvas_loader.set_context_menu_handler(right_panel_loader.context_menu_handler)
-			print("[Main] Context menu handler wired for analysis menu items")
 
 		# Get left dock area from main window
 		left_dock_area = main_builder.get_object('left_dock_area')
