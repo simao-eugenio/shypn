@@ -600,13 +600,32 @@ class SimulationController:
         self._steps_executed = 0
         self._time_step = time_step
         
-        # Calculate optimal step batching for smooth animation
+        # Calculate optimal step batching for smooth animation with time scale
         # Target: Execute multiple steps per GUI update to maintain smooth visualization
         # For small time steps (e.g., 0.002s), batch many steps together
         # For large time steps (e.g., 1.0s), execute 1 step per GUI update
-        gui_interval_s = 0.1  # Fixed 100ms GUI update interval
-        self._steps_per_callback = max(1, int(gui_interval_s / time_step))
-        self._steps_per_callback = min(self._steps_per_callback, 100)  # Cap at 100 steps/update
+        # Time scale: Controls playback speed (1.0 = real-time, 60.0 = 60x faster)
+        
+        gui_interval_s = 0.1  # Fixed 100ms GUI update interval (real-world playback time)
+        
+        # Calculate how much MODEL time should pass per GUI update
+        # time_scale = model_seconds / real_seconds
+        # Example: time_scale=60.0 means 60 seconds of model time per 1 second of real time
+        model_time_per_gui_update = gui_interval_s * self.settings.time_scale
+        
+        # Calculate how many simulation steps needed to cover that model time
+        # Example: model_time=6.0s, time_step=1.0s → 6 steps per GUI update
+        self._steps_per_callback = max(1, int(model_time_per_gui_update / time_step))
+        
+        # Safety cap: Prevent UI freeze on extreme time_scale values
+        # Cap at 1000 steps per GUI update (allows up to ~10000x speedup with dt=0.001)
+        if self._steps_per_callback > 1000:
+            effective_max_scale = 1000 * time_step / gui_interval_s
+            print(f"⚠️  Time scale {self.settings.time_scale}x is very high.")
+            print(f"   Capping at {effective_max_scale:.1f}x for UI responsiveness.")
+            self._steps_per_callback = 1000
+        else:
+            self._steps_per_callback = min(self._steps_per_callback, 1000)
         
         self._update_enablement_states()
         for transition in self.model.transitions:

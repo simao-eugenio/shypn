@@ -679,11 +679,12 @@ class ModelCanvasLoader:
         """
         drawing_area.queue_draw()
 
-    def _on_simulation_reset(self, palette):
+    def _on_simulation_reset(self, palette, drawing_area):
         """Handle simulation reset - blank analysis plots and prepare for new data.
         
         Args:
-            palette: SimulateToolsPaletteLoader that emitted the signal
+            palette: SwissKnifePalette that forwarded the signal
+            drawing_area: GtkDrawingArea widget for the canvas
         """
         if self.right_panel_loader:
             if hasattr(self.right_panel_loader, 'place_panel') and self.right_panel_loader.place_panel:
