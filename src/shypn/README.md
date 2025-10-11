@@ -1,6 +1,6 @@
 # shypn/
 
-This is the main Python package for the Shypn project - a GTK4-based Petri Net modeling application. All code modules, subpackages, and application logic reside here.
+This is the main Python package for the Shypn project - a GTK3-based Stochastic Hybrid Petri Net modeling application. All code modules, subpackages, and application logic reside here.
 
 ## Package Structure
 
@@ -9,17 +9,27 @@ This is the main Python package for the Shypn project - a GTK4-based Petri Net m
 - Structural analysis (P-invariants, T-invariants, siphons, traps)
 - Behavioral properties (liveness, boundedness, reachability)
 - Analysis algorithms and solvers
+- Integration with right panel analysis tools
+
+### `canvas/`
+**Canvas Management and Overlay System**
+- `canvas_overlay_manager.py` - Canvas overlay management
+- `model_canvas_manager.py` - Core canvas state and object management
+- Zoom, pan, grid rendering
+- Multi-document support with tabs
 
 ### `data/`
-**Data models and state management** for the application:
-- `model_canvas_manager.py` - Canvas state management (zoom, pan, grid, document metadata)
-- `canvas/` - Document model and canvas data structures
-- `user_model.py` - User data models
-
-This directory contains the business logic layer, separated from UI components.
+**Data Models and Project Management**
+- `document_model.py` - Petri net document model
+- `project_models.py` - Project management system
+- `workspace_state.py` - Workspace persistence
+- User preferences and settings
 
 ### `dev/`
-Development utilities and experimental code for testing and prototyping.
+**Development Utilities and Testing**
+- SwissKnife palette testbed
+- Experimental features
+- Prototyping utilities
 
 ### `diagnostic/`
 **System Diagnostics and Debug Tools**
@@ -28,12 +38,12 @@ Development utilities and experimental code for testing and prototyping.
 - Performance profiling tools
 
 ### `edit/`
-**Editing Operations and Controllers**
-- `selection_manager.py` - Object selection and multi-select
-- `drag_controller.py` - Drag and drop operations
-- `object_editing_transforms.py` - Object transformations (move, resize)
-- `rectangle_selection.py` - Rectangle selection tool
-- `transient_arc.py` - Temporary arc drawing during creation
+**Editing Operations and Graph Layout**
+- `editing_operations.py` - Core editing operations
+- `graph_layout/` - Layout algorithms (auto, hierarchical, force-directed)
+- `operations_palette.py` - Operations palette widget
+- `tools_palette.py` - Edit tools palette
+- Selection and transformation tools
 
 ### `engine/`
 **Simulation Engine and Transition Behaviors**
@@ -41,61 +51,68 @@ Development utilities and experimental code for testing and prototyping.
 - `immediate_behavior.py` - Immediate transitions (priority-based)
 - `timed_behavior.py` - Timed transitions (deterministic delays)
 - `stochastic_behavior.py` - Stochastic transitions (exponential distributions)
-- `continuous_behavior.py` - Continuous transitions (rate functions)
 - `behavior_factory.py` - Factory for creating behavior instances
-- `function_catalog.py` - Rate function catalog and parsing
-- `simulation/` - Simulation controller and execution engine
+- Simulation controller and execution
 
 ### `file/`
 **File Operations and Persistence**
 - `netobj_persistency.py` - Save/Load operations for Petri Net models
-- `explorer.py` - File explorer integration and file management
 - JSON serialization/deserialization
-- File format versioning and migration
+- File format versioning
+- Document state management
 
 ### `helpers/`
-**UI component loaders and controllers** for the GTK4 interface:
-- `left_panel_loader.py` - File Operations panel loader (attachable/detachable)
-- `right_panel_loader.py` - Dynamic Analyses panel loader (attachable/detachable)
-- `model_canvas_loader.py` - Multi-document canvas loader with tab management
-- `predefined_zoom.py` - Zoom control palette with revealer
-- `edit_palette_loader.py` - Edit tools palette loader
-- `edit_tools_loader.py` - Edit toolbar loader
-- `simulate_palette_loader.py` - Simulation palette loader
-- `simulate_tools_palette_loader.py` - Simulation tools palette loader
-- `place_prop_dialog_loader.py` - Place properties dialog
-- `transition_prop_dialog_loader.py` - Transition properties dialog
-- `arc_prop_dialog_loader.py` - Arc properties dialog
-- `color_picker.py` - Color picker widget
-- `example_helper.py` - Example helper utilities
+**UI Component Loaders and Controllers**
+- `model_canvas_loader.py` - Multi-document canvas with tabs
+- `left_panel_loader.py` - File explorer panel (dockable)
+- `right_panel_loader.py` - Analysis panel (dockable)
+- `swissknife_palette.py` - Unified Edit/Simulate/Layout palette
+- `simulate_tools_palette_loader.py` - Simulation controls
+- Property dialog loaders (place, transition, arc)
+- File explorer, project management interfaces
+- Color pickers and widget utilities
 
-These modules bridge the UI layer (GTK4 widgets) with the data layer.
+### `importer/`
+**External Format Import**
+- `kegg/` - KEGG pathway import system
+  - API client for KEGG database
+  - Pathway parser and converter
+  - Petri net transformation
+
+### `matrix/`
+**Petri Net Matrix Representations**
+- Incidence matrix construction
+- Pre/Post matrices
+- Matrix-based analysis support
 
 ### `netobjs/`
 **Petri Net Object Models**
 - `petri_net_object.py` - Base class for all Petri Net objects
-- `place.py` - Place nodes (tokens, initial marking, capacity)
-- `transition.py` - Transition nodes (type, priority, delay, rate function)
-- `arc.py` - Normal arcs (weight, multiplicity)
+- `place.py` - Place nodes (tokens, marking, capacity, source/sink types)
+- `transition.py` - Transition nodes (immediate, timed, stochastic, continuous)
+- `arc.py` - Normal arcs (straight and curved with Bézier curves)
 - `inhibitor_arc.py` - Inhibitor arcs (test without consuming)
-- `curved_arc.py` - Curved normal arcs (Bézier curves)
-- `curved_inhibitor_arc.py` - Curved inhibitor arcs
+- Rendering with Cairo, serialization, properties
 
-All objects support:
-- Serialization (to_dict/from_dict)
-- Rendering (draw method with Cairo)
-- Selection and highlighting
-- Properties editing
+### `pathway/`
+**Pathway Enhancement Pipeline**
+- `pipeline.py` - Post-processing pipeline orchestration
+- `metadata_enhancer.py` - Extract and enrich metadata
+- `arc_router.py` - Smart arc routing (parallel arcs, obstacles)
+- `layout_optimizer.py` - Overlap resolution and spacing
+- `visual_validator.py` - Visual validation against pathway images
 
 ### `ui/`
-**UI State Management**
-- UI state persistence
-- View state management (pan, zoom)
-- Window state tracking
+**UI Component Classes**
+- `document_canvas.py` - Canvas widget implementation
+- UI state management
+- View state persistence
 
 ### `utils/`
-**General utility modules** for common operations:
-- `arc_transform.py` - Arc geometry transformations and coordinate conversions
+**General Utility Modules**
+- Common operations and helper functions
+- Geometric calculations
+- Color utilities
 
 ## Architecture Overview
 
@@ -103,12 +120,16 @@ All objects support:
 shypn/
 ├── netobjs/       → Petri Net object models (Place, Transition, Arc)
 ├── engine/        → Simulation engine & transition behaviors
-├── data/          → Business logic & state management
+├── canvas/        → Canvas management & overlay system
+├── data/          → Data models & project management
 ├── file/          → File operations & persistence
-├── edit/          → Editing operations & selection management
-├── helpers/       → UI loaders & controllers (GTK4)
+├── edit/          → Editing operations & graph layout
+├── helpers/       → UI loaders & controllers (GTK3)
+├── importer/      → External format import (KEGG)
+├── pathway/       → Pathway enhancement pipeline
 ├── analyses/      → Static & dynamic analysis modules
-├── ui/            → UI state management
+├── matrix/        → Matrix representations
+├── ui/            → UI components & state
 ├── utils/         → Shared utilities
 ├── diagnostic/    → System diagnostics & debugging
 └── dev/           → Development tools & experiments
@@ -117,23 +138,68 @@ shypn/
 ## Import Patterns
 
 - **Petri Net objects**: `from shypn.netobjs.place import Place`
-- **Data models**: `from shypn.data.model_canvas_manager import ModelCanvasManager`
+- **Canvas management**: `from shypn.canvas.model_canvas_manager import ModelCanvasManager`
 - **UI helpers**: `from shypn.helpers.model_canvas_loader import create_model_canvas`
-- **Simulation engine**: `from shypn.engine.simulation.controller import SimulationController`
-- **File operations**: `from shypn.file.netobj_persistency import save_document, load_document`
-- **Editing**: `from shypn.edit.selection_manager import SelectionManager`
-- **Utils**: `from shypn.utils.arc_transform import transform_arc_coordinates`
+- **Simulation engine**: `from shypn.engine.behavior_factory import create_behavior`
+- **File operations**: `from shypn.file.netobj_persistency import NetobjPersistencyManager`
+- **Editing**: `from shypn.edit.editing_operations import EditingOperations`
+- **KEGG Import**: `from shypn.importer.kegg.pathway_converter import PathwayConverter`
+- **Pathway enhancement**: `from shypn.pathway.pipeline import EnhancementPipeline`
+
+## Key Features
+
+### Multi-Document Canvas
+- Tabbed interface with multiple documents
+- Per-document zoom and pan state
+- Document switching with unsaved changes protection
+
+### SwissKnife Unified Palette
+- **Edit Tools**: Place (P), Transition (T), Arc (A), Select (S), Label (L)
+- **Simulate Tools**: Step, Run, Pause, Reset, Settings
+- **Layout Tools**: Auto, Hierarchical, Force-Directed
+
+### Property Dialogs
+- Place properties: Name, label, tokens, capacity, source/sink types
+- Transition properties: Name, label, type (immediate/timed/stochastic)
+- Arc properties: Weight, inhibitor conversion, curve transformation
+
+### Arc System
+- Straight and curved arcs (Bézier curves)
+- Normal and inhibitor arcs
+- Parallel arc detection with automatic curving
+- Context menu transformations (straight↔curved, normal↔inhibitor)
+
+### KEGG Import
+- Import biological pathways from KEGG database
+- Automatic conversion to Petri nets
+- Enhancement pipeline with metadata, routing, and layout optimization
+
+### Project Management
+- Create and manage projects
+- Hierarchical file organization
+- Recent projects tracking
+- Workspace state persistence
 
 ## Recent Reorganization (October 2025)
 
-The package structure was reorganized to improve clarity:
-1. Moved `model_canvas_manager.py` from orphaned `src/data/` to `src/shypn/data/`
-2. Moved UI loaders from `src/shypn/` root to `src/shypn/helpers/`:
-   - `left_panel_loader.py`
-   - `right_panel_loader.py`
-   - `model_canvas_loader.py`
-   - `predefined_zoom.py`
+Major package restructuring completed:
+1. **Repository cleanup**: 64 files reorganized
+   - 31 markdown files moved to `doc/`
+   - 19 test files moved to `tests/`
+   - 14 utility scripts moved to `archive/`
 
-This separation clarifies the distinction between:
-- **Data layer** (`data/`) - State and business logic
-- **UI layer** (`helpers/`) - GTK4 components and controllers
+2. **Debug output cleanup**: 12 files cleaned
+   - All debug print statements removed
+   - Logger.debug/info statements removed
+   - Only critical errors remain
+
+3. **Feature additions**:
+   - Source/sink place types
+   - Arc boundary precision fixes
+   - Inhibitor arc positioning on curved arcs
+   - Enhanced context menus
+
+4. **Code quality**:
+   - Clean production codebase
+   - Consistent error handling
+   - Improved documentation

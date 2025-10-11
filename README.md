@@ -3,24 +3,32 @@
 
 A GTK-based visual editor for Stochastic Hybrid Petri Nets with advanced modeling capabilities.
 
-## Project Status (October 2, 2025)
+## Project Status (October 11, 2025)
 
-**Current State**: Active development and refactoring
-- ✅ GTK3 stable implementation
+**Current State**: Active development - Feature-rich Petri net editor
+- ✅ GTK3 stable implementation with Wayland support
 - ✅ Multi-document canvas system with tabbed interface
 - ✅ Dockable/undockable left and right panels
-- ✅ File explorer with hierarchical tree view
-- ✅ Zoom palette with predefined zoom levels
-- ✅ Canvas context menus (right-click)
-- ✅ Grid system with multiple styles (line/dot/cross)
-- ✅ Clean production codebase (debug code removed)
-- 🔄 Preparing for transition dialog integration from legacy
+- ✅ File explorer with hierarchical tree view and file operations
+- ✅ SwissKnife unified palette (Edit/Simulate/Layout tools)
+- ✅ Property dialogs for all Petri net objects
+- ✅ Arc transformations (straight/curved, normal/inhibitor, parallel arcs)
+- ✅ Simulation system with stochastic transitions
+- ✅ Graph layout algorithms (auto, hierarchical, force-directed)
+- ✅ KEGG pathway import with enhancement pipeline
+- ✅ Project management system
+- ✅ Canvas context menus with rich functionality
+- ✅ Clean production codebase (all debug output removed)
 
-**Recent Updates**:
-- Repository reorganization (tests consolidated, transition files removed)
-- Complete debug code cleanup (8 files cleaned)
-- Empty panel visibility fixes
-- Grid spacing corrections
+**Recent Updates** (October 2025):
+- Complete debug and print statement cleanup (12 files)
+- Repository reorganization (64 files moved to proper directories)
+- Arc boundary precision fixes (proper border width accounting)
+- Inhibitor arc hollow circle positioning on curved arcs
+- Context menu enhancements (arc transformation options)
+- Source/sink place types implementation
+- Workspace state persistence
+- Unsaved changes protection
 
 ## GTK 3 Notice
 
@@ -33,35 +41,49 @@ This project is designed with an object-oriented programming (OOP) approach. Cor
 
 ```
 shypn/
+├── archive/        # Archived utility scripts (moved from root)
 ├── data/           # Data model files (schemas, ORM models, sample data)
-├── doc/            # Main documentation in Markdown format
+├── doc/            # Comprehensive documentation (414+ markdown files)
 ├── legacy/         # Legacy code from previous versions (reference only)
 ├── models/         # User Petri net model files (.shy format)
 ├── scripts/        # Utility scripts, demos (non-test)
 ├── src/
 │   └── shypn/
-│       ├── api/    # Business logic APIs (file operations, etc.)
-│       ├── data/   # Data models and canvas managers
-│       ├── dev/    # Experimental or in-development code
-│       ├── helpers/# UI loaders and helper functions
-│       ├── ui/     # UI component classes
-│       └── utils/  # Specific code routines and utilities
-├── tests/          # Test suite (consolidated from scripts/)
+│       ├── analyses/      # Analysis tools and algorithms
+│       ├── canvas/        # Canvas management and overlay system
+│       ├── data/          # Data models and project management
+│       ├── dev/           # Development and testing utilities
+│       ├── diagnostic/    # Diagnostic tools
+│       ├── edit/          # Editing tools and graph layout
+│       ├── engine/        # Simulation engine and behaviors
+│       ├── file/          # File operations and persistence
+│       ├── helpers/       # UI loaders (panels, palettes, dialogs)
+│       ├── importer/      # KEGG pathway import system
+│       ├── matrix/        # Petri net matrix representations
+│       ├── netobjs/       # Petri net objects (Place, Transition, Arc)
+│       ├── pathway/       # Pathway enhancement pipeline
+│       ├── ui/            # UI component classes
+│       └── utils/         # Utility functions
+├── tests/          # Complete test suite (104+ test files)
 ├── ui/
 │   ├── canvas/     # Document canvas interfaces (.ui files)
 │   ├── dialogs/    # Modal dialogs (.ui files)
 │   ├── main/       # Main window interface (.ui files)
-│   ├── palettes/   # Control palettes like zoom (.ui files)
+│   ├── palettes/   # Control palettes (.ui files)
 │   └── panels/     # Dockable panels (left/right) (.ui files)
+├── workspace/      # User workspace directory
+│   ├── examples/   # Example Petri net models
+│   └── projects/   # User projects
 └── venv/           # Python virtual environment (optional)
 ```
 
 **Key Directories**:
 - `src/shypn/`: Main application source code (Python)
 - `ui/`: GTK UI definition files (Glade XML format)
-- `tests/`: All test files (moved from scripts/)
-- `models/`: User workspace for Petri net models
-- `legacy/`: Historical code for reference
+- `tests/`: All test files (104+ files)
+- `workspace/`: User workspace with examples and projects
+- `doc/`: Comprehensive technical documentation (414+ files)
+- `archive/`: Archived utility scripts
 
 ## Installation
 
@@ -101,16 +123,25 @@ python3 src/shypn.py
 ```
 
 ### Basic Operations
-- **New Document**: Click the "+" button in the left panel toolbar
-- **Toggle Panels**: Use the toggle buttons in the main window header
-- **Zoom**: Click the zoom button in the canvas to access zoom controls
-- **Grid Styles**: Right-click on canvas → Grid Style (line/dot/cross)
-- **Pan Canvas**: Right-click and drag on the canvas
+- **New Document**: File → New or Ctrl+N
+- **Open Document**: File → Open or Ctrl+O or double-click in file explorer
+- **Save Document**: File → Save or Ctrl+S
+- **Toggle Panels**: Use the minimize/maximize buttons in panel headers
+- **SwissKnife Palette**: Access Edit, Simulate, and Layout tools from unified palette
+- **Property Dialogs**: Double-click objects or right-click → Properties
+- **Arc Transformations**: Right-click arcs → Transform to Straight/Curved, Convert to Normal/Inhibitor
+- **Simulation**: Use Simulate tools (Step, Run, Reset, Settings)
+- **Graph Layout**: Apply Auto, Hierarchical, or Force-Directed layouts
+- **Pan Canvas**: Middle-mouse drag or right-click and drag
+- **Zoom**: Mouse wheel or zoom controls in status bar
 
-### File Organization
-- Models are saved in the `models/` directory
-- The file explorer panel shows this directory by default
-- Supports hierarchical folder navigation within models directory
+### Advanced Features
+- **Source/Sink Places**: Create places with infinite token supply/capacity
+- **Parallel Arcs**: Multiple arcs between same objects curve automatically
+- **Inhibitor Arcs**: Convert normal arcs to inhibitor arcs with hollow circle markers
+- **KEGG Import**: Import biological pathways from KEGG database
+- **Project Management**: Create and manage projects with multiple models
+- **Analysis Tools**: Use right panel for model analysis and data collection
 
 ## Running the GTK4 UI under WSLg / Windows
 
