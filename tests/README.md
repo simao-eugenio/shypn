@@ -1,35 +1,77 @@
 ```markdown
 # tests/
 
-This directory contains all test scripts and test modules for the SHYpn project.
+This directory contains all test scripts and test modules for the SHYpn project. **104+ test files** covering various aspects of the application.
 
 ## Organization
 
-Tests are organized to mirror the structure of the main codebase in `src/shypn/`:
-- Unit tests for specific modules
-- Integration tests for component interactions
-- UI tests for GTK widgets and panels
-- API tests for business logic
+Tests are organized by functionality:
+- **Arc tests**: Arc transformations, hit detection, boundary calculations
+- **KEGG tests**: Pathway import, relation conversion, rendering
+- **Workspace tests**: Isolation, state persistence
+- **Feature tests**: Filtering, compound handling, layout algorithms
+- **Check scripts**: Validation scripts for specific features
 
-## Recent Changes (October 2, 2025)
+## Recent Changes (October 2025)
 
 ### Test Consolidation
-All test files have been consolidated into this directory from `scripts/`:
-- `test_context_menu.py` - Context menu functionality tests
-- `test_file_explorer.py` - File explorer panel tests
-- `test_file_operations.py` - File operation API tests
-- `test_gesture_simple.py` - GTK gesture tests
-- `test_popover_methods.py` - Popover widget tests
-- `test_relative_paths.py` - Path handling tests
-- `test_right_click.py` - Right-click interaction tests
+All test files consolidated from repository root into this directory:
+- 18 `.py` test files moved from root
+- 1 `.sh` test script moved from root
+- Organized into logical groupings
+
+### Test Categories
+
+#### Arc System Tests
+- `test_arc_types.py` - All arc type transformations
+- `test_arc_transformation.py` - Arc geometry transformations
+- `test_arc_hit_detection.py` - Arc selection and hit detection
+- `test_long_arc_hit_detection.py` - Long arc click detection
+- `test_curved_arc_handle_position.py` - Curved arc control points
+- `test_all_arc_types_transformation.py` - Comprehensive arc testing
+- `check_arc_endpoints.py` - Arc endpoint validation
+
+#### KEGG Import Tests
+- `test_real_kegg_pathways.py` - Real KEGG pathway import
+- `test_phase0_relations_analysis.py` - Relation analysis
+- `test_phase0_rendering_search.py` - Rendering verification
+- `check_kegg_relations.py` - Relations validation
+- `check_kegg_relations_rendering.py` - Relations rendering check
+- `check_relation_conversion.py` - Conversion validation
+- `check_pathway_structure.py` - Pathway structure check
+- `check_specific_chain.py` - Chain validation
+- `check_specific_compounds.py` - Compound validation
+
+#### Feature Tests
+- `test_enhanced_filtering.py` - Enhanced filtering features
+- `test_filtering_option.py` - Filter options
+- `test_isolated_compounds.py` - Isolated compound handling
+- `test_isolated_filtering.py` - Isolated node filtering
+- `test_with_enhancements.py` - Enhancement pipeline
+
+#### Source/Sink Tests
+- `test_source_sink.py` - Source/sink place types
+- `test_timed_source.py` - Timed source places
+- `test_timed_sink.py` - Timed sink places
+
+#### Transformation Handler Tests
+- `test_transformation_handlers.py` - Arc transformation handlers
+
+#### Workspace Tests
+- `test_workspace_isolation.sh` - Workspace isolation validation
+
+#### Check Scripts
+- `check_old_converter.py` - Legacy converter validation
+- `check_transition_sizes.py` - Transition size validation
 
 ### Test Structure
 ```
 tests/
 ├── README.md (this file)
 ├── scripts/          # Test utility scripts
-├── test_*.py         # Individual test modules
-└── fixtures/         # Test data and fixtures (if needed)
+├── test_*.py         # Individual test modules (100+)
+├── check_*.py        # Validation scripts
+└── *.sh              # Shell test scripts
 ```
 
 ## Running Tests
