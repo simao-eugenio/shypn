@@ -165,24 +165,20 @@ class SwissKnifePalette(GObject.GObject):
                 widget_palette_instance.connect('reset-executed', self._on_simulation_reset)
                 widget_palette_instance.connect('settings-changed', self._on_simulation_settings_changed)
                 
-                # Get the widget (GtkGrid with all controls)
-                # Note: SimulateToolsPaletteLoader.get_widget() returns a GtkRevealer
-                # We need to get the container inside it
-                loader_revealer = widget_palette_instance.get_widget()
+                # Get the widget container (VBox with simulate_tools_revealer + settings_revealer)
+                # Note: SimulateToolsPaletteLoader.get_widget() now returns a complete container
+                # with both the simulation controls and the settings panel
+                widget_container = widget_palette_instance.get_widget()
                 
-                # Extract the container from the loader's revealer
-                # (we use our own revealer for animation)
-                container = widget_palette_instance.simulate_tools_container
-                
-                if container:
-                    # Remove from loader's revealer and add to ours
-                    loader_revealer.remove(container)
-                    revealer.add(container)
+                if widget_container:
+                    # Add the complete widget container to our revealer
+                    revealer.add(widget_container)
                 else:
                     # Fallback to empty box
                     revealer.add(Gtk.Box())
                     
             except Exception as e:
+                print(f"❌ Error creating simulate palette: {e}")
                 import traceback
                 traceback.print_exc()
                 # Fallback to empty box

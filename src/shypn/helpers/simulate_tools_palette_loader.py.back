@@ -10,7 +10,7 @@ methods directly rather than emitting signals for external handling.
 import os
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk, Gdk, GObject
+from gi.repository import Gtk, GObject
 from shypn.engine.simulation import SimulationController
 from shypn.analyses import SimulationDataCollector
 from shypn.utils.time_utils import TimeUnits, TimeFormatter
@@ -116,246 +116,6 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         
         self._apply_styling()
         self._initialize_duration_controls()
-        self._load_settings_panel()
-        self._create_widget_container()
-    
-    def _create_widget_container(self):
-        """Create a container that holds both the simulate tools and settings panels.
-        
-        This container will be returned by get_widget() and added to the SwissKnife
-        sub_palette_area. The settings panel will slide up above the tools palette.
-        """
-        # Create a vertical box to hold both palettes
-        self.widget_container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
-        
-        # Add settings revealer first (on top)
-        if hasattr(self, 'settings_revealer') and self.settings_revealer:
-            self.widget_container.pack_end(self.settings_revealer, False, False, 0)
-        
-        # Remove simulate tools container from its parent revealer (from UI file)
-        # and add it to our widget_container
-        if self.simulate_tools_container:
-            parent = self.simulate_tools_container.get_parent()
-            if parent:
-                parent.remove(self.simulate_tools_container)
-            self.widget_container.pack_end(self.simulate_tools_container, False, False, 0)
-        
-        self.widget_container.show_all()
-        
-        # Hide settings revealer initially
-        if hasattr(self, 'settings_revealer') and self.settings_revealer:
-            self.settings_revealer.set_visible(False)
-
-    def _load_settings_panel(self):
-        """Load the inline settings panel UI from separate file.
-        
-        Loads settings_sub_palette.ui which contains the settings revealer panel.
-        This replaces the modal settings dialog with an inline panel that slides
-        up from the simulate palette when the settings button is clicked.
-        """
-        settings_ui_path = os.path.join(
-            os.path.dirname(self.ui_dir), 'palettes', 'simulate', 'settings_sub_palette.ui'
-        )
-        
-        if not os.path.exists(settings_ui_path):
-            print(f"⚠️  Settings UI file not found: {settings_ui_path}")
-            print(f"   Falling back to modal settings dialog")
-            self.settings_revealer = None
-            return
-        
-        try:
-            # Load settings UI
-            settings_builder = Gtk.Builder()
-            settings_builder.add_from_file(settings_ui_path)
-            
-            # Get settings revealer
-            self.settings_revealer = settings_builder.get_object('settings_revealer')
-            
-            if self.settings_revealer is None:
-                print(f"⚠️  settings_revealer not found in UI file")
-                return
-            
-            # Get control widgets
-            self.speed_0_1x_button = settings_builder.get_object('speed_0_1x_button')
-            self.speed_1x_button = settings_builder.get_object('speed_1x_button')
-            self.speed_10x_button = settings_builder.get_object('speed_10x_button')
-            self.speed_60x_button = settings_builder.get_object('speed_60x_button')
-            self.time_scale_spin = settings_builder.get_object('time_scale_spin')
-            self.settings_apply_button = settings_builder.get_object('settings_apply_button')
-            self.settings_reset_button = settings_builder.get_object('settings_reset_button')
-            
-            # Wire up control handlers
-            self._wire_settings_controls()
-            
-            # Load CSS
-            self._load_settings_css()
-            
-            # Initially hidden
-            self.settings_revealer.set_reveal_child(False)
-            self.settings_revealer.set_visible(False)
-            
-        except Exception as e:
-            print(f"❌ Error loading settings panel: {e}")
-            import traceback
-            traceback.print_exc()
-            self.settings_revealer = None
-    
-    def _load_settings_css(self):
-        """Load CSS styling for settings panel."""
-        css_path = os.path.join(
-            os.path.dirname(self.ui_dir), 'palettes', 'simulate', 'settings_sub_palette.css'
-        )
-        
-        if not os.path.exists(css_path):
-            print(f"⚠️  Settings CSS file not found: {css_path}")
-            return
-        
-        try:
-            css_provider = Gtk.CssProvider()
-            css_provider.load_from_path(css_path)
-            screen = Gdk.Screen.get_default()
-            Gtk.StyleContext.add_provider_for_screen(
-                screen, css_provider,
-                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
-            )
-        except Exception as e:
-            print(f"❌ Error loading settings CSS: {e}")
-    
-    def _wire_settings_controls(self):
-        """Wire settings panel controls to simulation settings.
-        
-        Connects all UI controls (speed presets, spin button, etc.) to
-        simulation settings with proper validation and callbacks.
-        """
-        # Speed preset buttons - exclusive toggle group
-        speed_buttons = [
-            (self.speed_0_1x_button, 0.1),
-            (self.speed_1x_button, 1.0),
-            (self.speed_10x_button, 10.0),
-            (self.speed_60x_button, 60.0),
-        ]
-        
-        def on_speed_preset_clicked(clicked_button, speed_value):
-            """Handle speed preset button click - exclusive toggle."""
-            if clicked_button.get_active():
-                # Deactivate other buttons
-                for btn, _ in speed_buttons:
-                    if btn and btn != clicked_button and btn.get_active():
-                        btn.set_active(False)
-                # Apply speed
-                if self.simulation:
-                    # Check if simulation is currently running
-                    was_running = self.simulation.is_running()
-                    
-                    # Stop if running (will restart with new time_scale)
-                    if was_running:
-                        self.simulation.stop()
-                    
-                    # Update time_scale
-                    self.simulation.settings.time_scale = speed_value
-                    if self.time_scale_spin:
-                        self.time_scale_spin.set_value(speed_value)
-                    
-                    # Restart if it was running
-                    if was_running:
-                        time_step = self.simulation.get_effective_dt()
-                        self.simulation.run(time_step=time_step)
-                    
-                    self.emit('settings-changed')
-        
-        # Connect speed preset buttons
-        for btn, speed in speed_buttons:
-            if btn:
-                btn.connect('clicked', on_speed_preset_clicked, speed)
-        
-        # Custom speed spin button
-        if self.time_scale_spin:
-            def on_time_scale_changed(spin):
-                """Handle custom time scale change."""
-                # Deactivate all preset buttons
-                for btn, _ in speed_buttons:
-                    if btn and btn.get_active():
-                        btn.set_active(False)
-                # Apply custom speed
-                if self.simulation:
-                    # Check if simulation is currently running
-                    was_running = self.simulation.is_running()
-                    
-                    # Stop if running (will restart with new time_scale)
-                    if was_running:
-                        self.simulation.stop()
-                    
-                    # Update time_scale
-                    self.simulation.settings.time_scale = spin.get_value()
-                    
-                    # Restart if it was running
-                    if was_running:
-                        time_step = self.simulation.get_effective_dt()
-                        self.simulation.run(time_step=time_step)
-                    
-                    self.emit('settings-changed')
-            
-            self.time_scale_spin.connect('value-changed', on_time_scale_changed)
-        
-        # Apply button
-        if self.settings_apply_button:
-            def on_apply_clicked(button):
-                """Apply settings and close panel."""
-                self._hide_settings_panel()
-                self.emit('settings-changed')
-            
-            self.settings_apply_button.connect('clicked', on_apply_clicked)
-        
-        # Reset button
-        if self.settings_reset_button:
-            def on_reset_clicked(button):
-                """Reset settings to defaults."""
-                if self.simulation:
-                    # Reset time_scale to 1.0
-                    self.simulation.settings.time_scale = 1.0
-                    self._sync_settings_to_ui()
-                    self.emit('settings-changed')
-            
-            self.settings_reset_button.connect('clicked', on_reset_clicked)
-    
-    def _sync_settings_to_ui(self):
-        """Synchronize current simulation settings to UI controls."""
-        if not self.simulation or not hasattr(self, 'settings_revealer') or self.settings_revealer is None:
-            return
-        
-        time_scale = self.simulation.settings.time_scale
-        
-        # Update spin button
-        if self.time_scale_spin:
-            self.time_scale_spin.set_value(time_scale)
-        
-        # Update preset buttons
-        preset_map = {
-            0.1: self.speed_0_1x_button,
-            1.0: self.speed_1x_button,
-            10.0: self.speed_10x_button,
-            60.0: self.speed_60x_button,
-        }
-        
-        # Deactivate all first
-        for btn in preset_map.values():
-            if btn and btn.get_active():
-                btn.set_active(False)
-        
-        # Activate matching preset
-        if time_scale in preset_map:
-            btn = preset_map[time_scale]
-            if btn:
-                btn.set_active(True)
-    
-    def _hide_settings_panel(self):
-        """Hide the settings panel with animation."""
-        if hasattr(self, 'settings_revealer') and self.settings_revealer:
-            if self.settings_revealer.get_reveal_child():
-                self.settings_revealer.set_reveal_child(False)
-                # Set invisible after animation completes (500ms transition)
-                from gi.repository import GLib
-                GLib.timeout_add(550, lambda: self.settings_revealer.set_visible(False) if self.settings_revealer else False)
 
     def _init_simulation_controller(self):
         """Initialize the simulation controller with the model."""
@@ -622,9 +382,6 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         if self.simulation is None:
             return
         
-        # Hide settings panel if open
-        self._hide_settings_panel()
-        
         # Use effective dt from settings (no hardcoded time_step)
         self.simulation.run()
         
@@ -635,9 +392,6 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         """Handle Step button click - execute one simulation step."""
         if self.simulation is None:
             return
-        
-        # Hide settings panel if open
-        self._hide_settings_panel()
         
         # Use effective dt from settings (no hardcoded time_step)
         success = self.simulation.step()
@@ -651,9 +405,6 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         if self.simulation is None:
             return
         
-        # Hide settings panel if open
-        self._hide_settings_panel()
-        
         self.simulation.stop()
         
         # Update button states for stopped/paused simulation
@@ -664,9 +415,6 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         if self.simulation is None:
             return
         
-        # Hide settings panel if open
-        self._hide_settings_panel()
-        
         self.simulation.reset()
         self.emit('reset-executed')
         self._update_progress_display()  # Reset progress bar
@@ -675,44 +423,7 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         self._update_button_states(running=False, reset=True)
     
     def _on_settings_clicked(self, button):
-        """Handle Settings button click - toggle inline settings panel.
-        
-        New behavior: Toggles settings revealer instead of opening modal dialog.
-        Settings panel slides up from simulate palette with smooth animation.
-        Falls back to modal dialog if settings panel not available.
-        """
-        if self.simulation is None:
-            return
-        
-        # Check if inline settings panel is available
-        if not hasattr(self, 'settings_revealer') or self.settings_revealer is None:
-            # Fallback to modal dialog
-            return self._on_settings_clicked_modal_dialog(button)
-        
-        # Toggle settings revealer
-        from gi.repository import GLib
-        new_state = not self.settings_revealer.get_reveal_child()
-        
-        if new_state:
-            # Opening: Make visible first, then reveal
-            self.settings_revealer.set_visible(True)
-            self.settings_revealer.show_all()
-            # Sync current settings to UI
-            self._sync_settings_to_ui()
-            # Small delay to ensure visibility is set before animation
-            GLib.idle_add(lambda: self.settings_revealer.set_reveal_child(True))
-        else:
-            # Closing: Start hide animation
-            self.settings_revealer.set_reveal_child(False)
-            # Set invisible after animation completes (500ms transition)
-            GLib.timeout_add(550, lambda: self.settings_revealer.set_visible(False) if self.settings_revealer else False)
-    
-    def _on_settings_clicked_modal_dialog(self, button):
-        """Handle Settings dialog click - open simulation settings dialog (OLD VERSION).
-        
-        This is the original modal dialog implementation, kept as fallback
-        if the inline settings panel fails to load.
-        """
+        """Handle Settings dialog click - open simulation settings dialog."""
         if self.simulation is None:
             return
         
@@ -743,8 +454,7 @@ class SimulateToolsPaletteLoader(GObject.GObject):
                 # Notify user if simulation was running
                 pass
         except Exception as e:
-            print(f"❌ Error opening settings dialog: {e}")
-            import sys
+            print(f"❌ Error opening settings dialog: {e}", file=sys.stderr)
             import traceback
             traceback.print_exc()
         finally:
@@ -862,7 +572,7 @@ class SimulateToolsPaletteLoader(GObject.GObject):
             self.progress_bar.set_fraction(0.0)
             self.progress_bar.set_show_text(False)
         
-        # Update time display with speed indicator
+        # Update time display
         if settings.duration:
             duration_seconds = settings.get_duration_seconds()
             text, _ = TimeFormatter.format_progress(
@@ -870,14 +580,7 @@ class SimulateToolsPaletteLoader(GObject.GObject):
                 duration_seconds,
                 settings.time_units
             )
-            
-            # Add speed indicator if not 1.0x
-            if abs(settings.time_scale - 1.0) > 0.01:
-                speed_text = f" @ {settings.time_scale:.1f}x"
-            else:
-                speed_text = ""
-            
-            self.time_display_label.set_text(f"Time: {text}{speed_text}")
+            self.time_display_label.set_text(f"Time: {text}")
         else:
             # No duration set, just show current time
             time_text = TimeFormatter.format(
@@ -885,14 +588,7 @@ class SimulateToolsPaletteLoader(GObject.GObject):
                 TimeUnits.SECONDS,
                 include_unit=True
             )
-            
-            # Add speed indicator if not 1.0x
-            if abs(settings.time_scale - 1.0) > 0.01:
-                speed_text = f" @ {settings.time_scale:.1f}x"
-            else:
-                speed_text = ""
-            
-            self.time_display_label.set_text(f"Time: {time_text}{speed_text}")
+            self.time_display_label.set_text(f"Time: {time_text}")
 
     def show(self):
         """Show the tools palette with animation."""
@@ -917,13 +613,10 @@ class SimulateToolsPaletteLoader(GObject.GObject):
     def get_widget(self):
         """Get the root widget for adding to container.
         
-        Returns a container with both the simulate tools palette and the settings panel.
-        The settings panel will slide up above the tools palette when opened.
-        
         Returns:
-            Gtk.Widget: Container with tools palette and settings panel.
+            Gtk.Widget: The revealer widget containing the tools palette.
         """
-        return self.widget_container
+        return self.simulate_tools_revealer
 
     def is_simulation_running(self):
         """Check if simulation is currently running.

@@ -1,0 +1,362 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Settings Sub-Palette for Simulation - Production Version -->
+<interface>
+  <requires lib="gtk+" version="3.0"/>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- SETTINGS REVEALER - Inline settings panel for simulation -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+  <object class="GtkRevealer" id="settings_revealer">
+    <property name="visible">True</property>
+    <property name="reveal-child">False</property>
+    <property name="transition-type">slide-up</property>
+    <property name="transition-duration">500</property>
+
+    <child>
+      <object class="GtkFrame" id="settings_frame">
+        <property name="visible">True</property>
+        <property name="shadow-type">out</property>
+        <property name="margin_bottom">12</property>
+        <style>
+          <class name="settings-panel-frame"/>
+        </style>
+        
+        <child>
+          <object class="GtkBox" id="settings_container">
+            <property name="visible">True</property>
+            <property name="orientation">vertical</property>
+            <property name="spacing">12</property>
+            <property name="margin">16</property>
+            <style>
+              <class name="settings-panel"/>
+            </style>
+            
+            <!-- Header -->
+            <child>
+              <object class="GtkLabel" id="settings_header">
+                <property name="visible">True</property>
+                <property name="label">⚙ Simulation Settings</property>
+                <property name="xalign">0</property>
+                <style>
+                  <class name="settings-header"/>
+                </style>
+              </object>
+            </child>
+            
+            <!-- ─────────────────────────────────────────────── -->
+            <!-- Time Step Section -->
+            <!-- ─────────────────────────────────────────────── -->
+            
+            <child>
+              <object class="GtkBox">
+                <property name="visible">True</property>
+                <property name="orientation">vertical</property>
+                <property name="spacing">4</property>
+                <property name="margin_top">4</property>
+                
+                <child>
+                  <object class="GtkLabel">
+                    <property name="visible">True</property>
+                    <property name="label">TIME STEP</property>
+                    <property name="xalign">0</property>
+                    <style>
+                      <class name="settings-section-label"/>
+                    </style>
+                  </object>
+                </child>
+                
+                <child>
+                  <object class="GtkBox">
+                    <property name="visible">True</property>
+                    <property name="orientation">horizontal</property>
+                    <property name="spacing">8</property>
+                    <property name="margin_top">4</property>
+                    
+                    <child>
+                      <object class="GtkRadioButton" id="dt_auto_radio">
+                        <property name="visible">True</property>
+                        <property name="label">Auto</property>
+                        <property name="active">True</property>
+                        <property name="margin_end">4</property>
+                        <style>
+                          <class name="settings-radio"/>
+                        </style>
+                      </object>
+                    </child>
+                    
+                    <child>
+                      <object class="GtkRadioButton" id="dt_manual_radio">
+                        <property name="visible">True</property>
+                        <property name="label">Manual</property>
+                        <property name="group">dt_auto_radio</property>
+                        <property name="margin_end">8</property>
+                        <style>
+                          <class name="settings-radio"/>
+                        </style>
+                      </object>
+                    </child>
+                    
+                    <child>
+                      <object class="GtkEntry" id="dt_manual_entry">
+                        <property name="visible">True</property>
+                        <property name="text">0.06</property>
+                        <property name="width-chars">6</property>
+                        <property name="max-width-chars">8</property>
+                        <property name="sensitive">True</property>
+                        <property name="margin_end">4</property>
+                        <style>
+                          <class name="settings-entry-small"/>
+                        </style>
+                      </object>
+                    </child>
+                    
+                    <child>
+                      <object class="GtkLabel">
+                        <property name="visible">True</property>
+                        <property name="label">s</property>
+                        <style>
+                          <class name="settings-unit"/>
+                        </style>
+                      </object>
+                    </child>
+                    
+                  </object>
+                </child>
+                
+              </object>
+            </child>
+            
+            <!-- ─────────────────────────────────────────────── -->
+            <!-- Playback Speed Section -->
+            <!-- ─────────────────────────────────────────────── -->
+            
+            <child>
+              <object class="GtkBox">
+                <property name="visible">True</property>
+                <property name="orientation">vertical</property>
+                <property name="spacing">4</property>
+                <property name="margin_top">8</property>
+                
+                <child>
+                  <object class="GtkLabel">
+                    <property name="visible">True</property>
+                    <property name="label">PLAYBACK SPEED</property>
+                    <property name="xalign">0</property>
+                    <style>
+                      <class name="settings-section-label"/>
+                    </style>
+                  </object>
+                </child>
+                
+                <!-- Preset buttons row -->
+                <child>
+                  <object class="GtkBox">
+                    <property name="visible">True</property>
+                    <property name="orientation">horizontal</property>
+                    <property name="spacing">4</property>
+                    <property name="homogeneous">True</property>
+                    <property name="margin_top">4</property>
+                    
+                    <child>
+                      <object class="GtkToggleButton" id="speed_0_1x_button">
+                        <property name="visible">True</property>
+                        <property name="label">0.1x</property>
+                        <property name="tooltip-text">10× slower</property>
+                        <property name="height-request">36</property>
+                        <style>
+                          <class name="speed-preset-button"/>
+                        </style>
+                      </object>
+                    </child>
+                    
+                    <child>
+                      <object class="GtkToggleButton" id="speed_1x_button">
+                        <property name="visible">True</property>
+                        <property name="label">1x</property>
+                        <property name="active">True</property>
+                        <property name="tooltip-text">Real-time</property>
+                        <property name="height-request">36</property>
+                        <style>
+                          <class name="speed-preset-button"/>
+                        </style>
+                      </object>
+                    </child>
+                    
+                    <child>
+                      <object class="GtkToggleButton" id="speed_10x_button">
+                        <property name="visible">True</property>
+                        <property name="label">10x</property>
+                        <property name="tooltip-text">10× faster</property>
+                        <property name="height-request">36</property>
+                        <style>
+                          <class name="speed-preset-button"/>
+                        </style>
+                      </object>
+                    </child>
+                    
+                    <child>
+                      <object class="GtkToggleButton" id="speed_60x_button">
+                        <property name="visible">True</property>
+                        <property name="label">60x</property>
+                        <property name="tooltip-text">1 hour in 1 min</property>
+                        <property name="height-request">36</property>
+                        <style>
+                          <class name="speed-preset-button"/>
+                        </style>
+                      </object>
+                    </child>
+                    
+                  </object>
+                </child>
+                
+                <!-- Custom speed row -->
+                <child>
+                  <object class="GtkBox">
+                    <property name="visible">True</property>
+                    <property name="orientation">horizontal</property>
+                    <property name="spacing">8</property>
+                    <property name="margin_top">6</property>
+                    
+                    <child>
+                      <object class="GtkLabel">
+                        <property name="visible">True</property>
+                        <property name="label">Custom:</property>
+                        <property name="margin_end">4</property>
+                        <style>
+                          <class name="settings-label-small"/>
+                        </style>
+                      </object>
+                    </child>
+                    
+                    <child>
+                      <object class="GtkSpinButton" id="time_scale_spin">
+                        <property name="visible">True</property>
+                        <property name="adjustment">time_scale_adjustment</property>
+                        <property name="digits">2</property>
+                        <property name="value">1.0</property>
+                        <property name="width-chars">7</property>
+                        <property name="height-request">32</property>
+                        <style>
+                          <class name="settings-spin"/>
+                        </style>
+                      </object>
+                    </child>
+                    
+                    <child>
+                      <object class="GtkLabel">
+                        <property name="visible">True</property>
+                        <property name="label">×</property>
+                        <property name="margin_start">2</property>
+                        <style>
+                          <class name="settings-unit"/>
+                        </style>
+                      </object>
+                    </child>
+                    
+                  </object>
+                </child>
+                
+              </object>
+            </child>
+            
+            <!-- ─────────────────────────────────────────────── -->
+            <!-- Conflict Policy Section -->
+            <!-- ─────────────────────────────────────────────── -->
+            
+            <child>
+              <object class="GtkBox">
+                <property name="visible">True</property>
+                <property name="orientation">vertical</property>
+                <property name="spacing">4</property>
+                <property name="margin_top">8</property>
+                
+                <child>
+                  <object class="GtkLabel">
+                    <property name="visible">True</property>
+                    <property name="label">CONFLICT POLICY</property>
+                    <property name="xalign">0</property>
+                    <style>
+                      <class name="settings-section-label"/>
+                    </style>
+                  </object>
+                </child>
+                
+                <child>
+                  <object class="GtkComboBoxText" id="conflict_policy_combo">
+                    <property name="visible">True</property>
+                    <property name="active">0</property>
+                    <property name="margin_top">4</property>
+                    <property name="height-request">36</property>
+                    <style>
+                      <class name="settings-combo"/>
+                    </style>
+                    <items>
+                      <item>Random</item>
+                      <item>Oldest</item>
+                      <item>Youngest</item>
+                      <item>Priority</item>
+                    </items>
+                  </object>
+                </child>
+                
+              </object>
+            </child>
+            
+            <!-- ─────────────────────────────────────────────── -->
+            <!-- Action Buttons -->
+            <!-- ─────────────────────────────────────────────── -->
+            
+            <child>
+              <object class="GtkBox">
+                <property name="visible">True</property>
+                <property name="orientation">horizontal</property>
+                <property name="spacing">8</property>
+                <property name="homogeneous">True</property>
+                <property name="margin_top">12</property>
+                
+                <child>
+                  <object class="GtkButton" id="settings_reset_button">
+                    <property name="visible">True</property>
+                    <property name="label">Reset</property>
+                    <property name="tooltip-text">Reset to defaults</property>
+                    <property name="height-request">40</property>
+                    <style>
+                      <class name="settings-button"/>
+                    </style>
+                  </object>
+                </child>
+                
+                <child>
+                  <object class="GtkButton" id="settings_apply_button">
+                    <property name="visible">True</property>
+                    <property name="label">Apply</property>
+                    <property name="tooltip-text">Apply and close</property>
+                    <property name="height-request">40</property>
+                    <style>
+                      <class name="settings-button"/>
+                      <class name="settings-button-primary"/>
+                    </style>
+                  </object>
+                </child>
+                
+              </object>
+            </child>
+            
+          </object>
+        </child>
+      </object>
+    </child>
+
+  </object>
+
+  <!-- Adjustment for Time Scale Spin Button -->
+  <object class="GtkAdjustment" id="time_scale_adjustment">
+    <property name="lower">0.01</property>
+    <property name="upper">1000.0</property>
+    <property name="step-increment">0.1</property>
+    <property name="page-increment">1.0</property>
+    <property name="value">1.0</property>
+  </object>
+
+</interface>
