@@ -5,10 +5,12 @@ dependencies:
   - python=3.10
   - pygobject
   - gtk4
+  - networkx
   - pip
   - pip:
       - pytest
       - black
       - flake8
       - pre-commit
+      - python-libsbml>=5.19.0
       # Add any additional Python-only dependencies here
