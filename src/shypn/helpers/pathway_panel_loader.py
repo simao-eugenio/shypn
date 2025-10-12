@@ -55,6 +55,7 @@ class PathwayPanelLoader:
         
         # Import tab controllers (will be instantiated after loading UI)
         self.kegg_import_controller = None
+        self.sbml_import_controller = None
     
     def load(self):
         """Load the panel UI and return the window.
@@ -96,6 +97,7 @@ class PathwayPanelLoader:
         
         # Initialize tab controllers
         self._setup_import_tab()
+        self._setup_sbml_tab()
         
         # Hide window by default (will be shown when toggled)
         self.window.set_visible(False)
@@ -121,6 +123,25 @@ class PathwayPanelLoader:
             print(f"Warning: Could not load KEGG import controller: {e}", file=sys.stderr)
             pass
     
+    def _setup_sbml_tab(self):
+        """Set up the SBML tab controllers.
+        
+        This method instantiates the SBML import controller and wires it to the UI.
+        """
+        # Import the SBML import controller (from helpers)
+        try:
+            from shypn.helpers.sbml_import_panel import SBMLImportPanel
+            
+            # Instantiate controller with builder and model_canvas
+            self.sbml_import_controller = SBMLImportPanel(
+                self.builder,
+                self.model_canvas
+            )
+            
+        except ImportError as e:
+            print(f"Warning: Could not load SBML import controller: {e}", file=sys.stderr)
+            pass
+    
     def set_model_canvas(self, model_canvas):
         """Set or update the model canvas for loading imported pathways.
         
@@ -129,9 +150,12 @@ class PathwayPanelLoader:
         """
         self.model_canvas = model_canvas
         
-        # Update import controller if it exists
+        # Update import controllers if they exist
         if self.kegg_import_controller:
             self.kegg_import_controller.set_model_canvas(model_canvas)
+        
+        if self.sbml_import_controller:
+            self.sbml_import_controller.set_model_canvas(model_canvas)
     
     def _on_float_toggled(self, button):
         """Internal callback when float toggle button is clicked."""

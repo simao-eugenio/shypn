@@ -7,6 +7,9 @@
 # Graph layout algorithms
 networkx>=3.0
 
+# SBML parsing for biochemical pathway import
+python-libsbml>=5.19.0
+
 # Additional dependencies can be added here as the project grows
 # Example:
 # numpy>=1.24.0
