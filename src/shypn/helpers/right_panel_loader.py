@@ -121,6 +121,10 @@ class RightPanelLoader:
             self.place_panel = PlaceRatePanel(self.data_collector)
             places_container.pack_start(self.place_panel, True, True, 0)
             
+            # Register panel to observe model changes (for automatic cleanup of deleted objects)
+            if self.model is not None and hasattr(self.place_panel, 'register_with_model'):
+                self.place_panel.register_with_model(self.model)
+            
         else:
         
             pass
@@ -134,6 +138,10 @@ class RightPanelLoader:
             # Instantiate and add transition rate panel with expand=True to fill vertical space
             self.transition_panel = TransitionRatePanel(self.data_collector)
             transitions_container.pack_start(self.transition_panel, True, True, 0)
+            
+            # Register panel to observe model changes (for automatic cleanup of deleted objects)
+            if self.model is not None and hasattr(self.transition_panel, 'register_with_model'):
+                self.transition_panel.register_with_model(self.model)
             
         else:
         

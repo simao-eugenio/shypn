@@ -122,17 +122,9 @@ class ModelCanvasLoader:
                 if drawing_area and isinstance(drawing_area, Gtk.DrawingArea):
                     self._setup_canvas_manager(drawing_area)
             if drawing_area:
-                tab_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
-                tab_label = Gtk.Label(label='')
-                tab_label.set_ellipsize(3)
-                tab_box.pack_start(tab_label, True, True, 0)
-                close_button = Gtk.Button()
-                close_button.set_relief(Gtk.ReliefStyle.NONE)
-                close_button.set_focus_on_click(False)
-                close_icon = Gtk.Image.new_from_icon_name('window-close-symbolic', Gtk.IconSize.BUTTON)
-                close_button.set_image(close_icon)
+                # Create tab label with file icon
+                tab_box, tab_label, close_button = self._create_tab_label('default', False)
                 close_button.connect('clicked', self._on_tab_close_clicked, page)
-                tab_box.pack_start(close_button, False, False, 0)
                 self.notebook.set_tab_label(page, tab_box)
                 tab_box.show_all()
         self.notebook.connect('switch-page', self._on_notebook_page_changed)
@@ -193,6 +185,71 @@ class ModelCanvasLoader:
         if page_num == -1:
             return
         self.close_tab(page_num)
+
+    def _create_tab_label(self, filename='default', is_modified=False):
+        """Create a tab label with file icon, filename, and close button.
+        
+        Args:
+            filename: Document filename (without extension, or None for default)
+            is_modified: Whether document has unsaved changes
+            
+        Returns:
+            tuple: (tab_box, label_widget, close_button) for later updates
+        """
+        tab_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
+        
+        # File type icon (document icon for Petri nets)
+        file_icon = Gtk.Image.new_from_icon_name('text-x-generic', Gtk.IconSize.MENU)
+        tab_box.pack_start(file_icon, False, False, 0)
+        
+        # Use 'default.shy' if no filename provided
+        if not filename or filename == 'default':
+            filename = 'default.shy'
+        elif not filename.endswith('.shy'):
+            filename = f"{filename}.shy"
+        
+        # Filename label with ellipsize for long names
+        display_name = f"{filename}{'*' if is_modified else ''}"
+        tab_label = Gtk.Label(label=display_name)
+        tab_label.set_ellipsize(3)  # Pango.EllipsizeMode.END
+        tab_label.set_max_width_chars(20)
+        tab_box.pack_start(tab_label, True, True, 0)
+        
+        # Close button (X)
+        close_button = Gtk.Button()
+        close_button.set_relief(Gtk.ReliefStyle.NONE)
+        close_button.set_focus_on_click(False)
+        close_icon = Gtk.Image.new_from_icon_name('window-close-symbolic', Gtk.IconSize.BUTTON)
+        close_button.set_image(close_icon)
+        tab_box.pack_start(close_button, False, False, 0)
+        
+        return (tab_box, tab_label, close_button)
+
+    def _update_tab_label(self, page_widget, filename='default', is_modified=False):
+        """Update tab label for a page with new filename and modification state.
+        
+        Args:
+            page_widget: The page widget (Gtk.Overlay) whose tab to update
+            filename: New filename (without extension, or None for default)
+            is_modified: Whether document has unsaved changes
+        """
+        tab_widget = self.notebook.get_tab_label(page_widget)
+        if not tab_widget or not isinstance(tab_widget, Gtk.Box):
+            return
+        
+        # Use 'default.shy' if no filename provided
+        if not filename or filename == 'default':
+            filename = 'default.shy'
+        elif not filename.endswith('.shy'):
+            filename = f"{filename}.shy"
+        
+        # Find the label in the tab box (it's the second child after icon)
+        children = tab_widget.get_children()
+        if len(children) >= 2:
+            label = children[1]  # Index 1 is the label (after icon)
+            if isinstance(label, Gtk.Label):
+                display_name = f"{filename}{'*' if is_modified else ''}"
+                label.set_text(display_name)
 
     def close_tab(self, page_num):
         """Close a tab after checking for unsaved changes.
@@ -271,18 +328,13 @@ class ModelCanvasLoader:
         overlay_box.set_margin_end(10)
         overlay_box.set_margin_bottom(10)
         overlay.add_overlay(overlay_box)
-        tab_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
-        tab_label = Gtk.Label(label='')
-        tab_label.set_ellipsize(3)
-        tab_box.pack_start(tab_label, True, True, 0)
-        close_button = Gtk.Button()
-        close_button.set_relief(Gtk.ReliefStyle.NONE)
-        close_button.set_focus_on_click(False)
-        close_icon = Gtk.Image.new_from_icon_name('window-close-symbolic', Gtk.IconSize.BUTTON)
-        close_button.set_image(close_icon)
+        
+        # Create tab label with file icon
+        tab_filename = filename if filename else 'default'
+        tab_box, tab_label, close_button = self._create_tab_label(tab_filename, False)
         close_button.connect('clicked', self._on_tab_close_clicked, overlay)
-        tab_box.pack_start(close_button, False, False, 0)
         tab_box.show_all()
+        
         page_index = self.notebook.append_page(overlay, tab_box)
         overlay.show_all()
         self._setup_canvas_manager(drawing, overlay_box, overlay, filename=filename)
@@ -1677,6 +1729,107 @@ class ModelCanvasLoader:
             persistency: NetObjPersistency instance from main application
         """
         self.persistency = persistency
+        
+        # Connect to persistency callbacks to update tab labels
+        if hasattr(persistency, 'on_file_saved'):
+            original_on_file_saved = persistency.on_file_saved
+            def on_file_saved_wrapper(filepath):
+                self._on_file_operation_completed(filepath, is_save=True)
+                if original_on_file_saved:
+                    original_on_file_saved(filepath)
+            persistency.on_file_saved = on_file_saved_wrapper
+        
+        if hasattr(persistency, 'on_file_loaded'):
+            original_on_file_loaded = persistency.on_file_loaded
+            def on_file_loaded_wrapper(filepath, document):
+                self._on_file_operation_completed(filepath, is_save=False)
+                if original_on_file_loaded:
+                    original_on_file_loaded(filepath, document)
+            persistency.on_file_loaded = on_file_loaded_wrapper
+        
+        if hasattr(persistency, 'on_dirty_changed'):
+            original_on_dirty_changed = persistency.on_dirty_changed
+            def on_dirty_changed_wrapper(is_dirty):
+                self._on_dirty_state_changed(is_dirty)
+                if original_on_dirty_changed:
+                    original_on_dirty_changed(is_dirty)
+            persistency.on_dirty_changed = on_dirty_changed_wrapper
+
+    def _on_file_operation_completed(self, filepath, is_save=True):
+        """Handle file save/load completion to update tab label.
+        
+        Args:
+            filepath: Full path to the saved/loaded file
+            is_save: True if save operation, False if load operation
+        """
+        if not filepath:
+            return
+        
+        # Extract filename with .shy extension
+        filename = os.path.basename(filepath)
+        # If filename doesn't have .shy extension, it might be without extension
+        if not filename.endswith('.shy'):
+            base = os.path.splitext(filename)[0]
+            filename = f"{base}.shy"
+        
+        # Get current page
+        current_page_num = self.notebook.get_current_page()
+        if current_page_num < 0:
+            return
+        
+        current_page = self.notebook.get_nth_page(current_page_num)
+        
+        # Update tab label with new filename (no asterisk after save/load)
+        self._update_tab_label(current_page, filename, is_modified=False)
+        
+        # Also update the canvas manager's filename (without extension for internal use)
+        drawing_area = self._get_drawing_area_from_page(current_page)
+        if drawing_area and drawing_area in self.canvas_managers:
+            manager = self.canvas_managers[drawing_area]
+            # Store filename without extension in manager
+            base_filename = os.path.splitext(filename)[0]
+            manager.filename = base_filename
+
+    def _on_dirty_state_changed(self, is_dirty):
+        """Handle dirty state change to update tab label modification indicator.
+        
+        Args:
+            is_dirty: True if document has unsaved changes
+        """
+        # Get current page
+        current_page_num = self.notebook.get_current_page()
+        if current_page_num < 0:
+            return
+        
+        current_page = self.notebook.get_nth_page(current_page_num)
+        drawing_area = self._get_drawing_area_from_page(current_page)
+        
+        if drawing_area and drawing_area in self.canvas_managers:
+            manager = self.canvas_managers[drawing_area]
+            # Get base filename (without extension) from manager
+            base_filename = manager.filename if hasattr(manager, 'filename') else 'default'
+            
+            # _update_tab_label will add .shy extension automatically
+            # Update tab label with modification indicator (asterisk)
+            self._update_tab_label(current_page, base_filename, is_modified=is_dirty)
+
+    def _get_drawing_area_from_page(self, page_widget):
+        """Extract drawing area from a notebook page widget.
+        
+        Args:
+            page_widget: Page widget (usually Gtk.Overlay)
+            
+        Returns:
+            Gtk.DrawingArea or None
+        """
+        if isinstance(page_widget, Gtk.Overlay):
+            scrolled = page_widget.get_child()
+            if isinstance(scrolled, Gtk.ScrolledWindow):
+                drawing_area = scrolled.get_child()
+                if hasattr(drawing_area, 'get_child'):
+                    drawing_area = drawing_area.get_child()
+                return drawing_area
+        return None
 
     def set_right_panel_loader(self, right_panel_loader):
         """Set the right panel loader for data collector updates.
