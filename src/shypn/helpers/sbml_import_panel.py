@@ -482,9 +482,14 @@ class SBMLImportPanel:
         
         # Build preview text
         lines = []
-        lines.append(f"Pathway: {pathway.name or 'Unnamed'}")
-        if pathway.description:
-            lines.append(f"Description: {pathway.description}")
+        # Get name from metadata (PathwayData stores it there)
+        pathway_name = pathway.metadata.get('name', 'Unnamed')
+        lines.append(f"Pathway: {pathway_name}")
+        
+        # Get description from metadata if available
+        pathway_desc = pathway.metadata.get('description')
+        if pathway_desc:
+            lines.append(f"Description: {pathway_desc}")
         lines.append("")
         
         # Species info
@@ -582,7 +587,8 @@ class SBMLImportPanel:
             self._show_status("Loading to canvas...")
             if self.model_canvas:
                 # Create a new tab for this pathway
-                pathway_name = self.parsed_pathway.name or os.path.basename(self.current_filepath)
+                # Get name from metadata (PathwayData stores it there)
+                pathway_name = self.parsed_pathway.metadata.get('name') or os.path.basename(self.current_filepath)
                 page_index, drawing_area = self.model_canvas.add_document(filename=pathway_name)
                 
                 # Get the canvas manager for this tab
