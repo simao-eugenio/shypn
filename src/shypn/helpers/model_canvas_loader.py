@@ -123,6 +123,9 @@ class ModelCanvasLoader:
         notebook > header > tabs > tab:hover {
             background: transparent;
         }
+        notebook > header > tabs > tab:checked {
+            background: transparent;
+        }
         notebook > header > tabs > tab separator {
             min-width: 0;
             min-height: 0;
@@ -163,6 +166,8 @@ class ModelCanvasLoader:
                 # Create tab label with file icon - show "default.shy" on startup
                 tab_box, tab_label, close_button = self._create_tab_label('default.shy', False)
                 close_button.connect('clicked', self._on_tab_close_clicked, page)
+                # Mark first tab as active
+                tab_box.get_style_context().add_class('active')
                 # Show all widgets before setting as tab label
                 tab_box.show_all()
                 self.notebook.set_tab_label(page, tab_box)
@@ -177,6 +182,17 @@ class ModelCanvasLoader:
             page: The new page widget.
             page_num: The index of the new page.
         """
+        # Update active tab styling - remove 'active' class from all tabs, add to current
+        for i in range(notebook.get_n_pages()):
+            page_widget = notebook.get_nth_page(i)
+            tab_widget = notebook.get_tab_label(page_widget)
+            if tab_widget and isinstance(tab_widget, Gtk.Box):
+                style_context = tab_widget.get_style_context()
+                if i == page_num:
+                    style_context.add_class('active')
+                else:
+                    style_context.remove_class('active')
+        
         drawing_area = None
         if isinstance(page, Gtk.Overlay):
             scrolled = page.get_child()
@@ -257,6 +273,20 @@ class ModelCanvasLoader:
             background: linear-gradient(to bottom, #fff, #f0f0f0);
             border-color: #999;
             box-shadow: 0 -2px 6px rgba(0,0,0,0.15);
+        }
+        .tab-box.active {
+            background: linear-gradient(to bottom, #4a5f7f, #3a4f6f);
+            border-color: #2c3e50;
+            border-width: 2px;
+            margin-top: -3px;
+            margin-bottom: -2px;
+            padding-top: 11px;
+            box-shadow: 0 -4px 12px rgba(0,0,0,0.3), 0 2px 8px rgba(0,0,0,0.2);
+            color: white;
+            font-weight: bold;
+        }
+        .tab-box.active label {
+            color: white;
         }
         """
         css_provider.load_from_data(css)
