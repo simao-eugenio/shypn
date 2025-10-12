@@ -440,7 +440,7 @@
                     <child>
                       <object class="GtkLabel">
                         <property name="visible">True</property>
-                        <property name="label">SBML File</property>
+                        <property name="label">SBML Source</property>
                         <property name="halign">start</property>
                         <property name="xalign">0</property>
                         <attributes>
@@ -449,8 +449,36 @@
                       </object>
                     </child>
                     
+                    <!-- Mode Selection -->
                     <child>
                       <object class="GtkBox">
+                        <property name="visible">True</property>
+                        <property name="orientation">horizontal</property>
+                        <property name="spacing">12</property>
+                        
+                        <child>
+                          <object class="GtkRadioButton" id="sbml_local_radio">
+                            <property name="visible">True</property>
+                            <property name="label">Local File</property>
+                            <property name="active">True</property>
+                            <property name="tooltip-text">Browse for local SBML file</property>
+                          </object>
+                        </child>
+                        
+                        <child>
+                          <object class="GtkRadioButton" id="sbml_biomodels_radio">
+                            <property name="visible">True</property>
+                            <property name="label">BioModels Database</property>
+                            <property name="group">sbml_local_radio</property>
+                            <property name="tooltip-text">Fetch model from BioModels repository</property>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                    
+                    <!-- Local File Entry -->
+                    <child>
+                      <object class="GtkBox" id="sbml_local_box">
                         <property name="visible">True</property>
                         <property name="orientation">horizontal</property>
                         <property name="spacing">6</property>
@@ -458,8 +486,8 @@
                         <child>
                           <object class="GtkEntry" id="sbml_file_entry">
                             <property name="visible">True</property>
-                            <property name="editable">False</property>
-                            <property name="placeholder-text">Select SBML file...</property>
+                            <property name="editable">True</property>
+                            <property name="placeholder-text">Select SBML file or type path...</property>
                             <property name="hexpand">True</property>
                           </object>
                         </child>
@@ -471,6 +499,46 @@
                             <property name="tooltip-text">Select SBML file to import</property>
                           </object>
                         </child>
+                      </object>
+                    </child>
+                    
+                    <!-- BioModels Entry -->
+                    <child>
+                      <object class="GtkBox" id="sbml_biomodels_box">
+                        <property name="visible">False</property>
+                        <property name="orientation">horizontal</property>
+                        <property name="spacing">6</property>
+                        
+                        <child>
+                          <object class="GtkEntry" id="sbml_biomodels_entry">
+                            <property name="visible">True</property>
+                            <property name="editable">True</property>
+                            <property name="placeholder-text">Enter BioModels ID (e.g., BIOMD0000000001)...</property>
+                            <property name="hexpand">True</property>
+                          </object>
+                        </child>
+                        
+                        <child>
+                          <object class="GtkButton" id="sbml_fetch_button">
+                            <property name="visible">True</property>
+                            <property name="label">Fetch</property>
+                            <property name="tooltip-text">Download model from BioModels</property>
+                            <property name="sensitive">False</property>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                    
+                    <!-- Info Label -->
+                    <child>
+                      <object class="GtkLabel" id="sbml_source_info">
+                        <property name="visible">True</property>
+                        <property name="label">Browse for a local SBML file (.sbml or .xml)</property>
+                        <property name="halign">start</property>
+                        <property name="wrap">True</property>
+                        <style>
+                          <class name="dim-label"/>
+                        </style>
                       </object>
                     </child>
                   </object>

@@ -95,9 +95,22 @@ class SBMLImportPanel:
     
     def _get_widgets(self):
         """Get references to UI widgets from builder."""
-        # File selection widgets
+        # Mode selection widgets
+        self.sbml_local_radio = self.builder.get_object('sbml_local_radio')
+        self.sbml_biomodels_radio = self.builder.get_object('sbml_biomodels_radio')
+        
+        # Local file widgets
+        self.sbml_local_box = self.builder.get_object('sbml_local_box')
         self.sbml_file_entry = self.builder.get_object('sbml_file_entry')
         self.sbml_browse_button = self.builder.get_object('sbml_browse_button')
+        
+        # BioModels widgets
+        self.sbml_biomodels_box = self.builder.get_object('sbml_biomodels_box')
+        self.sbml_biomodels_entry = self.builder.get_object('sbml_biomodels_entry')
+        self.sbml_fetch_button = self.builder.get_object('sbml_fetch_button')
+        
+        # Info label
+        self.sbml_source_info = self.builder.get_object('sbml_source_info')
         
         # Options widgets
         self.sbml_spacing_spin = self.builder.get_object('sbml_spacing_spin')
@@ -114,17 +127,41 @@ class SBMLImportPanel:
     
     def _connect_signals(self):
         """Connect widget signals to handlers."""
+        # Mode selection
+        if self.sbml_local_radio:
+            self.sbml_local_radio.connect('toggled', self._on_mode_changed)
+        
+        if self.sbml_biomodels_radio:
+            self.sbml_biomodels_radio.connect('toggled', self._on_mode_changed)
+        
+        # Local file mode
         if self.sbml_browse_button:
             self.sbml_browse_button.connect('clicked', self._on_browse_clicked)
         
+        if self.sbml_file_entry:
+            self.sbml_file_entry.connect('changed', self._on_file_entry_changed)
+        
+        # BioModels mode
+        if self.sbml_biomodels_entry:
+            self.sbml_biomodels_entry.connect('changed', self._on_biomodels_entry_changed)
+        
+        if self.sbml_fetch_button:
+            self.sbml_fetch_button.connect('clicked', self._on_fetch_clicked)
+        
+        # Parse and import
         if self.sbml_parse_button:
             self.sbml_parse_button.connect('clicked', self._on_parse_clicked)
         
         if self.sbml_import_button:
             self.sbml_import_button.connect('clicked', self._on_import_clicked)
         
+        # Scale changes
         if self.sbml_scale_spin:
             self.sbml_scale_spin.connect('value-changed', self._on_scale_changed)
+        
+        # Enable parse button when user types in entry
+        if self.sbml_file_entry:
+            self.sbml_file_entry.connect('changed', self._on_file_entry_changed)
     
     def set_model_canvas(self, model_canvas):
         """Set or update the model canvas for loading imported pathways.
@@ -133,6 +170,47 @@ class SBMLImportPanel:
             model_canvas: ModelCanvasManager instance
         """
         self.model_canvas = model_canvas
+    
+    def _on_mode_changed(self, radio_button):
+        """Handle mode radio button changes (Local vs BioModels)."""
+        if not radio_button.get_active():
+            return  # Only handle the activated button
+        
+        if self.sbml_local_radio and self.sbml_local_radio.get_active():
+            # Switch to local file mode
+            if self.sbml_local_box:
+                self.sbml_local_box.set_visible(True)
+            if self.sbml_biomodels_box:
+                self.sbml_biomodels_box.set_visible(False)
+            if self.sbml_source_info:
+                self.sbml_source_info.set_text("Browse for a local SBML file (.sbml or .xml)")
+        else:
+            # Switch to BioModels mode
+            if self.sbml_local_box:
+                self.sbml_local_box.set_visible(False)
+            if self.sbml_biomodels_box:
+                self.sbml_biomodels_box.set_visible(True)
+            if self.sbml_source_info:
+                self.sbml_source_info.set_markup(
+                    'Enter a <a href="https://www.ebi.ac.uk/biomodels/">BioModels</a> ID '
+                    '(e.g., BIOMD0000000001 for glycolysis)'
+                )
+    
+    def _on_file_entry_changed(self, entry):
+        """Handle file entry text changes - enable parse if path exists."""
+        filepath = entry.get_text().strip()
+        if filepath and os.path.exists(filepath):
+            if self.sbml_parse_button:
+                self.sbml_parse_button.set_sensitive(True)
+        else:
+            if self.sbml_parse_button:
+                self.sbml_parse_button.set_sensitive(False)
+    
+    def _on_biomodels_entry_changed(self, entry):
+        """Handle BioModels ID entry changes - enable fetch button."""
+        biomodels_id = entry.get_text().strip()
+        if self.sbml_fetch_button:
+            self.sbml_fetch_button.set_sensitive(len(biomodels_id) > 0)
     
     def _on_browse_clicked(self, button):
         """Handle browse button click - open file chooser."""
@@ -191,6 +269,82 @@ class SBMLImportPanel:
             self._show_status(f"Selected: {os.path.basename(filepath)}")
         
         dialog.destroy()
+    
+    def _on_fetch_clicked(self, button):
+        """Handle fetch button click - download model from BioModels."""
+        if not self.sbml_biomodels_entry:
+            return
+        
+        biomodels_id = self.sbml_biomodels_entry.get_text().strip()
+        if not biomodels_id:
+            self._show_status("Please enter a BioModels ID", error=True)
+            return
+        
+        # Disable buttons during fetch
+        self.sbml_fetch_button.set_sensitive(False)
+        self.sbml_parse_button.set_sensitive(False)
+        self._show_status(f"Fetching {biomodels_id} from BioModels...")
+        
+        # Fetch in background
+        GLib.idle_add(self._fetch_biomodels_background, biomodels_id)
+    
+    def _fetch_biomodels_background(self, biomodels_id: str):
+        """Background task to fetch model from BioModels.
+        
+        Args:
+            biomodels_id: BioModels identifier (e.g., BIOMD0000000001)
+            
+        Returns:
+            False to stop GLib.idle_add from repeating
+        """
+        try:
+            import urllib.request
+            import tempfile
+            
+            # BioModels REST API URL
+            url = f"https://www.ebi.ac.uk/biomodels/model/download/{biomodels_id}?filename={biomodels_id}_url.xml"
+            
+            # Download to temporary file
+            temp_dir = tempfile.gettempdir()
+            temp_filepath = os.path.join(temp_dir, f"{biomodels_id}.xml")
+            
+            # Fetch the file
+            self._show_status(f"Downloading {biomodels_id}...")
+            urllib.request.urlretrieve(url, temp_filepath)
+            
+            # Verify file exists and has content
+            if not os.path.exists(temp_filepath) or os.path.getsize(temp_filepath) == 0:
+                self._show_status(f"Failed to download {biomodels_id}", error=True)
+                self.sbml_fetch_button.set_sensitive(True)
+                return False
+            
+            # Store filepath
+            self.current_filepath = temp_filepath
+            
+            # Update file entry to show the temp path
+            if self.sbml_file_entry:
+                self.sbml_file_entry.set_text(temp_filepath)
+            
+            # Enable parse button
+            if self.sbml_parse_button:
+                self.sbml_parse_button.set_sensitive(True)
+            
+            self._show_status(f"✓ Downloaded {biomodels_id} successfully")
+            
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                self._show_status(f"Model {biomodels_id} not found in BioModels", error=True)
+            else:
+                self._show_status(f"HTTP error {e.code}: {e.reason}", error=True)
+        except Exception as e:
+            self._show_status(f"Fetch error: {str(e)}", error=True)
+        
+        finally:
+            # Re-enable fetch button
+            if self.sbml_fetch_button:
+                self.sbml_fetch_button.set_sensitive(True)
+        
+        return False  # Don't repeat
     
     def _on_scale_changed(self, spin_button):
         """Handle scale factor spin button changes - update example."""
