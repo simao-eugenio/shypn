@@ -132,6 +132,63 @@ class SimulationController:
         # Timing configuration (composition pattern)
         from shypn.engine.simulation.settings import SimulationSettings
         self.settings = SimulationSettings()
+        
+        # Register to observe model changes (for arc transformations, deletions, etc.)
+        if hasattr(model, 'register_observer'):
+            model.register_observer(self._on_model_changed)
+
+    def _on_model_changed(self, event_type: str, obj, old_value=None, new_value=None):
+        """Handle model change notifications.
+        
+        Responds to model structure changes to keep simulation state consistent:
+        - Deleted transitions: Remove from behavior cache and state tracking
+        - Transformed arcs: Invalidate behaviors for affected transitions
+        - Created/deleted arcs: Invalidate model adapter caches
+        
+        Args:
+            event_type: 'created' | 'deleted' | 'modified' | 'transformed'
+            obj: The affected object (Place, Transition, or Arc)
+            old_value: Previous value (for transformed events)
+            new_value: New value (for transformed events)
+        """
+        from shypn.netobjs.transition import Transition
+        from shypn.netobjs.arc import Arc
+        
+        if event_type == 'deleted':
+            # If a transition was deleted, remove it from our caches
+            if isinstance(obj, Transition):
+                if obj.id in self.behavior_cache:
+                    del self.behavior_cache[obj.id]
+                if obj.id in self.transition_states:
+                    del self.transition_states[obj.id]
+            
+            # If an arc was deleted, invalidate model adapter caches
+            if isinstance(obj, Arc):
+                self.model_adapter.invalidate_caches()
+        
+        elif event_type == 'transformed':
+            # If an arc was transformed, rebuild behaviors for affected transitions
+            if isinstance(obj, Arc):
+                # Invalidate model adapter caches (arc dicts changed)
+                self.model_adapter.invalidate_caches()
+                
+                # Invalidate behavior cache for source and target transitions
+                # (they need to rebuild their input/output arc lists)
+                from shypn.netobjs.transition import Transition
+                if isinstance(obj.source, Transition):
+                    if obj.source.id in self.behavior_cache:
+                        del self.behavior_cache[obj.source.id]
+                if isinstance(obj.target, Transition):
+                    if obj.target.id in self.behavior_cache:
+                        del self.behavior_cache[obj.target.id]
+                
+                print(f"[SimulationController] Arc {obj.name} transformed from {old_value} to {new_value}, "
+                      f"behaviors rebuilt for affected transitions")
+        
+        elif event_type == 'created':
+            # New arc created, invalidate model adapter caches
+            if isinstance(obj, Arc):
+                self.model_adapter.invalidate_caches()
 
     def _get_behavior(self, transition):
         """Get or create behavior instance for a transition.

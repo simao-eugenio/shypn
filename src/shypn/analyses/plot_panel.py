@@ -72,8 +72,85 @@ class AnalysisPlotPanel(Gtk.Box):
         self.needs_update = False
         self.update_interval = 100
         self.last_data_length = {}
+        self._model_manager = None  # Will be set by register_with_model()
         self._setup_ui()
         GLib.timeout_add(self.update_interval, self._periodic_update)
+        # Periodic cleanup of stale objects (safety net)
+        GLib.timeout_add(5000, self._cleanup_stale_objects)
+
+    def register_with_model(self, model_manager):
+        """Register this panel to observe model changes.
+        
+        Args:
+            model_manager: ModelCanvasManager instance to observe
+        """
+        if self._model_manager is not None:
+            # Unregister from previous manager
+            self._model_manager.unregister_observer(self._on_model_changed)
+        
+        self._model_manager = model_manager
+        if model_manager is not None:
+            model_manager.register_observer(self._on_model_changed)
+
+    def _on_model_changed(self, event_type: str, obj, old_value=None, new_value=None):
+        """Handle model change notifications.
+        
+        Args:
+            event_type: 'created' | 'deleted' | 'modified' | 'transformed'
+            obj: The affected object (Place, Transition, or Arc)
+            old_value: Previous value (for transformed events)
+            new_value: New value (for transformed events)
+        """
+        if event_type == 'deleted':
+            # Remove deleted object from selection if present
+            self._remove_if_selected(obj)
+
+    def _remove_if_selected(self, obj):
+        """Remove object from selection if it's currently selected.
+        
+        Args:
+            obj: Object to remove from selection
+        """
+        # Check if object is in our selection
+        before_count = len(self.selected_objects)
+        self.selected_objects = [o for o in self.selected_objects 
+                                if o is not obj and o.id != obj.id]
+        
+        # If we removed something, trigger UI update
+        if len(self.selected_objects) < before_count:
+            self.needs_update = True
+            print(f"[AnalysisPlotPanel] Removed deleted {self.object_type} {obj.name} from selection")
+
+    def _cleanup_stale_objects(self):
+        """Periodic cleanup of stale object references (safety net).
+        
+        This method runs periodically to catch any objects that were deleted
+        but not properly removed from selection. This is a safety net in case
+        the observer pattern fails for any reason.
+        
+        Returns:
+            True to continue periodic callbacks
+        """
+        if self._model_manager is None:
+            return True
+        
+        # Get valid object IDs from model
+        if self.object_type == 'place':
+            valid_ids = {p.id for p in self._model_manager.places}
+        else:  # transition
+            valid_ids = {t.id for t in self._model_manager.transitions}
+        
+        # Remove objects with invalid IDs
+        before_count = len(self.selected_objects)
+        self.selected_objects = [o for o in self.selected_objects 
+                                if o.id in valid_ids]
+        
+        # If we removed something, trigger UI update
+        if len(self.selected_objects) < before_count:
+            self.needs_update = True
+            print(f"[AnalysisPlotPanel] Cleaned up {before_count - len(self.selected_objects)} stale objects")
+        
+        return True  # Continue periodic callbacks
 
     def _setup_ui(self):
         """Set up the panel UI components."""

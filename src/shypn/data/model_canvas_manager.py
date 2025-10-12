@@ -109,6 +109,9 @@ class ModelCanvasManager:
         # Dirty flag for redraw optimization
         self._needs_redraw = True
         
+        # Observer pattern for model change notifications
+        self._observers = []  # List of observer callbacks
+        
         # Ensure all arcs have proper manager references
         self.ensure_arc_references()
     
@@ -194,6 +197,57 @@ class ModelCanvasManager:
         """
         return self.current_tool is not None
     
+    # ==================== Observer Pattern ====================
+    
+    def register_observer(self, callback):
+        """Register callback for model change notifications.
+        
+        The callback will be invoked whenever objects are created, deleted,
+        modified, or transformed in the model.
+        
+        Args:
+            callback: Function(event_type, obj, old_value, new_value) where:
+                event_type: str - 'created' | 'deleted' | 'modified' | 'transformed'
+                obj: The affected object (Place, Transition, or Arc)
+                old_value: Previous value (for 'transformed' events)
+                new_value: New value (for 'transformed' events)
+        
+        Example:
+            def on_model_change(event_type, obj, old_value, new_value):
+                if event_type == 'deleted':
+                    print(f"Object {obj.id} was deleted")
+            
+            manager.register_observer(on_model_change)
+        """
+        if callback not in self._observers:
+            self._observers.append(callback)
+    
+    def unregister_observer(self, callback):
+        """Unregister an observer callback.
+        
+        Args:
+            callback: The callback function to remove
+        """
+        if callback in self._observers:
+            self._observers.remove(callback)
+    
+    def _notify_observers(self, event_type: str, obj, old_value=None, new_value=None):
+        """Notify all registered observers of a model change.
+        
+        Args:
+            event_type: Type of change ('created', 'deleted', 'modified', 'transformed')
+            obj: The affected object
+            old_value: Previous value (for transformations)
+            new_value: New value (for transformations)
+        """
+        for callback in self._observers:
+            try:
+                callback(event_type, obj, old_value, new_value)
+            except Exception as e:
+                print(f"Observer callback error: {e}")
+                import traceback
+                traceback.print_exc()
+    
     # ==================== Petri Net Object Management ====================
     
     def add_place(self, x, y, **kwargs):
@@ -224,6 +278,10 @@ class ModelCanvasManager:
         
         self.mark_modified()
         self.mark_dirty()
+        
+        # Notify observers of creation
+        self._notify_observers('created', place)
+        
         return place
     
     def add_transition(self, x, y, **kwargs):
@@ -254,6 +312,10 @@ class ModelCanvasManager:
         
         self.mark_modified()
         self.mark_dirty()
+        
+        # Notify observers of creation
+        self._notify_observers('created', transition)
+        
         return transition
     
     def add_arc(self, source, target, **kwargs):
@@ -289,6 +351,10 @@ class ModelCanvasManager:
         
         self.mark_modified()
         self.mark_dirty()
+        
+        # Notify observers of creation
+        self._notify_observers('created', arc)
+        
         return arc
     
     def remove_place(self, place):
@@ -300,6 +366,14 @@ class ModelCanvasManager:
             place: Place instance to remove
         """
         if place in self.places:
+            # Find affected arcs before removal
+            affected_arcs = [arc for arc in self.arcs 
+                           if arc.source == place or arc.target == place]
+            
+            # Notify observers about arc deletions first
+            for arc in affected_arcs:
+                self._notify_observers('deleted', arc)
+            
             # Remove connected arcs
             self.arcs = [arc for arc in self.arcs 
                         if arc.source != place and arc.target != place]
@@ -307,6 +381,9 @@ class ModelCanvasManager:
             self.places.remove(place)
             self.mark_modified()
             self.mark_dirty()
+            
+            # Notify observers about place deletion
+            self._notify_observers('deleted', place)
     
     def remove_transition(self, transition):
         """Remove a transition from the model.
@@ -317,6 +394,14 @@ class ModelCanvasManager:
             transition: Transition instance to remove
         """
         if transition in self.transitions:
+            # Find affected arcs before removal
+            affected_arcs = [arc for arc in self.arcs 
+                           if arc.source == transition or arc.target == transition]
+            
+            # Notify observers about arc deletions first
+            for arc in affected_arcs:
+                self._notify_observers('deleted', arc)
+            
             # Remove connected arcs
             self.arcs = [arc for arc in self.arcs 
                         if arc.source != transition and arc.target != transition]
@@ -324,6 +409,9 @@ class ModelCanvasManager:
             self.transitions.remove(transition)
             self.mark_modified()
             self.mark_dirty()
+            
+            # Notify observers about transition deletion
+            self._notify_observers('deleted', transition)
     
     def remove_arc(self, arc):
         """Remove an arc from the model.
@@ -335,6 +423,9 @@ class ModelCanvasManager:
             self.arcs.remove(arc)
             self.mark_modified()
             self.mark_dirty()
+            
+            # Notify observers about arc deletion
+            self._notify_observers('deleted', arc)
     
     def detect_parallel_arcs(self, arc):
         """Find arcs parallel to the given arc (same source/target or reversed).
@@ -494,6 +585,10 @@ class ModelCanvasManager:
         """
         try:
             index = self.arcs.index(old_arc)
+            
+            # Store old arc type for notification
+            old_arc_type = old_arc.arc_type
+            
             self.arcs[index] = new_arc
             
             # Ensure new arc has manager reference and change callback
@@ -502,6 +597,9 @@ class ModelCanvasManager:
             
             self.mark_modified()
             self.mark_dirty()
+            
+            # Notify observers of arc transformation
+            self._notify_observers('transformed', new_arc, old_arc_type, new_arc.arc_type)
         except ValueError:
             # Arc not found in list - may have been deleted
             pass
