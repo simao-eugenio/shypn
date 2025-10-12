@@ -450,7 +450,8 @@ class SBMLParser:
         metadata = {
             'source_file': str(filepath),
             'model_id': model.getId(),
-            'model_name': model.getName() or model.getId(),
+            'name': model.getName() or model.getId(),  # Primary name key
+            'model_name': model.getName() or model.getId(),  # Kept for compatibility
             'sbml_level': model.getLevel(),
             'sbml_version': model.getVersion(),
         }
