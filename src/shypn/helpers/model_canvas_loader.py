@@ -99,6 +99,44 @@ class ModelCanvasLoader:
             raise ValueError("Object 'model_canvas_container' not found in model_canvas.ui")
         if self.notebook is None:
             raise ValueError("Object 'canvas_notebook' not found in model_canvas.ui")
+        
+        # Apply CSS styling to notebook for bordered appearance
+        css_provider = Gtk.CssProvider()
+        css = b"""
+        notebook {
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            background: #f5f5f5;
+            padding: 0;
+        }
+        notebook > header {
+            background: transparent;
+            border-bottom: 1px solid #ccc;
+            padding: 2px;
+        }
+        notebook > header > tabs > tab {
+            border: none;
+            background: transparent;
+            padding: 0;
+            outline: none;
+        }
+        notebook > header > tabs > tab:hover {
+            background: transparent;
+        }
+        notebook > header > tabs > tab separator {
+            min-width: 0;
+            min-height: 0;
+            background: transparent;
+        }
+        notebook > stack {
+            border: none;
+            background: white;
+        }
+        """
+        css_provider.load_from_data(css)
+        style_context = self.notebook.get_style_context()
+        style_context.add_provider(css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        
         self.document_count = self.notebook.get_n_pages()
         if self.document_count > 0:
             page = self.notebook.get_nth_page(0)
@@ -125,8 +163,9 @@ class ModelCanvasLoader:
                 # Create tab label with file icon - show "default.shy" on startup
                 tab_box, tab_label, close_button = self._create_tab_label('default.shy', False)
                 close_button.connect('clicked', self._on_tab_close_clicked, page)
-                self.notebook.set_tab_label(page, tab_box)
+                # Show all widgets before setting as tab label
                 tab_box.show_all()
+                self.notebook.set_tab_label(page, tab_box)
         self.notebook.connect('switch-page', self._on_notebook_page_changed)
         return self.container
 
@@ -198,6 +237,33 @@ class ModelCanvasLoader:
         """
         tab_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
         
+        # Apply CSS styling for elevated tab appearance
+        css_provider = Gtk.CssProvider()
+        css = b"""
+        .tab-box {
+            padding: 8px 12px;
+            border: 1px solid #ccc;
+            border-bottom: none;
+            border-radius: 6px 6px 0 0;
+            background: linear-gradient(to bottom, #f5f5f5, #e8e8e8);
+            min-height: 32px;
+            margin-top: 0;
+            margin-bottom: -1px;
+            margin-left: 0;
+            margin-right: -1px;
+            box-shadow: 0 -2px 4px rgba(0,0,0,0.1);
+        }
+        .tab-box:hover {
+            background: linear-gradient(to bottom, #fff, #f0f0f0);
+            border-color: #999;
+            box-shadow: 0 -2px 6px rgba(0,0,0,0.15);
+        }
+        """
+        css_provider.load_from_data(css)
+        style_context = tab_box.get_style_context()
+        style_context.add_provider(css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        style_context.add_class('tab-box')
+        
         # File type icon (document icon for Petri nets)
         file_icon = Gtk.Image.new_from_icon_name('text-x-generic', Gtk.IconSize.MENU)
         file_icon.show()
@@ -209,13 +275,15 @@ class ModelCanvasLoader:
         elif not filename.endswith('.shy'):
             filename = f"{filename}.shy"
         
-        # Filename label with ellipsize for long names
+        # Filename label - expand to show full name without ellipsis
         display_name = f"{filename}{'*' if is_modified else ''}"
         tab_label = Gtk.Label(label=display_name)
-        tab_label.set_ellipsize(3)  # Pango.EllipsizeMode.END
-        tab_label.set_max_width_chars(20)
+        # Don't truncate - let tab expand to fit full filename
+        # tab_label.set_ellipsize(3)  # Removed - show full text
+        # tab_label.set_max_width_chars(20)  # Removed - no width limit
+        tab_label.set_xalign(0.0)  # Left align
         tab_label.show()
-        tab_box.pack_start(tab_label, True, True, 0)
+        tab_box.pack_start(tab_label, expand=True, fill=True, padding=0)
         
         # Close button (X)
         close_button = Gtk.Button()
