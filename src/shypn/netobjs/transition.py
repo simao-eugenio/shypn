@@ -55,8 +55,8 @@ class Transition(PetriNetObject):
         # Behavioral properties
         self.transition_type = 'immediate'  # Transition type: immediate, timed, stochastic, continuous
         self.enabled = True  # Can this transition fire?
-        self.guard = None  # Guard function/expression (enables/disables transition)
-        self.rate = None  # Rate function for consumption/production dynamics
+        self.guard = None  # Guard function/expression (enables/disables transition) - defaults to no guard
+        self.rate = 1.0  # Rate/delay for timed/stochastic/continuous transitions - defaults to 1.0
         self.priority = 0  # Priority for conflict resolution (higher = higher priority)
         
         # Source/Sink markers
