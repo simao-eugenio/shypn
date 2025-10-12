@@ -202,6 +202,73 @@ class TransitionRatePanel(AnalysisPlotPanel):
         """
         return 'Transition Behavior Evolution'
     
+    def _format_plot(self):
+        """Format the plot with labels, grid, legend, and smart Y-axis scaling.
+        
+        Overrides parent to add source/sink-aware Y-axis scaling:
+        - Source transitions: Generous upper margin for unbounded growth
+        - Sink transitions: Lower bound at 0 for bounded decrease
+        - Mixed/normal: Balanced margins
+        """
+        # Call parent formatting first
+        super()._format_plot()
+        
+        # Apply smart Y-axis scaling if not auto-scale
+        if not self.auto_scale and self.selected_objects:
+            self._apply_smart_ylim_scaling()
+    
+    def _apply_smart_ylim_scaling(self):
+        """Apply smart Y-axis limits based on transition types.
+        
+        Different transitions need different scaling:
+        - Source: Unbounded growth (generous upper margin +50%)
+        - Sink: Bounded to zero (lower limit at 0)
+        - Normal: Balanced margins (±10%)
+        """
+        ylim = self.axes.get_ylim()
+        y_range = ylim[1] - ylim[0]
+        
+        if y_range <= 0:
+            return
+        
+        # Detect if we have source or sink transitions
+        has_source = False
+        has_sink = False
+        
+        for obj in self.selected_objects:
+            is_source = getattr(obj, 'is_source', False)
+            is_sink = getattr(obj, 'is_sink', False)
+            
+            if is_source:
+                has_source = True
+            if is_sink:
+                has_sink = True
+        
+        # Apply appropriate margins based on transition types
+        if has_source and not has_sink:
+            # SOURCE: Generous upper margin for token generation
+            new_lower = max(0, ylim[0] - y_range * 0.1)  # Small lower margin
+            new_upper = ylim[1] + y_range * 0.5  # 50% upper margin
+            self.axes.set_ylim(new_lower, new_upper)
+            
+        elif has_sink and not has_source:
+            # SINK: Bottom at zero, modest upper margin
+            new_lower = 0  # Sinks converge to zero
+            new_upper = ylim[1] + y_range * 0.2  # 20% upper margin
+            self.axes.set_ylim(new_lower, new_upper)
+            
+        elif has_source and has_sink:
+            # MIXED: Balanced margins
+            new_lower = max(0, ylim[0] - y_range * 0.2)
+            new_upper = ylim[1] + y_range * 0.3
+            self.axes.set_ylim(new_lower, new_upper)
+            
+        else:
+            # NORMAL: Standard margins
+            new_lower = ylim[0] - y_range * 0.1
+            new_upper = ylim[1] + y_range * 0.1
+            self.axes.set_ylim(new_lower, new_upper)
+    
     def wire_search_ui(self, entry, search_btn, result_label, model):
         """Wire search UI controls to transition search functionality.
         
@@ -330,6 +397,10 @@ class TransitionRatePanel(AnalysisPlotPanel):
                 obj_name = getattr(obj, 'name', f'Transition{obj.id}')
                 transition_type = getattr(obj, 'transition_type', 'immediate')
                 
+                # Check source/sink status
+                is_source = getattr(obj, 'is_source', False)
+                is_sink = getattr(obj, 'is_sink', False)
+                
                 # Short type names for compact display
                 type_abbrev = {
                     'immediate': 'IMM',
@@ -337,6 +408,12 @@ class TransitionRatePanel(AnalysisPlotPanel):
                     'stochastic': 'STO',
                     'continuous': 'CON'
                 }.get(transition_type, transition_type[:3].upper())
+                
+                # Add source/sink indicator
+                if is_source:
+                    type_abbrev += '+SRC'
+                elif is_sink:
+                    type_abbrev += '+SNK'
                 
                 # Add transition row
                 row = Gtk.ListBoxRow()
@@ -371,67 +448,80 @@ class TransitionRatePanel(AnalysisPlotPanel):
                 if obj.id in self._locality_places:
                     locality_data = self._locality_places[obj.id]
                     
-                    # Add input places
-                    for place in locality_data['input_places']:
-                        place_row = Gtk.ListBoxRow()
-                        place_hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-                        place_hbox.set_margin_start(40)  # Indent to show hierarchy
-                        place_hbox.set_margin_end(6)
-                        place_hbox.set_margin_top(1)
-                        place_hbox.set_margin_bottom(1)
-                        
-                        # Lighter color box for places
-                        place_color_box = Gtk.DrawingArea()
-                        place_color_box.set_size_request(16, 16)
-                        # Derive lighter color for input places
-                        rgb = mcolors.hex2color(color)
-                        lighter_rgb = tuple(min(1.0, c + 0.2) for c in rgb)
-                        lighter_color = mcolors.rgb2hex(lighter_rgb)
-                        place_color_box.connect('draw', self._draw_color_box, lighter_color)
-                        place_hbox.pack_start(place_color_box, False, False, 0)
-                        
-                        # Place label with arrow
-                        place_name = getattr(place, 'name', f'Place{place.id}')
-                        tokens = getattr(place, 'tokens', 0)
-                        place_label = Gtk.Label(label=f"↓ {place_name} ({tokens} tokens)")
-                        place_label.set_xalign(0)
-                        place_label.get_style_context().add_class('dim-label')
-                        place_hbox.pack_start(place_label, True, True, 0)
-                        
-                        place_row.add(place_hbox)
-                        self.objects_listbox.add(place_row)
-                    
-                    # Add output places
-                    for place in locality_data['output_places']:
-                        place_row = Gtk.ListBoxRow()
-                        place_hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-                        place_hbox.set_margin_start(40)  # Indent to show hierarchy
-                        place_hbox.set_margin_end(6)
-                        place_hbox.set_margin_top(1)
-                        place_hbox.set_margin_bottom(1)
-                        
-                        # Darker color box for places
-                        place_color_box = Gtk.DrawingArea()
-                        place_color_box.set_size_request(16, 16)
-                        # Derive darker color for output places
-                        rgb = mcolors.hex2color(color)
-                        darker_rgb = tuple(max(0.0, c - 0.2) for c in rgb)
-                        darker_color = mcolors.rgb2hex(darker_rgb)
-                        place_color_box.connect('draw', self._draw_color_box, darker_color)
-                        place_hbox.pack_start(place_color_box, False, False, 0)
-                        
-                        # Place label with arrow
-                        place_name = getattr(place, 'name', f'Place{place.id}')
-                        tokens = getattr(place, 'tokens', 0)
-                        place_label = Gtk.Label(label=f"↑ {place_name} ({tokens} tokens)")
-                        place_label.set_xalign(0)
-                        place_label.get_style_context().add_class('dim-label')
-                        place_hbox.pack_start(place_label, True, True, 0)
-                        
-                        place_row.add(place_hbox)
-                        self.objects_listbox.add(place_row)
+                    # For source: Only show output places
+                    if is_source:
+                        for place in locality_data['output_places']:
+                            self._add_locality_place_row_to_list(
+                                place, color, "→ Output:", is_output=True
+                            )
+                    # For sink: Only show input places
+                    elif is_sink:
+                        for place in locality_data['input_places']:
+                            self._add_locality_place_row_to_list(
+                                place, color, "← Input:", is_output=False
+                            )
+                    # For normal: Show both input and output places
+                    else:
+                        # Add input places
+                        for place in locality_data['input_places']:
+                            self._add_locality_place_row_to_list(
+                                place, color, "← Input:", is_output=False
+                            )
+                        # Add output places
+                        for place in locality_data['output_places']:
+                            self._add_locality_place_row_to_list(
+                                place, color, "→ Output:", is_output=True
+                            )
         
         self.objects_listbox.show_all()
+    
+    def _add_locality_place_row_to_list(self, place, color, label_prefix, is_output):
+        """Add a locality place row to the objects list.
+        
+        Args:
+            place: Place object to add
+            color: Color hex string for the parent transition
+            label_prefix: Prefix string like "← Input:" or "→ Output:"
+            is_output: True if this is an output place, False if input
+        """
+        import gi
+        gi.require_version('Gtk', '3.0')
+        from gi.repository import Gtk
+        import matplotlib.colors as mcolors
+        
+        place_row = Gtk.ListBoxRow()
+        place_hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        place_hbox.set_margin_start(40)  # Indent to show hierarchy
+        place_hbox.set_margin_end(6)
+        place_hbox.set_margin_top(1)
+        place_hbox.set_margin_bottom(1)
+        
+        # Color box for place (lighter for input, darker for output)
+        place_color_box = Gtk.DrawingArea()
+        place_color_box.set_size_request(16, 16)
+        rgb = mcolors.hex2color(color)
+        
+        if is_output:
+            # Darker color for output places
+            modified_rgb = tuple(max(0.0, c - 0.2) for c in rgb)
+        else:
+            # Lighter color for input places
+            modified_rgb = tuple(min(1.0, c + 0.2) for c in rgb)
+        
+        modified_color = mcolors.rgb2hex(modified_rgb)
+        place_color_box.connect('draw', self._draw_color_box, modified_color)
+        place_hbox.pack_start(place_color_box, False, False, 0)
+        
+        # Place label
+        place_name = getattr(place, 'name', f'Place{place.id}')
+        tokens = getattr(place, 'tokens', 0)
+        place_label = Gtk.Label(label=f"{label_prefix} {place_name} ({tokens} tokens)")
+        place_label.set_xalign(0)
+        place_label.get_style_context().add_class('dim-label')
+        place_hbox.pack_start(place_label, True, True, 0)
+        
+        place_row.add(place_hbox)
+        self.objects_listbox.add(place_row)
     
     def _show_waiting_state(self):
         """Show message when objects are selected but simulation hasn't started."""

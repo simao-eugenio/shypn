@@ -87,12 +87,16 @@ class SearchHandler:
     def format_result_summary(results, object_type):
         """Format search results into a human-readable summary string.
         
+        For transitions, includes source/sink indicators:
+        - ⊙ = Source transition (generates tokens)
+        - ⊗ = Sink transition (consumes tokens)
+        
         Args:
             results: List of Place or Transition objects
             object_type: String "place" or "transition" for display
             
         Returns:
-            str: Formatted summary like "Found 3 places: P1, P2, P5"
+            str: Formatted summary like "Found 3 transitions: T1(⊙), T2, T3(⊗)"
         """
         if not results:
             return f"No {object_type}s found"
@@ -100,8 +104,23 @@ class SearchHandler:
         count = len(results)
         plural = "s" if count != 1 else ""
         
-        # Create list of names (P1, P2, ...) or (T1, T2, ...)
-        names = [obj.name for obj in results[:10]]  # Limit to first 10 for display
+        # Create list of names with type indicators for transitions
+        names = []
+        for obj in results[:10]:  # Limit to first 10 for display
+            if object_type == "transition":
+                # Add source/sink indicator
+                is_source = getattr(obj, 'is_source', False)
+                is_sink = getattr(obj, 'is_sink', False)
+                
+                if is_source:
+                    names.append(f"{obj.name}(⊙)")  # Source symbol
+                elif is_sink:
+                    names.append(f"{obj.name}(⊗)")  # Sink symbol
+                else:
+                    names.append(obj.name)
+            else:
+                names.append(obj.name)
+        
         names_str = ", ".join(names)
         
         if count > 10:

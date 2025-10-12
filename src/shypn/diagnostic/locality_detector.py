@@ -61,16 +61,53 @@ class Locality:
     
     @property
     def is_valid(self) -> bool:
-        """Check if locality is valid (has inputs AND outputs).
+        """Check if locality is valid.
         
-        A valid locality must have:
-        - At least 1 input place (tokens flow TO transition)
-        - At least 1 output place (tokens flow FROM transition)
+        A valid locality has at least one of:
+        - Input places (normal transition or sink)
+        - Output places (normal transition or source)
+        
+        Special cases (minimal localities per formal Petri net theory):
+        - Source: Only outputs (•t = ∅, t• ≠ ∅) - minimal locality = t•
+        - Sink: Only inputs (•t ≠ ∅, t• = ∅) - minimal locality = •t
+        - Normal: Both inputs and outputs
         
         Returns:
-            True if locality has both inputs and outputs
+            True if locality has inputs OR outputs (or both)
         """
+        # Check if transition is source or sink
+        is_source = getattr(self.transition, 'is_source', False)
+        is_sink = getattr(self.transition, 'is_sink', False)
+        
+        # Source: Valid if has outputs (minimal locality = t•)
+        if is_source:
+            return len(self.output_places) >= 1
+        
+        # Sink: Valid if has inputs (minimal locality = •t)
+        if is_sink:
+            return len(self.input_places) >= 1
+        
+        # Normal: Valid if has both inputs AND outputs
         return len(self.input_places) >= 1 and len(self.output_places) >= 1
+    
+    @property
+    def locality_type(self) -> str:
+        """Get locality type.
+        
+        Returns:
+            'source' | 'sink' | 'normal' | 'invalid'
+        """
+        is_source = getattr(self.transition, 'is_source', False)
+        is_sink = getattr(self.transition, 'is_sink', False)
+        
+        if is_source:
+            return 'source'
+        elif is_sink:
+            return 'sink'
+        elif self.is_valid:
+            return 'normal'
+        else:
+            return 'invalid'
     
     @property
     def place_count(self) -> int:
@@ -82,14 +119,25 @@ class Locality:
         return len(self.input_places) + len(self.output_places)
     
     def get_summary(self) -> str:
-        """Get human-readable summary.
+        """Get human-readable summary with source/sink awareness.
         
         Returns:
             String like "2 inputs → TransitionName → 3 outputs"
+            Or "TransitionName (source) → 2 outputs"
+            Or "1 input → TransitionName (sink)"
         """
-        return (f"{len(self.input_places)} inputs → "
-                f"{self.transition.name} → "
-                f"{len(self.output_places)} outputs")
+        locality_type = self.locality_type
+        
+        if locality_type == 'source':
+            return (f"{self.transition.name} (source) → "
+                    f"{len(self.output_places)} output{'s' if len(self.output_places) != 1 else ''}")
+        elif locality_type == 'sink':
+            return (f"{len(self.input_places)} input{'s' if len(self.input_places) != 1 else ''} → "
+                    f"{self.transition.name} (sink)")
+        else:
+            return (f"{len(self.input_places)} input{'s' if len(self.input_places) != 1 else ''} → "
+                    f"{self.transition.name} → "
+                    f"{len(self.output_places)} output{'s' if len(self.output_places) != 1 else ''}")
 
 
 class LocalityDetector:

@@ -539,6 +539,713 @@ class SimulationController:
         if self.data_collector is not None:
             self.data_collector.on_transition_fired(transition, self.time, details)
 
+    # ============================================================================
+    # Phase 1: Locality Independence Detection (Place-Sharing Analysis)
+    # ============================================================================
+    
+    def _get_all_places_for_transition(self, transition) -> set:
+        """Get all places (input and output) involved in a transition's locality.
+        
+        This extracts the complete neighborhood of a transition:
+        - Input places: •t (places that provide tokens TO transition)
+        - Output places: t• (places that receive tokens FROM transition)
+        
+        **Special handling for source/sink transitions (formal structure):**
+        - Source transition: Only output places (•t = ∅, locality = t•)
+        - Sink transition: Only input places (t• = ∅, locality = •t)
+        - Normal transition: Both input and output places (locality = •t ∪ t•)
+        
+        This ensures source/sink transitions have minimal localities and
+        are properly recognized in independence detection.
+        
+        Args:
+            transition: Transition object to analyze
+            
+        Returns:
+            Set of place IDs involved in this locality
+            
+        Examples:
+            Normal: P1 → T1 → P2  →  {P1.id, P2.id}
+            Source: T1 → P2       →  {P2.id} (only output)
+            Sink:   P1 → T1       →  {P1.id} (only input)
+        """
+        behavior = self._get_behavior(transition)
+        place_ids = set()
+        
+        # Check source/sink status
+        is_source = getattr(transition, 'is_source', False)
+        is_sink = getattr(transition, 'is_sink', False)
+        
+        # Get input places (•t) - SKIP for source transitions
+        if not is_source:
+            for arc in behavior.get_input_arcs():
+                if hasattr(arc, 'source_id'):
+                    place_ids.add(arc.source_id)
+                elif hasattr(arc, 'source') and hasattr(arc.source, 'id'):
+                    place_ids.add(arc.source.id)
+        
+        # Get output places (t•) - SKIP for sink transitions
+        if not is_sink:
+            for arc in behavior.get_output_arcs():
+                if hasattr(arc, 'target_id'):
+                    place_ids.add(arc.target_id)
+                elif hasattr(arc, 'target') and hasattr(arc.target, 'id'):
+                    place_ids.add(arc.target.id)
+        
+        return place_ids
+    
+    def _are_independent(self, t1, t2) -> bool:
+        """Check if two transitions are independent (don't share places).
+        
+        Two transitions are independent if their localities don't overlap:
+        - They don't share input places (no conflict for tokens)
+        - They don't share output places (no conflict for production)
+        
+        Mathematical definition:
+            t1 ⊥ t2  ⟺  (•t1 ∪ t1•) ∩ (•t2 ∪ t2•) = ∅
+        
+        **Source/Sink Independence:**
+        - Two source transitions: Independent unless they share output places
+          Example: T1(source)→P1, T2(source)→P2  →  Independent
+                   T1(source)→P1, T2(source)→P1  →  Dependent (same output)
+        
+        - Two sink transitions: Independent unless they share input places
+          Example: P1→T1(sink), P2→T2(sink)  →  Independent
+                   P1→T1(sink), P1→T2(sink)  →  Dependent (same input)
+        
+        - Source and sink: Always independent (no place overlap)
+          Example: T1(source)→P1, P2→T2(sink)  →  Independent
+        
+        - Source/sink with normal: Independent unless they share places
+          Example: T1(source)→P1, P1→T2→P2  →  Dependent (share P1)
+        
+        Independent transitions CAN fire in parallel (maximal step semantics).
+        Dependent transitions MUST fire sequentially (conflict resolution needed).
+        
+        Args:
+            t1: First transition
+            t2: Second transition
+            
+        Returns:
+            True if transitions don't share ANY places, False otherwise
+            
+        Examples:
+            Normal: P1→T1→P2, P3→T2→P4  →  Independent (no shared places)
+            Normal: P1→T1→P2, P1→T2→P3  →  Dependent (share P1)
+            Source: T1→P1, T2→P2        →  Independent (different outputs)
+            Sink:   P1→T1, P2→T2        →  Independent (different inputs)
+        """
+        # Get all places for each transition (respects source/sink structure)
+        places_t1 = self._get_all_places_for_transition(t1)
+        places_t2 = self._get_all_places_for_transition(t2)
+        
+        # Check for intersection (shared places)
+        shared_places = places_t1 & places_t2
+        
+        # Independent if NO shared places
+        return len(shared_places) == 0
+    
+    def _compute_conflict_sets(self, transitions: List) -> Dict[str, set]:
+        """Build conflict graph showing which transitions share places.
+        
+        A conflict graph represents dependencies between transitions:
+        - Nodes: Transitions
+        - Edges: Conflicts (transitions that share at least one place)
+        
+        Two transitions conflict if they share ANY place (input or output).
+        Conflicting transitions CANNOT fire simultaneously.
+        
+        This is the foundation for computing maximal concurrent sets
+        (Phase 2 implementation).
+        
+        Args:
+            transitions: List of Transition objects to analyze
+            
+        Returns:
+            Dictionary mapping transition ID to set of conflicting transition IDs
+            
+        Example:
+            Network:
+                P1 → T1 → P2
+                P1 → T2 → P3  (shares P1 with T1)
+                P4 → T3 → P5  (independent)
+            
+            Result:
+                {
+                    'T1': {'T2'},      # T1 conflicts with T2
+                    'T2': {'T1'},      # T2 conflicts with T1
+                    'T3': set()        # T3 has no conflicts
+                }
+        """
+        # Initialize empty conflict sets
+        conflict_sets = {t.id: set() for t in transitions}
+        
+        # Compare each pair of transitions
+        for i, t1 in enumerate(transitions):
+            for t2 in transitions[i+1:]:
+                # Check if they share places
+                if not self._are_independent(t1, t2):
+                    # They share places → Conflict!
+                    conflict_sets[t1.id].add(t2.id)
+                    conflict_sets[t2.id].add(t1.id)
+        
+        return conflict_sets
+    
+    def _get_independent_transitions(self, transitions: List) -> List[List]:
+        """Group transitions into independent sets (no place sharing within groups).
+        
+        This partitions transitions into groups where transitions within
+        each group are mutually independent (pairwise non-conflicting).
+        
+        This is useful for visualizing/debugging locality independence.
+        
+        Args:
+            transitions: List of Transition objects
+            
+        Returns:
+            List of lists, where each inner list contains independent transitions
+            
+        Example:
+            Network:
+                P1 → T1 → P2
+                P1 → T2 → P3  (conflicts with T1)
+                P4 → T3 → P5  (independent)
+                P4 → T4 → P6  (conflicts with T3)
+            
+            Result:
+                [
+                    [T1, T3],  # Group 1: T1 and T3 are independent
+                    [T2, T4]   # Group 2: T2 and T4 are independent
+                ]
+        """
+        if not transitions:
+            return []
+        
+        conflict_sets = self._compute_conflict_sets(transitions)
+        independent_groups = []
+        remaining = set(t.id for t in transitions)
+        transitions_by_id = {t.id: t for t in transitions}
+        
+        while remaining:
+            # Start new group with first remaining transition
+            current_id = next(iter(remaining))
+            current_group = [transitions_by_id[current_id]]
+            remaining.remove(current_id)
+            
+            # Try to add non-conflicting transitions to this group
+            to_check = list(remaining)
+            for tid in to_check:
+                # Check if this transition is independent of ALL in current group
+                independent_of_all = True
+                for group_transition in current_group:
+                    if tid in conflict_sets[group_transition.id]:
+                        independent_of_all = False
+                        break
+                
+                if independent_of_all:
+                    current_group.append(transitions_by_id[tid])
+                    remaining.remove(tid)
+            
+            independent_groups.append(current_group)
+        
+        return independent_groups
+
+    # ==================================================================================
+    # PHASE 2: MAXIMAL CONCURRENT SET COMPUTATION
+    # ==================================================================================
+    # These methods find maximal sets of transitions that can fire together.
+    # A maximal concurrent set is a set of independent transitions that cannot
+    # be extended without introducing conflicts.
+    #
+    # Algorithm: Hybrid approach using multiple greedy strategies to find diverse
+    # maximal sets. This provides good coverage without exponential complexity.
+    #
+    # Dependencies: Uses Phase 1 methods (_compute_conflict_sets, _are_independent)
+    # ==================================================================================
+
+    def _find_maximal_concurrent_sets(self, enabled_transitions: List, max_sets: int = 5) -> List[List]:
+        """
+        Find maximal concurrent sets of enabled transitions.
+        
+        A maximal concurrent set is a set of transitions where:
+        1. All transitions are mutually independent (don't share places)
+        2. Cannot add any more transitions without creating conflicts
+        
+        Uses hybrid approach with multiple greedy strategies to find diverse
+        maximal sets without exponential complexity.
+        
+        Args:
+            enabled_transitions: List of enabled Transition objects
+            max_sets: Maximum number of maximal sets to return (default: 5)
+            
+        Returns:
+            List of lists, each inner list is a maximal concurrent set of
+            Transition objects
+            
+        Example:
+            enabled = [T1, T2, T3, T4]
+            conflicts: T1↔T2 (share P1), T3↔T4 (share P5)
+            
+            Result: [[T1, T3], [T2, T4], [T1, T4], [T2, T3]]
+            Each is maximal (cannot add more without conflict)
+            
+        Complexity:
+            Time: O(k × n²) where k = max_sets, n = |enabled|
+            Space: O(n²) for conflict sets
+        """
+        if not enabled_transitions:
+            return []
+        
+        if len(enabled_transitions) == 1:
+            return [[enabled_transitions[0]]]
+        
+        # Build conflict graph using Phase 1
+        conflict_sets = self._compute_conflict_sets(enabled_transitions)
+        
+        maximal_sets = []
+        seen_sets = set()  # Track unique sets using frozenset of IDs
+        
+        # Strategy 1: Standard greedy from natural order
+        maximal_set = self._greedy_maximal_set(
+            enabled_transitions, conflict_sets, start_index=0
+        )
+        if maximal_set:
+            set_key = frozenset(t.id for t in maximal_set)
+            seen_sets.add(set_key)
+            maximal_sets.append(maximal_set)
+        
+        # Strategy 2: Try different starting points (rotation)
+        # This explores different orderings to find diverse maximal sets
+        for start_idx in range(1, min(len(enabled_transitions), max_sets)):
+            maximal_set = self._greedy_maximal_set(
+                enabled_transitions, conflict_sets, start_index=start_idx
+            )
+            if maximal_set:
+                set_key = frozenset(t.id for t in maximal_set)
+                if set_key not in seen_sets:
+                    seen_sets.add(set_key)
+                    maximal_sets.append(maximal_set)
+                    if len(maximal_sets) >= max_sets:
+                        break
+        
+        # Strategy 3: Prioritize transitions with MOST conflicts
+        # Handles constrained transitions first
+        if len(maximal_sets) < max_sets:
+            ordered = self._sort_by_conflict_degree(
+                enabled_transitions, conflict_sets, ascending=False
+            )
+            maximal_set = self._greedy_maximal_set(
+                ordered, conflict_sets, start_index=0
+            )
+            if maximal_set:
+                set_key = frozenset(t.id for t in maximal_set)
+                if set_key not in seen_sets:
+                    seen_sets.add(set_key)
+                    maximal_sets.append(maximal_set)
+        
+        # Strategy 4: Prioritize transitions with LEAST conflicts
+        # Maximizes set size by starting with least constrained
+        if len(maximal_sets) < max_sets:
+            ordered = self._sort_by_conflict_degree(
+                enabled_transitions, conflict_sets, ascending=True
+            )
+            maximal_set = self._greedy_maximal_set(
+                ordered, conflict_sets, start_index=0
+            )
+            if maximal_set:
+                set_key = frozenset(t.id for t in maximal_set)
+                if set_key not in seen_sets:
+                    seen_sets.add(set_key)
+                    maximal_sets.append(maximal_set)
+        
+        return maximal_sets
+
+    def _greedy_maximal_set(self, transitions: List, conflict_sets: dict, 
+                           start_index: int = 0) -> List:
+        """
+        Build one maximal concurrent set using greedy algorithm.
+        
+        Starting from a given position, greedily adds transitions that are
+        independent of all transitions already in the set.
+        
+        Args:
+            transitions: List of Transition objects to consider
+            conflict_sets: Dict mapping transition IDs to sets of conflicting IDs
+            start_index: Index to start greedy selection (for rotation)
+            
+        Returns:
+            List of Transition objects forming a maximal concurrent set
+            
+        Algorithm:
+            1. Start with transition at start_index
+            2. For each remaining transition:
+                - Check if independent of ALL in current set
+                - If yes, add to set
+            3. Result is maximal (cannot extend further)
+            
+        Complexity:
+            Time: O(n²) where n = |transitions|
+            Space: O(n)
+        """
+        if not transitions:
+            return []
+        
+        # Rotate list to start from different position
+        ordered = transitions[start_index:] + transitions[:start_index]
+        
+        # Initialize with first transition
+        maximal_set = [ordered[0]]
+        maximal_set_ids = {ordered[0].id}
+        
+        # Try to add each remaining transition
+        for t in ordered[1:]:
+            # Check if t is independent of ALL transitions in current set
+            can_add = True
+            for tid in maximal_set_ids:
+                if t.id in conflict_sets[tid]:
+                    # Conflict found - cannot add
+                    can_add = False
+                    break
+            
+            if can_add:
+                maximal_set.append(t)
+                maximal_set_ids.add(t.id)
+        
+        return maximal_set
+
+    def _sort_by_conflict_degree(self, transitions: List, conflict_sets: dict,
+                                 ascending: bool = True) -> List:
+        """
+        Sort transitions by number of conflicts (degree in conflict graph).
+        
+        Transitions with more conflicts are more "constrained" and may need
+        priority handling. Transitions with fewer conflicts are more "flexible".
+        
+        Args:
+            transitions: List of Transition objects
+            conflict_sets: Dict mapping transition IDs to sets of conflicting IDs
+            ascending: If True, sort by least conflicts first (flexible first)
+                      If False, sort by most conflicts first (constrained first)
+            
+        Returns:
+            Sorted list of Transition objects
+            
+        Example:
+            T1 conflicts with 3 transitions
+            T2 conflicts with 1 transition
+            T3 conflicts with 2 transitions
+            
+            ascending=True:  [T2, T3, T1] (least conflicts first)
+            ascending=False: [T1, T3, T2] (most conflicts first)
+        """
+        def conflict_degree(t):
+            return len(conflict_sets.get(t.id, set()))
+        
+        return sorted(transitions, key=conflict_degree, reverse=not ascending)
+
+    def _is_concurrent_set_maximal(self, concurrent_set: List, 
+                                   all_enabled: List, conflict_sets: dict) -> bool:
+        """
+        Check if a concurrent set is maximal (cannot be extended).
+        
+        A set is maximal if there is no transition outside the set that is
+        independent of all transitions in the set.
+        
+        Args:
+            concurrent_set: List of Transition objects in the set to check
+            all_enabled: List of all enabled Transition objects
+            conflict_sets: Dict mapping transition IDs to sets of conflicting IDs
+            
+        Returns:
+            True if the set is maximal, False if it can be extended
+            
+        Example:
+            concurrent_set = [T1, T3]
+            all_enabled = [T1, T2, T3, T4]
+            
+            If T2 conflicts with T1 AND T4 conflicts with T3:
+                → Cannot add T2 or T4 → Maximal ✅
+            
+            If T4 is independent of both T1 and T3:
+                → Can add T4 → Not maximal ❌
+        """
+        set_ids = {t.id for t in concurrent_set}
+        
+        # Try to add each transition not in the set
+        for t in all_enabled:
+            if t.id in set_ids:
+                continue  # Already in set, skip
+            
+            # Check if t is independent of ALL transitions in the set
+            can_add = True
+            for tid in set_ids:
+                if t.id in conflict_sets[tid]:
+                    # Conflict found - cannot add this transition
+                    can_add = False
+                    break
+            
+            if can_add:
+                # Found a transition we can add - not maximal!
+                return False
+        
+        # Cannot add any transition - is maximal!
+        return True
+
+    # ========================================================================
+    # PHASE 3: MAXIMAL STEP EXECUTION
+    # ========================================================================
+    # Atomic execution of maximal concurrent sets with rollback guarantees
+    # Methods: select, validate, snapshot, restore, execute
+    # ========================================================================
+
+    def _select_maximal_set(self, maximal_sets: List[List], 
+                           strategy: str = 'largest') -> List:
+        """
+        Select which maximal concurrent set to execute.
+        
+        Args:
+            maximal_sets: List of maximal concurrent sets from Phase 2
+            strategy: Selection strategy
+                - 'largest': Fire most transitions (maximize parallelism)
+                - 'priority': Fire highest priority transitions
+                - 'random': Random selection (for exploration)
+                - 'first': First set found (deterministic)
+                
+        Returns:
+            Selected maximal concurrent set (List of Transition objects)
+            Empty list if no sets provided
+            
+        Example:
+            maximal_sets = [[T1, T3], [T2, T3], [T2]]
+            
+            strategy='largest': → [T1, T3] or [T2, T3] (both size 2)
+            strategy='priority': → Based on sum of priorities
+            strategy='random': → Any set randomly
+            strategy='first': → [T1, T3] (first in list)
+        """
+        if not maximal_sets:
+            return []
+        
+        if strategy == 'largest':
+            # Maximize parallelism - choose set with most transitions
+            return max(maximal_sets, key=len)
+        
+        elif strategy == 'priority':
+            # Maximize sum of priorities
+            def total_priority(tset):
+                return sum(getattr(t, 'priority', 0) for t in tset)
+            return max(maximal_sets, key=total_priority)
+        
+        elif strategy == 'random':
+            # Random for exploration
+            return random.choice(maximal_sets)
+        
+        elif strategy == 'first':
+            # Deterministic (natural order from Phase 2)
+            return maximal_sets[0]
+        
+        else:
+            # Unknown strategy - fall back to first
+            return maximal_sets[0]
+
+    def _validate_all_can_fire(self, transition_set: List) -> bool:
+        """
+        Check if all transitions in set are currently enabled.
+        
+        Pre-flight validation before snapshot to avoid rollback overhead.
+        
+        Args:
+            transition_set: List of Transition objects to validate
+            
+        Returns:
+            True if all transitions can fire, False otherwise
+            
+        Checks:
+            1. All input places have sufficient tokens
+            2. All guards evaluate to True (if present)
+            3. All arc thresholds are met (if applicable)
+            
+        Example:
+            T1: P1(2) --[weight=1]--> T1 ---> P2
+            T2: P3(0) --[weight=1]--> T2 ---> P4
+            
+            validate([T1, T2]) → False (P3 has 0 < 1 tokens)
+            validate([T1]) → True (P1 has 2 >= 1 tokens)
+        """
+        for transition in transition_set:
+            # Find input arcs for this transition
+            for arc in self.model.arcs:
+                if arc.target == transition:
+                    # This is an input arc (place → transition)
+                    place = arc.source
+                    
+                    # Get weight/threshold
+                    tokens_needed = getattr(arc, 'weight', 1)
+                    if hasattr(arc, 'threshold') and arc.threshold is not None:
+                        tokens_needed = arc.threshold
+                    
+                    # Check sufficient tokens
+                    if place.tokens < tokens_needed:
+                        return False  # Not enough tokens
+            
+            # Check guard condition (if any)
+            if hasattr(transition, 'guard') and transition.guard is not None:
+                try:
+                    if not transition.guard.evaluate():
+                        return False  # Guard prevents firing
+                except Exception:
+                    return False  # Guard evaluation failed
+        
+        return True  # All transitions can fire
+
+    def _snapshot_marking(self) -> dict:
+        """
+        Create snapshot of current marking for rollback.
+        
+        Returns:
+            Dictionary mapping place_id → token_count
+            
+        Used for atomic execution: If any transition fails, we can
+        restore to this snapshot.
+        
+        Example:
+            Before: {P1: 2, P2: 0, P3: 1}
+            Snapshot: {'P1': 2, 'P2': 0, 'P3': 1}
+            
+            (Used later for rollback if execution fails)
+        """
+        # Handle both dict and list for places
+        places = self.model.places if hasattr(self.model, 'places') else []
+        if isinstance(places, dict):
+            return {place.id: place.tokens for place in places.values()}
+        else:
+            return {place.id: place.tokens for place in places}
+
+    def _restore_marking(self, snapshot: dict) -> None:
+        """
+        Restore marking from snapshot (rollback).
+        
+        Args:
+            snapshot: Dictionary from _snapshot_marking()
+            
+        Restores all place token counts to snapshotted values.
+        Used when maximal step execution fails partway through.
+        
+        Example:
+            snapshot = {'P1': 2, 'P2': 0, 'P3': 1}
+            
+            After partial execution: {P1: 1, P2: 1, P3: 1}
+            After restore: {P1: 2, P2: 0, P3: 1}  # Reverted ✓
+        """
+        # Handle both dict and list for places
+        places = self.model.places if hasattr(self.model, 'places') else []
+        if isinstance(places, dict):
+            places = places.values()
+        
+        for place in places:
+            if place.id in snapshot:
+                place.tokens = snapshot[place.id]
+
+    def _execute_maximal_step(self, transition_set: List) -> tuple:
+        """
+        Execute all transitions in set atomically with rollback guarantee.
+        
+        Uses three-phase commit protocol:
+        1. VALIDATE: Check all transitions can fire
+        2. PREPARE: Create snapshot for rollback
+        3. COMMIT: Execute all transitions (rollback on failure)
+        
+        Args:
+            transition_set: List of Transition objects to fire atomically
+            
+        Returns:
+            Tuple of (success: bool, fired_transitions: List, error: str)
+            - success: True if all transitions fired, False if any failed
+            - fired_transitions: List of transitions that fired (empty on failure)
+            - error: Error message (empty on success)
+            
+        Guarantees:
+            - Atomicity: All fire or none fire
+            - Consistency: Net state remains valid
+            - Isolation: No partial states visible
+            
+        Example:
+            Success case:
+                execute([T1, T3]) → (True, [T1, T3], "")
+                
+            Failure case:
+                execute([T1, T3]) → (False, [], "T3 failed: insufficient tokens")
+                (Net state rolled back to before attempt)
+        """
+        if not transition_set:
+            return (False, [], "Empty transition set")
+        
+        # PHASE 1: VALIDATE
+        if not self._validate_all_can_fire(transition_set):
+            return (False, [], "Pre-condition failed: Not all transitions enabled")
+        
+        # PHASE 2: PREPARE (snapshot for rollback)
+        snapshot = self._snapshot_marking()
+        
+        try:
+            # PHASE 3: COMMIT (execute atomically)
+            fired = []
+            
+            # Sort by priority for deterministic execution order
+            sorted_transitions = sorted(
+                transition_set, 
+                key=lambda t: (getattr(t, 'priority', 0), t.id), 
+                reverse=True
+            )
+            
+            for transition in sorted_transitions:
+                # Remove input tokens
+                for arc in self.model.arcs:
+                    if arc.target == transition:
+                        # Input arc (place → transition)
+                        place = arc.source
+                        
+                        # Get weight/threshold
+                        tokens_needed = getattr(arc, 'weight', 1)
+                        if hasattr(arc, 'threshold') and arc.threshold is not None:
+                            tokens_needed = arc.threshold
+                        
+                        # Safety check (should not fail after validation)
+                        if place.tokens < tokens_needed:
+                            raise RuntimeError(
+                                f"{transition.id} cannot fire: {place.id} has "
+                                f"{place.tokens} < {tokens_needed} tokens"
+                            )
+                        
+                        place.tokens -= tokens_needed
+                
+                # Execute transition behavior (if any)
+                if hasattr(transition, 'behavior') and transition.behavior is not None:
+                    try:
+                        transition.behavior.execute()
+                    except Exception as e:
+                        raise RuntimeError(
+                            f"{transition.id} behavior failed: {e}"
+                        )
+                
+                # Add output tokens
+                for arc in self.model.arcs:
+                    if arc.source == transition:
+                        # Output arc (transition → place)
+                        place = arc.target
+                        tokens_produced = getattr(arc, 'weight', 1)
+                        place.tokens += tokens_produced
+                
+                fired.append(transition)
+            
+            # SUCCESS: All transitions fired
+            return (True, fired, "")
+            
+        except Exception as e:
+            # ROLLBACK: Restore snapshot
+            self._restore_marking(snapshot)
+            return (False, [], f"Execution failed: {e}, rolled back")
+
     def _select_transition(self, enabled_transitions: List) -> Any:
         """Select one transition from enabled set based on conflict resolution policy.
         
