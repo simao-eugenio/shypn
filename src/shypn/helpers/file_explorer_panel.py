@@ -1057,6 +1057,10 @@ class FileExplorerPanel:
             if hasattr(self, 'persistency') and self.persistency:
                 self.persistency.set_filepath(filepath)
                 self.persistency.mark_clean()
+            
+            # Update tab label to show the actual filename
+            self.canvas_loader.update_current_tab_label(filename, is_modified=False)
+            
             drawing_area.queue_draw()
 
     def new_document(self):
@@ -1088,13 +1092,19 @@ class FileExplorerPanel:
         """Called by NetObjPersistency when a file is saved.
         
         Updates the current file display and refreshes the file explorer tree
-        to show the newly saved file.
+        to show the newly saved file. Also updates the tab label.
         
         Args:
             filepath: Full path to the saved file
         """
         self.set_current_file(filepath)
         self._load_current_directory()
+        
+        # Update tab label to show the saved filename
+        if hasattr(self, 'canvas_loader') and self.canvas_loader:
+            import os
+            filename = os.path.basename(filepath)
+            self.canvas_loader.update_current_tab_label(filename, is_modified=False)
 
     def _on_file_loaded_callback(self, filepath: str, document):
         """Called by NetObjPersistency when a file is loaded.
@@ -1116,6 +1126,7 @@ class FileExplorerPanel:
         """Called by NetObjPersistency when dirty state changes.
         
         Updates the current file display to show dirty state indicator (asterisk).
+        Also updates the tab label to show the asterisk.
         
         Args:
             is_dirty: True if document has unsaved changes, False otherwise
@@ -1129,6 +1140,13 @@ class FileExplorerPanel:
             elif not is_dirty and display.endswith(' *'):
                 display = display[:-2]
             self.current_file_label.set_text(display)
+        
+        # Update tab label to show/hide asterisk
+        if hasattr(self, 'canvas_loader') and self.canvas_loader:
+            if hasattr(self, 'persistency') and self.persistency:
+                import os
+                filename = os.path.basename(self.persistency.current_filepath) if self.persistency.current_filepath else 'default.shy'
+                self.canvas_loader.update_current_tab_label(filename, is_modified=is_dirty)
 
     def set_current_file(self, filename_or_path: Optional[str]):
         """Set the currently opened file to display in toolbar.

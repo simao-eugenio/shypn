@@ -122,8 +122,8 @@ class ModelCanvasLoader:
                 if drawing_area and isinstance(drawing_area, Gtk.DrawingArea):
                     self._setup_canvas_manager(drawing_area)
             if drawing_area:
-                # Create tab label with file icon
-                tab_box, tab_label, close_button = self._create_tab_label('default', False)
+                # Create tab label with file icon - show "default.shy" on startup
+                tab_box, tab_label, close_button = self._create_tab_label('default.shy', False)
                 close_button.connect('clicked', self._on_tab_close_clicked, page)
                 self.notebook.set_tab_label(page, tab_box)
                 tab_box.show_all()
@@ -200,6 +200,7 @@ class ModelCanvasLoader:
         
         # File type icon (document icon for Petri nets)
         file_icon = Gtk.Image.new_from_icon_name('text-x-generic', Gtk.IconSize.MENU)
+        file_icon.show()
         tab_box.pack_start(file_icon, False, False, 0)
         
         # Use 'default.shy' if no filename provided
@@ -213,6 +214,7 @@ class ModelCanvasLoader:
         tab_label = Gtk.Label(label=display_name)
         tab_label.set_ellipsize(3)  # Pango.EllipsizeMode.END
         tab_label.set_max_width_chars(20)
+        tab_label.show()
         tab_box.pack_start(tab_label, True, True, 0)
         
         # Close button (X)
@@ -221,7 +223,10 @@ class ModelCanvasLoader:
         close_button.set_focus_on_click(False)
         close_icon = Gtk.Image.new_from_icon_name('window-close-symbolic', Gtk.IconSize.BUTTON)
         close_button.set_image(close_icon)
+        close_button.show()
         tab_box.pack_start(close_button, False, False, 0)
+        
+        tab_box.show()
         
         return (tab_box, tab_label, close_button)
 
@@ -250,6 +255,22 @@ class ModelCanvasLoader:
             if isinstance(label, Gtk.Label):
                 display_name = f"{filename}{'*' if is_modified else ''}"
                 label.set_text(display_name)
+
+    def update_current_tab_label(self, filename='default', is_modified=False):
+        """Update the current (active) tab's label with new filename.
+        
+        Public method to be called when a file is opened or saved.
+        
+        Args:
+            filename: New filename (can include or exclude .shy extension)
+            is_modified: Whether document has unsaved changes
+        """
+        current_page = self.notebook.get_current_page()
+        if current_page < 0:
+            return
+        page_widget = self.notebook.get_nth_page(current_page)
+        if page_widget:
+            self._update_tab_label(page_widget, filename, is_modified)
 
     def close_tab(self, page_num):
         """Close a tab after checking for unsaved changes.
