@@ -527,8 +527,10 @@ class SBMLImportPanel:
         # Compartments info
         if pathway.compartments:
             lines.append(f"Compartments: {len(pathway.compartments)}")
-            for comp in pathway.compartments[:5]:
-                lines.append(f"  • {comp.name or comp.id}")
+            # pathway.compartments is a dict {id: name}, not a list
+            comp_items = list(pathway.compartments.items())[:5]
+            for comp_id, comp_name in comp_items:
+                lines.append(f"  • {comp_name or comp_id}")
             if len(pathway.compartments) > 5:
                 lines.append(f"  ... and {len(pathway.compartments) - 5} more")
         

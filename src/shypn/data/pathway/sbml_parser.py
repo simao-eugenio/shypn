@@ -461,7 +461,13 @@ class SBMLParser:
             # Extract plain text from notes (simplified)
             notes = model.getNotesString()
             if notes:
-                metadata['notes'] = notes[:500]  # Truncate to 500 chars
+                # Ensure notes is a string and truncate
+                try:
+                    notes_str = str(notes) if not isinstance(notes, str) else notes
+                    metadata['notes'] = notes_str[:500]  # Truncate to 500 chars
+                except Exception as e:
+                    self.logger.warning(f"Could not process notes: {e}")
+                    metadata['notes'] = "Notes unavailable"
         
         return PathwayData(
             species=species,
