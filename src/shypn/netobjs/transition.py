@@ -342,6 +342,90 @@ class Transition(PetriNetObject):
         
         return data
     
+    def validate_source_sink_structure(self, arcs_list) -> tuple:
+        """Validate that source/sink structure matches formal definition.
+        
+        Formal definitions (strict):
+        - Source transition: •t = ∅ (no input arcs), t• ≠ ∅ (has output arcs)
+        - Sink transition: •t ≠ ∅ (has input arcs), t• = ∅ (no output arcs)
+        
+        Args:
+            arcs_list: List of all arcs in the model (or iterable)
+            
+        Returns:
+            tuple: (is_valid: bool, error_message: str, incompatible_arcs: list)
+                - is_valid: True if structure is correct, False otherwise
+                - error_message: Description of the problem (empty if valid)
+                - incompatible_arcs: List of arcs that violate the structure
+        """
+        incompatible_arcs = []
+        
+        # Convert dict to list if needed
+        if isinstance(arcs_list, dict):
+            arcs_list = list(arcs_list.values())
+        
+        # Find all input and output arcs for this transition
+        input_arcs = []
+        output_arcs = []
+        
+        for arc in arcs_list:
+            # Check if arc targets this transition (input arc)
+            if hasattr(arc, 'target'):
+                if arc.target == self or (hasattr(arc.target, 'id') and arc.target.id == self.id):
+                    input_arcs.append(arc)
+            elif hasattr(arc, 'target_id') and arc.target_id == self.id:
+                input_arcs.append(arc)
+            
+            # Check if arc sources from this transition (output arc)
+            if hasattr(arc, 'source'):
+                if arc.source == self or (hasattr(arc.source, 'id') and arc.source.id == self.id):
+                    output_arcs.append(arc)
+            elif hasattr(arc, 'source_id') and arc.source_id == self.id:
+                output_arcs.append(arc)
+        
+        # Validate source transition structure
+        if self.is_source:
+            if len(input_arcs) > 0:
+                incompatible_arcs = input_arcs
+                return (
+                    False,
+                    f"Source transition '{self.name}' cannot have input arcs "
+                    f"(found {len(input_arcs)}). Source transitions must have "
+                    f"no input places (•t = ∅).",
+                    incompatible_arcs
+                )
+            
+            if len(output_arcs) == 0:
+                return (
+                    False,
+                    f"Source transition '{self.name}' must have at least one output arc. "
+                    f"Source transitions generate tokens to output places (t• ≠ ∅).",
+                    []
+                )
+        
+        # Validate sink transition structure
+        if self.is_sink:
+            if len(output_arcs) > 0:
+                incompatible_arcs = output_arcs
+                return (
+                    False,
+                    f"Sink transition '{self.name}' cannot have output arcs "
+                    f"(found {len(output_arcs)}). Sink transitions must have "
+                    f"no output places (t• = ∅).",
+                    incompatible_arcs
+                )
+            
+            if len(input_arcs) == 0:
+                return (
+                    False,
+                    f"Sink transition '{self.name}' must have at least one input arc. "
+                    f"Sink transitions consume tokens from input places (•t ≠ ∅).",
+                    []
+                )
+        
+        # Valid structure
+        return (True, "", [])
+    
     @classmethod
     def from_dict(cls, data: dict) -> 'Transition':
         """Create transition from dictionary (deserialization).
