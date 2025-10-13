@@ -174,8 +174,12 @@ Please read [CONTRIBUTING.md](doc/CONTRIBUTING.md) for details on our code of co
 
 All project documentation is located in the [`doc/`](doc/) directory:
 
+### Core Documentation
+- **[COORDINATE_SYSTEM.md](doc/COORDINATE_SYSTEM.md)** - Coordinate system conventions (Cartesian vs Graphics)
 - **[CONTRIBUTING.md](doc/CONTRIBUTING.md)** - Contribution guidelines and code standards
 - **[CHANGELOG.md](doc/CHANGELOG.md)** - Version history and changes
+
+### Technical Documentation
 - **[REFINEMENTS_LOG.md](doc/REFINEMENTS_LOG.md)** - Detailed technical refinements and fixes
 - **[CANVAS_CONTROLS.md](doc/CANVAS_CONTROLS.md)** - Canvas control and interaction documentation
 - **[ZOOM_PALETTE.md](doc/ZOOM_PALETTE.md)** - Zoom palette implementation details
@@ -184,6 +188,8 @@ All project documentation is located in the [`doc/`](doc/) directory:
 - **[DOCUMENTATION_UPDATE_SUMMARY.md](doc/DOCUMENTATION_UPDATE_SUMMARY.md)** - Recent documentation updates
 
 See the [`doc/`](doc/) directory for additional technical documentation and implementation notes.
+
+**Note on Coordinate Systems**: This project uses Cartesian coordinates conceptually (origin at lower-left, Y grows upward) for all documentation and mathematical reasoning, but implements using standard graphics coordinates (origin at top-left, Y grows downward) for Cairo/GTK rendering. See [COORDINATE_SYSTEM.md](doc/COORDINATE_SYSTEM.md) for details.
 
 ## License
 

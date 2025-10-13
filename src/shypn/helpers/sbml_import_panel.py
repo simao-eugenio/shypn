@@ -17,6 +17,7 @@ This follows the MVC pattern:
 """
 import os
 import sys
+import logging
 from typing import Optional
 
 try:
@@ -68,6 +69,7 @@ class SBMLImportPanel:
         """
         self.builder = builder
         self.model_canvas = model_canvas
+        self.logger = logging.getLogger(self.__class__.__name__)
         
         # Initialize backend components
         if SBMLParser and PathwayValidator and PathwayPostProcessor and PathwayConverter:
@@ -577,13 +579,58 @@ class SBMLImportPanel:
             self._show_status("Calculating layout and colors...")
             self.postprocessor = PathwayPostProcessor(
                 spacing=spacing,
-                scale_factor=scale_factor
+                scale_factor=scale_factor,
+                use_tree_layout=True  # Enable tree-based aperture angle layout
             )
             self.processed_pathway = self.postprocessor.process(self.parsed_pathway)
             
             # Convert to DocumentModel
             self._show_status("Converting to Petri net...")
             document_model = self.converter.convert(self.processed_pathway)
+            
+            # Check layout type to decide on enhancements
+            layout_type = document_model.metadata.get('layout_type', 'unknown')
+            self.logger.info(f"Layout type: {layout_type}")
+            
+            # Apply KEGG-style enhancements for better visualization
+            # Skip arc routing for hierarchical layouts (straight arcs look better)
+            try:
+                from shypn.pathway.options import EnhancementOptions
+                from shypn.pathway.pipeline import EnhancementPipeline
+                from shypn.pathway.layout_optimizer import LayoutOptimizer
+                from shypn.pathway.arc_router import ArcRouter
+                
+                # Decide on arc routing based on layout type
+                # Skip arc routing for hierarchical layouts (straight arcs preserve angular paths)
+                enable_arc_routing = layout_type not in ['hierarchical', 'hierarchical-tree', 'cross-reference']
+                
+                # Create enhancement options
+                enhancement_options = EnhancementOptions(
+                    enable_layout_optimization=True,
+                    enable_arc_routing=enable_arc_routing,  # Conditional!
+                    enable_metadata_enhancement=False,  # No KEGG metadata for SBML
+                    enable_visual_validation=False,
+                    layout_min_spacing=80.0,
+                    layout_max_iterations=50
+                )
+                
+                # Build enhancement pipeline
+                pipeline = EnhancementPipeline(enhancement_options)
+                pipeline.add_processor(LayoutOptimizer(enhancement_options))
+                
+                # Only add arc router if enabled
+                if enable_arc_routing:
+                    pipeline.add_processor(ArcRouter(enhancement_options))
+                    self.logger.info("Arc routing enabled (complex layout)")
+                else:
+                    self.logger.info(f"Arc routing disabled (hierarchical layout - straight arcs)")
+                
+                # Enhance the document
+                self._show_status("Optimizing layout...")
+                document_model = pipeline.process(document_model, None)  # No pathway object for SBML
+                
+            except Exception as e:
+                self.logger.warning(f"Enhancement failed: {e}, using basic layout")
             
             # Load into canvas
             self._show_status("Loading to canvas...")
@@ -595,11 +642,22 @@ class SBMLImportPanel:
                 
                 # Get the canvas manager for this tab
                 manager = self.model_canvas.get_canvas_manager(drawing_area)
+                
                 if manager:
                     # Load the document model into the manager
                     manager.places = list(document_model.places)
                     manager.transitions = list(document_model.transitions)
                     manager.arcs = list(document_model.arcs)
+                    
+                    print(f"  Loaded into manager:")
+                    print(f"    Places: {len(manager.places)}")
+                    print(f"    Transitions: {len(manager.transitions)}")
+                    print(f"    Arcs: {len(manager.arcs)}")
+                    if manager.places:
+                        p = manager.places[0]
+                        print(f"    First place: {p.name} at ({p.x}, {p.y})")
+                        print(f"    Border color: {p.border_color}")
+                        print(f"    Default: {p.DEFAULT_BORDER_COLOR}")
                     
                     # Update ID counters
                     manager._next_place_id = document_model._next_place_id

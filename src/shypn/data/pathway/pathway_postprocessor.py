@@ -33,6 +33,7 @@ from .pathway_data import (
     Species,
     Reaction,
 )
+from .hierarchical_layout import BiochemicalLayoutProcessor
 
 
 # Color palette for compartments
@@ -83,28 +84,80 @@ class LayoutProcessor(BaseProcessor):
     simple grid layout.
     """
     
-    def __init__(self, pathway: PathwayData, spacing: float = 150.0):
+    def __init__(self, pathway: PathwayData, spacing: float = 150.0, use_tree_layout: bool = False):
         """
         Initialize layout processor.
         
         Args:
             pathway: The pathway data
             spacing: Distance between nodes in pixels
+            use_tree_layout: If True, use tree-based aperture angle layout for hierarchical pathways
         """
         super().__init__(pathway)
         self.spacing = spacing
+        self.use_tree_layout = use_tree_layout
     
     def process(self, processed_data: ProcessedPathwayData) -> None:
-        """Calculate and assign positions."""
+        """Calculate and assign positions.
         
+        Tries layout strategies in order of quality:
+        1. Cross-reference (KEGG/Reactome coordinates) - BEST
+        2. Hierarchical (top-to-bottom flow) - GOOD for metabolic pathways
+        3. Force-directed (networkx) - OK for complex networks
+        4. Grid (fallback) - BASIC
+        """
+        
+        # STRATEGY 1: Try cross-reference resolution first (KEGG, etc.)
+        try:
+            from .sbml_layout_resolver import SBMLLayoutResolver
+            resolver = SBMLLayoutResolver(self.pathway)
+            positions = resolver.resolve_layout()
+            
+            if positions:
+                processed_data.positions = positions
+                # Still need to position reactions
+                self._position_reactions_between_compounds(processed_data)
+                # Mark as cross-reference layout (straight arcs preferred)
+                processed_data.metadata['layout_type'] = 'cross-reference'
+                self.logger.info(
+                    f"✓ Using cross-reference layout for {len(positions)} elements"
+                )
+                return
+        except Exception as e:
+            self.logger.debug(f"Cross-reference resolution failed: {e}")
+        
+        # STRATEGY 2: Try hierarchical layout (biochemical top-to-bottom)
+        try:
+            layout_processor = BiochemicalLayoutProcessor(
+                self.pathway, 
+                spacing=self.spacing,
+                use_tree_layout=self.use_tree_layout  # Pass through tree layout flag
+            )
+            layout_processor.process(processed_data)
+            
+            if processed_data.positions:
+                # layout_type already set by BiochemicalLayoutProcessor
+                self.logger.info(
+                    f"✓ Using hierarchical layout for {len(processed_data.positions)} elements"
+                )
+                return
+        except Exception as e:
+            self.logger.debug(f"Hierarchical layout failed: {e}")
+        
+        # STRATEGY 3: Force-directed layout (requires networkx)
         if HAS_NETWORKX:
             self._calculate_force_directed_layout(processed_data)
+            processed_data.metadata['layout_type'] = 'force-directed'
+            self.logger.info(
+                f"✓ Using force-directed layout for {len(processed_data.positions)} elements"
+            )
         else:
+            # STRATEGY 4: Grid layout (last resort)
             self._calculate_grid_layout(processed_data)
-        
-        self.logger.info(
-            f"Calculated positions for {len(processed_data.positions)} elements"
-        )
+            processed_data.metadata['layout_type'] = 'grid'
+            self.logger.info(
+                f"✓ Using grid layout for {len(processed_data.positions)} elements"
+            )
     
     def _calculate_force_directed_layout(self, processed_data: ProcessedPathwayData) -> None:
         """Calculate layout using networkx force-directed algorithm."""
@@ -148,6 +201,26 @@ class LayoutProcessor(BaseProcessor):
         except Exception as e:
             self.logger.error(f"Force-directed layout failed: {e}")
             self._calculate_grid_layout(processed_data)
+    
+    def _position_reactions_between_compounds(self, processed_data: ProcessedPathwayData) -> None:
+        """Position reactions at average of their reactants/products.
+        
+        Helper for cross-reference layout where only species have positions.
+        """
+        for reaction in self.pathway.reactions:
+            x_positions = []
+            y_positions = []
+            
+            for species_id, _ in reaction.reactants + reaction.products:
+                if species_id in processed_data.positions:
+                    x, y = processed_data.positions[species_id]
+                    x_positions.append(x)
+                    y_positions.append(y)
+            
+            if x_positions and y_positions:
+                avg_x = sum(x_positions) / len(x_positions)
+                avg_y = sum(y_positions) / len(y_positions)
+                processed_data.positions[reaction.id] = (avg_x, avg_y)
     
     def _calculate_grid_layout(self, processed_data: ProcessedPathwayData) -> None:
         """Calculate simple grid layout as fallback."""
@@ -337,7 +410,8 @@ class PathwayPostProcessor:
     def __init__(
         self,
         spacing: float = 150.0,
-        scale_factor: float = 1.0
+        scale_factor: float = 1.0,
+        use_tree_layout: bool = False
     ):
         """
         Initialize post-processor.
@@ -345,9 +419,11 @@ class PathwayPostProcessor:
         Args:
             spacing: Distance between nodes in pixels (for layout)
             scale_factor: Multiplier for concentration → tokens conversion
+            use_tree_layout: If True, use tree-based aperture angle layout for hierarchical pathways
         """
         self.spacing = spacing
         self.scale_factor = scale_factor
+        self.use_tree_layout = use_tree_layout
         self.logger = logging.getLogger(self.__class__.__name__)
     
     def process(self, pathway: PathwayData) -> ProcessedPathwayData:
@@ -376,7 +452,7 @@ class PathwayPostProcessor:
         
         # Create processors
         processors = [
-            LayoutProcessor(pathway, self.spacing),
+            LayoutProcessor(pathway, self.spacing, self.use_tree_layout),
             ColorProcessor(pathway),
             UnitNormalizer(pathway, self.scale_factor),
             NameResolver(pathway),

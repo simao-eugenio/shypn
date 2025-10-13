@@ -38,8 +38,8 @@ def create_behavior(transition, model) -> TransitionBehavior:
         >>> print(type(behavior).__name__)
         'ImmediateBehavior'
     """
-    # Get transition type (default to 'immediate' if not specified)
-    transition_type = getattr(transition, 'transition_type', 'immediate')
+    # Get transition type (default to 'continuous' if not specified)
+    transition_type = getattr(transition, 'transition_type', 'continuous')
     
     # Type mapping (all behaviors now implemented)
     type_map = {

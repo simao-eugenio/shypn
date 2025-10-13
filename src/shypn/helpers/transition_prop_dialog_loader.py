@@ -216,10 +216,10 @@ class TransitionPropDialogLoader(GObject.GObject):
         # Transition type combo box
         type_combo = self.builder.get_object('prop_transition_type_combo')
         if type_combo and hasattr(self.transition_obj, 'transition_type'):
-            transition_type = self.transition_obj.transition_type if self.transition_obj.transition_type else 'immediate'
+            transition_type = self.transition_obj.transition_type if self.transition_obj.transition_type else 'continuous'
             # Map type to combo index: immediate=0, timed=1, stochastic=2, continuous=3
             type_map = {'immediate': 0, 'timed': 1, 'stochastic': 2, 'continuous': 3}
-            index = type_map.get(transition_type, 0)  # Default to immediate
+            index = type_map.get(transition_type, 3)  # Default to continuous
             type_combo.set_active(index)
         
         # Priority spin button

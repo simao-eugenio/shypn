@@ -323,7 +323,7 @@ class PropertyChangeOperation(UndoOperation):
             obj.width = snapshot['width']
             obj.height = snapshot['height']
             obj.horizontal = snapshot['horizontal']
-            obj.transition_type = snapshot.get('transition_type', 'immediate')
+            obj.transition_type = snapshot.get('transition_type', 'continuous')
             if 'rate' in snapshot and hasattr(obj, 'rate'):
                 obj.rate = snapshot['rate']
             if 'delay' in snapshot and hasattr(obj, 'delay'):

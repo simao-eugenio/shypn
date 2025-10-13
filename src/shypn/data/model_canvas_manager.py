@@ -12,6 +12,13 @@ for the Petri Net model editor. It handles:
 - Petri net object collections (places, transitions, arcs)
 - View state persistence (pan, zoom)
 
+Coordinate System:
+- Uses standard Cairo/GTK graphics coordinates
+- Origin: (0, 0) at top-left corner
+- X-axis: increases to the right
+- Y-axis: increases downward
+- See doc/COORDINATE_SYSTEM.md for conceptual vs implementation details
+
 The manager maintains the model state separately from GTK widgets,
 making it easier to test and maintain.
 """
@@ -81,6 +88,10 @@ class ModelCanvasManager:
         
         # Grid style
         self.grid_style = self.GRID_STYLE_LINE  # Default to line grid
+        
+        # Snap to grid (enabled by default)
+        self.snap_to_grid = True
+        self.grid_snap_spacing = 10.0  # Grid spacing for snapping
         
         # Tool selection state
         self.current_tool = None  # Currently selected tool ('place', 'transition', 'arc', or None)
@@ -166,6 +177,19 @@ class ModelCanvasManager:
         screen_x = (world_x + self.pan_x) * self.zoom
         screen_y = (world_y + self.pan_y) * self.zoom
         return screen_x, screen_y
+    
+    def snap_to_grid_coord(self, value: float) -> float:
+        """Snap a coordinate value to grid if snap to grid is enabled.
+        
+        Args:
+            value: Coordinate value to snap
+            
+        Returns:
+            float: Snapped coordinate (or original if snapping disabled)
+        """
+        if self.snap_to_grid:
+            return round(value / self.grid_snap_spacing) * self.grid_snap_spacing
+        return value
     
     # ==================== Tool Management ====================
     
@@ -261,6 +285,10 @@ class ModelCanvasManager:
         Returns:
             Place: The newly created place instance
         """
+        # Snap to grid if enabled
+        x = self.snap_to_grid_coord(x)
+        y = self.snap_to_grid_coord(y)
+        
         place_id = self._next_place_id
         place_name = f"P{place_id}"
         self._next_place_id += 1
@@ -295,6 +323,10 @@ class ModelCanvasManager:
         Returns:
             Transition: The newly created transition instance
         """
+        # Snap to grid if enabled
+        x = self.snap_to_grid_coord(x)
+        y = self.snap_to_grid_coord(y)
+        
         transition_id = self._next_transition_id
         transition_name = f"T{transition_id}"
         self._next_transition_id += 1

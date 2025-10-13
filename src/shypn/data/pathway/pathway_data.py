@@ -3,6 +3,12 @@ Pathway Data Classes
 
 Data structures for representing biochemical pathway information
 before conversion to Petri nets.
+
+Coordinate System Note:
+- Position data stored as (x, y) tuples use graphics coordinates
+- Origin at top-left, Y increases downward (standard Cairo/GTK)
+- Conceptually represents Cartesian space (see doc/COORDINATE_SYSTEM.md)
+- Higher Y values = further descended in pathway hierarchy
 """
 
 from dataclasses import dataclass, field

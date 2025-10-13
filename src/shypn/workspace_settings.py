@@ -33,6 +33,10 @@ class WorkspaceSettings:
                 "x": None,  # None = let window manager decide
                 "y": None,
                 "maximized": False
+            },
+            "editor": {
+                "snap_to_grid": True,  # Snap to grid enabled by default
+                "grid_spacing": 10.0   # Default grid spacing in pixels
             }
         }
         
@@ -85,4 +89,44 @@ class WorkspaceSettings:
             "y": y,
             "maximized": maximized
         }
+        self.save()
+    
+    def get_snap_to_grid(self) -> bool:
+        """Get snap to grid setting.
+        
+        Returns:
+            bool: Whether snap to grid is enabled
+        """
+        editor = self.settings.get("editor", {})
+        return editor.get("snap_to_grid", True)  # Default True
+    
+    def set_snap_to_grid(self, enabled: bool) -> None:
+        """Set snap to grid setting.
+        
+        Args:
+            enabled: Whether to enable snap to grid
+        """
+        if "editor" not in self.settings:
+            self.settings["editor"] = {}
+        self.settings["editor"]["snap_to_grid"] = enabled
+        self.save()
+    
+    def get_grid_spacing(self) -> float:
+        """Get grid spacing setting.
+        
+        Returns:
+            float: Grid spacing in pixels
+        """
+        editor = self.settings.get("editor", {})
+        return editor.get("grid_spacing", 10.0)  # Default 10.0px
+    
+    def set_grid_spacing(self, spacing: float) -> None:
+        """Set grid spacing setting.
+        
+        Args:
+            spacing: Grid spacing in pixels
+        """
+        if "editor" not in self.settings:
+            self.settings["editor"] = {}
+        self.settings["editor"]["grid_spacing"] = spacing
         self.save()
