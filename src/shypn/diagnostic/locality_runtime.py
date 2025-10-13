@@ -273,7 +273,7 @@ class LocalityRuntimeAnalyzer:
         """
         transition_id = transition.id
         transition_name = getattr(transition, 'name', f'T{transition_id}')
-        transition_type = getattr(transition, 'transition_type', 'immediate')
+        transition_type = getattr(transition, 'transition_type', 'continuous')
         
         try:
             # Get input arcs

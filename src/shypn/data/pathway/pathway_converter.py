@@ -80,14 +80,18 @@ class SpeciesConverter(BaseConverter):
         
         for species in self.pathway.species:
             # Get position (from post-processor)
+            if species.id not in self.pathway.positions:
+                self.logger.warning(
+                    f"Species '{species.id}' has no position, using fallback (100.0, 100.0)"
+                )
             x, y = self.pathway.positions.get(species.id, (100.0, 100.0))
             
             # Get compartment color (from post-processor)
             compartment = species.compartment or "default"
             color_hex = self.pathway.colors.get(compartment, "#E8F4F8")
             
-            # Convert hex color to RGB tuple
-            border_color = self._hex_to_rgb(color_hex)
+            # Convert hex color to RGB tuple (not used for now - colors too light)
+            # border_color = self._hex_to_rgb(color_hex)
             
             # Create place
             place = self.document.create_place(
@@ -100,8 +104,9 @@ class SpeciesConverter(BaseConverter):
             place.set_tokens(species.initial_tokens)
             place.set_initial_marking(species.initial_tokens)
             
-            # Set visual properties
-            place.border_color = border_color
+            # Keep default black border for visibility
+            # TODO: Use compartment colors for fill instead of border
+            # place.border_color = border_color
             
             # Store metadata for traceability
             if not hasattr(place, 'metadata'):
@@ -155,6 +160,10 @@ class ReactionConverter(BaseConverter):
         
         for reaction in self.pathway.reactions:
             # Get position (from post-processor)
+            if reaction.id not in self.pathway.positions:
+                self.logger.warning(
+                    f"Reaction '{reaction.id}' has no position, using fallback (200.0, 200.0)"
+                )
             x, y = self.pathway.positions.get(reaction.id, (200.0, 200.0))
             
             # Create transition
@@ -181,8 +190,8 @@ class ReactionConverter(BaseConverter):
                     transition.transition_type = "timed"
                     transition.rate = 1.0
             else:
-                # Default: immediate transition
-                transition.transition_type = "immediate"
+                # Default: continuous transition (for biochemical pathways)
+                transition.transition_type = "continuous"
                 transition.rate = 1.0
             
             # Store metadata for traceability
@@ -333,7 +342,8 @@ class PathwayConverter:
             "pathway_name": pathway.metadata.get('name', 'Unknown'),
             "species_count": len(pathway.species),
             "reactions_count": len(pathway.reactions),
-            "compartments": list(pathway.compartments.keys())
+            "compartments": list(pathway.compartments.keys()),
+            "layout_type": pathway.metadata.get('layout_type', 'unknown')
         }
         
         # Convert species to places

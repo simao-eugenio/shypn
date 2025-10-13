@@ -267,7 +267,7 @@ class AnalysisPlotPanel(Gtk.Box):
                 hbox.pack_start(color_box, False, False, 0)
                 obj_name = getattr(obj, 'name', f'{self.object_type.title()}{obj.id}')
                 if self.object_type == 'transition':
-                    transition_type = getattr(obj, 'transition_type', 'immediate')
+                    transition_type = getattr(obj, 'transition_type', 'continuous')
                     type_abbrev = {'immediate': 'IMM', 'timed': 'TIM', 'stochastic': 'STO', 'continuous': 'CON'}.get(transition_type, transition_type[:3].upper())
                     label_text = f'{obj_name} [{type_abbrev}] ({self.object_type[0].upper()}{obj.id})'
                 else:
@@ -395,7 +395,7 @@ class AnalysisPlotPanel(Gtk.Box):
                 color = self._get_color(i)
                 obj_name = getattr(obj, 'name', f'{self.object_type.title()}{obj.id}')
                 if self.object_type == 'transition':
-                    transition_type = getattr(obj, 'transition_type', 'immediate')
+                    transition_type = getattr(obj, 'transition_type', 'continuous')
                     type_abbrev = {'immediate': 'IMM', 'timed': 'TIM', 'stochastic': 'STO', 'continuous': 'CON'}.get(transition_type, transition_type[:3].upper())
                     legend_label = f'{obj_name} [{type_abbrev}]'
                 else:

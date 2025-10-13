@@ -851,25 +851,34 @@ class ModelCanvasLoader:
         drawing_area.queue_draw()
 
     def _on_simulation_reset(self, palette, drawing_area):
-        """Handle simulation reset - blank analysis plots and prepare for new data.
+        """Handle simulation reset - blank analysis plots immediately.
+        
+        IMPORTANT: Force immediate canvas blanking by calling update_plot() directly
+        instead of setting needs_update=True. This ensures plots are cleared synchronously
+        with the reset action, providing immediate visual feedback to the user.
         
         Args:
             palette: SwissKnifePalette that forwarded the signal
             drawing_area: GtkDrawingArea widget for the canvas
         """
         if self.right_panel_loader:
+            # Place panel - force immediate update
             if hasattr(self.right_panel_loader, 'place_panel') and self.right_panel_loader.place_panel:
                 panel = self.right_panel_loader.place_panel
                 panel.last_data_length.clear()
+                # Force immediate canvas blank/update - don't wait for periodic check
                 if panel.selected_objects:
-                    panel.needs_update = True
+                    panel.update_plot()  # Will show empty plot with 0 data
                 else:
                     panel._show_empty_state()
+            
+            # Transition panel - force immediate update
             if hasattr(self.right_panel_loader, 'transition_panel') and self.right_panel_loader.transition_panel:
                 panel = self.right_panel_loader.transition_panel
                 panel.last_data_length.clear()
+                # Force immediate canvas blank/update - don't wait for periodic check
                 if panel.selected_objects:
-                    panel.needs_update = True
+                    panel.update_plot()  # Will show empty plot with 0 data
                 else:
                     panel._show_empty_state()
 
@@ -1671,7 +1680,7 @@ class ModelCanvasLoader:
         if isinstance(obj, Transition):
             type_submenu_item = Gtk.MenuItem(label='Change Type ►')
             type_submenu = Gtk.Menu()
-            current_type = getattr(obj, 'transition_type', 'immediate')
+            current_type = getattr(obj, 'transition_type', 'continuous')
             transition_types = [('immediate', 'Immediate (zero delay)'), ('timed', 'Timed (TPN)'), ('stochastic', 'Stochastic (GSPN)'), ('continuous', 'Continuous (SHPN)')]
             for type_value, type_label in transition_types:
                 if type_value == current_type:
@@ -2353,7 +2362,7 @@ class ModelCanvasLoader:
             drawing_area: GtkDrawingArea widget
         """
         from shypn.netobjs import Transition
-        old_type = getattr(transition, 'transition_type', 'immediate')
+        old_type = getattr(transition, 'transition_type', 'continuous')
         if old_type == new_type:
             return
         transition.transition_type = new_type

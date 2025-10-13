@@ -53,7 +53,7 @@ class Transition(PetriNetObject):
         self.border_width = self.DEFAULT_BORDER_WIDTH
         
         # Behavioral properties
-        self.transition_type = 'immediate'  # Transition type: immediate, timed, stochastic, continuous
+        self.transition_type = 'continuous'  # Transition type: immediate, timed, stochastic, continuous (default: continuous)
         self.enabled = True  # Can this transition fire?
         self.guard = None  # Guard function/expression (enables/disables transition) - defaults to no guard
         self.rate = 1.0  # Rate/delay for timed/stochastic/continuous transitions - defaults to 1.0

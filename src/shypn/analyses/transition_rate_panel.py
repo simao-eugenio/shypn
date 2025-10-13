@@ -395,7 +395,7 @@ class TransitionRatePanel(AnalysisPlotPanel):
             for i, obj in enumerate(self.selected_objects):
                 color = self._get_color(i)
                 obj_name = getattr(obj, 'name', f'Transition{obj.id}')
-                transition_type = getattr(obj, 'transition_type', 'immediate')
+                transition_type = getattr(obj, 'transition_type', 'continuous')
                 
                 # Check source/sink status
                 is_source = getattr(obj, 'is_source', False)
@@ -530,7 +530,7 @@ class TransitionRatePanel(AnalysisPlotPanel):
         
         for i, obj in enumerate(self.selected_objects):
             obj_name = getattr(obj, 'name', f'Transition{obj.id}')
-            transition_type = getattr(obj, 'transition_type', 'immediate')
+            transition_type = getattr(obj, 'transition_type', 'continuous')
             type_abbrev = {
                 'immediate': 'IMM',
                 'timed': 'TIM',
@@ -613,7 +613,7 @@ class TransitionRatePanel(AnalysisPlotPanel):
                 obj_name = getattr(obj, 'name', f'Transition{obj.id}')
                 
                 # Include type in legend
-                transition_type = getattr(obj, 'transition_type', 'immediate')
+                transition_type = getattr(obj, 'transition_type', 'continuous')
                 type_abbrev = {
                     'immediate': 'IMM',
                     'timed': 'TIM',

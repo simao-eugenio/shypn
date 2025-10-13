@@ -1,546 +1,381 @@
 # Simulation Time Scaling Analysis
 
-**Date**: October 11, 2025  
-**Subject**: Analysis of current simulation time control capabilities
+**Question**: In a simple net `P1 → T → P2` with P1=300 tokens, where the real phenomenon takes 2 hours, can I see the complete process in 1 second of viewing time?
 
-## User Requirements Analysis
+**Answer**: ✅ **YES**, and you have **THREE different ways** to achieve this!
 
-### Stated Requirements
+## Executive Summary
 
-1. **Real-time phenomena observation**: Should support milliseconds, seconds, minutes, hours, or days
-2. **Time scale control**: Want to see the whole observed real-time phenomenon in different time scales
-3. **Evolution visualization**: Should see the whole evolution of a phenomenon in any time scale
-4. **Example scenario**: See hours of real-time phenomenon in one minute of simulation playback
+To simulate a 2-hour real process in 1 second of viewing time, you need a **7,200x speedup** (2 hours = 7,200 seconds).
 
-### Core Need
-**Ability to compress/expand real-world time when visualizing simulation results**
+### Three Approaches:
 
-Example: A biological process that takes 24 hours in reality should be viewable in:
-- 1 minute (1440x speedup)
-- 5 minutes (288x speedup)  
-- Real-time (1x)
-- Slow motion (0.1x)
+| Approach | Parameter | Value | Best For |
+|----------|-----------|-------|----------|
+| **1. Time Scale** | `time_scale` | 7200.0 | **Watching visualization** at high speed |
+| **2. Transition Rate** | `transition.rate` | 150.0 tokens/s | Matching **real flow rates** |
+| **3. Duration + dt** | `duration=2h`, `dt=0.001s` | Fast forward | **Batch processing** without animation |
 
 ---
 
-## Current Implementation Status
+## Understanding the Problem
 
-### ✅ What IS Implemented
-
-#### 1. **Model Time Units** (`TimeUnits` enum)
-- **Location**: `src/shypn/utils/time_utils.py`
-- **Supported units**: milliseconds, seconds, minutes, hours, days
-- **Purpose**: Define the time scale of the **model itself**
-- **Status**: ✅ COMPLETE
-
-```python
-class TimeUnits(Enum):
-    MILLISECONDS = ('milliseconds', 'ms', 0.001)
-    SECONDS = ('seconds', 's', 1.0)
-    MINUTES = ('minutes', 'min', 60.0)
-    HOURS = ('hours', 'hr', 3600.0)
-    DAYS = ('days', 'd', 86400.0)
+### Your Net Structure
+```
+P1 (300 tokens) → T (continuous) → P2 (0 tokens)
 ```
 
-#### 2. **Simulation Duration Control**
-- **Location**: `src/shypn/engine/simulation/settings.py`
-- **Feature**: Set total simulation duration
-- **Units**: Can be specified in any TimeUnits
-- **Status**: ✅ COMPLETE
+### Real Phenomenon
+- **Duration**: 2 hours
+- **Flow**: 300 tokens must move from P1 to P2
+- **Real rate**: 300 tokens / 7200 seconds = 0.04167 tokens/second
 
-```python
-settings.set_duration(24.0, TimeUnits.HOURS)  # Simulate 24 hours
-```
-
-#### 3. **Time Step Control**
-- **Location**: `SimulationSettings.get_effective_dt()`
-- **Modes**:
-  - **Auto**: `dt = duration / 1000` (default 1000 steps)
-  - **Manual**: User-specified dt
-- **Status**: ✅ COMPLETE
-
-```python
-# Auto: 24 hours / 1000 steps = 86.4 seconds per step
-settings.dt_auto = True
-
-# Manual: 10 seconds per step
-settings.dt_auto = False
-settings.dt_manual = 10.0
-```
-
-#### 4. **Batch Step Execution** (Animation Smoothness)
-- **Location**: `SimulationController._simulation_loop()`
-- **Feature**: Execute multiple simulation steps per GUI update
-- **Purpose**: Smooth animation for very small time steps
-- **Status**: ✅ COMPLETE
-
-```python
-gui_interval_s = 0.1  # 100ms GUI updates
-self._steps_per_callback = max(1, int(gui_interval_s / time_step))
-```
-
-**Example**: If dt = 0.002s (2ms model time):
-- Steps per GUI update: 0.1 / 0.002 = 50 steps
-- Result: 50 simulation steps every 100ms = smooth animation
+### Viewing Requirement
+- **Watch it in**: 1 second
+- **Speedup needed**: 7200x
 
 ---
 
-### ❌ What IS NOT Implemented
+## Solution 1: Time Scale (Playback Speed) ⭐ RECOMMENDED
 
-#### 1. **Playback Speed / Time Scale** ⚠️ **CRITICAL MISSING**
+### Concept
+Time scale controls **playback speed** - how fast you watch the simulation.
 
-**Problem**: No independent control of visualization speed vs. model time
+```
+time_scale = model_seconds / real_seconds
+```
 
-**Current behavior**:
-- Model time step = GUI update rate
-- If dt = 1 second, each GUI update advances 1 second of model time
-- **NO WAY to say**: "Show me 1 hour of model time in 1 minute of real-world playback"
-
-**What's needed**:
+### Configuration
 ```python
-# DESIRED (not implemented):
-settings.time_scale = 60.0  # 60x speedup
-# 1 second of real-world playback = 60 seconds of model time
+# In simulation settings:
+settings.time_scale = 7200.0  # 7200 seconds of model time per 1 second of real time
 
-settings.time_scale = 0.1  # 10x slowdown  
-# 1 second of real-world playback = 0.1 seconds of model time
+# Transition configuration:
+T.transition_type = "continuous"
+T.rate = 0.04167  # Real-world rate (tokens/second in model time)
 ```
 
-**Current workaround** (inadequate):
-- Adjust `dt_manual` to smaller values → faster playback
-- **Limitation**: This changes the **simulation accuracy**, not just visualization speed
-- Small dt = more accurate but slower computation
-- Large dt = less accurate but faster computation
-- **No way to decouple simulation accuracy from playback speed**
+### How It Works
+1. **Model time**: Simulation runs for 7200 seconds (2 hours)
+2. **Transition rate**: 0.04167 tokens/s (real-world rate)
+3. **Viewing time**: You watch it in 1 second (7200x faster playback)
 
-#### 2. **Independent Visualization Tempo**
-
-**Problem**: Playback rate is coupled to simulation computation
-
-**Current flow**:
+### Calculation Details
 ```
-User clicks "Run" 
-→ GLib timeout every 100ms
-→ Execute N simulation steps (based on dt)
-→ Update GUI
-→ Repeat
+GUI update interval = 0.1 seconds (fixed)
+Model time per GUI update = 0.1s × 7200 = 720 seconds
+Time step dt = 0.1 seconds (auto-calculated)
+Steps per GUI update = 720s / 0.1s = 7200 steps
+
+Result: In 1 second of viewing (10 GUI updates):
+- Model advances 7200 seconds (2 hours)
+- Tokens flow at real-world rate: 0.04167 tokens/s × 7200s = 300 tokens
+- P1: 300 → 0
+- P2: 0 → 300 ✅
 ```
 
-**What's missing**:
-- Ability to pre-compute simulation results
-- Then play back at any desired speed
-- Like video playback: pause, slow-mo, fast-forward
+### Advantages
+✅ **Accurate physics** - Uses real-world rates  
+✅ **Flexible viewing** - Change playback speed without changing model  
+✅ **Smooth animation** - System batches steps automatically  
+✅ **Reusable model** - Same model works at any viewing speed  
 
-#### 3. **Real-Time Clock vs. Model Time Display**
-
-**Partial implementation**:
-- Time display shows **model time** (simulation time)
-- **No display of**: Real-world elapsed time, playback speed multiplier
-
-**Needed**:
-```
-Model Time:    2.5 hours
-Real Time:     3 minutes elapsed  
-Speed:         50x (50 model seconds per 1 real second)
-```
+### Disadvantages
+⚠️ Very high time_scale values (>1000x) may cause UI responsiveness issues  
+⚠️ System caps at 1000 steps per GUI update for safety  
 
 ---
 
-## Technical Analysis
+## Solution 2: Transition Rate (Flow Speed) 🔥
 
-### Current Architecture
+### Concept
+Increase the **transition rate** to make tokens flow faster.
 
-```
-┌─────────────────────────────────────────────────────┐
-│ SimulationSettings                                   │
-│                                                      │
-│ - time_units: TimeUnits (model time interpretation) │
-│ - duration: float (how long to simulate)            │
-│ - dt_auto/dt_manual: float (time step size)         │
-│ - time_scale: float ⚠️ DEFINED BUT NOT USED         │
-└─────────────────────────────────────────────────────┘
-                           │
-                           ▼
-┌─────────────────────────────────────────────────────┐
-│ SimulationController                                 │
-│                                                      │
-│ - step(time_step): Execute one step                 │
-│ - run(): Continuous execution                        │
-│   → GLib.timeout_add(100ms, _simulation_loop)       │
-│   → _simulation_loop():                              │
-│       for _ in range(steps_per_callback):            │
-│           self.step(self._time_step)                 │
-│       return True  # Continue                        │
-└─────────────────────────────────────────────────────┘
-```
-
-### Key Finding: `time_scale` Property Exists But Is Unused
-
-**Location**: `SimulationSettings.time_scale`
-
+### Configuration
 ```python
-@property
-def time_scale(self) -> float:
-    """Get time scale factor (real-world to simulation)."""
-    return self._time_scale
+# In simulation settings:
+settings.duration = 1.0  # 1 second of model time
+settings.time_scale = 1.0  # Real-time playback
 
-@time_scale.setter
-def time_scale(self, value: float):
-    """Set time scale with validation."""
-    if value <= 0:
-        raise ValueError("Time scale must be positive")
-    self._time_scale = value
+# Transition configuration:
+T.transition_type = "continuous"
+T.rate = 150.0  # tokens/second (FAST rate)
 ```
 
-**Status**: Property exists, serializable, but **never read or used** in simulation execution
+### How It Works
+1. **Model time**: Simulation runs for 1 second
+2. **Transition rate**: 150 tokens/s (artificially high)
+3. **Viewing time**: You watch it in 1 second (real-time)
+
+### Calculation Details
+```
+Duration = 1.0 second
+Rate = 150 tokens/second
+Time step dt = 0.001 seconds (auto: 1.0/1000 steps)
+
+Integration over 1 second:
+- Each step: 150 × 0.001 = 0.15 tokens flow
+- Total steps: 1000
+- Total flow: 0.15 × 1000 = 150 tokens... WAIT! ❌
+
+PROBLEM: Only 150 tokens move, not 300!
+```
+
+### Fix: Adjust Rate
+```python
+T.rate = 300.0  # tokens/second
+
+Result after 1 second:
+- Flow = 300 tokens/s × 1.0s = 300 tokens ✅
+- P1: 300 → 0
+- P2: 0 → 300
+```
+
+### Advantages
+✅ **Simple** - Just set the rate high  
+✅ **Fast simulation** - Short model time  
+✅ **Good for testing** - Quick iterations  
+
+### Disadvantages
+❌ **Unrealistic rates** - 300 tokens/s doesn't match real phenomenon (0.04167 tokens/s)  
+❌ **Model modification** - Changes the model itself, not just viewing  
+❌ **Not scalable** - Different rates needed for different viewing speeds  
 
 ---
 
-## Gap Analysis
+## Solution 3: Duration + Small dt (Batch Mode) ⚡
 
-### Requirement 1: Milliseconds to Days Time Range
-- **Status**: ✅ **SATISFIED**
-- **Implementation**: TimeUnits enum supports full range
-- **Example**: Can simulate 48 hours with dt = 10 seconds
+### Concept
+Run the full 2-hour simulation with fine time steps, let it compute as fast as possible.
 
-### Requirement 2: Different Time Scales for Same Phenomenon
-- **Status**: ❌ **NOT SATISFIED**
-- **Gap**: No way to set "playback speed" independent of simulation accuracy
-- **Workaround**: Adjust dt_manual (but this affects accuracy)
-
-### Requirement 3: See Whole Evolution in Any Time Scale
-- **Status**: ⚠️ **PARTIALLY SATISFIED**
-- **What works**: Can simulate any duration and visualize
-- **What's missing**: Cannot control **speed of visualization** after simulation
-- **Example issue**: 
-  - Simulate 24 hours with dt = 60s (1440 steps)
-  - Playback takes: 1440 steps × 0.1s GUI = 144 seconds (2.4 minutes)
-  - **Cannot make this faster or slower without re-running simulation**
-
-### Requirement 4: Hours of Real-Time in One Minute
-- **Status**: ❌ **NOT SATISFIED**
-- **Gap**: No explicit "real-world playback duration" setting
-- **Current limitation**: Playback time = steps × GUI_interval
-- **Need**: `playback_duration_seconds` setting that controls animation speed
-
----
-
-## Recommended Implementation Plan
-
-### Phase 1: Enable `time_scale` for Playback Control (HIGH PRIORITY)
-
-**Goal**: Use existing `time_scale` property to control playback speed
-
-**Changes needed**:
-
-#### 1.1 Modify `SimulationController.run()` to use time_scale
-
+### Configuration
 ```python
-def run(self, time_step: float = None, max_steps: Optional[int] = None) -> bool:
-    """Start continuous simulation execution.
-    
-    Uses settings.time_scale to control playback speed:
-    - time_scale = 1.0: Real-time (1 second model = 1 second real)
-    - time_scale = 60.0: 60x speedup (1 second real = 60 seconds model)
-    - time_scale = 0.5: 2x slowdown (1 second real = 0.5 seconds model)
-    """
-    # ... existing code ...
-    
-    # Calculate GUI update interval based on time_scale
-    # Default: 100ms real-time between GUI updates
-    base_gui_interval_ms = 100  
-    
-    # How much model time should pass per GUI update?
-    # time_scale = model_seconds / real_seconds
-    model_time_per_gui_update = base_gui_interval_ms / 1000.0 * self.settings.time_scale
-    
-    # How many steps needed to cover that model time?
-    self._steps_per_callback = max(1, int(model_time_per_gui_update / time_step))
-    
-    # Example: time_scale=60, dt=1.0, gui_interval=0.1s
-    # model_time_per_update = 0.1 * 60 = 6 seconds model time
-    # steps_per_callback = 6 / 1.0 = 6 steps
-    # Result: 6 steps per 100ms = smooth 60x speedup
-    
-    self._timeout_id = GLib.timeout_add(base_gui_interval_ms, self._simulation_loop)
-    return True
-```
-
-#### 1.2 Add Time Scale UI Control
-
-**Location**: `simulate_tools_palette.ui` and `simulate_tools_palette_loader.py`
-
-Add widgets:
-- SpinButton: time_scale (range: 0.01 to 1000.0)
-- Label: "Playback Speed: 60x" (calculated display)
-
-Connect signal:
-```python
-def _on_time_scale_changed(self, spin_button):
-    """Update time scale when user changes playback speed."""
-    new_scale = spin_button.get_value()
-    self.simulation.settings.time_scale = new_scale
-    
-    # If running, need to recalculate steps_per_callback
-    if self.simulation.is_running():
-        self.simulation.stop()
-        self.simulation.run()  # Restart with new time scale
-```
-
-### Phase 2: Add Real-Time vs. Model Time Display (MEDIUM PRIORITY)
-
-**Goal**: Show user both model time and real-world elapsed time
-
-**Changes needed**:
-
-#### 2.1 Track Real-World Start Time
-
-```python
-class SimulationController:
-    def __init__(self, model):
-        # ... existing code ...
-        self._real_time_start = None  # time.time() when run() called
-        self._real_time_paused = 0.0  # Total paused duration
-    
-    def run(self, ...):
-        # ... existing code ...
-        import time
-        self._real_time_start = time.time()
-        self._real_time_paused = 0.0
-    
-    def stop(self):
-        # ... existing code ...
-        if self._real_time_start is not None:
-            elapsed = time.time() - self._real_time_start - self._real_time_paused
-            self._real_time_paused += elapsed
-    
-    def get_real_time_elapsed(self) -> float:
-        """Get real-world time elapsed since run started."""
-        if self._real_time_start is None:
-            return 0.0
-        return time.time() - self._real_time_start - self._real_time_paused
-```
-
-#### 2.2 Update Time Display UI
-
-```python
-def _update_time_display(self):
-    """Update time display with both model time and real time."""
-    model_time = self.simulation.time
-    real_time_elapsed = self.simulation.get_real_time_elapsed()
-    
-    # Calculate effective playback speed
-    if real_time_elapsed > 0.001:
-        effective_speed = model_time / real_time_elapsed
-    else:
-        effective_speed = self.simulation.settings.time_scale
-    
-    # Format: "Model: 2.5 hr | Real: 3m 12s | Speed: 50x"
-    model_str = TimeFormatter.format_with_units(
-        model_time, 
-        self.simulation.settings.time_units
-    )
-    real_str = TimeFormatter.format_duration(real_time_elapsed)
-    
-    display_text = f"Model: {model_str} | Real: {real_str} | {effective_speed:.1f}x"
-    self.time_display_label.set_text(display_text)
-```
-
-### Phase 3: Preset Time Scales (LOW PRIORITY, UX ENHANCEMENT)
-
-**Goal**: Quick-select buttons for common time scales
-
-**UI Addition**:
-```
-[0.1x] [0.5x] [1x] [5x] [10x] [60x] [Custom: ___]
-```
-
-Buttons set `settings.time_scale` and restart simulation if running.
-
-### Phase 4: Post-Computation Playback (FUTURE ENHANCEMENT)
-
-**Goal**: Separate simulation computation from visualization
-
-**Architecture change**:
-```
-Step 1: Compute simulation
-   → Store all states: [(time_0, state_0), (time_1, state_1), ...]
-
-Step 2: Playback results
-   → Interpolate between stored states
-   → Play at any speed (independent of computation)
-   → Scrub timeline, reverse, etc.
-```
-
-**Benefits**:
-- Can replay same simulation at different speeds without recomputing
-- Can scrub timeline (jump to specific time)
-- Can reverse playback
-- Can export animation
-
-**Complexity**: HIGH (requires state recording infrastructure)
-
----
-
-## Implementation Priority
-
-### 🔴 **Phase 1** (Critical - Addresses core need)
-**Estimated effort**: 4-6 hours  
-**Impact**: HIGH - Enables the main user requirement
-
-**Tasks**:
-1. Use `settings.time_scale` in `SimulationController.run()` ✅ Property exists
-2. Calculate `steps_per_callback` based on time_scale ✅ Pattern exists
-3. Add time_scale spinbutton to simulation palette UI
-4. Connect signal handler for time scale changes
-5. Test with various scenarios (0.1x, 1x, 10x, 100x)
-
-### 🟡 **Phase 2** (Recommended - Better UX)
-**Estimated effort**: 2-3 hours  
-**Impact**: MEDIUM - Improves user understanding
-
-**Tasks**:
-1. Add real-time tracking to SimulationController
-2. Update time display to show both times + speed
-3. Format time display for readability
-4. Test time tracking accuracy
-
-### 🟢 **Phase 3** (Optional - Convenience)
-**Estimated effort**: 1-2 hours  
-**Impact**: LOW - Nice to have
-
-**Tasks**:
-1. Add preset buttons to UI
-2. Connect button signals
-3. Style buttons for quick access
-
-### ⚪ **Phase 4** (Future - Major feature)
-**Estimated effort**: 20-30 hours  
-**Impact**: VERY HIGH - Enables advanced features
-
-**Tasks**:
-- Design state recording system
-- Implement state capture during simulation
-- Build playback engine with interpolation
-- Add timeline scrubber widget
-- Add export functionality
-
-**Recommendation**: Defer to future release
-
----
-
-## Answer to User Question
-
-### Current Status: ❌ **NOT FULLY SUPPORTED**
-
-**What you CAN do now**:
-1. ✅ Simulate phenomena at any time scale (milliseconds to days)
-2. ✅ Set simulation duration in any units
-3. ✅ Control time step (simulation accuracy)
-4. ✅ Visualize simulation results
-
-**What you CANNOT do now**:
-1. ❌ **Control playback speed independent of simulation accuracy**
-2. ❌ **See 24 hours of model time in 1 minute of real-world playback**
-3. ❌ **Speed up/slow down visualization without changing dt (and thus accuracy)**
-
-### Example Scenario Gap
-
-**Your requirement**: 
-> "See hours of real-time phenomenon in one minute"
-
-**Current limitation**:
-```python
-# Want: 2 hours model time in 1 minute real playback
-# That's 120 minutes / 1 minute = 120x speedup
-
-# Current approach (WRONG):
-settings.dt_manual = 2.0  # 2 second steps
-# Problem: Changes simulation accuracy, not playback speed
-# Also doesn't guarantee 1 minute real-time playback
-
-# What's needed (NOT IMPLEMENTED):
-settings.duration = 2.0  # 2 hours
-settings.time_units = TimeUnits.HOURS
-settings.playback_speed = 120.0  # 120x speedup ❌ MISSING
-# Or equivalently:
-settings.playback_duration_seconds = 60.0  # Play in 60 seconds ❌ MISSING
-```
-
----
-
-## Recommended Action
-
-### Immediate (This week):
-**Implement Phase 1** - Enable time_scale property for playback control
-
-This will satisfy your core requirement with minimal code changes.
-
-### Code changes required:
-1. Modify `SimulationController.run()` to use `settings.time_scale`
-2. Calculate `steps_per_callback = model_time_per_gui_update / dt`
-3. Add time_scale spinbutton to simulation palette
-4. Test various time scales
-
-### Testing scenarios:
-```python
-# Scenario 1: 1 hour model time in 1 minute real time (60x)
-settings.set_duration(1.0, TimeUnits.HOURS)  # 3600 seconds
-settings.time_scale = 60.0  # 60x speedup
-settings.dt_manual = 1.0  # 1 second steps
-# Expected: 3600 steps in 60 seconds real time
-
-# Scenario 2: 10 seconds model time in slow motion (0.5x)
-settings.set_duration(10.0, TimeUnits.SECONDS)
-settings.time_scale = 0.5  # Half speed
+# In simulation settings:
+settings.duration = 7200.0  # 2 hours in seconds
+settings.time_units = TimeUnits.SECONDS
 settings.dt_manual = 0.1  # 0.1 second steps
-# Expected: 100 steps in 20 seconds real time
+settings.time_scale = 1.0  # Doesn't matter for batch
 
-# Scenario 3: 24 hours in 5 minutes (288x)
-settings.set_duration(24.0, TimeUnits.HOURS)
-settings.time_scale = 288.0
-settings.dt_manual = 10.0
-# Expected: 8640 steps in 300 seconds
+# Transition configuration:
+T.transition_type = "continuous"
+T.rate = 0.04167  # Real-world rate
+```
+
+### How It Works
+1. **Model time**: Simulation runs for 7200 seconds (2 hours)
+2. **Transition rate**: 0.04167 tokens/s (real rate)
+3. **Computation**: Runs as fast as CPU allows (no animation throttling)
+4. **Result**: You get the final state almost instantly
+
+### Calculation Details
+```
+Duration = 7200 seconds
+Time step = 0.1 seconds
+Total steps = 7200 / 0.1 = 72,000 steps
+
+Each step:
+- Rate = 0.04167 tokens/s
+- Flow = 0.04167 × 0.1 = 0.004167 tokens
+
+Total flow = 0.004167 × 72,000 = 300 tokens ✅
+
+Computation time: ~0.1-1 second (depending on CPU)
+```
+
+### Advantages
+✅ **Accurate physics** - Uses real-world rates  
+✅ **Fast computation** - No animation overhead  
+✅ **Batch processing** - Good for analysis, not watching  
+
+### Disadvantages
+❌ **No visualization** - You don't "see" the process  
+❌ **Many steps** - 72,000 steps takes memory  
+❌ **Not interactive** - Can't watch it flow  
+
+---
+
+## Comparison Matrix
+
+| Feature | Time Scale | Transition Rate | Duration + dt |
+|---------|------------|-----------------|---------------|
+| **Accurate real rates** | ✅ Yes | ❌ No (artificial) | ✅ Yes |
+| **Watch animation** | ✅ Yes (smooth) | ✅ Yes | ❌ No |
+| **Viewing time** | 1 second | 1 second | ~instant |
+| **Model changes** | None | Rate change | None |
+| **Reusability** | ✅ High | ❌ Low | ✅ High |
+| **CPU intensive** | Medium | Low | High |
+| **Memory usage** | Low | Low | High |
+| **Best for** | **Interactive viewing** | Quick tests | Batch analysis |
+
+---
+
+## Recommended Approach: Time Scale ⭐
+
+### Why?
+1. **Separation of concerns**: Model represents reality, viewing speed is separate
+2. **Flexibility**: Change viewing speed without modifying model
+3. **Accuracy**: Transition rates match real-world phenomenon
+4. **Smooth**: System handles animation batching automatically
+
+### Setup Steps
+
+#### 1. Configure Transition (Real Rates)
+```python
+# P1 → T → P2
+T.transition_type = "continuous"
+T.rate = 0.04167  # 300 tokens / 7200 seconds
+```
+
+Or in SBML import (now defaults to continuous):
+```python
+# Already set to continuous by default!
+# Rate will be 1.0 by default (can adjust)
+```
+
+#### 2. Configure Simulation Settings
+```python
+# In GUI or programmatically:
+settings = SimulationSettings()
+settings.duration = 7200.0  # 2 hours in seconds
+settings.time_units = TimeUnits.SECONDS
+settings.dt_auto = True  # Auto-calculate dt
+settings.time_scale = 7200.0  # 7200x speedup
+
+# Effective dt = 7200 / 1000 = 7.2 seconds per step
+# Steps per GUI update (0.1s) = (0.1 × 7200) / 7.2 = 100 steps
+```
+
+#### 3. Run Simulation
+```python
+# GUI: Click "Start Simulation"
+# Programmatic:
+controller.start_simulation(time_step=None)  # Uses effective dt
+
+# Watch for 1 second (10 GUI updates):
+# - 10 updates × 100 steps = 1000 steps total
+# - 1000 steps × 7.2s = 7200 seconds model time
+# - Flow: 0.04167 tokens/s × 7200s = 300 tokens ✅
 ```
 
 ---
 
-## Conclusion
+## Mathematical Validation
 
-**Current state**: Infrastructure is 80% complete but the critical `time_scale` property is not wired up to control playback speed.
+### Given
+- Real phenomenon duration: `T_real = 2 hours = 7200 seconds`
+- Tokens to transfer: `N = 300 tokens`
+- Viewing time desired: `T_view = 1 second`
 
-**Path forward**: Implement Phase 1 (4-6 hours) to fully satisfy your requirements.
+### Derived
+```
+Real flow rate:
+r_real = N / T_real = 300 / 7200 = 0.04167 tokens/s
 
-**Long-term vision**: Phase 4 (post-computation playback) would enable video-like control but is a major undertaking.
+Time scale required:
+time_scale = T_real / T_view = 7200 / 1 = 7200x
 
----
+Model configuration:
+- duration = T_real = 7200 seconds
+- rate = r_real = 0.04167 tokens/s
+- time_scale = 7200x
 
-## Files Requiring Changes
-
-### Phase 1 Implementation
-
-1. **`src/shypn/engine/simulation/controller.py`**
-   - Modify `run()` method (lines ~483-530)
-   - Use `self.settings.time_scale` to calculate `steps_per_callback`
-
-2. **`ui/simulate/simulate_tools_palette.ui`** (New widgets)
-   - Add SpinButton for time_scale (0.01 to 1000.0)
-   - Add Label showing "Playback Speed: Xx"
-
-3. **`src/shypn/helpers/simulate_tools_palette_loader.py`**
-   - Add `time_scale_spin` widget reference
-   - Add `_on_time_scale_changed()` signal handler
-   - Update time display to show effective speed
-
-### Phase 2 Implementation (Optional)
-
-4. **`src/shypn/engine/simulation/controller.py`**
-   - Add `_real_time_start` and `_real_time_paused` tracking
-   - Add `get_real_time_elapsed()` method
-
-5. **`src/shypn/helpers/simulate_tools_palette_loader.py`**
-   - Modify `_update_time_display()` to show both times
+Verification:
+- Model time: 7200 seconds
+- Flow: 0.04167 × 7200 = 300 tokens ✅
+- Viewing time: 7200 / 7200 = 1 second ✅
+```
 
 ---
 
-**END OF ANALYSIS**
+## Practical Example: SBML Import
+
+### Your SBML Pathway
+```
+P1 (initial: 300) → Reaction → P2 (initial: 0)
+```
+
+### After Import (with new defaults)
+```python
+# Automatic configuration:
+T.transition_type = "continuous"  # ✅ New default!
+T.rate = 1.0  # Default (adjust to 0.04167 for real rate)
+```
+
+### Adjust for 2-Hour Process
+```python
+# Method 1: Edit transition properties
+T.rate = 0.04167  # Real-world rate
+
+# Method 2: Keep rate=1.0, adjust time scale
+settings.duration = 300.0  # 300 seconds (5 minutes)
+settings.time_scale = 300.0  # Watch in 1 second
+# Flow: 1.0 tokens/s × 300s = 300 tokens ✅
+```
+
+---
+
+## Implementation Notes
+
+### Current Code Location
+- **Time scale**: `src/shypn/engine/simulation/settings.py` line ~128
+- **Time scale usage**: `src/shypn/engine/simulation/controller.py` line ~1378
+- **Continuous rate**: `src/shypn/engine/continuous_behavior.py` line ~70-92
+- **Integration**: `src/shypn/engine/continuous_behavior.py` (RK4 method)
+
+### Key Formula in Controller
+```python
+# controller.py line 1378
+model_time_per_gui_update = gui_interval_s * self.settings.time_scale
+
+# Example: gui_interval_s=0.1s, time_scale=7200
+# → model_time_per_gui_update = 720 seconds
+# → In 10 GUI updates (1 second), model advances 7200 seconds
+```
+
+### Integration Calculation
+```python
+# continuous_behavior.py - RK4 integration
+def integrate_step(self, dt, input_arcs, output_arcs):
+    rate = self.rate_function(places, time)  # e.g., 0.04167
+    flow = rate * dt  # tokens per step
+    
+    # Update place tokens
+    for arc in input_arcs:
+        arc.place.tokens -= flow * arc.weight
+    for arc in output_arcs:
+        arc.place.tokens += flow * arc.weight
+```
+
+---
+
+## Summary
+
+### Question Answered ✅
+**YES**, you can see a 2-hour real process complete in 1 second of viewing time.
+
+### Best Method: Time Scale
+```python
+# Model (represents reality):
+T.rate = 0.04167 tokens/s  # Real-world rate
+settings.duration = 7200 seconds  # 2 hours
+
+# Viewing (just playback speed):
+settings.time_scale = 7200.0  # Watch 7200x faster
+```
+
+### Result
+- **Model time**: 7200 seconds (2 hours)
+- **Real time to watch**: 1 second
+- **Tokens transferred**: 300 (P1→P2)
+- **Rate accuracy**: Matches real phenomenon ✅
+- **Animation**: Smooth and continuous ✅
+
+### Alternative (Simpler but less accurate)
+```python
+# Quick and dirty:
+T.rate = 300.0 tokens/s  # Just make it fast
+settings.duration = 1.0 second
+settings.time_scale = 1.0  # Real-time
+```
+
+**Use time scale for production, use high rate for quick testing!**

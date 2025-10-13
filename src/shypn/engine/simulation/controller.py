@@ -209,7 +209,7 @@ class SimulationController:
         if transition.id in self.behavior_cache:
             cached_behavior = self.behavior_cache[transition.id]
             cached_type = cached_behavior.get_type_name()
-            current_type = getattr(transition, 'transition_type', 'immediate')
+            current_type = getattr(transition, 'transition_type', 'continuous')
             type_name_map = {'Immediate': 'immediate', 'Timed (TPN)': 'timed', 'Stochastic (FSPN)': 'stochastic', 'Continuous (SHPN)': 'continuous'}
             cached_type_normalized = type_name_map.get(cached_type, cached_type.lower())
             if cached_type_normalized != current_type:

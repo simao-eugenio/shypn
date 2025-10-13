@@ -8,10 +8,12 @@
 
 | I Want To... | Use This Type | Set These Properties |
 |--------------|---------------|---------------------|
+| Flow continuously | **Continuous** ⭐ *(default)* | `rate_function` = expression |
 | Fire instantly | **Immediate** | *(no properties needed)* |
 | Fire after delay | **Timed** | `earliest` = min delay<br>`latest` = max delay |
 | Fire randomly | **Stochastic** | `rate` = λ parameter |
-| Flow continuously | **Continuous** | `rate_function` = expression |
+
+⭐ **New transitions default to Continuous** (best for biochemical pathways)
 
 ---
 

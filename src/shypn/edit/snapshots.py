@@ -56,7 +56,7 @@ def snapshot_transition(transition) -> Dict[str, Any]:
         'width': transition.width,
         'height': transition.height,
         'horizontal': transition.horizontal,
-        'transition_type': getattr(transition, 'transition_type', 'immediate'),
+        'transition_type': getattr(transition, 'transition_type', 'continuous'),
         'properties': dict(transition.properties) if hasattr(transition, 'properties') else {}
     }
     
@@ -166,7 +166,7 @@ def recreate_transition(canvas_manager, snapshot: Dict[str, Any]):
         height=snapshot['height'],
         horizontal=snapshot['horizontal']
     )
-    transition.transition_type = snapshot.get('transition_type', 'immediate')
+    transition.transition_type = snapshot.get('transition_type', 'continuous')
     
     # Restore type-specific properties
     if 'rate' in snapshot:
