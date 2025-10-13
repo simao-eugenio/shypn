@@ -147,7 +147,25 @@ class ReactionConverter(BaseConverter):
     - Position → Transition position
     - Kinetic properties → Transition type and rate
     - Reversibility → Could create reverse arcs (not implemented yet)
+    
+    Kinetic Law Handling:
+    - michaelis_menten: Creates rate_function with michaelis_menten() call
+    - mass_action: Sets transition to stochastic, uses k as lambda
+    - Other: Keeps continuous with simple rate
     """
+    
+    def __init__(self, pathway: ProcessedPathwayData, document: DocumentModel,
+                 species_to_place: Optional[Dict[str, Place]] = None):
+        """
+        Initialize reaction converter.
+        
+        Args:
+            pathway: The processed pathway data
+            document: The DocumentModel to populate
+            species_to_place: Optional mapping from species ID to Place (for rate functions)
+        """
+        super().__init__(pathway, document)
+        self.species_to_place = species_to_place or {}
     
     def convert(self) -> Dict[str, Transition]:
         """
@@ -173,26 +191,12 @@ class ReactionConverter(BaseConverter):
                 label=reaction.name or reaction.id
             )
             
-            # Set kinetic properties
-            if reaction.kinetic_law:
-                # Map kinetic law type to transition type
-                if reaction.kinetic_law.rate_type == "michaelis_menten":
-                    transition.transition_type = "continuous"
-                    # Extract Vmax as rate if available
-                    if "Vmax" in reaction.kinetic_law.parameters:
-                        transition.rate = reaction.kinetic_law.parameters["Vmax"]
-                elif reaction.kinetic_law.rate_type == "mass_action":
-                    transition.transition_type = "stochastic"
-                    # Extract rate constant
-                    if "k" in reaction.kinetic_law.parameters:
-                        transition.rate = reaction.kinetic_law.parameters["k"]
-                else:
-                    transition.transition_type = "timed"
-                    transition.rate = 1.0
-            else:
-                # Default: continuous transition (for biochemical pathways)
-                transition.transition_type = "continuous"
-                transition.rate = 1.0
+            # Initialize properties dict if not exists
+            if not hasattr(transition, 'properties'):
+                transition.properties = {}
+            
+            # Set kinetic properties based on kinetic law type
+            self._configure_transition_kinetics(transition, reaction)
             
             # Store metadata for traceability
             if not hasattr(transition, 'metadata'):
@@ -202,15 +206,136 @@ class ReactionConverter(BaseConverter):
             if reaction.kinetic_law:
                 transition.metadata['kinetic_formula'] = reaction.kinetic_law.formula
                 transition.metadata['kinetic_parameters'] = reaction.kinetic_law.parameters
+                transition.metadata['kinetic_type'] = reaction.kinetic_law.rate_type
             
             reaction_to_transition[reaction.id] = transition
             self.logger.debug(
                 f"Converted reaction '{reaction.id}' to transition '{transition.name}' "
-                f"(type: {transition.transition_type}, rate: {transition.rate})"
+                f"(type: {transition.transition_type}, rate: {getattr(transition, 'rate', 'N/A')})"
             )
         
         self.logger.info(f"Converted {len(reaction_to_transition)} reactions to transitions")
         return reaction_to_transition
+    
+    def _configure_transition_kinetics(self, transition: Transition, reaction: Reaction) -> None:
+        """
+        Configure transition kinetics based on reaction kinetic law.
+        
+        Strategies:
+        - michaelis_menten: Create rate_function with michaelis_menten(substrate, Vmax, Km)
+        - mass_action: Set to stochastic with lambda rate
+        - Other: Continuous with simple rate
+        
+        Args:
+            transition: The transition to configure
+            reaction: The reaction with kinetic law
+        """
+        if not reaction.kinetic_law:
+            # No kinetic law - use default continuous
+            transition.transition_type = "continuous"
+            transition.rate = 1.0
+            self.logger.debug(f"  No kinetic law, defaulting to continuous rate=1.0")
+            return
+        
+        kinetic = reaction.kinetic_law
+        
+        # MICHAELIS-MENTEN: Create rate function
+        if kinetic.rate_type == "michaelis_menten":
+            self._setup_michaelis_menten(transition, reaction, kinetic)
+        
+        # MASS ACTION: Stochastic transition
+        elif kinetic.rate_type == "mass_action":
+            self._setup_mass_action(transition, reaction, kinetic)
+        
+        # OTHER: Continuous with simple rate
+        else:
+            transition.transition_type = "continuous"
+            transition.rate = 1.0
+            self.logger.debug(
+                f"  Unknown kinetic type '{kinetic.rate_type}', defaulting to continuous"
+            )
+    
+    def _setup_michaelis_menten(self, transition: Transition, reaction: Reaction, 
+                                kinetic: 'KineticLaw') -> None:
+        """
+        Setup Michaelis-Menten kinetics with rate_function.
+        
+        Creates: michaelis_menten(substrate_place, Vmax, Km)
+        
+        Args:
+            transition: Transition to configure
+            reaction: Reaction data
+            kinetic: Kinetic law data
+        """
+        transition.transition_type = "continuous"
+        
+        # Extract parameters
+        vmax = kinetic.parameters.get("Vmax", kinetic.parameters.get("vmax", 1.0))
+        km = kinetic.parameters.get("Km", kinetic.parameters.get("km", 1.0))
+        
+        # Find substrate place (first reactant)
+        substrate_place_ref = None
+        if reaction.reactants:
+            substrate_species_id = reaction.reactants[0][0]  # (species_id, stoich)
+            substrate_place = self.species_to_place.get(substrate_species_id)
+            if substrate_place:
+                # Use place name as reference
+                substrate_place_ref = substrate_place.name
+        
+        if substrate_place_ref:
+            # Build rate function with place reference
+            rate_func = f"michaelis_menten({substrate_place_ref}, {vmax}, {km})"
+            transition.properties['rate_function'] = rate_func
+            transition.rate = vmax  # Fallback for simple display
+            self.logger.info(
+                f"  Michaelis-Menten: rate_function = '{rate_func}'"
+            )
+        else:
+            # No substrate place found, use simple rate
+            transition.rate = vmax
+            self.logger.warning(
+                f"  Michaelis-Menten: Could not find substrate place, using Vmax={vmax} as rate"
+            )
+    
+    def _setup_mass_action(self, transition: Transition, reaction: Reaction,
+                          kinetic: 'KineticLaw') -> None:
+        """
+        Setup mass action kinetics (stochastic).
+        
+        Mass action is inherently stochastic for small molecule counts.
+        Sets transition to stochastic with k as lambda parameter.
+        
+        Args:
+            transition: Transition to configure
+            reaction: Reaction data
+            kinetic: Kinetic law data
+        """
+        # Mass action → Stochastic transition
+        transition.transition_type = "stochastic"
+        
+        # Extract rate constant k
+        k = kinetic.parameters.get("k", kinetic.parameters.get("rate_constant", 1.0))
+        
+        # For stochastic, use lambda parameter
+        transition.lambda_param = k
+        
+        self.logger.info(
+            f"  Mass action: Set to stochastic with lambda={k}"
+        )
+        
+        # Optional: Build rate function for multi-reactant mass action
+        # Format: mass_action(reactant1, reactant2, rate_constant)
+        if len(reaction.reactants) >= 2:
+            reactant_refs = []
+            for species_id, _ in reaction.reactants[:2]:  # Up to 2 reactants
+                place = self.species_to_place.get(species_id)
+                if place:
+                    reactant_refs.append(place.name)
+            
+            if len(reactant_refs) == 2:
+                rate_func = f"mass_action({reactant_refs[0]}, {reactant_refs[1]}, {k})"
+                transition.properties['rate_function'] = rate_func
+                self.logger.info(f"    Rate function: '{rate_func}'")
 
 
 class ArcConverter(BaseConverter):
@@ -350,8 +475,8 @@ class PathwayConverter:
         species_converter = SpeciesConverter(pathway, document)
         species_to_place = species_converter.convert()
         
-        # Convert reactions to transitions
-        reaction_converter = ReactionConverter(pathway, document)
+        # Convert reactions to transitions (pass species_to_place for rate functions)
+        reaction_converter = ReactionConverter(pathway, document, species_to_place)
         reaction_to_transition = reaction_converter.convert()
         
         # Convert stoichiometry to arcs
