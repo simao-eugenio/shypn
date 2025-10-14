@@ -675,15 +675,16 @@
                           </object>
                         </child>
                         
-                        <!-- Enrichment Option (CrossFetch PRE-processing) -->
+                        <!-- Enrichment Option (CrossFetch PRE-processing) - DISABLED -->
                         <child>
                           <object class="GtkCheckButton" id="sbml_enrich_check">
                             <property name="visible">True</property>
                             <property name="can-focus">True</property>
                             <property name="receives-default">False</property>
-                            <property name="label">Enrich with external data (KEGG/Reactome)</property>
-                            <property name="tooltip-text">Fetch missing data from external databases before importing. This includes: concentrations, kinetics, annotations, and layout coordinates. PRE-processes the SBML to add data that may be missing from the original file.</property>
-                            <property name="active">True</property>
+                            <property name="label">Enrich with external data (Disabled)</property>
+                            <property name="tooltip-text">Feature disabled: Automatic pathway matching between heterogeneous databases (KEGG, BioModels, etc.) is computationally intractable. Different organisms, notations, and scopes make reliable pathway equivalence detection impossible.</property>
+                            <property name="active">False</property>
+                            <property name="sensitive">False</property>
                             <property name="margin-top">12</property>
                             <property name="margin-start">12</property>
                           </object>
