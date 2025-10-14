@@ -99,7 +99,8 @@ class SBMLImportPanel:
                 fetch_sources=["KEGG", "Reactome"],
                 enrich_concentrations=True,
                 enrich_kinetics=True,
-                enrich_annotations=True
+                enrich_annotations=True,
+                enrich_coordinates=True  # Enable coordinate enrichment
             )
         else:
             self.enricher = None
@@ -465,9 +466,9 @@ class SBMLImportPanel:
                     pathway_id = self._extract_pathway_id()
                     
                     if pathway_id:
-                        self._show_status(f"Fetching enrichment data from KEGG/Reactome...")
+                        self._show_status(f"Fetching enrichment data (concentrations, kinetics, coordinates)...")
                         
-                        # Enrich SBML
+                        # Enrich SBML (includes all: concentrations, kinetics, annotations, coordinates)
                         enriched_sbml = self.enricher.enrich_by_pathway_id(pathway_id)
                         
                         # Save enriched SBML to temporary file
@@ -480,7 +481,7 @@ class SBMLImportPanel:
                         
                         # Use enriched file for parsing
                         sbml_to_parse = enriched_filepath
-                        self._show_status(f"✓ SBML enriched with external data")
+                        self._show_status(f"✓ SBML enriched (data + coordinates)")
                     else:
                         self._show_status("Warning: Could not determine pathway ID for enrichment. Using base SBML.")
                         
