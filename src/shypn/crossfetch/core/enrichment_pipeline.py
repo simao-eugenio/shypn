@@ -24,7 +24,8 @@ from ..enrichers import (
     ConcentrationEnricher,
     InteractionEnricher,
     KineticsEnricher,
-    AnnotationEnricher
+    AnnotationEnricher,
+    CoordinateEnricher
 )
 from .quality_scorer import QualityScorer
 from ..metadata import create_metadata_manager, FileOperationsTracker
@@ -85,6 +86,7 @@ class EnrichmentPipeline:
             merge_multi_valued=True,
             keep_provenance=True
         ))
+        self.register_enricher(CoordinateEnricher())
     
     def register_fetcher(self, fetcher: BaseFetcher):
         """Register a data fetcher.
@@ -172,7 +174,7 @@ class EnrichmentPipeline:
         
         # Default to common data types
         if data_types is None:
-            data_types = ["pathway", "concentrations", "kinetics", "interactions", "annotations"]
+            data_types = ["pathway", "concentrations", "kinetics", "interactions", "annotations", "coordinates"]
         
         # Create request object  
         request = EnrichmentRequest(

@@ -33,7 +33,7 @@ class CoordinateEnricher(EnricherBase):
     
     def __init__(self):
         """Initialize coordinate enricher with helper components."""
-        super().__init__()
+        super().__init__("CoordinateEnricher")
         self.logger = logging.getLogger(self.__class__.__name__)
         
         # Initialize helper components
