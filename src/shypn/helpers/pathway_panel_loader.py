@@ -159,6 +159,18 @@ class PathwayPanelLoader:
         
         if self.sbml_import_controller:
             self.sbml_import_controller.set_model_canvas(model_canvas)
+        
+        # Wire SBML panel to model canvas so Swiss Palette can read layout parameters
+        if model_canvas and self.sbml_import_controller:
+            model_canvas.sbml_panel = self.sbml_import_controller
+    
+    def get_sbml_controller(self):
+        """Get the SBML import controller instance.
+        
+        Returns:
+            SBMLImportPanel instance or None
+        """
+        return self.sbml_import_controller
     
     def _on_float_toggled(self, button):
         """Internal callback when float toggle button is clicked."""
