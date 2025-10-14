@@ -682,7 +682,7 @@
                             <property name="can-focus">True</property>
                             <property name="receives-default">False</property>
                             <property name="label">Enrich with external data (KEGG/Reactome)</property>
-                            <property name="tooltip-text">Fetch missing concentrations, kinetics, and annotations from external databases before importing. This PRE-processes the SBML to add data that may be missing from the original file.</property>
+                            <property name="tooltip-text">Fetch missing data from external databases before importing. This includes: concentrations, kinetics, annotations, and layout coordinates. PRE-processes the SBML to add data that may be missing from the original file.</property>
                             <property name="active">False</property>
                             <property name="margin-top">12</property>
                             <property name="margin-start">12</property>
