@@ -251,6 +251,19 @@ class SimulationController:
         """
         for transition in self.model.transitions:
             behavior = self._get_behavior(transition)
+            
+            # Special handling for source transitions (no input places)
+            is_source = getattr(transition, 'is_source', False)
+            if is_source:
+                # Source transitions are always structurally enabled
+                state = self._get_or_create_state(transition)
+                if state.enablement_time is None:
+                    state.enablement_time = self.time
+                    if hasattr(behavior, 'set_enablement_time'):
+                        behavior.set_enablement_time(self.time)
+                # Source transitions stay enabled continuously
+                continue
+            
             input_arcs = behavior.get_input_arcs()
             locally_enabled = True
             for arc in input_arcs:
@@ -607,13 +620,11 @@ class SimulationController:
         - Input places: •t (places that provide tokens TO transition)
         - Output places: t• (places that receive tokens FROM transition)
         
-        **Special handling for source/sink transitions (formal structure):**
-        - Source transition: Only output places (•t = ∅, locality = t•)
-        - Sink transition: Only input places (t• = ∅, locality = •t)
-        - Normal transition: Both input and output places (locality = •t ∪ t•)
-        
-        This ensures source/sink transitions have minimal localities and
-        are properly recognized in independence detection.
+        **Locality patterns recognized:**
+        - Normal: Pn → T → Pm  (locality = •t ∪ t•, both inputs and outputs)
+        - Source: T → Pm       (locality = t•, only outputs, no inputs)
+        - Sink: Pn → T         (locality = •t, only inputs, no outputs)
+        - Multiple-source: T1 → P ← T2 (shared places allowed)
         
         Args:
             transition: Transition object to analyze
@@ -629,25 +640,19 @@ class SimulationController:
         behavior = self._get_behavior(transition)
         place_ids = set()
         
-        # Check source/sink status
-        is_source = getattr(transition, 'is_source', False)
-        is_sink = getattr(transition, 'is_sink', False)
+        # Get input places (•t)
+        for arc in behavior.get_input_arcs():
+            if hasattr(arc, 'source_id'):
+                place_ids.add(arc.source_id)
+            elif hasattr(arc, 'source') and hasattr(arc.source, 'id'):
+                place_ids.add(arc.source.id)
         
-        # Get input places (•t) - SKIP for source transitions
-        if not is_source:
-            for arc in behavior.get_input_arcs():
-                if hasattr(arc, 'source_id'):
-                    place_ids.add(arc.source_id)
-                elif hasattr(arc, 'source') and hasattr(arc.source, 'id'):
-                    place_ids.add(arc.source.id)
-        
-        # Get output places (t•) - SKIP for sink transitions
-        if not is_sink:
-            for arc in behavior.get_output_arcs():
-                if hasattr(arc, 'target_id'):
-                    place_ids.add(arc.target_id)
-                elif hasattr(arc, 'target') and hasattr(arc.target, 'id'):
-                    place_ids.add(arc.target.id)
+        # Get output places (t•)
+        for arc in behavior.get_output_arcs():
+            if hasattr(arc, 'target_id'):
+                place_ids.add(arc.target_id)
+            elif hasattr(arc, 'target') and hasattr(arc.target, 'id'):
+                place_ids.add(arc.target.id)
         
         return place_ids
     

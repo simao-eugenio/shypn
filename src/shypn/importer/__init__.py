@@ -1,1 +1,1 @@
-"""KEGG pathway importer module for shypn."""
+"""KEGG pathway import module for shypn."""

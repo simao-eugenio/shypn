@@ -387,6 +387,53 @@
                           </packing>
                         </child>
                         
+                        <!-- Firing Policy Field -->
+                        <child>
+                          <object class="GtkBox" id="firing_policy_box">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="spacing">10</property>
+                            <child>
+                              <object class="GtkLabel" id="firing_policy_label">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="label" translatable="yes">Firing Policy:</property>
+                                <property name="width-chars">12</property>
+                                <property name="xalign">1</property>
+                                <property name="tooltip-text">Policy for conflict resolution timing</property>
+                              </object>
+                              <packing>
+                                <property name="expand">False</property>
+                                <property name="fill">True</property>
+                                <property name="position">0</property>
+                              </packing>
+                            </child>
+                            <child>
+                              <object class="GtkComboBoxText" id="firing_policy_combo">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="hexpand">True</property>
+                                <property name="active">0</property>
+                                <property name="tooltip-text">When multiple transitions are enabled: 'Earliest' fires the transition enabled first, 'Latest' fires the most recently enabled transition</property>
+                                <items>
+                                  <item translatable="yes">Earliest</item>
+                                  <item translatable="yes">Latest</item>
+                                </items>
+                              </object>
+                              <packing>
+                                <property name="expand">True</property>
+                                <property name="fill">True</property>
+                                <property name="position">1</property>
+                              </packing>
+                            </child>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">True</property>
+                            <property name="position">1</property>
+                          </packing>
+                        </child>
+                        
                         <!-- Rate Field -->
                         <child>
                           <object class="GtkBox" id="rate_simple_box">

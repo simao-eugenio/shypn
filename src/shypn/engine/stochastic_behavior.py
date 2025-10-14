@@ -290,6 +290,13 @@ class StochasticBehavior(TransitionBehavior):
             # Phase 3: Clear scheduling state
             self.clear_enablement()
             
+            # Auto-reschedule source transitions for continuous firing
+            is_source = getattr(self.transition, 'is_source', False)
+            if is_source:
+                # Source transitions represent continuous processes (Poisson process)
+                # Immediately reschedule with new exponential delay
+                self.set_enablement_time(current_time)
+            
             # Phase 4: Record stochastic firing event
             self._record_event(
                 consumed=consumed_map,

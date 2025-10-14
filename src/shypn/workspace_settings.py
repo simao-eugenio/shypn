@@ -37,6 +37,9 @@ class WorkspaceSettings:
             "editor": {
                 "snap_to_grid": True,  # Snap to grid enabled by default
                 "grid_spacing": 10.0   # Default grid spacing in pixels
+            },
+            "sbml_import": {
+                "last_biomodels_id": ""  # Remember last BioModels query
             }
         }
         

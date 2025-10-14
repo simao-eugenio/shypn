@@ -206,7 +206,10 @@ def main(argv=None):
 		
 		# Load pathway panel via its loader
 		try:
-			pathway_panel_loader = create_pathway_panel(model_canvas=model_canvas_loader)
+			pathway_panel_loader = create_pathway_panel(
+				model_canvas=model_canvas_loader,
+				workspace_settings=workspace_settings
+			)
 		except Exception as e:
 			print(f'WARNING: Failed to load pathway panel: {e}', file=sys.stderr)
 			pathway_panel_loader = None

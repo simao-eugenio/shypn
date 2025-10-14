@@ -5,9 +5,18 @@ This module provides diagnostic tools for analyzing Petri net structure
 and behavior, including locality detection and analysis.
 
 Locality Concept:
-    A locality represents a Place-Transition-Place pattern in a Petri net,
-    consisting of a central transition with its connected input and output places.
-    This concept is useful for analyzing independent subsystems and token flow.
+    A locality is a transition-centered neighborhood consisting of its
+    connected places via input and/or output arcs.
+    
+    Locality L(T) = •T ∪ T•  (preset union postset)
+    
+    Valid Patterns:
+    - Normal:   Pn → T → Pm  (n ≥ 1 inputs, m ≥ 1 outputs)
+    - Source:   T → Pm       (no inputs, m ≥ 1 outputs) 
+    - Sink:     Pn → T       (n ≥ 1 inputs, no outputs)
+    - Multiple: T1 → P ← T2  (shared places allowed)
+    
+    A locality is valid if it has at least ONE connected place.
 
 Example:
     from shypn.diagnostic import LocalityDetector, LocalityInfoWidget
@@ -15,6 +24,9 @@ Example:
     # Detect locality for a transition
     detector = LocalityDetector(model)
     locality = detector.get_locality_for_transition(transition)
+    
+    if locality.is_valid:
+        print(f"{locality.get_summary()}")
     
     # Display in UI
     widget = LocalityInfoWidget(model)

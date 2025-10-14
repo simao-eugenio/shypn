@@ -290,16 +290,6 @@ class SelectionManager:
             return True
         return False
     
-    def get_move_data_for_undo(self):
-        """Get move data for undo before ending drag.
-        
-        Returns:
-            Move data dict or None if not dragging
-        """
-        if hasattr(self, '_drag_controller'):
-            return self._drag_controller.get_move_data_for_undo()
-        return None
-    
     def cancel_drag(self):
         """Cancel drag and restore original positions.
         

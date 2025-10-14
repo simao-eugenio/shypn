@@ -58,6 +58,7 @@ class Transition(PetriNetObject):
         self.guard = None  # Guard function/expression (enables/disables transition) - defaults to no guard
         self.rate = 1.0  # Rate/delay for timed/stochastic/continuous transitions - defaults to 1.0
         self.priority = 0  # Priority for conflict resolution (higher = higher priority)
+        self.firing_policy = 'earliest'  # Firing policy: 'earliest' or 'latest' (default: earliest)
         
         # Source/Sink markers
         self.is_source = False  # Source transition (generates tokens without input)
@@ -328,6 +329,7 @@ class Transition(PetriNetObject):
             "border_width": self.border_width,
             "transition_type": self.transition_type,
             "priority": self.priority,
+            "firing_policy": self.firing_policy,
             "is_source": self.is_source,
             "is_sink": self.is_sink
         })
@@ -463,6 +465,8 @@ class Transition(PetriNetObject):
             transition.transition_type = data["transition_type"]
         if "priority" in data:
             transition.priority = data["priority"]
+        if "firing_policy" in data:
+            transition.firing_policy = data["firing_policy"]
         if "guard" in data:
             transition.guard = data["guard"]
         if "rate" in data:

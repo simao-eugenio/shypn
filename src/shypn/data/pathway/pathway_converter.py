@@ -260,7 +260,9 @@ class ReactionConverter(BaseConverter):
         """
         Setup Michaelis-Menten kinetics with rate_function.
         
-        Creates: michaelis_menten(substrate_place, Vmax, Km)
+        For single substrate: michaelis_menten(S, Vmax, Km)
+        For multiple substrates: Sequential Michaelis-Menten
+          - michaelis_menten(S1, Vmax, Km1) * (S2/(Km2+S2)) * (S3/(Km3+S3)) * ...
         
         Args:
             transition: Transition to configure
@@ -273,29 +275,48 @@ class ReactionConverter(BaseConverter):
         vmax = kinetic.parameters.get("Vmax", kinetic.parameters.get("vmax", 1.0))
         km = kinetic.parameters.get("Km", kinetic.parameters.get("km", 1.0))
         
-        # Find substrate place (first reactant)
-        substrate_place_ref = None
-        if reaction.reactants:
-            substrate_species_id = reaction.reactants[0][0]  # (species_id, stoich)
-            substrate_place = self.species_to_place.get(substrate_species_id)
-            if substrate_place:
-                # Use place name as reference
-                substrate_place_ref = substrate_place.name
+        # Get all substrate places
+        substrate_refs = []
+        for species_id, stoich in reaction.reactants:
+            place = self.species_to_place.get(species_id)
+            if place:
+                substrate_refs.append(place.name)
         
-        if substrate_place_ref:
-            # Build rate function with place reference
-            rate_func = f"michaelis_menten({substrate_place_ref}, {vmax}, {km})"
-            transition.properties['rate_function'] = rate_func
-            transition.rate = vmax  # Fallback for simple display
-            self.logger.info(
-                f"  Michaelis-Menten: rate_function = '{rate_func}'"
-            )
-        else:
-            # No substrate place found, use simple rate
+        if not substrate_refs:
+            # No substrate places found, use simple rate
             transition.rate = vmax
             self.logger.warning(
-                f"  Michaelis-Menten: Could not find substrate place, using Vmax={vmax} as rate"
+                f"  Michaelis-Menten: Could not find substrate places, using Vmax={vmax} as rate"
             )
+            return
+        
+        # Build rate function based on number of substrates
+        if len(substrate_refs) == 1:
+            # Single substrate - standard Michaelis-Menten
+            rate_func = f"michaelis_menten({substrate_refs[0]}, {vmax}, {km})"
+            self.logger.info(
+                f"  Michaelis-Menten (single substrate): rate_function = '{rate_func}'"
+            )
+        else:
+            # Multiple substrates - Sequential Michaelis-Menten
+            # Primary substrate uses full MM, others use saturation terms
+            # Formula: Vmax * [S1]/(Km+[S1]) * [S2]/(Km+[S2]) * ...
+            
+            # Primary substrate (first reactant)
+            rate_func = f"michaelis_menten({substrate_refs[0]}, {vmax}, {km})"
+            
+            # Additional substrates as saturation terms
+            for i, substrate in enumerate(substrate_refs[1:], start=2):
+                # Use same Km for all substrates (could be enhanced to use Km2, Km3, etc.)
+                rate_func += f" * ({substrate} / ({km} + {substrate}))"
+            
+            self.logger.info(
+                f"  Michaelis-Menten (sequential, {len(substrate_refs)} substrates): "
+                f"rate_function = '{rate_func}'"
+            )
+        
+        transition.properties['rate_function'] = rate_func
+        transition.rate = vmax  # Fallback for simple display
     
     def _setup_mass_action(self, transition: Transition, reaction: Reaction,
                           kinetic: 'KineticLaw') -> None:
@@ -303,7 +324,7 @@ class ReactionConverter(BaseConverter):
         Setup mass action kinetics (stochastic).
         
         Mass action is inherently stochastic for small molecule counts.
-        Sets transition to stochastic with k as lambda parameter.
+        Sets transition to stochastic with k as rate (lambda) parameter.
         
         Args:
             transition: Transition to configure
@@ -316,11 +337,11 @@ class ReactionConverter(BaseConverter):
         # Extract rate constant k
         k = kinetic.parameters.get("k", kinetic.parameters.get("rate_constant", 1.0))
         
-        # For stochastic, use lambda parameter
-        transition.lambda_param = k
+        # For stochastic, rate attribute is the lambda parameter (used by StochasticBehavior)
+        transition.rate = k
         
         self.logger.info(
-            f"  Mass action: Set to stochastic with lambda={k}"
+            f"  Mass action: Set to stochastic with rate (lambda)={k}"
         )
         
         # Optional: Build rate function for multi-reactant mass action

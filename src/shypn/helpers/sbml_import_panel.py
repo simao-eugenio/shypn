@@ -41,6 +41,13 @@ except ImportError as e:
     PathwayPostProcessor = None
     PathwayConverter = None
 
+# Import CrossFetch enricher (PRE-processor)
+try:
+    from shypn.crossfetch.sbml_enricher import SBMLEnricher
+except ImportError as e:
+    print(f'Warning: CrossFetch enricher not available: {e}', file=sys.stderr)
+    SBMLEnricher = None
+
 
 class SBMLImportPanel:
     """Controller for SBML import functionality.
@@ -60,15 +67,17 @@ class SBMLImportPanel:
         processed_pathway: Post-processed PathwayData with layout and colors
     """
     
-    def __init__(self, builder: Gtk.Builder, model_canvas=None):
+    def __init__(self, builder: Gtk.Builder, model_canvas=None, workspace_settings=None):
         """Initialize the SBML import panel controller.
         
         Args:
             builder: GTK Builder with loaded pathway_panel.ui
             model_canvas: Optional ModelCanvasManager for loading pathways
+            workspace_settings: Optional WorkspaceSettings for remembering last query
         """
         self.builder = builder
         self.model_canvas = model_canvas
+        self.workspace_settings = workspace_settings
         self.logger = logging.getLogger(self.__class__.__name__)
         
         # Initialize backend components
@@ -84,6 +93,18 @@ class SBMLImportPanel:
             self.converter = None
             print("Warning: SBML import backend not available", file=sys.stderr)
         
+        # Initialize enricher (PRE-processor)
+        if SBMLEnricher:
+            self.enricher = SBMLEnricher(
+                fetch_sources=["KEGG", "Reactome"],
+                enrich_concentrations=True,
+                enrich_kinetics=True,
+                enrich_annotations=True
+            )
+        else:
+            self.enricher = None
+            print("Warning: CrossFetch enricher not available", file=sys.stderr)
+        
         # Current state
         self.current_filepath = None
         self.parsed_pathway = None
@@ -94,6 +115,9 @@ class SBMLImportPanel:
         
         # Connect signals
         self._connect_signals()
+        
+        # Load last BioModels query from settings
+        self._load_last_biomodels_query()
     
     def _get_widgets(self):
         """Get references to UI widgets from builder."""
@@ -118,6 +142,9 @@ class SBMLImportPanel:
         self.sbml_spacing_spin = self.builder.get_object('sbml_spacing_spin')
         self.sbml_scale_spin = self.builder.get_object('sbml_scale_spin')
         self.sbml_scale_example = self.builder.get_object('sbml_scale_example')
+        
+        # Enrichment option (CrossFetch PRE-processing)
+        self.sbml_enrich_check = self.builder.get_object('sbml_enrich_check')
         
         # Preview and status
         self.sbml_preview_text = self.builder.get_object('sbml_preview_text')
@@ -164,6 +191,34 @@ class SBMLImportPanel:
         # Enable parse button when user types in entry
         if self.sbml_file_entry:
             self.sbml_file_entry.connect('changed', self._on_file_entry_changed)
+    
+    def _load_last_biomodels_query(self):
+        """Load the last BioModels query from workspace settings."""
+        if not self.workspace_settings or not self.sbml_biomodels_entry:
+            return
+        
+        try:
+            last_query = self.workspace_settings.get_setting("sbml_import", "last_biomodels_id", "")
+            if last_query:
+                self.sbml_biomodels_entry.set_text(last_query)
+                self.logger.debug(f"Loaded last BioModels query: {last_query}")
+        except Exception as e:
+            self.logger.warning(f"Could not load last BioModels query: {e}")
+    
+    def _save_biomodels_query(self, biomodels_id: str):
+        """Save the BioModels query to workspace settings.
+        
+        Args:
+            biomodels_id: BioModels ID to remember
+        """
+        if not self.workspace_settings:
+            return
+        
+        try:
+            self.workspace_settings.set_setting("sbml_import", "last_biomodels_id", biomodels_id)
+            self.logger.debug(f"Saved BioModels query: {biomodels_id}")
+        except Exception as e:
+            self.logger.warning(f"Could not save BioModels query: {e}")
     
     def set_model_canvas(self, model_canvas):
         """Set or update the model canvas for loading imported pathways.
@@ -282,6 +337,9 @@ class SBMLImportPanel:
             self._show_status("Please enter a BioModels ID", error=True)
             return
         
+        # Save query to workspace settings
+        self._save_biomodels_query(biomodels_id)
+        
         # Disable buttons during fetch
         self.sbml_fetch_button.set_sensitive(False)
         self.sbml_parse_button.set_sensitive(False)
@@ -391,8 +449,50 @@ class SBMLImportPanel:
             False to stop GLib.idle_add from repeating
         """
         try:
-            # Parse SBML file
-            self.parsed_pathway = self.parser.parse_file(self.current_filepath)
+            # Check if enrichment is enabled
+            enrich_enabled = False
+            if self.sbml_enrich_check and self.enricher:
+                enrich_enabled = self.sbml_enrich_check.get_active()
+            
+            # PRE-PROCESSING: Enrich SBML if enabled
+            sbml_to_parse = self.current_filepath
+            
+            if enrich_enabled:
+                self._show_status("PRE-PROCESSING: Enriching SBML with external data...")
+                
+                try:
+                    # Determine pathway ID for enrichment
+                    pathway_id = self._extract_pathway_id()
+                    
+                    if pathway_id:
+                        self._show_status(f"Fetching enrichment data from KEGG/Reactome...")
+                        
+                        # Enrich SBML
+                        enriched_sbml = self.enricher.enrich_by_pathway_id(pathway_id)
+                        
+                        # Save enriched SBML to temporary file
+                        import tempfile
+                        temp_dir = tempfile.gettempdir()
+                        enriched_filepath = os.path.join(temp_dir, f"enriched_{os.path.basename(self.current_filepath)}")
+                        
+                        with open(enriched_filepath, 'w') as f:
+                            f.write(enriched_sbml)
+                        
+                        # Use enriched file for parsing
+                        sbml_to_parse = enriched_filepath
+                        self._show_status(f"✓ SBML enriched with external data")
+                    else:
+                        self._show_status("Warning: Could not determine pathway ID for enrichment. Using base SBML.")
+                        
+                except Exception as e:
+                    self.logger.warning(f"Enrichment failed: {e}. Falling back to base SBML.")
+                    self._show_status(f"Enrichment failed: {e}. Using base SBML.")
+                    # Fall back to original file
+                    sbml_to_parse = self.current_filepath
+            
+            # POST-PROCESSING: Parse SBML file (enriched or base)
+            self._show_status(f"Parsing SBML...")
+            self.parsed_pathway = self.parser.parse_file(sbml_to_parse)
             
             if not self.parsed_pathway:
                 self._show_status("Failed to parse SBML file", error=True)
@@ -420,9 +520,11 @@ class SBMLImportPanel:
             # Show warnings if any
             if validation_result.warnings:
                 warning_count = len(validation_result.warnings)
-                self._show_status(f"Parsed successfully with {warning_count} warning(s)")
+                status_prefix = "✓ Enriched and parsed" if enrich_enabled else "✓ Parsed"
+                self._show_status(f"{status_prefix} with {warning_count} warning(s)")
             else:
-                self._show_status("✓ Parsed and validated successfully")
+                status_prefix = "✓ Enriched, parsed, and validated" if enrich_enabled else "✓ Parsed and validated"
+                self._show_status(f"{status_prefix} successfully")
             
             # Update preview with pathway info
             self._update_preview()
@@ -444,6 +546,52 @@ class SBMLImportPanel:
                 self.sbml_parse_button.set_sensitive(True)
         
         return False  # Don't repeat
+    
+    def _extract_pathway_id(self) -> Optional[str]:
+        """Extract pathway ID from current context.
+        
+        Tries multiple sources:
+        1. BioModels entry (if in BioModels mode)
+        2. Filename parsing (if looks like BIOMD or pathway ID)
+        3. SBML file metadata
+        
+        Returns:
+            Pathway ID or None
+        """
+        # Try BioModels entry first
+        if self.sbml_biomodels_radio and self.sbml_biomodels_radio.get_active():
+            if self.sbml_biomodels_entry:
+                biomodels_id = self.sbml_biomodels_entry.get_text().strip()
+                if biomodels_id:
+                    return biomodels_id
+        
+        # Try parsing filename
+        if self.current_filepath:
+            basename = os.path.basename(self.current_filepath)
+            
+            # Check for BioModels ID pattern (BIOMD0000000XXX)
+            import re
+            biomodels_match = re.match(r'(BIOMD\d{10})', basename, re.IGNORECASE)
+            if biomodels_match:
+                return biomodels_match.group(1).upper()
+            
+            # Check for KEGG pathway pattern (hsa00010, eco00010, etc.)
+            kegg_match = re.match(r'([a-z]{2,4}\d{5})', basename, re.IGNORECASE)
+            if kegg_match:
+                return kegg_match.group(1).lower()
+        
+        # Try reading SBML file for model ID
+        try:
+            if self.enricher:
+                pathway_id = self.enricher._extract_pathway_id_from_sbml(
+                    open(self.current_filepath).read()
+                )
+                if pathway_id:
+                    return pathway_id
+        except Exception as e:
+            self.logger.debug(f"Could not extract pathway ID from SBML: {e}")
+        
+        return None
     
     def _show_validation_errors(self, validation_result):
         """Show validation errors and warnings in preview area.
@@ -669,6 +817,17 @@ class SBMLImportPanel:
                     
                     # Mark as dirty to ensure redraw
                     manager.mark_dirty()
+                    
+                    # CRITICAL: Notify observers that model structure has changed
+                    # This invalidates simulation controller caches (behavior cache, model adapter)
+                    if hasattr(manager, '_notify_observers'):
+                        # Notify about all new objects
+                        for place in manager.places:
+                            manager._notify_observers('created', place)
+                        for transition in manager.transitions:
+                            manager._notify_observers('created', transition)
+                        for arc in manager.arcs:
+                            manager._notify_observers('created', arc)
                     
                     self._show_status(f"✓ Imported: {len(document_model.places)} places, "
                                     f"{len(document_model.transitions)} transitions, "

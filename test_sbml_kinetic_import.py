@@ -20,7 +20,7 @@ from shypn.data.pathway.pathway_postprocessor import PathwayPostProcessor
 
 
 def create_test_michaelis_menten_pathway():
-    """Create test pathway with Michaelis-Menten kinetics."""
+    """Create test pathway with Michaelis-Menten kinetics (single substrate)."""
     
     # Create species
     substrate = Species(
@@ -60,6 +60,59 @@ def create_test_michaelis_menten_pathway():
         reactions=[reaction],
         compartments={"default": "Default"},
         metadata={"name": "MM Test Pathway"}
+    )
+    
+    return pathway
+
+
+def create_test_multi_substrate_mm_pathway():
+    """Create test pathway with multi-substrate Michaelis-Menten kinetics."""
+    
+    # Create species
+    substrate_a = Species(
+        id="S1",
+        name="Substrate A",
+        initial_concentration=15.0,
+        compartment="default"
+    )
+    
+    substrate_b = Species(
+        id="S2",
+        name="Substrate B",
+        initial_concentration=12.0,
+        compartment="default"
+    )
+    
+    product = Species(
+        id="P1",
+        name="Product",
+        initial_concentration=0.0,
+        compartment="default"
+    )
+    
+    # Create Michaelis-Menten kinetic law
+    mm_kinetic = KineticLaw(
+        formula="Vmax * S1 * S2 / (Km + S1 * S2)",
+        parameters={"Vmax": 20.0, "Km": 3.0},
+        rate_type="michaelis_menten"
+    )
+    
+    # Create bi-substrate reaction
+    reaction = Reaction(
+        id="R1",
+        name="Bi-Substrate Enzyme Reaction",
+        reactants=[("S1", 1.0), ("S2", 1.0)],  # Two substrates
+        products=[("P1", 1.0)],
+        kinetic_law=mm_kinetic,
+        reversible=False
+    )
+    
+    # Create pathway
+    pathway = PathwayData(
+        species=[substrate_a, substrate_b, product],
+        reactions=[reaction],
+        compartments={"default": "Default"},
+        metadata={"name": "Multi-Substrate MM Test Pathway"}
     )
     
     return pathway
@@ -203,7 +256,7 @@ def test_mass_action_import():
     
     print(f"\nTransition: {transition.name}")
     print(f"  Type: {transition.transition_type}")
-    print(f"  Lambda: {getattr(transition, 'lambda_param', 'N/A')}")
+    print(f"  Rate (lambda): {getattr(transition, 'rate', 'N/A')}")
     
     # Check rate_function (optional for mass action)
     rate_func = transition.properties.get('rate_function')
@@ -212,8 +265,8 @@ def test_mass_action_import():
     
     # Verify mass action setup
     assert transition.transition_type == "stochastic", "Should be STOCHASTIC"
-    assert hasattr(transition, 'lambda_param'), "Should have lambda_param"
-    assert transition.lambda_param == 0.1, f"Lambda should be 0.1, got {transition.lambda_param}"
+    assert hasattr(transition, 'rate'), "Should have rate attribute (lambda for stochastic)"
+    assert transition.rate == 0.1, f"Rate should be 0.1, got {transition.rate}"
     
     # Check if rate function was created (for bimolecular)
     if rate_func:
@@ -223,7 +276,7 @@ def test_mass_action_import():
     
     print("\n✅ PASS: Mass action kinetics correctly imported as STOCHASTIC")
     print(f"   Transition type: {transition.transition_type}")
-    print(f"   Lambda parameter: {transition.lambda_param}")
+    print(f"   Rate (lambda): {transition.rate}")
     return True
 
 
@@ -261,6 +314,65 @@ def test_place_name_resolution():
     return True
 
 
+def test_multi_substrate_sequential_mm():
+    """Test that multi-substrate reactions use sequential Michaelis-Menten."""
+    print("\n" + "="*80)
+    print("TEST 4: Multi-Substrate Sequential Michaelis-Menten")
+    print("="*80)
+    
+    # Create test pathway with 2 substrates
+    pathway_data = create_test_multi_substrate_mm_pathway()
+    
+    # Post-process
+    postprocessor = PathwayPostProcessor()
+    processed = postprocessor.process(pathway_data)
+    
+    # Convert to DocumentModel
+    converter = PathwayConverter()
+    document = converter.convert(processed)
+    
+    # Verify results
+    print(f"\nDocument created:")
+    print(f"  Places: {len(document.places)}")
+    print(f"  Transitions: {len(document.transitions)}")
+    print(f"  Arcs: {len(document.arcs)}")
+    
+    # Check transition properties
+    assert len(document.transitions) == 1, "Should have 1 transition"
+    transition = document.transitions[0]
+    
+    print(f"\nTransition: {transition.name}")
+    print(f"  Type: {transition.transition_type}")
+    print(f"  Rate: {getattr(transition, 'rate', 'N/A')}")
+    
+    # Check rate_function
+    rate_func = transition.properties.get('rate_function')
+    print(f"  Rate Function: {rate_func}")
+    
+    # Verify sequential MM setup
+    assert transition.transition_type == "continuous", "Should be continuous"
+    assert rate_func is not None, "Should have rate_function"
+    assert "michaelis_menten" in rate_func, "Should use michaelis_menten function"
+    
+    # Check for sequential structure: primary MM * saturation terms
+    # Should look like: michaelis_menten(P1, 20.0, 3.0) * (P2 / (3.0 + P2))
+    place_names = [p.name for p in document.places if p.tokens > 0]  # Get substrate places
+    print(f"\n  Substrate places: {place_names}")
+    
+    # Verify both substrates are referenced
+    substrates_referenced = sum(1 for p_name in place_names if p_name in rate_func)
+    assert substrates_referenced >= 2, f"Should reference both substrates, found {substrates_referenced}"
+    
+    # Verify sequential structure (primary MM + saturation term)
+    assert " * " in rate_func, "Should have multiplication for sequential kinetics"
+    assert "/" in rate_func, "Should have division terms for saturation"
+    
+    print("\n✅ PASS: Multi-substrate sequential Michaelis-Menten correctly imported")
+    print(f"   Rate function: {rate_func}")
+    print(f"   Substrates referenced: {substrates_referenced}")
+    return True
+
+
 def main():
     """Run all tests."""
     print("\n" + "="*80)
@@ -268,7 +380,7 @@ def main():
     print("="*80)
     
     try:
-        # Test 1: Michaelis-Menten
+        # Test 1: Michaelis-Menten (single substrate)
         test_michaelis_menten_import()
         
         # Test 2: Mass Action → Stochastic
@@ -277,11 +389,15 @@ def main():
         # Test 3: Place name resolution
         test_place_name_resolution()
         
+        # Test 4: Multi-substrate Sequential MM
+        test_multi_substrate_sequential_mm()
+        
         print("\n" + "="*80)
         print("✅ ALL TESTS PASSED")
         print("="*80)
         print("\nSummary:")
-        print("  ✓ Michaelis-Menten → rate_function with michaelis_menten()")
+        print("  ✓ Michaelis-Menten (single) → rate_function with michaelis_menten()")
+        print("  ✓ Michaelis-Menten (multi) → sequential rate function")
         print("  ✓ Mass action → stochastic transition with lambda")
         print("  ✓ Place names correctly resolved in rate functions")
         print("\nEnhancements working correctly! 🎉")

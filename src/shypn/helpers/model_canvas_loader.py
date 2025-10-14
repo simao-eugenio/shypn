@@ -79,6 +79,7 @@ class ModelCanvasLoader:
         self.persistency = None
         self.right_panel_loader = None
         self.context_menu_handler = None
+        self._clipboard = []  # Clipboard for cut/copy/paste operations
 
     def load(self):
         """Load the canvas UI and return the container.
@@ -1210,9 +1211,11 @@ class ModelCanvasLoader:
         
         # Complete lasso selection if active
         if lasso_state.get('active', False) and lasso_state.get('selector'):
-            if lasso_state['selector'].is_active:
+            if lasso_state['selector'].is_active and event.button == 1:
                 lasso_state['selector'].finish_lasso()
+                # Deactivate lasso mode completely after selection
                 lasso_state['active'] = False
+                # Force redraw to remove lasso visualization
                 widget.queue_draw()
                 return True
         
@@ -1373,6 +1376,47 @@ class ModelCanvasLoader:
         is_ctrl = event.state & Gdk.ModifierType.CONTROL_MASK
         is_shift = event.state & Gdk.ModifierType.SHIFT_MASK
         
+        # Delete key - delete selected objects
+        if event.keyval == Gdk.KEY_Delete or event.keyval == Gdk.KEY_KP_Delete:
+            selected = manager.selection_manager.get_selected_objects()
+            if selected:
+                from shypn.edit.undo_operations import DeleteOperation
+                # Store delete data for undo
+                delete_data = []
+                for obj in selected:
+                    delete_data.append(manager.serialize_object_for_undo(obj))
+                
+                # Delete all selected objects
+                for obj in selected:
+                    manager.delete_object(obj)
+                
+                # Push to undo stack
+                if hasattr(manager, 'undo_manager') and delete_data:
+                    manager.undo_manager.push(DeleteOperation(delete_data, manager))
+                
+                widget.queue_draw()
+                return True
+        
+        # Cut (Ctrl+X)
+        if is_ctrl and not is_shift and event.keyval == Gdk.KEY_x:
+            selected = manager.selection_manager.get_selected_objects()
+            if selected:
+                self._cut_selection(manager, widget)
+                return True
+        
+        # Copy (Ctrl+C)
+        if is_ctrl and not is_shift and event.keyval == Gdk.KEY_c:
+            selected = manager.selection_manager.get_selected_objects()
+            if selected:
+                self._copy_selection(manager)
+                return True
+        
+        # Paste (Ctrl+V)
+        if is_ctrl and not is_shift and event.keyval == Gdk.KEY_v:
+            if hasattr(self, '_clipboard') and self._clipboard:
+                self._paste_selection(manager, widget)
+                return True
+        
         # Undo (Ctrl+Z)
         if is_ctrl and not is_shift and event.keyval == Gdk.KEY_z:
             if hasattr(manager, 'undo_manager') and manager.undo_manager:
@@ -1380,8 +1424,9 @@ class ModelCanvasLoader:
                     widget.queue_draw()
                 return True
         
-        # Redo (Ctrl+Shift+Z)
-        if is_ctrl and is_shift and event.keyval == Gdk.KEY_z:
+        # Redo (Ctrl+Shift+Z or Ctrl+Y)
+        if (is_ctrl and is_shift and event.keyval == Gdk.KEY_z) or \
+           (is_ctrl and not is_shift and event.keyval == Gdk.KEY_y):
             if hasattr(manager, 'undo_manager') and manager.undo_manager:
                 if manager.undo_manager.redo(manager):
                     widget.queue_draw()
@@ -2471,6 +2516,219 @@ class ModelCanvasLoader:
         new_arc = convert_to_normal(arc)
         manager.replace_arc(arc, new_arc)
         drawing_area.queue_draw()
+    
+    def _cut_selection(self, manager, widget):
+        """Cut selected objects to clipboard.
+        
+        Args:
+            manager: ModelCanvasManager instance
+            widget: GtkDrawingArea widget
+        """
+        # First copy, then delete
+        self._copy_selection(manager)
+        
+        # Delete selected objects
+        selected = manager.selection_manager.get_selected_objects()
+        if selected:
+            from shypn.edit.undo_operations import DeleteOperation
+            # Store delete data for undo
+            delete_data = []
+            for obj in selected:
+                delete_data.append(manager.serialize_object_for_undo(obj))
+            
+            # Delete all selected objects
+            for obj in selected:
+                manager.delete_object(obj)
+            
+            # Push to undo stack
+            if hasattr(manager, 'undo_manager') and delete_data:
+                manager.undo_manager.push(DeleteOperation(delete_data, manager))
+            
+            widget.queue_draw()
+    
+    def _copy_selection(self, manager):
+        """Copy selected objects to clipboard.
+        
+        Args:
+            manager: ModelCanvasManager instance
+        """
+        from shypn.netobjs import Place, Transition, Arc
+        
+        selected = manager.selection_manager.get_selected_objects()
+        if not selected:
+            return
+        
+        self._clipboard = []
+        
+        # Separate places, transitions, and arcs
+        places = [obj for obj in selected if isinstance(obj, Place)]
+        transitions = [obj for obj in selected if isinstance(obj, Transition)]
+        arcs = [obj for obj in selected if isinstance(obj, Arc)]
+        
+        # Serialize places and transitions
+        for place in places:
+            self._clipboard.append({
+                'type': 'place',
+                'name': place.name,
+                'x': place.x,
+                'y': place.y,
+                'radius': place.radius,
+                'tokens': place.tokens,
+                'capacity': place.capacity,
+                'id': id(place)  # Temporary ID for arc reconstruction
+            })
+        
+        for transition in transitions:
+            self._clipboard.append({
+                'type': 'transition',
+                'name': transition.name,
+                'x': transition.x,
+                'y': transition.y,
+                'width': transition.width,
+                'height': transition.height,
+                'horizontal': transition.horizontal,
+                'transition_type': getattr(transition, 'transition_type', 'continuous'),
+                'rate': getattr(transition, 'rate', 1.0),
+                'delay': getattr(transition, 'delay', 0.0),
+                'id': id(transition)  # Temporary ID for arc reconstruction
+            })
+        
+        # Serialize arcs only if both source and target are in selection
+        for arc in arcs:
+            if arc.source in selected and arc.target in selected:
+                arc_data = {
+                    'type': 'arc',
+                    'source_id': id(arc.source),
+                    'target_id': id(arc.target),
+                    'weight': arc.weight,
+                    'arc_type': getattr(arc, 'arc_type', 'normal')
+                }
+                
+                # Handle curved arcs
+                if hasattr(arc, 'is_curved') and arc.is_curved:
+                    arc_data['is_curved'] = True
+                    arc_data['handle_x'] = arc.handle_x
+                    arc_data['handle_y'] = arc.handle_y
+                
+                self._clipboard.append(arc_data)
+    
+    def _paste_selection(self, manager, widget):
+        """Paste objects from clipboard.
+        
+        Args:
+            manager: ModelCanvasManager instance
+            widget: GtkDrawingArea widget
+        """
+        from shypn.netobjs import Place, Transition
+        
+        if not self._clipboard:
+            return
+        
+        # Paste with offset to avoid exact overlap
+        offset_x, offset_y = 30, 30
+        
+        # Clear current selection
+        manager.clear_all_selections()
+        
+        # Map old IDs to new objects
+        id_map = {}
+        
+        # Create places and transitions first
+        for item in self._clipboard:
+            if item['type'] == 'place':
+                place = manager.add_place(
+                    item['x'] + offset_x,
+                    item['y'] + offset_y,
+                    name=self._generate_unique_name(manager, item['name'])
+                )
+                place.tokens = item['tokens']
+                place.capacity = item.get('capacity', float('inf'))
+                place.radius = item['radius']
+                id_map[item['id']] = place
+                
+                # Select pasted object
+                place.selected = True
+                manager.selection_manager.select(place, multi=True, manager=manager)
+            
+            elif item['type'] == 'transition':
+                transition = manager.add_transition(
+                    item['x'] + offset_x,
+                    item['y'] + offset_y,
+                    name=self._generate_unique_name(manager, item['name'])
+                )
+                transition.horizontal = item['horizontal']
+                transition.width = item['width']
+                transition.height = item['height']
+                transition.transition_type = item.get('transition_type', 'continuous')
+                transition.rate = item.get('rate', 1.0)
+                transition.delay = item.get('delay', 0.0)
+                id_map[item['id']] = transition
+                
+                # Select pasted object
+                transition.selected = True
+                manager.selection_manager.select(transition, multi=True, manager=manager)
+        
+        # Create arcs after all nodes exist
+        for item in self._clipboard:
+            if item['type'] == 'arc':
+                source = id_map.get(item['source_id'])
+                target = id_map.get(item['target_id'])
+                
+                if source and target:
+                    try:
+                        arc = manager.add_arc(source, target)
+                        arc.weight = item['weight']
+                        
+                        # Set arc type
+                        if item.get('arc_type') == 'inhibitor':
+                            from shypn.utils.arc_transform import convert_to_inhibitor
+                            new_arc = convert_to_inhibitor(arc)
+                            manager.replace_arc(arc, new_arc)
+                            arc = new_arc
+                        
+                        # Handle curved arcs
+                        if item.get('is_curved'):
+                            arc.is_curved = True
+                            arc.handle_x = item['handle_x'] + offset_x
+                            arc.handle_y = item['handle_y'] + offset_y
+                    except ValueError:
+                        # Skip invalid arcs
+                        pass
+        
+        widget.queue_draw()
+    
+    def _generate_unique_name(self, manager, base_name):
+        """Generate a unique name for a pasted object.
+        
+        Args:
+            manager: ModelCanvasManager instance
+            base_name: Base name to start from
+            
+        Returns:
+            str: Unique name
+        """
+        # Extract base name without numeric suffix
+        import re
+        match = re.match(r'(.+?)(\d+)$', base_name)
+        if match:
+            prefix = match.group(1)
+        else:
+            prefix = base_name
+        
+        # Find all existing names
+        existing_names = set()
+        for place in manager.places:
+            existing_names.add(place.name)
+        for transition in manager.transitions:
+            existing_names.add(transition.name)
+        
+        # Generate unique name
+        counter = 1
+        while True:
+            candidate = f"{prefix}{counter}"
+            if candidate not in existing_names:
+                return candidate
+            counter += 1
     
     def _show_error_dialog(self, message):
         """Show an error dialog to the user.
