@@ -41,13 +41,6 @@ except ImportError as e:
     PathwayPostProcessor = None
     PathwayConverter = None
 
-# Import CrossFetch enricher (PRE-processor)
-try:
-    from shypn.crossfetch.sbml_enricher import SBMLEnricher
-except ImportError as e:
-    print(f'Warning: CrossFetch enricher not available: {e}', file=sys.stderr)
-    SBMLEnricher = None
-
 
 class SBMLImportPanel:
     """Controller for SBML import functionality.
@@ -93,19 +86,6 @@ class SBMLImportPanel:
             self.converter = None
             print("Warning: SBML import backend not available", file=sys.stderr)
         
-        # Initialize enricher (PRE-processor)
-        if SBMLEnricher:
-            self.enricher = SBMLEnricher(
-                fetch_sources=["KEGG", "Reactome"],
-                enrich_concentrations=True,
-                enrich_kinetics=True,
-                enrich_annotations=True,
-                enrich_coordinates=True  # Enable coordinate enrichment
-            )
-        else:
-            self.enricher = None
-            print("Warning: CrossFetch enricher not available", file=sys.stderr)
-        
         # Current state
         self.current_filepath = None
         self.parsed_pathway = None
@@ -144,8 +124,8 @@ class SBMLImportPanel:
         self.sbml_scale_spin = self.builder.get_object('sbml_scale_spin')
         self.sbml_scale_example = self.builder.get_object('sbml_scale_example')
         
-        # Enrichment option (CrossFetch PRE-processing)
-        self.sbml_enrich_check = self.builder.get_object('sbml_enrich_check')
+        # Enrichment checkbox removed - feature disabled (heterogeneity intractable)
+        # self.sbml_enrich_check = self.builder.get_object('sbml_enrich_check')
         
         # Preview and status
         self.sbml_preview_text = self.builder.get_object('sbml_preview_text')
@@ -450,50 +430,9 @@ class SBMLImportPanel:
             False to stop GLib.idle_add from repeating
         """
         try:
-            # Check if enrichment is enabled
-            enrich_enabled = False
-            if self.sbml_enrich_check and self.enricher:
-                enrich_enabled = self.sbml_enrich_check.get_active()
-            
-            # PRE-PROCESSING: Enrich SBML if enabled
-            sbml_to_parse = self.current_filepath
-            
-            if enrich_enabled:
-                self._show_status("PRE-PROCESSING: Enriching SBML with external data...")
-                
-                try:
-                    # Determine pathway ID for enrichment
-                    pathway_id = self._extract_pathway_id()
-                    
-                    if pathway_id:
-                        self._show_status(f"Fetching enrichment data (concentrations, kinetics, coordinates)...")
-                        
-                        # Enrich SBML (includes all: concentrations, kinetics, annotations, coordinates)
-                        enriched_sbml = self.enricher.enrich_by_pathway_id(pathway_id)
-                        
-                        # Save enriched SBML to temporary file
-                        import tempfile
-                        temp_dir = tempfile.gettempdir()
-                        enriched_filepath = os.path.join(temp_dir, f"enriched_{os.path.basename(self.current_filepath)}")
-                        
-                        with open(enriched_filepath, 'w') as f:
-                            f.write(enriched_sbml)
-                        
-                        # Use enriched file for parsing
-                        sbml_to_parse = enriched_filepath
-                        self._show_status(f"✓ SBML enriched (data + coordinates)")
-                    else:
-                        self._show_status("Warning: Could not determine pathway ID for enrichment. Using base SBML.")
-                        
-                except Exception as e:
-                    self.logger.warning(f"Enrichment failed: {e}. Falling back to base SBML.")
-                    self._show_status(f"Enrichment failed: {e}. Using base SBML.")
-                    # Fall back to original file
-                    sbml_to_parse = self.current_filepath
-            
-            # POST-PROCESSING: Parse SBML file (enriched or base)
+            # Parse SBML file directly (enrichment removed - heterogeneity intractable)
             self._show_status(f"Parsing SBML...")
-            self.parsed_pathway = self.parser.parse_file(sbml_to_parse)
+            self.parsed_pathway = self.parser.parse_file(self.current_filepath)
             
             if not self.parsed_pathway:
                 self._show_status("Failed to parse SBML file", error=True)
@@ -521,11 +460,9 @@ class SBMLImportPanel:
             # Show warnings if any
             if validation_result.warnings:
                 warning_count = len(validation_result.warnings)
-                status_prefix = "✓ Enriched and parsed" if enrich_enabled else "✓ Parsed"
-                self._show_status(f"{status_prefix} with {warning_count} warning(s)")
+                self._show_status(f"✓ Parsed with {warning_count} warning(s)")
             else:
-                status_prefix = "✓ Enriched, parsed, and validated" if enrich_enabled else "✓ Parsed and validated"
-                self._show_status(f"{status_prefix} successfully")
+                self._show_status(f"✓ Parsed and validated successfully")
             
             # Update preview with pathway info
             self._update_preview()
@@ -547,52 +484,6 @@ class SBMLImportPanel:
                 self.sbml_parse_button.set_sensitive(True)
         
         return False  # Don't repeat
-    
-    def _extract_pathway_id(self) -> Optional[str]:
-        """Extract pathway ID from current context.
-        
-        Tries multiple sources:
-        1. BioModels entry (if in BioModels mode)
-        2. Filename parsing (if looks like BIOMD or pathway ID)
-        3. SBML file metadata
-        
-        Returns:
-            Pathway ID or None
-        """
-        # Try BioModels entry first
-        if self.sbml_biomodels_radio and self.sbml_biomodels_radio.get_active():
-            if self.sbml_biomodels_entry:
-                biomodels_id = self.sbml_biomodels_entry.get_text().strip()
-                if biomodels_id:
-                    return biomodels_id
-        
-        # Try parsing filename
-        if self.current_filepath:
-            basename = os.path.basename(self.current_filepath)
-            
-            # Check for BioModels ID pattern (BIOMD0000000XXX)
-            import re
-            biomodels_match = re.match(r'(BIOMD\d{10})', basename, re.IGNORECASE)
-            if biomodels_match:
-                return biomodels_match.group(1).upper()
-            
-            # Check for KEGG pathway pattern (hsa00010, eco00010, etc.)
-            kegg_match = re.match(r'([a-z]{2,4}\d{5})', basename, re.IGNORECASE)
-            if kegg_match:
-                return kegg_match.group(1).lower()
-        
-        # Try reading SBML file for model ID
-        try:
-            if self.enricher:
-                pathway_id = self.enricher._extract_pathway_id_from_sbml(
-                    open(self.current_filepath).read()
-                )
-                if pathway_id:
-                    return pathway_id
-        except Exception as e:
-            self.logger.debug(f"Could not extract pathway ID from SBML: {e}")
-        
-        return None
     
     def _show_validation_errors(self, validation_result):
         """Show validation errors and warnings in preview area.
@@ -733,50 +624,61 @@ class SBMLImportPanel:
             )
             self.processed_pathway = self.postprocessor.process(self.parsed_pathway)
             
+            # DEBUG: Log coordinates after post-processing
+            if self.processed_pathway.positions:
+                first_id = list(self.processed_pathway.positions.keys())[0]
+                x, y = self.processed_pathway.positions[first_id]
+                self.logger.warning(f"🔍 AFTER POST-PROCESSOR: {first_id} at ({x:.1f}, {y:.1f})")
+                self.logger.warning(f"   Total positions: {len(self.processed_pathway.positions)}")
+            
             # Convert to DocumentModel
             self._show_status("Converting to Petri net...")
             document_model = self.converter.convert(self.processed_pathway)
+            
+            # DEBUG: Log coordinates after conversion
+            if document_model.places:
+                first_place = document_model.places[0]
+                self.logger.warning(f"🔍 AFTER CONVERTER: {first_place.name} (id={id(first_place)}) at ({first_place.x:.1f}, {first_place.y:.1f})")
             
             # Check layout type to decide on enhancements
             layout_type = document_model.metadata.get('layout_type', 'unknown')
             self.logger.info(f"Layout type: {layout_type}")
             
             # Apply KEGG-style enhancements for better visualization
-            # Skip arc routing for hierarchical layouts (straight arcs look better)
+            # Skip both layout optimization AND arc routing for hierarchical layouts
+            # Hierarchical layouts are already well-structured with bounded coordinates
             try:
                 from shypn.pathway.options import EnhancementOptions
                 from shypn.pathway.pipeline import EnhancementPipeline
                 from shypn.pathway.layout_optimizer import LayoutOptimizer
                 from shypn.pathway.arc_router import ArcRouter
                 
-                # Decide on arc routing based on layout type
-                # Skip arc routing for hierarchical layouts (straight arcs preserve angular paths)
-                enable_arc_routing = layout_type not in ['hierarchical', 'hierarchical-tree', 'cross-reference']
+                # Check if this is a hierarchical layout (already optimized)
+                is_hierarchical = layout_type in ['hierarchical', 'hierarchical-tree', 'cross-reference']
                 
-                # Create enhancement options
-                enhancement_options = EnhancementOptions(
-                    enable_layout_optimization=True,
-                    enable_arc_routing=enable_arc_routing,  # Conditional!
-                    enable_metadata_enhancement=False,  # No KEGG metadata for SBML
-                    enable_visual_validation=False,
-                    layout_min_spacing=80.0,
-                    layout_max_iterations=50
-                )
-                
-                # Build enhancement pipeline
-                pipeline = EnhancementPipeline(enhancement_options)
-                pipeline.add_processor(LayoutOptimizer(enhancement_options))
-                
-                # Only add arc router if enabled
-                if enable_arc_routing:
-                    pipeline.add_processor(ArcRouter(enhancement_options))
-                    self.logger.info("Arc routing enabled (complex layout)")
+                # Skip ALL enhancements for hierarchical layouts (they're already perfect!)
+                if is_hierarchical:
+                    self.logger.info(f"Skipping enhancements for {layout_type} layout (already optimized)")
                 else:
-                    self.logger.info(f"Arc routing disabled (hierarchical layout - straight arcs)")
-                
-                # Enhance the document
-                self._show_status("Optimizing layout...")
-                document_model = pipeline.process(document_model, None)  # No pathway object for SBML
+                    # Create enhancement options for non-hierarchical layouts
+                    enhancement_options = EnhancementOptions(
+                        enable_layout_optimization=True,
+                        enable_arc_routing=True,
+                        enable_metadata_enhancement=False,  # No KEGG metadata for SBML
+                        enable_visual_validation=False,
+                        layout_min_spacing=80.0,
+                        layout_max_iterations=50
+                    )
+                    
+                    # Build enhancement pipeline
+                    pipeline = EnhancementPipeline(enhancement_options)
+                    pipeline.add_processor(LayoutOptimizer(enhancement_options))
+                    pipeline.add_processor(ArcRouter(enhancement_options))
+                    
+                    # Enhance the document
+                    self._show_status("Optimizing layout...")
+                    document_model = pipeline.process(document_model, None)  # No pathway object for SBML
+                    self.logger.info("Layout optimization complete")
                 
             except Exception as e:
                 self.logger.warning(f"Enhancement failed: {e}, using basic layout")
@@ -784,6 +686,11 @@ class SBMLImportPanel:
             # Load into canvas
             self._show_status("Loading to canvas...")
             if self.model_canvas:
+                # DEBUG: Check coordinates right before loading to canvas
+                if document_model.places:
+                    first_place = document_model.places[0]
+                    self.logger.warning(f"🔍 BEFORE CANVAS LOADING: {first_place.name} (id={id(first_place)}) at ({first_place.x:.1f}, {first_place.y:.1f})")
+                
                 # Create a new tab for this pathway
                 # Get name from metadata (PathwayData stores it there)
                 pathway_name = self.parsed_pathway.metadata.get('name') or os.path.basename(self.current_filepath)
@@ -795,8 +702,43 @@ class SBMLImportPanel:
                 if manager:
                     # Load the document model into the manager
                     manager.places = list(document_model.places)
+                    
+                    # DEBUG: Check if coordinates changed during list() copy
+                    if document_model.places and manager.places:
+                        doc_p = document_model.places[0]
+                        mgr_p = manager.places[0]
+                        self.logger.warning(f"🔍 AFTER list() COPY:")
+                        self.logger.warning(f"   document_model: {doc_p.name} (id={id(doc_p)}) at ({doc_p.x}, {doc_p.y})")
+                        self.logger.warning(f"   manager:        {mgr_p.name} (id={id(mgr_p)}) at ({mgr_p.x}, {mgr_p.y})")
+                    
                     manager.transitions = list(document_model.transitions)
-                    manager.arcs = list(document_model.arcs)
+                    
+                    # DEBUG: Check arc types BEFORE loading
+                    self.logger.warning(f"🔍 DOCUMENT ARCS (before load): {len(document_model.arcs)} arcs")
+                    for i, arc in enumerate(document_model.arcs[:3]):  # First 3 arcs
+                        self.logger.warning(f"   Arc {i}: type={type(arc).__name__}, is_curved={getattr(arc, 'is_curved', 'N/A')}")
+                    
+                    # Load arcs WITHOUT auto-converting to curved arcs
+                    # Curved arcs can cause coordinate issues - keep all arcs straight/linear
+                    for arc in document_model.arcs:
+                        # FORCE all arcs to be straight
+                        arc.is_curved = False
+                        arc.control_offset_x = 0.0
+                        arc.control_offset_y = 0.0
+                        
+                        arc._manager = manager
+                        arc.on_changed = manager._on_object_changed
+                        manager.arcs.append(arc)
+                    
+                    # DEBUG: Check arc types AFTER loading
+                    self.logger.warning(f"🔍 MANAGER ARCS (after load): {len(manager.arcs)} arcs")
+                    for i, arc in enumerate(manager.arcs[:3]):  # First 3 arcs
+                        self.logger.warning(f"   Arc {i}: type={type(arc).__name__}, is_curved={getattr(arc, 'is_curved', 'N/A')}")
+                    
+                    # DEBUG: Check coordinates immediately after loading
+                    if manager.places:
+                        p = manager.places[0]
+                        self.logger.warning(f"🔍 IMMEDIATELY AFTER LOADING: {p.name} (id={id(p)}) at ({p.x}, {p.y})")
                     
                     print(f"  Loaded into manager:")
                     print(f"    Places: {len(manager.places)}")
@@ -804,7 +746,7 @@ class SBMLImportPanel:
                     print(f"    Arcs: {len(manager.arcs)}")
                     if manager.places:
                         p = manager.places[0]
-                        print(f"    First place: {p.name} at ({p.x}, {p.y})")
+                        print(f"    First place: {p.name} (id={id(p)}) at ({p.x}, {p.y})")
                         print(f"    Border color: {p.border_color}")
                         print(f"    Default: {p.DEFAULT_BORDER_COLOR}")
                     
@@ -813,8 +755,18 @@ class SBMLImportPanel:
                     manager._next_transition_id = document_model._next_transition_id
                     manager._next_arc_id = document_model._next_arc_id
                     
+                    # DEBUG: Check before ensure_arc_references
+                    if manager.places:
+                        p = manager.places[0]
+                        self.logger.warning(f"🔍 BEFORE ensure_arc_references: {p.name} at ({p.x}, {p.y})")
+                    
                     # Ensure arc references are properly set
                     manager.ensure_arc_references()
+                    
+                    # DEBUG: Check after ensure_arc_references
+                    if manager.places:
+                        p = manager.places[0]
+                        self.logger.warning(f"🔍 AFTER ensure_arc_references: {p.name} at ({p.x}, {p.y})")
                     
                     # Mark as dirty to ensure redraw
                     manager.mark_dirty()

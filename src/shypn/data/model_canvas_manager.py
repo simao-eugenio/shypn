@@ -351,6 +351,10 @@ class ModelCanvasManager:
         Args:
             new_arc: The newly added arc that may create parallels
         """
+        # DISABLED: Keep all arcs straight/linear for imported pathways
+        # Curved arcs can cause coordinate calculation issues
+        return
+        
         from shypn.netobjs import CurvedArc, CurvedInhibitorArc, InhibitorArc
         from shypn.utils.arc_transform import make_curved
         

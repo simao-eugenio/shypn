@@ -78,6 +78,12 @@ class SpeciesConverter(BaseConverter):
         """
         species_to_place = {}
         
+        # DEBUG: Log first few positions from pathway data
+        first_positions = list(self.pathway.positions.items())[:3]
+        self.logger.warning(f"🔍 CONVERTER INPUT (pathway.positions):")
+        for species_id, (x, y) in first_positions:
+            self.logger.warning(f"   {species_id}: ({x:.1f}, {y:.1f})")
+        
         for species in self.pathway.species:
             # Get position (from post-processor)
             if species.id not in self.pathway.positions:

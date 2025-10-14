@@ -101,32 +101,16 @@ class LayoutProcessor(BaseProcessor):
         """Calculate and assign positions.
         
         Tries layout strategies in order of quality:
-        1. Cross-reference (KEGG/Reactome coordinates) - BEST
-        2. Hierarchical (top-to-bottom flow) - GOOD for metabolic pathways
-        3. Force-directed (networkx) - OK for complex networks
-        4. Grid (fallback) - BASIC
+        1. Hierarchical (top-to-bottom flow) - ALWAYS use this for consistent look
+        2. Force-directed (networkx) - OK for complex networks (fallback)
+        3. Grid (fallback) - BASIC (last resort)
+        
+        Note: Cross-reference layout (KEGG/Reactome coordinates) disabled - 
+        hierarchical layout provides better visual consistency.
         """
         
-        # STRATEGY 1: Try cross-reference resolution first (KEGG, etc.)
-        try:
-            from .sbml_layout_resolver import SBMLLayoutResolver
-            resolver = SBMLLayoutResolver(self.pathway)
-            positions = resolver.resolve_layout()
-            
-            if positions:
-                processed_data.positions = positions
-                # Still need to position reactions
-                self._position_reactions_between_compounds(processed_data)
-                # Mark as cross-reference layout (straight arcs preferred)
-                processed_data.metadata['layout_type'] = 'cross-reference'
-                self.logger.info(
-                    f"✓ Using cross-reference layout for {len(positions)} elements"
-                )
-                return
-        except Exception as e:
-            self.logger.debug(f"Cross-reference resolution failed: {e}")
-        
-        # STRATEGY 2: Try hierarchical layout (biochemical top-to-bottom)
+        # STRATEGY 1: Always use hierarchical layout (biochemical top-to-bottom)
+        # This provides the beautiful layered structure shown in UI
         try:
             layout_processor = BiochemicalLayoutProcessor(
                 self.pathway, 
@@ -142,9 +126,9 @@ class LayoutProcessor(BaseProcessor):
                 )
                 return
         except Exception as e:
-            self.logger.debug(f"Hierarchical layout failed: {e}")
+            self.logger.warning(f"Hierarchical layout failed: {e}, falling back to force-directed")
         
-        # STRATEGY 3: Force-directed layout (requires networkx)
+        # STRATEGY 2: Force-directed layout (requires networkx)
         if HAS_NETWORKX:
             self._calculate_force_directed_layout(processed_data)
             processed_data.metadata['layout_type'] = 'force-directed'
@@ -152,7 +136,7 @@ class LayoutProcessor(BaseProcessor):
                 f"✓ Using force-directed layout for {len(processed_data.positions)} elements"
             )
         else:
-            # STRATEGY 4: Grid layout (last resort)
+            # STRATEGY 3: Grid layout (last resort)
             self._calculate_grid_layout(processed_data)
             processed_data.metadata['layout_type'] = 'grid'
             self.logger.info(

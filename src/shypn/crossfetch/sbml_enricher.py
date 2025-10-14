@@ -430,31 +430,226 @@ class SBMLEnricher:
         logger.info(f"Would merge {len(annotation_data)} annotations (not yet implemented)")
     
     def _extract_pathway_id_from_sbml(self, sbml_string: str) -> Optional[str]:
-        """Extract pathway ID from SBML annotations.
+        """Extract KEGG pathway ID from SBML annotations.
+        
+        Searches for KEGG pathway IDs in:
+        1. Model-level annotations (direct pathway reference)
+        2. Species annotations (finds most common pathway with organism awareness)
+        3. Reaction annotations
+        
+        IMPORTANT: Returns organism-specific pathway ID (e.g., sce00010 for yeast)
+        NOT a generic reference pathway (map00010)
         
         Args:
             sbml_string: SBML as string
             
         Returns:
-            Pathway ID or None
+            KEGG pathway ID with organism code (e.g., "sce00010") or None
         """
-        # Parse SBML and look for pathway ID in annotations
-        # This is a simplified implementation
+        import re
+        from collections import Counter
+        
         document = libsbml.readSBMLFromString(sbml_string)
         model = document.getModel()
         
         if not model:
             return None
         
-        # Try to get from model ID
-        model_id = model.getId()
-        if model_id:
-            return model_id
+        # Try to extract KEGG pathway from model annotations
+        model_annotation = model.getAnnotationString()
+        if model_annotation:
+            kegg_match = re.search(r'kegg\.pathway[:/]([a-z]{2,4}\d{5})', model_annotation, re.IGNORECASE)
+            if kegg_match:
+                pathway_id = kegg_match.group(1).lower()
+                logger.info(f"Found KEGG pathway in model annotations: {pathway_id}")
+                return pathway_id
         
-        # Could also check annotations for BioModels/KEGG IDs
-        # TODO: Implement more sophisticated ID extraction
+        # Try to infer organism from model metadata
+        organism_code = self._infer_organism_from_model(model)
+        logger.info(f"Inferred organism code: {organism_code or 'unknown'}")
         
+        # Collect KEGG pathway IDs from species and reactions
+        pathway_votes = Counter()
+        
+        # Check species annotations for KEGG compound IDs
+        for i in range(model.getNumSpecies()):
+            species = model.getSpecies(i)
+            annotation = species.getAnnotationString()
+            
+            if not annotation:
+                continue
+            
+            # Look for KEGG compound IDs (e.g., C00031, C00002)
+            kegg_compound = re.search(r'kegg\.compound[:/]([C]\d{5})', annotation, re.IGNORECASE)
+            if kegg_compound:
+                compound_id = kegg_compound.group(1).upper()
+                
+                # Query KEGG for pathways containing this compound
+                pathways = self._query_kegg_pathways_for_compound(compound_id, organism_code)
+                pathway_votes.update(pathways)
+        
+        # Check reaction annotations for KEGG reaction IDs
+        for i in range(model.getNumReactions()):
+            reaction = model.getReaction(i)
+            annotation = reaction.getAnnotationString()
+            
+            if not annotation:
+                continue
+            
+            # Look for KEGG reaction IDs (e.g., R00001)
+            kegg_reaction = re.search(r'kegg\.reaction[:/]([R]\d{5})', annotation, re.IGNORECASE)
+            if kegg_reaction:
+                reaction_id = kegg_reaction.group(1).upper()
+                
+                # Query KEGG for pathways containing this reaction
+                pathways = self._query_kegg_pathways_for_reaction(reaction_id, organism_code)
+                pathway_votes.update(pathways)
+        
+        # Filter and return most common ORGANISM-SPECIFIC pathway (not map)
+        if pathway_votes:
+            # Remove generic "map" pathways, prefer organism-specific
+            organism_pathways = {k: v for k, v in pathway_votes.items() if not k.startswith('map')}
+            
+            if organism_pathways:
+                most_common = Counter(organism_pathways).most_common(1)[0]
+                pathway_id, count = most_common
+                logger.info(f"Found KEGG pathway by voting: {pathway_id} ({count} references)")
+                return pathway_id
+            else:
+                # Fallback to map pathway if that's all we have
+                most_common = pathway_votes.most_common(1)[0]
+                pathway_id, count = most_common
+                logger.warning(f"Only found generic map pathway: {pathway_id}, may not have coordinates")
+                return pathway_id
+        
+        logger.debug("No KEGG pathway ID found in SBML annotations")
         return None
+    
+    def _infer_organism_from_model(self, model) -> Optional[str]:
+        """Infer organism code from SBML model metadata.
+        
+        Checks:
+        - Model name for organism keywords
+        - Model annotations for taxonomy
+        - Species names for organism-specific terms
+        
+        Args:
+            model: libsbml Model object
+            
+        Returns:
+            KEGG organism code (e.g., "hsa", "sce", "eco") or None
+        """
+        import re
+        
+        # Common organism mappings
+        organism_map = {
+            'human': 'hsa',
+            'homo sapiens': 'hsa',
+            'sapiens': 'hsa',
+            'yeast': 'sce',
+            'saccharomyces cerevisiae': 'sce',
+            'cerevisiae': 'sce',
+            's. cerevisiae': 'sce',
+            'e. coli': 'eco',
+            'escherichia coli': 'eco',
+            'coli': 'eco',
+            'mouse': 'mmu',
+            'mus musculus': 'mmu',
+            'rat': 'rno',
+            'rattus norvegicus': 'rno',
+        }
+        
+        # Check model name
+        model_name = model.getName() if model.isSetName() else model.getId()
+        if model_name:
+            model_name_lower = model_name.lower()
+            for keyword, code in organism_map.items():
+                if keyword in model_name_lower:
+                    logger.debug(f"Inferred organism from model name: {code}")
+                    return code
+        
+        # Check model annotations for taxonomy
+        model_annotation = model.getAnnotationString()
+        if model_annotation:
+            # Look for taxonomy IDs or organism names
+            for keyword, code in organism_map.items():
+                if keyword in model_annotation.lower():
+                    logger.debug(f"Inferred organism from annotations: {code}")
+                    return code
+        
+        # Default to human if nothing found
+        logger.debug("Could not infer organism, defaulting to human (hsa)")
+        return 'hsa'
+    
+    def _query_kegg_pathways_for_compound(self, compound_id: str, organism_code: Optional[str] = None) -> List[str]:
+        """Query KEGG for pathways containing a compound.
+        
+        Args:
+            compound_id: KEGG compound ID (e.g., "C00031")
+            organism_code: Preferred organism code (e.g., "hsa", "sce")
+            
+        Returns:
+            List of pathway IDs, prioritizing organism-specific pathways
+        """
+        try:
+            import urllib.request
+            
+            url = f"https://rest.kegg.jp/link/pathway/{compound_id}"
+            with urllib.request.urlopen(url, timeout=5) as response:
+                data = response.read().decode('utf-8')
+            
+            # Parse response: "cpd:C00031\tpath:hsa00010"
+            pathways = []
+            for line in data.strip().split('\n'):
+                if '\t' in line:
+                    _, pathway_ref = line.split('\t')
+                    pathway_id = pathway_ref.replace('path:', '')
+                    
+                    # Prioritize organism-specific pathways
+                    if organism_code and pathway_id.startswith(organism_code):
+                        pathways.insert(0, pathway_id)  # Add to front
+                    else:
+                        pathways.append(pathway_id)
+            
+            return pathways
+        except Exception as e:
+            logger.debug(f"Failed to query pathways for {compound_id}: {e}")
+            return []
+    
+    def _query_kegg_pathways_for_reaction(self, reaction_id: str, organism_code: Optional[str] = None) -> List[str]:
+        """Query KEGG for pathways containing a reaction.
+        
+        Args:
+            reaction_id: KEGG reaction ID (e.g., "R00001")
+            organism_code: Preferred organism code (e.g., "hsa", "sce")
+            
+        Returns:
+            List of pathway IDs, prioritizing organism-specific pathways
+        """
+        try:
+            import urllib.request
+            
+            url = f"https://rest.kegg.jp/link/pathway/{reaction_id}"
+            with urllib.request.urlopen(url, timeout=5) as response:
+                data = response.read().decode('utf-8')
+            
+            # Parse response
+            pathways = []
+            for line in data.strip().split('\n'):
+                if '\t' in line:
+                    _, pathway_ref = line.split('\t')
+                    pathway_id = pathway_ref.replace('path:', '')
+                    
+                    # Prioritize organism-specific pathways
+                    if organism_code and pathway_id.startswith(organism_code):
+                        pathways.insert(0, pathway_id)
+                    else:
+                        pathways.append(pathway_id)
+            
+            return pathways
+        except Exception as e:
+            logger.debug(f"Failed to query pathways for {reaction_id}: {e}")
+            return []
     
     def _merge_coordinates(self, model, coordinate_data: Dict[str, Any]):
         """Merge coordinate data into SBML Layout extension.

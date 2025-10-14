@@ -1,14 +1,20 @@
 """
 SBML Layout Resolver
 
-Resolves SBML species/reactions to graphical positions using
-cross-reference databases (KEGG, Reactome, WikiPathways).
+Resolves SBML species/reactions to graphical positions using multiple strategies:
 
-Strategy:
-1. Extract pathway-level cross-references from SBML
-2. Fetch graphical layout from source database
-3. Map SBML species → database entries by ID
-4. Return position dictionary
+Priority 1: SBML Layout Extension (if present from CrossFetch enrichment)
+  - Read coordinates directly from SBML Layout package
+  - Fastest and most accurate (no external fetching)
+  - Already in Cartesian coordinate system
+
+Priority 2: Cross-Reference Databases (fallback)
+  - Extract pathway-level cross-references from SBML
+  - Fetch graphical layout from source database (KEGG, Reactome, WikiPathways)
+  - Map SBML species → database entries by ID
+
+Priority 3: None (algorithmic layout will be used)
+  - Return None to trigger tree_layout.py
 
 Author: Shypn Development Team
 Date: October 2025
@@ -35,16 +41,28 @@ class SBMLLayoutResolver:
         self.logger = logging.getLogger(self.__class__.__name__)
     
     def resolve_layout(self) -> Optional[Dict[str, Tuple[float, float]]]:
-        """Resolve positions using cross-reference databases.
+        """Resolve positions using multiple strategies (priority order).
+        
+        Strategy Priority:
+        1. SBML Layout extension (if present from enrichment)
+        2. Cross-reference databases (KEGG, Reactome)
+        3. None (fallback to algorithmic layout)
         
         Returns:
             Dictionary {species_id: (x, y)} or None if resolution fails
         """
         self.logger.info("="*60)
-        self.logger.info("SBML Cross-Reference Layout Resolution Starting...")
+        self.logger.info("SBML Layout Resolution Starting...")
         self.logger.info("="*60)
         
-        # Strategy 1: Try KEGG pathway mapping
+        # PRIORITY 1: Check for SBML Layout extension first
+        positions = self._try_sbml_layout_extension()
+        if positions:
+            coverage = len(positions) / len(self.pathway.species)
+            self.logger.info(f"✓ SBML Layout extension found: {len(positions)}/{len(self.pathway.species)} species ({coverage:.0%} coverage)")
+            return positions
+        
+        # PRIORITY 2: Try KEGG pathway mapping (fallback)
         positions = self._try_kegg_pathway_mapping()
         if positions:
             coverage = len(positions) / len(self.pathway.species)
@@ -53,8 +71,92 @@ class SBMLLayoutResolver:
         
         # Future: Add Reactome, WikiPathways strategies
         
-        self.logger.info("✗ No cross-reference layout found, using fallback")
+        self.logger.info("✗ No layout found, using algorithmic layout")
         return None
+    
+    def _try_sbml_layout_extension(self) -> Optional[Dict[str, Tuple[float, float]]]:
+        """Try to read layout from SBML Layout extension.
+        
+        If the SBML was enriched with CrossFetch coordinate enrichment,
+        it will contain a Layout extension with species/reaction glyphs.
+        These coordinates are already in Cartesian system (first quadrant).
+        
+        Returns:
+            Dictionary {species_id: (x, y)} or None if no Layout extension
+        """
+        self.logger.info("Checking for SBML Layout extension...")
+        
+        # Check if we have the SBML document
+        if not hasattr(self.pathway, 'sbml_document') or not self.pathway.sbml_document:
+            self.logger.debug("No SBML document available")
+            return None
+        
+        try:
+            import libsbml
+            
+            document = self.pathway.sbml_document
+            model = document.getModel()
+            
+            if not model:
+                self.logger.debug("No SBML model in document")
+                return None
+            
+            # Get Layout plugin
+            mplugin = model.getPlugin('layout')
+            if not mplugin:
+                self.logger.debug("No Layout plugin found")
+                return None
+            
+            num_layouts = mplugin.getNumLayouts()
+            if num_layouts == 0:
+                self.logger.debug("No layouts in Layout plugin")
+                return None
+            
+            # Use first layout (typically "kegg_layout_1" from coordinate enricher)
+            layout = mplugin.getLayout(0)
+            layout_id = layout.getId() if layout.isSetId() else "unknown"
+            layout_name = layout.getName() if layout.isSetName() else "unknown"
+            
+            self.logger.info(f"Found SBML Layout: '{layout_id}' ({layout_name})")
+            
+            # Extract species positions from species glyphs
+            positions = {}
+            num_species_glyphs = layout.getNumSpeciesGlyphs()
+            
+            for i in range(num_species_glyphs):
+                glyph = layout.getSpeciesGlyph(i)
+                
+                if not glyph.isSetSpeciesId():
+                    continue
+                
+                species_id = glyph.getSpeciesId()
+                
+                # Get bounding box
+                if not glyph.isSetBoundingBox():
+                    continue
+                
+                bbox = glyph.getBoundingBox()
+                
+                # Extract position (x, y are already in Cartesian coordinates)
+                x = bbox.getX()
+                y = bbox.getY()
+                
+                positions[species_id] = (x, y)
+                self.logger.debug(f"Layout glyph: {species_id} at ({x:.1f}, {y:.1f})")
+            
+            if not positions:
+                self.logger.warning("Layout extension exists but contains no species glyphs")
+                return None
+            
+            self.logger.info(f"Successfully extracted {len(positions)} positions from SBML Layout extension")
+            return positions
+            
+        except ImportError:
+            self.logger.warning("libsbml not available, cannot read Layout extension")
+            return None
+        except Exception as e:
+            self.logger.warning(f"Error reading SBML Layout extension: {e}", exc_info=True)
+            return None
     
     def _try_kegg_pathway_mapping(self) -> Optional[Dict[str, Tuple[float, float]]]:
         """Try to map via KEGG pathway."""

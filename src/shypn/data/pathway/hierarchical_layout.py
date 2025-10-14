@@ -80,7 +80,53 @@ class HierarchicalLayoutProcessor:
         reaction_positions = self._position_reactions(positions)
         positions.update(reaction_positions)
         
-        self.logger.info(f"Hierarchical layout complete: {len(layers)} layers")
+        # Step 5: Validate and normalize coordinates (ensure all positive)
+        positions = self._normalize_coordinates(positions)
+        
+        self.logger.info(f"Hierarchical layout complete: {len(layers)} layers, {len(positions)} positioned")
+        return positions
+    
+    def _normalize_coordinates(self, positions: Dict[str, Tuple[float, float]]) -> Dict[str, Tuple[float, float]]:
+        """Ensure all coordinates are positive by shifting if needed.
+        
+        Args:
+            positions: Raw positions that may contain negative coordinates
+            
+        Returns:
+            Normalized positions with all positive coordinates
+        """
+        if not positions:
+            return positions
+        
+        # Find minimum coordinates
+        min_x = min(x for x, y in positions.values())
+        min_y = min(y for x, y in positions.values())
+        max_x = max(x for x, y in positions.values())
+        max_y = max(y for x, y in positions.values())
+        
+        # DEBUG: Always log coordinate ranges
+        self.logger.warning(f"🔍 HIERARCHICAL LAYOUT COORDINATES BEFORE NORMALIZATION:")
+        self.logger.warning(f"   X range: {min_x:.1f} to {max_x:.1f} (width: {max_x - min_x:.1f}px)")
+        self.logger.warning(f"   Y range: {min_y:.1f} to {max_y:.1f} (height: {max_y - min_y:.1f}px)")
+        
+        # If any coordinate is negative, shift everything
+        offset_x = max(0, 50 - min_x)  # At least 50px margin
+        offset_y = max(0, 50 - min_y)
+        
+        if offset_x > 0 or offset_y > 0:
+            self.logger.warning(f"⚠️  NORMALIZING: offset=({offset_x:.1f}, {offset_y:.1f})")
+            positions = {
+                element_id: (x + offset_x, y + offset_y)
+                for element_id, (x, y) in positions.items()
+            }
+            
+            # Verify after normalization
+            new_min_x = min(x for x, y in positions.values())
+            new_min_y = min(y for x, y in positions.values())
+            self.logger.warning(f"✓ AFTER NORMALIZATION: min=({new_min_x:.1f}, {new_min_y:.1f})")
+        else:
+            self.logger.warning(f"✓ No normalization needed (all coordinates positive)")
+        
         return positions
     
     def _build_dependency_graph(self) -> Tuple[Dict[str, List[str]], Dict[str, int]]:
@@ -179,10 +225,12 @@ class HierarchicalLayoutProcessor:
         return layers
     
     def _position_layers(self, layers: List[List[str]]) -> Dict[str, Tuple[float, float]]:
-        """Position species within their assigned layers.
+        """Position species within their assigned layers - SIMPLE FIXED SPACING.
         
-        Vertical: Top-to-bottom based on layer
-        Horizontal: Evenly distributed with consistent spacing
+        Uses clean, predictable layout:
+        - Vertical: Fixed spacing between layers (150px)
+        - Horizontal: Even distribution within each layer
+        - Canvas: Centered, max width 1200px
         
         Args:
             layers: List of layers with species IDs
@@ -192,32 +240,50 @@ class HierarchicalLayoutProcessor:
         """
         positions = {}
         
-        # Calculate starting Y position (top of canvas)
-        start_y = 100.0
+        # Layout parameters
+        start_y = 100.0  # Top margin
+        canvas_center_x = 600.0  # Canvas center
+        max_canvas_width = 1200.0  # Maximum width
+        min_spacing = 80.0  # Minimum spacing between nodes
         
-        # Canvas center X
-        canvas_center_x = 400.0
+        self.logger.warning(f"🔍 POSITIONING {len(layers)} LAYERS:")
         
         for layer_index, layer_species in enumerate(layers):
             # Y position for this layer
             y = start_y + layer_index * self.vertical_spacing
             
-            # Calculate X positions for species in this layer
-            # Give equal spacing to all elements
             num_species = len(layer_species)
+            self.logger.warning(f"   Layer {layer_index}: {num_species} species at Y={y:.1f}")
             
             if num_species == 1:
                 # Single element: center it
-                positions[layer_species[0]] = (canvas_center_x, y)
+                x = canvas_center_x
+                positions[layer_species[0]] = (x, y)
+                self.logger.debug(f"      {layer_species[0]}: ({x:.1f}, {y:.1f})")
             else:
                 # Multiple elements: distribute evenly
-                total_width = (num_species - 1) * self.horizontal_spacing
-                start_x = canvas_center_x - total_width / 2
+                # Calculate spacing (but don't exceed max width)
+                ideal_width = (num_species - 1) * self.horizontal_spacing
+                
+                if ideal_width > max_canvas_width:
+                    # Too wide - use max width with tighter spacing
+                    actual_width = max_canvas_width
+                    actual_spacing = max_canvas_width / (num_species - 1)
+                    self.logger.debug(f"      Layer too wide, reducing spacing to {actual_spacing:.1f}px")
+                else:
+                    actual_width = ideal_width
+                    actual_spacing = self.horizontal_spacing
+                
+                # Center the layer horizontally
+                start_x = canvas_center_x - actual_width / 2
                 
                 for i, species_id in enumerate(layer_species):
-                    x = start_x + i * self.horizontal_spacing
+                    x = start_x + i * actual_spacing
                     positions[species_id] = (x, y)
+                    if i < 3 or i >= num_species - 1:  # Log first 3 and last
+                        self.logger.debug(f"      {species_id}: ({x:.1f}, {y:.1f})")
         
+        self.logger.warning(f"✓ POSITIONED {len(positions)} species")
         return positions
     
     def _position_reactions(self, species_positions: Dict[str, Tuple[float, float]]) -> Dict[str, Tuple[float, float]]:
@@ -311,6 +377,14 @@ class BiochemicalLayoutProcessor:
         Args:
             processed_data: Processed pathway data (will be modified)
         """
+        # Check if positions already exist (e.g., from SBML Layout extension)
+        if processed_data.positions:
+            self.logger.info(
+                f"Positions already set ({len(processed_data.positions)} elements), "
+                "skipping hierarchical layout calculation"
+            )
+            return
+        
         # Analyze pathway structure
         pathway_type = self._analyze_pathway_type()
         
