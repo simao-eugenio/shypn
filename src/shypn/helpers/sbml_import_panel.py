@@ -60,6 +60,10 @@ class SBMLImportPanel:
         processed_pathway: Post-processed PathwayData with layout and colors
     """
     
+    # 🔬 TESTING CONFIGURATION (Hardcoded - No UI changes)
+    # Set to True to enable quick load after parse (for Swiss Palette testing)
+    ENABLE_QUICK_LOAD_AFTER_PARSE = True  # ← Change this to enable/disable
+    
     def __init__(self, builder: Gtk.Builder, model_canvas=None, workspace_settings=None):
         """Initialize the SBML import panel controller.
         
@@ -119,13 +123,28 @@ class SBMLImportPanel:
         # Info label
         self.sbml_source_info = self.builder.get_object('sbml_source_info')
         
-        # Options widgets
-        self.sbml_spacing_spin = self.builder.get_object('sbml_spacing_spin')
+        # Layout algorithm selection
+        self.sbml_layout_algorithm_combo = self.builder.get_object('sbml_layout_algorithm_combo')
+        
+        # Layout parameter boxes (for showing/hiding based on algorithm)
+        self.sbml_auto_params_box = self.builder.get_object('sbml_auto_params_box')
+        self.sbml_hierarchical_params_box = self.builder.get_object('sbml_hierarchical_params_box')
+        self.sbml_force_params_box = self.builder.get_object('sbml_force_params_box')
+        
+        # Hierarchical layout parameters
+        self.sbml_layer_spacing_spin = self.builder.get_object('sbml_layer_spacing_spin')
+        self.sbml_node_spacing_spin = self.builder.get_object('sbml_node_spacing_spin')
+        
+        # Force-directed layout parameters
+        self.sbml_iterations_spin = self.builder.get_object('sbml_iterations_spin')
+        self.sbml_k_factor_spin = self.builder.get_object('sbml_k_factor_spin')
+        self.sbml_canvas_scale_spin = self.builder.get_object('sbml_canvas_scale_spin')
+        
+        # Legacy/optional widgets (may not exist in UI, handle gracefully)
+        self.sbml_spacing_spin = None  # Legacy widget removed from UI
         self.sbml_scale_spin = self.builder.get_object('sbml_scale_spin')
         self.sbml_scale_example = self.builder.get_object('sbml_scale_example')
-        
-        # Enrichment checkbox removed - feature disabled (heterogeneity intractable)
-        # self.sbml_enrich_check = self.builder.get_object('sbml_enrich_check')
+        self.sbml_enrich_check = self.builder.get_object('sbml_enrich_check')  # Exists but disabled
         
         # Preview and status
         self.sbml_preview_text = self.builder.get_object('sbml_preview_text')
@@ -168,6 +187,10 @@ class SBMLImportPanel:
         # Scale changes
         if self.sbml_scale_spin:
             self.sbml_scale_spin.connect('value-changed', self._on_scale_changed)
+        
+        # Layout algorithm selection
+        if self.sbml_layout_algorithm_combo:
+            self.sbml_layout_algorithm_combo.connect('changed', self._on_layout_algorithm_changed)
         
         # Enable parse button when user types in entry
         if self.sbml_file_entry:
@@ -400,6 +423,140 @@ class SBMLImportPanel:
             f"Example: {example_concentration} mM glucose → {tokens} tokens"
         )
     
+    def _on_layout_algorithm_changed(self, combo):
+        """Handle layout algorithm selection changes - show/hide parameter boxes."""
+        if not combo:
+            return
+        
+        active_index = combo.get_active()
+        
+        # Hide all parameter boxes
+        if self.sbml_auto_params_box:
+            self.sbml_auto_params_box.set_visible(False)
+        if self.sbml_hierarchical_params_box:
+            self.sbml_hierarchical_params_box.set_visible(False)
+        if self.sbml_force_params_box:
+            self.sbml_force_params_box.set_visible(False)
+        
+        # Show appropriate parameter box based on selection
+        # 0 = Auto, 1 = Hierarchical, 2 = Force-Directed
+        if active_index == 0 and self.sbml_auto_params_box:
+            self.sbml_auto_params_box.set_visible(True)
+        elif active_index == 1 and self.sbml_hierarchical_params_box:
+            self.sbml_hierarchical_params_box.set_visible(True)
+        elif active_index == 2 and self.sbml_force_params_box:
+            self.sbml_force_params_box.set_visible(True)
+    
+    def _quick_load_to_canvas(self):
+        """Quick load parsed pathway to canvas as PURE Petri net (NO layout processing).
+        
+        🔬 TESTING MODE: Enables Swiss Palette testing of PURE force-directed layout.
+        
+        Workflow:
+        1. Parse SBML → PathwayData (species, reactions, connections)
+        2. Create ProcessedPathwayData with ARBITRARY positions (NO layout algorithms)
+        3. Convert to Petri net (places, transitions, arcs with stoichiometry weights)
+        4. Load to canvas
+        5. Swiss Palette force-directed COMPLETELY RECALCULATES positions from scratch
+        
+        CRITICAL: We bypass ALL layout algorithms (grid, hierarchical, circular, etc.)
+        The initial positions are ARBITRARY - force-directed will ignore them anyway.
+        We only need positions to exist so the converter doesn't complain.
+        
+        Controlled by: ENABLE_QUICK_LOAD_AFTER_PARSE class constant
+        """
+        if not self.parsed_pathway:
+            self.logger.warning("No parsed pathway to quick load")
+            return
+        
+        if not self.model_canvas or not self.converter:
+            self.logger.warning("Canvas or converter not available for quick load")
+            return
+        
+        try:
+            self.logger.info("🔬 QUICK LOAD MODE - Arbitrary positions (force-directed will recalculate)")
+            
+            from shypn.data.pathway.pathway_data import ProcessedPathwayData
+            
+            # Create ProcessedPathwayData manually
+            processed = ProcessedPathwayData(
+                species=list(self.parsed_pathway.species),
+                reactions=list(self.parsed_pathway.reactions),
+                metadata=dict(self.parsed_pathway.metadata)
+            )
+            
+            # Set ARBITRARY positions - doesn't matter where, force-directed recalculates everything
+            # We just need positions to exist so converter doesn't fail
+            base_x, base_y = 100.0, 100.0
+            offset = 0.0
+            
+            # All species at similar positions (force-directed will spread them)
+            for species in processed.species:
+                processed.positions[species.id] = (base_x + offset, base_y + offset)
+                offset += 10.0  # Small offset to avoid exact overlap
+            
+            # All reactions at similar positions (force-directed will spread them)
+            offset = 0.0
+            for reaction in processed.reactions:
+                processed.positions[reaction.id] = (base_x + 50.0 + offset, base_y + 50.0 + offset)
+                offset += 10.0
+            
+            # Set default colors (compartment-based)
+            compartments = set(s.compartment or "default" for s in processed.species)
+            default_colors = ["#E8F4F8", "#FFE8E8", "#E8FFE8", "#FFFFE8", "#FFE8FF"]
+            for i, comp in enumerate(compartments):
+                processed.colors[comp] = default_colors[i % len(default_colors)]
+            
+            # Mark as arbitrary (no real layout applied)
+            processed.metadata['layout_type'] = 'arbitrary'
+            
+            self.logger.info(f"Arbitrary positions set: {len(processed.positions)} objects (force-directed will recalculate)")
+            
+            # Convert ProcessedPathwayData to Petri net
+            document_model = self.converter.convert(processed)
+            self.logger.warning(f"🔍 QUICK LOAD: Converted to Petri net: {len(document_model.places)} places, {len(document_model.transitions)} transitions")
+            
+            # Show first object position
+            if document_model.places:
+                first = document_model.places[0]
+                self.logger.warning(f"🔍 QUICK LOAD: First place '{first.name}' at ({first.x:.1f}, {first.y:.1f})")
+            
+            # Load to canvas - create new tab
+            self.logger.warning("🔍 QUICK LOAD: Creating canvas tab...")
+            pathway_name = self.parsed_pathway.metadata.get('name', 'Pathway') + " [Testing]"
+            page_index, drawing_area = self.model_canvas.add_document(filename=pathway_name)
+            
+            # CRITICAL: Wire sbml_panel to ModelCanvasLoader (if not already wired)
+            # This allows Swiss Palette Layout tools to read parameters from SBML Import Options
+            if not hasattr(self.model_canvas, 'sbml_panel') or self.model_canvas.sbml_panel is None:
+                self.model_canvas.sbml_panel = self
+                self.logger.warning(f"✅ Wired SBML panel to ModelCanvasLoader")
+            
+            # Get canvas manager for this tab
+            manager = self.model_canvas.get_canvas_manager(drawing_area)
+            
+            if manager:
+                self.logger.warning("🔍 QUICK LOAD: Loading objects to canvas...")
+                # Load places, transitions, and arcs
+                manager.places = list(document_model.places)
+                manager.transitions = list(document_model.transitions)
+                manager.arcs = list(document_model.arcs)
+                
+                # Trigger redraw
+                drawing_area.queue_draw()
+                
+                self.logger.warning(f"🔍 QUICK LOAD: Canvas loaded with {len(manager.places)} places, {len(manager.transitions)} transitions!")
+                self._show_status("🔬 Pathway loaded - Use Swiss Palette → Force-Directed to apply physics!")
+                self.logger.warning("✓ Quick load complete - Swiss Palette can now apply force-directed transformation")
+            else:
+                self.logger.error("Failed to get canvas manager")
+                self._show_status("Error: Failed to get canvas manager", error=True)
+            
+        except Exception as e:
+            self.logger.error(f"Quick load failed: {e}")
+            import traceback
+            traceback.print_exc()
+    
     def _on_parse_clicked(self, button):
         """Handle parse button click - parse and validate SBML file."""
         if not self.parser or not self.validator:
@@ -470,6 +627,13 @@ class SBMLImportPanel:
             # Enable import button
             if self.sbml_import_button:
                 self.sbml_import_button.set_sensitive(True)
+            
+            # 🔬 TESTING MODE: Quick load to canvas after parse
+            if self.ENABLE_QUICK_LOAD_AFTER_PARSE and self.model_canvas:
+                self.logger.info("Quick load enabled - loading to canvas after parse")
+                GLib.idle_add(self._quick_load_to_canvas)
+            else:
+                self.logger.debug("Quick load disabled or canvas not available")
             
         except Exception as e:
             self._show_status(f"Parse error: {str(e)}", error=True)
@@ -611,16 +775,51 @@ class SBMLImportPanel:
             False to stop GLib.idle_add from repeating
         """
         try:
-            # Get options from UI
-            spacing = self.sbml_spacing_spin.get_value() if self.sbml_spacing_spin else 150.0
+            # Get token conversion scale factor
             scale_factor = self.sbml_scale_spin.get_value() if self.sbml_scale_spin else 1.0
+            
+            # Get layout algorithm selection (0=Auto, 1=Hierarchical, 2=Force-Directed)
+            layout_algorithm_index = self.sbml_layout_algorithm_combo.get_active() if self.sbml_layout_algorithm_combo else 0
+            
+            # Determine layout type and parameters
+            layout_type = 'auto'  # Default
+            layout_params = {}
+            
+            if layout_algorithm_index == 0:
+                # Auto - let the system choose
+                layout_type = 'auto'
+                self.logger.info("Using automatic layout algorithm selection")
+            elif layout_algorithm_index == 1:
+                # Hierarchical - use user-specified parameters
+                layout_type = 'hierarchical'
+                layer_spacing = self.sbml_layer_spacing_spin.get_value() if self.sbml_layer_spacing_spin else 150.0
+                node_spacing = self.sbml_node_spacing_spin.get_value() if self.sbml_node_spacing_spin else 100.0
+                layout_params = {
+                    'layer_spacing': layer_spacing,
+                    'node_spacing': node_spacing
+                }
+                self.logger.info(f"Using Hierarchical layout: layer_spacing={layer_spacing}, node_spacing={node_spacing}")
+            elif layout_algorithm_index == 2:
+                # Force-Directed - use user-specified parameters
+                layout_type = 'force_directed'
+                iterations = int(self.sbml_iterations_spin.get_value()) if self.sbml_iterations_spin else 500
+                k_factor = self.sbml_k_factor_spin.get_value() if self.sbml_k_factor_spin else 1.5
+                canvas_scale = self.sbml_canvas_scale_spin.get_value() if self.sbml_canvas_scale_spin else 2000.0
+                layout_params = {
+                    'iterations': iterations,
+                    'k_multiplier': k_factor,
+                    'scale': canvas_scale
+                }
+                self.logger.info(f"Using Force-Directed layout: iterations={iterations}, k_factor={k_factor}, scale={canvas_scale}")
             
             # Post-process: layout, colors, unit normalization, etc.
             self._show_status("Calculating layout and colors...")
             self.postprocessor = PathwayPostProcessor(
-                spacing=spacing,
+                spacing=150.0,  # Base spacing (overridden by layout_params)
                 scale_factor=scale_factor,
-                use_tree_layout=True  # Enable tree-based aperture angle layout
+                use_tree_layout=True,  # Enable tree-based aperture angle layout for hierarchical
+                layout_type=layout_type,
+                layout_params=layout_params
             )
             self.processed_pathway = self.postprocessor.process(self.parsed_pathway)
             
@@ -818,3 +1017,37 @@ class SBMLImportPanel:
             self.sbml_status_label.set_markup(f'<span foreground="red">{message}</span>')
         else:
             self.sbml_status_label.set_text(message)
+    
+    def get_layout_parameters_for_algorithm(self, algorithm: str) -> dict:
+        """Get layout parameters from UI for the specified algorithm.
+        
+        This allows Swiss Palette Layout tools to use the same parameters
+        that were configured in the SBML Import Options.
+        
+        Args:
+            algorithm: Algorithm name ('auto', 'hierarchical', 'force_directed')
+            
+        Returns:
+            Dictionary of algorithm-specific parameters
+        """
+        params = {}
+        
+        if algorithm == 'hierarchical':
+            if self.sbml_layer_spacing_spin:
+                params['layer_spacing'] = self.sbml_layer_spacing_spin.get_value()
+            if self.sbml_node_spacing_spin:
+                params['node_spacing'] = self.sbml_node_spacing_spin.get_value()
+                
+        elif algorithm == 'force_directed':
+            if self.sbml_iterations_spin:
+                params['iterations'] = int(self.sbml_iterations_spin.get_value())
+            if self.sbml_k_factor_spin:
+                # k_factor is a multiplier, will be used to calculate actual k
+                k_multiplier = self.sbml_k_factor_spin.get_value()
+                params['k_multiplier'] = k_multiplier
+                # Note: actual k is calculated as: k = sqrt(area/nodes) * k_multiplier
+                # We don't set 'k' directly, let the algorithm calculate it
+            if self.sbml_canvas_scale_spin:
+                params['scale'] = self.sbml_canvas_scale_spin.get_value()
+        
+        return params

@@ -18,6 +18,7 @@ Date: October 2025
 
 from typing import Dict, List, Tuple, Optional, Any
 import logging
+import math
 from dataclasses import replace
 
 try:
@@ -34,6 +35,7 @@ from .pathway_data import (
     Reaction,
 )
 from .hierarchical_layout import BiochemicalLayoutProcessor
+from .layout_projector import LayoutProjector
 
 
 # Color palette for compartments
@@ -84,7 +86,10 @@ class LayoutProcessor(BaseProcessor):
     simple grid layout.
     """
     
-    def __init__(self, pathway: PathwayData, spacing: float = 150.0, use_tree_layout: bool = False):
+    def __init__(self, pathway: PathwayData, spacing: float = 150.0, 
+                 use_tree_layout: bool = False, use_spiral_layout: bool = False,
+                 use_raw_force_directed: bool = False, layout_type: str = 'auto',
+                 layout_params: dict = None):
         """
         Initialize layout processor.
         
@@ -92,51 +97,82 @@ class LayoutProcessor(BaseProcessor):
             pathway: The pathway data
             spacing: Distance between nodes in pixels
             use_tree_layout: If True, use tree-based aperture angle layout for hierarchical pathways
+            use_spiral_layout: If True, use spiral projection (entry at center, products spiral outward)
+            use_raw_force_directed: If True, skip projection (pure physics testing)
+            layout_type: Layout algorithm to use ('auto', 'hierarchical', 'force_directed')
+            layout_params: Dictionary of algorithm-specific parameters
         """
         super().__init__(pathway)
         self.spacing = spacing
         self.use_tree_layout = use_tree_layout
+        self.use_spiral_layout = use_spiral_layout
+        self.use_raw_force_directed = use_raw_force_directed
+        self.layout_type = layout_type
+        self.layout_params = layout_params or {}
     
     def process(self, processed_data: ProcessedPathwayData) -> None:
         """Calculate and assign positions.
         
-        Tries layout strategies in order of quality:
-        1. Hierarchical (top-to-bottom flow) - ALWAYS use this for consistent look
-        2. Force-directed (networkx) - OK for complex networks (fallback)
-        3. Grid (fallback) - BASIC (last resort)
+        Tries layout strategies based on user selection:
+        - 'auto': Automatic selection (hierarchical → force-directed → grid)
+        - 'hierarchical': Top-to-bottom flow layout
+        - 'force_directed': Physics-based networkx layout
         
         Note: Cross-reference layout (KEGG/Reactome coordinates) disabled - 
         hierarchical layout provides better visual consistency.
         """
         
-        # STRATEGY 1: Always use hierarchical layout (biochemical top-to-bottom)
-        # This provides the beautiful layered structure shown in UI
-        try:
-            layout_processor = BiochemicalLayoutProcessor(
-                self.pathway, 
-                spacing=self.spacing,
-                use_tree_layout=self.use_tree_layout  # Pass through tree layout flag
-            )
-            layout_processor.process(processed_data)
-            
-            if processed_data.positions:
-                # layout_type already set by BiochemicalLayoutProcessor
+        # User explicitly selected Force-Directed
+        if self.layout_type == 'force_directed':
+            if HAS_NETWORKX:
+                self.logger.info("Using user-selected Force-Directed layout")
+                self._calculate_force_directed_layout(processed_data)
+                processed_data.metadata['layout_type'] = 'force-directed'
                 self.logger.info(
-                    f"✓ Using hierarchical layout for {len(processed_data.positions)} elements"
+                    f"✓ Force-directed layout complete for {len(processed_data.positions)} elements"
                 )
                 return
-        except Exception as e:
-            self.logger.warning(f"Hierarchical layout failed: {e}, falling back to force-directed")
+            else:
+                self.logger.warning("NetworkX not available, falling back to hierarchical")
+                self.layout_type = 'hierarchical'
         
-        # STRATEGY 2: Force-directed layout (requires networkx)
-        if HAS_NETWORKX:
+        # User explicitly selected Hierarchical OR auto selection
+        if self.layout_type in ('hierarchical', 'auto'):
+            try:
+                # Get hierarchical parameters from layout_params if provided
+                layer_spacing = self.layout_params.get('layer_spacing', self.spacing)
+                node_spacing = self.layout_params.get('node_spacing', self.spacing * 0.67)
+                
+                layout_processor = BiochemicalLayoutProcessor(
+                    self.pathway, 
+                    spacing=layer_spacing,  # Use layer_spacing for vertical spacing
+                    use_tree_layout=self.use_tree_layout
+                )
+                layout_processor.process(processed_data)
+                
+                if processed_data.positions:
+                    self.logger.info(
+                        f"✓ Using hierarchical layout for {len(processed_data.positions)} elements "
+                        f"(layer_spacing={layer_spacing}, node_spacing={node_spacing})"
+                    )
+                    return
+            except Exception as e:
+                self.logger.warning(f"Hierarchical layout failed: {e}")
+                if self.layout_type == 'hierarchical':
+                    # User explicitly wanted hierarchical, fall back to grid
+                    self._calculate_grid_layout(processed_data)
+                    processed_data.metadata['layout_type'] = 'grid'
+                    return
+        
+        # Auto mode fallback: try force-directed
+        if self.layout_type == 'auto' and HAS_NETWORKX:
             self._calculate_force_directed_layout(processed_data)
             processed_data.metadata['layout_type'] = 'force-directed'
             self.logger.info(
                 f"✓ Using force-directed layout for {len(processed_data.positions)} elements"
             )
         else:
-            # STRATEGY 3: Grid layout (last resort)
+            # Last resort: Grid layout
             self._calculate_grid_layout(processed_data)
             processed_data.metadata['layout_type'] = 'grid'
             self.logger.info(
@@ -144,43 +180,158 @@ class LayoutProcessor(BaseProcessor):
             )
     
     def _calculate_force_directed_layout(self, processed_data: ProcessedPathwayData) -> None:
-        """Calculate layout using networkx force-directed algorithm."""
+        """Calculate layout using NetworkX force-directed algorithm (Fruchterman-Reingold).
         
-        # Build bipartite graph (species + reactions)
+        Physics-based simulation using classical mechanics:
+        
+        TERMINOLOGY (Physics):
+        - Mass nodes: All species and reactions (have mass, repel each other)
+        - Springs: Arcs/edges connecting reactants↔reaction↔products (attract with force)
+        - Spring strength: Proportional to stoichiometry (2A → reaction has 2× spring force)
+        
+        FORCES:
+        - Spring attraction: Pulls connected mass nodes together (F = k × distance)
+        - Electrostatic repulsion: Pushes all mass nodes apart (F = -k² / distance)
+        - Equilibrium: System converges when spring forces balance repulsion forces
+        
+        PARAMETERS:
+        - k: Optimal distance between mass nodes (spring rest length)
+        - weight: Spring strength multiplier (stoichiometry-based)
+        - iterations: Number of physics simulation steps
+        - threshold: Convergence criterion (stop when delta < threshold)
+        """
+        
+        # Build bipartite graph: species mass nodes + reaction mass nodes
         graph = nx.Graph()
         
-        # Add species nodes
+        # Add species as mass nodes
         for species in self.pathway.species:
-            graph.add_node(species.id, bipartite=0)  # Species on one side
+            graph.add_node(species.id, bipartite=0, node_type='species')
         
-        # Add reaction nodes and edges
+        # Add reactions as mass nodes and connect with springs (arcs)
+        edges = []
         for reaction in self.pathway.reactions:
-            graph.add_node(reaction.id, bipartite=1)  # Reactions on other side
+            graph.add_node(reaction.id, bipartite=1, node_type='reaction')
             
-            # Connect reactants to reaction
-            for species_id, _ in reaction.reactants:
-                graph.add_edge(species_id, reaction.id)
+            # Create springs (arcs) from reactants to reaction
+            # Spring strength = stoichiometry (2A means 2× stronger attraction)
+            for species_id, stoich in reaction.reactants:
+                spring_strength = max(1.0, float(stoich))  # Minimum strength 1.0
+                graph.add_edge(species_id, reaction.id, weight=spring_strength)
+                edges.append((species_id, reaction.id))
+                self.logger.debug(f"Spring: {species_id} → {reaction.id} (strength={spring_strength:.1f})")
             
-            # Connect reaction to products
-            for species_id, _ in reaction.products:
-                graph.add_edge(reaction.id, species_id)
+            # Create springs (arcs) from reaction to products
+            for species_id, stoich in reaction.products:
+                spring_strength = max(1.0, float(stoich))
+                graph.add_edge(reaction.id, species_id, weight=spring_strength)
+                edges.append((reaction.id, species_id))
+                self.logger.debug(f"Spring: {reaction.id} → {species_id} (strength={spring_strength:.1f})")
         
-        # Calculate positions using spring layout
+        # Calculate raw positions using spring layout (force-directed physics)
         try:
-            pos = nx.spring_layout(
+            self.logger.info(f"Running force-directed layout on {len(graph.nodes())} mass nodes, {len(edges)} springs...")
+            
+            # Get parameters from layout_params or use defaults
+            num_mass_nodes = len(graph.nodes())
+            
+            # User-specified parameters take precedence
+            iterations = self.layout_params.get('iterations', 500)
+            k_multiplier = self.layout_params.get('k_multiplier', 1.5)
+            scale = self.layout_params.get('scale', 2000.0)
+            
+            # If no user params, use adaptive scaling
+            if 'iterations' not in self.layout_params:
+                iterations = min(500, 100 + num_mass_nodes * 5)
+            
+            if 'k_multiplier' not in self.layout_params:
+                if num_mass_nodes > 20:
+                    k_multiplier = 2.0
+                elif num_mass_nodes > 10:
+                    k_multiplier = 1.5
+                else:
+                    k_multiplier = 1.0
+            
+            if 'scale' not in self.layout_params:
+                if num_mass_nodes > 20:
+                    scale = 3000.0
+                elif num_mass_nodes > 10:
+                    scale = 2000.0
+                else:
+                    scale = 1000.0
+            
+            self.logger.info(f"Physics params: k_multiplier={k_multiplier} (spring rest length), scale={scale}px, iterations={iterations}")
+            
+            # Calculate k based on area and node count
+            area = scale * scale
+            k = math.sqrt(area / num_mass_nodes) * k_multiplier if num_mass_nodes > 0 else None
+            
+            # Fruchterman-Reingold force-directed layout with spring weights
+            raw_pos = nx.spring_layout(
                 graph,
-                k=self.spacing / 50,  # Optimal distance between nodes
-                iterations=50,
-                scale=self.spacing * 2,  # Scale to desired spacing
-                seed=42  # For reproducibility
+                k=k,                  # Optimal distance between mass nodes (spring rest length)
+                iterations=iterations,  # Physics simulation steps (force calculations)
+                threshold=1e-6,       # Convergence: stop when max displacement < threshold
+                weight='weight',      # Use spring strength (stoichiometry) in force calculation
+                scale=scale,          # Output coordinate scale (canvas size)
+                seed=42               # Reproducible results
             )
             
+            self.logger.info(f"Force-directed physics simulation complete (threshold=1e-6)")
+            
             # Convert to pixel coordinates (centered at origin)
-            for node_id, (x, y) in pos.items():
-                processed_data.positions[node_id] = (
+            positions = {}
+            for node_id, (x, y) in raw_pos.items():
+                positions[node_id] = (
                     x + 400,  # Offset to positive coordinates
                     y + 300
                 )
+            
+            # TESTING MODE: Pure force-directed without projection
+            if self.use_raw_force_directed:
+                self.logger.warning("🔬 PURE FORCE-DIRECTED MODE - No projection post-processing!")
+                processed_data.positions.update(positions)
+                processed_data.metadata['layout_type'] = 'force-directed-raw'
+                processed_data.metadata['canvas_width'] = scale * 2 + 800
+                processed_data.metadata['canvas_height'] = scale * 2 + 600
+                self.logger.info(f"✓ Raw physics layout: {len(positions)} nodes positioned")
+                return
+            
+            self.logger.info(f"Force-directed complete, projecting to 2D canvas...")
+            
+            # Apply 2D projection post-processing
+            projector = LayoutProjector(
+                layer_threshold=50.0,      # Cluster nodes within 50px Y distance
+                layer_spacing=200.0,       # 200px between layers
+                min_horizontal_spacing=120.0,  # 120px minimum between nodes
+                canvas_width=2000.0,       # 2000px max width
+                canvas_center_x=1000.0,    # Center at X=1000
+                top_margin=800.0,          # Start at Y=800
+                left_margin=100.0          # 100px left margin
+            )
+            
+            # Choose projection strategy: SPIRAL or LAYERED
+            if self.use_spiral_layout:
+                # SPIRAL: Entry at center, products spiral outward
+                self.logger.info("Using SPIRAL projection (entry → outward)")
+                projected_positions, canvas_dims = projector.project_spiral(positions, edges)
+                layout_type = 'force-directed-spiral'
+            else:
+                # LAYERED: Horizontal layers top-to-bottom
+                self.logger.info("Using LAYERED projection (top → bottom)")
+                projected_positions, canvas_dims = projector.project(positions, edges)
+                layout_type = 'force-directed-projected'
+            
+            # Store canvas dimensions in metadata for proper viewport sizing
+            processed_data.metadata['canvas_width'] = canvas_dims['width']
+            processed_data.metadata['canvas_height'] = canvas_dims['height']
+            
+            self.logger.info(f"✓ Canvas dimensions: {canvas_dims['width']:.0f}x{canvas_dims['height']:.0f}px")
+            
+            # Update processed data
+            processed_data.positions.update(projected_positions)
+            processed_data.metadata['layout_type'] = layout_type
+            self.logger.info(f"✓ 2D projection complete: {len(projected_positions)} nodes positioned")
         
         except Exception as e:
             self.logger.error(f"Force-directed layout failed: {e}")
@@ -395,7 +546,11 @@ class PathwayPostProcessor:
         self,
         spacing: float = 150.0,
         scale_factor: float = 1.0,
-        use_tree_layout: bool = False
+        use_tree_layout: bool = False,
+        use_spiral_layout: bool = False,
+        use_raw_force_directed: bool = False,
+        layout_type: str = 'auto',
+        layout_params: dict = None
     ):
         """
         Initialize post-processor.
@@ -404,10 +559,18 @@ class PathwayPostProcessor:
             spacing: Distance between nodes in pixels (for layout)
             scale_factor: Multiplier for concentration → tokens conversion
             use_tree_layout: If True, use tree-based aperture angle layout for hierarchical pathways
+            use_spiral_layout: If True, use spiral projection (entry at center, products outward)
+            use_raw_force_directed: If True, skip projection post-processing (for testing pure physics)
+            layout_type: Layout algorithm to use ('auto', 'hierarchical', 'force_directed')
+            layout_params: Dictionary of algorithm-specific parameters
         """
         self.spacing = spacing
         self.scale_factor = scale_factor
         self.use_tree_layout = use_tree_layout
+        self.use_spiral_layout = use_spiral_layout
+        self.use_raw_force_directed = use_raw_force_directed
+        self.layout_type = layout_type
+        self.layout_params = layout_params or {}
         self.logger = logging.getLogger(self.__class__.__name__)
     
     def process(self, pathway: PathwayData) -> ProcessedPathwayData:
@@ -436,7 +599,9 @@ class PathwayPostProcessor:
         
         # Create processors
         processors = [
-            LayoutProcessor(pathway, self.spacing, self.use_tree_layout),
+            LayoutProcessor(pathway, self.spacing, self.use_tree_layout, 
+                          self.use_spiral_layout, self.use_raw_force_directed,
+                          self.layout_type, self.layout_params),
             ColorProcessor(pathway),
             UnitNormalizer(pathway, self.scale_factor),
             NameResolver(pathway),

@@ -1241,7 +1241,12 @@ class ModelCanvasLoader:
                 from shypn.edit.undo_operations import MoveOperation
                 manager.undo_manager.push(MoveOperation(move_data))
             
+            # Reset drag state immediately to stop further drag processing
+            state['active'] = False
+            state['button'] = 0
             widget.queue_draw()
+            return True
+            
         if state.get('is_rect_selecting', False):
             is_ctrl = event.state & Gdk.ModifierType.CONTROL_MASK
             bounds = manager.rectangle_selection.finish()
@@ -2212,9 +2217,21 @@ class ModelCanvasLoader:
                 center_x = manager.canvas_width / 2
                 center_y = manager.canvas_height / 2
             
-            # Create engine and apply layout
+            # Try to get layout parameters from SBML Import panel (if available)
+            layout_params = {}
+            try:
+                # Check if sbml_panel is available (set during initialization)
+                if hasattr(self, 'sbml_panel') and self.sbml_panel:
+                    layout_params = self.sbml_panel.get_layout_parameters_for_algorithm(algorithm)
+                    if layout_params:
+                        print(f"🎛️ Using SBML Import Options parameters: {layout_params}")
+            except Exception as e:
+                # If we can't get params from SBML panel, just use defaults
+                print(f"Note: Could not get layout parameters from SBML panel: {e}")
+            
+            # Create engine and apply layout with parameters
             engine = LayoutEngine(manager)
-            result = engine.apply_layout(algorithm)
+            result = engine.apply_layout(algorithm, **layout_params)
             
             # The layout algorithms center at (0, 0), so we need to offset
             # back to the original center or canvas center
@@ -2235,6 +2252,8 @@ class ModelCanvasLoader:
             
             # Show result
             message = f"Applied {algorithm_name} layout\nMoved {result['nodes_moved']} objects"
+            if layout_params:
+                message += f"\nParameters: {layout_params}"
             self._show_layout_message(message, drawing_area)
             
             # Redraw

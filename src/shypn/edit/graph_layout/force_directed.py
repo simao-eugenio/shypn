@@ -40,18 +40,40 @@ class ForceDirectedLayout(LayoutAlgorithm):
         graph: nx.DiGraph,
         iterations: int = 500,
         k: float = None,
-        scale: float = 1000.0,
+        k_multiplier: float = 1.5,  # Multiplier for auto-calculated k
+        scale: float = 2000.0,  # Increased from 1000.0 → more canvas space
         seed: int = 42,
         **kwargs
     ) -> Dict[str, Tuple[float, float]]:
         """
-        Compute force-directed layout positions.
+        Compute force-directed layout positions using Fruchterman-Reingold algorithm.
+        
+        PHYSICS MODEL:
+        
+        1. UNIVERSAL REPULSION (ALL mass nodes):
+           - Every place repels every other place
+           - Every transition repels every other transition
+           - Every place repels every transition
+           - Force: F_repulsion = -k² / distance
+           - Prevents overlap, creates spacing
+        
+        2. SELECTIVE ATTRACTION (only via springs/arcs):
+           - Springs (arcs) pull connected mass nodes together
+           - Force: F_spring = k × distance × spring_strength
+           - Spring strength = arc weight (stoichiometry)
+           - Example: 2A + B → C means A has 2× stronger spring to reaction
+        
+        3. EQUILIBRIUM:
+           - System converges when forces balance on each mass node
+           - Connected nodes: pulled together by spring, pushed apart by repulsion
+           - Disconnected nodes: only repulsion, pushed to maximum separation
         
         Args:
-            graph: NetworkX directed graph
-            iterations: Number of simulation steps (more = better, slower)
-            k: Optimal distance between nodes (None = auto-calculate)
-            scale: Scale factor for final positions
+            graph: NetworkX directed graph (mass nodes + springs)
+            iterations: Number of physics simulation steps (more = better, slower)
+            k: Optimal distance between mass nodes (None = auto-calculate using k_multiplier)
+            k_multiplier: Multiplier for auto-calculated k (ignored if k is provided)
+            scale: Scale factor for final positions (canvas size)
             seed: Random seed for reproducible layouts
             
         Returns:
@@ -65,21 +87,71 @@ class ForceDirectedLayout(LayoutAlgorithm):
             return {list(graph.nodes())[0]: (0.0, 0.0)}
         
         # Calculate optimal distance if not provided
+        # NetworkX spring_layout uses k internally as 1/sqrt(n) in normalized [0,1] space
+        # To control spacing, we adjust the 'scale' parameter instead
         if k is None:
-            # k = optimal distance = sqrt(area / |V|)
-            # For scale=1000, area = 1000*1000 = 1,000,000
-            area = scale * scale
-            k = math.sqrt(area / graph.number_of_nodes())
+            # User wants more/less spacing via k_multiplier
+            # Achieve this by scaling the output coordinates
+            adjusted_scale = scale * k_multiplier
+        else:
+            # User provided explicit k value (rare)
+            adjusted_scale = k
+        
+        scale_to_use = adjusted_scale if k is None else k
+        
+        # CRITICAL: Convert to undirected graph for UNIVERSAL repulsion
+        # DiGraph (directed): Only connected nodes repel → places don't repel other places!
+        # Graph (undirected): ALL nodes repel ALL other nodes → correct physics!
+        if isinstance(graph, nx.DiGraph):
+            # Convert to undirected while preserving edge weights (stoichiometry)
+            undirected_graph = graph.to_undirected()
+            print(f"🔬 Force-directed: ✓ Converted DiGraph → Graph for universal repulsion")
+        else:
+            undirected_graph = graph
+            print(f"🔬 Force-directed: Already Graph (undirected)")
+        
+        # Count node types for diagnostics
+        places = [n for n, d in undirected_graph.nodes(data=True) if d.get('type') == 'place']
+        transitions = [n for n, d in undirected_graph.nodes(data=True) if d.get('type') == 'transition']
+        print(f"🔬 Force-directed: Graph contents:")
+        print(f"   - Total nodes: {undirected_graph.number_of_nodes()}")
+        print(f"   - Places: {len(places)}")
+        print(f"   - Transitions: {len(transitions)}")
+        print(f"   - Edges: {undirected_graph.number_of_edges()}")
+        
+        if len(places) < 5:
+            print(f"   ⚠️ WARNING: Very few places detected!")
+            print(f"   Place IDs: {places}")
+        elif len(places) <= 10:
+            print(f"   Place IDs (all {len(places)}): {places}")
+        
+        # Check if edges have weights (arc stoichiometry)
+        has_weights = any('weight' in undirected_graph[u][v] for u, v in undirected_graph.edges())
         
         # Use NetworkX spring_layout (Fruchterman-Reingold implementation)
-        positions = nx.spring_layout(
-            graph,
-            k=k / scale,  # Normalize to 0-1 range
-            iterations=iterations,
-            scale=scale,
-            center=(0, 0),
-            seed=seed
-        )
+        # If edges have weights (stoichiometry), use them as spring strength
+        #
+        # NetworkX spring_layout parameters:
+        # - k: optimal distance between nodes in normalized space (None = auto: 1/sqrt(n))
+        # - scale: output coordinate scale (scales the final positions)
+        # - iterations: number of iterations for force-directed algorithm
+        # - weight: edge attribute name for spring strength
+        layout_params = {
+            'k': None,  # Let NetworkX auto-calculate: k = 1/sqrt(n)
+            'iterations': iterations,
+            'scale': scale_to_use,  # Use adjusted scale for spacing control
+            'center': (0, 0),
+            'seed': seed
+        }
+        
+        if has_weights:
+            # Use arc weights as spring strength (stoichiometry-based)
+            layout_params['weight'] = 'weight'
+            print(f"🔬 Force-directed: Using arc weights as spring strength")
+        
+        print(f"🔬 Force-directed: Parameters: iterations={iterations}, scale={scale_to_use:.1f}, k_multiplier={k_multiplier}x")
+        
+        positions = nx.spring_layout(undirected_graph, **layout_params)
         
         # Convert positions to our format
         result = {}
@@ -118,14 +190,13 @@ class ForceDirectedLayout(LayoutAlgorithm):
             # Fall back to unweighted
             return self.compute(graph, iterations=iterations, scale=scale)
         
-        # Calculate k based on graph size
-        area = scale * scale
-        k = math.sqrt(area / graph.number_of_nodes())
+        # FIXED: Use k=None to let NetworkX auto-calculate optimal distance
+        # Use scale parameter to control output spacing instead of manipulating k
         
         # Use NetworkX spring_layout with weights
         positions = nx.spring_layout(
             graph,
-            k=k / scale,
+            k=None,  # Auto-calculate: k = 1/sqrt(n)
             iterations=iterations,
             weight=weight_attr,
             scale=scale,

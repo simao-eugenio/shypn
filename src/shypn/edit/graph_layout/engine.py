@@ -68,6 +68,27 @@ class LayoutEngine:
         """
         Build NetworkX graph from current DocumentModel.
         
+        PHYSICS MODEL (Fruchterman-Reingold):
+        
+        1. MASS NODES (Places + Transitions):
+           - ALL mass nodes repel ALL other mass nodes (universal repulsion)
+           - Place ↔ Place: repel
+           - Transition ↔ Transition: repel
+           - Place ↔ Transition: repel
+           - Force: F_repulsion = -k² / distance
+           - This prevents overlap and creates spacing
+        
+        2. SPRINGS (Arcs):
+           - ONLY connected mass nodes attract each other (selective attraction)
+           - Springs pull connected mass nodes together
+           - Force: F_spring = k × distance × spring_strength
+           - Spring strength = arc weight (stoichiometry)
+        
+        3. EQUILIBRIUM:
+           - Each mass node settles where forces balance
+           - Connected nodes: spring pull ⇄ repulsion → optimal distance
+           - Disconnected nodes: only repulsion → maximum separation
+        
         Returns:
             NetworkX directed graph representing the Petri net
             
@@ -86,16 +107,63 @@ class LayoutEngine:
         
         graph = nx.DiGraph()
         
-        # Add nodes (places and transitions)
-        for place in doc.places:
-            graph.add_node(place.id, type='place', obj=place)
+        # DIAGNOSTIC: Count and log what we're loading
+        print(f"\n{'='*80}")
+        print(f"🔍 GRAPH BUILD DIAGNOSTIC")
+        print(f"{'='*80}")
+        print(f"📊 Document has:")
+        print(f"   - {len(doc.places)} places")
+        print(f"   - {len(doc.transitions)} transitions")
+        print(f"   - {len(doc.arcs)} arcs")
         
+        # Add mass nodes (places and transitions)
+        # Use the actual objects as node IDs - NetworkX handles this perfectly
+        # This automatically avoids ID collisions since Python objects are unique by identity
+        place_count = 0
+        for i, place in enumerate(doc.places):
+            graph.add_node(place, type='place')  # Use object itself as node ID
+            place_count += 1
+            if i < 5:  # Show first 5
+                place_name = getattr(place, 'name', 'unnamed')
+                print(f"   Place {i+1}: id={place.id}, name='{place_name}'")
+        
+        if len(doc.places) > 5:
+            print(f"   ... and {len(doc.places) - 5} more places")
+        
+        transition_count = 0
         for transition in doc.transitions:
-            graph.add_node(transition.id, type='transition', obj=transition)
+            graph.add_node(transition, type='transition')  # Use object itself as node ID
+            transition_count += 1
         
-        # Add edges (arcs)
+        print(f"\n📦 Added to graph:")
+        print(f"   - {place_count} place nodes")
+        print(f"   - {transition_count} transition nodes")
+        print(f"   - Total nodes in graph: {graph.number_of_nodes()}")
+        
+        # Add springs (arcs) with weight as spring strength
+        # Arcs have .source and .target which are OBJECT REFERENCES, not IDs!
+        arcs_added = 0
         for arc in doc.arcs:
-            graph.add_edge(arc.source, arc.target, obj=arc)
+            # Arc weight = stoichiometry = spring strength
+            # Higher weight = stronger spring = pulls mass nodes closer
+            weight = getattr(arc, 'weight', 1.0)  # Default weight = 1.0
+            
+            # arc.source and arc.target are the actual Place/Transition objects
+            # These are already in the graph as node IDs
+            source_obj = arc.source
+            target_obj = arc.target
+            
+            if source_obj in graph and target_obj in graph:
+                graph.add_edge(source_obj, target_obj, weight=weight, obj=arc)
+                arcs_added += 1
+            else:
+                # This shouldn't happen if everything is wired correctly
+                source_name = getattr(source_obj, 'name', 'unknown')
+                target_name = getattr(target_obj, 'name', 'unknown')
+                print(f"   ⚠️ Arc skipped: {source_name} → {target_name} (nodes not in graph)")
+        
+        print(f"   - {arcs_added} arcs/edges")
+        print(f"{'='*80}\n")
         
         return graph
     
@@ -262,20 +330,19 @@ class LayoutEngine:
         
         nodes_moved = 0
         
-        # Map node IDs to objects
-        id_to_obj = {}
-        for place in doc.places:
-            id_to_obj[place.id] = place
-        for transition in doc.transitions:
-            id_to_obj[transition.id] = transition
+        # Node IDs in the graph are the actual Place/Transition objects
+        # positions dict maps: {place_obj: (x, y), transition_obj: (x, y)}
+        # So we can directly use the node_id (which IS the object) to set positions
         
         # Apply positions
-        for node_id, (x, y) in positions.items():
-            if node_id in id_to_obj:
-                obj = id_to_obj[node_id]
+        for obj, (x, y) in positions.items():
+            # obj is the actual Place or Transition object
+            if hasattr(obj, 'x') and hasattr(obj, 'y'):
                 obj.x = x
                 obj.y = y
                 nodes_moved += 1
+            else:
+                print(f"⚠️ Warning: Object {obj} has no x/y attributes")
         
         return nodes_moved
     
