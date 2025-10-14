@@ -23,6 +23,11 @@ class EditOperations:
         """
         self.canvas_manager = canvas_manager
         
+        # Undo/Redo stacks
+        self.undo_stack = []
+        self.redo_stack = []
+        self.max_undo_levels = 50
+        
         # Clipboard
         self.clipboard = []
         
@@ -70,6 +75,7 @@ class EditOperations:
         # Deactivate any active tool
         if self.canvas_manager.is_tool_active():
             self.canvas_manager.set_tool('select')
+        print("[EditOps] Activated rectangle selection mode")
     
     def activate_lasso_mode(self):
         """Activate lasso selection mode."""
@@ -77,28 +83,39 @@ class EditOperations:
         self.selection_mode = 'lasso'
         if not self.lasso_selector:
             self.lasso_selector = LassoSelector(self.canvas_manager)
+        print("[EditOps] Activated lasso selection mode")
         # TODO: Implement lasso activation
     
     # History Operations
     def undo(self):
         """Undo the last operation."""
-        # Delegate to UndoManager if available
-        if hasattr(self.canvas_manager, 'undo_manager'):
-            if self.canvas_manager.undo_manager.undo(self.canvas_manager):
-                self._notify_state_changed()
-                return
+        if not self.undo_stack:
+            print("[EditOps] Nothing to undo")
+            return
         
-        # Fallback (should not reach here)
+        operation = self.undo_stack.pop()
+        self.redo_stack.append(operation)
+        
+        # Apply reverse operation
+        operation.undo()
+        
+        print(f"[EditOps] Undone: {operation}")
+        self._notify_state_changed()
     
     def redo(self):
         """Redo the last undone operation."""
-        # Delegate to UndoManager if available
-        if hasattr(self.canvas_manager, 'undo_manager'):
-            if self.canvas_manager.undo_manager.redo(self.canvas_manager):
-                self._notify_state_changed()
-                return
+        if not self.redo_stack:
+            print("[EditOps] Nothing to redo")
+            return
         
-        # Fallback (should not reach here)
+        operation = self.redo_stack.pop()
+        self.undo_stack.append(operation)
+        
+        # Apply forward operation
+        operation.redo()
+        
+        print(f"[EditOps] Redone: {operation}")
+        self._notify_state_changed()
     
     def push_operation(self, operation):
         """Add an operation to the undo stack.
@@ -106,10 +123,14 @@ class EditOperations:
         Args:
             operation: Operation instance with undo/redo methods
         """
-        # Delegate to UndoManager if available
-        if hasattr(self.canvas_manager, 'undo_manager'):
-            self.canvas_manager.undo_manager.push(operation)
-            self._notify_state_changed()
+        self.undo_stack.append(operation)
+        self.redo_stack.clear()  # Clear redo when new operation added
+        
+        # Limit stack size
+        if len(self.undo_stack) > self.max_undo_levels:
+            self.undo_stack.pop(0)
+        
+        self._notify_state_changed()
     
     def can_undo(self):
         """Check if undo is available.
@@ -117,9 +138,7 @@ class EditOperations:
         Returns:
             bool: True if can undo
         """
-        if hasattr(self.canvas_manager, 'undo_manager'):
-            return self.canvas_manager.undo_manager.can_undo()
-        return False
+        return len(self.undo_stack) > 0
     
     def can_redo(self):
         """Check if redo is available.
@@ -127,14 +146,13 @@ class EditOperations:
         Returns:
             bool: True if can redo
         """
-        if hasattr(self.canvas_manager, 'undo_manager'):
-            return self.canvas_manager.undo_manager.can_redo()
-        return False
+        return len(self.redo_stack) > 0
     
     # Clipboard Operations
     def cut(self):
         """Cut selected objects to clipboard."""
         if not self._has_selection():
+            print("[EditOps] No selection to cut")
             return
         
         self.copy()
@@ -143,25 +161,30 @@ class EditOperations:
         for obj in selected:
             self.canvas_manager.delete_object(obj)
         
+        print(f"[EditOps] Cut {len(selected)} object(s)")
         self._notify_state_changed()
     
     def copy(self):
         """Copy selected objects to clipboard."""
         if not self._has_selection():
+            print("[EditOps] No selection to copy")
             return
         
         selected = self.canvas_manager.selection_manager.get_selected_objects()
         self.clipboard = [self._serialize_object(obj) for obj in selected]
         
+        print(f"[EditOps] Copied {len(selected)} object(s)")
     
     def paste(self):
         """Paste objects from clipboard."""
         if not self.clipboard:
+            print("[EditOps] Clipboard is empty")
             return
         
         # Paste with offset to avoid exact overlap
         offset_x, offset_y = 20, 20
         
+        print(f"[EditOps] Pasting {len(self.clipboard)} object(s)")
         # TODO: Implement object creation from clipboard data
         
         self._notify_state_changed()
@@ -199,9 +222,11 @@ class EditOperations:
     def duplicate_selection(self):
         """Duplicate selected objects."""
         if not self._has_selection():
+            print("[EditOps] No selection to duplicate")
             return
         
         selected = self.canvas_manager.selection_manager.get_selected_objects()
+        print(f"[EditOps] Duplicating {len(selected)} object(s)")
         # TODO: Implement duplication with offset
         
         self._notify_state_changed()
@@ -209,13 +234,17 @@ class EditOperations:
     def group_selection(self):
         """Group selected objects."""
         if not self._has_selection():
+            print("[EditOps] No selection to group")
             return
         
+        print("[EditOps] Grouping selection (not yet implemented)")
         # TODO: Implement grouping (future feature)
     
     def show_align_dialog(self):
         """Show alignment dialog for selected objects."""
         if not self._has_selection():
+            print("[EditOps] No selection to align")
             return
         
+        print("[EditOps] Showing align dialog (not yet implemented)")
         # TODO: Implement alignment dialog

@@ -1,22 +1,31 @@
 #!/usr/bin/env python3
-"""Locality Detector - Detect transition neighborhoods (Place-Transition-Place).
+"""Locality Detector - Detect transition neighborhoods (locality patterns).
 
 This module provides the LocalityDetector class for identifying localities
 in Petri nets based on arc connectivity.
 
-Locality Concept (from legacy shypnpy):
-    "Place-transition-place defines what is called a Locality"
+Locality Concept:
+    A locality is a transition-centered neighborhood consisting of its
+    connected places via input and/or output arcs.
     
-    A locality is: Input Places → Transition → Output Places
+    Locality L(T) = •T ∪ T•  (preset union postset)
     
-    Each locality has exactly ONE central transition, but places can be
-    shared between multiple localities (organic system structure).
+    Valid Patterns:
+    1. Normal:   Pn → T → Pm  (n ≥ 1 inputs, m ≥ 1 outputs)
+    2. Source:   T → Pm       (no inputs, m ≥ 1 outputs)
+    3. Sink:     Pn → T       (n ≥ 1 inputs, no outputs)
+    4. Multiple: T1 → P ← T2  (shared places allowed)
+    
+    A locality is valid if it has at least ONE connected place.
 
 Example:
     detector = LocalityDetector(model)
     locality = detector.get_locality_for_transition(transition)
     
     if locality.is_valid:
+        print(f"Type: {locality.locality_type}")
+        print(f"Inputs: {len(locality.input_places)}")
+        print(f"Outputs: {len(locality.output_places)}")
 """
 
 from typing import Dict, List, Any, Optional
@@ -63,51 +72,48 @@ class Locality:
     def is_valid(self) -> bool:
         """Check if locality is valid.
         
-        A valid locality has at least one of:
-        - Input places (normal transition or sink)
-        - Output places (normal transition or source)
+        A valid locality is a transition with at least one connected place
+        (either input or output, or both).
         
-        Special cases (minimal localities per formal Petri net theory):
-        - Source: Only outputs (•t = ∅, t• ≠ ∅) - minimal locality = t•
-        - Sink: Only inputs (•t ≠ ∅, t• = ∅) - minimal locality = •t
-        - Normal: Both inputs and outputs
+        Valid locality patterns:
+        - Normal: Pn → T → Pm (n ≥ 1 inputs AND m ≥ 1 outputs)
+        - Source: T → Pm (no inputs, m ≥ 1 outputs) - token generation
+        - Sink: Pn → T (n ≥ 1 inputs, no outputs) - token consumption
+        - Multiple-source: T1 → P ← T2 (shared output place)
+        
+        Shared places are allowed (organic system structure).
         
         Returns:
-            True if locality has inputs OR outputs (or both)
+            True if locality has at least ONE place (input OR output or both)
         """
-        # Check if transition is source or sink
-        is_source = getattr(self.transition, 'is_source', False)
-        is_sink = getattr(self.transition, 'is_sink', False)
-        
-        # Source: Valid if has outputs (minimal locality = t•)
-        if is_source:
-            return len(self.output_places) >= 1
-        
-        # Sink: Valid if has inputs (minimal locality = •t)
-        if is_sink:
-            return len(self.input_places) >= 1
-        
-        # Normal: Valid if has both inputs AND outputs
-        return len(self.input_places) >= 1 and len(self.output_places) >= 1
+        # A locality is valid if it has at least one connected place
+        # This accepts: Normal (P→T→P), Source (T→P), Sink (P→T), and shared patterns
+        return len(self.input_places) >= 1 or len(self.output_places) >= 1
     
     @property
     def locality_type(self) -> str:
-        """Get locality type.
+        """Get locality type based on arc pattern.
+        
+        Classification:
+        - 'source': T → P pattern (no inputs, has outputs)
+        - 'sink': P → T pattern (has inputs, no outputs)  
+        - 'normal': P → T → P pattern (has both inputs and outputs)
+        - 'invalid': Isolated transition (no inputs, no outputs)
         
         Returns:
             'source' | 'sink' | 'normal' | 'invalid'
         """
-        is_source = getattr(self.transition, 'is_source', False)
-        is_sink = getattr(self.transition, 'is_sink', False)
+        has_inputs = len(self.input_places) >= 1
+        has_outputs = len(self.output_places) >= 1
         
-        if is_source:
-            return 'source'
-        elif is_sink:
-            return 'sink'
-        elif self.is_valid:
-            return 'normal'
+        if not has_inputs and not has_outputs:
+            return 'invalid'  # Isolated transition (no connected places)
+        elif not has_inputs and has_outputs:
+            return 'source'   # T→P pattern (token generation)
+        elif has_inputs and not has_outputs:
+            return 'sink'     # P→T pattern (token consumption)
         else:
-            return 'invalid'
+            return 'normal'   # P→T→P pattern (normal flow)
     
     @property
     def place_count(self) -> int:

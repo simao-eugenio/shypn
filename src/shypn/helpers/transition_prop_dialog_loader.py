@@ -227,6 +227,15 @@ class TransitionPropDialogLoader(GObject.GObject):
         if priority_spin and hasattr(self.transition_obj, 'priority'):
             priority_spin.set_value(float(self.transition_obj.priority))
         
+        # Firing policy combo box
+        firing_policy_combo = self.builder.get_object('firing_policy_combo')
+        if firing_policy_combo and hasattr(self.transition_obj, 'firing_policy'):
+            # Map policy to combo index: earliest=0, latest=1
+            policy_map = {'earliest': 0, 'latest': 1}
+            policy = self.transition_obj.firing_policy
+            index = policy_map.get(policy, 0)  # Default to earliest
+            firing_policy_combo.set_active(index)
+        
         # Source checkbox
         is_source_check = self.builder.get_object('is_source_check')
         if is_source_check and hasattr(self.transition_obj, 'is_source'):
@@ -355,6 +364,15 @@ class TransitionPropDialogLoader(GObject.GObject):
         if priority_spin and hasattr(self.transition_obj, 'priority'):
             old_priority = self.transition_obj.priority
             self.transition_obj.priority = int(priority_spin.get_value())
+        
+        # Firing policy combo box
+        firing_policy_combo = self.builder.get_object('firing_policy_combo')
+        if firing_policy_combo and hasattr(self.transition_obj, 'firing_policy'):
+            # Map index to policy: 0=earliest, 1=latest
+            policy_list = ['earliest', 'latest']
+            policy_index = firing_policy_combo.get_active()
+            if policy_index >= 0:
+                self.transition_obj.firing_policy = policy_list[policy_index]
         
         # Source checkbox
         is_source_check = self.builder.get_object('is_source_check')

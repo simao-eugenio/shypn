@@ -12,13 +12,6 @@ for the Petri Net model editor. It handles:
 - Petri net object collections (places, transitions, arcs)
 - View state persistence (pan, zoom)
 
-Coordinate System:
-- Uses standard Cairo/GTK graphics coordinates
-- Origin: (0, 0) at top-left corner
-- X-axis: increases to the right
-- Y-axis: increases downward
-- See doc/COORDINATE_SYSTEM.md for conceptual vs implementation details
-
 The manager maintains the model state separately from GTK widgets,
 making it easier to test and maintain.
 """
@@ -89,10 +82,6 @@ class ModelCanvasManager:
         # Grid style
         self.grid_style = self.GRID_STYLE_LINE  # Default to line grid
         
-        # Snap to grid (enabled by default)
-        self.snap_to_grid = True
-        self.grid_snap_spacing = 10.0  # Grid spacing for snapping
-        
         # Tool selection state
         self.current_tool = None  # Currently selected tool ('place', 'transition', 'arc', or None)
         
@@ -113,15 +102,8 @@ class ModelCanvasManager:
         self.editing_transforms = ObjectEditingTransforms(self.selection_manager)
         self.rectangle_selection = RectangleSelection()
         
-        # Undo/redo system
-        from shypn.edit.undo_manager import UndoManager
-        self.undo_manager = UndoManager(limit=50)
-        
         # Dirty flag for redraw optimization
         self._needs_redraw = True
-        
-        # Observer pattern for model change notifications
-        self._observers = []  # List of observer callbacks
         
         # Ensure all arcs have proper manager references
         self.ensure_arc_references()
@@ -178,19 +160,6 @@ class ModelCanvasManager:
         screen_y = (world_y + self.pan_y) * self.zoom
         return screen_x, screen_y
     
-    def snap_to_grid_coord(self, value: float) -> float:
-        """Snap a coordinate value to grid if snap to grid is enabled.
-        
-        Args:
-            value: Coordinate value to snap
-            
-        Returns:
-            float: Snapped coordinate (or original if snapping disabled)
-        """
-        if self.snap_to_grid:
-            return round(value / self.grid_snap_spacing) * self.grid_snap_spacing
-        return value
-    
     # ==================== Tool Management ====================
     
     def set_tool(self, tool_name):
@@ -221,57 +190,6 @@ class ModelCanvasManager:
         """
         return self.current_tool is not None
     
-    # ==================== Observer Pattern ====================
-    
-    def register_observer(self, callback):
-        """Register callback for model change notifications.
-        
-        The callback will be invoked whenever objects are created, deleted,
-        modified, or transformed in the model.
-        
-        Args:
-            callback: Function(event_type, obj, old_value, new_value) where:
-                event_type: str - 'created' | 'deleted' | 'modified' | 'transformed'
-                obj: The affected object (Place, Transition, or Arc)
-                old_value: Previous value (for 'transformed' events)
-                new_value: New value (for 'transformed' events)
-        
-        Example:
-            def on_model_change(event_type, obj, old_value, new_value):
-                if event_type == 'deleted':
-                    print(f"Object {obj.id} was deleted")
-            
-            manager.register_observer(on_model_change)
-        """
-        if callback not in self._observers:
-            self._observers.append(callback)
-    
-    def unregister_observer(self, callback):
-        """Unregister an observer callback.
-        
-        Args:
-            callback: The callback function to remove
-        """
-        if callback in self._observers:
-            self._observers.remove(callback)
-    
-    def _notify_observers(self, event_type: str, obj, old_value=None, new_value=None):
-        """Notify all registered observers of a model change.
-        
-        Args:
-            event_type: Type of change ('created', 'deleted', 'modified', 'transformed')
-            obj: The affected object
-            old_value: Previous value (for transformations)
-            new_value: New value (for transformations)
-        """
-        for callback in self._observers:
-            try:
-                callback(event_type, obj, old_value, new_value)
-            except Exception as e:
-                print(f"Observer callback error: {e}")
-                import traceback
-                traceback.print_exc()
-    
     # ==================== Petri Net Object Management ====================
     
     def add_place(self, x, y, **kwargs):
@@ -285,10 +203,6 @@ class ModelCanvasManager:
         Returns:
             Place: The newly created place instance
         """
-        # Snap to grid if enabled
-        x = self.snap_to_grid_coord(x)
-        y = self.snap_to_grid_coord(y)
-        
         place_id = self._next_place_id
         place_name = f"P{place_id}"
         self._next_place_id += 1
@@ -297,19 +211,8 @@ class ModelCanvasManager:
         place.on_changed = self._on_object_changed
         self.places.append(place)
         
-        # Record operation for undo
-        if hasattr(self, 'undo_manager'):
-            from shypn.edit.snapshots import snapshot_place
-            from shypn.edit.undo_operations import AddPlaceOperation
-            snapshot = snapshot_place(place)
-            self.undo_manager.push(AddPlaceOperation(place_id, snapshot))
-        
         self.mark_modified()
         self.mark_dirty()
-        
-        # Notify observers of creation
-        self._notify_observers('created', place)
-        
         return place
     
     def add_transition(self, x, y, **kwargs):
@@ -323,10 +226,6 @@ class ModelCanvasManager:
         Returns:
             Transition: The newly created transition instance
         """
-        # Snap to grid if enabled
-        x = self.snap_to_grid_coord(x)
-        y = self.snap_to_grid_coord(y)
-        
         transition_id = self._next_transition_id
         transition_name = f"T{transition_id}"
         self._next_transition_id += 1
@@ -335,19 +234,8 @@ class ModelCanvasManager:
         transition.on_changed = self._on_object_changed
         self.transitions.append(transition)
         
-        # Record operation for undo
-        if hasattr(self, 'undo_manager'):
-            from shypn.edit.snapshots import snapshot_transition
-            from shypn.edit.undo_operations import AddTransitionOperation
-            snapshot = snapshot_transition(transition)
-            self.undo_manager.push(AddTransitionOperation(transition_id, snapshot))
-        
         self.mark_modified()
         self.mark_dirty()
-        
-        # Notify observers of creation
-        self._notify_observers('created', transition)
-        
         return transition
     
     def add_arc(self, source, target, **kwargs):
@@ -370,23 +258,11 @@ class ModelCanvasManager:
         arc._manager = self  # Store reference to manager for parallel detection
         self.arcs.append(arc)
         
-        # Auto-conversion to curved arcs for visual separation of parallel arcs
-        # The parallel_offset in rendering will handle the separation
+        # Check if this arc creates a parallel situation and auto-convert to curved
         self._auto_convert_parallel_arcs_to_curved(arc)
-        
-        # Record operation for undo
-        if hasattr(self, 'undo_manager'):
-            from shypn.edit.snapshots import snapshot_arc
-            from shypn.edit.undo_operations import AddArcOperation
-            snapshot = snapshot_arc(arc)
-            self.undo_manager.push(AddArcOperation(arc_id, snapshot))
         
         self.mark_modified()
         self.mark_dirty()
-        
-        # Notify observers of creation
-        self._notify_observers('created', arc)
-        
         return arc
     
     def remove_place(self, place):
@@ -398,14 +274,6 @@ class ModelCanvasManager:
             place: Place instance to remove
         """
         if place in self.places:
-            # Find affected arcs before removal
-            affected_arcs = [arc for arc in self.arcs 
-                           if arc.source == place or arc.target == place]
-            
-            # Notify observers about arc deletions first
-            for arc in affected_arcs:
-                self._notify_observers('deleted', arc)
-            
             # Remove connected arcs
             self.arcs = [arc for arc in self.arcs 
                         if arc.source != place and arc.target != place]
@@ -413,9 +281,6 @@ class ModelCanvasManager:
             self.places.remove(place)
             self.mark_modified()
             self.mark_dirty()
-            
-            # Notify observers about place deletion
-            self._notify_observers('deleted', place)
     
     def remove_transition(self, transition):
         """Remove a transition from the model.
@@ -426,14 +291,6 @@ class ModelCanvasManager:
             transition: Transition instance to remove
         """
         if transition in self.transitions:
-            # Find affected arcs before removal
-            affected_arcs = [arc for arc in self.arcs 
-                           if arc.source == transition or arc.target == transition]
-            
-            # Notify observers about arc deletions first
-            for arc in affected_arcs:
-                self._notify_observers('deleted', arc)
-            
             # Remove connected arcs
             self.arcs = [arc for arc in self.arcs 
                         if arc.source != transition and arc.target != transition]
@@ -441,9 +298,6 @@ class ModelCanvasManager:
             self.transitions.remove(transition)
             self.mark_modified()
             self.mark_dirty()
-            
-            # Notify observers about transition deletion
-            self._notify_observers('deleted', transition)
     
     def remove_arc(self, arc):
         """Remove an arc from the model.
@@ -455,9 +309,6 @@ class ModelCanvasManager:
             self.arcs.remove(arc)
             self.mark_modified()
             self.mark_dirty()
-            
-            # Notify observers about arc deletion
-            self._notify_observers('deleted', arc)
     
     def detect_parallel_arcs(self, arc):
         """Find arcs parallel to the given arc (same source/target or reversed).
@@ -496,8 +347,6 @@ class ModelCanvasManager:
         
         When a new arc creates a parallel situation (same source/target or opposite),
         convert all involved arcs to curved arcs for better visualization.
-        
-        The parallel_offset mechanism in arc rendering will handle the separation.
         
         Args:
             new_arc: The newly added arc that may create parallels
@@ -565,17 +414,13 @@ class ModelCanvasManager:
         
         # For opposite direction arcs (most common case: A→B, B→A)
         if len(opposite_direction) == 1 and len(same_direction) == 0:
-            # Two arcs in opposite directions should curve to opposite sides
-            # Determine which arc should curve which way based on arc ID ordering
-            # (consistent assignment so they don't flip on reload)
-            opposite = opposite_direction[0]
-            
-            # Use arc IDs to determine which gets positive/negative offset
-            # This ensures consistent behavior across sessions
-            if arc.id < opposite.id:
-                return -50.0  # This arc curves one way
+            # Two arcs in opposite directions - mirror each other
+            # Use a deterministic rule: arc with lower ID gets positive offset
+            other = opposite_direction[0]
+            if arc.id < other.id:
+                return 50.0  # Curve counterclockwise (increased from 25)
             else:
-                return 50.0   # This arc curves the other way
+                return -50.0  # Curve clockwise (mirror, increased from -25)
         
         # For same-direction arcs or mixed cases, use stable ordering
         all_arcs = [arc] + parallels
@@ -617,10 +462,6 @@ class ModelCanvasManager:
         """
         try:
             index = self.arcs.index(old_arc)
-            
-            # Store old arc type for notification
-            old_arc_type = old_arc.arc_type
-            
             self.arcs[index] = new_arc
             
             # Ensure new arc has manager reference and change callback
@@ -629,9 +470,6 @@ class ModelCanvasManager:
             
             self.mark_modified()
             self.mark_dirty()
-            
-            # Notify observers of arc transformation
-            self._notify_observers('transformed', new_arc, old_arc_type, new_arc.arc_type)
         except ValueError:
             # Arc not found in list - may have been deleted
             pass

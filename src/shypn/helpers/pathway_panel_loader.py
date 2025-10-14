@@ -26,12 +26,13 @@ except Exception as e:
 class PathwayPanelLoader:
     """Loader and controller for the Pathway Operations panel (attachable window)."""
     
-    def __init__(self, ui_path=None, model_canvas=None):
+    def __init__(self, ui_path=None, model_canvas=None, workspace_settings=None):
         """Initialize the pathway panel loader.
         
         Args:
             ui_path: Optional path to pathway_panel.ui. If None, uses default location.
             model_canvas: Optional ModelCanvasManager for loading imported pathways
+            workspace_settings: Optional WorkspaceSettings for remembering user preferences
         """
         if ui_path is None:
             # Default: ui/panels/pathway_panel.ui
@@ -43,6 +44,7 @@ class PathwayPanelLoader:
         
         self.ui_path = ui_path
         self.model_canvas = model_canvas
+        self.workspace_settings = workspace_settings
         self.builder = None
         self.window = None
         self.content = None
@@ -135,7 +137,8 @@ class PathwayPanelLoader:
             # Instantiate controller with builder and model_canvas
             self.sbml_import_controller = SBMLImportPanel(
                 self.builder,
-                self.model_canvas
+                self.model_canvas,
+                self.workspace_settings
             )
             
         except ImportError as e:
@@ -319,22 +322,23 @@ class PathwayPanelLoader:
             self.window.set_visible(False)
 
 
-def create_pathway_panel(ui_path=None, model_canvas=None):
+def create_pathway_panel(ui_path=None, model_canvas=None, workspace_settings=None):
     """Convenience function to create and load the pathway panel loader.
     
     Args:
         ui_path: Optional path to pathway_panel.ui.
         model_canvas: Optional ModelCanvasManager for loading imported pathways.
+        workspace_settings: Optional WorkspaceSettings for remembering user preferences.
         
     Returns:
         PathwayPanelLoader: The loaded pathway panel loader instance.
         
     Example:
-        loader = create_pathway_panel(model_canvas=canvas_manager)
+        loader = create_pathway_panel(model_canvas=canvas_manager, workspace_settings=settings)
         loader.detach(main_window)  # Show as floating
         # or
         loader.attach_to(container)  # Attach to container
     """
-    loader = PathwayPanelLoader(ui_path, model_canvas)
+    loader = PathwayPanelLoader(ui_path, model_canvas, workspace_settings)
     loader.load()
     return loader

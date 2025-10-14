@@ -10,52 +10,19 @@
     <property name="spacing">0</property>
     <property name="halign">center</property>
     <property name="valign">end</property>
-    <property name="margin_bottom">12</property>
+    <property name="margin_bottom">24</property>
 
-    <!-- Inner control box with [ ][S][ ] layout -->
+    <!-- Simulate Button [S] - Toggles the simulation tools palette -->
     <child>
-      <object class="GtkBox" id="simulate_control">
+      <object class="GtkToggleButton" id="simulate_toggle_button">
         <property name="visible">True</property>
-        <property name="orientation">horizontal</property>
-        <property name="spacing">8</property>
-        <property name="halign">fill</property>
-        <property name="valign">fill</property>
+        <property name="label">S</property>
+        <property name="tooltip-text">Toggle Simulation Tools (Run, Stop, Reset)</property>
+        <property name="width-request">36</property>
+        <property name="height-request">36</property>
         <style>
-          <class name="simulate-palette-control"/>
+          <class name="simulate-button"/>
         </style>
-
-        <!-- Left placeholder -->
-        <child>
-          <object class="GtkBox" id="left_placeholder">
-            <property name="visible">True</property>
-            <property name="width-request">28</property>
-            <property name="height-request">28</property>
-          </object>
-        </child>
-
-        <!-- Simulate Button [S] - Toggles the simulation tools palette -->
-        <child>
-          <object class="GtkToggleButton" id="simulate_toggle_button">
-            <property name="visible">True</property>
-            <property name="label">S</property>
-            <property name="tooltip-text">Toggle Simulation Tools (Run, Stop, Reset)</property>
-            <property name="width-request">28</property>
-            <property name="height-request">28</property>
-            <style>
-              <class name="simulate-button"/>
-            </style>
-          </object>
-        </child>
-
-        <!-- Right placeholder -->
-        <child>
-          <object class="GtkBox" id="right_placeholder">
-            <property name="visible">True</property>
-            <property name="width-request">28</property>
-            <property name="height-request">28</property>
-          </object>
-        </child>
-
       </object>
     </child>
 

@@ -45,7 +45,7 @@ shypn/
 ├── data/           # Data model files (schemas, ORM models, sample data)
 ├── doc/            # Comprehensive documentation (414+ markdown files)
 ├── legacy/         # Legacy code from previous versions (reference only)
-├── models/         # User Petri net model files (.shy format)
+├── models/         # User Petri net model files (.shy format - primary extension)
 ├── scripts/        # Utility scripts, demos (non-test)
 ├── src/
 │   └── shypn/
