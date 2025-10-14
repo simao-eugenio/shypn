@@ -87,35 +87,127 @@ class KEGGFetcher(BaseFetcher):
             )
     
     def _fetch_coordinates(self, pathway_id: str, **kwargs) -> FetchResult:
-        """Fetch coordinate data from KEGG.
+        """Fetch coordinate data from KEGG KGML.
+        
+        Fetches KGML XML from KEGG and extracts layout coordinates
+        for species and reactions.
         
         Args:
-            pathway_id: KEGG pathway ID
+            pathway_id: KEGG pathway ID (e.g., 'hsa00010')
             **kwargs: Additional parameters
             
         Returns:
-            FetchResult with coordinate data
+            FetchResult with coordinate data:
+            {
+                'pathway_id': 'hsa00010',
+                'species': [
+                    {
+                        'kegg_id': 'cpd:C00031',
+                        'name': 'Glucose',
+                        'x': 150.0,
+                        'y': 100.0,
+                        'width': 46.0,
+                        'height': 17.0
+                    },
+                    ...
+                ],
+                'reactions': [
+                    {
+                        'kegg_id': 'rn:R00299',
+                        'name': 'Hexokinase',
+                        'x': 200.0,
+                        'y': 150.0
+                    },
+                    ...
+                ]
+            }
         """
-        # TODO: Implement actual KEGG API call
-        # For now, return a placeholder
-        
-        self.logger.info(f"Fetching coordinates for pathway: {pathway_id}")
-        
-        # Placeholder data structure
-        data = {
-            "pathway_id": pathway_id,
-            "species": [],
-            "reactions": []
-        }
-        
-        fields_filled = ["pathway_id"]
-        
-        return self._create_success_result(
-            data=data,
-            data_type="coordinates",
-            fields_filled=fields_filled,
-            source_url=f"{self.KEGG_PATHWAY_BASE}?{pathway_id}"
-        )
+        try:
+            import requests
+            
+            # Fetch KGML XML from KEGG API
+            kgml_url = f"{self.KEGG_API_BASE}/get/{pathway_id}/kgml"
+            self.logger.info(f"Fetching KGML from: {kgml_url}")
+            
+            response = requests.get(kgml_url, timeout=30)
+            response.raise_for_status()
+            
+            # Parse KGML using existing parser
+            try:
+                from shypn.importer.kegg.kgml_parser import KGMLParser
+            except ImportError as e:
+                self.logger.warning(f"KGML parser not available: {e}")
+                return self._create_failure_result(
+                    error="KGML parser not available",
+                    data_type="coordinates"
+                )
+            
+            parser = KGMLParser()
+            pathway_data = parser.parse_string(response.text)
+            
+            # Extract coordinates from entries
+            species_coords = []
+            reaction_coords = []
+            
+            for entry_id, entry in pathway_data.entries.items():
+                graphics = entry.graphics
+                
+                # Extract compound coordinates
+                if entry.type == 'compound':
+                    kegg_ids = entry.get_kegg_ids()
+                    for kegg_id in kegg_ids:
+                        species_coords.append({
+                            'kegg_id': kegg_id,
+                            'name': graphics.name,
+                            'x': graphics.x,
+                            'y': graphics.y,
+                            'width': graphics.width,
+                            'height': graphics.height
+                        })
+                
+                # Extract reaction coordinates (from enzyme entries or reaction attribute)
+                elif entry.type in ('enzyme', 'ortholog'):
+                    if entry.reaction:
+                        reaction_coords.append({
+                            'kegg_id': entry.reaction,
+                            'name': graphics.name,
+                            'x': graphics.x,
+                            'y': graphics.y
+                        })
+            
+            # Build result data
+            data = {
+                'pathway_id': pathway_id,
+                'species': species_coords,
+                'reactions': reaction_coords
+            }
+            
+            fields_filled = ['pathway_id', 'species', 'reactions']
+            
+            self.logger.info(
+                f"✓ Fetched {len(species_coords)} species coords, "
+                f"{len(reaction_coords)} reaction coords from KEGG"
+            )
+            
+            return self._create_success_result(
+                data=data,
+                data_type="coordinates",
+                fields_filled=fields_filled,
+                source_url=kgml_url
+            )
+            
+        except requests.exceptions.RequestException as e:
+            self.logger.error(f"Network error fetching KGML: {e}")
+            return self._create_failure_result(
+                error=f"Network error: {str(e)}",
+                data_type="coordinates"
+            )
+        except Exception as e:
+            self.logger.error(f"Failed to fetch KEGG coordinates: {e}")
+            return self._create_failure_result(
+                error=str(e),
+                data_type="coordinates"
+            )
     
     def _fetch_annotations(self, pathway_id: str, **kwargs) -> FetchResult:
         """Fetch annotation data from KEGG.
