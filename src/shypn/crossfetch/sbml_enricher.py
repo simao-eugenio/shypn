@@ -71,7 +71,8 @@ class SBMLEnricher:
                  fetch_sources: Optional[List[str]] = None,
                  enrich_concentrations: bool = True,
                  enrich_kinetics: bool = True,
-                 enrich_annotations: bool = True):
+                 enrich_annotations: bool = True,
+                 enrich_coordinates: bool = True):
         """Initialize SBML enricher.
         
         Args:
@@ -79,12 +80,14 @@ class SBMLEnricher:
             enrich_concentrations: Whether to enrich concentration data
             enrich_kinetics: Whether to enrich kinetic parameters
             enrich_annotations: Whether to enrich annotations
+            enrich_coordinates: Whether to enrich layout coordinates
         """
         self.pipeline = EnrichmentPipeline()
         self.fetch_sources = fetch_sources or ["KEGG", "Reactome"]
         self.enrich_concentrations = enrich_concentrations
         self.enrich_kinetics = enrich_kinetics
         self.enrich_annotations = enrich_annotations
+        self.enrich_coordinates = enrich_coordinates
         
         logger.info(f"SBMLEnricher initialized with sources: {self.fetch_sources}")
     
@@ -249,6 +252,24 @@ class SBMLEnricher:
             if elements_without_annotations:
                 missing['annotations'] = elements_without_annotations
         
+        # Check for missing layout coordinates
+        if self.enrich_coordinates:
+            # Check if SBML already has Layout extension
+            has_layout = False
+            try:
+                mplugin = model.getPlugin('layout')
+                if mplugin and mplugin.getNumLayouts() > 0:
+                    has_layout = True
+            except:
+                pass
+            
+            if not has_layout:
+                # Request coordinates for all species and reactions
+                missing['coordinates'] = {
+                    'species': [model.getSpecies(i).getId() for i in range(model.getNumSpecies())],
+                    'reactions': [model.getReaction(i).getId() for i in range(model.getNumReactions())]
+                }
+        
         return missing
     
     def _fetch_external_data(self, 
@@ -273,6 +294,8 @@ class SBMLEnricher:
             data_types.append('kinetics')
         if 'annotations' in missing_data:
             data_types.append('annotations')
+        if 'coordinates' in missing_data:
+            data_types.append('coordinates')
         
         if not data_types:
             logger.info("No missing data to fetch")
@@ -325,6 +348,10 @@ class SBMLEnricher:
         # Merge annotations
         if 'annotations' in external_data:
             self._merge_annotations(model, external_data['annotations'])
+        
+        # Merge coordinates (via CoordinateEnricher)
+        if 'coordinates' in external_data:
+            self._merge_coordinates(model, external_data['coordinates'])
         
         # Convert back to string
         enriched_sbml = libsbml.writeSBMLToString(document)
@@ -428,3 +455,65 @@ class SBMLEnricher:
         # TODO: Implement more sophisticated ID extraction
         
         return None
+    
+    def _merge_coordinates(self, model, coordinate_data: Dict[str, Any]):
+        """Merge coordinate data into SBML Layout extension.
+        
+        Uses the CoordinateEnricher to apply coordinate data to the SBML model.
+        The coordinates are transformed from screen coordinates to Cartesian
+        (first quadrant, origin at bottom-left) as required by Shypn.
+        
+        Args:
+            model: libsbml Model object
+            coordinate_data: Dictionary with 'species' and 'reactions' coordinate data
+        """
+        logger.info("Merging coordinate data...")
+        
+        try:
+            from shypn.crossfetch.enrichers import CoordinateEnricher
+            from shypn.crossfetch.models import FetchResult
+            
+            # Create a CoordinateEnricher instance
+            enricher = CoordinateEnricher()
+            
+            # Wrap coordinate data in FetchResult format
+            fetch_result = FetchResult(
+                source='KEGG',
+                data_type='coordinates',
+                pathway_id=model.getId() or 'unknown',
+                success=True,
+                data=coordinate_data
+            )
+            
+            # Create a simple pathway wrapper with the model
+            class PathwayWrapper:
+                def __init__(self, sbml_model):
+                    self.model = sbml_model
+            
+            pathway = PathwayWrapper(model)
+            
+            # Validate data before applying
+            is_valid, warnings = enricher.validate(pathway, fetch_result)
+            
+            if not is_valid:
+                logger.warning(f"Coordinate data validation failed: {warnings}")
+                return
+            
+            if warnings:
+                for warning in warnings:
+                    logger.warning(f"Coordinate validation warning: {warning}")
+            
+            # Apply coordinate enrichment
+            result = enricher.apply(pathway, fetch_result)
+            
+            if result.success:
+                logger.info(
+                    f"Successfully merged coordinates: "
+                    f"{result.statistics.get('species_glyphs', 0)} species, "
+                    f"{result.statistics.get('reaction_glyphs', 0)} reactions"
+                )
+            else:
+                logger.error(f"Failed to merge coordinates: {result.message}")
+                
+        except Exception as e:
+            logger.error(f"Failed to merge coordinate data: {e}", exc_info=True)
