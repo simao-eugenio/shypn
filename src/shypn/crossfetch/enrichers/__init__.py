@@ -12,6 +12,12 @@ from .concentration_enricher import ConcentrationEnricher
 from .interaction_enricher import InteractionEnricher, InteractionType
 from .kinetics_enricher import KineticsEnricher, KineticLawType
 from .annotation_enricher import AnnotationEnricher, ConflictResolutionStrategy
+from .coordinate_enricher import CoordinateEnricher
+
+# Helper modules (not exported but available internally)
+from . import sbml_id_mapper
+from . import sbml_layout_writer
+from . import coordinate_transformer
 
 __all__ = [
     # Base classes
@@ -23,6 +29,7 @@ __all__ = [
     "InteractionEnricher",
     "KineticsEnricher",
     "AnnotationEnricher",
+    "CoordinateEnricher",
     # Enums and helpers
     "InteractionType",
     "KineticLawType",

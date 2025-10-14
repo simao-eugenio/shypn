@@ -1,0 +1,204 @@
+COORDINATE ENRICHMENT ARCHITECTURE
+==================================
+
+┌─────────────────────────────────────────────────────────────────────┐
+│                        ENRICHMENT PIPELINE                           │
+└─────────────────────────────────────────────────────────────────────┘
+
+                          ┌──────────────────┐
+                          │  SBMLEnricher    │
+                          │  (Orchestrator)  │
+                          └────────┬─────────┘
+                                   │
+                                   │ dispatch by data_type
+                                   ▼
+                    ┌──────────────────────────────┐
+                    │   CoordinateEnricher         │
+                    │   (EnricherBase subclass)    │
+                    │                              │
+                    │  + can_enrich(type) → bool   │
+                    │  + apply(pathway, result)    │
+                    │  + validate(pathway, result) │
+                    └──────────┬───────────────────┘
+                               │
+                 ┌─────────────┼─────────────┐
+                 │             │             │
+                 ▼             ▼             ▼
+    ┌────────────────┐  ┌─────────────┐  ┌──────────────┐
+    │ Coordinate     │  │  SBML ID    │  │  SBML Layout │
+    │ Transformer    │  │  Mapper     │  │  Writer      │
+    │                │  │             │  │              │
+    │ Screen ↔       │  │ KEGG IDs    │  │ Layout       │
+    │ Cartesian      │  │     ↓       │  │ Extension    │
+    │                │  │ SBML IDs    │  │ XML Gen      │
+    └────────────────┘  └─────────────┘  └──────────────┘
+
+┌─────────────────────────────────────────────────────────────────────┐
+│                     COORDINATE SYSTEMS                               │
+└─────────────────────────────────────────────────────────────────────┘
+
+    KEGG (Screen)                    Shypn (Cartesian)
+    ═════════════                    ═════════════════
+
+    (0,0)────────► X                      ▲ Y
+      │                                   │
+      │  ┌─────────┐                ┌─────────┐
+      │  │ Species │                │ Species │
+      ▼  │ (x,y)   │                │ (x,y')  │
+    Y    └─────────┘                └─────────┴────► X
+                                   (0,0)
+
+    Top-left origin                Bottom-left origin
+    Y increases DOWN               Y increases UP
+
+    Transformation:
+    ──────────────
+    x' = x
+    y' = canvas_height - y - element_height
+
+
+┌─────────────────────────────────────────────────────────────────────┐
+│                      DATA FLOW DIAGRAM                               │
+└─────────────────────────────────────────────────────────────────────┘
+
+1. FETCH COORDINATES
+   ┌──────────────┐
+   │ KEGGFetcher  │ ─── GET /get/{pathway_id}/kgml
+   │              │ 
+   │ _fetch_      │ ◄── <pathway name="..." ...>
+   │ coordinates()│       <entry id="1" type="compound">
+   │              │         <graphics x="100" y="200" .../>
+   └──────┬───────┘       </entry>
+          │             </pathway>
+          ▼
+   FetchResult{
+     data: {
+       species: [{kegg_id: 'cpd:C00031', x: 100, y: 200, ...}],
+       reactions: [{kegg_id: 'rn:R00299', x: 150, y: 250, ...}]
+     }
+   }
+
+2. TRANSFORM COORDINATES
+   ┌──────────────────────┐
+   │ CoordinateTransformer│
+   └──────────────────────┘
+          │ screen_to_cartesian()
+          ▼
+   {x: 100, y: 400}  (Cartesian, first quadrant)
+
+3. MAP IDS
+   ┌──────────────┐
+   │ SBMLIDMapper │
+   └──────────────┘
+          │ map_species_ids()
+          ▼
+   {
+     'M_glucose_c': {kegg_id: 'cpd:C00031', x: 100, y: 400, ...},
+     'M_atp_c': {kegg_id: 'cpd:C00002', x: 200, y: 380, ...}
+   }
+
+4. WRITE LAYOUT
+   ┌───────────────────┐
+   │ SBMLLayoutWriter  │
+   └───────────────────┘
+          │ write_layout()
+          ▼
+   <layout id="kegg_layout_1">
+     <dimensions width="800" height="600"/>
+     <listOfSpeciesGlyphs>
+       <speciesGlyph species="M_glucose_c">
+         <boundingBox x="100" y="400" width="50" height="20"/>
+       </speciesGlyph>
+     </listOfSpeciesGlyphs>
+   </layout>
+
+5. RESULT
+   ┌──────────────────┐
+   │ EnrichmentResult │
+   │                  │
+   │ success: True    │
+   │ changes: [...]   │
+   │ statistics: {...}│
+   └──────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────┐
+│                      MODULE DEPENDENCIES                             │
+└─────────────────────────────────────────────────────────────────────┘
+
+    coordinate_enricher.py (main)
+           │
+           ├─► EnricherBase (abstract interface)
+           │
+           ├─► coordinate_transformer.py
+           │        │
+           │        └─► (no dependencies, pure math)
+           │
+           ├─► sbml_id_mapper.py
+           │        │
+           │        └─► (no dependencies, pure logic)
+           │
+           └─► sbml_layout_writer.py
+                    │
+                    └─► libsbml (SBML Layout package)
+
+
+┌─────────────────────────────────────────────────────────────────────┐
+│                    INTEGRATION POINTS                                │
+└─────────────────────────────────────────────────────────────────────┘
+
+1. KEGGFetcher Registration
+   ─────────────────────────
+   SBMLEnricher registers KEGGFetcher with 'coordinates' capability
+
+2. Enricher Registration
+   ─────────────────────
+   SBMLEnricher registers CoordinateEnricher for 'coordinates' type
+
+3. UI Control
+   ──────────
+   SBML Import Dialog adds checkbox: "□ Use KEGG layout coordinates"
+
+4. Layout Resolver
+   ───────────────
+   LayoutResolver checks for Layout extension before computing
+
+
+┌─────────────────────────────────────────────────────────────────────┐
+│                         TESTING STRATEGY                             │
+└─────────────────────────────────────────────────────────────────────┘
+
+Unit Tests (Isolated)
+─────────────────────
+▸ CoordinateTransformer
+  - screen_to_cartesian: (100, 200, h=600) → (100, 400)
+  - cartesian_to_screen: (100, 400, h=600) → (100, 200)
+  - Edge cases: (0, 0), (max_x, max_y)
+
+▸ SBMLIDMapper
+  - Exact match: 'C00031' → 'M_glucose_c'
+  - Name match: 'Glucose' → 'M_glucose_c'
+  - Partial match: 'glucose' in 'M_glucose_c'
+
+▸ SBMLLayoutWriter
+  - Mock libsbml.Model
+  - Verify Layout extension created
+  - Verify species glyphs added
+  - Verify bounding box coordinates
+
+Integration Tests
+─────────────────
+▸ End-to-end enrichment
+  - Input: SBML string + FetchResult with coords
+  - Output: SBML with Layout extension
+  - Validate: Layout elements present
+
+▸ Coordinate transformation chain
+  - KGML screen coords → Cartesian → SBML Layout
+  - Verify: No upside-down rendering
+
+Visual Tests
+────────────
+▸ Import pathway with KEGG coordinates
+▸ Verify layout matches KEGG pathway map
+▸ Compare with algorithmic layout (should be different)
