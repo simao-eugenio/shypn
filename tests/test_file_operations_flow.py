@@ -6,7 +6,11 @@ This test simulates the flow of a save operation to verify all components work.
 
 import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+from pathlib import Path
+
+# Add src to path
+src_path = Path(__file__).parent.parent / 'src'
+sys.path.insert(0, str(src_path))
 
 from shypn.data.model_canvas_manager import ModelCanvasManager
 
