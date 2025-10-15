@@ -571,199 +571,24 @@
                         <child>
                           <object class="GtkLabel">
                             <property name="visible">True</property>
-                            <property name="label" translatable="yes">&lt;b&gt;Layout Algorithm:&lt;/b&gt;</property>
+                            <property name="label" translatable="yes">&lt;b&gt;Layout Strategy:&lt;/b&gt;</property>
                             <property name="use-markup">True</property>
                             <property name="halign">start</property>
                             <property name="margin-bottom">3</property>
                           </object>
                         </child>
                         
-                        <!-- Algorithm Selection -->
+                        <!-- Info about new workflow -->
                         <child>
-                          <object class="GtkComboBoxText" id="sbml_layout_algorithm_combo">
+                          <object class="GtkLabel">
                             <property name="visible">True</property>
-                            <property name="active">0</property>
-                            <property name="tooltip-text">Choose layout algorithm for pathway visualization</property>
-                            <items>
-                              <item>Auto (Automatic Selection)</item>
-                              <item>Hierarchical (Layered)</item>
-                              <item>Force-Directed (Physics-based)</item>
-                            </items>
-                          </object>
-                        </child>
-                        
-                        <!-- Auto Layout Parameters (shown when Auto is selected) -->
-                        <child>
-                          <object class="GtkBox" id="sbml_auto_params_box">
-                            <property name="visible">True</property>
-                            <property name="orientation">vertical</property>
-                            <property name="spacing">6</property>
-                            <property name="margin-start">20</property>
-                            <property name="margin-top">6</property>
-                            
-                            <child>
-                              <object class="GtkLabel">
-                                <property name="visible">True</property>
-                                <property name="label">Automatic algorithm selection based on graph topology</property>
-                                <property name="halign">start</property>
-                                <property name="wrap">True</property>
-                                <style>
-                                  <class name="dim-label"/>
-                                </style>
-                              </object>
-                            </child>
-                          </object>
-                        </child>
-                        
-                        <!-- Hierarchical Layout Parameters -->
-                        <child>
-                          <object class="GtkBox" id="sbml_hierarchical_params_box">
-                            <property name="visible">False</property>
-                            <property name="orientation">vertical</property>
-                            <property name="spacing">6</property>
-                            <property name="margin-start">20</property>
-                            <property name="margin-top">6</property>
-                            
-                            <child>
-                              <object class="GtkBox">
-                                <property name="visible">True</property>
-                                <property name="orientation">horizontal</property>
-                                <property name="spacing">6</property>
-                                
-                                <child>
-                                  <object class="GtkLabel">
-                                    <property name="visible">True</property>
-                                    <property name="label">Layer spacing:</property>
-                                    <property name="tooltip-text">Vertical distance between layers</property>
-                                  </object>
-                                </child>
-                                
-                                <child>
-                                  <object class="GtkSpinButton" id="sbml_layer_spacing_spin">
-                                    <property name="visible">True</property>
-                                    <property name="adjustment">sbml_layer_spacing_adjustment</property>
-                                    <property name="digits">0</property>
-                                    <property name="value">150</property>
-                                    <property name="tooltip-text">Vertical spacing between layers (50-500 pixels)</property>
-                                  </object>
-                                </child>
-                              </object>
-                            </child>
-                            
-                            <child>
-                              <object class="GtkBox">
-                                <property name="visible">True</property>
-                                <property name="orientation">horizontal</property>
-                                <property name="spacing">6</property>
-                                
-                                <child>
-                                  <object class="GtkLabel">
-                                    <property name="visible">True</property>
-                                    <property name="label">Node spacing:</property>
-                                    <property name="tooltip-text">Horizontal distance between nodes in same layer</property>
-                                  </object>
-                                </child>
-                                
-                                <child>
-                                  <object class="GtkSpinButton" id="sbml_node_spacing_spin">
-                                    <property name="visible">True</property>
-                                    <property name="adjustment">sbml_node_spacing_adjustment</property>
-                                    <property name="digits">0</property>
-                                    <property name="value">100</property>
-                                    <property name="tooltip-text">Horizontal spacing between nodes (50-300 pixels)</property>
-                                  </object>
-                                </child>
-                              </object>
-                            </child>
-                          </object>
-                        </child>
-                        
-                        <!-- Force-Directed Layout Parameters -->
-                        <child>
-                          <object class="GtkBox" id="sbml_force_params_box">
-                            <property name="visible">False</property>
-                            <property name="orientation">vertical</property>
-                            <property name="spacing">6</property>
-                            <property name="margin-start">20</property>
-                            <property name="margin-top">6</property>
-                            
-                            <child>
-                              <object class="GtkBox">
-                                <property name="visible">True</property>
-                                <property name="orientation">horizontal</property>
-                                <property name="spacing">6</property>
-                                
-                                <child>
-                                  <object class="GtkLabel">
-                                    <property name="visible">True</property>
-                                    <property name="label">Iterations:</property>
-                                    <property name="tooltip-text">Number of physics simulation steps</property>
-                                  </object>
-                                </child>
-                                
-                                <child>
-                                  <object class="GtkSpinButton" id="sbml_iterations_spin">
-                                    <property name="visible">True</property>
-                                    <property name="adjustment">sbml_iterations_adjustment</property>
-                                    <property name="digits">0</property>
-                                    <property name="value">500</property>
-                                    <property name="tooltip-text">More iterations = better layout but slower (50-1000)</property>
-                                  </object>
-                                </child>
-                              </object>
-                            </child>
-                            
-                            <child>
-                              <object class="GtkBox">
-                                <property name="visible">True</property>
-                                <property name="orientation">horizontal</property>
-                                <property name="spacing">6</property>
-                                
-                                <child>
-                                  <object class="GtkLabel">
-                                    <property name="visible">True</property>
-                                    <property name="label">Optimal distance (k):</property>
-                                    <property name="tooltip-text">Target distance between connected nodes</property>
-                                  </object>
-                                </child>
-                                
-                                <child>
-                                  <object class="GtkSpinButton" id="sbml_k_factor_spin">
-                                    <property name="visible">True</property>
-                                    <property name="adjustment">sbml_k_factor_adjustment</property>
-                                    <property name="digits">1</property>
-                                    <property name="value">1.5</property>
-                                    <property name="tooltip-text">Multiplier for optimal distance (0.5-3.0, higher = more spread)</property>
-                                  </object>
-                                </child>
-                              </object>
-                            </child>
-                            
-                            <child>
-                              <object class="GtkBox">
-                                <property name="visible">True</property>
-                                <property name="orientation">horizontal</property>
-                                <property name="spacing">6</property>
-                                
-                                <child>
-                                  <object class="GtkLabel">
-                                    <property name="visible">True</property>
-                                    <property name="label">Canvas scale:</property>
-                                    <property name="tooltip-text">Overall size of the layout</property>
-                                  </object>
-                                </child>
-                                
-                                <child>
-                                  <object class="GtkSpinButton" id="sbml_canvas_scale_spin">
-                                    <property name="visible">True</property>
-                                    <property name="adjustment">sbml_canvas_scale_adjustment</property>
-                                    <property name="digits">0</property>
-                                    <property name="value">2000</property>
-                                    <property name="tooltip-text">Canvas size in pixels (500-5000)</property>
-                                  </object>
-                                </child>
-                              </object>
-                            </child>
+                            <property name="label">Parsed pathways are loaded with arbitrary positions. Use Swiss Palette → Force-Directed Layout to organize nodes after import.</property>
+                            <property name="halign">start</property>
+                            <property name="wrap">True</property>
+                            <property name="margin-bottom">12</property>
+                            <style>
+                              <class name="dim-label"/>
+                            </style>
                           </object>
                         </child>
                         
@@ -903,18 +728,9 @@
                     <child>
                       <object class="GtkButton" id="sbml_parse_button">
                         <property name="visible">True</property>
-                        <property name="label">Parse File</property>
+                        <property name="label">Parse and Load</property>
                         <property name="sensitive">False</property>
-                        <property name="tooltip-text">Parse and validate SBML file</property>
-                      </object>
-                    </child>
-                    
-                    <child>
-                      <object class="GtkButton" id="sbml_import_button">
-                        <property name="visible">True</property>
-                        <property name="label">Import to Canvas</property>
-                        <property name="sensitive">False</property>
-                        <property name="tooltip-text">Convert pathway to Petri net and load into canvas</property>
+                        <property name="tooltip-text">Parse SBML file and automatically load to canvas (use Swiss Palette to apply force-directed layout)</property>
                         <style>
                           <class name="suggested-action"/>
                         </style>
@@ -931,7 +747,7 @@
                     <child>
                       <object class="GtkLabel">
                         <property name="visible">True</property>
-                        <property name="label">ℹ Import biochemical pathways from SBML files. Species become places, reactions become transitions, and stoichiometry becomes arc weights.</property>
+                        <property name="label">ℹ Import biochemical pathways from SBML files. Species → places, reactions → transitions, stoichiometry → arc weights. After loading, use Swiss Palette → Force-Directed Layout to organize nodes.</property>
                         <property name="wrap">True</property>
                         <property name="margin">6</property>
                         <property name="xalign">0</property>
@@ -1021,47 +837,5 @@
     <property name="step-increment">0.1</property>
     <property name="page-increment">1.0</property>
     <property name="value">1.0</property>
-  </object>
-  
-  <!-- Hierarchical Layout Adjustments -->
-  <object class="GtkAdjustment" id="sbml_layer_spacing_adjustment">
-    <property name="lower">50</property>
-    <property name="upper">500</property>
-    <property name="step-increment">10</property>
-    <property name="page-increment">50</property>
-    <property name="value">150</property>
-  </object>
-  
-  <object class="GtkAdjustment" id="sbml_node_spacing_adjustment">
-    <property name="lower">50</property>
-    <property name="upper">300</property>
-    <property name="step-increment">10</property>
-    <property name="page-increment">50</property>
-    <property name="value">100</property>
-  </object>
-  
-  <!-- Force-Directed Layout Adjustments -->
-  <object class="GtkAdjustment" id="sbml_iterations_adjustment">
-    <property name="lower">50</property>
-    <property name="upper">1000</property>
-    <property name="step-increment">50</property>
-    <property name="page-increment">100</property>
-    <property name="value">500</property>
-  </object>
-  
-  <object class="GtkAdjustment" id="sbml_k_factor_adjustment">
-    <property name="lower">0.5</property>
-    <property name="upper">3.0</property>
-    <property name="step-increment">0.1</property>
-    <property name="page-increment">0.5</property>
-    <property name="value">1.5</property>
-  </object>
-  
-  <object class="GtkAdjustment" id="sbml_canvas_scale_adjustment">
-    <property name="lower">500</property>
-    <property name="upper">5000</property>
-    <property name="step-increment">100</property>
-    <property name="page-increment">500</property>
-    <property name="value">2000</property>
   </object>
 </interface>
