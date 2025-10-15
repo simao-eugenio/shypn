@@ -154,7 +154,9 @@ class LayoutEngine:
             target_obj = arc.target
             
             if source_obj in graph and target_obj in graph:
-                graph.add_edge(source_obj, target_obj, weight=weight, obj=arc)
+                # Don't store arc object - it contains GObject references that can't be deepcopied
+                # Just store the weight (stoichiometry) which is all we need for layout
+                graph.add_edge(source_obj, target_obj, weight=weight)
                 arcs_added += 1
             else:
                 # This shouldn't happen if everything is wired correctly

@@ -103,8 +103,19 @@ class ForceDirectedLayout(LayoutAlgorithm):
         # DiGraph (directed): Only connected nodes repel → places don't repel other places!
         # Graph (undirected): ALL nodes repel ALL other nodes → correct physics!
         if isinstance(graph, nx.DiGraph):
-            # Convert to undirected while preserving edge weights (stoichiometry)
-            undirected_graph = graph.to_undirected()
+            # Manually convert to undirected to avoid deepcopy issues with GObject references
+            # NetworkX's to_undirected() uses deepcopy which fails on GObject descendants
+            undirected_graph = nx.Graph()
+            
+            # Copy nodes with their attributes (type='place' or 'transition')
+            for node, data in graph.nodes(data=True):
+                undirected_graph.add_node(node, **data)
+            
+            # Copy edges with their weights (no deepcopy, just reference)
+            for u, v, data in graph.edges(data=True):
+                weight = data.get('weight', 1.0)
+                undirected_graph.add_edge(u, v, weight=weight)
+            
             print(f"🔬 Force-directed: ✓ Converted DiGraph → Graph for universal repulsion")
         else:
             undirected_graph = graph

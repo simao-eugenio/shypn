@@ -474,6 +474,10 @@ class ModelCanvasLoader:
             filename = 'default'
         manager = ModelCanvasManager(canvas_width=2000, canvas_height=2000, filename=filename)
         self.canvas_managers[drawing_area] = manager
+        
+        # Set redraw callback so manager can trigger widget redraws
+        manager.set_redraw_callback(lambda: drawing_area.queue_draw())
+        
         try:
             screen = drawing_area.get_screen()
             if screen:
@@ -1493,9 +1497,8 @@ class ModelCanvasLoader:
         
         # Render all objects
         all_objects = manager.get_all_objects()
-        if len(all_objects) > 0 and len(manager.places) > 0:
-            for obj in all_objects:
-                obj.render(cr, zoom=manager.zoom)
+        for obj in all_objects:
+            obj.render(cr, zoom=manager.zoom)
         
         manager.editing_transforms.render_selection_layer(cr, manager, manager.zoom)
         manager.rectangle_selection.render(cr, manager.zoom)
@@ -2064,13 +2067,13 @@ class ModelCanvasLoader:
         self.canvas_context_menus[drawing_area] = menu
 
     def _on_zoom_in_clicked(self, menu, drawing_area, manager):
-        """Zoom in action."""
-        manager.zoom_in(manager.viewport_width / 2, manager.viewport_height / 2)
+        """Zoom in action (pointer-centered)."""
+        manager.zoom_in(manager.pointer_x, manager.pointer_y)
         drawing_area.queue_draw()
 
     def _on_zoom_out_clicked(self, menu, drawing_area, manager):
-        """Zoom out action."""
-        manager.zoom_out(manager.viewport_width / 2, manager.viewport_height / 2)
+        """Zoom out action (pointer-centered)."""
+        manager.zoom_out(manager.pointer_x, manager.pointer_y)
         drawing_area.queue_draw()
 
     def _on_fit_to_window_clicked(self, menu, drawing_area, manager):

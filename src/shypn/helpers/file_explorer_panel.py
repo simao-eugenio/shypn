@@ -1043,19 +1043,19 @@ class FileExplorerPanel:
         page_index, drawing_area = self.canvas_loader.add_document(filename=base_name)
         manager = self.canvas_loader.get_canvas_manager(drawing_area)
         if manager:
-            # Restore objects
-            manager.places = list(document.places)
-            manager.transitions = list(document.transitions)
-            manager.arcs = list(document.arcs)
-            manager._next_place_id = document._next_place_id
-            manager._next_transition_id = document._next_transition_id
-            manager._next_arc_id = document._next_arc_id
+            # ===== UNIFIED OBJECT LOADING =====
+            # Use load_objects() for consistent, unified initialization path
+            # This replaces direct assignment + manual notification loop
+            # Benefits: Single code path, automatic notifications, proper references
+            manager.load_objects(
+                places=document.places,
+                transitions=document.transitions,
+                arcs=document.arcs
+            )
             
-            # Ensure arc references are properly set
-            manager.ensure_arc_references()
-            
-            # Mark as dirty to ensure redraw
-            manager.mark_dirty()
+            # CRITICAL: Set on_changed callback on all loaded objects
+            # This is required for proper object state management and dirty tracking
+            manager.document_controller.set_change_callback(manager._on_object_changed)
             
             # Restore view state (zoom and pan)
             if hasattr(document, 'view_state') and document.view_state:

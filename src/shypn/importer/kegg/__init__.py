@@ -21,7 +21,7 @@ Users must comply with KEGG's usage policies.
 """
 
 from .api_client import KEGGAPIClient, fetch_pathway
-from .kgml_parser import KGMLParser
+from .kgml_parser import KGMLParser, parse_kgml
 from .pathway_converter import PathwayConverter
 from .models import (
     KEGGPathway,
@@ -38,6 +38,7 @@ __all__ = [
     'KEGGAPIClient',
     'fetch_pathway',
     'KGMLParser',
+    'parse_kgml',
     'PathwayConverter',
     'KEGGPathway',
     'KEGGEntry',

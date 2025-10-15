@@ -129,6 +129,12 @@ class ModelCanvasManager:
         # Dirty flag for redraw optimization
         self._needs_redraw = True
         
+        # Callback to trigger widget redraw (set by UI layer)
+        self._redraw_callback = None
+        
+        # Observer pattern for model changes
+        self._observers = []  # List of observer callbacks
+        
         # Ensure all arcs have proper manager references
         self.ensure_arc_references()
     
@@ -350,6 +356,7 @@ class ModelCanvasManager:
         """
         # Delegate to DocumentController
         place = self.document_controller.add_place(x, y, **kwargs)
+        self._notify_observers('created', place)
         self.mark_dirty()
         return place
     
@@ -366,6 +373,7 @@ class ModelCanvasManager:
         """
         # Delegate to DocumentController
         transition = self.document_controller.add_transition(x, y, **kwargs)
+        self._notify_observers('created', transition)
         self.mark_dirty()
         return transition
     
@@ -387,6 +395,7 @@ class ModelCanvasManager:
         arc._manager = self  # Store reference to manager for parallel detection
         self._auto_convert_parallel_arcs_to_curved(arc)
         
+        self._notify_observers('created', arc)
         self.mark_dirty()
         return arc
     
@@ -400,6 +409,7 @@ class ModelCanvasManager:
         """
         # Delegate to DocumentController (handles cascade)
         self.document_controller.remove_place(place)
+        self._notify_observers('deleted', place)
         self.mark_dirty()
     
     def remove_transition(self, transition):
@@ -412,6 +422,7 @@ class ModelCanvasManager:
         """
         # Delegate to DocumentController (handles cascade)
         self.document_controller.remove_transition(transition)
+        self._notify_observers('deleted', transition)
         self.mark_dirty()
     
     def remove_arc(self, arc):
@@ -422,6 +433,74 @@ class ModelCanvasManager:
         """
         # Delegate to DocumentController
         self.document_controller.remove_arc(arc)
+        self._notify_observers('deleted', arc)
+        self.mark_dirty()
+    
+    def load_objects(self, places=None, transitions=None, arcs=None):
+        """Load objects into the model in bulk (for import/deserialize operations).
+        
+        This method ensures all objects are added through proper channels with
+        automatic observer notification, providing a UNIFIED PATH for both manual
+        creation and import/load operations.
+        
+        This eliminates the dual-path architecture problem where:
+        - Manual creation: objects added one-by-one via add_place/transition/arc()
+        - Import/load: objects bulk-assigned to manager.places/transitions/arcs lists
+        
+        Now ALL object loading uses this single method, ensuring:
+        - Consistent observer notifications
+        - Proper manager references (for arcs)
+        - Correct ID counter updates
+        - Single code path = consistent behavior
+        
+        Args:
+            places: List of Place objects to add (default: None = no places)
+            transitions: List of Transition objects to add (default: None = no transitions)
+            arcs: List of Arc objects to add (default: None = no arcs)
+        
+        Example:
+            # For imports/loads:
+            manager.load_objects(
+                places=document_model.places,
+                transitions=document_model.transitions,
+                arcs=document_model.arcs
+            )
+        """
+        if places is None:
+            places = []
+        if transitions is None:
+            transitions = []
+        if arcs is None:
+            arcs = []
+        
+        # Add places with proper notification
+        for place in places:
+            self.places.append(place)
+            self._notify_observers('created', place)
+        
+        # Add transitions with proper notification
+        for transition in transitions:
+            self.transitions.append(transition)
+            self._notify_observers('created', transition)
+        
+        # Add arcs with proper notification and manager reference
+        for arc in arcs:
+            self.arcs.append(arc)
+            arc._manager = self  # Set manager reference for parallel detection
+            self._notify_observers('created', arc)
+        
+        # Update ID counters to avoid collisions
+        if places:
+            max_place_id = max(p.id for p in self.places)
+            self.document_controller._next_place_id = max_place_id + 1
+        if transitions:
+            max_transition_id = max(t.id for t in self.transitions)
+            self.document_controller._next_transition_id = max_transition_id + 1
+        if arcs:
+            max_arc_id = max(a.id for a in self.arcs)
+            self.document_controller._next_arc_id = max_arc_id + 1
+        
+        # Mark dirty for redraw
         self.mark_dirty()
     
     def detect_parallel_arcs(self, arc):
@@ -741,10 +820,8 @@ class ModelCanvasManager:
             center_x: X coordinate of zoom center (screen space). If None, uses viewport center.
             center_y: Y coordinate of zoom center (screen space). If None, uses viewport center.
         """
-        # Delegate to ViewportController
-        if center_x is not None and center_y is not None:
-            self.viewport_controller.set_pointer_position(center_x, center_y)
-        self.viewport_controller.zoom_in()
+        # Delegate to ViewportController with center coordinates
+        self.viewport_controller.zoom_in(center_x, center_y)
         self._needs_redraw = True
     
     def zoom_out(self, center_x=None, center_y=None):
@@ -754,10 +831,8 @@ class ModelCanvasManager:
             center_x: X coordinate of zoom center (screen space). If None, uses viewport center.
             center_y: Y coordinate of zoom center (screen space). If None, uses viewport center.
         """
-        # Delegate to ViewportController
-        if center_x is not None and center_y is not None:
-            self.viewport_controller.set_pointer_position(center_x, center_y)
-        self.viewport_controller.zoom_out()
+        # Delegate to ViewportController with center coordinates
+        self.viewport_controller.zoom_out(center_x, center_y)
         self._needs_redraw = True
     
     def zoom_by_factor(self, factor, center_x=None, center_y=None):
@@ -773,10 +848,8 @@ class ModelCanvasManager:
             center_x: X coordinate of zoom center (screen space). If None, uses viewport center.
             center_y: Y coordinate of zoom center (screen space). If None, uses viewport center.
         """
-        # Delegate to ViewportController
-        if center_x is not None and center_y is not None:
-            self.viewport_controller.set_pointer_position(center_x, center_y)
-        self.viewport_controller.zoom_by_factor(factor)
+        # Delegate to ViewportController with center coordinates
+        self.viewport_controller.zoom_by_factor(factor, center_x, center_y)
         self._needs_redraw = True
     
     def set_zoom(self, zoom_level, center_x=None, center_y=None):
@@ -787,10 +860,8 @@ class ModelCanvasManager:
             center_x: X coordinate of zoom center (screen space).
             center_y: Y coordinate of zoom center (screen space).
         """
-        # Delegate to ViewportController
-        if center_x is not None and center_y is not None:
-            self.viewport_controller.set_pointer_position(center_x, center_y)
-        self.viewport_controller.set_zoom(zoom_level)
+        # Delegate to ViewportController with center coordinates
+        self.viewport_controller.set_zoom(zoom_level, center_x, center_y)
         self._needs_redraw = True
     
     def zoom_at_point(self, factor, center_x, center_y):
@@ -801,9 +872,8 @@ class ModelCanvasManager:
             center_x: X coordinate of zoom center (screen space).
             center_y: Y coordinate of zoom center (screen space).
         """
-        # Delegate to ViewportController (sets pointer first)
-        self.viewport_controller.set_pointer_position(center_x, center_y)
-        self.viewport_controller.zoom_by_factor(factor)
+        # Delegate to ViewportController with center coordinates
+        self.viewport_controller.zoom_by_factor(factor, center_x, center_y)
         self._needs_redraw = True
     
     def clamp_pan(self):
@@ -1026,8 +1096,64 @@ class ModelCanvasManager:
         self._needs_redraw = False
     
     def mark_dirty(self):
-        """Mark canvas as dirty (needs redraw)."""
+        """Mark canvas as dirty (needs redraw) and trigger widget redraw."""
         self._needs_redraw = True
+        # Trigger widget redraw if callback is set
+        if self._redraw_callback:
+            self._redraw_callback()
+    
+    def set_redraw_callback(self, callback):
+        """Set callback to trigger widget redraw.
+        
+        Args:
+            callback: Function to call to trigger widget.queue_draw()
+        """
+        self._redraw_callback = callback
+    
+    # ==================== Observer Pattern ====================
+    
+    def register_observer(self, callback):
+        """Register an observer to be notified of model changes.
+        
+        Observers are called with: callback(event_type, obj, old_value=None, new_value=None)
+        
+        Event types:
+            - 'created': New object added (obj=new object)
+            - 'deleted': Object removed (obj=deleted object)
+            - 'modified': Object properties changed (obj=modified object)
+            - 'transformed': Arc type transformed (obj=arc, old_value=old type, new_value=new type)
+        
+        Args:
+            callback: Function to call on model changes
+        """
+        if callback not in self._observers:
+            self._observers.append(callback)
+    
+    def unregister_observer(self, callback):
+        """Unregister an observer.
+        
+        Args:
+            callback: Function to remove from observers
+        """
+        if callback in self._observers:
+            self._observers.remove(callback)
+    
+    def _notify_observers(self, event_type, obj, old_value=None, new_value=None):
+        """Notify all registered observers of a model change.
+        
+        Args:
+            event_type: Type of event ('created', 'deleted', 'modified', 'transformed')
+            obj: The affected object
+            old_value: Previous value (for 'transformed' events)
+            new_value: New value (for 'transformed' events)
+        """
+        for callback in self._observers:
+            try:
+                callback(event_type, obj, old_value=old_value, new_value=new_value)
+            except Exception as e:
+                print(f"[ModelCanvasManager] Error in observer callback: {e}")
+                import traceback
+                traceback.print_exc()
     
     # ==================== Info Methods ====================
     
