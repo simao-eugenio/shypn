@@ -919,10 +919,13 @@ class ModelCanvasManager:
         
         render_draw_grid(
             cr=cr,
+            grid_style=self.grid_style,
             grid_spacing=grid_spacing,
-            visible_bounds=(min_x, min_y, max_x, max_y),
             zoom=self.zoom,
-            grid_style=self.grid_style
+            min_x=min_x,
+            min_y=min_y,
+            max_x=max_x,
+            max_y=max_y
         )
     
     # ==================== State Management ====================
