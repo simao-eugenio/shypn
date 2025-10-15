@@ -108,6 +108,9 @@ class ModelCanvasManager:
         # DocumentController: Manages Petri net objects and metadata
         self.document_controller = DocumentController(filename=filename)
         
+        # Set change callback for all objects
+        self.document_controller.set_change_callback(self._on_object_changed)
+        
         # Flag for initial pan centering
         self._initial_pan_set = False  # Flag to center on first draw
         
@@ -342,15 +345,8 @@ class ModelCanvasManager:
         Returns:
             Place: The newly created place instance
         """
-        place_id = self._next_place_id
-        place_name = f"P{place_id}"
-        self._next_place_id += 1
-        
-        place = Place(x, y, place_id, place_name, **kwargs)
-        place.on_changed = self._on_object_changed
-        self.places.append(place)
-        
-        self.mark_modified()
+        # Delegate to DocumentController
+        place = self.document_controller.add_place(x, y, **kwargs)
         self.mark_dirty()
         return place
     
@@ -365,15 +361,8 @@ class ModelCanvasManager:
         Returns:
             Transition: The newly created transition instance
         """
-        transition_id = self._next_transition_id
-        transition_name = f"T{transition_id}"
-        self._next_transition_id += 1
-        
-        transition = Transition(x, y, transition_id, transition_name, **kwargs)
-        transition.on_changed = self._on_object_changed
-        self.transitions.append(transition)
-        
-        self.mark_modified()
+        # Delegate to DocumentController
+        transition = self.document_controller.add_transition(x, y, **kwargs)
         self.mark_dirty()
         return transition
     
@@ -388,19 +377,13 @@ class ModelCanvasManager:
         Returns:
             Arc: The newly created arc instance
         """
-        arc_id = self._next_arc_id
-        arc_name = f"A{arc_id}"
-        self._next_arc_id += 1
+        # Delegate to DocumentController
+        arc = self.document_controller.add_arc(source, target, **kwargs)
         
-        arc = Arc(source, target, arc_id, arc_name, **kwargs)
-        arc.on_changed = self._on_object_changed
+        # Additional facade-level logic for parallel arc handling
         arc._manager = self  # Store reference to manager for parallel detection
-        self.arcs.append(arc)
-        
-        # Check if this arc creates a parallel situation and auto-convert to curved
         self._auto_convert_parallel_arcs_to_curved(arc)
         
-        self.mark_modified()
         self.mark_dirty()
         return arc
     
@@ -412,14 +395,9 @@ class ModelCanvasManager:
         Args:
             place: Place instance to remove
         """
-        if place in self.places:
-            # Remove connected arcs
-            self.arcs = [arc for arc in self.arcs 
-                        if arc.source != place and arc.target != place]
-            
-            self.places.remove(place)
-            self.mark_modified()
-            self.mark_dirty()
+        # Delegate to DocumentController (handles cascade)
+        self.document_controller.remove_place(place)
+        self.mark_dirty()
     
     def remove_transition(self, transition):
         """Remove a transition from the model.
@@ -429,14 +407,9 @@ class ModelCanvasManager:
         Args:
             transition: Transition instance to remove
         """
-        if transition in self.transitions:
-            # Remove connected arcs
-            self.arcs = [arc for arc in self.arcs 
-                        if arc.source != transition and arc.target != transition]
-            
-            self.transitions.remove(transition)
-            self.mark_modified()
-            self.mark_dirty()
+        # Delegate to DocumentController (handles cascade)
+        self.document_controller.remove_transition(transition)
+        self.mark_dirty()
     
     def remove_arc(self, arc):
         """Remove an arc from the model.
@@ -444,10 +417,9 @@ class ModelCanvasManager:
         Args:
             arc: Arc instance to remove
         """
-        if arc in self.arcs:
-            self.arcs.remove(arc)
-            self.mark_modified()
-            self.mark_dirty()
+        # Delegate to DocumentController
+        self.document_controller.remove_arc(arc)
+        self.mark_dirty()
     
     def detect_parallel_arcs(self, arc):
         """Find arcs parallel to the given arc (same source/target or reversed).
@@ -635,10 +607,44 @@ class ModelCanvasManager:
         Returns:
             list: All objects in rendering order (arcs behind, then P and T on top)
         """
-        # Rendering order: Arcs (behind) → Places and Transitions (on top)
-        # Arcs render first so they appear behind the nodes
-        # Places and transitions render after (order between P/T doesn't matter)
-        return list(self.arcs) + list(self.places) + list(self.transitions)
+        # Delegate to DocumentController
+        return self.document_controller.get_all_objects()
+    
+    def find_object_at_position(self, x, y):
+        """Find the topmost object at the given world position.
+        
+        Args:
+            x: X coordinate in world space
+            y: Y coordinate in world space
+            
+        Returns:
+            Place, Transition, Arc, or None: The object at the position, or None
+        """
+        # Delegate to DocumentController
+        return self.document_controller.find_object_at_position(x, y)
+    
+    def clear_all_selections(self):
+        """Clear selection state on all objects.
+        
+        Used when SelectionManager needs to clear all selections.
+        """
+        # Use DocumentController to get all objects, then clear selections
+        for obj in self.document_controller.get_all_objects():
+            obj.selected = False
+        self.mark_dirty()
+    
+    def clear_all_objects(self):
+        """Remove all Petri net objects from the model and reset to new document state.
+        
+        This resets the canvas to a fresh "default" state as if creating a new document.
+        """
+        # Delegate to DocumentController
+        self.document_controller.clear_all_objects()
+        
+        # Clear selection state (additional facade-level logic)
+        self.selection_manager.clear_selection()
+        
+        self.mark_dirty()
     
     def find_object_at_position(self, x, y):
         """Find the topmost object at the given world position.
