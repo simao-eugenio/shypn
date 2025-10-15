@@ -88,6 +88,13 @@ class PlacePropDialogLoader(GObject.GObject):
         radius_entry = self.builder.get_object('prop_place_radius_entry')
         if radius_entry and hasattr(self.place_obj, 'radius'):
             radius_entry.set_text(str(self.place_obj.radius))
+        capacity_entry = self.builder.get_object('prop_place_capacity_entry')
+        if capacity_entry and hasattr(self.place_obj, 'capacity'):
+            capacity_value = self.place_obj.capacity
+            if capacity_value == float('inf'):
+                capacity_entry.set_text('inf')
+            else:
+                capacity_entry.set_text(str(int(capacity_value)))
         description_text = self.builder.get_object('description_text')
         if description_text and hasattr(self.place_obj, 'label'):
             buffer = description_text.get_buffer()
@@ -129,6 +136,18 @@ class PlacePropDialogLoader(GObject.GObject):
                 if radius_text:
                     radius_value = float(radius_text)
                     self.place_obj.radius = max(1.0, radius_value)
+            except ValueError as e:
+                pass
+        capacity_entry = self.builder.get_object('prop_place_capacity_entry')
+        if capacity_entry and hasattr(self.place_obj, 'capacity'):
+            try:
+                capacity_text = capacity_entry.get_text().strip().lower()
+                if capacity_text:
+                    if capacity_text == 'inf' or capacity_text == 'infinity':
+                        self.place_obj.capacity = float('inf')
+                    else:
+                        capacity_value = int(capacity_text)
+                        self.place_obj.capacity = max(1, capacity_value)
             except ValueError as e:
                 pass
         if self.color_picker and hasattr(self.place_obj, 'border_color'):

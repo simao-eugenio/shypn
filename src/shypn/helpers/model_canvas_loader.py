@@ -1026,6 +1026,10 @@ class ModelCanvasLoader:
 
     def _on_button_press(self, widget, event, manager):
         """Handle button press events (GTK3)."""
+        # Grab focus so keyboard shortcuts work
+        if not widget.has_focus():
+            widget.grab_focus()
+        
         state = self._drag_state[widget]
         arc_state = self._arc_state[widget]
         lasso_state = self._lasso_state.get(widget, {})
@@ -1402,41 +1406,42 @@ class ModelCanvasLoader:
         
         # Delete key - delete selected objects
         if event.keyval == Gdk.KEY_Delete or event.keyval == Gdk.KEY_KP_Delete:
-            selected = manager.selection_manager.get_selected_objects()
+            selected = manager.selection_manager.get_selected_objects(manager)
             if selected:
-                from shypn.edit.undo_operations import DeleteOperation
+                # TODO: Implement undo support for delete
+                # from shypn.edit.undo_operations import DeleteOperation
                 # Store delete data for undo
-                delete_data = []
-                for obj in selected:
-                    delete_data.append(manager.serialize_object_for_undo(obj))
+                # delete_data = []
+                # for obj in selected:
+                #     delete_data.append(manager.serialize_object_for_undo(obj))
                 
                 # Delete all selected objects
                 for obj in selected:
-                    manager.delete_object(obj)
+                    self._delete_object(manager, obj)
                 
                 # Push to undo stack
-                if hasattr(manager, 'undo_manager') and delete_data:
-                    manager.undo_manager.push(DeleteOperation(delete_data, manager))
+                # if hasattr(manager, 'undo_manager') and delete_data:
+                #     manager.undo_manager.push(DeleteOperation(delete_data, manager))
                 
                 widget.queue_draw()
                 return True
         
-        # Cut (Ctrl+X)
-        if is_ctrl and not is_shift and event.keyval == Gdk.KEY_x:
-            selected = manager.selection_manager.get_selected_objects()
+        # Cut (Ctrl+X) - check both lowercase and uppercase
+        if is_ctrl and not is_shift and (event.keyval == Gdk.KEY_x or event.keyval == Gdk.KEY_X):
+            selected = manager.selection_manager.get_selected_objects(manager)
             if selected:
                 self._cut_selection(manager, widget)
                 return True
         
-        # Copy (Ctrl+C)
-        if is_ctrl and not is_shift and event.keyval == Gdk.KEY_c:
-            selected = manager.selection_manager.get_selected_objects()
+        # Copy (Ctrl+C) - check both lowercase and uppercase
+        if is_ctrl and not is_shift and (event.keyval == Gdk.KEY_c or event.keyval == Gdk.KEY_C):
+            selected = manager.selection_manager.get_selected_objects(manager)
             if selected:
                 self._copy_selection(manager)
                 return True
         
-        # Paste (Ctrl+V)
-        if is_ctrl and not is_shift and event.keyval == Gdk.KEY_v:
+        # Paste (Ctrl+V) - check both lowercase and uppercase
+        if is_ctrl and not is_shift and (event.keyval == Gdk.KEY_v or event.keyval == Gdk.KEY_V):
             if hasattr(self, '_clipboard') and self._clipboard:
                 # Paste at last known pointer position
                 self._paste_selection(
@@ -1447,16 +1452,34 @@ class ModelCanvasLoader:
                 )
                 return True
         
-        # Undo (Ctrl+Z)
-        if is_ctrl and not is_shift and event.keyval == Gdk.KEY_z:
+        # Undo (Ctrl+Z) - check both lowercase and uppercase
+        if is_ctrl and not is_shift and (event.keyval == Gdk.KEY_z or event.keyval == Gdk.KEY_Z):
+            # Try to access edit_operations from overlay manager
+            if widget in self.overlay_managers:
+                overlay_manager = self.overlay_managers[widget]
+                operations_palette = overlay_manager.get_palette('operations')
+                if operations_palette and operations_palette.edit_operations:
+                    operations_palette.edit_operations.undo()
+                    widget.queue_draw()
+                    return True
+            # Fallback: check for undo_manager (legacy)
             if hasattr(manager, 'undo_manager') and manager.undo_manager:
                 if manager.undo_manager.undo(manager):
                     widget.queue_draw()
                 return True
         
-        # Redo (Ctrl+Shift+Z or Ctrl+Y)
-        if (is_ctrl and is_shift and event.keyval == Gdk.KEY_z) or \
-           (is_ctrl and not is_shift and event.keyval == Gdk.KEY_y):
+        # Redo (Ctrl+Shift+Z or Ctrl+Y) - check both lowercase and uppercase
+        if (is_ctrl and is_shift and (event.keyval == Gdk.KEY_z or event.keyval == Gdk.KEY_Z)) or \
+           (is_ctrl and not is_shift and (event.keyval == Gdk.KEY_y or event.keyval == Gdk.KEY_Y)):
+            # Try to access edit_operations from overlay manager
+            if widget in self.overlay_managers:
+                overlay_manager = self.overlay_managers[widget]
+                operations_palette = overlay_manager.get_palette('operations')
+                if operations_palette and operations_palette.edit_operations:
+                    operations_palette.edit_operations.redo()
+                    widget.queue_draw()
+                    return True
+            # Fallback: check for undo_manager (legacy)
             if hasattr(manager, 'undo_manager') and manager.undo_manager:
                 if manager.undo_manager.redo(manager):
                     widget.queue_draw()
@@ -2575,23 +2598,40 @@ class ModelCanvasLoader:
         self._copy_selection(manager)
         
         # Delete selected objects
-        selected = manager.selection_manager.get_selected_objects()
+        selected = manager.selection_manager.get_selected_objects(manager)
         if selected:
-            from shypn.edit.undo_operations import DeleteOperation
+            # TODO: Implement undo support for cut
+            # from shypn.edit.undo_operations import DeleteOperation
             # Store delete data for undo
-            delete_data = []
-            for obj in selected:
-                delete_data.append(manager.serialize_object_for_undo(obj))
+            # delete_data = []
+            # for obj in selected:
+            #     delete_data.append(manager.serialize_object_for_undo(obj))
             
             # Delete all selected objects
             for obj in selected:
-                manager.delete_object(obj)
+                self._delete_object(manager, obj)
             
             # Push to undo stack
-            if hasattr(manager, 'undo_manager') and delete_data:
-                manager.undo_manager.push(DeleteOperation(delete_data, manager))
+            # if hasattr(manager, 'undo_manager') and delete_data:
+            #     manager.undo_manager.push(DeleteOperation(delete_data, manager))
             
             widget.queue_draw()
+    
+    def _delete_object(self, manager, obj):
+        """Delete an object using the appropriate remove method.
+        
+        Args:
+            manager: ModelCanvasManager instance
+            obj: Object to delete (Place, Transition, or Arc)
+        """
+        from shypn.netobjs import Place, Transition, Arc
+        
+        if isinstance(obj, Place):
+            manager.remove_place(obj)
+        elif isinstance(obj, Transition):
+            manager.remove_transition(obj)
+        elif isinstance(obj, Arc):
+            manager.remove_arc(obj)
     
     def _copy_selection(self, manager):
         """Copy selected objects to clipboard.
@@ -2601,7 +2641,7 @@ class ModelCanvasLoader:
         """
         from shypn.netobjs import Place, Transition, Arc
         
-        selected = manager.selection_manager.get_selected_objects()
+        selected = manager.selection_manager.get_selected_objects(manager)
         if not selected:
             return
         
@@ -2621,7 +2661,7 @@ class ModelCanvasLoader:
                 'y': place.y,
                 'radius': place.radius,
                 'tokens': place.tokens,
-                'capacity': place.capacity,
+                'capacity': getattr(place, 'capacity', float('inf')),
                 'id': id(place)  # Temporary ID for arc reconstruction
             })
         
@@ -2710,8 +2750,7 @@ class ModelCanvasLoader:
             if item['type'] == 'place':
                 place = manager.add_place(
                     item['x'] + offset_x,
-                    item['y'] + offset_y,
-                    name=self._generate_unique_name(manager, item['name'])
+                    item['y'] + offset_y
                 )
                 place.tokens = item['tokens']
                 place.capacity = item.get('capacity', float('inf'))
@@ -2725,8 +2764,7 @@ class ModelCanvasLoader:
             elif item['type'] == 'transition':
                 transition = manager.add_transition(
                     item['x'] + offset_x,
-                    item['y'] + offset_y,
-                    name=self._generate_unique_name(manager, item['name'])
+                    item['y'] + offset_y
                 )
                 transition.horizontal = item['horizontal']
                 transition.width = item['width']
