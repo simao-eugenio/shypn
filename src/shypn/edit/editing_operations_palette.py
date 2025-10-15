@@ -119,6 +119,11 @@ class EditingOperationsPalette:
         """
         key = event.keyval
         
+        # Don't intercept Ctrl+key combinations - let main handler deal with them
+        is_ctrl = event.state & Gdk.ModifierType.CONTROL_MASK
+        if is_ctrl:
+            return False
+        
         # Selection tools
         if key == Gdk.KEY_l or key == Gdk.KEY_L:
             self.on_lasso_clicked()
@@ -142,7 +147,7 @@ class EditingOperationsPalette:
             self.on_align_clicked()
             return True
         
-        # Clipboard
+        # Clipboard (without Ctrl modifier - these are legacy single-key shortcuts)
         if key == Gdk.KEY_x or key == Gdk.KEY_X:
             self.on_cut_clicked()
             return True

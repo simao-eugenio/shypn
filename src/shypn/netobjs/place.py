@@ -47,6 +47,7 @@ class Place(PetriNetObject):
         # State
         self.tokens = 0  # Number of tokens in this place
         self.initial_marking = 0  # Initial marking for simulation reset
+        self.capacity = float('inf')  # Maximum token capacity (infinite by default)
     
     def render(self, cr, transform=None, zoom=1.0):
         """Render the place using Cairo.
@@ -172,10 +173,15 @@ class Place(PetriNetObject):
     def set_tokens(self, count: int):
         """Set the number of tokens in this place.
         
+        Respects capacity constraint if set.
+        
         Args:
-            count: Token count (non-negative)
+            count: Token count (non-negative, will be capped at capacity)
         """
-        self.tokens = max(0, count)
+        count = max(0, count)
+        if self.capacity != float('inf'):
+            count = min(count, int(self.capacity))
+        self.tokens = count
         self._trigger_redraw()
     
     def set_initial_marking(self, count: int):
@@ -205,6 +211,7 @@ class Place(PetriNetObject):
             "radius": self.radius,
             "marking": self.tokens,  # Use 'marking' for compatibility
             "initial_marking": self.initial_marking,  # Store initial marking for reset
+            "capacity": self.capacity,  # Store capacity constraint
             "border_color": list(self.border_color),
             "border_width": self.border_width
         })
@@ -238,6 +245,8 @@ class Place(PetriNetObject):
         else:
             # If no initial_marking stored, use current marking as initial
             place.initial_marking = place.tokens
+        if "capacity" in data:
+            place.capacity = data["capacity"]
         if "border_color" in data:
             place.border_color = tuple(data["border_color"])
         if "border_width" in data:
