@@ -199,7 +199,7 @@ class SBMLImportPanel:
             return
         
         try:
-            last_query = self.workspace_settings.get_setting("sbml_import", "last_biomodels_id", "")
+            last_query = self.workspace_settings.get_setting("sbml_import.last_biomodels_id", "")
             if last_query:
                 self.sbml_biomodels_entry.set_text(last_query)
                 self.logger.debug(f"Loaded last BioModels query: {last_query}")
@@ -216,7 +216,7 @@ class SBMLImportPanel:
             return
         
         try:
-            self.workspace_settings.set_setting("sbml_import", "last_biomodels_id", biomodels_id)
+            self.workspace_settings.set_setting("sbml_import.last_biomodels_id", biomodels_id)
             self.logger.debug(f"Saved BioModels query: {biomodels_id}")
         except Exception as e:
             self.logger.warning(f"Could not save BioModels query: {e}")
@@ -496,33 +496,22 @@ class SBMLImportPanel:
             manager = self.model_canvas.get_canvas_manager(drawing_area)
             
             if manager:
-                # Load places, transitions, and arcs
-                manager.places = list(document_model.places)
-                manager.transitions = list(document_model.transitions)
-                manager.arcs = list(document_model.arcs)
+                # ===== UNIFIED OBJECT LOADING =====
+                # Use load_objects() for consistent, unified initialization path
+                # This replaces direct assignment + manual notification loop
+                # Benefits: Single code path, automatic notifications, proper references
+                manager.load_objects(
+                    places=document_model.places,
+                    transitions=document_model.transitions,
+                    arcs=document_model.arcs
+                )
                 
-                # Update ID counters
-                manager._next_place_id = document_model._next_place_id
-                manager._next_transition_id = document_model._next_transition_id
-                manager._next_arc_id = document_model._next_arc_id
+                # CRITICAL: Set on_changed callback on all loaded objects
+                # This is required for proper object state management and dirty tracking
+                manager.document_controller.set_change_callback(manager._on_object_changed)
                 
                 # Mark as imported so "Save" triggers "Save As" behavior
                 manager.mark_as_imported(pathway_name)
-                
-                # Ensure arc references are properly set
-                manager.ensure_arc_references()
-                
-                # Mark as dirty to ensure redraw
-                manager.mark_dirty()
-                
-                # Notify observers that model structure has changed
-                if hasattr(manager, '_notify_observers'):
-                    for place in manager.places:
-                        manager._notify_observers('created', place)
-                    for transition in manager.transitions:
-                        manager._notify_observers('created', transition)
-                    for arc in manager.arcs:
-                        manager._notify_observers('created', arc)
                 
                 # Trigger redraw
                 drawing_area.queue_draw()

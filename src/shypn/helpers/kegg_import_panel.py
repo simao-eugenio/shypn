@@ -284,24 +284,22 @@ class KEGGImportPanel:
                 # Get the canvas manager for this tab
                 manager = self.model_canvas.get_canvas_manager(drawing_area)
                 if manager:
-                    # Load the document model into the manager
-                    manager.places = list(document_model.places)
-                    manager.transitions = list(document_model.transitions)
-                    manager.arcs = list(document_model.arcs)
+                    # ===== UNIFIED OBJECT LOADING =====
+                    # Use load_objects() for consistent, unified initialization path
+                    # This replaces direct assignment + manual notification loop
+                    # Benefits: Single code path, automatic notifications, proper references
+                    manager.load_objects(
+                        places=document_model.places,
+                        transitions=document_model.transitions,
+                        arcs=document_model.arcs
+                    )
                     
-                    # Update ID counters
-                    manager._next_place_id = document_model._next_place_id
-                    manager._next_transition_id = document_model._next_transition_id
-                    manager._next_arc_id = document_model._next_arc_id
+                    # CRITICAL: Set on_changed callback on all loaded objects
+                    # This is required for proper object state management and dirty tracking
+                    manager.document_controller.set_change_callback(manager._on_object_changed)
                     
                     # Mark as imported so "Save" triggers "Save As" behavior
                     manager.mark_as_imported(pathway_name)
-                    
-                    # Ensure arc references are properly set
-                    manager.ensure_arc_references()
-                    
-                    # Mark as dirty to ensure redraw
-                    manager.mark_dirty()
                     
                     self._show_status(f"Pathway imported: {len(document_model.places)} places, "
                                     f"{len(document_model.transitions)} transitions, "

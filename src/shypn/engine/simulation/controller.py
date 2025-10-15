@@ -186,8 +186,10 @@ class SimulationController:
                       f"behaviors rebuilt for affected transitions")
         
         elif event_type == 'created':
-            # New arc created, invalidate model adapter caches
-            if isinstance(obj, Arc):
+            # New object created (place, transition, or arc)
+            # Invalidate model adapter caches to include the new object
+            from shypn.netobjs.place import Place
+            if isinstance(obj, (Place, Transition, Arc)):
                 self.model_adapter.invalidate_caches()
 
     def _get_behavior(self, transition):
@@ -219,8 +221,22 @@ class SimulationController:
                 if transition.id in self.transition_states:
                     del self.transition_states[transition.id]
         if transition.id not in self.behavior_cache:
+            # Create behavior instance
+            # IMPORTANT: This method ONLY creates behaviors, it does NOT initialize
+            # their enablement state. Initialization is handled EXCLUSIVELY by 
+            # _update_enablement_states() to ensure consistent behavior for both
+            # manually created and imported/loaded models.
+            #
+            # This eliminates the dual initialization problem where:
+            # - _get_behavior() would initialize during type switch
+            # - _update_enablement_states() would also initialize
+            # - This caused double-sampling in stochastic transitions
+            # - Created timing race conditions
+            #
+            # Now: Single responsibility = creation only, no initialization
             behavior = behavior_factory.create_behavior(transition, self.model_adapter)
             self.behavior_cache[transition.id] = behavior
+        
         return self.behavior_cache[transition.id]
 
     def _get_or_create_state(self, transition) -> TransitionState:
