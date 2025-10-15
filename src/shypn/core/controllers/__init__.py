@@ -7,7 +7,9 @@ Controllers manage application state and business logic:
 """
 
 from .viewport_controller import ViewportController
+from .document_controller import DocumentController
 
 __all__ = [
     'ViewportController',
+    'DocumentController',
 ]
