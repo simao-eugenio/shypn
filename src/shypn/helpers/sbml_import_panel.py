@@ -148,7 +148,7 @@ class SBMLImportPanel:
         
         # Action buttons
         self.sbml_parse_button = self.builder.get_object('sbml_parse_button')
-        self.sbml_import_button = self.builder.get_object('sbml_import_button')
+        # Note: sbml_import_button removed in v2.0 - Parse now auto-loads to canvas
     
     def _connect_signals(self):
         """Connect widget signals to handlers."""
@@ -314,10 +314,6 @@ class SBMLImportPanel:
             # Clear previous state
             self.parsed_pathway = None
             self.processed_pathway = None
-            
-            # Disable import button until parsed
-            if self.sbml_import_button:
-                self.sbml_import_button.set_sensitive(False)
             
             # Clear preview
             if self.sbml_preview_text:
@@ -555,9 +551,8 @@ class SBMLImportPanel:
             self._show_status(f"File not found: {self.current_filepath}", error=True)
             return
         
-        # Disable buttons during parsing
+        # Disable parse button during parsing
         self.sbml_parse_button.set_sensitive(False)
-        self.sbml_import_button.set_sensitive(False)
         self._show_status(f"Parsing {os.path.basename(self.current_filepath)}...")
         
         # Parse in background to avoid blocking UI
@@ -606,10 +601,6 @@ class SBMLImportPanel:
             
             # Update preview with pathway info
             self._update_preview()
-            
-            # Enable import button
-            if self.sbml_import_button:
-                self.sbml_import_button.set_sensitive(True)
             
             # Load to canvas after parse (NEW: always enabled, not a testing mode)
             if self.model_canvas:
