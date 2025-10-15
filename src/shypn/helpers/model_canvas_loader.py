@@ -1033,6 +1033,9 @@ class ModelCanvasLoader:
         # Check if lasso mode is active
         if lasso_state.get('active', False) and event.button == 1:
             world_x, world_y = manager.screen_to_world(event.x, event.y)
+            # Store Ctrl state at press time for multi-select support
+            is_ctrl = event.state & Gdk.ModifierType.CONTROL_MASK
+            lasso_state['is_ctrl'] = is_ctrl
             lasso_state['selector'].start_lasso(world_x, world_y)
             widget.queue_draw()
             return True
@@ -1220,11 +1223,13 @@ class ModelCanvasLoader:
         # Complete lasso selection if active
         if lasso_state.get('active', False) and lasso_state.get('selector'):
             if lasso_state['selector'].is_active and event.button == 1:
-                # Support Ctrl+Lasso for multi-select
-                is_ctrl = event.state & Gdk.ModifierType.CONTROL_MASK
+                # Use Ctrl state from button press (not release) for consistent behavior
+                is_ctrl = lasso_state.get('is_ctrl', False)
                 lasso_state['selector'].finish_lasso(multi=is_ctrl)
                 # Deactivate lasso mode completely after selection
                 lasso_state['active'] = False
+                # Clear stored Ctrl state
+                lasso_state['is_ctrl'] = False
                 # Force redraw to remove lasso visualization
                 widget.queue_draw()
                 return True
