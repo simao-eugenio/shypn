@@ -281,9 +281,8 @@ class ModelCanvasManager:
         Returns:
             tuple: (world_x, world_y) in model coordinate space.
         """
-        world_x = (screen_x / self.zoom) - self.pan_x
-        world_y = (screen_y / self.zoom) - self.pan_y
-        return world_x, world_y
+        # Delegate to CoordinateTransform service
+        return coord_screen_to_world(screen_x, screen_y, self.zoom, self.pan_x, self.pan_y)
     
     def world_to_screen(self, world_x, world_y):
         """Convert world (model) coordinates to screen coordinates.
@@ -297,9 +296,8 @@ class ModelCanvasManager:
         Returns:
             tuple: (screen_x, screen_y) in screen coordinate space (pixels).
         """
-        screen_x = (world_x + self.pan_x) * self.zoom
-        screen_y = (world_y + self.pan_y) * self.zoom
-        return screen_x, screen_y
+        # Delegate to CoordinateTransform service
+        return coord_world_to_screen(world_x, world_y, self.zoom, self.pan_x, self.pan_y)
     
     # ==================== Tool Management ====================
     
@@ -734,7 +732,11 @@ class ModelCanvasManager:
             center_x: X coordinate of zoom center (screen space). If None, uses viewport center.
             center_y: Y coordinate of zoom center (screen space). If None, uses viewport center.
         """
-        self.zoom_by_factor(self.ZOOM_STEP, center_x, center_y)
+        # Delegate to ViewportController
+        if center_x is not None and center_y is not None:
+            self.viewport_controller.set_pointer_position(center_x, center_y)
+        self.viewport_controller.zoom_in()
+        self._needs_redraw = True
     
     def zoom_out(self, center_x=None, center_y=None):
         """Zoom out by one step, centered at the given point.
@@ -743,7 +745,11 @@ class ModelCanvasManager:
             center_x: X coordinate of zoom center (screen space). If None, uses viewport center.
             center_y: Y coordinate of zoom center (screen space). If None, uses viewport center.
         """
-        self.zoom_by_factor(1.0 / self.ZOOM_STEP, center_x, center_y)
+        # Delegate to ViewportController
+        if center_x is not None and center_y is not None:
+            self.viewport_controller.set_pointer_position(center_x, center_y)
+        self.viewport_controller.zoom_out()
+        self._needs_redraw = True
     
     def zoom_by_factor(self, factor, center_x=None, center_y=None):
         """Zoom by a given factor, centered at a point.
@@ -758,35 +764,10 @@ class ModelCanvasManager:
             center_x: X coordinate of zoom center (screen space). If None, uses viewport center.
             center_y: Y coordinate of zoom center (screen space). If None, uses viewport center.
         """
-        # Default to viewport center if no center provided
-        if center_x is None:
-            center_x = self.viewport_width / 2
-        if center_y is None:
-            center_y = self.viewport_height / 2
-        
-        # Get world coordinates of zoom center before zoom
-        # Legacy formula: world = screen / zoom - pan
-        world_x = (center_x / self.zoom) - self.pan_x
-        world_y = (center_y / self.zoom) - self.pan_y
-        
-        # Apply zoom with bounds
-        new_zoom = self.zoom * factor
-        new_zoom = max(self.MIN_ZOOM, min(self.MAX_ZOOM, new_zoom))
-        
-        # Calculate new pan to keep zoom center at same screen position
-        # After zoom, we want: world = screen / new_zoom - new_pan
-        # So: new_pan = screen / new_zoom - world
-        self.pan_x = (center_x / new_zoom) - world_x
-        self.pan_y = (center_y / new_zoom) - world_y
-        
-        self.zoom = new_zoom
-        
-        # Clamp pan to maintain infinite canvas bounds
-        self.clamp_pan()
-        
-        # Save view state after zoom operation
-        self.save_view_state_to_file()
-        
+        # Delegate to ViewportController
+        if center_x is not None and center_y is not None:
+            self.viewport_controller.set_pointer_position(center_x, center_y)
+        self.viewport_controller.zoom_by_factor(factor)
         self._needs_redraw = True
     
     def set_zoom(self, zoom_level, center_x=None, center_y=None):
@@ -797,9 +778,11 @@ class ModelCanvasManager:
             center_x: X coordinate of zoom center (screen space).
             center_y: Y coordinate of zoom center (screen space).
         """
-        zoom_level = max(self.MIN_ZOOM, min(self.MAX_ZOOM, zoom_level))
-        factor = zoom_level / self.zoom
-        self.zoom_by_factor(factor, center_x, center_y)
+        # Delegate to ViewportController
+        if center_x is not None and center_y is not None:
+            self.viewport_controller.set_pointer_position(center_x, center_y)
+        self.viewport_controller.set_zoom(zoom_level)
+        self._needs_redraw = True
     
     def zoom_at_point(self, factor, center_x, center_y):
         """Zoom by a factor at a specific point (alias for zoom_by_factor).
@@ -809,7 +792,10 @@ class ModelCanvasManager:
             center_x: X coordinate of zoom center (screen space).
             center_y: Y coordinate of zoom center (screen space).
         """
-        self.zoom_by_factor(factor, center_x, center_y)
+        # Delegate to ViewportController (sets pointer first)
+        self.viewport_controller.set_pointer_position(center_x, center_y)
+        self.viewport_controller.zoom_by_factor(factor)
+        self._needs_redraw = True
     
     def clamp_pan(self):
         """Clamp pan to keep canvas bounds within viewport.
@@ -825,26 +811,9 @@ class ModelCanvasManager:
         - Left edge: (-extent + pan) * zoom <= 0  →  pan <= extent
         - Right edge: (extent + pan) * zoom >= width  →  pan >= width/zoom - extent
         """
-        extent_x = self.CANVAS_EXTENT
-        extent_y = self.CANVAS_EXTENT
-        
-        # Ensure extent is large enough to cover viewport at current zoom
-        min_half_x = (self.viewport_width / self.zoom) / 2.0
-        min_half_y = (self.viewport_height / self.zoom) / 2.0
-        extent_x = max(extent_x, min_half_x)
-        extent_y = max(extent_y, min_half_y)
-        
-        # Calculate pan limits
-        # Grid bounds: [-extent, +extent] in world space
-        # Screen bounds: [0, viewport] in screen space
-        min_pan_x = (self.viewport_width / self.zoom) - extent_x
-        max_pan_x = extent_x
-        min_pan_y = (self.viewport_height / self.zoom) - extent_y
-        max_pan_y = extent_y
-        
-        # Clamp pan values
-        self.pan_x = max(min_pan_x, min(max_pan_x, self.pan_x))
-        self.pan_y = max(min_pan_y, min(max_pan_y, self.pan_y))
+        # Delegate to ViewportController
+        self.viewport_controller.clamp_pan()
+        self._needs_redraw = True
     
     # ==================== Pan Operations ====================
     
@@ -855,17 +824,8 @@ class ModelCanvasManager:
             dx: Pan delta X in screen pixels (positive = drag right = pan increases).
             dy: Pan delta Y in screen pixels (positive = drag down = pan increases).
         """
-        # Convert screen delta to world delta
-        world_dx = dx / self.zoom
-        world_dy = dy / self.zoom
-        
-        # Update pan (drag right = pan increases, matching legacy behavior)
-        self.pan_x += world_dx
-        self.pan_y += world_dy
-        
-        # Clamp pan to canvas bounds
-        self.clamp_pan()
-        
+        # Delegate to ViewportController
+        self.viewport_controller.pan(dx, dy)
         self._needs_redraw = True
     
     def pan_to(self, world_x, world_y):
@@ -875,12 +835,8 @@ class ModelCanvasManager:
             world_x: Target world X coordinate.
             world_y: Target world Y coordinate.
         """
-        self.pan_x = world_x - (self.viewport_width / 2) / self.zoom
-        self.pan_y = world_y - (self.viewport_height / 2) / self.zoom
-        
-        # Clamp pan to canvas bounds
-        self.clamp_pan()
-        
+        # Delegate to ViewportController
+        self.viewport_controller.pan_to(world_x, world_y)
         self._needs_redraw = True
     
     def pan_relative(self, dx, dy):
@@ -892,7 +848,9 @@ class ModelCanvasManager:
             dx: Pan delta X in screen pixels (positive = pan right).
             dy: Pan delta Y in screen pixels (positive = pan down).
         """
-        self.pan(dx, dy)
+        # Delegate to ViewportController
+        self.viewport_controller.pan_relative(dx, dy)
+        self._needs_redraw = True
     
     # ==================== Grid Rendering ====================
     
@@ -1089,14 +1047,13 @@ class ModelCanvasManager:
             width: New viewport width in pixels.
             height: New viewport height in pixels.
         """
-        self.viewport_width = width
-        self.viewport_height = height
+        # Delegate to ViewportController
+        self.viewport_controller.set_viewport_size(width, height)
         
-        # On first viewport size update, center the canvas
+        # Handle initial pan centering (legacy compatibility)
         if not self._initial_pan_set and width > 0 and height > 0:
-            # Center the canvas: pan so that (0,0) world coordinate is at screen center
-            self.pan_x = -(width / 2) / self.zoom
-            self.pan_y = -(height / 2) / self.zoom
+            # Center the canvas at origin
+            self.viewport_controller.pan_to(0, 0)
             self._initial_pan_set = True
         
         self._needs_redraw = True
@@ -1107,7 +1064,7 @@ class ModelCanvasManager:
         Args:
             style: Grid style ('line', 'dot', or 'cross').
         """
-        if style in [self.GRID_STYLE_LINE, self.GRID_STYLE_DOT, self.GRID_STYLE_CROSS]:
+        if style in [GRID_STYLE_LINE, GRID_STYLE_DOT, GRID_STYLE_CROSS]:
             self.grid_style = style
             self._needs_redraw = True
     
@@ -1118,6 +1075,9 @@ class ModelCanvasManager:
             x: Pointer X coordinate in screen space.
             y: Pointer Y coordinate in screen space.
         """
+        # Delegate to ViewportController
+        self.viewport_controller.set_pointer_position(x, y)
+        # Also update local copy (legacy compatibility)
         self.pointer_x = x
         self.pointer_y = y
     
