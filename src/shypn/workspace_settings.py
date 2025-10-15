@@ -8,6 +8,7 @@ This module handles saving and restoring:
 Settings are stored in ~/.config/shypn/workspace.json
 """
 import os
+import sys
 import json
 from pathlib import Path
 from typing import Optional, Dict, Any
@@ -132,4 +133,45 @@ class WorkspaceSettings:
         if "editor" not in self.settings:
             self.settings["editor"] = {}
         self.settings["editor"]["grid_spacing"] = spacing
+        self.save()
+    
+    def get_setting(self, key: str, default: Any = None) -> Any:
+        """Get a setting value by dot-notation key.
+        
+        Args:
+            key: Setting key in dot notation (e.g., "sbml_import.last_biomodels_id")
+            default: Default value if setting not found
+            
+        Returns:
+            Setting value or default
+        """
+        keys = key.split('.')
+        value = self.settings
+        
+        for k in keys:
+            if isinstance(value, dict) and k in value:
+                value = value[k]
+            else:
+                return default
+        
+        return value
+    
+    def set_setting(self, key: str, value: Any) -> None:
+        """Set a setting value by dot-notation key.
+        
+        Args:
+            key: Setting key in dot notation (e.g., "sbml_import.last_biomodels_id")
+            value: Value to set
+        """
+        keys = key.split('.')
+        target = self.settings
+        
+        # Navigate to the parent dict
+        for k in keys[:-1]:
+            if k not in target:
+                target[k] = {}
+            target = target[k]
+        
+        # Set the final value
+        target[keys[-1]] = value
         self.save()
