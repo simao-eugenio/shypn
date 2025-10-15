@@ -940,6 +940,11 @@ class FileExplorerPanel:
             if manager is None:
                 return
             document = manager.to_document_model()
+            
+            # Set suggested filename from manager (for imported documents)
+            if manager.filename and manager.filename != "default":
+                self.persistency.suggested_filename = manager.filename
+            
             self.persistency.save_document(document, save_as=False, is_default_filename=manager.is_default_filename())
         except Exception as e:
             print(f"[FileExplorer] save_current_document ERROR: {e}", file=sys.stderr)
@@ -963,6 +968,11 @@ class FileExplorerPanel:
             if manager is None:
                 return
             document = manager.to_document_model()
+            
+            # Set suggested filename from manager (for imported documents)
+            if manager.filename and manager.filename != "default":
+                self.persistency.suggested_filename = manager.filename
+            
             self.persistency.save_document(document, save_as=True)
         except Exception as e:
             print(f"[FileExplorer] save_current_document_as ERROR: {e}", file=sys.stderr)

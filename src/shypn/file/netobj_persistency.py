@@ -97,6 +97,9 @@ class NetObjPersistency:
             except Exception as e:
                 pass
         self._last_directory: Optional[str] = self.models_directory
+        
+        # Suggested filename for save dialog (used for imported documents)
+        self.suggested_filename: Optional[str] = None
 
     def update_models_directory_from_project(self) -> None:
         """Update models directory based on current project.
@@ -322,7 +325,11 @@ class NetObjPersistency:
         if self.current_filepath:
             dialog.set_filename(self.current_filepath)
         else:
-            default_name = 'default.shy'
+            # Use suggested filename if available (e.g., for imported documents)
+            if self.suggested_filename:
+                default_name = f'{self.suggested_filename}.shy'
+            else:
+                default_name = 'default.shy'
             dialog.set_current_name(default_name)
         response = dialog.run()
         filepath = dialog.get_filename()
