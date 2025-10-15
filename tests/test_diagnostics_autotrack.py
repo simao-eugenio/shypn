@@ -12,7 +12,7 @@ gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, GLib
 
 import sys
-sys.path.insert(0, 'src')
+sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from shypn.analyses.diagnostics_panel import DiagnosticsPanel
 from shypn.models import PetriNetModel, Place, Transition

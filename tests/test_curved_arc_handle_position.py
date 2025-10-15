@@ -7,7 +7,7 @@ actual curve, not on the straight line midpoint.
 """
 
 import sys
-sys.path.insert(0, 'src')
+sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from shypn.netobjs import Place, Transition
 from shypn.netobjs.curved_arc import CurvedArc

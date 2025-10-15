@@ -10,7 +10,7 @@ import time
 import os
 
 # Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from shypn.importer.kegg import fetch_pathway, parse_kgml
 from shypn.importer.kegg.pathway_converter import convert_pathway_enhanced

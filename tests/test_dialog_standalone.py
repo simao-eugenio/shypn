@@ -4,12 +4,13 @@ Standalone test for New Project dialog
 """
 import sys
 import os
+from pathlib import Path
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk
 
 # Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from shypn.data.project_models import ProjectManager
 from shypn.helpers.project_dialog_manager import ProjectDialogManager

@@ -2,7 +2,7 @@
 """Test script to verify LocalityDetector works with list-based model."""
 
 import sys
-sys.path.insert(0, 'src')
+sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from shypn.data.model_canvas_manager import ModelCanvasManager
 from shypn.diagnostic import LocalityDetector

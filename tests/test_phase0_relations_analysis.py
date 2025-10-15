@@ -12,7 +12,7 @@ This script analyzes:
 
 import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from shypn.importer.kegg.kgml_parser import KGMLParser
 from shypn.importer.kegg.pathway_converter import convert_pathway_enhanced

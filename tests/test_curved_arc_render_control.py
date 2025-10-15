@@ -2,7 +2,7 @@
 """Test that CurvedArc rendering uses manual control point correctly."""
 
 import sys
-sys.path.insert(0, 'src')
+sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from shypn.netobjs.place import Place
 from shypn.netobjs.transition import Transition

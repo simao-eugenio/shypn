@@ -5,7 +5,7 @@ Shows the spacing issue at each level.
 """
 
 import sys
-sys.path.insert(0, 'src')
+sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from shypn.data.pathway.pathway_data import PathwayData, Species, Reaction
 from shypn.data.pathway.pathway_postprocessor import PathwayPostProcessor

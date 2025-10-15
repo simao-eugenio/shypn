@@ -12,7 +12,7 @@ Verify that arcs work correctly regardless of their visual orientation:
 import sys
 import os
 import math
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from shypn.netobjs.place import Place
 from shypn.netobjs.transition import Transition

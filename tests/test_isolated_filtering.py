@@ -2,7 +2,7 @@
 """Test that isolated compounds are filtered from multiple pathways."""
 
 import sys
-sys.path.insert(0, 'src')
+sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from shypn.importer.kegg.api_client import KEGGAPIClient
 from shypn.importer.kegg.kgml_parser import KGMLParser

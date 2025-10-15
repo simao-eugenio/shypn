@@ -3,7 +3,7 @@
 
 import sys
 import math
-sys.path.insert(0, 'src')
+sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from shypn.data.pathway.tree_layout import TreeLayoutProcessor
 from shypn.data.pathway.pathway_data import PathwayData, Species, Reaction

@@ -858,6 +858,45 @@ class ModelCanvasManager:
         self.viewport_controller.pan_relative(dx, dy)
         self._needs_redraw = True
     
+    def get_content_bounds(self):
+        """Calculate the bounding box of all content (places and transitions).
+        
+        Returns:
+            tuple: (min_x, min_y, max_x, max_y) or None if no content.
+        """
+        all_objects = list(self.places) + list(self.transitions)
+        if not all_objects:
+            return None
+        
+        # Calculate bounds
+        min_x = min(obj.x for obj in all_objects)
+        max_x = max(obj.x for obj in all_objects)
+        min_y = min(obj.y for obj in all_objects)
+        max_y = max(obj.y for obj in all_objects)
+        
+        return (min_x, min_y, max_x, max_y)
+    
+    def center_view_on_content(self):
+        """Center the viewport on all content.
+        
+        Pans the view so that the center of all objects is at the viewport center.
+        If no content exists, centers on (0, 0).
+        """
+        bounds = self.get_content_bounds()
+        
+        if bounds:
+            # Calculate center of content
+            min_x, min_y, max_x, max_y = bounds
+            center_x = (min_x + max_x) / 2.0
+            center_y = (min_y + max_y) / 2.0
+        else:
+            # No content, center on origin
+            center_x = 0.0
+            center_y = 0.0
+        
+        # Pan to center the content
+        self.pan_to(center_x, center_y)
+    
     # ==================== Grid Rendering ====================
     
     def get_grid_spacing(self):
@@ -1232,6 +1271,8 @@ class ModelCanvasManager:
     def load_view_state_from_file(self, filepath=None):
         """Load view state from a JSON file.
         
+        If no view state file exists or loading fails, centers the view on content.
+        
         Args:
             filepath: Optional custom file path. If None, uses default location.
             
@@ -1245,6 +1286,8 @@ class ModelCanvasManager:
             filepath = os.path.join(config_dir, f'{filename}_view.json')
         
         if not os.path.exists(filepath):
+            # No saved view state - center on content as fallback
+            self.center_view_on_content()
             return False
         
         try:
@@ -1253,4 +1296,6 @@ class ModelCanvasManager:
             self.set_view_state(view_state)
             return True
         except Exception as e:
+            # Failed to load - center on content as fallback
+            self.center_view_on_content()
             return False

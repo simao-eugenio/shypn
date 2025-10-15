@@ -5,9 +5,10 @@ Tests that time_scale properly controls playback speed.
 """
 import sys
 import os
+from pathlib import Path
 
 # Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from shypn.engine.simulation.settings import SimulationSettings
 from shypn.utils.time_utils import TimeUnits

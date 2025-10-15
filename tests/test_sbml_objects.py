@@ -2,7 +2,7 @@
 """Test SBML import object creation"""
 
 import sys
-sys.path.insert(0, 'src')
+sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from shypn.data.pathway.sbml_parser import SBMLParser
 from shypn.data.pathway.pathway_postprocessor import PathwayPostProcessor

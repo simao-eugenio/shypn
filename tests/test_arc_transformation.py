@@ -6,7 +6,7 @@ Tests the arc curve/straight transformation functionality.
 """
 
 import sys
-sys.path.insert(0, 'src')
+sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from shypn.netobjs import Place, Transition, Arc
 from shypn.edit.transformation.handle_detector import HandleDetector
