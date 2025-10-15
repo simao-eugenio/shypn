@@ -51,8 +51,13 @@ class LassoSelector:
         
         self.points.append((x, y))
     
-    def finish_lasso(self):
-        """Finish lasso and select objects inside."""
+    def finish_lasso(self, multi=False):
+        """Finish lasso and select objects inside.
+        
+        Args:
+            multi: If True, add to existing selection (Ctrl+Lasso).
+                   If False, replace selection (clear first).
+        """
         if not self.is_active or len(self.points) < 3:
             self.cancel_lasso()
             return
@@ -68,11 +73,16 @@ class LassoSelector:
                 selected.append(obj)
         
         # Update selection
-        self.canvas_manager.selection_manager.clear_selection()
+        if not multi:
+            # Single-select mode: clear existing selection first
+            self.canvas_manager.selection_manager.clear_selection()
+            self.canvas_manager.clear_all_selections()
+        
+        # Add selected objects (either to empty selection or to existing)
         for obj in selected:
             self.canvas_manager.selection_manager.select(
                 obj, 
-                multi=True, 
+                multi=True,  # Always use multi=True since we already cleared if needed
                 manager=self.canvas_manager
             )
         

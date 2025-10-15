@@ -308,3 +308,17 @@ class SelectionManager:
             True if dragging, False otherwise
         """
         return hasattr(self, '_drag_controller') and self._drag_controller.is_dragging()
+    
+    def get_move_data_for_undo(self):
+        """Get move data for undo operation.
+        
+        Returns initial positions of currently dragged objects for undo support.
+        This should be called BEFORE end_drag() to capture the move operation.
+        
+        Returns:
+            Dictionary mapping object id() to (initial_x, initial_y) tuples,
+            or empty dict if not dragging
+        """
+        if hasattr(self, '_drag_controller') and self._drag_controller.is_dragging():
+            return self._drag_controller.get_initial_positions()
+        return {}

@@ -80,6 +80,10 @@ class ModelCanvasLoader:
         self.right_panel_loader = None
         self.context_menu_handler = None
         self._clipboard = []  # Clipboard for cut/copy/paste operations
+        
+        # Track last pointer position for paste-at-pointer functionality
+        self._last_pointer_world_x = 0.0
+        self._last_pointer_world_y = 0.0
 
     def load(self):
         """Load the canvas UI and return the container.
@@ -1216,7 +1220,9 @@ class ModelCanvasLoader:
         # Complete lasso selection if active
         if lasso_state.get('active', False) and lasso_state.get('selector'):
             if lasso_state['selector'].is_active and event.button == 1:
-                lasso_state['selector'].finish_lasso()
+                # Support Ctrl+Lasso for multi-select
+                is_ctrl = event.state & Gdk.ModifierType.CONTROL_MASK
+                lasso_state['selector'].finish_lasso(multi=is_ctrl)
                 # Deactivate lasso mode completely after selection
                 lasso_state['active'] = False
                 # Force redraw to remove lasso visualization
@@ -1286,6 +1292,10 @@ class ModelCanvasLoader:
         manager.set_pointer_position(event.x, event.y)
         world_x, world_y = manager.screen_to_world(event.x, event.y)
         arc_state['cursor_pos'] = (world_x, world_y)
+        
+        # Track pointer position for paste-at-pointer functionality
+        self._last_pointer_world_x = world_x
+        self._last_pointer_world_y = world_y
         
         # Update lasso path if active
         if lasso_state.get('active', False) and lasso_state.get('selector'):
@@ -1423,7 +1433,13 @@ class ModelCanvasLoader:
         # Paste (Ctrl+V)
         if is_ctrl and not is_shift and event.keyval == Gdk.KEY_v:
             if hasattr(self, '_clipboard') and self._clipboard:
-                self._paste_selection(manager, widget)
+                # Paste at last known pointer position
+                self._paste_selection(
+                    manager, 
+                    widget, 
+                    self._last_pointer_world_x, 
+                    self._last_pointer_world_y
+                )
                 return True
         
         # Undo (Ctrl+Z)
@@ -2638,20 +2654,45 @@ class ModelCanvasLoader:
                 
                 self._clipboard.append(arc_data)
     
-    def _paste_selection(self, manager, widget):
-        """Paste objects from clipboard.
+    def _paste_selection(self, manager, widget, pointer_x=None, pointer_y=None):
+        """Paste objects from clipboard at pointer position.
+        
+        Pastes the clipboard contents centered at the pointer position (or canvas center).
+        This provides intuitive paste behavior where objects appear where you want them.
         
         Args:
             manager: ModelCanvasManager instance
             widget: GtkDrawingArea widget
+            pointer_x: World X coordinate to paste at (None = use canvas center)
+            pointer_y: World Y coordinate to paste at (None = use canvas center)
         """
         from shypn.netobjs import Place, Transition
         
         if not self._clipboard:
             return
         
-        # Paste with offset to avoid exact overlap
-        offset_x, offset_y = 30, 30
+        # Calculate clipboard bounding box center
+        items_with_pos = [item for item in self._clipboard if 'x' in item and 'y' in item]
+        if not items_with_pos:
+            return
+        
+        clipboard_min_x = min(item['x'] for item in items_with_pos)
+        clipboard_min_y = min(item['y'] for item in items_with_pos)
+        clipboard_max_x = max(item['x'] for item in items_with_pos)
+        clipboard_max_y = max(item['y'] for item in items_with_pos)
+        clipboard_center_x = (clipboard_min_x + clipboard_max_x) / 2
+        clipboard_center_y = (clipboard_min_y + clipboard_max_y) / 2
+        
+        # Get paste position
+        if pointer_x is None or pointer_y is None:
+            # Use canvas center if no pointer position provided
+            screen_center_x = manager.viewport_width / 2
+            screen_center_y = manager.viewport_height / 2
+            pointer_x, pointer_y = manager.screen_to_world(screen_center_x, screen_center_y)
+        
+        # Calculate offset to center clipboard at pointer
+        offset_x = pointer_x - clipboard_center_x
+        offset_y = pointer_y - clipboard_center_y
         
         # Clear current selection
         manager.clear_all_selections()
