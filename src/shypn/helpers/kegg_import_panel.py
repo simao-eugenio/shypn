@@ -294,6 +294,9 @@ class KEGGImportPanel:
                     manager._next_transition_id = document_model._next_transition_id
                     manager._next_arc_id = document_model._next_arc_id
                     
+                    # Mark as imported so "Save" triggers "Save As" behavior
+                    manager.mark_as_imported(pathway_name)
+                    
                     # Ensure arc references are properly set
                     manager.ensure_arc_references()
                     

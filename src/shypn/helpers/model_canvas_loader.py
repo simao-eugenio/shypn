@@ -1967,6 +1967,10 @@ class ModelCanvasLoader:
             # Store filename without extension in manager
             base_filename = os.path.splitext(filename)[0]
             manager.filename = base_filename
+            
+            # If this was a save operation, mark as saved (clears imported flag)
+            if is_save:
+                manager.mark_as_saved()
 
     def _on_dirty_state_changed(self, is_dirty):
         """Handle dirty state change to update tab label modification indicator.

@@ -114,6 +114,9 @@ class ModelCanvasManager:
         # Flag for initial pan centering
         self._initial_pan_set = False  # Flag to center on first draw
         
+        # Flag to track if document was imported (needs "Save As" on first save)
+        self._is_imported = False
+        
         # Pointer position (for pointer-centered zoom)
         self.pointer_x = 0
         self.pointer_y = 0
@@ -1171,10 +1174,33 @@ class ModelCanvasManager:
         This is a flag that indicates the document is in an unsaved/new state
         and should trigger file chooser dialogs in save operations.
         
+        Also returns True for imported documents that haven't been saved yet,
+        so they trigger "Save As" behavior on first save.
+        
         Returns:
-            bool: True if filename is "default", False otherwise
+            bool: True if filename is "default" or document is imported (unsaved), False otherwise
         """
-        return self.filename == "default"
+        return self.filename == "default" or self._is_imported
+    
+    def mark_as_imported(self, imported_name: str = None):
+        """Mark this document as imported (from KEGG, SBML, etc.).
+        
+        Imported documents should trigger "Save As" on first save, even if they
+        have a descriptive filename.
+        
+        Args:
+            imported_name: Optional descriptive name for the imported document
+        """
+        self._is_imported = True
+        if imported_name and imported_name != "default":
+            self.filename = imported_name
+    
+    def mark_as_saved(self):
+        """Mark this document as saved (no longer imported/new).
+        
+        Call this after a successful save operation to clear the imported flag.
+        """
+        self._is_imported = False
     
     def to_document_model(self):
         """Convert canvas manager's Petri net objects to a DocumentModel.
