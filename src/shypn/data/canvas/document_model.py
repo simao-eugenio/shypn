@@ -431,7 +431,7 @@ class DocumentModel:
         for place_data in data.get("places", []):
             place = Place.from_dict(place_data)
             document.places.append(place)
-            places_dict[place.id] = place
+            places_dict[place.id] = place  # place.id is now guaranteed to be int
             # Update next ID counter
             document._next_place_id = max(document._next_place_id, place.id + 1)
         
@@ -440,7 +440,7 @@ class DocumentModel:
         for transition_data in data.get("transitions", []):
             transition = Transition.from_dict(transition_data)
             document.transitions.append(transition)
-            transitions_dict[transition.id] = transition
+            transitions_dict[transition.id] = transition  # transition.id is now guaranteed to be int
             # Update next ID counter
             document._next_transition_id = max(document._next_transition_id, transition.id + 1)
         

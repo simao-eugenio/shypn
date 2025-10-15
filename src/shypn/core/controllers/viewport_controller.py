@@ -158,16 +158,30 @@ class ViewportController:
     
     # ==================== Pan Operations ====================
     
-    def pan(self, dx, dy):
+    def pan(self, dx, dy, rotation=None):
         """Pan the viewport by a delta in screen coordinates.
         
         Args:
             dx: Pan delta X in screen pixels (positive = drag right = pan increases).
             dy: Pan delta Y in screen pixels (positive = drag down = pan increases).
+            rotation: Optional CanvasRotation object for rotated canvas support.
         """
         # Convert screen delta to world delta
         world_dx = dx / self.zoom
         world_dy = dy / self.zoom
+        
+        # Apply inverse rotation if canvas is rotated
+        if rotation and rotation.angle_degrees != 0:
+            import math
+            cos_a = math.cos(-rotation.angle_radians)  # Inverse rotation
+            sin_a = math.sin(-rotation.angle_radians)
+            
+            # Rotate the pan delta
+            rotated_dx = world_dx * cos_a - world_dy * sin_a
+            rotated_dy = world_dx * sin_a + world_dy * cos_a
+            
+            world_dx = rotated_dx
+            world_dy = rotated_dy
         
         # Update pan (drag right = pan increases, matching legacy behavior)
         self.pan_x += world_dx
@@ -193,7 +207,7 @@ class ViewportController:
         
         self._needs_redraw = True
     
-    def pan_relative(self, dx, dy):
+    def pan_relative(self, dx, dy, rotation=None):
         """Pan the viewport by incremental deltas (for drag updates).
         
         This is an alias for pan() but with clearer intent for incremental updates.
@@ -201,8 +215,9 @@ class ViewportController:
         Args:
             dx: Pan delta X in screen pixels (positive = pan right).
             dy: Pan delta Y in screen pixels (positive = pan down).
+            rotation: Optional CanvasRotation object for rotated canvas support.
         """
-        self.pan(dx, dy)
+        self.pan(dx, dy, rotation)
     
     def clamp_pan(self):
         """Clamp pan to keep canvas bounds within viewport.

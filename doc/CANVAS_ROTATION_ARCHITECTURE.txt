@@ -1,0 +1,234 @@
+"""
+Canvas Rotation Feature - Architecture Diagram
+
+┌─────────────────────────────────────────────────────────────────────┐
+│                      USER INTERFACE LAYER                            │
+│  ┌────────────────────────────────────────────────────────────────┐ │
+│  │  Context Menu (Right-click on canvas)                          │ │
+│  │  ┌──────────────────┬─────────────────┬──────────────────┐    │ │
+│  │  │ Rotate 90° CW    │ Rotate 90° CCW  │ Rotate 180°      │    │ │
+│  │  └────────┬─────────┴────────┬────────┴──────┬───────────┘    │ │
+│  │           │                  │                │                 │ │
+│  │           ▼                  ▼                ▼                 │ │
+│  │  ┌────────────────────────────────────────────────────────┐    │ │
+│  │  │ ModelCanvasLoader Handler Methods                      │    │ │
+│  │  │  • _on_rotate_90_cw_clicked()                         │    │ │
+│  │  │  • _on_rotate_90_ccw_clicked()                        │    │ │
+│  │  │  • _on_rotate_180_clicked()                           │    │ │
+│  │  │  • _on_reset_rotation_clicked()                       │    │ │
+│  │  └───────────────────────┬────────────────────────────────┘    │ │
+│  └──────────────────────────┼─────────────────────────────────────┘ │
+└────────────────────────────┼───────────────────────────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                    CANVAS MANAGER LAYER                              │
+│  ┌────────────────────────────────────────────────────────────────┐ │
+│  │  ModelCanvasManager (Facade)                                   │ │
+│  │  ┌──────────────────────────────────────────────────────────┐ │ │
+│  │  │ Convenience Methods (Public API)                         │ │ │
+│  │  │  • rotate_canvas_90_cw()                                │ │ │
+│  │  │  • rotate_canvas_90_ccw()                               │ │ │
+│  │  │  • rotate_canvas_180()                                  │ │ │
+│  │  │  • reset_canvas_rotation()                              │ │ │
+│  │  │  • get_canvas_rotation_angle()                          │ │ │
+│  │  │  • is_canvas_rotated()                                  │ │ │
+│  │  └────────────────────┬─────────────────────────────────────┘ │ │
+│  │                       │                                         │ │
+│  │                       ▼                                         │ │
+│  │  ┌──────────────────────────────────────────────────────────┐ │ │
+│  │  │ transformation_manager: TransformationManager            │ │ │
+│  │  └────────────────────┬─────────────────────────────────────┘ │ │
+│  └───────────────────────┼──────────────────────────────────────┘ │
+└────────────────────────┼─────────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│               TRANSFORMATION FRAMEWORK LAYER                         │
+│  ┌────────────────────────────────────────────────────────────────┐ │
+│  │  TransformationManager (Coordinator)                           │ │
+│  │  ┌──────────────────────────────────────────────────────────┐ │ │
+│  │  │ Methods:                                                 │ │ │
+│  │  │  • get_rotation() → CanvasRotation                      │ │ │
+│  │  │  • apply_all_to_context(cr, vw, vh)                    │ │ │
+│  │  │  • screen_to_world_all(sx, sy, vw, vh)                 │ │ │
+│  │  │  • world_to_screen_all(wx, wy, vw, vh)                 │ │ │
+│  │  │  • reset_all()                                          │ │ │
+│  │  └────────────────────┬─────────────────────────────────────┘ │ │
+│  │                       │                                         │ │
+│  │                       ▼                                         │ │
+│  │  ┌──────────────────────────────────────────────────────────┐ │ │
+│  │  │ Transformations Collection                               │ │ │
+│  │  │  ┌────────────────────────────────────────────────────┐ │ │ │
+│  │  │  │ 'rotation': CanvasRotation                         │ │ │ │
+│  │  │  │   • angle_degrees: float                           │ │ │ │
+│  │  │  │   • angle_radians: float                           │ │ │ │
+│  │  │  │   • rotate_90_cw()                                 │ │ │ │
+│  │  │  │   • rotate_90_ccw()                                │ │ │ │
+│  │  │  │   • rotate_180()                                   │ │ │ │
+│  │  │  │   • reset()                                        │ │ │ │
+│  │  │  └────────────────────────────────────────────────────┘ │ │ │
+│  │  │  ┌────────────────────────────────────────────────────┐ │ │ │
+│  │  │  │ Future: 'reflection', 'skew', etc.                 │ │ │ │
+│  │  │  └────────────────────────────────────────────────────┘ │ │ │
+│  │  └──────────────────────────────────────────────────────────┘ │ │
+│  └───────────────────────┼──────────────────────────────────────┘ │
+│                          │                                          │
+│                          ▼                                          │
+│  ┌────────────────────────────────────────────────────────────────┐ │
+│  │  CanvasTransformation (Abstract Base Class)                    │ │
+│  │  ┌──────────────────────────────────────────────────────────┐ │ │
+│  │  │ Abstract Methods:                                        │ │ │
+│  │  │  • apply_to_context(cr, vw, vh)                        │ │ │
+│  │  │  • screen_to_world(sx, sy, vw, vh)                     │ │ │
+│  │  │  • world_to_screen(wx, wy, vw, vh)                     │ │ │
+│  │  │  • reset()                                              │ │ │
+│  │  │  • to_dict()                                            │ │ │
+│  │  │  • from_dict(data)                                      │ │ │
+│  │  └──────────────────────────────────────────────────────────┘ │ │
+│  └────────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────────┘
+
+
+COORDINATE TRANSFORMATION PIPELINE
+═══════════════════════════════════════════════════════════════════════
+
+Drawing (World → Screen):
+┌─────────┐    ┌─────────┐    ┌──────────┐    ┌────────┐
+│ World   │───▶│ Zoom+   │───▶│ Rotation │───▶│ Screen │
+│ Coords  │    │ Pan     │    │          │    │ Coords │
+└─────────┘    └─────────┘    └──────────┘    └────────┘
+   Objects      Scale+Translate  Rotate around     Pixels
+   (x, y)       (zoom * (x+pan)) viewport center   (sx,sy)
+
+Mouse Input (Screen → World):
+┌────────┐    ┌──────────┐    ┌─────────┐    ┌─────────┐
+│ Screen │───▶│ Rotation │───▶│ Zoom+   │───▶│ World   │
+│ Coords │    │ (Inverse)│    │ Pan     │    │ Coords  │
+└────────┘    └──────────┘    └─────────┘    └─────────┘
+   Pixels      Inverse rotate  (x/zoom)-pan    Objects
+   (sx,sy)     -angle                          (x, y)
+
+
+CAIRO DRAWING PIPELINE
+═══════════════════════════════════════════════════════════════════════
+
+_on_draw() method execution order:
+
+1. cr.save()                              # Save clean state
+   
+2. TransformationManager                  # STEP 1: Rotation
+   .apply_all_to_context(cr, vw, vh)
+   ├── cr.translate(center_x, center_y)   # Move to center
+   ├── cr.rotate(angle_radians)           # Rotate
+   └── cr.translate(-center_x, -center_y) # Move back
+   
+3. cr.translate(pan_x * zoom, pan_y * zoom) # STEP 2: Pan
+   
+4. cr.scale(zoom, zoom)                   # STEP 3: Zoom
+   
+5. Draw objects in world coordinates      # Objects auto-transform
+   ├── manager.draw_grid(cr)
+   ├── place.render(cr, zoom)
+   ├── transition.render(cr, zoom)
+   ├── arc.render(cr, zoom)
+   └── selection_manager.render(cr, zoom)
+   
+6. cr.restore()                           # Restore clean state
+
+
+ROTATION MATHEMATICS
+═══════════════════════════════════════════════════════════════════════
+
+Rotation Matrix (Counterclockwise):
+┌             ┐   ┌                        ┐   ┌   ┐
+│ rotated_x   │   │  cos(θ)   -sin(θ)     │   │ x │
+│             │ = │                        │ × │   │
+│ rotated_y   │   │  sin(θ)    cos(θ)     │   │ y │
+└             ┘   └                        ┘   └   ┘
+
+Implementation (around center point):
+1. Translate to origin: (x', y') = (x - cx, y - cy)
+2. Apply rotation matrix: (rx, ry) = (x'·cos(θ) - y'·sin(θ), x'·sin(θ) + y'·cos(θ))
+3. Translate back: (x_final, y_final) = (rx + cx, ry + cy)
+
+Angle Conventions:
+• Positive angles = Counterclockwise (CCW) rotation
+• Negative angles = Clockwise (CW) rotation
+• 0° = No rotation (default)
+• 90° = Quarter turn CCW
+• -90° = Quarter turn CW = 270° CCW
+• 180° = Half turn (flip upside down)
+
+
+EXTENSIBILITY PATTERN
+═══════════════════════════════════════════════════════════════════════
+
+Adding New Transformation (Example: Reflection):
+
+1. Create subclass of CanvasTransformation:
+   class CanvasReflection(CanvasTransformation):
+       def __init__(self, axis='horizontal'):
+           super().__init__()
+           self.axis = axis  # 'horizontal' or 'vertical'
+       
+       def apply_to_context(self, cr, vw, vh):
+           if self.axis == 'horizontal':
+               cr.scale(-1, 1)
+               cr.translate(-vw, 0)
+           else:
+               cr.scale(1, -1)
+               cr.translate(0, -vh)
+       
+       # ... implement other abstract methods
+
+2. Register in TransformationManager:
+   manager = TransformationManager()
+   reflection = CanvasReflection(axis='horizontal')
+   manager.add_transformation('reflection', reflection)
+
+3. Update transformation order in TransformationManager:
+   for name in ['rotation', 'reflection', 'skew']:
+       if name in self._transformations:
+           trans = self._transformations[name]
+           if trans.enabled:
+               trans.apply_to_context(cr, vw, vh)
+
+4. Add UI controls (context menu, buttons, etc.)
+
+
+KEY DESIGN DECISIONS
+═══════════════════════════════════════════════════════════════════════
+
+1. **Rotation Center:** Viewport center (not canvas center)
+   • Rationale: User expects rotation around what they see
+   • Canvas center may be off-screen when zoomed/panned
+
+2. **Transformation Order:** Rotation → Zoom → Pan
+   • Rationale: Rotation independent of zoom level
+   • Makes coordinate math simpler
+
+3. **Angle Snapping:** 2° threshold to common angles
+   • Rationale: Prevents floating-point drift
+   • Ensures precise 90°, 180°, 270° rotations
+
+4. **OOP Architecture:** Abstract base + concrete implementations
+   • Rationale: Extensibility for future transformations
+   • Clean separation of concerns
+   • Easy to add reflection, skew, perspective, etc.
+
+5. **Manager Pattern:** TransformationManager coordinates all
+   • Rationale: Single point of control
+   • Enforces transformation order
+   • Aggregates coordinate conversions
+
+
+PERFORMANCE NOTES
+═══════════════════════════════════════════════════════════════════════
+
+• Rotation matrix computed once per angle change (cached)
+• Redraw only when transformation changes (needs_redraw flag)
+• Coordinate conversions: O(1) per point (matrix multiply)
+• No performance impact when rotation = 0° (early exit)
+• Cairo handles GPU acceleration where available
+"""
