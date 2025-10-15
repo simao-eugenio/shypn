@@ -9,6 +9,22 @@
 
 ## Executive Summary
 
+### Architecture Note: UI/Implementation Separation
+
+**CRITICAL**: This project uses **complete UI/implementation decoupling**:
+- **UI Definitions** (`.ui` files): Located in `/ui/` at repo root
+- **Python Implementation**: Located in `src/shypn/ui/` 
+- **Business Logic**: Located in `src/shypn/core/`
+
+The `.ui` files are GTK/Glade XML definitions created with a visual designer.
+Python code loads these files and adds behavior (event handlers, controllers).
+
+**Benefits**:
+- Designers can edit UI without touching Python code
+- UI changes don't require code changes (unless adding new widgets)
+- Easy to swap UI implementations (GTK → Qt → Web)
+- Clear separation: visual design vs behavior
+
 ### Current Problems
 
 1. **Loaders do too much** - Business logic mixed with UI loading
@@ -32,8 +48,31 @@
 
 ### Directory Structure (Proposed)
 
+**IMPORTANT**: UI files (.ui) are in `/ui/` at repo root, completely decoupled from Python implementation!
+
 ```
-src/shypn/
+ui/                                # UI DEFINITIONS (Glade/GTK files) - REPO ROOT
+├── main/
+│   └── main_window.ui             # Main window UI definition
+├── panels/
+│   ├── left_panel.ui              # Left panel UI definition
+│   ├── right_panel.ui             # Right panel UI definition
+│   └── pathway_panel.ui           # Pathway panel UI definition
+├── canvas/
+│   └── model_canvas.ui            # Canvas UI definition
+├── dialogs/
+│   ├── place_prop_dialog.ui       # Place properties dialog
+│   ├── transition_prop_dialog.ui  # Transition properties dialog
+│   └── arc_prop_dialog.ui         # Arc properties dialog
+├── palettes/
+│   ├── edit_palette.ui            # Edit palette UI
+│   ├── zoom.ui                    # Zoom palette UI
+│   └── edit_tools_palette.ui      # Edit tools palette UI
+└── simulate/
+    ├── simulate_palette.ui        # Simulate palette UI
+    └── simulate_tools_palette.ui  # Simulate tools palette UI
+
+src/shypn/                         # PYTHON IMPLEMENTATION
 ├── core/                          # Core business logic
 │   ├── __init__.py
 │   ├── state/                     # State management
@@ -63,7 +102,7 @@ src/shypn/
 │       ├── export_service.py      # Export operations
 │       └── validation_service.py  # Model validation
 │
-├── ui/                            # UI-specific code
+├── ui/                            # UI Python implementation (loads from /ui/)
 │   ├── __init__.py
 │   ├── base/                      # Base UI classes
 │   │   ├── __init__.py
@@ -71,24 +110,24 @@ src/shypn/
 │   │   ├── base_dialog.py         # Abstract dialog base
 │   │   └── base_palette.py        # Abstract palette base
 │   │
-│   ├── panels/                    # Panel implementations
+│   ├── panels/                    # Panel Python implementations
 │   │   ├── __init__.py
-│   │   ├── left_panel.py          # LeftPanel class
-│   │   ├── right_panel.py         # RightPanel class
-│   │   ├── pathway_panel.py       # PathwayPanel class
-│   │   └── canvas_panel.py        # CanvasPanel class
+│   │   ├── left_panel.py          # LeftPanel class (loads /ui/panels/left_panel.ui)
+│   │   ├── right_panel.py         # RightPanel class (loads /ui/panels/right_panel.ui)
+│   │   ├── pathway_panel.py       # PathwayPanel class (loads /ui/panels/pathway_panel.ui)
+│   │   └── canvas_panel.py        # CanvasPanel class (loads /ui/canvas/model_canvas.ui)
 │   │
-│   ├── dialogs/                   # Dialog implementations
+│   ├── dialogs/                   # Dialog Python implementations
 │   │   ├── __init__.py
-│   │   ├── properties_dialog.py   # Properties dialog
+│   │   ├── properties_dialog.py   # Properties dialog (loads /ui/dialogs/*.ui)
 │   │   ├── settings_dialog.py     # Settings dialog
 │   │   └── about_dialog.py        # About dialog
 │   │
-│   ├── palettes/                  # Palette implementations
+│   ├── palettes/                  # Palette Python implementations
 │   │   ├── __init__.py
 │   │   ├── swiss_palette.py       # SwissKnifePalette class
-│   │   ├── edit_palette.py        # EditPalette class
-│   │   └── simulate_palette.py    # SimulatePalette class
+│   │   ├── edit_palette.py        # EditPalette class (loads /ui/palettes/edit_palette.ui)
+│   │   └── simulate_palette.py    # SimulatePalette class (loads /ui/simulate/simulate_palette.ui)
 │   │
 │   └── widgets/                   # Custom widgets
 │       ├── __init__.py
@@ -98,9 +137,9 @@ src/shypn/
 │
 ├── loaders/                       # MINIMAL loaders (UI loading only)
 │   ├── __init__.py
-│   ├── panel_loader.py            # Generic panel loader
-│   ├── dialog_loader.py           # Generic dialog loader
-│   └── main_window_loader.py      # Main window loader
+│   ├── panel_loader.py            # Generic panel loader (loads from /ui/)
+│   ├── dialog_loader.py           # Generic dialog loader (loads from /ui/)
+│   └── main_window_loader.py      # Main window loader (loads from /ui/)
 │
 ├── observers/                     # Observer pattern implementations
 │   ├── __init__.py
@@ -125,6 +164,12 @@ src/shypn/
     └── (move code to proper modules)
 ```
 
+**Key Separation**:
+- **UI Definitions** (`/ui/*.ui`) = GTK/Glade XML files (visual design)
+- **Python Implementation** (`src/shypn/ui/*.py`) = Business logic + event handlers
+- **Controllers** (`src/shypn/core/controllers/`) = Pure business logic
+- **Loaders** (`src/shypn/loaders/`) = Load .ui files, create instances, minimal glue
+
 ---
 
 ## Refactoring Principles
@@ -147,13 +192,44 @@ class ModelCanvasLoader:
 **Good (Target)**:
 ```python
 # loaders/panel_loader.py (50 lines max!)
+import os
+from pathlib import Path
+
 class PanelLoader:
-    """Generic panel loader - UI construction only."""
+    """Generic panel loader - UI construction only.
+    
+    Loads .ui files from /ui/ directory at repo root.
+    """
+    
+    def __init__(self, ui_root: Path = None):
+        """Initialize loader with UI root directory.
+        
+        Args:
+            ui_root: Path to UI root (defaults to /ui/ at repo root)
+        """
+        if ui_root is None:
+            # Get repo root: src/shypn/loaders -> ../../..
+            repo_root = Path(__file__).parent.parent.parent.parent
+            ui_root = repo_root / "ui"
+        self.ui_root = ui_root
     
     def load_panel(self, ui_file: str, panel_class: Type[BasePanel], 
                    **dependencies) -> BasePanel:
-        """Load UI and create panel instance with dependencies."""
-        builder = Gtk.Builder.new_from_file(ui_file)
+        """Load UI and create panel instance with dependencies.
+        
+        Args:
+            ui_file: Relative path from UI root (e.g., "panels/left_panel.ui")
+            panel_class: Panel class to instantiate
+            **dependencies: Dependencies to inject
+        
+        Returns:
+            Panel instance with loaded UI
+        """
+        # Build full path: /ui/panels/left_panel.ui
+        ui_path = self.ui_root / ui_file
+        
+        # Load GTK builder from .ui file
+        builder = Gtk.Builder.new_from_file(str(ui_path))
         
         # Create panel instance with injected dependencies
         panel = panel_class(builder=builder, **dependencies)
@@ -164,9 +240,9 @@ class PanelLoader:
         return panel
 
 # Usage:
-loader = PanelLoader()
+loader = PanelLoader()  # Auto-finds /ui/ at repo root
 canvas_panel = loader.load_panel(
-    ui_file="ui/panels/canvas.ui",
+    ui_file="canvas/model_canvas.ui",  # Loads from /ui/canvas/model_canvas.ui
     panel_class=CanvasPanel,
     state_manager=state_manager,
     controller=canvas_controller
@@ -242,6 +318,8 @@ from shypn.core.controllers import CanvasController
 class CanvasPanel(BasePanel):
     """Canvas panel implementation.
     
+    Loads UI from /ui/canvas/model_canvas.ui at repo root.
+    
     Responsibilities:
     - Display canvas widget
     - Handle mouse/keyboard events
@@ -256,7 +334,7 @@ class CanvasPanel(BasePanel):
                         canvas_controller=canvas_controller)
     
     def _load_widgets(self):
-        """Load canvas-specific widgets."""
+        """Load canvas-specific widgets from /ui/canvas/model_canvas.ui."""
         self.drawing_area = self.get_widget('drawing_area')
         self.toolbar = self.get_widget('canvas_toolbar')
     
