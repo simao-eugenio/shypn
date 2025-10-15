@@ -14,6 +14,13 @@ for the Petri Net model editor. It handles:
 
 The manager maintains the model state separately from GTK widgets,
 making it easier to test and maintain.
+
+REFACTORING NOTE: This class now acts as a Facade, delegating to:
+- ViewportController: zoom/pan operations
+- DocumentController: object management
+- CoordinateTransform: coordinate conversions (service)
+- GridRenderer: grid drawing (service)
+- ArcGeometryService: arc geometry (service)
 """
 import math
 import json
@@ -21,6 +28,32 @@ import os
 from datetime import datetime
 from shypn.netobjs import Place, Arc, Transition
 from shypn.edit import SelectionManager, ObjectEditingTransforms, RectangleSelection
+
+# Import extracted controllers and services
+from shypn.core.controllers import ViewportController, DocumentController
+from shypn.core.services import (
+    screen_to_world as coord_screen_to_world,
+    world_to_screen as coord_world_to_screen,
+    mm_to_pixels as coord_mm_to_pixels,
+    pixels_to_mm as coord_pixels_to_mm,
+    validate_zoom as coord_validate_zoom,
+)
+from shypn.rendering import (
+    draw_grid as render_draw_grid,
+    get_adaptive_grid_spacing,
+    GRID_STYLE_LINE,
+    GRID_STYLE_DOT,
+    GRID_STYLE_CROSS,
+    BASE_GRID_SPACING,
+    GRID_MAJOR_EVERY,
+)
+from shypn.core.services import (
+    detect_parallel_arcs as arc_detect_parallel,
+    calculate_arc_offset as arc_calculate_offset,
+    count_parallel_arcs as arc_count_parallel,
+    has_parallel_arcs as arc_has_parallel,
+    get_arc_offset_for_rendering as arc_get_offset_for_rendering,
+)
 
 
 class ModelCanvasManager:
@@ -55,47 +88,32 @@ class ModelCanvasManager:
         self.canvas_width = canvas_width
         self.canvas_height = canvas_height
         
-        # Document metadata
-        self.filename = filename  # Base filename without .shy extension
-        self.modified = False  # Document modified flag
-        self.created_at = datetime.now()
-        self.modified_at = None
-        
-        # Viewport properties
-        self.zoom = 1.0  # Current zoom level (1.0 = 100%)
-        # Initialize pan to center the canvas (updated when viewport size is known)
-        self.pan_x = 0.0  # Pan offset X (in world coordinates)
-        self.pan_y = 0.0  # Pan offset Y (in world coordinates)
-        self._initial_pan_set = False  # Flag to center on first draw
-        
-        # Viewport size (screen coordinates) - updated when widget is allocated
-        self.viewport_width = 800
-        self.viewport_height = 600
-        
         # DPI detection (defaults to 96.0, updated from widget)
         self.screen_dpi = 96.0
         
-        # Pointer position (for pointer-centered zoom)
-        self.pointer_x = 0
-        self.pointer_y = 0
-        
         # Grid style
-        self.grid_style = self.GRID_STYLE_LINE  # Default to line grid
+        self.grid_style = GRID_STYLE_LINE  # Default to line grid
         
         # Tool selection state
         self.current_tool = None  # Currently selected tool ('place', 'transition', 'arc', or None)
         
-        # Petri net object collections
-        # Creation order: Places and Transitions can be created in any order,
-        # but Arcs must come after (they connect P↔T or T↔P)
-        self.places = []  # List of Place instances
-        self.transitions = []  # List of Transition instances
-        self.arcs = []  # List of Arc instances (created last, after P and T)
+        # Initialize Controllers
+        # ViewportController: Manages zoom, pan, viewport state
+        self.viewport_controller = ViewportController(
+            viewport_width=800,
+            viewport_height=600,
+            filename=filename
+        )
         
-        # ID counters for object naming
-        self._next_place_id = 1
-        self._next_transition_id = 1
-        self._next_arc_id = 1
+        # DocumentController: Manages Petri net objects and metadata
+        self.document_controller = DocumentController(filename=filename)
+        
+        # Flag for initial pan centering
+        self._initial_pan_set = False  # Flag to center on first draw
+        
+        # Pointer position (for pointer-centered zoom)
+        self.pointer_x = 0
+        self.pointer_y = 0
         
         # Selection and transformation system
         self.selection_manager = SelectionManager()
@@ -107,6 +125,129 @@ class ModelCanvasManager:
         
         # Ensure all arcs have proper manager references
         self.ensure_arc_references()
+    
+    # ==================== Property Proxies (Backward Compatibility) ====================
+    # These properties delegate to controllers for backward compatibility
+    
+    @property
+    def zoom(self):
+        """Get current zoom level (delegates to ViewportController)."""
+        return self.viewport_controller.zoom
+    
+    @zoom.setter
+    def zoom(self, value):
+        """Set zoom level (delegates to ViewportController)."""
+        self.viewport_controller.zoom = value
+    
+    @property
+    def pan_x(self):
+        """Get pan X offset (delegates to ViewportController)."""
+        return self.viewport_controller.pan_x
+    
+    @pan_x.setter
+    def pan_x(self, value):
+        """Set pan X offset (delegates to ViewportController)."""
+        self.viewport_controller.pan_x = value
+    
+    @property
+    def pan_y(self):
+        """Get pan Y offset (delegates to ViewportController)."""
+        return self.viewport_controller.pan_y
+    
+    @pan_y.setter
+    def pan_y(self, value):
+        """Set pan Y offset (delegates to ViewportController)."""
+        self.viewport_controller.pan_y = value
+    
+    @property
+    def viewport_width(self):
+        """Get viewport width (delegates to ViewportController)."""
+        return self.viewport_controller.viewport_width
+    
+    @viewport_width.setter
+    def viewport_width(self, value):
+        """Set viewport width (delegates to ViewportController)."""
+        self.viewport_controller.viewport_width = value
+    
+    @property
+    def viewport_height(self):
+        """Get viewport height (delegates to ViewportController)."""
+        return self.viewport_controller.viewport_height
+    
+    @viewport_height.setter
+    def viewport_height(self, value):
+        """Set viewport height (delegates to ViewportController)."""
+        self.viewport_controller.viewport_height = value
+    
+    @property
+    def places(self):
+        """Get places collection (delegates to DocumentController)."""
+        return self.document_controller.places
+    
+    @places.setter
+    def places(self, value):
+        """Set places collection (delegates to DocumentController)."""
+        self.document_controller.places = value
+    
+    @property
+    def transitions(self):
+        """Get transitions collection (delegates to DocumentController)."""
+        return self.document_controller.transitions
+    
+    @transitions.setter
+    def transitions(self, value):
+        """Set transitions collection (delegates to DocumentController)."""
+        self.document_controller.transitions = value
+    
+    @property
+    def arcs(self):
+        """Get arcs collection (delegates to DocumentController)."""
+        return self.document_controller.arcs
+    
+    @arcs.setter
+    def arcs(self, value):
+        """Set arcs collection (delegates to DocumentController)."""
+        self.document_controller.arcs = value
+    
+    @property
+    def filename(self):
+        """Get filename (delegates to DocumentController)."""
+        return self.document_controller.filename
+    
+    @filename.setter
+    def filename(self, value):
+        """Set filename (delegates to DocumentController)."""
+        self.document_controller.filename = value
+    
+    @property
+    def modified(self):
+        """Get modified flag (delegates to DocumentController)."""
+        return self.document_controller.modified
+    
+    @modified.setter
+    def modified(self, value):
+        """Set modified flag (delegates to DocumentController)."""
+        self.document_controller.modified = value
+    
+    @property
+    def created_at(self):
+        """Get creation timestamp (delegates to DocumentController)."""
+        return self.document_controller.created_at
+    
+    @created_at.setter
+    def created_at(self, value):
+        """Set creation timestamp (delegates to DocumentController)."""
+        self.document_controller.created_at = value
+    
+    @property
+    def modified_at(self):
+        """Get modification timestamp (delegates to DocumentController)."""
+        return self.document_controller.modified_at
+    
+    @modified_at.setter
+    def modified_at(self, value):
+        """Set modification timestamp (delegates to DocumentController)."""
+        self.document_controller.modified_at = value
     
     # ==================== DPI and Physical Units ====================
     
