@@ -37,13 +37,13 @@ class Arc(PetriNetObject):
         # Validate bipartite connection (Place↔Transition only)
         self._validate_connection(source, target)
         
-        # Initialize base class (arcs don't have user labels typically)
-        super().__init__(id, name, label="")
+        # Initialize base class (arcs don't have user labels typically) - ensure id is int
+        super().__init__(int(id), str(name), label="")
         
         # Connection (references to object instances)
         self.source = source
         self.target = target
-        self.weight = weight
+        self.weight = int(weight)
         
         # Styling
         self.color = self.DEFAULT_COLOR
@@ -640,6 +640,13 @@ class Arc(PetriNetObject):
     def from_dict(cls, data: dict, places: dict, transitions: dict) -> 'Arc':
         """Create arc from dictionary (deserialization).
         
+        NOTE: source_id and target_id can be either:
+        - Integer IDs (modern format) - look up by ID
+        - String names like 'P45', 'T12' (legacy format) - look up by name
+        
+        The places/transitions dicts are keyed by integer IDs, so for legacy
+        string names, we need to find objects by name instead.
+        
         Args:
             data: Dictionary containing arc properties
             places: Dictionary mapping place IDs to Place instances
@@ -651,32 +658,56 @@ class Arc(PetriNetObject):
         Raises:
             ValueError: If source or target objects not found
         """
-        # Resolve source and target references
-        source_id = data["source_id"]
-        target_id = data["target_id"]
+        # Resolve source and target references (handle both int IDs and string names)
+        raw_source_id = data["source_id"]
+        raw_target_id = data["target_id"]
         
+        # Helper function to find object by ID or name
+        def find_object(raw_id, obj_dict, obj_type_name):
+            if isinstance(raw_id, str):
+                # Legacy format: string name like 'P45' or 'T12'
+                # Search by name in the object dict
+                for obj in obj_dict.values():
+                    if obj.name == raw_id:
+                        return obj
+                raise ValueError(f"{obj_type_name} not found with name: {raw_id}")
+            else:
+                # Modern format: integer ID
+                obj = obj_dict.get(int(raw_id))
+                if obj is None:
+                    raise ValueError(f"{obj_type_name} not found with ID: {raw_id}")
+                return obj
+        
+        # Find source object
         if data["source_type"] == "place":
-            source = places.get(source_id)
+            source = find_object(raw_source_id, places, "Source place")
         else:
-            source = transitions.get(source_id)
-            
+            source = find_object(raw_source_id, transitions, "Source transition")
+        
+        # Find target object
         if data["target_type"] == "place":
-            target = places.get(target_id)
+            target = find_object(raw_target_id, places, "Target place")
         else:
-            target = transitions.get(target_id)
+            target = find_object(raw_target_id, transitions, "Target transition")
         
-        if source is None:
-            raise ValueError(f"Source object not found: {data['source_type']} ID {source_id}")
-        if target is None:
-            raise ValueError(f"Target object not found: {data['target_type']} ID {target_id}")
+        # Handle arc ID (can also be string in legacy format)
+        raw_arc_id = data.get("id")
+        if isinstance(raw_arc_id, str):
+            import re
+            match = re.search(r'\d+', raw_arc_id)
+            arc_id = int(match.group()) if match else abs(hash(raw_arc_id)) % 100000
+            arc_name = raw_arc_id
+        else:
+            arc_id = int(raw_arc_id)
+            arc_name = str(data.get("name", f"A{arc_id}"))
         
-        # Create arc
+        # Create arc with type conversion
         arc = cls(
             source=source,
             target=target,
-            id=data["id"],
-            name=data["name"],
-            weight=data.get("weight", 1)
+            id=arc_id,
+            name=arc_name,
+            weight=int(data.get("weight", 1))
         )
         
         # Restore optional properties

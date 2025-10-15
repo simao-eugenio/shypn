@@ -1034,15 +1034,19 @@ class FileExplorerPanel:
             filepath: Full path to the file
         """
         if not document or not filepath:
+            print(f"[FileExplorer] _load_document_into_canvas: Invalid document or filepath")
             return
         import os
         filename = os.path.basename(filepath)
         base_name = os.path.splitext(filename)[0]
         
+        print(f"[FileExplorer] _load_document_into_canvas: Loading {filepath}")
+        print(f"[FileExplorer] Document has {len(document.places)} places, {len(document.transitions)} transitions, {len(document.arcs)} arcs")
         
         page_index, drawing_area = self.canvas_loader.add_document(filename=base_name)
         manager = self.canvas_loader.get_canvas_manager(drawing_area)
         if manager:
+            print(f"[FileExplorer] Got manager, loading objects...")
             # ===== UNIFIED OBJECT LOADING =====
             # Use load_objects() for consistent, unified initialization path
             # This replaces direct assignment + manual notification loop
@@ -1052,6 +1056,7 @@ class FileExplorerPanel:
                 transitions=document.transitions,
                 arcs=document.arcs
             )
+            print(f"[FileExplorer] After load_objects: manager has {len(manager.places)} places, {len(manager.transitions)} transitions, {len(manager.arcs)} arcs")
             
             # CRITICAL: Set on_changed callback on all loaded objects
             # This is required for proper object state management and dirty tracking

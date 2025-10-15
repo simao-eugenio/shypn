@@ -37,15 +37,15 @@ class Transition(PetriNetObject):
             label: Optional user-editable text label (mutable)
             horizontal: True for horizontal bar, False for vertical
         """
-        # Initialize base class
-        super().__init__(id, name, label)
+        # Initialize base class (ensure id is int)
+        super().__init__(int(id), str(name), str(label))
         
         # Position and dimensions
-        self.x = x
-        self.y = y
-        self.width = width if width is not None else self.DEFAULT_WIDTH
-        self.height = height if height is not None else self.DEFAULT_HEIGHT
-        self.horizontal = horizontal
+        self.x = float(x)
+        self.y = float(y)
+        self.width = float(width) if width is not None else self.DEFAULT_WIDTH
+        self.height = float(height) if height is not None else self.DEFAULT_HEIGHT
+        self.horizontal = bool(horizontal)
         
         # Styling
         self.fill_color = self.DEFAULT_COLOR
@@ -432,22 +432,45 @@ class Transition(PetriNetObject):
     def from_dict(cls, data: dict) -> 'Transition':
         """Create transition from dictionary (deserialization).
         
+        NOTE: The 'id' field in JSON can be either:
+        - An integer ID (modern format)
+        - A string name like 'T12' (legacy format, used as both id and name)
+        
+        For legacy compatibility, we extract numeric ID from string names.
+        
         Args:
             data: Dictionary containing transition properties
             
         Returns:
             Transition: New transition instance with restored properties
         """
-        # Extract required properties
+        # Handle both integer IDs and string names in the 'id' field
+        raw_id = data.get("id")
+        raw_name = data.get("name")
+        
+        # Determine actual ID and name
+        if isinstance(raw_id, str):
+            # Legacy format: "id": "T12" means both id and name are derived from this
+            name = raw_id  # Use string as name (e.g., "T12")
+            # Extract numeric part for ID (e.g., "T12" -> 12)
+            import re
+            match = re.search(r'\d+', raw_id)
+            transition_id = int(match.group()) if match else abs(hash(raw_id)) % 100000
+        else:
+            # Modern format: separate integer id and string name
+            transition_id = int(raw_id)
+            name = str(raw_name)
+        
+        # Extract required properties with type conversion
         transition = cls(
-            x=data["x"],
-            y=data["y"],
-            id=data["id"],
-            name=data["name"],
-            width=data.get("width", cls.DEFAULT_WIDTH),
-            height=data.get("height", cls.DEFAULT_HEIGHT),
-            label=data.get("label", ""),
-            horizontal=data.get("horizontal", True)
+            x=float(data["x"]),
+            y=float(data["y"]),
+            id=transition_id,
+            name=name,
+            width=float(data.get("width", cls.DEFAULT_WIDTH)),
+            height=float(data.get("height", cls.DEFAULT_HEIGHT)),
+            label=str(data.get("label", "")),
+            horizontal=bool(data.get("horizontal", True))
         )
         
         # Restore optional properties

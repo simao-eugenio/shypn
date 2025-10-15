@@ -82,13 +82,16 @@ class NetObjPersistency:
                     # Use current project's models directory
                     models_directory = manager.current_project.get_models_dir()
                 else:
-                    # No active project, use projects root
-                    models_directory = manager.projects_root
+                    # No active project - use repo root's models/ directory as fallback
+                    # This allows users to open files from the legacy models/ folder
+                    script_dir = os.path.dirname(os.path.abspath(__file__))
+                    repo_root = os.path.normpath(os.path.join(script_dir, '..', '..', '..'))
+                    models_directory = os.path.join(repo_root, 'models')
             except Exception:
-                # Fallback if ProjectManager not available
+                # Fallback if ProjectManager not available - use repo root's models/ directory
                 script_dir = os.path.dirname(os.path.abspath(__file__))
                 repo_root = os.path.normpath(os.path.join(script_dir, '..', '..', '..'))
-                models_directory = os.path.join(repo_root, 'workspace', 'projects')
+                models_directory = os.path.join(repo_root, 'models')
         
         self.models_directory = models_directory
         if not os.path.exists(self.models_directory):

@@ -1360,10 +1360,13 @@ class ModelCanvasLoader:
             if should_pan and state['is_panning']:
                 dx = event.x - state['start_x']
                 dy = event.y - state['start_y']
-                manager.pan_x = state['start_pan_x'] + dx / manager.zoom
-                manager.pan_y = state['start_pan_y'] + dy / manager.zoom
-                manager.clamp_pan()
-                manager._needs_redraw = True
+                
+                # Use pan() method which handles rotation correctly
+                # Reset pan to start position first, then apply delta
+                manager.pan_x = state['start_pan_x']
+                manager.pan_y = state['start_pan_y']
+                manager.pan(dx, dy)
+                
                 widget.queue_draw()
         return True
 
@@ -1454,36 +1457,18 @@ class ModelCanvasLoader:
         
         # Undo (Ctrl+Z) - check both lowercase and uppercase
         if is_ctrl and not is_shift and (event.keyval == Gdk.KEY_z or event.keyval == Gdk.KEY_Z):
-            # Try to access edit_operations from overlay manager
-            if widget in self.overlay_managers:
-                overlay_manager = self.overlay_managers[widget]
-                operations_palette = overlay_manager.get_palette('operations')
-                if operations_palette and operations_palette.edit_operations:
-                    operations_palette.edit_operations.undo()
-                    widget.queue_draw()
-                    return True
-            # Fallback: check for undo_manager (legacy)
-            if hasattr(manager, 'undo_manager') and manager.undo_manager:
-                if manager.undo_manager.undo(manager):
-                    widget.queue_draw()
-                return True
+            # TODO: Implement undo/redo functionality
+            # Undo/redo system not yet implemented
+            # For now, just consume the event silently
+            return True
         
         # Redo (Ctrl+Shift+Z or Ctrl+Y) - check both lowercase and uppercase
         if (is_ctrl and is_shift and (event.keyval == Gdk.KEY_z or event.keyval == Gdk.KEY_Z)) or \
            (is_ctrl and not is_shift and (event.keyval == Gdk.KEY_y or event.keyval == Gdk.KEY_Y)):
-            # Try to access edit_operations from overlay manager
-            if widget in self.overlay_managers:
-                overlay_manager = self.overlay_managers[widget]
-                operations_palette = overlay_manager.get_palette('operations')
-                if operations_palette and operations_palette.edit_operations:
-                    operations_palette.edit_operations.redo()
-                    widget.queue_draw()
-                    return True
-            # Fallback: check for undo_manager (legacy)
-            if hasattr(manager, 'undo_manager') and manager.undo_manager:
-                if manager.undo_manager.redo(manager):
-                    widget.queue_draw()
-                return True
+            # TODO: Implement undo/redo functionality
+            # Undo/redo system not yet implemented
+            # For now, just consume the event silently
+            return True
         
         if event.keyval == Gdk.KEY_Escape:
             # Cancel lasso if active
@@ -1501,17 +1486,29 @@ class ModelCanvasLoader:
                 widget.queue_draw()
                 return True
             
+            # Cancel drag if active
             if manager.selection_manager.cancel_drag():
                 widget.queue_draw()
                 return True
+            
+            # Exit edit mode if active
             if manager.selection_manager.is_edit_mode():
                 manager.selection_manager.exit_edit_mode()
                 widget.queue_draw()
                 return True
+            
+            # Close context menu if open
             if hasattr(self, '_canvas_context_menu') and self._canvas_context_menu:
                 if isinstance(self._canvas_context_menu, Gtk.Menu):
                     self._canvas_context_menu.popdown()
                     return True
+            
+            # Finally, clear all selections if any exist
+            if manager.selection_manager.has_selection():
+                manager.clear_all_selections()
+                widget.queue_draw()
+                return True
+        
         return False
 
     def _on_draw(self, drawing_area, cr, width, height, manager):
@@ -1522,6 +1519,8 @@ class ModelCanvasLoader:
         - Apply cr.scale() and cr.translate() for automatic coordinate transformation
         - Objects render in world coordinates, Cairo scales them automatically
         - Line widths compensated to maintain constant pixel size
+        - Grid drawn BEFORE rotation (stays fixed in screen space)
+        - Model objects drawn AFTER rotation (rotate with canvas)
         
         Args:
             drawing_area: GtkDrawingArea being drawn.
@@ -1534,12 +1533,35 @@ class ModelCanvasLoader:
             manager.set_viewport_size(width, height)
         cr.set_source_rgb(1.0, 1.0, 1.0)
         cr.paint()
+        
+        # Apply ALL transformations for infinite rotating canvas
+        # Transformation order (Cairo applies in reverse):
+        #   Code order: zoom/pan → rotation
+        #   Actual order: rotation → zoom/pan (rotation happens first in world space)
         cr.save()
+        
+        # STEP 1: Apply zoom and pan transformations
+        # These establish the viewport position and scale in world space
         cr.translate(manager.pan_x * manager.zoom, manager.pan_y * manager.zoom)
         cr.scale(manager.zoom, manager.zoom)
+        
+        # STEP 2: Apply rotation around viewport center
+        # This rotates the entire zoomed/panned coordinate system
+        # Rotation center needs to be in world coordinates (account for zoom/pan)
+        center_world_x = width / (2.0 * manager.zoom) - manager.pan_x
+        center_world_y = height / (2.0 * manager.zoom) - manager.pan_y
+        
+        rotation = manager.transformation_manager.get_rotation()
+        if rotation and rotation.angle_degrees != 0:
+            cr.translate(center_world_x, center_world_y)
+            cr.rotate(rotation.angle_radians)
+            cr.translate(-center_world_x, -center_world_y)
+        
+        # STEP 3: Draw grid with all transformations applied (infinite canvas effect)
+        # Grid bounds are calculated to cover the entire rotated viewport
         manager.draw_grid(cr)
         
-        # Render all objects
+        # Render all objects (these will be rotated)
         all_objects = manager.get_all_objects()
         for obj in all_objects:
             obj.render(cr, zoom=manager.zoom)
@@ -2095,7 +2117,30 @@ class ModelCanvasLoader:
         menu = Gtk.Menu()
         # Attach menu to drawing_area for proper Wayland parent window handling
         menu.attach_to_widget(drawing_area, None)
-        menu_items = [('Reset Zoom (100%)', lambda: self._on_reset_zoom_clicked(menu, drawing_area, manager)), ('Zoom In', lambda: self._on_zoom_in_clicked(menu, drawing_area, manager)), ('Zoom Out', lambda: self._on_zoom_out_clicked(menu, drawing_area, manager)), ('Fit to Window', lambda: self._on_fit_to_window_clicked(menu, drawing_area, manager)), None, ('Grid: Line Style', lambda: self._on_grid_line_clicked(menu, drawing_area, manager)), ('Grid: Dot Style', lambda: self._on_grid_dot_clicked(menu, drawing_area, manager)), ('Grid: Cross Style', lambda: self._on_grid_cross_clicked(menu, drawing_area, manager)), None, ('Layout: Auto (Best)', lambda: self._on_layout_auto_clicked(menu, drawing_area, manager)), ('Layout: Hierarchical', lambda: self._on_layout_hierarchical_clicked(menu, drawing_area, manager)), ('Layout: Force-Directed', lambda: self._on_layout_force_clicked(menu, drawing_area, manager)), ('Layout: Circular', lambda: self._on_layout_circular_clicked(menu, drawing_area, manager)), ('Layout: Orthogonal', lambda: self._on_layout_orthogonal_clicked(menu, drawing_area, manager)), None, ('Center View', lambda: self._on_center_view_clicked(menu, drawing_area, manager)), ('Clear Canvas', lambda: self._on_clear_canvas_clicked(menu, drawing_area, manager))]
+        menu_items = [
+            ('Reset Zoom (100%)', lambda: self._on_reset_zoom_clicked(menu, drawing_area, manager)),
+            ('Zoom In', lambda: self._on_zoom_in_clicked(menu, drawing_area, manager)),
+            ('Zoom Out', lambda: self._on_zoom_out_clicked(menu, drawing_area, manager)),
+            ('Fit to Window', lambda: self._on_fit_to_window_clicked(menu, drawing_area, manager)),
+            None,  # Separator
+            ('Rotate 90° CW', lambda: self._on_rotate_90_cw_clicked(menu, drawing_area, manager)),
+            ('Rotate 90° CCW', lambda: self._on_rotate_90_ccw_clicked(menu, drawing_area, manager)),
+            ('Rotate 180°', lambda: self._on_rotate_180_clicked(menu, drawing_area, manager)),
+            ('Reset Rotation', lambda: self._on_reset_rotation_clicked(menu, drawing_area, manager)),
+            None,  # Separator
+            ('Grid: Line Style', lambda: self._on_grid_line_clicked(menu, drawing_area, manager)),
+            ('Grid: Dot Style', lambda: self._on_grid_dot_clicked(menu, drawing_area, manager)),
+            ('Grid: Cross Style', lambda: self._on_grid_cross_clicked(menu, drawing_area, manager)),
+            None,  # Separator
+            ('Layout: Auto (Best)', lambda: self._on_layout_auto_clicked(menu, drawing_area, manager)),
+            ('Layout: Hierarchical', lambda: self._on_layout_hierarchical_clicked(menu, drawing_area, manager)),
+            ('Layout: Force-Directed', lambda: self._on_layout_force_clicked(menu, drawing_area, manager)),
+            ('Layout: Circular', lambda: self._on_layout_circular_clicked(menu, drawing_area, manager)),
+            ('Layout: Orthogonal', lambda: self._on_layout_orthogonal_clicked(menu, drawing_area, manager)),
+            None,  # Separator
+            ('Center View', lambda: self._on_center_view_clicked(menu, drawing_area, manager)),
+            ('Clear Canvas', lambda: self._on_clear_canvas_clicked(menu, drawing_area, manager))
+        ]
         for item_data in menu_items:
             if item_data is None:
                 menu_item = Gtk.SeparatorMenuItem()
@@ -2128,6 +2173,26 @@ class ModelCanvasLoader:
         manager.set_zoom(fit_zoom, manager.viewport_width / 2, manager.viewport_height / 2)
         manager.pan_x = 0
         manager.pan_y = 0
+        drawing_area.queue_draw()
+    
+    def _on_rotate_90_cw_clicked(self, menu, drawing_area, manager):
+        """Rotate canvas 90° clockwise."""
+        manager.rotate_canvas_90_cw()
+        drawing_area.queue_draw()
+    
+    def _on_rotate_90_ccw_clicked(self, menu, drawing_area, manager):
+        """Rotate canvas 90° counterclockwise."""
+        manager.rotate_canvas_90_ccw()
+        drawing_area.queue_draw()
+    
+    def _on_rotate_180_clicked(self, menu, drawing_area, manager):
+        """Rotate canvas 180°."""
+        manager.rotate_canvas_180()
+        drawing_area.queue_draw()
+    
+    def _on_reset_rotation_clicked(self, menu, drawing_area, manager):
+        """Reset canvas rotation to 0°."""
+        manager.reset_canvas_rotation()
         drawing_area.queue_draw()
 
     def _on_grid_line_clicked(self, menu, drawing_area, manager):

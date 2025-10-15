@@ -47,6 +47,7 @@ from shypn.rendering import (
     BASE_GRID_SPACING,
     GRID_MAJOR_EVERY,
 )
+from shypn.core.canvas_transformations import TransformationManager
 from shypn.core.services import (
     detect_parallel_arcs as arc_detect_parallel,
     calculate_arc_offset as arc_calculate_offset,
@@ -125,6 +126,9 @@ class ModelCanvasManager:
         self.selection_manager = SelectionManager()
         self.editing_transforms = ObjectEditingTransforms(self.selection_manager)
         self.rectangle_selection = RectangleSelection()
+        
+        # Canvas transformations (rotation, etc.)
+        self.transformation_manager = TransformationManager()
         
         # Dirty flag for redraw optimization
         self._needs_redraw = True
@@ -284,7 +288,8 @@ class ModelCanvasManager:
     def screen_to_world(self, screen_x, screen_y):
         """Convert screen coordinates to world (model) coordinates.
         
-        Legacy formula: world = screen / zoom - pan
+        Applies transformations in order: zoom/pan inverse, then rotation inverse.
+        This matches the drawing pipeline: zoom/pan → rotation.
         
         Args:
             screen_x: X coordinate in screen space (pixels).
@@ -293,13 +298,39 @@ class ModelCanvasManager:
         Returns:
             tuple: (world_x, world_y) in model coordinate space.
         """
-        # Delegate to CoordinateTransform service
-        return coord_screen_to_world(screen_x, screen_y, self.zoom, self.pan_x, self.pan_y)
+        # Step 1: Apply zoom/pan inverse transformation (screen → pre-rotation space)
+        pre_rot_x, pre_rot_y = coord_screen_to_world(screen_x, screen_y, self.zoom, self.pan_x, self.pan_y)
+        
+        # Step 2: Apply rotation inverse transformation (pre-rotation → world space)
+        # Rotation happens around viewport center in world coordinates
+        rotation = self.transformation_manager.get_rotation()
+        if rotation and rotation.angle_degrees != 0:
+            # Calculate rotation center in world space
+            center_world_x = self.viewport_width / (2.0 * self.zoom) - self.pan_x
+            center_world_y = self.viewport_height / (2.0 * self.zoom) - self.pan_y
+            
+            # Translate to origin, rotate inverse, translate back
+            dx = pre_rot_x - center_world_x
+            dy = pre_rot_y - center_world_y
+            
+            cos_a = math.cos(-rotation.angle_radians)  # Negative for inverse rotation
+            sin_a = math.sin(-rotation.angle_radians)
+            
+            rotated_dx = dx * cos_a - dy * sin_a
+            rotated_dy = dx * sin_a + dy * cos_a
+            
+            world_x = rotated_dx + center_world_x
+            world_y = rotated_dy + center_world_y
+            
+            return world_x, world_y
+        else:
+            return pre_rot_x, pre_rot_y
     
     def world_to_screen(self, world_x, world_y):
         """Convert world (model) coordinates to screen coordinates.
         
-        Legacy formula: screen = (world + pan) * zoom
+        Applies transformations in order: rotation, then zoom/pan.
+        This matches the drawing pipeline: zoom/pan → rotation (applied in reverse).
         
         Args:
             world_x: X coordinate in world space.
@@ -308,8 +339,31 @@ class ModelCanvasManager:
         Returns:
             tuple: (screen_x, screen_y) in screen coordinate space (pixels).
         """
-        # Delegate to CoordinateTransform service
-        return coord_world_to_screen(world_x, world_y, self.zoom, self.pan_x, self.pan_y)
+        # Step 1: Apply rotation transformation (world → pre-screen space)
+        rotation = self.transformation_manager.get_rotation()
+        if rotation and rotation.angle_degrees != 0:
+            # Calculate rotation center in world space
+            center_world_x = self.viewport_width / (2.0 * self.zoom) - self.pan_x
+            center_world_y = self.viewport_height / (2.0 * self.zoom) - self.pan_y
+            
+            # Translate to origin, rotate, translate back
+            dx = world_x - center_world_x
+            dy = world_y - center_world_y
+            
+            cos_a = math.cos(rotation.angle_radians)
+            sin_a = math.sin(rotation.angle_radians)
+            
+            rotated_dx = dx * cos_a - dy * sin_a
+            rotated_dy = dx * sin_a + dy * cos_a
+            
+            pre_screen_x = rotated_dx + center_world_x
+            pre_screen_y = rotated_dy + center_world_y
+        else:
+            pre_screen_x = world_x
+            pre_screen_y = world_y
+        
+        # Step 2: Apply zoom/pan transformation (pre-screen → screen space)
+        return coord_world_to_screen(pre_screen_x, pre_screen_y, self.zoom, self.pan_x, self.pan_y)
     
     # ==================== Tool Management ====================
     
@@ -865,15 +919,96 @@ class ModelCanvasManager:
         self._needs_redraw = True
     
     def zoom_at_point(self, factor, center_x, center_y):
-        """Zoom by a factor at a specific point (alias for zoom_by_factor).
+        """Zoom by a factor at a specific point with rotation support.
+        
+        CORRECTED APPROACH: The issue is that rotation center changes with zoom.
+        We need to work backwards from the desired world point position.
         
         Args:
             factor: Multiplicative zoom factor.
             center_x: X coordinate of zoom center (screen space).
             center_y: Y coordinate of zoom center (screen space).
         """
-        # Delegate to ViewportController with center coordinates
-        self.viewport_controller.zoom_by_factor(factor, center_x, center_y)
+        # STEP 1: Get world coordinates of zoom center BEFORE zoom change
+        world_x, world_y = self.screen_to_world(center_x, center_y)
+        
+        # STEP 2: Apply new zoom with bounds
+        new_zoom = self.zoom * factor
+        new_zoom = max(self.MIN_ZOOM, min(self.MAX_ZOOM, new_zoom))
+        
+        # If zoom didn't change (hit bounds), nothing to do
+        if new_zoom == self.zoom:
+            return
+        
+        # STEP 3: Update zoom
+        old_zoom = self.zoom
+        self.zoom = new_zoom
+        self.viewport_controller.zoom = new_zoom
+        
+        # STEP 4: Calculate new pan
+        # We want screen_to_world(center_x, center_y) == (world_x, world_y)
+        # 
+        # WITHOUT rotation:
+        #   screen_to_world: world = screen/zoom - pan
+        #   So: pan = screen/zoom - world
+        #
+        # WITH rotation:
+        #   We need to solve this equation working backwards through the pipeline
+        
+        rotation = self.transformation_manager.get_rotation()
+        if rotation and rotation.angle_degrees != 0:
+            # The equation we need to solve:
+            # 1. screen → pre_rot: pre_rot = screen/zoom - pan  (what we're solving for)
+            # 2. pre_rot → world: world = rotate_inverse(pre_rot - rot_center) + rot_center
+            #
+            # But rot_center = viewport_center/zoom - pan (depends on pan!)
+            #
+            # So we have circular dependency. Let's solve it algebraically:
+            # Let: cx = viewport_width/2, cy = viewport_height/2 (screen center)
+            # Let: rcx = cx/zoom - pan_x, rcy = cy/zoom - pan_y (rotation center in world)
+            #
+            # Step 1: pre_rot = screen/zoom - pan
+            # Step 2: world = R_inv(pre_rot - rot_center) + rot_center
+            #         where rot_center = (cx/zoom - pan_x, cy/zoom - pan_y)
+            #
+            # Expanding:
+            # world = R_inv((screen/zoom - pan) - (c/zoom - pan)) + (c/zoom - pan)
+            # world = R_inv(screen/zoom - c/zoom) + (c/zoom - pan)
+            # world = R_inv((screen - c)/zoom) + c/zoom - pan
+            #
+            # Solving for pan:
+            # pan = c/zoom - world + R_inv((screen - c)/zoom)
+            
+            cx = self.viewport_width / 2.0
+            cy = self.viewport_height / 2.0
+            
+            # (screen - c)/zoom
+            screen_offset_x = (center_x - cx) / self.zoom
+            screen_offset_y = (center_y - cy) / self.zoom
+            
+            # R_inv((screen - c)/zoom)
+            cos_a = math.cos(-rotation.angle_radians)
+            sin_a = math.sin(-rotation.angle_radians)
+            
+            rotated_x = screen_offset_x * cos_a - screen_offset_y * sin_a
+            rotated_y = screen_offset_x * sin_a + screen_offset_y * cos_a
+            
+            # pan = c/zoom - world + R_inv((screen - c)/zoom)
+            self.pan_x = (cx / self.zoom) - world_x + rotated_x
+            self.pan_y = (cy / self.zoom) - world_y + rotated_y
+        else:
+            # No rotation: simple formula
+            # world = screen/zoom - pan
+            # So: pan = screen/zoom - world
+            self.pan_x = (center_x / self.zoom) - world_x
+            self.pan_y = (center_y / self.zoom) - world_y
+        
+        # Clamp pan to maintain infinite canvas bounds
+        self.clamp_pan()
+        
+        # Save view state
+        self.save_view_state_to_file()
+        
         self._needs_redraw = True
     
     def clamp_pan(self):
@@ -903,8 +1038,11 @@ class ModelCanvasManager:
             dx: Pan delta X in screen pixels (positive = drag right = pan increases).
             dy: Pan delta Y in screen pixels (positive = drag down = pan increases).
         """
-        # Delegate to ViewportController
-        self.viewport_controller.pan(dx, dy)
+        # Get rotation for pan delta transformation
+        rotation = self.transformation_manager.get_rotation()
+        
+        # Delegate to ViewportController with rotation
+        self.viewport_controller.pan(dx, dy, rotation=rotation)
         self._needs_redraw = True
     
     def pan_to(self, world_x, world_y):
@@ -927,8 +1065,11 @@ class ModelCanvasManager:
             dx: Pan delta X in screen pixels (positive = pan right).
             dy: Pan delta Y in screen pixels (positive = pan down).
         """
-        # Delegate to ViewportController
-        self.viewport_controller.pan_relative(dx, dy)
+        # Get rotation for pan delta transformation
+        rotation = self.transformation_manager.get_rotation()
+        
+        # Delegate to ViewportController with rotation
+        self.viewport_controller.pan_relative(dx, dy, rotation=rotation)
         self._needs_redraw = True
     
     def get_content_bounds(self):
@@ -1006,27 +1147,74 @@ class ModelCanvasManager:
         Uses screen_to_world transform to correctly map viewport corners.
         This ensures grid is regenerated for current view, creating infinite canvas illusion.
         
+        IMPORTANT: When canvas is rotated, the viewport becomes a rotated rectangle in world space.
+        We calculate the axis-aligned bounding box (AABB) that encompasses all four corners
+        to ensure the grid covers the entire visible area at any rotation angle.
+        
+        This method recalculates bounds on EVERY call, adapting to pan, zoom, and rotation.
+        
         Returns:
-            tuple: (min_x, min_y, max_x, max_y) in world coordinates.
+            tuple: (min_x, min_y, max_x, max_y) in world coordinates (axis-aligned bounding box).
         """
-        # Top-left corner of viewport (screen origin)
-        min_x, min_y = self.screen_to_world(0, 0)
-        # Bottom-right corner of viewport
-        max_x, max_y = self.screen_to_world(self.viewport_width, self.viewport_height)
+        # Transform all four viewport corners to world space
+        # This accounts for rotation - corners form a rotated rectangle in world space
+        top_left = self.screen_to_world(0, 0)
+        top_right = self.screen_to_world(self.viewport_width, 0)
+        bottom_left = self.screen_to_world(0, self.viewport_height)
+        bottom_right = self.screen_to_world(self.viewport_width, self.viewport_height)
+        
+        # Calculate axis-aligned bounding box (AABB) that encompasses all corners
+        # This ensures grid fills the entire rotated viewport
+        all_x = [top_left[0], top_right[0], bottom_left[0], bottom_right[0]]
+        all_y = [top_left[1], top_right[1], bottom_left[1], bottom_right[1]]
+        
+        min_x = min(all_x)
+        max_x = max(all_x)
+        min_y = min(all_y)
+        max_y = max(all_y)
+        
+        return min_x, min_y, max_x, max_y
+    
+    def get_visible_bounds_no_rotation(self):
+        """Calculate the visible area WITHOUT rotation transformation.
+        
+        Used when rotation-independent bounds are needed for specific operations.
+        Grid rendering uses get_visible_bounds() (with rotation) for infinite canvas effect.
+        
+        Returns:
+            tuple: (min_x, min_y, max_x, max_y) in world coordinates (no rotation).
+        """
+        # Apply only zoom/pan transformation (skip rotation)
+        min_x, min_y = coord_screen_to_world(0, 0, self.zoom, self.pan_x, self.pan_y)
+        max_x, max_y = coord_screen_to_world(
+            self.viewport_width, self.viewport_height,
+            self.zoom, self.pan_x, self.pan_y
+        )
         return min_x, min_y, max_x, max_y
     
     def draw_grid(self, cr):
         """Draw the grid pattern on the cairo context.
         
-        Now draws in world space (inside Cairo transform) so grid scales with zoom.
-        Line widths are compensated to maintain constant pixel size.
+        GRID RECALCULATION: Grid is recalculated on EVERY draw call, adapting to:
+        - Pan: Grid position shifts as viewport moves
+        - Zoom: Grid spacing adapts (1mm base at 100% zoom)
+        - Rotation: Grid bounds expand to cover rotated viewport (AABB of corners)
+        
+        The grid is drawn in world space with ALL transformations applied (rotation + zoom + pan).
+        This creates the infinite canvas illusion - grid rotates with canvas and always fills viewport.
+        
+        Line widths are compensated to maintain constant pixel size regardless of zoom.
         Uses major/minor line distinction (every 5th line is major).
         
         Args:
-            cr: Cairo context to draw on (with zoom transform already applied).
+            cr: Cairo context to draw on (with rotation + zoom + pan transforms already applied).
         """
         # Delegate to GridRenderer service
         grid_spacing = self.get_grid_spacing()
+        
+        # RECALCULATE BOUNDS: get_visible_bounds() transforms all 4 viewport corners
+        # and computes axis-aligned bounding box (AABB) to cover rotated viewport
+        # This ensures grid regenerates correctly for pan, zoom, and rotation
         min_x, min_y, max_x, max_y = self.get_visible_bounds()
         
         render_draw_grid(
@@ -1069,6 +1257,56 @@ class ModelCanvasManager:
         if style in [GRID_STYLE_LINE, GRID_STYLE_DOT, GRID_STYLE_CROSS]:
             self.grid_style = style
             self._needs_redraw = True
+    
+    # ==================== Canvas Rotation Methods ====================
+    
+    def rotate_canvas_90_cw(self):
+        """Rotate canvas 90° clockwise."""
+        rotation = self.transformation_manager.get_rotation()
+        if rotation:
+            rotation.rotate_90_cw()
+            self.mark_dirty()
+    
+    def rotate_canvas_90_ccw(self):
+        """Rotate canvas 90° counterclockwise."""
+        rotation = self.transformation_manager.get_rotation()
+        if rotation:
+            rotation.rotate_90_ccw()
+            self.mark_dirty()
+    
+    def rotate_canvas_180(self):
+        """Rotate canvas 180°."""
+        rotation = self.transformation_manager.get_rotation()
+        if rotation:
+            rotation.rotate_180()
+            self.mark_dirty()
+    
+    def reset_canvas_rotation(self):
+        """Reset canvas rotation to 0°."""
+        rotation = self.transformation_manager.get_rotation()
+        if rotation:
+            rotation.reset()
+            self.mark_dirty()
+    
+    def get_canvas_rotation_angle(self):
+        """Get current canvas rotation angle in degrees.
+        
+        Returns:
+            float: Rotation angle in degrees (0-360).
+        """
+        rotation = self.transformation_manager.get_rotation()
+        return rotation.angle_degrees if rotation else 0.0
+    
+    def is_canvas_rotated(self):
+        """Check if canvas is rotated.
+        
+        Returns:
+            bool: True if canvas rotation is not 0°.
+        """
+        rotation = self.transformation_manager.get_rotation()
+        return rotation.is_rotated if rotation else False
+    
+    # ==================== Pointer and Redraw Management ====================
     
     def set_pointer_position(self, x, y):
         """Update current pointer position for pointer-centered zoom.
