@@ -12,10 +12,25 @@ from .coordinate_transform import (
     validate_zoom,
 )
 
+from .arc_geometry_service import (
+    detect_parallel_arcs,
+    calculate_arc_offset,
+    count_parallel_arcs,
+    has_parallel_arcs,
+    get_arc_offset_for_rendering,
+    separate_parallel_arcs_by_direction,
+)
+
 __all__ = [
     'screen_to_world',
     'world_to_screen',
     'mm_to_pixels',
     'pixels_to_mm',
     'validate_zoom',
+    'detect_parallel_arcs',
+    'calculate_arc_offset',
+    'count_parallel_arcs',
+    'has_parallel_arcs',
+    'get_arc_offset_for_rendering',
+    'separate_parallel_arcs_by_direction',
 ]
