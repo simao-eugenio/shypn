@@ -60,10 +60,6 @@ class SBMLImportPanel:
         processed_pathway: Post-processed PathwayData with layout and colors
     """
     
-    # 🔬 TESTING CONFIGURATION (Hardcoded - No UI changes)
-    # Set to True to enable quick load after parse (for Swiss Palette testing)
-    ENABLE_QUICK_LOAD_AFTER_PARSE = True  # ← Change this to enable/disable
-    
     def __init__(self, builder: Gtk.Builder, model_canvas=None, workspace_settings=None):
         """Initialize the SBML import panel controller.
         
@@ -448,112 +444,98 @@ class SBMLImportPanel:
             self.sbml_force_params_box.set_visible(True)
     
     def _quick_load_to_canvas(self):
-        """Quick load parsed pathway to canvas as PURE Petri net (NO layout processing).
+        """Load parsed pathway to canvas with arbitrary positions.
         
-        🔬 TESTING MODE: Enables Swiss Palette testing of PURE force-directed layout.
-        
-        Workflow:
+        New Simplified Workflow (v2.0):
         1. Parse SBML → PathwayData (species, reactions, connections)
-        2. Create ProcessedPathwayData with ARBITRARY positions (NO layout algorithms)
+        2. Post-process with minimal PathwayPostProcessor (arbitrary positions, colors, units)
         3. Convert to Petri net (places, transitions, arcs with stoichiometry weights)
         4. Load to canvas
-        5. Swiss Palette force-directed COMPLETELY RECALCULATES positions from scratch
+        5. User applies Swiss Palette → Force-Directed for physics-based layout
         
-        CRITICAL: We bypass ALL layout algorithms (grid, hierarchical, circular, etc.)
-        The initial positions are ARBITRARY - force-directed will ignore them anyway.
-        We only need positions to exist so the converter doesn't complain.
-        
-        Controlled by: ENABLE_QUICK_LOAD_AFTER_PARSE class constant
+        IMPORTANT: Initial positions are ARBITRARY - force-directed will recalculate everything.
+        This is now the MAIN import path (not a testing mode anymore).
         """
         if not self.parsed_pathway:
-            self.logger.warning("No parsed pathway to quick load")
+            self.logger.warning("No parsed pathway to load")
             return
         
         if not self.model_canvas or not self.converter:
-            self.logger.warning("Canvas or converter not available for quick load")
+            self.logger.warning("Canvas or converter not available for load")
             return
         
         try:
-            self.logger.info("🔬 QUICK LOAD MODE - Arbitrary positions (force-directed will recalculate)")
+            self.logger.info("Loading pathway to canvas with arbitrary positions")
             
-            from shypn.data.pathway.pathway_data import ProcessedPathwayData
+            # Get scale factor from UI
+            scale_factor = self.sbml_scale_spin.get_value() if self.sbml_scale_spin else 1.0
             
-            # Create ProcessedPathwayData manually
-            processed = ProcessedPathwayData(
-                species=list(self.parsed_pathway.species),
-                reactions=list(self.parsed_pathway.reactions),
-                metadata=dict(self.parsed_pathway.metadata)
-            )
+            # Post-process: arbitrary positions, colors, unit normalization
+            # This uses the NEW simplified PathwayPostProcessor (v2.0)
+            self._show_status("Preparing pathway data...")
+            from shypn.data.pathway.pathway_postprocessor import PathwayPostProcessor
+            postprocessor = PathwayPostProcessor(scale_factor=scale_factor)
+            processed = postprocessor.process(self.parsed_pathway)
             
-            # Set ARBITRARY positions - doesn't matter where, force-directed recalculates everything
-            # We just need positions to exist so converter doesn't fail
-            base_x, base_y = 100.0, 100.0
-            offset = 0.0
-            
-            # All species at similar positions (force-directed will spread them)
-            for species in processed.species:
-                processed.positions[species.id] = (base_x + offset, base_y + offset)
-                offset += 10.0  # Small offset to avoid exact overlap
-            
-            # All reactions at similar positions (force-directed will spread them)
-            offset = 0.0
-            for reaction in processed.reactions:
-                processed.positions[reaction.id] = (base_x + 50.0 + offset, base_y + 50.0 + offset)
-                offset += 10.0
-            
-            # Set default colors (compartment-based)
-            compartments = set(s.compartment or "default" for s in processed.species)
-            default_colors = ["#E8F4F8", "#FFE8E8", "#E8FFE8", "#FFFFE8", "#FFE8FF"]
-            for i, comp in enumerate(compartments):
-                processed.colors[comp] = default_colors[i % len(default_colors)]
-            
-            # Mark as arbitrary (no real layout applied)
-            processed.metadata['layout_type'] = 'arbitrary'
-            
-            self.logger.info(f"Arbitrary positions set: {len(processed.positions)} objects (force-directed will recalculate)")
+            self.logger.info(f"Post-processing complete: {len(processed.positions)} arbitrary positions")
             
             # Convert ProcessedPathwayData to Petri net
+            self._show_status("Converting to Petri net...")
             document_model = self.converter.convert(processed)
-            self.logger.warning(f"🔍 QUICK LOAD: Converted to Petri net: {len(document_model.places)} places, {len(document_model.transitions)} transitions")
-            
-            # Show first object position
-            if document_model.places:
-                first = document_model.places[0]
-                self.logger.warning(f"🔍 QUICK LOAD: First place '{first.name}' at ({first.x:.1f}, {first.y:.1f})")
+            self.logger.info(f"Converted to Petri net: {len(document_model.places)} places, {len(document_model.transitions)} transitions")
             
             # Load to canvas - create new tab
-            self.logger.warning("🔍 QUICK LOAD: Creating canvas tab...")
-            pathway_name = self.parsed_pathway.metadata.get('name', 'Pathway') + " [Testing]"
+            self._show_status("Loading to canvas...")
+            pathway_name = self.parsed_pathway.metadata.get('name', 'Pathway')
             page_index, drawing_area = self.model_canvas.add_document(filename=pathway_name)
             
-            # CRITICAL: Wire sbml_panel to ModelCanvasLoader (if not already wired)
+            # Wire sbml_panel to ModelCanvasLoader (if not already wired)
             # This allows Swiss Palette Layout tools to read parameters from SBML Import Options
             if not hasattr(self.model_canvas, 'sbml_panel') or self.model_canvas.sbml_panel is None:
                 self.model_canvas.sbml_panel = self
-                self.logger.warning(f"✅ Wired SBML panel to ModelCanvasLoader")
+                self.logger.info("Wired SBML panel to ModelCanvasLoader")
             
             # Get canvas manager for this tab
             manager = self.model_canvas.get_canvas_manager(drawing_area)
             
             if manager:
-                self.logger.warning("🔍 QUICK LOAD: Loading objects to canvas...")
                 # Load places, transitions, and arcs
                 manager.places = list(document_model.places)
                 manager.transitions = list(document_model.transitions)
                 manager.arcs = list(document_model.arcs)
                 
+                # Update ID counters
+                manager._next_place_id = document_model._next_place_id
+                manager._next_transition_id = document_model._next_transition_id
+                manager._next_arc_id = document_model._next_arc_id
+                
+                # Ensure arc references are properly set
+                manager.ensure_arc_references()
+                
+                # Mark as dirty to ensure redraw
+                manager.mark_dirty()
+                
+                # Notify observers that model structure has changed
+                if hasattr(manager, '_notify_observers'):
+                    for place in manager.places:
+                        manager._notify_observers('created', place)
+                    for transition in manager.transitions:
+                        manager._notify_observers('created', transition)
+                    for arc in manager.arcs:
+                        manager._notify_observers('created', arc)
+                
                 # Trigger redraw
                 drawing_area.queue_draw()
                 
-                self.logger.warning(f"🔍 QUICK LOAD: Canvas loaded with {len(manager.places)} places, {len(manager.transitions)} transitions!")
-                self._show_status("🔬 Pathway loaded - Use Swiss Palette → Force-Directed to apply physics!")
-                self.logger.warning("✓ Quick load complete - Swiss Palette can now apply force-directed transformation")
+                self.logger.info(f"Canvas loaded: {len(manager.places)} places, {len(manager.transitions)} transitions")
+                self._show_status(f"✓ Loaded {len(manager.places)} places, {len(manager.transitions)} transitions - Use Swiss Palette → Force-Directed for layout")
             else:
                 self.logger.error("Failed to get canvas manager")
                 self._show_status("Error: Failed to get canvas manager", error=True)
             
         except Exception as e:
-            self.logger.error(f"Quick load failed: {e}")
+            self.logger.error(f"Load failed: {e}")
+            self._show_status(f"Load error: {str(e)}", error=True)
             import traceback
             traceback.print_exc()
     
@@ -628,12 +610,12 @@ class SBMLImportPanel:
             if self.sbml_import_button:
                 self.sbml_import_button.set_sensitive(True)
             
-            # 🔬 TESTING MODE: Quick load to canvas after parse
-            if self.ENABLE_QUICK_LOAD_AFTER_PARSE and self.model_canvas:
-                self.logger.info("Quick load enabled - loading to canvas after parse")
+            # Load to canvas after parse (NEW: always enabled, not a testing mode)
+            if self.model_canvas:
+                self.logger.info("Auto-loading to canvas after parse")
                 GLib.idle_add(self._quick_load_to_canvas)
             else:
-                self.logger.debug("Quick load disabled or canvas not available")
+                self.logger.debug("Canvas not available, skipping auto-load")
             
         except Exception as e:
             self._show_status(f"Parse error: {str(e)}", error=True)
