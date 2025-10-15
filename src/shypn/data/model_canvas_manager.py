@@ -913,136 +913,17 @@ class ModelCanvasManager:
         Args:
             cr: Cairo context to draw on (with zoom transform already applied).
         """
+        # Delegate to GridRenderer service
         grid_spacing = self.get_grid_spacing()
         min_x, min_y, max_x, max_y = self.get_visible_bounds()
         
-        # Calculate grid positions in world coordinates
-        start_x = math.floor(min_x / grid_spacing) * grid_spacing
-        start_y = math.floor(min_y / grid_spacing) * grid_spacing
-        
-        # Calculate starting indices (for major/minor line determination)
-        start_index_x = int(math.floor(min_x / grid_spacing))
-        start_index_y = int(math.floor(min_y / grid_spacing))
-        
-        if self.grid_style == self.GRID_STYLE_LINE:
-            # Standard line grid - draw in world coordinates with major/minor distinction
-            
-            # Draw vertical grid lines
-            x = start_x
-            index_x = start_index_x
-            while x <= max_x:
-                # Determine if this is a major line
-                is_major = (index_x % self.GRID_MAJOR_EVERY) == 0
-                
-                if is_major:
-                    # Major line: darker color, thicker width
-                    cr.set_source_rgba(0.65, 0.65, 0.68, 0.8)  # Darker gray
-                    cr.set_line_width(1.0 / self.zoom)
-                else:
-                    # Minor line: lighter color, thinner width
-                    cr.set_source_rgba(0.85, 0.85, 0.88, 0.6)  # Lighter gray
-                    cr.set_line_width(0.5 / self.zoom)
-                
-                cr.move_to(x, min_y)
-                cr.line_to(x, max_y)
-                cr.stroke()
-                
-                x += grid_spacing
-                index_x += 1
-            
-            # Draw horizontal grid lines
-            y = start_y
-            index_y = start_index_y
-            while y <= max_y:
-                # Determine if this is a major line
-                is_major = (index_y % self.GRID_MAJOR_EVERY) == 0
-                
-                if is_major:
-                    # Major line: darker color, thicker width
-                    cr.set_source_rgba(0.65, 0.65, 0.68, 0.8)  # Darker gray
-                    cr.set_line_width(1.0 / self.zoom)
-                else:
-                    # Minor line: lighter color, thinner width
-                    cr.set_source_rgba(0.85, 0.85, 0.88, 0.6)  # Lighter gray
-                    cr.set_line_width(0.5 / self.zoom)
-                
-                cr.move_to(min_x, y)
-                cr.line_to(max_x, y)
-                cr.stroke()
-                
-                y += grid_spacing
-                index_y += 1
-            
-        elif self.grid_style == self.GRID_STYLE_DOT:
-            # Dot grid - draw small circles at intersections in world coordinates
-            # Major intersections (every 5th line) get larger/darker dots
-            
-            y = start_y
-            index_y = start_index_y
-            while y <= max_y:
-                x = start_x
-                index_x = start_index_x
-                while x <= max_x:
-                    # Check if this is a major intersection
-                    is_major_x = (index_x % self.GRID_MAJOR_EVERY) == 0
-                    is_major_y = (index_y % self.GRID_MAJOR_EVERY) == 0
-                    is_major = is_major_x and is_major_y
-                    
-                    if is_major:
-                        # Major intersection: larger, darker dot
-                        cr.set_source_rgba(0.65, 0.65, 0.68, 0.8)
-                        dot_radius = 2.0 / self.zoom
-                    else:
-                        # Minor intersection: smaller, lighter dot
-                        cr.set_source_rgba(0.85, 0.85, 0.88, 0.6)
-                        dot_radius = 1.5 / self.zoom
-                    
-                    cr.arc(x, y, dot_radius, 0, 2 * math.pi)
-                    cr.fill()
-                    
-                    x += grid_spacing
-                    index_x += 1
-                y += grid_spacing
-                index_y += 1
-                
-        elif self.grid_style == self.GRID_STYLE_CROSS:
-            # Cross-hair grid - draw small + at intersections in world coordinates
-            # Major intersections (every 5th line) get larger/darker crosses
-            
-            y = start_y
-            index_y = start_index_y
-            while y <= max_y:
-                x = start_x
-                index_x = start_index_x
-                while x <= max_x:
-                    # Check if this is a major intersection
-                    is_major_x = (index_x % self.GRID_MAJOR_EVERY) == 0
-                    is_major_y = (index_y % self.GRID_MAJOR_EVERY) == 0
-                    is_major = is_major_x and is_major_y
-                    
-                    if is_major:
-                        # Major intersection: larger, darker cross
-                        cr.set_source_rgba(0.65, 0.65, 0.68, 0.8)
-                        cross_size = 4.0 / self.zoom
-                        cr.set_line_width(1.0 / self.zoom)
-                    else:
-                        # Minor intersection: smaller, lighter cross
-                        cr.set_source_rgba(0.85, 0.85, 0.88, 0.6)
-                        cross_size = 3.0 / self.zoom
-                        cr.set_line_width(0.5 / self.zoom)
-                    
-                    # Horizontal line of cross
-                    cr.move_to(x - cross_size, y)
-                    cr.line_to(x + cross_size, y)
-                    # Vertical line of cross
-                    cr.move_to(x, y - cross_size)
-                    cr.line_to(x, y + cross_size)
-                    cr.stroke()
-                    
-                    x += grid_spacing
-                    index_x += 1
-                y += grid_spacing
-                index_y += 1
+        render_draw_grid(
+            cr=cr,
+            grid_spacing=grid_spacing,
+            visible_bounds=(min_x, min_y, max_x, max_y),
+            zoom=self.zoom,
+            grid_style=self.grid_style
+        )
     
     # ==================== State Management ====================
     
