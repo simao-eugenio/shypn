@@ -841,6 +841,7 @@ class FileExplorerPanel:
         parent = window if isinstance(window, Gtk.Window) else None
         dialog = Gtk.Dialog(title='New Folder', transient_for=parent, modal=True)
         dialog.set_modal(True)
+        dialog.set_keep_above(True)  # Ensure dialog stays on top
         dialog.set_default_size(300, -1)
         dialog.add_button('Cancel', Gtk.ResponseType.CANCEL)
         dialog.add_button('Create', Gtk.ResponseType.OK)
@@ -880,6 +881,7 @@ class FileExplorerPanel:
         parent = window if isinstance(window, Gtk.Window) else None
         dialog = Gtk.Dialog(title='Rename', transient_for=parent, modal=True)
         dialog.set_modal(True)
+        dialog.set_keep_above(True)  # Ensure dialog stays on top
         dialog.set_default_size(300, -1)
         dialog.add_button('Cancel', Gtk.ResponseType.CANCEL)
         dialog.add_button('Rename', Gtk.ResponseType.OK)
@@ -918,6 +920,7 @@ class FileExplorerPanel:
         # Ensure window is valid before use (required for Wayland)
         parent = window if isinstance(window, Gtk.Window) else None
         dialog = Gtk.MessageDialog(transient_for=parent, modal=True, message_type=Gtk.MessageType.WARNING, buttons=Gtk.ButtonsType.YES_NO, text=f"Delete '{self.selected_item_name}'?")
+        dialog.set_keep_above(True)  # Ensure dialog stays on top
         if self.selected_item_is_dir:
             dialog.set_property('secondary-text', 'This folder will be deleted. Only empty folders can be deleted.')
         else:
@@ -946,6 +949,7 @@ class FileExplorerPanel:
         parent = window if isinstance(window, Gtk.Window) else None
         dialog = Gtk.Dialog(title=f"Properties - {info['name']}", transient_for=parent, modal=True)
         dialog.set_modal(True)
+        dialog.set_keep_above(True)  # Ensure dialog stays on top
         dialog.set_default_size(400, -1)
         dialog.add_button('Close', Gtk.ResponseType.CLOSE)
         content = dialog.get_content_area()

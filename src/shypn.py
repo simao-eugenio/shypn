@@ -493,6 +493,7 @@ def main(argv=None):
 							buttons=Gtk.ButtonsType.NONE,
 							text='Unsaved changes'
 						)
+						dialog.set_keep_above(True)  # Ensure dialog stays on top
 						dialog.format_secondary_text(
 							f"Document '{persistency.get_display_name()}' has unsaved changes.\n"
 							"Do you want to save before closing?"

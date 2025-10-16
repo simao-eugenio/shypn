@@ -1182,6 +1182,7 @@ class ModelCanvasLoader:
                         buttons=Gtk.ButtonsType.OK,
                         text="Cannot Create Arc"
                     )
+                    dialog.set_keep_above(True)  # Ensure dialog stays on top
                     dialog.format_secondary_text(str(e))
                     dialog.run()
                     dialog.destroy()
@@ -2719,6 +2720,7 @@ class ModelCanvasLoader:
             drawing_area: GtkDrawingArea widget
         """
         dialog = Gtk.Dialog(title=f'Edit {arc.name} Weight', parent=self.parent_window, modal=True, destroy_with_parent=True)
+        dialog.set_keep_above(True)  # Ensure dialog stays on top
         dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OK, Gtk.ResponseType.OK)
         content_area = dialog.get_content_area()
         content_area.set_spacing(10)
@@ -3069,6 +3071,7 @@ class ModelCanvasLoader:
             buttons=Gtk.ButtonsType.OK,
             text="Invalid Operation"
         )
+        dialog.set_keep_above(True)  # Ensure dialog stays on top
         dialog.format_secondary_text(message)
         dialog.run()
         dialog.destroy()

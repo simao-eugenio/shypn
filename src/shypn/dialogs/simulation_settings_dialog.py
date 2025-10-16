@@ -44,6 +44,7 @@ class SimulationSettingsDialog(Gtk.Dialog):
             modal=True,
             destroy_with_parent=True
         )
+        self.set_keep_above(True)  # Ensure dialog stays on top
         
         self.settings = settings
         self._widgets = {}
