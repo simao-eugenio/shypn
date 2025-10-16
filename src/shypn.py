@@ -222,6 +222,11 @@ def main(argv=None):
 		# This allows right-click context menus to include "Add to Analysis" options
 		if hasattr(right_panel_loader, 'context_menu_handler') and right_panel_loader.context_menu_handler:
 			model_canvas_loader.set_context_menu_handler(right_panel_loader.context_menu_handler)
+		
+		# Wire file explorer panel to canvas loader
+		# This allows keyboard shortcuts (Ctrl+S, Ctrl+Shift+S) to trigger save operations
+		if file_explorer:
+			model_canvas_loader.set_file_explorer_panel(file_explorer)
 
 		# Get left dock area from main window
 		left_dock_area = main_builder.get_object('left_dock_area')

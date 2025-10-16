@@ -1556,6 +1556,20 @@ class ModelCanvasLoader:
                 )
                 return True
         
+        # Save (Ctrl+S) - check both lowercase and uppercase
+        if is_ctrl and not is_shift and (event.keyval == Gdk.KEY_s or event.keyval == Gdk.KEY_S):
+            # Trigger save for current document
+            if hasattr(self, 'file_explorer_panel') and self.file_explorer_panel:
+                self.file_explorer_panel.save_current_document()
+                return True
+        
+        # Save As (Ctrl+Shift+S) - check both lowercase and uppercase
+        if is_ctrl and is_shift and (event.keyval == Gdk.KEY_s or event.keyval == Gdk.KEY_S):
+            # Trigger save as for current document
+            if hasattr(self, 'file_explorer_panel') and self.file_explorer_panel:
+                self.file_explorer_panel.save_current_document_as()
+                return True
+        
         # Undo (Ctrl+Z) - check both lowercase and uppercase
         if is_ctrl and not is_shift and (event.keyval == Gdk.KEY_z or event.keyval == Gdk.KEY_Z):
             # TODO: Implement undo/redo functionality
@@ -2221,6 +2235,17 @@ class ModelCanvasLoader:
             handler: ContextMenuHandler instance
         """
         self.context_menu_handler = handler
+
+    def set_file_explorer_panel(self, file_explorer_panel):
+        """Set the file explorer panel for keyboard shortcut integration.
+        
+        This allows keyboard shortcuts (Ctrl+S, Ctrl+Shift+S) to trigger
+        save operations through the file explorer panel.
+        
+        Args:
+            file_explorer_panel: FileExplorerPanel instance from main application
+        """
+        self.file_explorer_panel = file_explorer_panel
 
     def _setup_canvas_context_menu(self, drawing_area, manager):
         """Setup context menu for canvas operations using Gtk.Menu.
