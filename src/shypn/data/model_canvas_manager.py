@@ -885,20 +885,26 @@ class ModelCanvasManager:
     def create_test_objects(self):
         """Create test objects for debugging rendering.
         
-        Creates a simple Petri net: P1 -> T1 -> P2
+        Creates a CENTER MARKER at world origin (0, 0).
+        Use 'Center View' context menu to center the viewport on it.
         """
-        # Create places
-        p1 = self.add_place(-100, 0, label="P1")
-        p2 = self.add_place(100, 0, label="P2")
-        p1.set_tokens(2)
-        p1.set_initial_marking(2)  # Set initial marking for proper reset
+        # Create a large center marker at document origin (0, 0)
+        center = self.add_place(0, 0, label="ORIGIN\n(0,0)", radius=50)
+        center.set_tokens(0)
+        center.set_initial_marking(0)
+        center.border_color = (1.0, 0.0, 0.0)  # Red border for visibility
+        center.border_width = 5.0  # Thick border
         
-        # Create transition
-        t1 = self.add_transition(0, 0, label="T1")
+        print(f"[CENTER MARKER] Created at world origin (0, 0)")
+        print(f"[CENTER MARKER] Use 'Center View' to see it centered")
+        print(f"[VIEWPORT STATE] Current Pan: ({self.pan_x}, {self.pan_y}), Zoom: {self.zoom}")
         
-        # Create arcs
-        a1 = self.add_arc(p1, t1, weight=1)
-        a2 = self.add_arc(t1, p2, weight=1)
+        # Show where (0,0) currently appears on screen
+        screen_x, screen_y = self.world_to_screen(0, 0)
+        print(f"[CENTER MARKER] Origin (0,0) appears at screen position: ({screen_x:.1f}, {screen_y:.1f})")
+        
+        if screen_x < 0 or screen_x > self.viewport_width or screen_y < 0 or screen_y > self.viewport_height:
+            print(f"[CENTER MARKER] ⚠️ Origin is OFF-SCREEN! Use 'Center View' to see it.")
         
     
     # ==================== Zoom Operations ====================
