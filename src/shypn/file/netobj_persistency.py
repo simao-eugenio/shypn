@@ -330,7 +330,12 @@ class NetObjPersistency:
         else:
             # Use suggested filename if available (e.g., for imported documents)
             if self.suggested_filename:
-                default_name = f'{self.suggested_filename}.shy'
+                # Ensure suggested filename doesn't already have .shy extension
+                suggested = self.suggested_filename
+                if suggested.lower().endswith('.shy'):
+                    default_name = suggested
+                else:
+                    default_name = f'{suggested}.shy'
             else:
                 default_name = 'default.shy'
             dialog.set_current_name(default_name)
@@ -339,8 +344,13 @@ class NetObjPersistency:
         dialog.destroy()
         if response != Gtk.ResponseType.OK or not filepath:
             return None
-        if not filepath.endswith('.shy'):
+        
+        # Ensure .shy extension is present (case-insensitive check)
+        if not filepath.lower().endswith('.shy'):
             filepath += '.shy'
+        elif not filepath.endswith('.shy'):
+            # Handle case where user typed .SHY or .Shy - normalize to .shy
+            filepath = filepath[:-4] + '.shy'
         filename = os.path.basename(filepath)
         if filename.lower() == 'default.shy':
             warning_dialog = Gtk.MessageDialog(parent=parent, modal=True, message_type=Gtk.MessageType.WARNING, buttons=Gtk.ButtonsType.YES_NO, text="Save as 'default.shy'?")
