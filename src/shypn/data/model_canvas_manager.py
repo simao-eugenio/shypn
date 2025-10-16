@@ -115,8 +115,21 @@ class ModelCanvasManager:
         # Flag for initial pan centering
         self._initial_pan_set = False  # Flag to center on first draw
         
+        # Flag to trigger fit_to_page on next draw (for SBML/KEGG imports)
+        self._fit_to_page_pending = False
+        self._fit_to_page_padding = 10  # Default padding percentage
+        self._fit_to_page_horizontal_offset = 0  # Default horizontal offset (0% = centered)
+        self._fit_to_page_vertical_offset = 0  # Default vertical offset (0% = centered)
+        
         # Flag to track if document was imported (needs "Save As" on first save)
         self._is_imported = False
+        
+        # ===== PER-DOCUMENT FILE STATE (Phase 1: Multi-Document Support) =====
+        # Each manager now owns its filepath and dirty state
+        # This fixes critical data loss issues from single global persistency
+        self.filepath = None  # Full path to saved file (None if unsaved)
+        self._is_dirty = False  # Has unsaved changes
+        self.on_dirty_changed = None  # Callback(is_dirty) when dirty state changes
         
         # Pointer position (for pointer-centered zoom)
         self.pointer_x = 0
@@ -265,6 +278,36 @@ class ModelCanvasManager:
         """Set modification timestamp (delegates to DocumentController)."""
         self.document_controller.modified_at = value
     
+    @property
+    def _next_place_id(self):
+        """Get next place ID (delegates to DocumentController)."""
+        return self.document_controller._next_place_id
+    
+    @_next_place_id.setter
+    def _next_place_id(self, value):
+        """Set next place ID (delegates to DocumentController)."""
+        self.document_controller._next_place_id = value
+    
+    @property
+    def _next_transition_id(self):
+        """Get next transition ID (delegates to DocumentController)."""
+        return self.document_controller._next_transition_id
+    
+    @_next_transition_id.setter
+    def _next_transition_id(self, value):
+        """Set next transition ID (delegates to DocumentController)."""
+        self.document_controller._next_transition_id = value
+    
+    @property
+    def _next_arc_id(self):
+        """Get next arc ID (delegates to DocumentController)."""
+        return self.document_controller._next_arc_id
+    
+    @_next_arc_id.setter
+    def _next_arc_id(self, value):
+        """Set next arc ID (delegates to DocumentController)."""
+        self.document_controller._next_arc_id = value
+    
     # ==================== DPI and Physical Units ====================
     
     def set_screen_dpi(self, dpi):
@@ -411,7 +454,8 @@ class ModelCanvasManager:
         # Delegate to DocumentController
         place = self.document_controller.add_place(x, y, **kwargs)
         self._notify_observers('created', place)
-        self.mark_dirty()
+        self.mark_dirty()  # Mark document as having unsaved changes
+        self.mark_needs_redraw()  # Trigger canvas redraw to show new place
         return place
     
     def add_transition(self, x, y, **kwargs):
@@ -428,7 +472,8 @@ class ModelCanvasManager:
         # Delegate to DocumentController
         transition = self.document_controller.add_transition(x, y, **kwargs)
         self._notify_observers('created', transition)
-        self.mark_dirty()
+        self.mark_dirty()  # Mark document as having unsaved changes
+        self.mark_needs_redraw()  # Trigger canvas redraw to show new transition
         return transition
     
     def add_arc(self, source, target, **kwargs):
@@ -450,7 +495,8 @@ class ModelCanvasManager:
         self._auto_convert_parallel_arcs_to_curved(arc)
         
         self._notify_observers('created', arc)
-        self.mark_dirty()
+        self.mark_dirty()  # Mark document as having unsaved changes
+        self.mark_needs_redraw()  # Trigger canvas redraw to show new arc
         return arc
     
     def remove_place(self, place):
@@ -464,7 +510,8 @@ class ModelCanvasManager:
         # Delegate to DocumentController (handles cascade)
         self.document_controller.remove_place(place)
         self._notify_observers('deleted', place)
-        self.mark_dirty()
+        self.mark_dirty()  # Mark document as having unsaved changes
+        self.mark_needs_redraw()  # Trigger canvas redraw to remove from view
     
     def remove_transition(self, transition):
         """Remove a transition from the model.
@@ -477,7 +524,8 @@ class ModelCanvasManager:
         # Delegate to DocumentController (handles cascade)
         self.document_controller.remove_transition(transition)
         self._notify_observers('deleted', transition)
-        self.mark_dirty()
+        self.mark_dirty()  # Mark document as having unsaved changes
+        self.mark_needs_redraw()  # Trigger canvas redraw to remove from view
     
     def remove_arc(self, arc):
         """Remove an arc from the model.
@@ -488,7 +536,8 @@ class ModelCanvasManager:
         # Delegate to DocumentController
         self.document_controller.remove_arc(arc)
         self._notify_observers('deleted', arc)
-        self.mark_dirty()
+        self.mark_dirty()  # Mark document as having unsaved changes
+        self.mark_needs_redraw()  # Trigger canvas redraw to remove from view
     
     def load_objects(self, places=None, transitions=None, arcs=None):
         """Load objects into the model in bulk (for import/deserialize operations).
@@ -527,6 +576,8 @@ class ModelCanvasManager:
         if arcs is None:
             arcs = []
         
+        print(f"[ModelCanvasManager] load_objects(): Loading {len(places)} places, {len(transitions)} transitions, {len(arcs)} arcs")
+        
         # Add places with proper notification
         for place in places:
             self.places.append(place)
@@ -543,6 +594,8 @@ class ModelCanvasManager:
             arc._manager = self  # Set manager reference for parallel detection
             self._notify_observers('created', arc)
         
+        print(f"[ModelCanvasManager] load_objects(): After loading, manager now has {len(self.places)} places, {len(self.transitions)} transitions, {len(self.arcs)} arcs")
+        
         # Update ID counters to avoid collisions
         if places:
             max_place_id = max(p.id for p in self.places)
@@ -554,8 +607,9 @@ class ModelCanvasManager:
             max_arc_id = max(a.id for a in self.arcs)
             self.document_controller._next_arc_id = max_arc_id + 1
         
-        # Mark dirty for redraw
-        self.mark_dirty()
+        # Mark document as dirty (unsaved changes) and trigger redraw
+        self.mark_dirty()  # Document dirty tracking for save state
+        self.mark_needs_redraw()  # Canvas redraw for rendering
     
     def detect_parallel_arcs(self, arc):
         """Find arcs parallel to the given arc (same source/target or reversed).
@@ -767,7 +821,8 @@ class ModelCanvasManager:
         # Use DocumentController to get all objects, then clear selections
         for obj in self.document_controller.get_all_objects():
             obj.selected = False
-        self.mark_dirty()
+        self.mark_dirty()  # Mark document as having unsaved changes
+        self.mark_needs_redraw()  # Trigger canvas redraw to update selection visuals
     
     def clear_all_objects(self):
         """Remove all Petri net objects from the model and reset to new document state.
@@ -780,7 +835,8 @@ class ModelCanvasManager:
         # Clear selection state (additional facade-level logic)
         self.selection_manager.clear_selection()
         
-        self.mark_dirty()
+        self.mark_dirty()  # Mark document as having unsaved changes
+        self.mark_needs_redraw()  # Trigger canvas redraw to clear visual display
     
     def find_object_at_position(self, x, y):
         """Find the topmost object at the given world position.
@@ -817,34 +873,14 @@ class ModelCanvasManager:
         for obj in self.get_all_objects():
             obj.selected = False
         self.selection_manager.clear_selection()
-        self.mark_dirty()
-    
-    def clear_all_objects(self):
-        """Remove all Petri net objects from the model and reset to new document state.
-        
-        This resets the canvas to a fresh "default" state as if creating a new document.
-        """
-        self.places.clear()
-        self.transitions.clear()
-        self.arcs.clear()
-        
-        # Reset ID counters
-        self._next_place_id = 1
-        self._next_transition_id = 1
-        self._next_arc_id = 1
-        
-        # Reset to default filename (unsaved document state)
-        self.filename = "default"
-        self.modified = False
-        self.created_at = datetime.now()
-        self.modified_at = None
-        
-        self.mark_dirty()
+        self.mark_dirty()  # Mark document as having unsaved changes
+        self.mark_needs_redraw()  # Trigger canvas redraw to update selection visuals
     
     def _on_object_changed(self):
         """Callback when an object's properties change."""
         self.mark_modified()
-        self.mark_dirty()
+        self.mark_dirty()  # Mark document as having unsaved changes
+        self.mark_needs_redraw()  # Trigger canvas redraw to show property changes
     
     def create_test_objects(self):
         """Create test objects for debugging rendering.
@@ -1111,6 +1147,124 @@ class ModelCanvasManager:
         # Pan to center the content
         self.pan_to(center_x, center_y)
     
+    def fit_to_page(self, padding_percent=10, deferred=False, horizontal_offset_percent=0, vertical_offset_percent=0):
+        """Fit all content to viewport with optimal zoom and centering.
+        
+        Calculates bounding box of all objects, computes zoom level to fit
+        content in viewport with padding, and centers view on content.
+        
+        This is typically called after loading/importing models to ensure
+        all content is immediately visible to the user.
+        
+        Args:
+            padding_percent: Percentage of viewport to leave as margin (10% default).
+                           Use 15% for larger imported models (SBML/KEGG).
+            deferred: If True, defer execution until next draw (when viewport size is known).
+            horizontal_offset_percent: Percentage of viewport width to offset center horizontally.
+                                     Positive values shift RIGHT (+X direction in Cartesian).
+                                     Typical: 20-30% when right panel visible, 0% when closed.
+            vertical_offset_percent: Percentage of viewport height to offset center vertically.
+                                   Positive values shift UP (increase Y in Cartesian).
+                                   Negative values shift DOWN (decrease Y in Cartesian).
+                                   Typical: +30% to shift content up when bottom panels are open.
+        
+        Returns:
+            bool: True if content was fitted, False if no content exists or deferred.
+        """
+        # If deferred, just set the flag and return
+        if deferred:
+            self._fit_to_page_pending = True
+            self._fit_to_page_padding = padding_percent
+            self._fit_to_page_horizontal_offset = horizontal_offset_percent
+            self._fit_to_page_vertical_offset = vertical_offset_percent
+            print(f"[fit_to_page] Deferred - will execute on next draw with {padding_percent}% padding, {horizontal_offset_percent}% horizontal offset, {vertical_offset_percent}% vertical offset")
+            return False
+        
+        bounds = self.get_content_bounds()
+        
+        if not bounds:
+            # No content - center on origin at default zoom
+            self.zoom = 1.0
+            self.viewport_controller.zoom = 1.0
+            self.pan_to(0.0, 0.0)
+            return False
+        
+        # Calculate content dimensions (add padding for object sizes)
+        min_x, min_y, max_x, max_y = bounds
+        print(f"[fit_to_page] Content bounds: ({min_x:.1f}, {min_y:.1f}) to ({max_x:.1f}, {max_y:.1f})")
+        
+        # Add ~40px padding to account for object sizes (places/transitions are ~20-30px radius)
+        content_width = max_x - min_x + 40
+        content_height = max_y - min_y + 40
+        
+        # Handle edge case: single object or very small cluster
+        if content_width < 40:
+            content_width = 40
+        if content_height < 40:
+            content_height = 40
+        
+        print(f"[fit_to_page] Content size: {content_width:.1f} x {content_height:.1f}")
+        print(f"[fit_to_page] Viewport size: {self.viewport_controller.viewport_width} x {self.viewport_controller.viewport_height}")
+        
+        # Calculate available viewport space (with padding margin)
+        # Use viewport controller's dimensions (synchronized with actual widget size)
+        padding_factor = 1.0 - (padding_percent / 100.0)
+        available_width = self.viewport_controller.viewport_width * padding_factor
+        available_height = self.viewport_controller.viewport_height * padding_factor
+        
+        # Compute zoom to fit both dimensions
+        zoom_x = available_width / content_width if content_width > 0 else 1.0
+        zoom_y = available_height / content_height if content_height > 0 else 1.0
+        target_zoom = min(zoom_x, zoom_y)  # Use smaller to fit both dimensions
+        
+        # Clamp to zoom limits
+        target_zoom = max(self.MIN_ZOOM, min(self.MAX_ZOOM, target_zoom))
+        
+        print(f"[fit_to_page] Calculated zoom: {target_zoom:.3f} (from zoom_x={zoom_x:.3f}, zoom_y={zoom_y:.3f})")
+        
+        # Apply zoom
+        self.zoom = target_zoom
+        self.viewport_controller.zoom = target_zoom
+        
+        # Center on content
+        center_x = (min_x + max_x) / 2.0
+        center_y = (min_y + max_y) / 2.0
+        print(f"[fit_to_page] Centering on: ({center_x:.1f}, {center_y:.1f})")
+        
+        # Calculate horizontal offset in world coordinates (for right panel accommodation)
+        # IMPORTANT: Offset is calculated as percentage of viewport BEFORE dividing by zoom
+        # This ensures offset remains constant in screen space regardless of zoom level
+        # In Cartesian world space: positive offset shifts content to the RIGHT (+X direction)
+        # This is achieved by moving the viewport LEFT (adding to pan_x)
+        # When right panel is open, this makes content appear more centered in visible area
+        horizontal_offset_world = (horizontal_offset_percent / 100.0) * self.viewport_controller.viewport_width / target_zoom
+        
+        # Calculate vertical offset in world coordinates
+        # IMPORTANT: Offset is calculated as percentage of viewport BEFORE dividing by zoom
+        # This ensures offset remains constant in screen space regardless of zoom level
+        # In Cartesian world space: positive offset shifts content UP (increase Y)
+        # This is achieved by moving the viewport DOWN (adding to pan_y)
+        # When bottom panels are open, use positive value to shift content up
+        vertical_offset_world = (vertical_offset_percent / 100.0) * self.viewport_controller.viewport_height / target_zoom
+        
+        # Set pan directly without clamping (we want to show content anywhere)
+        # ADD horizontal_offset to pan_x: shifts viewport LEFT, content appears RIGHT (positive X)
+        # ADD vertical_offset to pan_y: shifts viewport DOWN, content appears UP (increase Y in Cartesian)
+        self.viewport_controller.pan_x = center_x - (self.viewport_controller.viewport_width / 2) / target_zoom + horizontal_offset_world
+        self.viewport_controller.pan_y = center_y - (self.viewport_controller.viewport_height / 2) / target_zoom + vertical_offset_world
+        
+        # Update local references
+        self.pan_x = self.viewport_controller.pan_x
+        self.pan_y = self.viewport_controller.pan_y
+        
+        print(f"[fit_to_page] Final pan: ({self.pan_x:.1f}, {self.pan_y:.1f})")
+        
+        # Save view state and trigger redraw (NO clamping - show content anywhere)
+        self.save_view_state_to_file()
+        self._needs_redraw = True
+        
+        return True
+    
     # ==================== Grid Rendering ====================
     
     def get_grid_spacing(self):
@@ -1265,28 +1419,32 @@ class ModelCanvasManager:
         rotation = self.transformation_manager.get_rotation()
         if rotation:
             rotation.rotate_90_cw()
-            self.mark_dirty()
+            self.mark_dirty()  # Mark document as having unsaved changes
+            self.mark_needs_redraw()  # Trigger canvas redraw with new rotation
     
     def rotate_canvas_90_ccw(self):
         """Rotate canvas 90° counterclockwise."""
         rotation = self.transformation_manager.get_rotation()
         if rotation:
             rotation.rotate_90_ccw()
-            self.mark_dirty()
+            self.mark_dirty()  # Mark document as having unsaved changes
+            self.mark_needs_redraw()  # Trigger canvas redraw with new rotation
     
     def rotate_canvas_180(self):
         """Rotate canvas 180°."""
         rotation = self.transformation_manager.get_rotation()
         if rotation:
             rotation.rotate_180()
-            self.mark_dirty()
+            self.mark_dirty()  # Mark document as having unsaved changes
+            self.mark_needs_redraw()  # Trigger canvas redraw with new rotation
     
     def reset_canvas_rotation(self):
         """Reset canvas rotation to 0°."""
         rotation = self.transformation_manager.get_rotation()
         if rotation:
             rotation.reset()
-            self.mark_dirty()
+            self.mark_dirty()  # Mark document as having unsaved changes
+            self.mark_needs_redraw()  # Trigger canvas redraw with reset rotation
     
     def get_canvas_rotation_angle(self):
         """Get current canvas rotation angle in degrees.
@@ -1329,12 +1487,12 @@ class ModelCanvasManager:
         """
         return self._needs_redraw
     
-    def mark_clean(self):
-        """Mark canvas as clean (drawn)."""
+    def mark_canvas_clean(self):
+        """Mark canvas as clean (drawn) - internal rendering state."""
         self._needs_redraw = False
     
-    def mark_dirty(self):
-        """Mark canvas as dirty (needs redraw) and trigger widget redraw."""
+    def mark_needs_redraw(self):
+        """Mark canvas as needing redraw and trigger widget redraw - internal rendering state."""
         self._needs_redraw = True
         # Trigger widget redraw if callback is set
         if self._redraw_callback:
@@ -1443,7 +1601,8 @@ class ModelCanvasManager:
         self._initial_pan_set = False
         
         # Mark for redraw
-        self.mark_dirty()
+        self.mark_dirty()  # Mark document as having unsaved changes
+        self.mark_needs_redraw()  # Trigger canvas redraw with reset view
         
         # Validate initial state
         return self.validate_initial_state()
@@ -1566,6 +1725,93 @@ class ModelCanvasManager:
         """
         self._is_imported = False
     
+    # ==================== Per-Document File State Management (Phase 1) ====================
+    
+    def mark_dirty(self):
+        """Mark document as having unsaved changes.
+        
+        This is the new per-document dirty tracking system that replaces
+        the global NetObjPersistency dirty state. Each manager owns its
+        own dirty flag.
+        
+        Automatically called when objects are modified, added, or deleted.
+        Triggers on_dirty_changed callback to update UI (tab labels).
+        """
+        if not self._is_dirty:
+            self._is_dirty = True
+            print(f"[ModelCanvasManager] mark_dirty(): Document '{self.filename}' is now DIRTY")
+            if self.on_dirty_changed:
+                self.on_dirty_changed(True)
+    
+    def mark_clean(self):
+        """Mark document as saved (no unsaved changes).
+        
+        Call this after successful save operation.
+        Triggers on_dirty_changed callback to update UI (remove asterisk from tab).
+        """
+        if self._is_dirty:
+            self._is_dirty = False
+            print(f"[ModelCanvasManager] mark_clean(): Document '{self.filename}' is now CLEAN")
+            if self.on_dirty_changed:
+                self.on_dirty_changed(False)
+    
+    def is_dirty(self) -> bool:
+        """Check if document has unsaved changes.
+        
+        Returns:
+            bool: True if document has been modified since last save, False otherwise
+        """
+        return self._is_dirty
+    
+    def set_filepath(self, filepath: str):
+        """Set the full file path for this document.
+        
+        Updates both the filepath (full path) and filename (base name).
+        Used when saving document or loading from file.
+        
+        Args:
+            filepath: Full path to the .shy file (e.g., "/path/to/model.shy")
+        """
+        import os
+        self.filepath = filepath
+        if filepath:
+            # Extract base filename without extension
+            base_name = os.path.splitext(os.path.basename(filepath))[0]
+            self.filename = base_name
+            print(f"[ModelCanvasManager] set_filepath(): filepath='{filepath}', filename='{self.filename}'")
+        else:
+            self.filename = "default"
+            print(f"[ModelCanvasManager] set_filepath(): Cleared filepath, filename='default'")
+    
+    def get_filepath(self) -> str:
+        """Get the full file path for this document.
+        
+        Returns:
+            str: Full path to file, or None if document hasn't been saved yet
+        """
+        return self.filepath
+    
+    def has_filepath(self) -> bool:
+        """Check if document has an associated file path.
+        
+        Returns:
+            bool: True if document has been saved to a file, False if new/unsaved
+        """
+        return self.filepath is not None and self.filepath != ""
+    
+    def get_display_name(self) -> str:
+        """Get display name for this document.
+        
+        Returns:
+            str: Filename if saved, "Untitled" if new document
+        """
+        if self.has_filepath():
+            import os
+            return os.path.basename(self.filepath)
+        return "Untitled" if self.filename == "default" else self.filename
+    
+    # ==================== End Per-Document State Management ====================
+    
     def to_document_model(self):
         """Convert canvas manager's Petri net objects to a DocumentModel.
         
@@ -1577,10 +1823,15 @@ class ModelCanvasManager:
         """
         from shypn.data.canvas import DocumentModel
         
+        print(f"[ModelCanvasManager] to_document_model(): Converting manager state to document")
+        print(f"[ModelCanvasManager] to_document_model(): Manager has {len(self.places)} places, {len(self.transitions)} transitions, {len(self.arcs)} arcs")
+        
         document = DocumentModel()
         document.places = list(self.places)
         document.transitions = list(self.transitions)
         document.arcs = list(self.arcs)
+        
+        print(f"[ModelCanvasManager] to_document_model(): Document created with {len(document.places)} places, {len(document.transitions)} transitions, {len(document.arcs)} arcs")
         
         # Sync ID counters
         document._next_place_id = self._next_place_id
@@ -1630,7 +1881,8 @@ class ModelCanvasManager:
             # Mark that we don't need initial centering
             self._initial_pan_set = True
             
-            self.mark_dirty()
+            self.mark_dirty()  # Mark document as having unsaved changes
+            self.mark_needs_redraw()  # Trigger canvas redraw with restored view
     
     def save_view_state_to_file(self, filepath=None):
         """Save current view state to a JSON file.

@@ -482,6 +482,35 @@ class ModelCanvasLoader:
         # Set redraw callback so manager can trigger widget redraws
         manager.set_redraw_callback(lambda: drawing_area.queue_draw())
         
+        # PHASE 1: Wire dirty state callback to update tab label with asterisk
+        # This enables automatic tab label updates when document is modified
+        def on_dirty_changed(is_dirty):
+            """Callback when manager's dirty state changes.
+            
+            Updates the tab label to show/hide asterisk indicator.
+            """
+            try:
+                # Find the page widget for this drawing area
+                # Navigation: drawing_area -> GtkScrolledWindow -> GtkOverlay (page widget)
+                parent = drawing_area.get_parent()  # Should be GtkScrolledWindow
+                if parent:
+                    page_widget = parent.get_parent()  # Should be GtkOverlay
+                    if page_widget:
+                        # Get display name from manager (filename without path)
+                        display_name = manager.get_display_name()
+                        # Update tab label using existing method
+                        self._update_tab_label(page_widget, display_name, is_modified=is_dirty)
+                        
+                        # Find page number for logging
+                        page_num = self.notebook.page_num(page_widget)
+                        print(f"[ModelCanvasLoader] on_dirty_changed: Updated tab {page_num} - '{display_name}' dirty={is_dirty}")
+            except Exception as e:
+                print(f"[ModelCanvasLoader] on_dirty_changed ERROR: {e}")
+                import traceback
+                traceback.print_exc()
+        
+        manager.on_dirty_changed = on_dirty_changed
+        
         try:
             screen = drawing_area.get_screen()
             if screen:
@@ -499,6 +528,10 @@ class ModelCanvasLoader:
             return False
         drawing_area.connect('draw', on_draw_wrapper)
         self._setup_event_controllers(drawing_area, manager)
+        
+        # Trigger initial redraw now that draw handler is connected
+        # (create_new_document() called mark_needs_redraw() but handler wasn't connected yet)
+        manager.mark_needs_redraw()
         
         # Setup overlay manager to handle all palettes
         if overlay_box and overlay_widget:
@@ -1531,6 +1564,20 @@ class ModelCanvasLoader:
         """
         if manager.viewport_width != width or manager.viewport_height != height:
             manager.set_viewport_size(width, height)
+        
+        # Execute deferred fit_to_page if pending (after viewport size is known)
+        if hasattr(manager, '_fit_to_page_pending') and manager._fit_to_page_pending:
+            horizontal_offset = getattr(manager, '_fit_to_page_horizontal_offset', 0)
+            vertical_offset = getattr(manager, '_fit_to_page_vertical_offset', 0)
+            print(f"[_on_draw] Executing deferred fit_to_page with {manager._fit_to_page_padding}% padding, {horizontal_offset}% horizontal offset, {vertical_offset}% vertical offset")
+            manager._fit_to_page_pending = False  # Clear flag before execution
+            manager.fit_to_page(
+                padding_percent=manager._fit_to_page_padding,
+                deferred=False,
+                horizontal_offset_percent=horizontal_offset,
+                vertical_offset_percent=vertical_offset
+            )
+        
         cr.set_source_rgb(1.0, 1.0, 1.0)
         cr.paint()
         
@@ -1621,7 +1668,7 @@ class ModelCanvasLoader:
             arc_state = self._arc_state[drawing_area]
             if manager.is_tool_active() and manager.get_tool() == 'arc' and (arc_state['source'] is not None):
                 self._draw_arc_preview(cr, arc_state, manager)
-        manager.mark_clean()
+        manager.mark_canvas_clean()
 
     def _draw_arc_preview(self, cr, arc_state, manager):
         """Draw orange preview line for arc creation.
