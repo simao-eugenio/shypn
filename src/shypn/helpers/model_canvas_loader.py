@@ -1571,6 +1571,13 @@ class ModelCanvasLoader:
                 self.file_explorer_panel.save_current_document_as()
                 return True
         
+        # Open (Ctrl+O) - check both lowercase and uppercase
+        if is_ctrl and not is_shift and (event.keyval == Gdk.KEY_o or event.keyval == Gdk.KEY_O):
+            # Trigger open file dialog (FileChooser, not system file explorer)
+            if hasattr(self, 'file_explorer_panel') and self.file_explorer_panel:
+                self.file_explorer_panel.open_document()
+                return True
+        
         # Undo (Ctrl+Z) - check both lowercase and uppercase
         if is_ctrl and not is_shift and (event.keyval == Gdk.KEY_z or event.keyval == Gdk.KEY_Z):
             # TODO: Implement undo/redo functionality
