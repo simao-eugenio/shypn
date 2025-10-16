@@ -1268,12 +1268,16 @@ class FileExplorerPanel:
             # This is required for proper object state management and dirty tracking
             manager.document_controller.set_change_callback(manager._on_object_changed)
             
-            # Restore view state (zoom and pan)
+            # Restore view state (zoom, pan, and rotation)
             if hasattr(document, 'view_state') and document.view_state:
                 manager.zoom = document.view_state.get('zoom', 1.0)
                 manager.pan_x = document.view_state.get('pan_x', 0.0)
                 manager.pan_y = document.view_state.get('pan_y', 0.0)
                 manager._initial_pan_set = True  # Mark as set to prevent auto-centering
+                
+                # Restore transformations (rotation) if available
+                if 'transformations' in document.view_state:
+                    manager.transformation_manager.from_dict(document.view_state['transformations'])
             else:
                 # No saved view state - fit content to page automatically
                 # Use 30% horizontal offset to shift right (accounting for right panel)
