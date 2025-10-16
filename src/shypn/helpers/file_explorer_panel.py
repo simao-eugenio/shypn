@@ -60,8 +60,10 @@ class FileExplorerPanel:
             base_path: Starting directory (default: project root or home)
             root_boundary: Root boundary - cannot navigate above this (default: same as base_path)
         """
+        print(f"[FileExplorerPanel] __init__: base_path='{base_path}', root_boundary='{root_boundary}'")
         self.builder = builder
         self.explorer = FileExplorer(base_path=base_path, root_boundary=root_boundary)
+        print(f"[FileExplorerPanel] __init__: FileExplorer created with current_path='{self.explorer.current_path}', root_boundary='{self.explorer.root_boundary}'")
         self.explorer.on_path_changed = self._on_path_changed
         self.explorer.on_error = self._on_error
         # Default file is now in workspace/examples/
@@ -204,11 +206,79 @@ class FileExplorerPanel:
         self.tree_view.connect('button-press-event', self._on_tree_view_button_press)
         self.scrolled_window.connect('button-press-event', self._on_scroll_button_press)
 
+    def _get_expanded_paths(self):
+        """Get list of currently expanded directory paths in tree view.
+        
+        Returns:
+            set: Set of expanded directory paths
+        """
+        expanded = set()
+        
+        def collect_expanded(tree_iter):
+            """Recursively collect expanded paths."""
+            while tree_iter:
+                path = self.store.get_value(tree_iter, 2)  # Column 2 is the path
+                is_dir = self.store.get_value(tree_iter, 3)  # Column 3 is is_directory
+                tree_path = self.store.get_path(tree_iter)
+                
+                if is_dir and self.tree_view.row_expanded(tree_path):
+                    expanded.add(path)
+                
+                # Check children
+                child_iter = self.store.iter_children(tree_iter)
+                if child_iter:
+                    collect_expanded(child_iter)
+                
+                tree_iter = self.store.iter_next(tree_iter)
+        
+        # Start from root
+        root_iter = self.store.get_iter_first()
+        if root_iter:
+            collect_expanded(root_iter)
+        
+        return expanded
+    
+    def _restore_expanded_paths(self, expanded_paths):
+        """Restore expanded state for directories in tree view.
+        
+        Args:
+            expanded_paths: Set of directory paths that should be expanded
+        """
+        if not expanded_paths:
+            return
+        
+        def expand_paths(tree_iter):
+            """Recursively expand paths that were previously expanded."""
+            while tree_iter:
+                path = self.store.get_value(tree_iter, 2)  # Column 2 is the path
+                is_dir = self.store.get_value(tree_iter, 3)  # Column 3 is is_directory
+                tree_path = self.store.get_path(tree_iter)
+                
+                if is_dir and path in expanded_paths:
+                    self.tree_view.expand_to_path(tree_path)
+                
+                # Check children
+                child_iter = self.store.iter_children(tree_iter)
+                if child_iter:
+                    expand_paths(child_iter)
+                
+                tree_iter = self.store.iter_next(tree_iter)
+        
+        # Start from root
+        root_iter = self.store.get_iter_first()
+        if root_iter:
+            expand_paths(root_iter)
+
     def _load_current_directory(self):
         """Load current directory contents into tree view (Controller logic)."""
+        # Save expanded state before clearing
+        expanded_paths = self._get_expanded_paths() if self.hierarchical_view else set()
+        
         self.store.clear()
         if self.hierarchical_view:
             self._load_directory_tree(self.explorer.current_path, None)
+            # Restore expanded state after loading
+            self._restore_expanded_paths(expanded_paths)
         else:
             self._load_directory_flat(self.explorer.current_path)
         if self.current_file_label:
@@ -462,27 +532,50 @@ class FileExplorerPanel:
         except Exception as e:
             pass
 
-    def _on_rename_clicked(self, button):
-        """Handle 'Rename' context menu button."""
+    def _on_rename_clicked(self, menu_item):
+        """Handle 'Rename' context menu item.
+        
+        Args:
+            menu_item: The Gtk.MenuItem that was activated (from 'activate' signal)
+        """
         if self.selected_item_path:
             self._show_rename_dialog()
 
-    def _on_delete_clicked(self, button):
-        """Handle 'Delete' context menu button."""
+    def _on_delete_clicked(self, menu_item):
+        """Handle 'Delete' context menu item.
+        
+        Args:
+            menu_item: The Gtk.MenuItem that was activated (from 'activate' signal)
+        """
+        print(f"[FileExplorer] _on_delete_clicked: selected_item_path='{self.selected_item_path}'")
         if self.selected_item_path:
             self._show_delete_confirmation()
+        else:
+            print("[FileExplorer] _on_delete_clicked: No item selected!")
 
-    def _on_refresh_clicked(self, button):
-        """Handle 'Refresh' context menu button."""
+    def _on_refresh_clicked(self, menu_item):
+        """Handle 'Refresh' context menu item.
+        
+        Args:
+            menu_item: The Gtk.MenuItem that was activated (from 'activate' signal)
+        """
         self._load_current_directory()
 
-    def _on_properties_clicked(self, button):
-        """Handle 'Properties' context menu button."""
+    def _on_properties_clicked(self, menu_item):
+        """Handle 'Properties' context menu item.
+        
+        Args:
+            menu_item: The Gtk.MenuItem that was activated (from 'activate' signal)
+        """
         if self.selected_item_path:
             self._show_properties_dialog()
 
-    def _on_context_open_clicked(self, button):
-        """Handle 'Open' from context menu - opens file in canvas."""
+    def _on_context_open_clicked(self, menu_item):
+        """Handle 'Open' from context menu - opens file in canvas.
+        
+        Args:
+            menu_item: The Gtk.MenuItem that was activated (from 'activate' signal)
+        """
         if self.selected_item_path and (not self.selected_item_is_dir):
             if not self.selected_item_path.endswith('.shy'):
                 if self.explorer.on_error:
@@ -493,20 +586,36 @@ class FileExplorerPanel:
             else:
                 self._open_file_from_path(self.selected_item_path)
 
-    def _on_context_new_file_clicked(self, button):
-        """Handle 'New File' from context menu - creates new .shy file inline."""
+    def _on_context_new_file_clicked(self, menu_item):
+        """Handle 'New File' from context menu - creates new .shy file inline.
+        
+        Args:
+            menu_item: The Gtk.MenuItem that was activated (from 'activate' signal)
+        """
         self._start_inline_edit_new_file()
 
-    def _on_context_new_folder_clicked(self, button):
-        """Handle 'New Folder' from context menu - creates new folder inline."""
+    def _on_context_new_folder_clicked(self, menu_item):
+        """Handle 'New Folder' from context menu - creates new folder inline.
+        
+        Args:
+            menu_item: The Gtk.MenuItem that was activated (from 'activate' signal)
+        """
         self._start_inline_edit_new_folder()
 
-    def _on_context_save_clicked(self, button):
-        """Handle 'Save' from context menu - saves current document."""
+    def _on_context_save_clicked(self, menu_item):
+        """Handle 'Save' from context menu - saves current document.
+        
+        Args:
+            menu_item: The Gtk.MenuItem that was activated (from 'activate' signal)
+        """
         self.save_current_document()
 
-    def _on_context_save_as_clicked(self, button):
-        """Handle 'Save As' from context menu - saves with new name."""
+    def _on_context_save_as_clicked(self, menu_item):
+        """Handle 'Save As' from context menu - saves with new name.
+        
+        Args:
+            menu_item: The Gtk.MenuItem that was activated (from 'activate' signal)
+        """
         self.save_current_document_as()
 
     def _start_inline_edit_new_file(self):
@@ -923,29 +1032,85 @@ class FileExplorerPanel:
         self.canvas_loader = canvas_loader
 
     def save_current_document(self):
-        """Save the current document using the persistency manager.
+        """Save the current document using per-document state.
         
-        This method properly checks the ModelCanvasManager's is_default_filename()
-        flag to determine if a file chooser should be shown.
+        PHASE 1 REFACTORING: Now uses manager's filepath and is_dirty state
+        instead of global persistency state. This fixes multi-document issues.
+        
+        Behavior:
+        - If manager has no filepath (new/unsaved): Show save dialog
+        - If manager.is_default_filename() (imported/default): Show save dialog
+        - Otherwise: Save directly to manager's filepath
         """
         try:
             if not hasattr(self, 'canvas_loader') or self.canvas_loader is None:
                 return
             if not hasattr(self, 'persistency') or self.persistency is None:
                 return
+            
             drawing_area = self.canvas_loader.get_current_document()
             if drawing_area is None:
                 return
+            
             manager = self.canvas_loader.get_canvas_manager(drawing_area)
             if manager is None:
                 return
+            
+            # Convert canvas state to document model
             document = manager.to_document_model()
+            print(f"[FileExplorer] save_current_document: Document created with {len(document.places)} places, {len(document.transitions)} transitions, {len(document.arcs)} arcs")
             
-            # Set suggested filename from manager (for imported documents)
-            if manager.filename and manager.filename != "default":
-                self.persistency.suggested_filename = manager.filename
+            # Determine if we need to show file chooser
+            needs_chooser = not manager.has_filepath() or manager.is_default_filename()
             
-            self.persistency.save_document(document, save_as=False, is_default_filename=manager.is_default_filename())
+            if needs_chooser:
+                # Show save dialog (new document or imported)
+                print(f"[FileExplorer] save_current_document: Showing save dialog (filepath={manager.get_filepath()}, is_default={manager.is_default_filename()})")
+                
+                # Set suggested filename from manager
+                if manager.filename and manager.filename != "default":
+                    self.persistency.suggested_filename = manager.filename
+                
+                # Show file chooser
+                filepath = self.persistency._show_save_dialog()
+                if not filepath:
+                    print("[FileExplorer] save_current_document: User cancelled save dialog")
+                    return  # User cancelled
+                
+                # Save to chosen file
+                print(f"[FileExplorer] save_current_document: Saving to '{filepath}'")
+                document.save_to_file(filepath)
+                
+                # Update manager state
+                manager.set_filepath(filepath)
+                manager.mark_clean()
+                manager.mark_as_saved()  # Clear imported flag
+                
+                # Update UI
+                import os
+                filename = os.path.basename(filepath)
+                self.canvas_loader.update_current_tab_label(filename, is_modified=False)
+                self.set_current_file(filepath)
+                self._load_current_directory()  # Refresh file tree
+                
+                print(f"[FileExplorer] save_current_document: SUCCESS - saved to '{filepath}'")
+            else:
+                # Direct save to existing file
+                filepath = manager.get_filepath()
+                print(f"[FileExplorer] save_current_document: Direct save to existing file '{filepath}'")
+                
+                document.save_to_file(filepath)
+                
+                # Update manager state
+                manager.mark_clean()
+                
+                # Update UI
+                import os
+                filename = os.path.basename(filepath)
+                self.canvas_loader.update_current_tab_label(filename, is_modified=False)
+                
+                print(f"[FileExplorer] save_current_document: SUCCESS - saved to '{filepath}'")
+                
         except Exception as e:
             print(f"[FileExplorer] save_current_document ERROR: {e}", file=sys.stderr)
             import traceback
@@ -954,26 +1119,55 @@ class FileExplorerPanel:
     def save_current_document_as(self):
         """Save the current document with a new name (Save As).
         
-        Always shows file chooser regardless of filename state.
+        PHASE 1 REFACTORING: Now uses manager's filepath and updates it after save.
+        Always shows file chooser regardless of current state.
         """
         try:
             if not hasattr(self, 'canvas_loader') or self.canvas_loader is None:
                 return
             if not hasattr(self, 'persistency') or self.persistency is None:
                 return
+            
             drawing_area = self.canvas_loader.get_current_document()
             if drawing_area is None:
                 return
+            
             manager = self.canvas_loader.get_canvas_manager(drawing_area)
             if manager is None:
                 return
+            
+            # Convert canvas state to document model
             document = manager.to_document_model()
             
-            # Set suggested filename from manager (for imported documents)
+            # Set suggested filename from manager
             if manager.filename and manager.filename != "default":
                 self.persistency.suggested_filename = manager.filename
             
-            self.persistency.save_document(document, save_as=True)
+            # Always show file chooser for Save As
+            print(f"[FileExplorer] save_current_document_as: Showing save dialog")
+            filepath = self.persistency._show_save_dialog()
+            if not filepath:
+                print("[FileExplorer] save_current_document_as: User cancelled save dialog")
+                return  # User cancelled
+            
+            # Save to chosen file
+            print(f"[FileExplorer] save_current_document_as: Saving to '{filepath}'")
+            document.save_to_file(filepath)
+            
+            # Update manager state
+            manager.set_filepath(filepath)
+            manager.mark_clean()
+            manager.mark_as_saved()  # Clear imported flag
+            
+            # Update UI - CRITICAL: Update tab label with new filename
+            import os
+            filename = os.path.basename(filepath)
+            self.canvas_loader.update_current_tab_label(filename, is_modified=False)
+            self.set_current_file(filepath)
+            self._load_current_directory()  # Refresh file tree
+            
+            print(f"[FileExplorer] save_current_document_as: SUCCESS - saved to '{filepath}'")
+            
         except Exception as e:
             print(f"[FileExplorer] save_current_document_as ERROR: {e}", file=sys.stderr)
             import traceback
@@ -1017,6 +1211,9 @@ class FileExplorerPanel:
         try:
             from shypn.data.canvas.document_model import DocumentModel
             document = DocumentModel.load_from_file(filepath)
+            print(f"[FileExplorer] _open_file_from_path: Loaded document from '{filepath}'")
+            if document:
+                print(f"[FileExplorer] _open_file_from_path: Document has {len(document.places)} places, {len(document.transitions)} transitions, {len(document.arcs)} arcs")
             self._load_document_into_canvas(document, filepath)
         except Exception as e:
             import traceback
@@ -1068,12 +1265,25 @@ class FileExplorerPanel:
                 manager.pan_x = document.view_state.get('pan_x', 0.0)
                 manager.pan_y = document.view_state.get('pan_y', 0.0)
                 manager._initial_pan_set = True  # Mark as set to prevent auto-centering
+            else:
+                # No saved view state - fit content to page automatically
+                # Use 30% horizontal offset to shift right (accounting for right panel)
+                # Use +10% vertical offset to shift UP in Cartesian space (increase Y)
+                manager.fit_to_page(padding_percent=10, horizontal_offset_percent=30, vertical_offset_percent=10)
             
+            # PHASE 1: Set per-document file state
+            # Initialize manager's filepath and mark as clean (just loaded)
+            manager.set_filepath(filepath)
+            manager.mark_clean()  # Just loaded, no unsaved changes
+            print(f"[FileExplorer] _load_document_into_canvas: Set filepath='{filepath}', marked clean")
+            
+            # Legacy: Also update global persistency for backward compatibility
             if hasattr(self, 'persistency') and self.persistency:
                 self.persistency.set_filepath(filepath)
                 self.persistency.mark_clean()
             
             # Update tab label to show the actual filename
+            self.canvas_loader.update_current_tab_label(filename, is_modified=False)
             self.canvas_loader.update_current_tab_label(filename, is_modified=False)
             
             drawing_area.queue_draw()

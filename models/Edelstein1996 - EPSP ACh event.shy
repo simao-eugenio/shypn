@@ -1,0 +1,1343 @@
+{
+  "version": "2.0",
+  "metadata": {
+    "created": "2025-10-15T22:10:59.123753",
+    "object_counts": {
+      "places": 12,
+      "transitions": 17,
+      "arcs": 34
+    }
+  },
+  "view_state": {
+    "zoom": 0.49052397247967405,
+    "pan_x": 757.5521784742326,
+    "pan_y": 641.4459615261687
+  },
+  "places": [
+    {
+      "id": 1,
+      "name": "P1",
+      "label": "BasalACh2",
+      "type": "place",
+      "x": 98.96551724137933,
+      "y": 48.9655172413793,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": 2,
+      "name": "P2",
+      "label": "IntermediateACh",
+      "type": "place",
+      "x": 198.96551724137933,
+      "y": 348.9655172413793,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": 3,
+      "name": "P3",
+      "label": "ActiveACh",
+      "type": "place",
+      "x": 198.96551724137933,
+      "y": 48.9655172413793,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": 4,
+      "name": "P4",
+      "label": "Active",
+      "type": "place",
+      "x": 248.96551724137933,
+      "y": -251.0344827586207,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": 5,
+      "name": "P5",
+      "label": "BasalACh",
+      "type": "place",
+      "x": 148.96551724137933,
+      "y": -251.0344827586207,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": 6,
+      "name": "P6",
+      "label": "Basal",
+      "type": "place",
+      "x": 198.96551724137933,
+      "y": -551.0344827586207,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": 7,
+      "name": "P7",
+      "label": "DesensitisedACh2",
+      "type": "place",
+      "x": 198.96551724137933,
+      "y": 948.9655172413793,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": 8,
+      "name": "P8",
+      "label": "Desensitised",
+      "type": "place",
+      "x": 298.9655172413793,
+      "y": 348.9655172413793,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": 9,
+      "name": "P9",
+      "label": "IntermediateACh2",
+      "type": "place",
+      "x": 148.96551724137933,
+      "y": 648.9655172413793,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": 10,
+      "name": "P10",
+      "label": "DesensitisedACh",
+      "type": "place",
+      "x": 248.96551724137933,
+      "y": 648.9655172413793,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": 11,
+      "name": "P11",
+      "label": "Intermediate",
+      "type": "place",
+      "x": 298.9655172413793,
+      "y": 48.9655172413793,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": 12,
+      "name": "P12",
+      "label": "ActiveACh2",
+      "type": "place",
+      "x": 98.96551724137933,
+      "y": 348.9655172413793,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "id": 1,
+      "name": "T1",
+      "label": "React0",
+      "type": "transition",
+      "x": 148.96551724137933,
+      "y": -401.0344827586207,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "stochastic",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "rate": 1.0
+    },
+    {
+      "id": 2,
+      "name": "T2",
+      "label": "React1",
+      "type": "transition",
+      "x": 48.96551724137933,
+      "y": -101.0344827586207,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "stochastic",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "rate": 1.0
+    },
+    {
+      "id": 3,
+      "name": "T3",
+      "label": "React2",
+      "type": "transition",
+      "x": -1.034482758620669,
+      "y": 198.9655172413793,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "stochastic",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "rate": 1.0
+    },
+    {
+      "id": 4,
+      "name": "T4",
+      "label": "React3",
+      "type": "transition",
+      "x": 248.96551724137933,
+      "y": -101.0344827586207,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "stochastic",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "rate": 1.0
+    },
+    {
+      "id": 5,
+      "name": "T5",
+      "label": "React4",
+      "type": "transition",
+      "x": 98.96551724137933,
+      "y": 198.9655172413793,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "stochastic",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "rate": 1.0
+    },
+    {
+      "id": 6,
+      "name": "T6",
+      "label": "React5",
+      "type": "transition",
+      "x": 248.96551724137933,
+      "y": -401.0344827586207,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "stochastic",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "rate": 1.0
+    },
+    {
+      "id": 7,
+      "name": "T7",
+      "label": "React6",
+      "type": "transition",
+      "x": 148.96551724137933,
+      "y": -101.0344827586207,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "stochastic",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "rate": 1.0
+    },
+    {
+      "id": 8,
+      "name": "T8",
+      "label": "React7",
+      "type": "transition",
+      "x": 298.9655172413793,
+      "y": 198.9655172413793,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "stochastic",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "rate": 1.0
+    },
+    {
+      "id": 9,
+      "name": "T9",
+      "label": "React8",
+      "type": "transition",
+      "x": 148.96551724137933,
+      "y": 498.9655172413793,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "stochastic",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "rate": 1.0
+    },
+    {
+      "id": 10,
+      "name": "T10",
+      "label": "React9",
+      "type": "transition",
+      "x": 348.9655172413793,
+      "y": -101.0344827586207,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "stochastic",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "rate": 1.0
+    },
+    {
+      "id": 11,
+      "name": "T11",
+      "label": "React10",
+      "type": "transition",
+      "x": 198.96551724137933,
+      "y": 198.9655172413793,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "stochastic",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "rate": 1.0
+    },
+    {
+      "id": 12,
+      "name": "T12",
+      "label": "React11",
+      "type": "transition",
+      "x": 48.96551724137933,
+      "y": 498.9655172413793,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "stochastic",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "rate": 1.0
+    },
+    {
+      "id": 13,
+      "name": "T13",
+      "label": "React12",
+      "type": "transition",
+      "x": 348.9655172413793,
+      "y": 498.9655172413793,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "stochastic",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "rate": 1.0
+    },
+    {
+      "id": 14,
+      "name": "T14",
+      "label": "React13",
+      "type": "transition",
+      "x": 248.96551724137933,
+      "y": 798.9655172413793,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "stochastic",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "rate": 1.0
+    },
+    {
+      "id": 15,
+      "name": "T15",
+      "label": "React14",
+      "type": "transition",
+      "x": 398.9655172413793,
+      "y": 198.9655172413793,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "stochastic",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "rate": 1.0
+    },
+    {
+      "id": 16,
+      "name": "T16",
+      "label": "React15",
+      "type": "transition",
+      "x": 248.96551724137933,
+      "y": 498.9655172413793,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "stochastic",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "rate": 1.0
+    },
+    {
+      "id": 17,
+      "name": "T17",
+      "label": "React16",
+      "type": "transition",
+      "x": 148.96551724137933,
+      "y": 798.9655172413793,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "stochastic",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "rate": 1.0
+    }
+  ],
+  "arcs": [
+    {
+      "id": 1,
+      "name": "A1",
+      "label": "",
+      "type": "arc",
+      "source_id": 6,
+      "source_type": "place",
+      "target_id": 1,
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": 2,
+      "name": "A2",
+      "label": "",
+      "type": "arc",
+      "source_id": 1,
+      "source_type": "transition",
+      "target_id": 5,
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": 3,
+      "name": "A3",
+      "label": "",
+      "type": "arc",
+      "source_id": 5,
+      "source_type": "place",
+      "target_id": 2,
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": 4,
+      "name": "A4",
+      "label": "",
+      "type": "arc",
+      "source_id": 2,
+      "source_type": "transition",
+      "target_id": 1,
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": 5,
+      "name": "A5",
+      "label": "",
+      "type": "arc",
+      "source_id": 1,
+      "source_type": "place",
+      "target_id": 3,
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": 6,
+      "name": "A6",
+      "label": "",
+      "type": "arc",
+      "source_id": 3,
+      "source_type": "transition",
+      "target_id": 12,
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": 7,
+      "name": "A7",
+      "label": "",
+      "type": "arc",
+      "source_id": 4,
+      "source_type": "place",
+      "target_id": 4,
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": 8,
+      "name": "A8",
+      "label": "",
+      "type": "arc",
+      "source_id": 4,
+      "source_type": "transition",
+      "target_id": 3,
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": 9,
+      "name": "A9",
+      "label": "",
+      "type": "arc",
+      "source_id": 3,
+      "source_type": "place",
+      "target_id": 5,
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": 10,
+      "name": "A10",
+      "label": "",
+      "type": "arc",
+      "source_id": 5,
+      "source_type": "transition",
+      "target_id": 12,
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": 11,
+      "name": "A11",
+      "label": "",
+      "type": "arc",
+      "source_id": 6,
+      "source_type": "place",
+      "target_id": 6,
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": 12,
+      "name": "A12",
+      "label": "",
+      "type": "arc",
+      "source_id": 6,
+      "source_type": "transition",
+      "target_id": 4,
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": 13,
+      "name": "A13",
+      "label": "",
+      "type": "arc",
+      "source_id": 5,
+      "source_type": "place",
+      "target_id": 7,
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": 14,
+      "name": "A14",
+      "label": "",
+      "type": "arc",
+      "source_id": 7,
+      "source_type": "transition",
+      "target_id": 3,
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": 15,
+      "name": "A15",
+      "label": "",
+      "type": "arc",
+      "source_id": 11,
+      "source_type": "place",
+      "target_id": 8,
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": 16,
+      "name": "A16",
+      "label": "",
+      "type": "arc",
+      "source_id": 8,
+      "source_type": "transition",
+      "target_id": 2,
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": 17,
+      "name": "A17",
+      "label": "",
+      "type": "arc",
+      "source_id": 2,
+      "source_type": "place",
+      "target_id": 9,
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": 18,
+      "name": "A18",
+      "label": "",
+      "type": "arc",
+      "source_id": 9,
+      "source_type": "transition",
+      "target_id": 9,
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": 19,
+      "name": "A19",
+      "label": "",
+      "type": "arc",
+      "source_id": 4,
+      "source_type": "place",
+      "target_id": 10,
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": 20,
+      "name": "A20",
+      "label": "",
+      "type": "arc",
+      "source_id": 10,
+      "source_type": "transition",
+      "target_id": 11,
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": 21,
+      "name": "A21",
+      "label": "",
+      "type": "arc",
+      "source_id": 3,
+      "source_type": "place",
+      "target_id": 11,
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": 22,
+      "name": "A22",
+      "label": "",
+      "type": "arc",
+      "source_id": 11,
+      "source_type": "transition",
+      "target_id": 2,
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": 23,
+      "name": "A23",
+      "label": "",
+      "type": "arc",
+      "source_id": 12,
+      "source_type": "place",
+      "target_id": 12,
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": 24,
+      "name": "A24",
+      "label": "",
+      "type": "arc",
+      "source_id": 12,
+      "source_type": "transition",
+      "target_id": 9,
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": 25,
+      "name": "A25",
+      "label": "",
+      "type": "arc",
+      "source_id": 8,
+      "source_type": "place",
+      "target_id": 13,
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": 26,
+      "name": "A26",
+      "label": "",
+      "type": "arc",
+      "source_id": 13,
+      "source_type": "transition",
+      "target_id": 10,
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": 27,
+      "name": "A27",
+      "label": "",
+      "type": "arc",
+      "source_id": 10,
+      "source_type": "place",
+      "target_id": 14,
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": 28,
+      "name": "A28",
+      "label": "",
+      "type": "arc",
+      "source_id": 14,
+      "source_type": "transition",
+      "target_id": 7,
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": 29,
+      "name": "A29",
+      "label": "",
+      "type": "arc",
+      "source_id": 11,
+      "source_type": "place",
+      "target_id": 15,
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": 30,
+      "name": "A30",
+      "label": "",
+      "type": "arc",
+      "source_id": 15,
+      "source_type": "transition",
+      "target_id": 8,
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": 31,
+      "name": "A31",
+      "label": "",
+      "type": "arc",
+      "source_id": 2,
+      "source_type": "place",
+      "target_id": 16,
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": 32,
+      "name": "A32",
+      "label": "",
+      "type": "arc",
+      "source_id": 16,
+      "source_type": "transition",
+      "target_id": 10,
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": 33,
+      "name": "A33",
+      "label": "",
+      "type": "arc",
+      "source_id": 9,
+      "source_type": "place",
+      "target_id": 17,
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": 34,
+      "name": "A34",
+      "label": "",
+      "type": "arc",
+      "source_id": 17,
+      "source_type": "transition",
+      "target_id": 7,
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    }
+  ]
+}

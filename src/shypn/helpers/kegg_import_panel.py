@@ -298,6 +298,14 @@ class KEGGImportPanel:
                     # This is required for proper object state management and dirty tracking
                     manager.document_controller.set_change_callback(manager._on_object_changed)
                     
+                    # Fit imported content to page (KEGG models often have extreme coordinates)
+                    # Use 15% padding for better visibility of large imported models
+                    # Use 30% horizontal offset to shift right (accounting for right panel)
+                    # Use +10% vertical offset to shift UP in Cartesian space (increase Y)
+                    # Offsets are calculated in screen space, so they remain constant regardless of zoom
+                    # DEFERRED: Wait until viewport dimensions are set on first draw
+                    manager.fit_to_page(padding_percent=15, deferred=True, horizontal_offset_percent=30, vertical_offset_percent=10)
+                    
                     # Mark as imported so "Save" triggers "Save As" behavior
                     manager.mark_as_imported(pathway_name)
                     
