@@ -415,18 +415,86 @@ class ModelCanvasLoader:
             self.add_document(filename='default')
         return True
 
-    def add_document(self, title=None, filename=None):
+    def is_current_tab_empty_default(self):
+        """Check if current tab is an empty default tab that can be replaced.
+        
+        Returns:
+            bool: True if current tab is empty default (no objects, default name, not dirty)
+        """
+        current_page = self.notebook.get_current_page()
+        if current_page < 0:
+            return False
+        
+        page_widget = self.notebook.get_nth_page(current_page)
+        drawing_area = self._get_drawing_area_from_page(page_widget)
+        if not drawing_area:
+            return False
+        
+        manager = self.canvas_managers.get(drawing_area)
+        if not manager:
+            return False
+        
+        # Check if it's truly empty and default
+        has_objects = (len(manager.places) > 0 or 
+                      len(manager.transitions) > 0 or 
+                      len(manager.arcs) > 0)
+        is_default_name = manager.filename in ('default', 'default.shy')
+        is_clean = not manager.is_dirty()
+        
+        return not has_objects and is_default_name and is_clean
+
+    def _get_drawing_area_from_page(self, page_widget):
+        """Extract drawing area from a notebook page widget.
+        
+        Args:
+            page_widget: Notebook page widget (Gtk.Overlay or Gtk.ScrolledWindow)
+            
+        Returns:
+            Gtk.DrawingArea or None
+        """
+        if isinstance(page_widget, Gtk.Overlay):
+            scrolled = page_widget.get_child()
+            if isinstance(scrolled, Gtk.ScrolledWindow):
+                return scrolled.get_child()
+        elif isinstance(page_widget, Gtk.ScrolledWindow):
+            return page_widget.get_child()
+        return None
+
+    def add_document(self, title=None, filename=None, replace_empty_default=True):
         """Add a new document (tab) to the canvas.
         
         Args:
             title: Optional title for the new document tab (deprecated, use filename).
             filename: Base filename without extension (default: "default").
+            replace_empty_default: If True, replace current tab if it's empty default (default: True).
             
         Returns:
             tuple: (page_index, drawing_area) for the new document.
         """
         if self.notebook is None:
             raise RuntimeError('Canvas not loaded. Call load() first.')
+        
+        # Check if we should replace the current empty default tab
+        if replace_empty_default and self.is_current_tab_empty_default():
+            print(f"[ModelCanvasLoader] add_document: Replacing empty default tab with '{filename}'")
+            current_page = self.notebook.get_current_page()
+            page_widget = self.notebook.get_nth_page(current_page)
+            drawing_area = self._get_drawing_area_from_page(page_widget)
+            
+            if drawing_area:
+                # Get the manager and update its filename
+                manager = self.canvas_managers.get(drawing_area)
+                if manager:
+                    # Update manager's filename
+                    manager.filename = filename if filename else 'default'
+                    
+                    # Update tab label with new filename
+                    self.update_current_tab_label(filename if filename else 'default', is_modified=False)
+                    
+                    print(f"[ModelCanvasLoader] add_document: Reusing current tab (page {current_page})")
+                    return (current_page, drawing_area)
+        
+        # Create new tab
         self.document_count += 1
         if filename is None:
             if title:
