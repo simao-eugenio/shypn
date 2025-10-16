@@ -275,6 +275,7 @@ class NetObjPersistency:
         # Ensure parent window is set (fixes Wayland crash)
         parent = self.parent_window if self.parent_window else None
         dialog = Gtk.MessageDialog(parent=parent, modal=True, message_type=Gtk.MessageType.WARNING, buttons=Gtk.ButtonsType.NONE, text='Unsaved changes')
+        dialog.set_keep_above(True)  # Ensure dialog stays on top
         dialog.format_secondary_text(f"Document '{self.get_display_name()}' has unsaved changes.\n" + 'Do you want to save before continuing?')
         dialog.add_button('Cancel', Gtk.ResponseType.CANCEL)
         dialog.add_button('Discard Changes', Gtk.ResponseType.NO)
@@ -310,6 +311,7 @@ class NetObjPersistency:
         # Ensure parent window is set (fixes Wayland crash)
         parent = self.parent_window if self.parent_window else None
         dialog = Gtk.FileChooserDialog(title='Save Petri Net', parent=parent, action=Gtk.FileChooserAction.SAVE)
+        dialog.set_keep_above(True)  # Ensure dialog stays on top
         dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_SAVE, Gtk.ResponseType.OK)
         dialog.set_default_response(Gtk.ResponseType.OK)
         dialog.set_do_overwrite_confirmation(True)
@@ -354,6 +356,7 @@ class NetObjPersistency:
         filename = os.path.basename(filepath)
         if filename.lower() == 'default.shy':
             warning_dialog = Gtk.MessageDialog(parent=parent, modal=True, message_type=Gtk.MessageType.WARNING, buttons=Gtk.ButtonsType.YES_NO, text="Save as 'default.shy'?")
+            warning_dialog.set_keep_above(True)  # Ensure dialog stays on top
             warning_dialog.format_secondary_text("You are about to save with the default filename 'default.shy'.\n\nThis may overwrite existing default files or make it hard to identify this model later.\n\nDo you want to continue with this filename?")
             warning_response = warning_dialog.run()
             warning_dialog.destroy()
@@ -371,6 +374,7 @@ class NetObjPersistency:
         # Ensure parent window is set (fixes Wayland crash)
         parent = self.parent_window if self.parent_window else None
         dialog = Gtk.FileChooserDialog(title='Open Petri Net', parent=parent, action=Gtk.FileChooserAction.OPEN)
+        dialog.set_keep_above(True)  # Ensure dialog stays on top
         dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.OK)
         dialog.set_default_response(Gtk.ResponseType.OK)
         filter_shy = Gtk.FileFilter()
@@ -403,6 +407,7 @@ class NetObjPersistency:
         # Ensure parent window is set (fixes Wayland crash)
         parent = self.parent_window if self.parent_window else None
         dialog = Gtk.MessageDialog(parent=parent, modal=True, message_type=Gtk.MessageType.INFO, buttons=Gtk.ButtonsType.OK, text=title)
+        dialog.set_keep_above(True)  # Ensure dialog stays on top
         dialog.format_secondary_text(message)
         dialog.run()
         dialog.destroy()
@@ -417,6 +422,7 @@ class NetObjPersistency:
         # Ensure parent window is set (fixes Wayland crash)
         parent = self.parent_window if self.parent_window else None
         dialog = Gtk.MessageDialog(parent=parent, modal=True, message_type=Gtk.MessageType.ERROR, buttons=Gtk.ButtonsType.OK, text=title)
+        dialog.set_keep_above(True)  # Ensure dialog stays on top
         dialog.format_secondary_text(message)
         dialog.run()
         dialog.destroy()
