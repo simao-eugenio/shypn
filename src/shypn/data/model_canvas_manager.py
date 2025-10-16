@@ -1844,11 +1844,12 @@ class ModelCanvasManager:
         document._next_transition_id = self._next_transition_id
         document._next_arc_id = self._next_arc_id
         
-        # Sync view state (zoom and pan)
+        # Sync view state (zoom, pan, and transformations including rotation)
         document.view_state = {
             "zoom": self.zoom,
             "pan_x": self.pan_x,
-            "pan_y": self.pan_y
+            "pan_y": self.pan_y,
+            "transformations": self.transformation_manager.to_dict()
         }
         
         return document
@@ -1859,19 +1860,20 @@ class ModelCanvasManager:
         """Get current canvas view state for persistence.
         
         Returns:
-            dict: View state containing pan_x, pan_y, zoom
+            dict: View state containing pan_x, pan_y, zoom, and transformations (rotation)
         """
         return {
             'pan_x': self.pan_x,
             'pan_y': self.pan_y,
-            'zoom': self.zoom
+            'zoom': self.zoom,
+            'transformations': self.transformation_manager.to_dict()
         }
     
     def set_view_state(self, view_state):
         """Restore canvas view state from saved data.
         
         Args:
-            view_state: Dictionary containing pan_x, pan_y, zoom
+            view_state: Dictionary containing pan_x, pan_y, zoom, and transformations
         """
         if view_state:
             self.pan_x = view_state.get('pan_x', 0.0)
@@ -1883,6 +1885,10 @@ class ModelCanvasManager:
             
             # Clamp pan to infinite canvas bounds
             self.clamp_pan()
+            
+            # Restore transformations (rotation)
+            if 'transformations' in view_state:
+                self.transformation_manager.from_dict(view_state['transformations'])
             
             # Mark that we don't need initial centering
             self._initial_pan_set = True
