@@ -2,7 +2,11 @@
 
 ## Overview
 
-When you click **"New Project"**, you'll see a dialog with three template options. Currently, these templates are **placeholders** - all projects are created the same way (empty). However, here's what each template is **intended** to provide in future implementations:
+**Status Update (2025-10-16):** Template dropdown has been **removed** from the New Project dialog. All projects are created empty. See `PROJECT_TEMPLATES_DECISION.md` for the rationale.
+
+**Current Behavior:** When you click **"New Project"**, you create an empty project. You then import data using the KEGG/SBML import panels.
+
+**Historical Note:** This document previously described template options that were never implemented. Templates are deferred until the file operations architecture matures.
 
 ---
 

@@ -390,14 +390,15 @@ class ProjectManager:
         sanitized = sanitized.strip('_')
         return sanitized if sanitized else "Project"
     
-    def create_project(self, name: str, description: str = "",
-                      template: str = None) -> Project:
+    def create_project(self, name: str, description: str = "") -> Project:
         """Create a new project.
+        
+        Creates an empty project with standard directory structure.
+        Users can then import data using KEGG/SBML import panels.
         
         Args:
             name: Project name
             description: Optional description
-            template: Optional template name ('basic', 'kegg', etc.')
             
         Returns:
             Created Project instance

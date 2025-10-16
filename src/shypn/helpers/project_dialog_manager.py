@@ -81,7 +81,6 @@ class ProjectDialogManager:
             name_entry = self.builder.get_object('new_project_name_entry')
             location_entry = self.builder.get_object('new_project_location_entry')
             description_text = self.builder.get_object('new_project_description_text')
-            template_combo = self.builder.get_object('new_project_template_combo')
             create_button = self.builder.get_object('new_project_create_button')
             
             # Set default location
@@ -111,17 +110,14 @@ class ProjectDialogManager:
                 start, end = description_buffer.get_bounds()
                 description = description_buffer.get_text(start, end, False).strip()
                 
-                template = template_combo.get_active_id()
-                
                 if not name:
                     name = "Untitled Project"
                 
-                # Create project
+                # Create project (empty - users import data via KEGG/SBML panels)
                 try:
                     project = self.project_manager.create_project(
                         name=name,
-                        description=description,
-                        template=template
+                        description=description
                     )
                     
                     # Set as current project

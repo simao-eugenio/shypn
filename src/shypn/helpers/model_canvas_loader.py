@@ -2186,7 +2186,9 @@ class ModelCanvasLoader:
             ('Layout: Orthogonal', lambda: self._on_layout_orthogonal_clicked(menu, drawing_area, manager)),
             None,  # Separator
             ('Center View', lambda: self._on_center_view_clicked(menu, drawing_area, manager)),
-            ('Clear Canvas', lambda: self._on_clear_canvas_clicked(menu, drawing_area, manager))
+            ('Clear Canvas', lambda: self._on_clear_canvas_clicked(menu, drawing_area, manager)),
+            None,  # Separator
+            ('🎯 Create Center Marker', lambda: self._on_create_center_marker_clicked(menu, drawing_area, manager))
         ]
         for item_data in menu_items:
             if item_data is None:
@@ -2269,6 +2271,15 @@ class ModelCanvasLoader:
                 return
             self.persistency.new_document()
         manager.clear_all_objects()
+        drawing_area.queue_draw()
+
+    def _on_create_center_marker_clicked(self, menu, drawing_area, manager):
+        """Create a red circle at document center (0, 0) for viewport calibration.
+        
+        This creates a large red circle at the exact document origin to help
+        visualize and calibrate viewport centering.
+        """
+        manager.create_test_objects()
         drawing_area.queue_draw()
 
     def _on_reset_zoom_clicked(self, menu, drawing_area, manager):
