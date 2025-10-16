@@ -700,8 +700,13 @@ class FileExplorerPanel:
                 self.store.remove(self.editing_iter)
             return
         new_text = new_text.strip()
-        if not self.editing_is_folder and (not new_text.endswith('.shy')):
-            new_text += '.shy'
+        if not self.editing_is_folder:
+            # Ensure .shy extension is present (case-insensitive check)
+            if not new_text.lower().endswith('.shy'):
+                new_text += '.shy'
+            elif not new_text.endswith('.shy'):
+                # Handle case where user typed .SHY or .Shy - normalize to .shy
+                new_text = new_text[:-4] + '.shy'
         full_path = os.path.join(self.editing_parent_dir, new_text)
         if os.path.exists(full_path):
             if self.explorer.on_error:
