@@ -1,14 +1,14 @@
-# Keyboard Shortcuts - Save Operations Fix
+# Keyboard Shortcuts - File Operations Implementation
 
 **Date**: October 16, 2025  
 **Status**: ✅ Complete  
-**Issue**: Ctrl+S and Ctrl+Shift+S keyboard shortcuts were not working to save files
+**Issue**: Ctrl+S, Ctrl+Shift+S, and Ctrl+O keyboard shortcuts were not working
 
 ## Problem
 
-While the UI tooltips showed "Save File (Ctrl+S)" and "Save As... (Ctrl+Shift+S)", these keyboard shortcuts were **not actually implemented**. Users could only save files by:
-- Clicking the Save button in the File Explorer panel
-- Using the context menu "Save" option
+While the UI tooltips showed "Save File (Ctrl+S)", "Save As... (Ctrl+Shift+S)", and "Open File (Ctrl+O)", these keyboard shortcuts were **not actually implemented**. Users could only perform file operations by:
+- Clicking the Save/Open buttons in the File Explorer panel
+- Using the context menu options
 
 This is inconsistent with standard desktop application behavior and reduces productivity.
 
@@ -23,15 +23,15 @@ The `_on_key_press_event()` handler in `model_canvas_loader.py` implemented seve
 - ✅ Ctrl+Shift+Z / Ctrl+Y (redo - placeholder)
 - ✅ Escape (cancel operations)
 
-But **Ctrl+S** and **Ctrl+Shift+S** were missing entirely.
+But **Ctrl+S**, **Ctrl+Shift+S**, and **Ctrl+O** were missing entirely.
 
-Additionally, the `ModelCanvasLoader` class didn't have a reference to the `FileExplorerPanel` instance, which contains the `save_current_document()` and `save_current_document_as()` methods.
+Additionally, the `ModelCanvasLoader` class didn't have a reference to the `FileExplorerPanel` instance, which contains the `save_current_document()`, `save_current_document_as()`, and `open_document()` methods.
 
 ## Solution
 
 ### Phase 1: Add Keyboard Shortcut Handlers
 
-Added Ctrl+S and Ctrl+Shift+S handlers to `_on_key_press_event()`:
+Added Ctrl+S, Ctrl+Shift+S, and Ctrl+O handlers to `_on_key_press_event()`:
 
 ```python
 # Save (Ctrl+S) - check both lowercase and uppercase
@@ -47,9 +47,16 @@ if is_ctrl and is_shift and (event.keyval == Gdk.KEY_s or event.keyval == Gdk.KE
     if hasattr(self, 'file_explorer_panel') and self.file_explorer_panel:
         self.file_explorer_panel.save_current_document_as()
         return True
+
+# Open (Ctrl+O) - check both lowercase and uppercase
+if is_ctrl and not is_shift and (event.keyval == Gdk.KEY_o or event.keyval == Gdk.KEY_O):
+    # Trigger open file dialog (FileChooser, not system file explorer)
+    if hasattr(self, 'file_explorer_panel') and self.file_explorer_panel:
+        self.file_explorer_panel.open_document()
+        return True
 ```
 
-**Location**: `src/shypn/helpers/model_canvas_loader.py` lines 1558-1571
+**Location**: `src/shypn/helpers/model_canvas_loader.py` lines 1561-1578
 
 ### Phase 2: Wire FileExplorerPanel Reference
 
@@ -59,8 +66,8 @@ Added `set_file_explorer_panel()` method to `ModelCanvasLoader`:
 def set_file_explorer_panel(self, file_explorer_panel):
     """Set the file explorer panel for keyboard shortcut integration.
     
-    This allows keyboard shortcuts (Ctrl+S, Ctrl+Shift+S) to trigger
-    save operations through the file explorer panel.
+    This allows keyboard shortcuts (Ctrl+S, Ctrl+Shift+S, Ctrl+O) to trigger
+    file operations through the file explorer panel.
     
     Args:
         file_explorer_panel: FileExplorerPanel instance from main application
@@ -76,7 +83,7 @@ Wired the file explorer panel to canvas loader in main application startup:
 
 ```python
 # Wire file explorer panel to canvas loader
-# This allows keyboard shortcuts (Ctrl+S, Ctrl+Shift+S) to trigger save operations
+# This allows keyboard shortcuts (Ctrl+S, Ctrl+Shift+S, Ctrl+O) to trigger file operations
 if file_explorer:
     model_canvas_loader.set_file_explorer_panel(file_explorer)
 ```
@@ -90,11 +97,11 @@ if file_explorer:
 1. User presses Ctrl+S or Ctrl+Shift+S while canvas has focus
 2. `_on_key_press_event()` in `ModelCanvasLoader` receives event
 3. Handler checks for Ctrl modifier and 's'/'S' key
-4. Handler calls `file_explorer_panel.save_current_document()` or `save_current_document_as()`
+4. Handler calls `file_explorer_panel.save_current_document()`, `save_current_document_as()`, or `open_document()`
 5. FileExplorerPanel delegates to current tab's persistency manager
-6. Save operation executes with full file operations logic (see FILE_OPERATIONS_PHASE1_IMPLEMENTATION.md)
+6. File operation executes with full file operations logic (see FILE_OPERATIONS_PHASE1_IMPLEMENTATION.md)
 
-### Save Operation Behavior
+### File Operation Behavior
 
 **Ctrl+S (Save)**:
 - If document has filepath → save directly to that file
@@ -108,18 +115,25 @@ if file_explorer:
 - Updates tab label with new filename
 - Marks manager as clean
 
+**Ctrl+O (Open)**:
+- Shows GTK FileChooser dialog (not system file explorer)
+- Allows selecting .shy files to open
+- Prompts to save if current document has unsaved changes
+- Opens file in new tab or replaces empty default tab
+- Dialog has `set_keep_above(True)` for visibility
+
 ### Case Handling
 
 Both lowercase and uppercase keys are handled to ensure compatibility with different keyboard layouts and Caps Lock states:
-- `Gdk.KEY_s` (lowercase 's')
-- `Gdk.KEY_S` (uppercase 'S')
+- `Gdk.KEY_s` / `Gdk.KEY_S` (lowercase/uppercase 's')
+- `Gdk.KEY_o` / `Gdk.KEY_O` (lowercase/uppercase 'o')
 
 This matches the pattern used for other shortcuts (Ctrl+C, Ctrl+V, etc.).
 
 ## Files Modified
 
 1. **src/shypn/helpers/model_canvas_loader.py**
-   - Added Ctrl+S and Ctrl+Shift+S handlers in `_on_key_press_event()` (lines 1558-1571)
+   - Added Ctrl+S, Ctrl+Shift+S, and Ctrl+O handlers in `_on_key_press_event()` (lines 1561-1578)
    - Added `set_file_explorer_panel()` method (lines 2240-2250)
 
 2. **src/shypn.py**
@@ -142,25 +156,35 @@ This matches the pattern used for other shortcuts (Ctrl+C, Ctrl+V, etc.).
 - [ ] Save with new name → verify tab label updates
 - [ ] Save to same location → verify replaces file
 
+### Open (Ctrl+O)
+
+- [ ] Empty default tab → Ctrl+O → shows file chooser → select file → opens
+- [ ] Tab with content → Ctrl+O → if clean, shows chooser → if dirty, prompts to save first
+- [ ] File chooser shows .shy files filter
+- [ ] File chooser dialog appears on top (set_keep_above)
+- [ ] Cancel chooser → no action taken
+
 ### Multi-Document Scenarios
 
 - [ ] Tab 1 dirty → Tab 2 clean → Ctrl+S in Tab 1 → only Tab 1 saves
 - [ ] Switch tabs → Ctrl+S in each → verify correct document saved
 - [ ] Tab 1 save as → verify Tab 1 filename changes, Tab 2 unchanged
+- [ ] Ctrl+O with unsaved changes → prompts to save current tab first
 
 ### Edge Cases
 
-- [ ] Caps Lock ON → Ctrl+S → still works (uppercase 'S' handled)
+- [ ] Caps Lock ON → Ctrl+S / Ctrl+O → still works (uppercase handled)
 - [ ] Shift+Ctrl+S → works (order doesn't matter)
 - [ ] Ctrl+Alt+S → doesn't trigger (only Ctrl modifier)
 - [ ] Empty canvas → Ctrl+S → shows save dialog (saves empty document)
+- [ ] Ctrl+O → Cancel dialog → current document unchanged
 
 ## Consistency with Other Shortcuts
 
 This implementation follows the same pattern as existing shortcuts:
 
-| Shortcut | Action | Files Modified |
-|----------|--------|---------------|
+| Shortcut | Action | Status |
+|----------|--------|--------|
 | Delete | Delete selected objects | ✅ Already implemented |
 | Ctrl+X | Cut | ✅ Already implemented |
 | Ctrl+C | Copy | ✅ Already implemented |
@@ -168,23 +192,24 @@ This implementation follows the same pattern as existing shortcuts:
 | Ctrl+Z | Undo (placeholder) | ✅ Already implemented |
 | Ctrl+Shift+Z | Redo (placeholder) | ✅ Already implemented |
 | Escape | Cancel operations | ✅ Already implemented |
-| **Ctrl+S** | **Save** | **✅ NEW** |
-| **Ctrl+Shift+S** | **Save As** | **✅ NEW** |
+| **Ctrl+S** | **Save** | **✅ IMPLEMENTED** |
+| **Ctrl+Shift+S** | **Save As** | **✅ IMPLEMENTED** |
+| **Ctrl+O** | **Open (FileChooser)** | **✅ IMPLEMENTED** |
 
 ## Benefits
 
 1. **Standard UX**: Matches behavior of all major desktop applications
-2. **Productivity**: Faster save workflow without reaching for mouse
-3. **Muscle Memory**: Users expect Ctrl+S to work
+2. **Productivity**: Faster file operations without reaching for mouse
+3. **Muscle Memory**: Users expect Ctrl+S and Ctrl+O to work
 4. **Consistency**: Aligns with other implemented shortcuts
 5. **Discoverability**: Tooltips already mentioned these shortcuts
+6. **Non-intrusive**: Opens GTK FileChooser, not system file explorer
 
 ## Future Enhancements
 
 ### Additional Shortcuts to Consider
 
 - **Ctrl+N**: New document (currently only via File menu)
-- **Ctrl+O**: Open file (currently only via File panel)
 - **Ctrl+W**: Close current tab
 - **Ctrl+Tab**: Switch to next tab
 - **Ctrl+Shift+Tab**: Switch to previous tab
@@ -205,12 +230,13 @@ Currently Ctrl+Z and Ctrl+Shift+Z are placeholders. When undo/redo system is imp
 
 ✅ Application compiles successfully  
 ✅ Application launches without errors  
-⏳ Awaiting user testing of keyboard shortcuts
+✅ Ctrl+O opens GTK FileChooser (not system file explorer)  
+⏳ Awaiting user testing of all keyboard shortcuts
 
 ## Commit Message
 
 ```
-Add Ctrl+S and Ctrl+Shift+S keyboard shortcuts for save operations
+Add Ctrl+S, Ctrl+Shift+S, and Ctrl+O keyboard shortcuts
 
 - Added keyboard shortcut handlers in _on_key_press_event()
 - Added set_file_explorer_panel() method to ModelCanvasLoader
@@ -218,6 +244,7 @@ Add Ctrl+S and Ctrl+Shift+S keyboard shortcuts for save operations
 - Supports both lowercase and uppercase keys (Caps Lock compatible)
 - Ctrl+S: Save current document (shows dialog if no filepath)
 - Ctrl+Shift+S: Save As (always shows dialog)
+- Ctrl+O: Open file (GTK FileChooser, not system file explorer)
 - Matches standard desktop application behavior
 - Files: model_canvas_loader.py, shypn.py
 ```
