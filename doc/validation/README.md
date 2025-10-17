@@ -27,7 +27,9 @@ SHYpn supports four transition types, each with specific properties:
 
 ### ✅ Immediate Transition Benchmark Plan (COMPLETE)
 
-**Document:** [IMMEDIATE_TRANSITION_BENCHMARK_PLAN.md](IMMEDIATE_TRANSITION_BENCHMARK_PLAN.md)
+**Directory:** [immediate/](immediate/)  
+**Document:** [immediate/BENCHMARK_PLAN.md](immediate/BENCHMARK_PLAN.md)  
+**Overview:** [immediate/README.md](immediate/README.md)
 
 **Coverage:**
 - **7 test categories** with 40+ test cases
@@ -182,14 +184,39 @@ tests/validation/
 
 ## Documentation
 
-### Benchmark Plans
-- [IMMEDIATE_TRANSITION_BENCHMARK_PLAN.md](IMMEDIATE_TRANSITION_BENCHMARK_PLAN.md) - Detailed test plan for immediate transitions
-- TIMED_TRANSITION_BENCHMARK_PLAN.md - 🔜 Coming soon
-- STOCHASTIC_TRANSITION_BENCHMARK_PLAN.md - 🔜 Coming soon
-- CONTINUOUS_TRANSITION_BENCHMARK_PLAN.md - 🔜 Coming soon
+### Transition Type Directories
 
-### Implementation Guides
-- Guard Function Implementation - See `/doc/GUARD_FUNCTION_GUIDE.md`
+Each transition type has its own directory with complete validation documentation:
+
+#### 1. Immediate Transitions ✅
+**Directory:** [immediate/](immediate/)
+- [README.md](immediate/README.md) - Overview and quick reference
+- [BENCHMARK_PLAN.md](immediate/BENCHMARK_PLAN.md) - Complete test plan (40+ tests)
+- **Status:** Planning complete, ready for implementation
+
+#### 2. Timed Transitions 🔜
+**Directory:** [timed/](timed/) *(coming soon)*
+- README.md - Overview and properties
+- BENCHMARK_PLAN.md - Test plan for deterministic delays
+- **Status:** Not yet planned
+
+#### 3. Stochastic Transitions 🔜
+**Directory:** [stochastic/](stochastic/) *(coming soon)*
+- README.md - Overview and properties
+- BENCHMARK_PLAN.md - Test plan for exponential distributions
+- **Status:** Not yet planned
+
+#### 4. Continuous Transitions 🔜
+**Directory:** [continuous/](continuous/) *(coming soon)*
+- README.md - Overview and properties
+- BENCHMARK_PLAN.md - Test plan for rate functions and ODEs
+- **Status:** Not yet planned
+
+---
+
+### Reference Documentation
+
+**Implementation Guides:**
 - Arc Weight Specification - See `/doc/behaviors/README.md`
 - Rate Function Implementation - See `/doc/GUARD_RATE_PERSISTENCE_FIX.md`
 
@@ -202,9 +229,13 @@ tests/validation/
 
 ## Quick Start
 
-### 1. Read the Immediate Transition Plan
+### 1. Read the Immediate Transition Documentation
 ```bash
-cat doc/validation/IMMEDIATE_TRANSITION_BENCHMARK_PLAN.md
+# Overview and quick reference
+cat doc/validation/immediate/README.md
+
+# Complete benchmark plan
+cat doc/validation/immediate/BENCHMARK_PLAN.md
 ```
 
 ### 2. Run Tests (when implemented)
@@ -251,6 +282,7 @@ When adding new tests:
 - `/doc/DEFAULT_VALUES_FIX.md` - Default property values
 - `/doc/behaviors/README.md` - Transition behaviors overview
 - `/doc/GUARD_RATE_PERSISTENCE_FIX.md` - Persistence implementation
+- **[immediate/](immediate/)** - Immediate transition validation (current focus)
 
 ---
 
