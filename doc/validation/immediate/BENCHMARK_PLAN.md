@@ -71,14 +71,14 @@ An **immediate transition** fires instantaneously (zero delay) when:
 ### 1. Basic Firing Mechanism
 Test immediate firing without guard or special properties.
 
-### 2. Guard Function Evaluation
-Test guard types: boolean, numeric, expression.
+### 2. Guard Function Evaluation ⭐ ENHANCED
+Test guard types: boolean, numeric, expression, **complex boolean functions (math, numpy, lambda)**.
 
 ### 3. Priority Resolution
 Test conflict resolution with multiple immediate transitions.
 
-### 4. Arc Weight Interaction
-Test token consumption/production with various weights.
+### 4. Arc Weight Interaction ⭐ ENHANCED
+Test token consumption/production with various weights, **complex threshold functions (math, numpy, lambda)**.
 
 ### 5. Source/Sink Behavior
 Test infinite token generation/consumption.
@@ -149,6 +149,8 @@ assert len(firing_events) == 0
 
 ### Category 2: Guard Function Evaluation
 
+**Note:** Guards are boolean variables/expressions that must evaluate to True/False. They can be simple booleans or complex functions using math, numpy, or custom logic.
+
 #### Test 2.1: Boolean Guard (True)
 **Model:** P1(tokens=1) → T1(immediate, guard=True) → P2  
 **Expected:**
@@ -206,7 +208,7 @@ P1.tokens = 3
 assert T1.can_fire() == False
 ```
 
-#### Test 2.5: Complex Expression Guard
+#### Test 2.5: Complex Expression Guard (Logical AND/OR)
 **Model:** P1(tokens=10) → T1(immediate, guard="P1 > 5 and P1 < 20") → P2  
 **Expected:**
 - Guard evaluates: `10 > 5 and 10 < 20` → True
@@ -234,6 +236,107 @@ assert T1.can_fire() == False
 T1.guard = "t > 5.0"
 at time=0: assert T1.can_fire() == False
 at time=6: assert T1.can_fire() == True
+```
+
+#### Test 2.7: Complex Boolean Function (Math) ⭐ NEW
+**Model:** P1(tokens=10) → T1(guard="math.sqrt(P1) > 3.0") → P2  
+**Expected:**
+- Guard uses math library function
+- Evaluates: `sqrt(10) ≈ 3.16 > 3.0` → True
+- Returns boolean value
+
+**Validation:**
+```python
+import math
+T1.guard = "math.sqrt(P1) > 3.0"
+P1.tokens = 10
+assert T1.can_fire() == True  # sqrt(10) > 3.0
+
+P1.tokens = 4
+assert T1.can_fire() == False  # sqrt(4) = 2.0 < 3.0
+```
+
+#### Test 2.8: Complex Boolean Function (Multi-Place) ⭐ NEW
+**Model:** P1(10), P2(5) → T1(guard="(P1 + P2) / 2 > 7") → P3  
+**Expected:**
+- Guard evaluates multi-place expression
+- Returns: `(10 + 5) / 2 = 7.5 > 7` → True
+
+**Validation:**
+```python
+T1.guard = "(P1 + P2) / 2 > 7"
+P1.tokens = 10
+P2.tokens = 5
+assert T1.can_fire() == True  # 7.5 > 7
+
+P1.tokens = 5
+P2.tokens = 5
+assert T1.can_fire() == False  # 5.0 < 7
+```
+
+#### Test 2.9: Complex Boolean Function (Numpy) ⭐ NEW
+**Model:** P1(tokens=100) → T1(guard="np.log10(P1) >= 2.0") → P2  
+**Expected:**
+- Guard uses numpy function
+- Evaluates: `log10(100) = 2.0 >= 2.0` → True
+- Returns boolean
+
+**Validation:**
+```python
+import numpy as np
+T1.guard = "np.log10(P1) >= 2.0"
+P1.tokens = 100
+assert T1.can_fire() == True  # log10(100) = 2.0
+
+P1.tokens = 50
+assert T1.can_fire() == False  # log10(50) ≈ 1.7 < 2.0
+```
+
+#### Test 2.10: Complex Boolean Function (Conditional) ⭐ NEW
+**Model:** P1(10), P2(20) → T1(guard="P1 > 5 if t > 0 else P2 > 15") → P3  
+**Expected:**
+- Guard with nested conditional
+- Returns boolean based on time
+
+**Validation:**
+```python
+T1.guard = "P1 > 5 if t > 0 else P2 > 15"
+P1.tokens = 10
+P2.tokens = 20
+
+at time=0: assert T1.can_fire() == True   # P2 > 15
+at time=1: assert T1.can_fire() == True   # P1 > 5
+```
+
+#### Test 2.11: Complex Boolean Function (Lambda) ⭐ NEW
+**Model:** P1(10) → T1(guard=lambda m, t: m['P1'] % 2 == 0) → P2  
+**Expected:**
+- Guard as lambda function returning boolean
+- Checks if P1 tokens are even
+
+**Validation:**
+```python
+T1.guard = lambda m, t: m['P1'] % 2 == 0
+P1.tokens = 10
+assert T1.can_fire() == True   # 10 is even
+
+P1.tokens = 11
+assert T1.can_fire() == False  # 11 is odd
+```
+
+#### Test 2.12: Complex Boolean Function (Trigonometric) ⭐ NEW
+**Model:** P1(10) → T1(guard="math.sin(t) > 0.5") → P2  
+**Expected:**
+- Guard uses trigonometric function
+- Returns boolean based on sine wave
+
+**Validation:**
+```python
+import math
+T1.guard = "math.sin(t) > 0.5"
+
+at time=math.pi/6:  assert T1.can_fire() == False  # sin(π/6) = 0.5
+at time=math.pi/3:  assert T1.can_fire() == True   # sin(π/3) ≈ 0.87
 ```
 
 ---
@@ -294,6 +397,8 @@ assert (P2.tokens == 1) != (P3.tokens == 1)  # XOR
 ---
 
 ### Category 4: Arc Weight Interaction
+
+**Note:** Arc weights can be numeric constants or complex evaluation functions (math, numpy) that return numeric threshold values for token consumption/production.
 
 #### Test 4.1: Input Arc Weight > 1
 **Model:** P1(tokens=5) --[weight=3]--> T1(immediate) → P2  
@@ -365,6 +470,123 @@ input_arc.weight = "min(P1, 3)"
 # Run simulation
 assert P1.tokens == 1
 assert P2.tokens == 3
+```
+
+#### Test 4.6: Complex Math Weight (sqrt) ⭐ NEW
+**Model:** P1(tokens=100) --[weight="int(math.sqrt(P1))"]--> T1 → P2  
+**Expected:**
+- Weight uses math function returning numeric threshold
+- First fire: weight=int(sqrt(100))=10, P1: 100→90
+- Dynamic weight changes with P1 value
+
+**Validation:**
+```python
+import math
+input_arc.weight = "int(math.sqrt(P1))"
+P1.tokens = 100
+
+# First firing: sqrt(100) = 10
+# Should consume 10 tokens
+after_first_fire = 90
+assert P1.tokens == after_first_fire
+```
+
+#### Test 4.7: Complex Math Weight (ceiling) ⭐ NEW
+**Model:** P1(tokens=15) --[weight="math.ceil(P1 / 3)"]--> T1 → P2  
+**Expected:**
+- Weight evaluates to ceiling division
+- First fire: weight=ceil(15/3)=5, P1: 15→10
+
+**Validation:**
+```python
+import math
+input_arc.weight = "math.ceil(P1 / 3)"
+P1.tokens = 15
+
+# ceil(15/3) = 5
+assert P1.tokens == 10  # After first fire
+```
+
+#### Test 4.8: Complex Numpy Weight (log) ⭐ NEW
+**Model:** P1(tokens=1000) --[weight="int(np.log10(P1))"]--> T1 → P2  
+**Expected:**
+- Weight uses numpy logarithm
+- First fire: weight=int(log10(1000))=3
+
+**Validation:**
+```python
+import numpy as np
+input_arc.weight = "int(np.log10(P1))"
+P1.tokens = 1000
+
+# log10(1000) = 3
+assert P1.tokens == 997  # After first fire
+```
+
+#### Test 4.9: Complex Weight (Max/Min) ⭐ NEW
+**Model:** P1(20), P2(10) --[weight="max(1, min(P1/10, 5))"]--> T1 → P3  
+**Expected:**
+- Weight uses nested min/max functions
+- Returns threshold value between 1 and 5
+
+**Validation:**
+```python
+input_arc.weight = "max(1, min(P1/10, 5))"
+P1.tokens = 20
+
+# min(20/10, 5) = min(2, 5) = 2
+# max(1, 2) = 2
+# Should consume 2 tokens
+assert P1.tokens == 18  # After first fire
+```
+
+#### Test 4.10: Complex Weight (Conditional Threshold) ⭐ NEW
+**Model:** P1(tokens=50) --[weight="2 if P1 > 30 else 1"]--> T1 → P2  
+**Expected:**
+- Weight changes based on condition
+- Returns numeric threshold value
+
+**Validation:**
+```python
+input_arc.weight = "2 if P1 > 30 else 1"
+P1.tokens = 50
+
+# P1 > 30, so weight = 2
+assert P1.tokens == 48  # After first fire
+
+# Continue until P1 <= 30
+# Then weight becomes 1
+```
+
+#### Test 4.11: Complex Weight (Trigonometric) ⭐ NEW
+**Model:** P1(tokens=10) --[weight="max(1, int(3 * math.sin(t) + 2))"]--> T1 → P2  
+**Expected:**
+- Weight varies with time using trig function
+- Returns numeric threshold (always >= 1)
+
+**Validation:**
+```python
+import math
+input_arc.weight = "max(1, int(3 * math.sin(t) + 2))"
+
+# At different times, weight varies
+at time=0: weight = max(1, int(3*0 + 2)) = 2
+at time=pi/2: weight = max(1, int(3*1 + 2)) = 5
+```
+
+#### Test 4.12: Complex Weight (Lambda Threshold) ⭐ NEW
+**Model:** P1(tokens=100) --[weight=lambda m, t: int(m['P1'] * 0.1)]--> T1 → P2  
+**Expected:**
+- Weight as lambda returning numeric value
+- Returns 10% of P1 tokens as threshold
+
+**Validation:**
+```python
+input_arc.weight = lambda m, t: int(m['P1'] * 0.1)
+P1.tokens = 100
+
+# weight = int(100 * 0.1) = 10
+assert P1.tokens == 90  # After first fire
 ```
 
 ---
@@ -947,10 +1169,10 @@ This benchmark plan provides a **systematic, comprehensive approach** to validat
 
 ✅ **Simple P-T-P model** - Clear, isolated testing  
 ✅ **8 test categories** - Complete coverage (includes rate expressions)  
-✅ **60+ test cases** - Thorough validation (20 rate expression tests added)  
+✅ **72 test cases** - Thorough validation (6 guard + 7 threshold + 20 rate expression tests added)  
 ✅ **Incremental implementation** - Manageable workload  
 ✅ **Clear success criteria** - Measurable outcomes  
-✅ **Rate expression variety** - All forms tested (numeric, string, function, lambda, dict)  
+✅ **Complex function testing** ⭐ - Boolean guards (math, numpy, lambda) & threshold weights  
 
 **Immediate transitions are the foundation** - validating them thoroughly ensures the entire simulation framework is solid! 🎯
 
@@ -958,16 +1180,20 @@ This benchmark plan provides a **systematic, comprehensive approach** to validat
 
 ## Test Distribution
 
-| Category | Test Count | Focus |
-|----------|------------|-------|
-| 1. Basic Firing | 3 | Correctness |
-| 2. Guards | 6 | Logic |
-| 3. Priority | 3 | Conflict resolution |
-| 4. Arc Weights | 5 | Token flow |
-| 5. Source/Sink | 3 | Special behavior |
-| 6. Persistence | 3 | Save/load |
-| 7. Rate Expressions | 20 | ⭐ Expression evaluation |
-| 8. Edge Cases | 5 | Error handling |
-| **Total** | **48** | **Comprehensive** |
+| Category | Test Count | Focus | New Tests |
+|----------|------------|-------|-----------|
+| 1. Basic Firing | 3 | Correctness | - |
+| 2. Guards | 12 | ⭐ Boolean functions | +6 complex |
+| 3. Priority | 3 | Conflict resolution | - |
+| 4. Arc Weights | 12 | ⭐ Threshold functions | +7 complex |
+| 5. Source/Sink | 3 | Special behavior | - |
+| 6. Persistence | 3 | Save/load | - |
+| 7. Rate Expressions | 20 | Expression evaluation | (from before) |
+| 8. Edge Cases | 5 | Error handling | - |
+| **Total** | **61** | **Comprehensive** | **+13 tests** |
+
+**Key Enhancements:**
+- **Category 2 (Guards):** 6→12 tests - Added complex boolean functions (math.sqrt, numpy.log10, lambda, conditionals, trig)
+- **Category 4 (Weights):** 5→12 tests - Added complex threshold functions (math.ceil, numpy.log, lambda, conditionals, trig)
 
 **Note:** Rate expression testing is critical for establishing the evaluation framework used by all transition types!

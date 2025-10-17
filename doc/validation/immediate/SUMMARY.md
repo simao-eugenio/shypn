@@ -13,9 +13,10 @@ Complete validation and benchmarking framework for **immediate transitions** in 
 ### Key Achievements
 
 ✅ **Structure Defined** - Separation of validation tests vs benchmarks  
-✅ **Test Plan Complete** - 48 comprehensive test cases  
+✅ **Test Plan Complete** - 61 comprehensive test cases ⭐ **UPDATED**  
 ✅ **Methodology Documented** - pytest framework with fixtures  
 ✅ **Rate Expressions Added** - 20 tests covering all expression types  
+✅ **Complex Functions Added** ⭐ **NEW** - 13 tests for boolean guards & threshold weights  
 
 ---
 
@@ -48,24 +49,24 @@ tests/
 
 ## 📊 Test Categories & Distribution
 
-| # | Category | Validation Tests | Benchmark Tests | Total |
-|---|----------|-----------------|-----------------|-------|
-| 1 | Basic Firing Mechanism | 3 | 3 | 6 |
-| 2 | Guard Function Evaluation | 6 | 6 | 12 |
-| 3 | Priority Resolution | 3 | 3 | 6 |
-| 4 | Arc Weight Interaction | 5 | 5 | 10 |
-| 5 | Source/Sink Behavior | 3 | 3 | 6 |
-| 6 | Persistence & Serialization | 3 | 3 | 6 |
-| 7 | Rate Expression Evaluation | - | 20 ⭐ | 20 |
-| 8 | Edge Cases | 5 | 5 | 10 |
-| **TOTAL** | **28** | **48** | **76** |
+| # | Category | Validation Tests | Benchmark Tests | Total | New |
+|---|----------|-----------------|-----------------|-------|-----|
+| 1 | Basic Firing Mechanism | 3 | 3 | 6 | - |
+| 2 | Guard Function Evaluation ⭐ | 12 | 12 | 24 | **+6** |
+| 3 | Priority Resolution | 3 | 3 | 6 | - |
+| 4 | Arc Weight Interaction ⭐ | 12 | 12 | 24 | **+7** |
+| 5 | Source/Sink Behavior | 3 | 3 | 6 | - |
+| 6 | Persistence & Serialization | 3 | 3 | 6 | - |
+| 7 | Rate Expression Evaluation | - | 20 ⭐ | 20 | - |
+| 8 | Edge Cases | 5 | 5 | 10 | - |
+| **TOTAL** | **41** | **61** | **102** | **+13** |
 
 ### Category Focus
 
 1. **Basic Firing** - Zero-delay firing, multiple firings, insufficient tokens
-2. **Guards** - Boolean, numeric, expression, complex conditions
+2. **Guards** ⭐ - Boolean, numeric, expression, **complex boolean functions (math, numpy, lambda, trig)**
 3. **Priority** - Conflict resolution, equal priorities
-4. **Arc Weights** - Input/output weights, expression weights
+4. **Arc Weights** ⭐ - Input/output weights, **complex threshold functions (math, numpy, lambda, trig)**
 5. **Source/Sink** - Infinite generation/consumption
 6. **Persistence** - Save/load property integrity
 7. **Rate Expressions** ⭐ - Numeric, string, function, lambda, dictionary forms
@@ -129,6 +130,84 @@ T1.rate = "P1 * 0.5 + t"  # Repeated evaluations
 ```
 
 **Total Rate Expression Tests: 20** ⭐
+
+---
+
+## 🔬 Complex Boolean Guards Testing (NEW) ⭐
+
+### Guard Function Types
+
+Guards are **boolean variables/expressions** that must evaluate to True/False.
+
+#### 1. Simple Boolean/Numeric (4 tests)
+```python
+T1.guard = True                   # Boolean
+T1.guard = False                  # Boolean
+T1.guard = 5                      # Numeric (> 0 → True)
+T1.guard = "P1 > 5"              # Expression
+```
+
+#### 2. Complex Boolean Functions (6 NEW tests) ⭐
+```python
+# Math library
+T1.guard = "math.sqrt(P1) > 3.0"
+
+# Multi-place logic
+T1.guard = "(P1 + P2) / 2 > 7"
+
+# Numpy functions
+T1.guard = "np.log10(P1) >= 2.0"
+
+# Conditional boolean
+T1.guard = "P1 > 5 if t > 0 else P2 > 15"
+
+# Lambda boolean
+T1.guard = lambda m, t: m['P1'] % 2 == 0
+
+# Trigonometric
+T1.guard = "math.sin(t) > 0.5"
+```
+
+**Total Guard Tests: 12** (6 basic + 6 complex) ⭐
+
+---
+
+## 🎚️ Complex Threshold/Weight Testing (NEW) ⭐
+
+### Arc Weight Function Types
+
+Arc weights are **numeric values/expressions** that return threshold values for token consumption/production.
+
+#### 1. Simple Numeric/Expression (5 tests)
+```python
+arc.weight = 3                    # Constant
+arc.weight = "2*2"               # Expression
+arc.weight = "min(P1, 3)"        # Function
+```
+
+#### 2. Complex Threshold Functions (7 NEW tests) ⭐
+```python
+# Math functions
+arc.weight = "int(math.sqrt(P1))"
+arc.weight = "math.ceil(P1 / 3)"
+
+# Numpy functions
+arc.weight = "int(np.log10(P1))"
+
+# Nested min/max
+arc.weight = "max(1, min(P1/10, 5))"
+
+# Conditional threshold
+arc.weight = "2 if P1 > 30 else 1"
+
+# Trigonometric
+arc.weight = "max(1, int(3 * math.sin(t) + 2))"
+
+# Lambda threshold
+arc.weight = lambda m, t: int(m['P1'] * 0.1)
+```
+
+**Total Arc Weight Tests: 12** (5 basic + 7 complex) ⭐
 
 ---
 
@@ -479,10 +558,11 @@ doc/validation/
 ## 💡 Summary
 
 ### What We Have
-✅ **Complete planning** - 48 test cases across 8 categories  
+✅ **Complete planning** - 61 test cases across 8 categories ⭐ **UPDATED**  
 ✅ **Clear structure** - Validation vs benchmark separation  
 ✅ **Testing methodology** - pytest with fixtures  
 ✅ **Rate expressions** ⭐ - 20 tests for all expression types  
+✅ **Complex functions** ⭐ **NEW** - 13 tests (6 guard + 7 threshold)  
 ✅ **Documentation** - Comprehensive guides at multiple levels  
 
 ### What's Next
@@ -496,6 +576,7 @@ doc/validation/
 🎯 **Confidence** - Comprehensive testing ensures correctness  
 🎯 **Performance** - Benchmarks identify optimization opportunities  
 🎯 **Scalability** - Establishes patterns for other transition types  
+🎯 **Real-world** ⭐ **NEW** - Complex math/numpy functions for scientific models  
 
 ---
 
