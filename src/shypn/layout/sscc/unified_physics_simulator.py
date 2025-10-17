@@ -1,6 +1,6 @@
 """Unified Physics Simulator - Combines all forces for Solar System Layout.
 
-VERSION: 2.2.3 - Fixed Hub Mass Threshold for Selective Weakening
+VERSION: 2.2.4 - Black Hole Gravity Enabled + Arc Weight Removed from Forces
 DATE: October 17, 2025
 STATUS: PRODUCTION STABLE
 
@@ -81,7 +81,8 @@ stable layouts without user intervention. The pulsating singularity
 ensures the system never freezes in suboptimal configurations.
 
 CHANGELOG:
-v2.2.3 (Oct 17, 2025): Fixed hub mass threshold (500→150) for selective weakening ⭐ CRITICAL FIX
+v2.2.4 (Oct 17, 2025): FUNDAMENTAL FIX - Enable SCC gravity + remove arc weight from forces ⭐ CRITICAL
+v2.2.3 (Oct 17, 2025): Fixed hub mass threshold (500→150) for selective weakening
 v2.2.2 (Oct 17, 2025): Selective arc weakening - mass-based (wrong threshold)
 v2.2.1 (Oct 17, 2025): Place orbital fix - disable extra proximity for low-mass nodes
 v2.2.0 (Oct 17, 2025): Pulsating singularity - stochastic dynamics & variance tracking
@@ -156,7 +157,7 @@ class UnifiedPhysicsSimulator:
     """
     
     # VERSION MARKER
-    VERSION = "2.2.3"
+    VERSION = "2.2.4"
     VERSION_DATE = "2025-10-17"
     
     # Physics constants (tuned for black hole galaxy - 94% cumulative reduction applied)
@@ -180,8 +181,8 @@ class UnifiedPhysicsSimulator:
     SCC_COHESION_STRENGTH = 30000.0         # Pulls SCC nodes toward centroid (was 100k → now 30k: 70% reduction)
     SCC_TARGET_RADIUS = 30.0                # Target radius for SCC cycle shape
     SCC_GRAVITY_CONSTANT = 300.0            # Attracts hubs to black hole (was 1000 → now 300: 70% reduction)
-    SCC_GRAVITY_MIN_MASS = 1000.0           # Only nodes with mass >= this affected by SCC gravity
-    SCC_ARC_WEAKENING_FACTOR = 0.1          # Weaken arcs to/from SCC by 90% (prevents ternary clustering) - v2.0.0
+    SCC_GRAVITY_MIN_MASS = 150.0            # v2.2.4: LOWERED from 1000 to enable gravity for hubs (200-300 mass)
+    SCC_ARC_WEAKENING_FACTOR = 0.3          # v2.2.4: REDUCED from 0.1 - less extreme weakening
     
     # Black hole whirlwind effect (v2.1.0) - "Clogged sink drain" spiral forces
     SCC_WHIRLWIND_STRENGTH = 50.0           # Tangential force strength (creates spiral motion)
@@ -573,18 +574,26 @@ class UnifiedPhysicsSimulator:
                                      m1: float, m2: float, weight: float) -> float:
         """Calculate oscillatory force (attractive or repulsive).
         
+        VERSION 2.2.4: Arc weight NO LONGER affects force magnitude!
+        - Arc weight only affects equilibrium distance (r_eq)
+        - Force strength based ONLY on masses and distance
+        - Prevents drift caused by weighted arc discrimination
+        
         - If distance > r_eq: Gravitational attraction (pull together)
         - If distance < r_eq: Spring repulsion (push apart)
         - At distance = r_eq: Zero force (equilibrium)
         """
         if distance > r_eq:
             # Too far: gravitational attraction
-            # F = (G * m1 * m2 * weight) / r²
-            force = (self.GRAVITY_CONSTANT * m1 * m2 * weight) / (distance * distance)
+            # v2.2.4: REMOVED weight from force calculation
+            # F = (G * m1 * m2) / r²  (NO weight multiplier)
+            force = (self.GRAVITY_CONSTANT * m1 * m2) / (distance * distance)
             return force  # Positive = attract
         else:
             # Too close: spring repulsion
             # F = -k * (r_eq - r)
+            force = self.SPRING_CONSTANT * (r_eq - distance)
+            return -force  # Negative = repel
             force = self.SPRING_CONSTANT * (r_eq - distance)
             return -force  # Negative = repel
     
