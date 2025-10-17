@@ -312,9 +312,6 @@ class PathwayPostProcessor:
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     
-    print("=" * 70)
-    print("PATHWAY POST-PROCESSOR (v2.0 Simplified)")
-    print("=" * 70)
     
     # Example pathway
     from pathway_data import Species, Reaction
@@ -355,25 +352,13 @@ if __name__ == "__main__":
     processor = PathwayPostProcessor(scale_factor=2.0)
     processed = processor.process(pathway)
     
-    print(f"\nProcessed pathway:")
-    print(f"  Species: {len(processed.species)}")
-    print(f"  Positions: {len(processed.positions)} (arbitrary)")
-    print(f"  Colors: {len(processed.colors)}")
-    print(f"  Compartment groups: {len(processed.compartment_groups)}")
-    print(f"  Layout type: {processed.metadata.get('layout_type')}")
     
-    print(f"\nToken counts (scale={processor.scale_factor}):")
     for species in processed.species:
-        print(f"  {species.name}: {species.initial_tokens} tokens (from {species.initial_concentration} mM)")
+        pass  # Process species
     
-    print(f"\nArbitrary positions (will be replaced by force-directed):")
     for element_id, (x, y) in list(processed.positions.items())[:5]:
-        print(f"  {element_id}: ({x:.1f}, {y:.1f})")
+        pass  # Process positions
     
-    print(f"\nColors:")
     for comp, color in processed.colors.items():
-        print(f"  {comp}: {color}")
+        pass  # Process colors
     
-    print("\n" + "=" * 70)
-    print("✓ Post-processor ready! Use Swiss Palette → Force-Directed for layout")
-    print("=" * 70)

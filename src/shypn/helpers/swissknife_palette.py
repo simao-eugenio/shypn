@@ -178,7 +178,6 @@ class SwissKnifePalette(GObject.GObject):
                     revealer.add(Gtk.Box())
                     
             except Exception as e:
-                print(f"❌ Error creating simulate palette: {e}")
                 import traceback
                 traceback.print_exc()
                 # Fallback to empty box
@@ -569,4 +568,4 @@ class SwissKnifePalette(GObject.GObject):
                 Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
             )
         except Exception as e:
-            print(f"[SwissKnifePalette] CSS error: {e}")
+            pass  # Silently ignore CSS errors

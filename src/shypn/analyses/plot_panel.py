@@ -119,7 +119,6 @@ class AnalysisPlotPanel(Gtk.Box):
         # If we removed something, trigger UI update
         if len(self.selected_objects) < before_count:
             self.needs_update = True
-            print(f"[AnalysisPlotPanel] Removed deleted {self.object_type} {obj.name} from selection")
 
     def _cleanup_stale_objects(self):
         """Periodic cleanup of stale object references (safety net).
@@ -148,7 +147,6 @@ class AnalysisPlotPanel(Gtk.Box):
         # If we removed something, trigger UI update
         if len(self.selected_objects) < before_count:
             self.needs_update = True
-            print(f"[AnalysisPlotPanel] Cleaned up {before_count - len(self.selected_objects)} stale objects")
         
         return True  # Continue periodic callbacks
 

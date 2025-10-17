@@ -110,7 +110,6 @@ class KGMLParser:
             return entry
             
         except KeyError as e:
-            print(f"Warning: Missing required entry attribute: {e}")
             return None
     
     def _parse_graphics(self, elem: ET.Element) -> KEGGGraphics:
@@ -172,7 +171,6 @@ class KGMLParser:
             return reaction
             
         except KeyError as e:
-            print(f"Warning: Missing required reaction attribute: {e}")
             return None
     
     def _parse_relation(self, elem: ET.Element) -> Optional[KEGGRelation]:
@@ -204,7 +202,6 @@ class KGMLParser:
             return relation
             
         except KeyError as e:
-            print(f"Warning: Missing required relation attribute: {e}")
             return None
 
 

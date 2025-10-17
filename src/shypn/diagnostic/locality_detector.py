@@ -23,9 +23,6 @@ Example:
     locality = detector.get_locality_for_transition(transition)
     
     if locality.is_valid:
-        print(f"Type: {locality.locality_type}")
-        print(f"Inputs: {len(locality.input_places)}")
-        print(f"Outputs: {len(locality.output_places)}")
 """
 
 from typing import Dict, List, Any, Optional

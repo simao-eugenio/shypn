@@ -576,7 +576,6 @@ class ModelCanvasManager:
         if arcs is None:
             arcs = []
         
-        print(f"[ModelCanvasManager] load_objects(): Loading {len(places)} places, {len(transitions)} transitions, {len(arcs)} arcs")
         
         # Add places with proper notification
         for place in places:
@@ -594,7 +593,6 @@ class ModelCanvasManager:
             arc._manager = self  # Set manager reference for parallel detection
             self._notify_observers('created', arc)
         
-        print(f"[ModelCanvasManager] load_objects(): After loading, manager now has {len(self.places)} places, {len(self.transitions)} transitions, {len(self.arcs)} arcs")
         
         # Update ID counters to avoid collisions
         if places:
@@ -895,16 +893,12 @@ class ModelCanvasManager:
         center.border_color = (1.0, 0.0, 0.0)  # Red border for visibility
         center.border_width = 5.0  # Thick border
         
-        print(f"[CENTER MARKER] Created at world origin (0, 0)")
-        print(f"[CENTER MARKER] Use 'Center View' to see it centered")
-        print(f"[VIEWPORT STATE] Current Pan: ({self.pan_x}, {self.pan_y}), Zoom: {self.zoom}")
         
         # Show where (0,0) currently appears on screen
         screen_x, screen_y = self.world_to_screen(0, 0)
-        print(f"[CENTER MARKER] Origin (0,0) appears at screen position: ({screen_x:.1f}, {screen_y:.1f})")
         
         if screen_x < 0 or screen_x > self.viewport_width or screen_y < 0 or screen_y > self.viewport_height:
-            print(f"[CENTER MARKER] ⚠️ Origin is OFF-SCREEN! Use 'Center View' to see it.")
+            pass  # Origin is off-screen
         
     
     # ==================== Zoom Operations ====================
@@ -1183,7 +1177,6 @@ class ModelCanvasManager:
             self._fit_to_page_padding = padding_percent
             self._fit_to_page_horizontal_offset = horizontal_offset_percent
             self._fit_to_page_vertical_offset = vertical_offset_percent
-            print(f"[fit_to_page] Deferred - will execute on next draw with {padding_percent}% padding, {horizontal_offset_percent}% horizontal offset, {vertical_offset_percent}% vertical offset")
             return False
         
         bounds = self.get_content_bounds()
@@ -1197,7 +1190,6 @@ class ModelCanvasManager:
         
         # Calculate content dimensions (add padding for object sizes)
         min_x, min_y, max_x, max_y = bounds
-        print(f"[fit_to_page] Content bounds: ({min_x:.1f}, {min_y:.1f}) to ({max_x:.1f}, {max_y:.1f})")
         
         # Add ~40px padding to account for object sizes (places/transitions are ~20-30px radius)
         content_width = max_x - min_x + 40
@@ -1209,8 +1201,6 @@ class ModelCanvasManager:
         if content_height < 40:
             content_height = 40
         
-        print(f"[fit_to_page] Content size: {content_width:.1f} x {content_height:.1f}")
-        print(f"[fit_to_page] Viewport size: {self.viewport_controller.viewport_width} x {self.viewport_controller.viewport_height}")
         
         # Calculate available viewport space (with padding margin)
         # Use viewport controller's dimensions (synchronized with actual widget size)
@@ -1226,7 +1216,6 @@ class ModelCanvasManager:
         # Clamp to zoom limits
         target_zoom = max(self.MIN_ZOOM, min(self.MAX_ZOOM, target_zoom))
         
-        print(f"[fit_to_page] Calculated zoom: {target_zoom:.3f} (from zoom_x={zoom_x:.3f}, zoom_y={zoom_y:.3f})")
         
         # Apply zoom
         self.zoom = target_zoom
@@ -1235,7 +1224,6 @@ class ModelCanvasManager:
         # Center on content
         center_x = (min_x + max_x) / 2.0
         center_y = (min_y + max_y) / 2.0
-        print(f"[fit_to_page] Centering on: ({center_x:.1f}, {center_y:.1f})")
         
         # Calculate horizontal offset in world coordinates (for right panel accommodation)
         # IMPORTANT: Offset is calculated as percentage of viewport BEFORE dividing by zoom
@@ -1263,7 +1251,6 @@ class ModelCanvasManager:
         self.pan_x = self.viewport_controller.pan_x
         self.pan_y = self.viewport_controller.pan_y
         
-        print(f"[fit_to_page] Final pan: ({self.pan_x:.1f}, {self.pan_y:.1f})")
         
         # Save view state and trigger redraw (NO clamping - show content anywhere)
         self.save_view_state_to_file()
@@ -1553,7 +1540,6 @@ class ModelCanvasManager:
             try:
                 callback(event_type, obj, old_value=old_value, new_value=new_value)
             except Exception as e:
-                print(f"[ModelCanvasManager] Error in observer callback: {e}")
                 import traceback
                 traceback.print_exc()
     
@@ -1745,7 +1731,6 @@ class ModelCanvasManager:
         """
         if not self._is_dirty:
             self._is_dirty = True
-            print(f"[ModelCanvasManager] mark_dirty(): Document '{self.filename}' is now DIRTY")
             if self.on_dirty_changed:
                 self.on_dirty_changed(True)
     
@@ -1757,7 +1742,6 @@ class ModelCanvasManager:
         """
         if self._is_dirty:
             self._is_dirty = False
-            print(f"[ModelCanvasManager] mark_clean(): Document '{self.filename}' is now CLEAN")
             if self.on_dirty_changed:
                 self.on_dirty_changed(False)
     
@@ -1784,10 +1768,8 @@ class ModelCanvasManager:
             # Extract base filename without extension
             base_name = os.path.splitext(os.path.basename(filepath))[0]
             self.filename = base_name
-            print(f"[ModelCanvasManager] set_filepath(): filepath='{filepath}', filename='{self.filename}'")
         else:
             self.filename = "default"
-            print(f"[ModelCanvasManager] set_filepath(): Cleared filepath, filename='default'")
     
     def get_filepath(self) -> str:
         """Get the full file path for this document.
@@ -1829,15 +1811,12 @@ class ModelCanvasManager:
         """
         from shypn.data.canvas import DocumentModel
         
-        print(f"[ModelCanvasManager] to_document_model(): Converting manager state to document")
-        print(f"[ModelCanvasManager] to_document_model(): Manager has {len(self.places)} places, {len(self.transitions)} transitions, {len(self.arcs)} arcs")
         
         document = DocumentModel()
         document.places = list(self.places)
         document.transitions = list(self.transitions)
         document.arcs = list(self.arcs)
         
-        print(f"[ModelCanvasManager] to_document_model(): Document created with {len(document.places)} places, {len(document.transitions)} transitions, {len(document.arcs)} arcs")
         
         # Sync ID counters
         document._next_place_id = self._next_place_id

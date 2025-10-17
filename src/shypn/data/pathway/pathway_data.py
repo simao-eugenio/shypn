@@ -280,8 +280,3 @@ if __name__ == "__main__":
         metadata={"name": "Glycolysis (partial)", "organism": "Homo sapiens"}
     )
     
-    print(pathway)
-    print(f"  Species: {[s.name for s in pathway.species]}")
-    print(f"  Reactions: {[r.name for r in pathway.reactions]}")
-    print(f"  First reaction: {hexokinase}")
-    print(f"  Kinetics: {hexokinase.kinetic_law}")

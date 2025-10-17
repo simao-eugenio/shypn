@@ -356,7 +356,6 @@ class SBMLParser:
     Example:
         parser = SBMLParser()
         pathway = parser.parse_file('glycolysis.sbml')
-        print(f"Loaded {len(pathway.species)} species")
     """
     
     def __init__(self):
@@ -517,18 +516,9 @@ if __name__ == "__main__":
     )
     
     # Example: Parse SBML file
-    print("SBML Parser Example")
-    print("=" * 50)
     
     # Check if libsbml is available
     if libsbml is None:
-        print("❌ python-libsbml not installed")
-        print("Install with: pip3 install --user python-libsbml")
+        pass  # libsbml not available
     else:
-        print(f"✅ libSBML version {libsbml.getLibSBMLVersion()}")
-        print()
-        print("To parse an SBML file:")
-        print("  parser = SBMLParser()")
-        print("  pathway = parser.parse_file('glycolysis.sbml')")
-        print("  print(f'Species: {len(pathway.species)}')")
-        print("  print(f'Reactions: {len(pathway.reactions)}')")
+        pass  # libsbml available

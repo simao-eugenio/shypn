@@ -48,8 +48,6 @@ class VisualValidator(PostProcessorBase):
         # Check validation report
         stats = validator.get_stats()
         if stats.get('discrepancies'):
-            print("Warning: validation found discrepancies")
-            print(stats['validation_report'])
     """
     
     def __init__(self, options: Optional['EnhancementOptions'] = None):

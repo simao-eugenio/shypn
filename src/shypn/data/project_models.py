@@ -342,7 +342,6 @@ class ProjectManager:
                 with open(index_file, 'r', encoding='utf-8') as f:
                     self.project_index = json.load(f)
             except Exception as e:
-                print(f"Warning: Failed to load project index: {e}")
                 self.project_index = {}
         else:
             self.project_index = {}
@@ -362,7 +361,6 @@ class ProjectManager:
                 with open(recent_file, 'r', encoding='utf-8') as f:
                     self.recent_projects = json.load(f)
             except Exception as e:
-                print(f"Warning: Failed to load recent projects: {e}")
                 self.recent_projects = []
         else:
             self.recent_projects = []
@@ -455,7 +453,6 @@ class ProjectManager:
         project_file = os.path.join(project_info['path'], 'project.shy')
         
         if not os.path.exists(project_file):
-            print(f"Warning: Project file not found: {project_file}")
             return None
         
         try:
@@ -464,7 +461,6 @@ class ProjectManager:
             self.add_to_recent(project_id)
             return project
         except Exception as e:
-            print(f"Error loading project: {e}")
             return None
     
     def open_project_by_path(self, project_file: str) -> Optional[Project]:
@@ -494,7 +490,6 @@ class ProjectManager:
             self.add_to_recent(project.id)
             return project
         except Exception as e:
-            print(f"Error loading project: {e}")
             return None
     
     def close_current_project(self, save: bool = True):
@@ -507,7 +502,7 @@ class ProjectManager:
             try:
                 self.current_project.save()
             except Exception as e:
-                print(f"Error saving project: {e}")
+                pass  # Silently ignore save errors when closing
         
         self.current_project = None
     
@@ -658,11 +653,9 @@ class ProjectManager:
                 # Final confirmation: path exists and is a directory
                 if os.path.exists(project_path) and os.path.isdir(project_path):
                     shutil.rmtree(project_path)
-                    print(f"Deleted project files: {project_path}")
                 else:
-                    print(f"Warning: Project path not found or not a directory: {project_path}")
+                    pass  # Path doesn't exist or isn't a directory
             except Exception as e:
-                print(f"ERROR: Failed to delete project files: {e}")
                 # Re-add to index if file deletion failed
                 self.project_index[project_id] = project_info
                 self.save_index()
@@ -715,7 +708,6 @@ class ProjectManager:
             # Ensure .zip extension
             final_archive_path = base_name + '.zip'
             
-            print(f"Project archived to: {final_archive_path}")
             
             # Now safe to remove from index (files preserved in archive)
             del self.project_index[project_id]

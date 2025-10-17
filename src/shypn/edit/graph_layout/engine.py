@@ -108,13 +108,6 @@ class LayoutEngine:
         graph = nx.DiGraph()
         
         # DIAGNOSTIC: Count and log what we're loading
-        print(f"\n{'='*80}")
-        print(f"🔍 GRAPH BUILD DIAGNOSTIC")
-        print(f"{'='*80}")
-        print(f"📊 Document has:")
-        print(f"   - {len(doc.places)} places")
-        print(f"   - {len(doc.transitions)} transitions")
-        print(f"   - {len(doc.arcs)} arcs")
         
         # Add mass nodes (places and transitions)
         # Use the actual objects as node IDs - NetworkX handles this perfectly
@@ -125,20 +118,15 @@ class LayoutEngine:
             place_count += 1
             if i < 5:  # Show first 5
                 place_name = getattr(place, 'name', 'unnamed')
-                print(f"   Place {i+1}: id={place.id}, name='{place_name}'")
         
         if len(doc.places) > 5:
-            print(f"   ... and {len(doc.places) - 5} more places")
+            pass  # More places exist
         
         transition_count = 0
         for transition in doc.transitions:
             graph.add_node(transition, type='transition')  # Use object itself as node ID
             transition_count += 1
         
-        print(f"\n📦 Added to graph:")
-        print(f"   - {place_count} place nodes")
-        print(f"   - {transition_count} transition nodes")
-        print(f"   - Total nodes in graph: {graph.number_of_nodes()}")
         
         # Add springs (arcs) with weight as spring strength
         # Arcs have .source and .target which are OBJECT REFERENCES, not IDs!
@@ -162,10 +150,7 @@ class LayoutEngine:
                 # This shouldn't happen if everything is wired correctly
                 source_name = getattr(source_obj, 'name', 'unknown')
                 target_name = getattr(target_obj, 'name', 'unknown')
-                print(f"   ⚠️ Arc skipped: {source_name} → {target_name} (nodes not in graph)")
         
-        print(f"   - {arcs_added} arcs/edges")
-        print(f"{'='*80}\n")
         
         return graph
     
@@ -344,7 +329,7 @@ class LayoutEngine:
                 obj.y = y
                 nodes_moved += 1
             else:
-                print(f"⚠️ Warning: Object {obj} has no x/y attributes")
+                pass  # Node not found or invalid
         
         return nodes_moved
     

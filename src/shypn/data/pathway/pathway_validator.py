@@ -344,11 +344,8 @@ class PathwayValidator:
         validator = PathwayValidator()
         result = validator.validate(pathway_data)
         if result.is_valid:
-            print("✅ Pathway is valid")
         else:
-            print("❌ Validation errors:")
             for error in result.errors:
-                print(f"  - {error}")
     """
     
     def __init__(self):
@@ -425,14 +422,3 @@ if __name__ == "__main__":
         format='%(name)s - %(levelname)s - %(message)s'
     )
     
-    print("Pathway Validator Example")
-    print("=" * 50)
-    print()
-    print("To validate pathway data:")
-    print("  validator = PathwayValidator()")
-    print("  result = validator.validate(pathway_data)")
-    print("  if result.is_valid:")
-    print("      print('✅ Valid')")
-    print("  else:")
-    print("      for error in result.errors:")
-    print("          print(f'❌ {error}')")

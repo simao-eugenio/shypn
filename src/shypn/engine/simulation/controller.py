@@ -182,8 +182,7 @@ class SimulationController:
                     if obj.target.id in self.behavior_cache:
                         del self.behavior_cache[obj.target.id]
                 
-                print(f"[SimulationController] Arc {obj.name} transformed from {old_value} to {new_value}, "
-                      f"behaviors rebuilt for affected transitions")
+                pass  # Behaviors rebuilt for affected transitions
         
         elif event_type == 'created':
             # New object created (place, transition, or arc)
@@ -1406,8 +1405,6 @@ class SimulationController:
         # Cap at 1000 steps per GUI update (allows up to ~10000x speedup with dt=0.001)
         if self._steps_per_callback > 1000:
             effective_max_scale = 1000 * time_step / gui_interval_s
-            print(f"⚠️  Time scale {self.settings.time_scale}x is very high.")
-            print(f"   Capping at {effective_max_scale:.1f}x for UI responsiveness.")
             self._steps_per_callback = 1000
         else:
             self._steps_per_callback = min(self._steps_per_callback, 1000)

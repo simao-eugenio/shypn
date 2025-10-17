@@ -26,7 +26,6 @@ Example:
     locality = detector.get_locality_for_transition(transition)
     
     if locality.is_valid:
-        print(f"{locality.get_summary()}")
     
     # Display in UI
     widget = LocalityInfoWidget(model)

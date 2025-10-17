@@ -141,7 +141,6 @@ def count_parallel_arcs(arc: Any, all_arcs: List[Any]) -> int:
     
     Example:
         if count_parallel_arcs(arc, all_arcs) > 0:
-            print("Arc has parallels")
     """
     return len(detect_parallel_arcs(arc, all_arcs))
 
@@ -199,7 +198,6 @@ def separate_parallel_arcs_by_direction(arc: Any, parallels: List[Any]) -> tuple
     
     Example:
         same, opposite = separate_parallel_arcs_by_direction(arc, parallels)
-        print(f"Same direction: {len(same)}, Opposite: {len(opposite)}")
     """
     same_direction = []
     opposite_direction = []

@@ -557,7 +557,6 @@ def main(argv=None):
 	try:
 		return app.run(argv)
 	except KeyboardInterrupt:
-		print("\n✋ Application interrupted by user (Ctrl+C)")
 		return 0
 
 
@@ -566,5 +565,4 @@ if __name__ == '__main__':
 		exit_code = main()
 		sys.exit(exit_code if exit_code is not None else 0)
 	except KeyboardInterrupt:
-		print("\n✋ Shutting down gracefully...")
 		sys.exit(0)
