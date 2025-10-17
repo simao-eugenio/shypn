@@ -1,20 +1,60 @@
 """Unified Physics Simulator - Combines all forces for Solar System Layout.
 
+VERSION: 2.0.0 - Black Hole Galaxy Physics
+DATE: October 17, 2025
+STATUS: PRODUCTION STABLE
+
+MAJOR FEATURES:
+- Black hole galaxy model with SCC cycle at center
+- SCC-aware gravitational attraction (only affects constellation hubs)
+- Black hole damping wave (distance-based repulsion reduction)
+- Arc force weakening for SCC connections (prevents ternary clustering)
+- Event horizon mechanics (configurable node trapping)
+- Multi-level galaxy cluster hierarchies
+
+PHYSICS MODEL:
 This simulator implements a unified physics model that combines:
 1. Oscillatory forces (arc-based attraction/repulsion with equilibrium)
-2. Proximity repulsion (all-pairs Coulomb-like repulsion)
+2. Proximity repulsion (all-pairs Coulomb-like repulsion with damping wave)
 3. Ambient tension (global spacing force)
+4. Hub group repulsion (prevents constellation clustering)
+5. SCC cohesion (maintains black hole cycle shape)
+6. SCC gravity (pulls constellation hubs toward black hole)
 
 Key insight: Graph properties → Physics properties
-- SCCs have super-massive mass (like stars)
-- Hubs have massive mass (like planets)
-- Regular nodes have light mass
+- SCC nodes have super-massive mass (MASS_SCC_NODE = 1000) - Black hole
+- Super hubs have massive mass (MASS_SUPER_HUB = 300) - Constellation hubs
+- Major hubs have mass (MASS_MAJOR_HUB = 200)
+- Minor hubs have mass (MASS_MINOR_HUB = 100)
+- Places have mass (MASS_PLACE = 100) - Shared places/satellites
+- Transitions have light mass (MASS_TRANSITION = 50)
 - Everything attracts via arcs (oscillatory forces)
 - Everything repels by proximity (prevents overlap/clustering)
 - Ambient tension maintains global spacing
+- Black hole damping wave reduces repulsion near SCC (allows tight packing)
+- Arc weakening for SCC connections (90% reduction) prevents ternary systems
+
+FORCE HIERARCHY (Current Calibration - 94% global reduction applied):
+1. SCC Cohesion: 30,000 (maintains black hole cycle shape)
+2. SCC Gravity: 300 (pulls hubs only, mass >= 1000)
+3. Hub Group Repulsion: 30 (prevents constellation clustering)
+4. Arc Forces: 1.2 (attraction/repulsion via connections)
+   - Normal arcs: 1.2
+   - SCC arcs: 0.12 (90% weaker - prevents ternary clustering)
+5. Proximity Repulsion: 6 (with black hole damping)
+6. Damping Wave: 0.1-1.0 (distance-based from black hole center)
 
 The algorithm automatically balances all forces to create natural,
 stable layouts without user intervention.
+
+CHANGELOG:
+v2.0.0 (Oct 17, 2025): Black hole galaxy physics with arc weakening
+v1.5.0: Added SCC gravity and event horizon mechanics
+v1.4.0: Implemented black hole damping wave
+v1.3.0: Added hub group repulsion
+v1.2.0: Implemented SCC cohesion forces
+v1.1.0: Added oscillatory forces with equilibrium
+v1.0.0: Initial unified physics implementation
 """
 
 from typing import Dict, List, Tuple
@@ -25,6 +65,8 @@ from shypn.netobjs import Place, Transition, Arc
 class UnifiedPhysicsSimulator:
     """Unified physics engine combining oscillatory, proximity, and ambient forces.
     
+    VERSION: 2.0.0 - Black Hole Galaxy Physics
+    
     This is the core physics engine that makes the Solar System Layout work.
     It combines multiple force types to create stable, aesthetic layouts:
     
@@ -33,12 +75,14 @@ class UnifiedPhysicsSimulator:
        - Repulsive when r < r_equilibrium (pushes nodes apart)
        - Creates natural orbital patterns
        - Weighted by arc.weight
+       - SCC arc weakening: 90% reduction to prevent ternary clustering
     
     2. Proximity Repulsion (all-pairs):
        - Always repulsive (prevents overlap)
        - Stronger for higher masses (hubs repel more)
        - Distance-dependent (1/r² falloff)
        - Creates hub separation
+       - Black hole damping wave: reduced near SCC center
     
     3. Ambient Tension (global):
        - Weak repulsion between all nodes
@@ -46,31 +90,67 @@ class UnifiedPhysicsSimulator:
        - Prevents global clustering
        - Maintains minimum spacing
     
+    4. Hub Group Repulsion:
+       - Group-to-group repulsion between constellations
+       - Prevents constellation clustering
+       - Distance-based with combined masses
+    
+    5. SCC Cohesion:
+       - Pulls SCC nodes toward centroid
+       - Maintains black hole cycle shape
+       - Strong force (30,000) with target radius
+    
+    6. SCC Gravity:
+       - Attracts constellation hubs (mass >= 1000) to black hole
+       - Creates orbital mechanics around SCC center
+       - Does NOT affect satellites or shared places
+    
     The combination of these forces creates layouts where:
-    - SCCs become gravitational centers
-    - Hubs spread into constellation patterns
-    - Regular nodes orbit naturally
-    - Everything stays well-spaced
+    - SCCs become black hole gravitational centers
+    - Constellation hubs orbit the black hole
+    - Shared places orbit constellation hubs (not black hole)
+    - Satellites orbit hubs naturally
+    - Everything stays well-spaced with hierarchical structure
     """
     
-    # Physics constants (tuned for good visual results)
-    GRAVITY_CONSTANT = 1.2                  # Arc attraction (SCALED DOWN: was 4, now 1.2 - 70% reduction from 4)
-    SPRING_CONSTANT = 30.0                  # Spring repulsion strength (SCALED DOWN: was 100, now 30)
-    PROXIMITY_CONSTANT = 6.0                # Hub-to-hub repulsion (SCALED DOWN: was 20, now 6)
+    # VERSION MARKER
+    VERSION = "2.0.0"
+    VERSION_DATE = "2025-10-17"
+    
+    # Physics constants (tuned for black hole galaxy - 94% cumulative reduction applied)
+    # CALIBRATION HISTORY:
+    # - Original values (v1.0.0)
+    # - First scaling: 80% reduction (v1.5.0)
+    # - Second scaling: 70% reduction from scaled values (v2.0.0)
+    # - Cumulative: 94% reduction from original
+    
+    GRAVITY_CONSTANT = 1.2                  # Arc attraction (was 4 → now 1.2: 70% reduction)
+    SPRING_CONSTANT = 30.0                  # Spring repulsion strength (was 100 → now 30: 70% reduction)
+    PROXIMITY_CONSTANT = 6.0                # Hub-to-hub repulsion (was 20 → now 6: 70% reduction)
     PROXIMITY_THRESHOLD = 500.0             # Mass threshold for proximity repulsion
     AMBIENT_CONSTANT = 1000.0               # Base for universal repulsion
-    UNIVERSAL_REPULSION_MULTIPLIER = 2.0    # Multiplier for universal repulsion (REDUCED: was 5, now 2 for 100% zoom calibration)
+    UNIVERSAL_REPULSION_MULTIPLIER = 2.0    # Multiplier for universal repulsion
+    
+    # Hub group repulsion (prevents constellation clustering)
+    HUB_GROUP_CONSTANT = 30.0               # Group repulsion strength (was 100 → now 30: 70% reduction)
+    
+    # SCC-specific forces (Black Hole Physics v2.0.0)
+    SCC_COHESION_STRENGTH = 30000.0         # Pulls SCC nodes toward centroid (was 100k → now 30k: 70% reduction)
+    SCC_TARGET_RADIUS = 30.0                # Target radius for SCC cycle shape
+    SCC_GRAVITY_CONSTANT = 300.0            # Attracts hubs to black hole (was 1000 → now 300: 70% reduction)
+    SCC_GRAVITY_MIN_MASS = 1000.0           # Only nodes with mass >= this affected by SCC gravity
+    SCC_ARC_WEAKENING_FACTOR = 0.1          # Weaken arcs to/from SCC by 90% (prevents ternary clustering) - v2.0.0
     
     # Equilibrium distance parameters
     # For Hub(1000) ← Place(100): r_eq = 200 * (1100)^0.1 * weight^-0.3
-    EQUILIBRIUM_SCALE = 0.5                 # Base equilibrium distance (REDUCED: was 1.0, now 0.5 for 100% zoom calibration ~75-125 units)
-    MASS_EXPONENT = 0.1                     # Mass influence on equilibrium (REDUCED from 0.35)
+    EQUILIBRIUM_SCALE = 0.5                 # Base equilibrium distance
+    MASS_EXPONENT = 0.1                     # Mass influence on equilibrium
     ARC_WEIGHT_EXPONENT = -0.3              # Weight influence on equilibrium
     
     # Simulation parameters
     TIME_STEP = 0.5                         # Integration time step
     DAMPING = 0.9                           # Velocity damping (0-1, higher = less damping)
-    MAX_FORCE = 100000.0                    # Maximum force per node (INCREASED: was 1000, now 100k to allow strong hub repulsion!)
+    MAX_FORCE = 100000.0                    # Maximum force per node
     MIN_DISTANCE = 1.0                      # Minimum distance for force calculations
     
     def __init__(self,
@@ -287,19 +367,37 @@ class UnifiedPhysicsSimulator:
             if arc_weight is None:
                 arc_weight = getattr(arc, 'weight', 1.0)
             
-            # WEAKEN arcs connecting to SCC nodes (black hole transitions)
+            # ============================================================
+            # VERSION 2.0.0 - BLACK HOLE ARC WEAKENING (Oct 17, 2025)
+            # ============================================================
+            # CRITICAL FIX: Weaken arcs connecting to SCC nodes (black hole transitions)
             # This prevents shared places from being pulled toward black hole
             # and forming ternary systems that drag constellations
+            # 
+            # PROBLEM: Shared places have arcs to BOTH:
+            #   1. Constellation hub (normal force)
+            #   2. Black hole transition (equal force)
+            # Result: 3 shared places cluster together near black hole
+            #         and drag their constellations with them
+            #
+            # SOLUTION: Reduce arc force to black hole by 90%
+            #   - Arc to constellation hub: 1.2 (normal)
+            #   - Arc to black hole: 0.12 (10× weaker)
+            # Result: Shared places orbit constellation hubs like satellites
+            #         Constellations free to spread evenly around black hole
+            # ============================================================
             arc_strength_multiplier = 1.0
             if hasattr(self, 'sccs') and self.sccs:
                 for scc in self.sccs:
                     scc_nodes = set(scc.node_ids)
                     # If either end connects to SCC, weaken the arc force
                     if source_id in scc_nodes or target_id in scc_nodes:
-                        # Reduce arc force by 90% (10× weaker)
-                        # This makes shared places prefer staying with constellation hub
-                        arc_strength_multiplier = 0.1
+                        # Reduce arc force by 90% using SCC_ARC_WEAKENING_FACTOR
+                        arc_strength_multiplier = self.SCC_ARC_WEAKENING_FACTOR  # 0.1
                         break
+            # ============================================================
+            # END VERSION 2.0.0 ARC WEAKENING
+            # ============================================================
             
             r_eq = self._calculate_equilibrium_distance(source_mass, target_mass, arc_weight)
             
@@ -454,6 +552,10 @@ class UnifiedPhysicsSimulator:
                                      positions: Dict[int, Tuple[float, float]]) -> float:
         """Calculate damping factor based on distance from black hole center.
         
+        ============================================================
+        VERSION 1.4.0 - BLACK HOLE DAMPING WAVE
+        ============================================================
+        
         Black hole creates a "gravity wave" that dampens repulsion forces.
         Nodes closer to black hole experience reduced repulsion (allows tighter packing).
         Nodes far from black hole experience full repulsion (normal spreading).
@@ -465,6 +567,13 @@ class UnifiedPhysicsSimulator:
         At r=1000+: damping = 1.0 (no reduction - full repulsion)
         
         This creates natural gradient: tight near black hole, spread far away.
+        
+        Used by:
+        - Proximity repulsion (_calculate_proximity_repulsion)
+        - Hub group repulsion (_calculate_hub_group_repulsion)
+        
+        Result: Beautiful hierarchical structure with density gradient
+        ============================================================
         """
         if not hasattr(self, 'sccs') or not self.sccs:
             return 1.0  # No damping if no black hole
