@@ -1,6 +1,6 @@
 """Unified Physics Simulator - Combines all forces for Solar System Layout.
 
-VERSION: 2.2.0 - Pulsating Singularity Dynamics
+VERSION: 2.2.1 - Place Orbital Stabilization Fix
 DATE: October 17, 2025
 STATUS: PRODUCTION STABLE
 
@@ -81,7 +81,8 @@ stable layouts without user intervention. The pulsating singularity
 ensures the system never freezes in suboptimal configurations.
 
 CHANGELOG:
-v2.2.0 (Oct 17, 2025): Pulsating singularity - stochastic dynamics & variance tracking ⭐
+v2.2.1 (Oct 17, 2025): Place orbital fix - disable extra proximity for low-mass nodes ⭐
+v2.2.0 (Oct 17, 2025): Pulsating singularity - stochastic dynamics & variance tracking
 v2.1.0 (Oct 17, 2025): Black hole whirlwind effect - spiral orbital patterns
 v2.0.0 (Oct 17, 2025): Black hole galaxy physics with arc weakening
 v1.5.0: Added SCC gravity and event horizon mechanics
@@ -153,7 +154,7 @@ class UnifiedPhysicsSimulator:
     """
     
     # VERSION MARKER
-    VERSION = "2.2.0"
+    VERSION = "2.2.1"
     VERSION_DATE = "2025-10-17"
     
     # Physics constants (tuned for black hole galaxy - 94% cumulative reduction applied)
@@ -614,12 +615,33 @@ class UnifiedPhysicsSimulator:
                     # Strength: 0.0x - DISABLED extra satellite repulsion (only universal base remains)
                     satellite_repulsion = 0.0  # (self.AMBIENT_CONSTANT * self.UNIVERSAL_REPULSION_MULTIPLIER * 0.0) / (distance * distance)
                 
+                # ============================================================
+                # VERSION 2.2.1 - PLACE ORBITAL FIX (Oct 17, 2025)
+                # ============================================================
                 # EXTRA HUB REPULSION: High-mass nodes get additional repulsion
-                # Only applies if at least one node is a hub (mass >= threshold)
+                # CRITICAL FIX: Only applies when BOTH nodes are hubs (mass >= threshold)
+                # 
+                # PROBLEM: Places (mass=100) were getting massive repulsion from hubs
+                #   - Hub-to-place: 6.0 × 1000 × 100 / r² = 600,000 / r² (!)
+                #   - This pushed places to "middle path" between cycle and constellation
+                #   - Arc forces (1.2) couldn't compete with proximity (600,000 / r²)
+                #
+                # SOLUTION: Change "or" to "and"
+                #   - Hub-to-hub: Extra repulsion ACTIVE (both >= 500) ✓
+                #   - Hub-to-place: Extra repulsion DISABLED (place < 500) ✓
+                #   - Place-to-place: Extra repulsion DISABLED ✓
+                #
+                # RESULT: Places orbit close to hubs (arc forces dominate)
+                #         Hubs spread apart (proximity repulsion active)
+                #         Beautiful hierarchy maintained!
+                # ============================================================
                 extra_force = 0.0
-                if m1 >= self.PROXIMITY_THRESHOLD or m2 >= self.PROXIMITY_THRESHOLD:
+                if m1 >= self.PROXIMITY_THRESHOLD and m2 >= self.PROXIMITY_THRESHOLD:
                     # Coulomb-like repulsion: F = (K * m1 * m2) / r²
                     extra_force = (self.PROXIMITY_CONSTANT * m1 * m2) / (distance * distance)
+                # ============================================================
+                # END VERSION 2.2.1 PLACE ORBITAL FIX
+                # ============================================================
                 
                 # BLACK HOLE DAMPING WAVE: Reduce repulsion near black hole
                 # Calculate average distance of both nodes from black hole center
