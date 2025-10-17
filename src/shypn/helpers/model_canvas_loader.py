@@ -2283,6 +2283,7 @@ class ModelCanvasLoader:
             ('Layout: Auto (Best)', lambda: self._on_layout_auto_clicked(menu, drawing_area, manager)),
             ('Layout: Hierarchical', lambda: self._on_layout_hierarchical_clicked(menu, drawing_area, manager)),
             ('Layout: Force-Directed', lambda: self._on_layout_force_clicked(menu, drawing_area, manager)),
+            ('Layout: Solar System (SSCC)', lambda: self._on_layout_solar_system_clicked(menu, drawing_area, manager)),
             ('Layout: Circular', lambda: self._on_layout_circular_clicked(menu, drawing_area, manager)),
             ('Layout: Orthogonal', lambda: self._on_layout_orthogonal_clicked(menu, drawing_area, manager)),
             None,  # Separator
@@ -2456,6 +2457,67 @@ class ModelCanvasLoader:
     def _on_layout_force_clicked(self, menu, drawing_area, manager):
         """Apply force-directed (Fruchterman-Reingold) layout."""
         self._apply_specific_layout(manager, drawing_area, 'force_directed', 'Force-Directed')
+    
+    def _on_layout_solar_system_clicked(self, menu, drawing_area, manager):
+        """Apply Solar System (SSCC) layout with unified physics."""
+        try:
+            from shypn.layout.sscc import SolarSystemLayoutEngine
+            
+            # Check if there are nodes to layout
+            if not manager.places and not manager.transitions:
+                self._show_layout_message("No objects to layout", drawing_area)
+                return
+            
+            # Create engine with unified physics (all forces active)
+            engine = SolarSystemLayoutEngine(
+                iterations=1000,
+                use_arc_weight=True,
+                scc_radius=50.0,
+                planet_orbit=300.0,
+                satellite_orbit=50.0
+            )
+            
+            # Apply layout
+            positions = engine.apply_layout(
+                places=list(manager.places),
+                transitions=list(manager.transitions),
+                arcs=list(manager.arcs)
+            )
+            
+            # Update object positions
+            for obj_id, (x, y) in positions.items():
+                # Find object by ID
+                obj = None
+                for place in manager.places:
+                    if place.id == obj_id:
+                        obj = place
+                        break
+                if not obj:
+                    for transition in manager.transitions:
+                        if transition.id == obj_id:
+                            obj = transition
+                            break
+                
+                if obj:
+                    obj.x = x
+                    obj.y = y
+            
+            # Get statistics
+            stats = engine.get_statistics()
+            message = f"Applied Solar System (SSCC) layout\n"
+            message += f"Physics: {stats['physics_model']}\n"
+            message += f"SCCs found: {stats['num_sccs']}\n"
+            message += f"Nodes in SCCs: {stats['num_nodes_in_sccs']}\n"
+            message += f"Free places: {stats['num_free_places']}"
+            self._show_layout_message(message, drawing_area)
+            
+            # Redraw
+            drawing_area.queue_draw()
+            
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            self._show_layout_message(f"Solar System layout error: {str(e)}", drawing_area)
     
     def _on_layout_circular_clicked(self, menu, drawing_area, manager):
         """Apply circular layout."""
