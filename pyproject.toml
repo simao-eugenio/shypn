@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "shypn"
-version = "2.1.0"
-description = "Petri Net editor with Black Hole Whirlwind Physics - spiral orbital patterns like water circling a drain"
+version = "2.2.0"
+description = "Petri Net editor with Pulsating Singularity Physics - dynamic equilibrium through high-frequency oscillations"
 authors = [
     { name="Simão Eugénio", email="simao-eugenio@github.com" }
 ]
