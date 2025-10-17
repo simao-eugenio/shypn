@@ -1,6 +1,6 @@
 """Unified Physics Simulator - Combines all forces for Solar System Layout.
 
-VERSION: 2.0.0 - Black Hole Galaxy Physics
+VERSION: 2.1.0 - Black Hole Whirlwind Effect
 DATE: October 17, 2025
 STATUS: PRODUCTION STABLE
 
@@ -9,8 +9,15 @@ MAJOR FEATURES:
 - SCC-aware gravitational attraction (only affects constellation hubs)
 - Black hole damping wave (distance-based repulsion reduction)
 - Arc force weakening for SCC connections (prevents ternary clustering)
+- Black hole whirlwind effect (spiral orbital patterns) ⭐ NEW in v2.1.0
 - Event horizon mechanics (configurable node trapping)
 - Multi-level galaxy cluster hierarchies
+
+WHIRLWIND INSIGHT (v2.1.0):
+"Black holes are like clogged sink drains" - The damping wave oscillates
+between attract/repulsion, causing matter to spiral around the black hole
+like water circling a drain. This creates a whirlwind effect with beautiful
+spiral orbital patterns instead of simple radial motion.
 
 PHYSICS MODEL:
 This simulator implements a unified physics model that combines:
@@ -20,6 +27,7 @@ This simulator implements a unified physics model that combines:
 4. Hub group repulsion (prevents constellation clustering)
 5. SCC cohesion (maintains black hole cycle shape)
 6. SCC gravity (pulls constellation hubs toward black hole)
+7. SCC whirlwind (tangential forces create spiral motion) ⭐ NEW
 
 Key insight: Graph properties → Physics properties
 - SCC nodes have super-massive mass (MASS_SCC_NODE = 1000) - Black hole
@@ -36,18 +44,20 @@ Key insight: Graph properties → Physics properties
 
 FORCE HIERARCHY (Current Calibration - 94% global reduction applied):
 1. SCC Cohesion: 30,000 (maintains black hole cycle shape)
-2. SCC Gravity: 300 (pulls hubs only, mass >= 1000)
-3. Hub Group Repulsion: 30 (prevents constellation clustering)
-4. Arc Forces: 1.2 (attraction/repulsion via connections)
+2. SCC Gravity: 300 (radial pull toward black hole, mass >= 1000)
+3. SCC Whirlwind: 50 (tangential spiral force) ⭐ NEW in v2.1.0
+4. Hub Group Repulsion: 30 (prevents constellation clustering)
+5. Arc Forces: 1.2 (attraction/repulsion via connections)
    - Normal arcs: 1.2
    - SCC arcs: 0.12 (90% weaker - prevents ternary clustering)
-5. Proximity Repulsion: 6 (with black hole damping)
-6. Damping Wave: 0.1-1.0 (distance-based from black hole center)
+6. Proximity Repulsion: 6 (with black hole damping)
+7. Damping Wave: 0.1-1.0 (distance-based from black hole center)
 
 The algorithm automatically balances all forces to create natural,
 stable layouts without user intervention.
 
 CHANGELOG:
+v2.1.0 (Oct 17, 2025): Black hole whirlwind effect - spiral orbital patterns ⭐
 v2.0.0 (Oct 17, 2025): Black hole galaxy physics with arc weakening
 v1.5.0: Added SCC gravity and event horizon mechanics
 v1.4.0: Implemented black hole damping wave
@@ -65,7 +75,7 @@ from shypn.netobjs import Place, Transition, Arc
 class UnifiedPhysicsSimulator:
     """Unified physics engine combining oscillatory, proximity, and ambient forces.
     
-    VERSION: 2.0.0 - Black Hole Galaxy Physics
+    VERSION: 2.1.0 - Black Hole Whirlwind Effect
     
     This is the core physics engine that makes the Solar System Layout work.
     It combines multiple force types to create stable, aesthetic layouts:
@@ -107,14 +117,15 @@ class UnifiedPhysicsSimulator:
     
     The combination of these forces creates layouts where:
     - SCCs become black hole gravitational centers
-    - Constellation hubs orbit the black hole
+    - Constellation hubs spiral around the black hole (whirlwind!) ⭐
     - Shared places orbit constellation hubs (not black hole)
     - Satellites orbit hubs naturally
     - Everything stays well-spaced with hierarchical structure
+    - Beautiful spiral patterns emerge from whirlwind effect
     """
     
     # VERSION MARKER
-    VERSION = "2.0.0"
+    VERSION = "2.1.0"
     VERSION_DATE = "2025-10-17"
     
     # Physics constants (tuned for black hole galaxy - 94% cumulative reduction applied)
@@ -140,6 +151,11 @@ class UnifiedPhysicsSimulator:
     SCC_GRAVITY_CONSTANT = 300.0            # Attracts hubs to black hole (was 1000 → now 300: 70% reduction)
     SCC_GRAVITY_MIN_MASS = 1000.0           # Only nodes with mass >= this affected by SCC gravity
     SCC_ARC_WEAKENING_FACTOR = 0.1          # Weaken arcs to/from SCC by 90% (prevents ternary clustering) - v2.0.0
+    
+    # Black hole whirlwind effect (v2.1.0) - "Clogged sink drain" spiral forces
+    SCC_WHIRLWIND_STRENGTH = 50.0           # Tangential force strength (creates spiral motion)
+    SCC_WHIRLWIND_ENABLED = True            # Enable/disable whirlwind effect
+    SCC_WHIRLWIND_DIRECTION = 1.0           # 1.0 = counterclockwise, -1.0 = clockwise
     
     # Equilibrium distance parameters
     # For Hub(1000) ← Place(100): r_eq = 200 * (1100)^0.1 * weight^-0.3
@@ -905,6 +921,56 @@ class UnifiedPhysicsSimulator:
                 # Direction: toward SCC centroid (attraction)
                 fx = (dx / distance) * force_magnitude
                 fy = (dy / distance) * force_magnitude
+                
+                # ============================================================
+                # VERSION 2.1.0 - BLACK HOLE WHIRLWIND EFFECT (Oct 17, 2025)
+                # ============================================================
+                # INSIGHT: "Black holes are like clogged sink drains"
+                # 
+                # The damping wave oscillates between attract/repulsion,
+                # causing matter to spiral around the black hole like water
+                # circling a drain. This creates a whirlwind effect.
+                #
+                # IMPLEMENTATION: Add tangential force perpendicular to radial
+                # - Radial force: pulls toward/pushes from black hole
+                # - Tangential force: creates rotation/spiral motion
+                # - Result: Nodes orbit in spiral patterns (whirlwind!)
+                #
+                # The tangential force is strongest at medium distances
+                # where the damping wave oscillation is most active.
+                # ============================================================
+                if self.SCC_WHIRLWIND_ENABLED:
+                    # Calculate tangential force (perpendicular to radial)
+                    # For 2D rotation: if radial vector is (dx, dy)
+                    # then tangential vector is (-dy, dx) for counterclockwise
+                    # or (dy, -dx) for clockwise
+                    
+                    # Tangential force magnitude depends on distance
+                    # Strongest at medium range (500-1000 units) where damping oscillates
+                    # Weaker near black hole (tight) and far away (escapes whirlwind)
+                    distance_ratio = distance / 1000.0
+                    if distance_ratio > 1.0:
+                        distance_ratio = 1.0
+                    
+                    # Bell curve: strongest at 0.5-0.8 range
+                    whirlwind_intensity = 4.0 * distance_ratio * (1.0 - distance_ratio)
+                    
+                    # Tangential force strength
+                    tangential_magnitude = (self.SCC_WHIRLWIND_STRENGTH * 
+                                          node_mass * whirlwind_intensity)
+                    
+                    # Tangential direction (perpendicular to radial)
+                    # Normalized radial: (dx/r, dy/r)
+                    # Tangential (CCW): (-dy/r, dx/r)
+                    tx = (-dy / distance) * tangential_magnitude * self.SCC_WHIRLWIND_DIRECTION
+                    ty = (dx / distance) * tangential_magnitude * self.SCC_WHIRLWIND_DIRECTION
+                    
+                    # Add tangential force to radial force
+                    fx += tx
+                    fy += ty
+                # ============================================================
+                # END VERSION 2.1.0 WHIRLWIND EFFECT
+                # ============================================================
                 
                 # Add to existing forces
                 curr_fx, curr_fy = self.forces[node_id]
