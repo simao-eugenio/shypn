@@ -1,6 +1,6 @@
 """Unified Physics Simulator - Combines all forces for Solar System Layout.
 
-VERSION: 2.2.2 - Selective Arc Weakening (Mass-Based)
+VERSION: 2.2.3 - Fixed Hub Mass Threshold for Selective Weakening
 DATE: October 17, 2025
 STATUS: PRODUCTION STABLE
 
@@ -81,7 +81,8 @@ stable layouts without user intervention. The pulsating singularity
 ensures the system never freezes in suboptimal configurations.
 
 CHANGELOG:
-v2.2.2 (Oct 17, 2025): Selective arc weakening - mass-based (places keep full strength) ⭐
+v2.2.3 (Oct 17, 2025): Fixed hub mass threshold (500→150) for selective weakening ⭐ CRITICAL FIX
+v2.2.2 (Oct 17, 2025): Selective arc weakening - mass-based (wrong threshold)
 v2.2.1 (Oct 17, 2025): Place orbital fix - disable extra proximity for low-mass nodes
 v2.2.0 (Oct 17, 2025): Pulsating singularity - stochastic dynamics & variance tracking
 v2.1.0 (Oct 17, 2025): Black hole whirlwind effect - spiral orbital patterns
@@ -155,7 +156,7 @@ class UnifiedPhysicsSimulator:
     """
     
     # VERSION MARKER
-    VERSION = "2.2.2"
+    VERSION = "2.2.3"
     VERSION_DATE = "2025-10-17"
     
     # Physics constants (tuned for black hole galaxy - 94% cumulative reduction applied)
@@ -461,7 +462,7 @@ class UnifiedPhysicsSimulator:
                 arc_weight = getattr(arc, 'weight', 1.0)
             
             # ============================================================
-            # VERSION 2.2.2 - SELECTIVE ARC WEAKENING (Oct 17, 2025)
+            # VERSION 2.2.3 - FIXED SELECTIVE ARC WEAKENING (Oct 17, 2025)
             # ============================================================
             # SMART ARC WEAKENING: Only weaken hub-to-SCC arcs, not place-to-SCC
             # 
@@ -472,19 +473,25 @@ class UnifiedPhysicsSimulator:
             # v2.2.1: Fixed proximity repulsion (or→and)
             #   Problem: Places form ternary system (arc still too weak!)
             #   
-            # v2.2.2: Selective weakening - ONLY for high-mass nodes
-            #   Solution: Places keep FULL arc strength to cycle
-            #            Hubs get WEAKENED arc to cycle
+            # v2.2.2: Selective weakening - but WRONG threshold (>= 500)
+            #   Problem: Hubs have mass 200-300, so they got FULL strength too!
+            #   Result: Still forming ternary system!
+            #
+            # v2.2.3: FIXED threshold - distinguish places from hubs
+            #   Mass values: Place=100, MinorHub=200, MajorHub=200, SuperHub=300
+            #   Threshold: 150 (between place and hub)
+            #   Solution: Places (100) get FULL strength
+            #            Hubs (200+) get WEAKENED strength
             #
             # LOGIC:
-            # - If BOTH nodes are high-mass (>= 500): NO weakening (hub-to-hub)
-            # - If ONE node is SCC AND other is high-mass: WEAKEN (hub-to-cycle)
-            # - If ONE node is SCC AND other is low-mass: FULL STRENGTH (place-to-cycle)
+            # - If ONE node is SCC AND other mass < 150: FULL STRENGTH (place-to-cycle)
+            # - If ONE node is SCC AND other mass >= 150: WEAKEN (hub-to-cycle)  
+            # - If BOTH nodes NOT in SCC: FULL STRENGTH (hub-to-hub, place-to-hub)
             #
             # RESULT:
-            # - Places orbit cycle closely (full arc: 1.2)
-            # - Hubs spread around cycle (weakened arc: 0.12)
-            # - Beautiful hierarchy!
+            # - Places (mass=100) orbit cycle closely (full arc: 1.2) ✓
+            # - Hubs (mass=200-300) spread around cycle (weakened arc: 0.12) ✓
+            # - Beautiful hierarchy! ✓
             # ============================================================
             arc_strength_multiplier = 1.0
             if hasattr(self, 'sccs') and self.sccs:
@@ -496,21 +503,24 @@ class UnifiedPhysicsSimulator:
                     target_in_scc = target_id in scc_nodes
                     
                     if source_in_scc or target_in_scc:
-                        # One end is in SCC - check if OTHER end is high-mass
-                        # Only weaken if connecting high-mass node to SCC
+                        # One end is in SCC - check if OTHER end is a hub or place
+                        # Use mass threshold of 150 to distinguish:
+                        #   Place: mass = 100 (< 150) → FULL strength
+                        #   Hub: mass = 200-300 (>= 150) → WEAKENED
                         other_mass = target_mass if source_in_scc else source_mass
+                        HUB_MASS_THRESHOLD = 150.0  # Between place (100) and hub (200+)
                         
-                        if other_mass >= self.PROXIMITY_THRESHOLD:
-                            # High-mass node (hub) connecting to SCC
+                        if other_mass >= HUB_MASS_THRESHOLD:
+                            # Hub (mass >= 150) connecting to SCC
                             # Weaken to prevent constellation dragging
                             arc_strength_multiplier = self.SCC_ARC_WEAKENING_FACTOR  # 0.1
                         else:
-                            # Low-mass node (place) connecting to SCC
+                            # Place (mass < 150) connecting to SCC
                             # Keep FULL strength so place can orbit cycle!
                             arc_strength_multiplier = 1.0  # FULL STRENGTH
                         break
             # ============================================================
-            # END VERSION 2.2.2 SELECTIVE ARC WEAKENING
+            # END VERSION 2.2.3 FIXED SELECTIVE ARC WEAKENING
             # ============================================================
             
             r_eq = self._calculate_equilibrium_distance(source_mass, target_mass, arc_weight)
