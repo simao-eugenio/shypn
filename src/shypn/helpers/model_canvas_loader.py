@@ -476,7 +476,6 @@ class ModelCanvasLoader:
         
         # Check if we should replace the current empty default tab
         if replace_empty_default and self.is_current_tab_empty_default():
-            print(f"[ModelCanvasLoader] add_document: Replacing empty default tab with '{filename}'")
             current_page = self.notebook.get_current_page()
             page_widget = self.notebook.get_nth_page(current_page)
             drawing_area = self._get_drawing_area_from_page(page_widget)
@@ -491,7 +490,6 @@ class ModelCanvasLoader:
                     # Update tab label with new filename
                     self.update_current_tab_label(filename if filename else 'default', is_modified=False)
                     
-                    print(f"[ModelCanvasLoader] add_document: Reusing current tab (page {current_page})")
                     return (current_page, drawing_area)
         
         # Create new tab
@@ -571,9 +569,7 @@ class ModelCanvasLoader:
                         
                         # Find page number for logging
                         page_num = self.notebook.page_num(page_widget)
-                        print(f"[ModelCanvasLoader] on_dirty_changed: Updated tab {page_num} - '{display_name}' dirty={is_dirty}")
             except Exception as e:
-                print(f"[ModelCanvasLoader] on_dirty_changed ERROR: {e}")
                 import traceback
                 traceback.print_exc()
         
@@ -1659,7 +1655,6 @@ class ModelCanvasLoader:
         if hasattr(manager, '_fit_to_page_pending') and manager._fit_to_page_pending:
             horizontal_offset = getattr(manager, '_fit_to_page_horizontal_offset', 0)
             vertical_offset = getattr(manager, '_fit_to_page_vertical_offset', 0)
-            print(f"[_on_draw] Executing deferred fit_to_page with {manager._fit_to_page_padding}% padding, {horizontal_offset}% horizontal offset, {vertical_offset}% vertical offset")
             manager._fit_to_page_pending = False  # Clear flag before execution
             manager.fit_to_page(
                 padding_percent=manager._fit_to_page_padding,
@@ -2561,10 +2556,9 @@ class ModelCanvasLoader:
                 if hasattr(self, 'sbml_panel') and self.sbml_panel:
                     layout_params = self.sbml_panel.get_layout_parameters_for_algorithm(algorithm)
                     if layout_params:
-                        print(f"🎛️ Using SBML Import Options parameters: {layout_params}")
+                        pass  # Use these params
             except Exception as e:
-                # If we can't get params from SBML panel, just use defaults
-                print(f"Note: Could not get layout parameters from SBML panel: {e}")
+                pass  # If we can't get params from SBML panel, just use defaults
             
             # Create engine and apply layout with parameters
             engine = LayoutEngine(manager)

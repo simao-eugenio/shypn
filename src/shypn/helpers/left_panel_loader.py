@@ -140,7 +140,6 @@ class LeftPanelLoader:
             self.project_controller.on_project_opened = self._on_project_opened
             self.project_controller.on_project_closed = self._on_project_closed
         except Exception as e:
-            print(f"Warning: Failed to initialize project controller: {e}")
             self.project_controller = None
         
         # Hide window by default (will be shown when toggled)

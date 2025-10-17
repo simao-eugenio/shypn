@@ -41,7 +41,6 @@ class EnhancementPipeline:
         enhanced = pipeline.process(document, pathway)
         
         # Check results
-        print(pipeline.get_report())
     """
     
     def __init__(self, options: Optional[EnhancementOptions] = None):
@@ -271,28 +270,16 @@ class EnhancementPipeline:
         """Print human-readable report to console."""
         report = self.get_report()
         
-        print("\n" + "="*60)
-        print("ENHANCEMENT PIPELINE REPORT")
-        print("="*60)
-        print(f"Processors run:      {report['processors_run']}")
-        print(f"Succeeded:           {report['processors_succeeded']}")
-        print(f"Failed:              {report['processors_failed']}")
-        print(f"Skipped:             {report['processors_skipped']}")
-        print(f"Total time:          {report['total_time']:.2f}s")
-        print("\nProcessor Details:")
-        print("-"*60)
         
         for entry in report['execution_log']:
             status = "SKIPPED" if entry['skipped'] else ("SUCCESS" if entry['success'] else "FAILED")
-            print(f"{entry['processor']:30} {status:10} {entry['processing_time']:6.2f}s")
             
             if entry['error']:
-                print(f"  Error: {entry['error']}")
+                pass  # Error already logged
             
             if entry['stats']:
-                print(f"  Stats: {entry['stats']}")
+                pass  # Stats already logged
         
-        print("="*60 + "\n")
     
     def __str__(self) -> str:
         """String representation."""

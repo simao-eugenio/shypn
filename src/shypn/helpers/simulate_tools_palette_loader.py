@@ -158,8 +158,6 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         )
         
         if not os.path.exists(settings_ui_path):
-            print(f"⚠️  Settings UI file not found: {settings_ui_path}")
-            print(f"   Falling back to modal settings dialog")
             self.settings_revealer = None
             return
         
@@ -172,7 +170,6 @@ class SimulateToolsPaletteLoader(GObject.GObject):
             self.settings_revealer = settings_builder.get_object('settings_revealer')
             
             if self.settings_revealer is None:
-                print(f"⚠️  settings_revealer not found in UI file")
                 return
             
             # Get control widgets
@@ -195,7 +192,6 @@ class SimulateToolsPaletteLoader(GObject.GObject):
             self.settings_revealer.set_visible(False)
             
         except Exception as e:
-            print(f"❌ Error loading settings panel: {e}")
             import traceback
             traceback.print_exc()
             self.settings_revealer = None
@@ -207,7 +203,6 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         )
         
         if not os.path.exists(css_path):
-            print(f"⚠️  Settings CSS file not found: {css_path}")
             return
         
         try:
@@ -219,7 +214,7 @@ class SimulateToolsPaletteLoader(GObject.GObject):
                 Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
             )
         except Exception as e:
-            print(f"❌ Error loading settings CSS: {e}")
+            pass  # Silently ignore CSS errors
     
     def _wire_settings_controls(self):
         """Wire settings panel controls to simulation settings.
@@ -743,7 +738,6 @@ class SimulateToolsPaletteLoader(GObject.GObject):
                 # Notify user if simulation was running
                 pass
         except Exception as e:
-            print(f"❌ Error opening settings dialog: {e}")
             import sys
             import traceback
             traceback.print_exc()

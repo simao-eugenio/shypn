@@ -33,8 +33,6 @@ class BaseEvent(ABC):
         event = MyEvent(some_data)
         
         # Event type is automatically derived
-        print(event.event_type)  # "MyEvent"
-        print(event.timestamp)   # datetime object
     """
     
     def __init__(self):

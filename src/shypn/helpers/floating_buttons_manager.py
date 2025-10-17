@@ -322,18 +322,21 @@ class FloatingButtonsManager(GObject.GObject):
         if self.edit_operations:
             self.edit_operations.activate_lasso_mode()
         else:
+            pass  # No edit operations available
     
     def _on_undo_clicked(self, button):
         """Handle Undo button click."""
         if self.edit_operations:
             self.edit_operations.undo()
         else:
+            pass  # No edit operations available
     
     def _on_redo_clicked(self, button):
         """Handle Redo button click."""
         if self.edit_operations:
             self.edit_operations.redo()
         else:
+            pass  # No edit operations available
     
     # ==================== Public API ====================
     

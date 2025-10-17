@@ -33,8 +33,6 @@ class ModePaletteLoader(GObject.GObject):
         
         # Font metrics for dynamic sizing
         self.target_height = 28  # Will be calculated from font metrics
-        
-        print(f"[ModePalette] Initialized (will load UI from {self.ui_path})")
     
     def load(self):
         """Load the mode palette UI and return the widget.
@@ -85,8 +83,6 @@ class ModePaletteLoader(GObject.GObject):
         # Set initial button states
         self.update_button_states()
         
-        print(f"[ModePalette] Loaded and initialized in {self.current_mode} mode")
-        
         return self.mode_palette_container
     
     def _calculate_target_size(self):
@@ -107,12 +103,9 @@ class ModePaletteLoader(GObject.GObject):
             # Ensure minimum size for usability
             if self.target_height < 24:
                 self.target_height = 24
-            
-            print(f"[ModePalette] Calculated target button size: {self.target_height}px")
         else:
             # Fallback if layout not available
             self.target_height = 28
-            print(f"[ModePalette] Using fallback button size: {self.target_height}px")
     
     def _apply_css(self):
         """Apply custom CSS styling to match zoom palette."""
@@ -194,9 +187,6 @@ class ModePaletteLoader(GObject.GObject):
             self.edit_palettes_visible = False  # Start with palettes hidden
             self.emit('mode-changed', 'edit')
             self.update_button_states()
-            print(f"[ModePalette] Switched to edit mode")
-        else:
-            print(f"[ModePalette] Already in edit mode - no action")
 
     def on_sim_clicked(self, button):
         """Switch to simulation mode (mutually exclusive with edit mode)."""
@@ -206,9 +196,6 @@ class ModePaletteLoader(GObject.GObject):
             self.edit_palettes_visible = False  # Hide edit palettes when switching to sim
             self.emit('mode-changed', 'sim')
             self.update_button_states()
-            print(f"[ModePalette] Switched to simulation mode")
-        else:
-            print(f"[ModePalette] Already in simulation mode - no action")
 
     def update_button_states(self):
         """Update button visual appearance - highlight active mode button."""
@@ -222,12 +209,10 @@ class ModePaletteLoader(GObject.GObject):
             # Edit mode active: highlight Edit button, normal Sim button
             edit_context.add_class('active-mode')
             sim_context.remove_class('active-mode')
-            print(f"[ModePalette] Button states: Edit=ACTIVE (highlighted), Sim=inactive")
         else:
             # Sim mode active: highlight Sim button, normal Edit button
             edit_context.remove_class('active-mode')
             sim_context.add_class('active-mode')
-            print(f"[ModePalette] Button states: Edit=inactive, Sim=ACTIVE (highlighted)")
 
     def get_widget(self):
         """Get the mode palette container widget.

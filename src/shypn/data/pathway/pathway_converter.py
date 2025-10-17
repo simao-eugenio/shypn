@@ -527,9 +527,6 @@ class PathwayConverter:
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     
-    print("=" * 70)
-    print("PATHWAY CONVERTER")
-    print("=" * 70)
     
     # Example: Load and convert pathway
     from .pathway_data import Species, Reaction, KineticLaw, PathwayData
@@ -580,35 +577,20 @@ if __name__ == "__main__":
     postprocessor = PathwayPostProcessor(spacing=150.0, scale_factor=2.0)
     processed = postprocessor.process(pathway)
     
-    print(f"\nProcessed pathway:")
-    print(f"  Species: {len(processed.species)}")
-    print(f"  Reactions: {len(processed.reactions)}")
-    print(f"  Positions: {len(processed.positions)}")
     
     # Convert to DocumentModel
     converter = PathwayConverter()
     document = converter.convert(processed)
     
-    print(f"\nDocument model:")
     place_count, transition_count, arc_count = document.get_object_count()
-    print(f"  Places: {place_count}")
-    print(f"  Transitions: {transition_count}")
-    print(f"  Arcs: {arc_count}")
     
-    print(f"\nPlace details:")
     for place in document.places:
-        print(f"  {place.label}: {place.tokens} tokens at ({place.x:.1f}, {place.y:.1f})")
+        pass  # Process place
     
-    print(f"\nTransition details:")
     for transition in document.transitions:
-        print(f"  {transition.label}: {transition.transition_type}, rate={transition.rate}")
+        pass  # Process transition
     
-    print(f"\nArc details:")
     for arc in document.arcs:
         source_label = arc.source.label if hasattr(arc.source, 'label') else arc.source.name
         target_label = arc.target.label if hasattr(arc.target, 'label') else arc.target.name
-        print(f"  {source_label} → {target_label} (weight: {arc.weight})")
     
-    print("\n" + "=" * 70)
-    print("Converter ready for use!")
-    print("=" * 70)

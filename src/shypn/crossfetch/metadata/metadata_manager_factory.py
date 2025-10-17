@@ -217,15 +217,12 @@ def create_json_manager(pathway_file: Path, **kwargs) -> JSONMetadataManager:
 if __name__ == "__main__":
     # Auto-detect format from file extension
     manager = MetadataManagerFactory.create(Path("project/models/glycolysis.shypn"))
-    print(f"Created manager: {type(manager).__name__}")
     
     # Explicit format
     manager = MetadataManagerFactory.create(
         Path("project/models/glycolysis.shypn"),
         format=MetadataFormat.JSON
     )
-    print(f"Created manager: {type(manager).__name__}")
     
     # Check supported formats
     formats = MetadataManagerFactory.get_supported_formats()
-    print(f"Supported formats: {[f.value for f in formats]}")

@@ -39,9 +39,7 @@ Usage Example:
     results = pipeline.enrich(Path("glycolysis.shy"), request)
     
     # Check results
-    print(f"Enrichments: {len(results['enrichments'])}")
     for enrichment in results['enrichments']:
-        print(f"  {enrichment['data_type']}: {enrichment['best_source']}")
 
 Author: Shypn Development Team
 Date: October 2025

@@ -174,7 +174,6 @@ class PanelLoader:
         
         Example:
             path = loader.get_ui_path("panels/left_panel.ui")
-            print(path)  # /home/user/repo/ui/panels/left_panel.ui
         """
         return self.ui_root / ui_file
     

@@ -45,9 +45,6 @@ class LayoutOptimizer(PostProcessorBase):
         enhanced_document = optimizer.process(document, pathway)
         
         stats = optimizer.get_stats()
-        print(f"Overlaps before: {stats['overlaps_before']}")
-        print(f"Overlaps after: {stats['overlaps_after']}")
-        print(f"Iterations: {stats['iterations']}")
     """
     
     def __init__(self, options: Optional['EnhancementOptions'] = None):

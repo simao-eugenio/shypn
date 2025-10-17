@@ -43,9 +43,6 @@ class MetadataEnhancer(PostProcessorBase):
         # Elements now have rich metadata
         for place in document.places:
             if hasattr(place, 'metadata'):
-                print(f"Place {place.id}: {place.metadata.get('name')}")
-                print(f"  KEGG ID: {place.metadata.get('kegg_id')}")
-                print(f"  Compartment: {place.metadata.get('compartment')}")
     """
     
     def __init__(self, options: Optional['EnhancementOptions'] = None):

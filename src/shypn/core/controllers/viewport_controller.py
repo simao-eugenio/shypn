@@ -329,7 +329,7 @@ class ViewportController:
             with open(state_file, 'w') as f:
                 json.dump(view_state, f, indent=2)
         except Exception as e:
-            print(f"Warning: Could not save view state: {e}")
+            pass  # Silently ignore save errors
     
     def load_view_state_from_file(self):
         """Load view state (pan and zoom) from file.
@@ -357,7 +357,6 @@ class ViewportController:
             self._needs_redraw = True
             return True
         except Exception as e:
-            print(f"Warning: Could not load view state: {e}")
             return False
     
     # ==================== Redraw Management ====================

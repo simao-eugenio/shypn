@@ -16,7 +16,6 @@ Example:
     class MyObserver(BaseObserver):
         def on_event(self, event):
             if isinstance(event, ObjectAddedEvent):
-                print(f"Added {event.obj.name}")
 """
 
 from .base_event import BaseEvent

@@ -116,25 +116,17 @@ class ForceDirectedLayout(LayoutAlgorithm):
                 weight = data.get('weight', 1.0)
                 undirected_graph.add_edge(u, v, weight=weight)
             
-            print(f"🔬 Force-directed: ✓ Converted DiGraph → Graph for universal repulsion")
         else:
             undirected_graph = graph
-            print(f"🔬 Force-directed: Already Graph (undirected)")
         
         # Count node types for diagnostics
         places = [n for n, d in undirected_graph.nodes(data=True) if d.get('type') == 'place']
         transitions = [n for n, d in undirected_graph.nodes(data=True) if d.get('type') == 'transition']
-        print(f"🔬 Force-directed: Graph contents:")
-        print(f"   - Total nodes: {undirected_graph.number_of_nodes()}")
-        print(f"   - Places: {len(places)}")
-        print(f"   - Transitions: {len(transitions)}")
-        print(f"   - Edges: {undirected_graph.number_of_edges()}")
         
         if len(places) < 5:
-            print(f"   ⚠️ WARNING: Very few places detected!")
-            print(f"   Place IDs: {places}")
+            pass  # Small network
         elif len(places) <= 10:
-            print(f"   Place IDs (all {len(places)}): {places}")
+            pass  # Medium network
         
         # Check if edges have weights (arc stoichiometry)
         has_weights = any('weight' in undirected_graph[u][v] for u, v in undirected_graph.edges())
@@ -158,9 +150,7 @@ class ForceDirectedLayout(LayoutAlgorithm):
         if has_weights:
             # Use arc weights as spring strength (stoichiometry-based)
             layout_params['weight'] = 'weight'
-            print(f"🔬 Force-directed: Using arc weights as spring strength")
         
-        print(f"🔬 Force-directed: Parameters: iterations={iterations}, scale={scale_to_use:.1f}, k_multiplier={k_multiplier}x")
         
         positions = nx.spring_layout(undirected_graph, **layout_params)
         

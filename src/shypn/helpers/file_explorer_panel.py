@@ -60,10 +60,8 @@ class FileExplorerPanel:
             base_path: Starting directory (default: project root or home)
             root_boundary: Root boundary - cannot navigate above this (default: same as base_path)
         """
-        print(f"[FileExplorerPanel] __init__: base_path='{base_path}', root_boundary='{root_boundary}'")
         self.builder = builder
         self.explorer = FileExplorer(base_path=base_path, root_boundary=root_boundary)
-        print(f"[FileExplorerPanel] __init__: FileExplorer created with current_path='{self.explorer.current_path}', root_boundary='{self.explorer.root_boundary}'")
         self.explorer.on_path_changed = self._on_path_changed
         self.explorer.on_error = self._on_error
         # Default file is now in workspace/examples/
@@ -547,11 +545,10 @@ class FileExplorerPanel:
         Args:
             menu_item: The Gtk.MenuItem that was activated (from 'activate' signal)
         """
-        print(f"[FileExplorer] _on_delete_clicked: selected_item_path='{self.selected_item_path}'")
         if self.selected_item_path:
             self._show_delete_confirmation()
         else:
-            print("[FileExplorer] _on_delete_clicked: No item selected!")
+            pass  # No item selected
 
     def _on_refresh_clicked(self, menu_item):
         """Handle 'Refresh' context menu item.
@@ -1067,14 +1064,12 @@ class FileExplorerPanel:
             
             # Convert canvas state to document model
             document = manager.to_document_model()
-            print(f"[FileExplorer] save_current_document: Document created with {len(document.places)} places, {len(document.transitions)} transitions, {len(document.arcs)} arcs")
             
             # Determine if we need to show file chooser
             needs_chooser = not manager.has_filepath() or manager.is_default_filename()
             
             if needs_chooser:
                 # Show save dialog (new document or imported)
-                print(f"[FileExplorer] save_current_document: Showing save dialog (filepath={manager.get_filepath()}, is_default={manager.is_default_filename()})")
                 
                 # Set suggested filename from manager
                 if manager.filename and manager.filename != "default":
@@ -1083,11 +1078,9 @@ class FileExplorerPanel:
                 # Show file chooser
                 filepath = self.persistency._show_save_dialog()
                 if not filepath:
-                    print("[FileExplorer] save_current_document: User cancelled save dialog")
                     return  # User cancelled
                 
                 # Save to chosen file
-                print(f"[FileExplorer] save_current_document: Saving to '{filepath}'")
                 document.save_to_file(filepath)
                 
                 # Update manager state
@@ -1102,11 +1095,9 @@ class FileExplorerPanel:
                 self.set_current_file(filepath)
                 self._load_current_directory()  # Refresh file tree
                 
-                print(f"[FileExplorer] save_current_document: SUCCESS - saved to '{filepath}'")
             else:
                 # Direct save to existing file
                 filepath = manager.get_filepath()
-                print(f"[FileExplorer] save_current_document: Direct save to existing file '{filepath}'")
                 
                 document.save_to_file(filepath)
                 
@@ -1118,7 +1109,6 @@ class FileExplorerPanel:
                 filename = os.path.basename(filepath)
                 self.canvas_loader.update_current_tab_label(filename, is_modified=False)
                 
-                print(f"[FileExplorer] save_current_document: SUCCESS - saved to '{filepath}'")
                 
         except Exception as e:
             print(f"[FileExplorer] save_current_document ERROR: {e}", file=sys.stderr)
@@ -1153,14 +1143,11 @@ class FileExplorerPanel:
                 self.persistency.suggested_filename = manager.filename
             
             # Always show file chooser for Save As
-            print(f"[FileExplorer] save_current_document_as: Showing save dialog")
             filepath = self.persistency._show_save_dialog()
             if not filepath:
-                print("[FileExplorer] save_current_document_as: User cancelled save dialog")
                 return  # User cancelled
             
             # Save to chosen file
-            print(f"[FileExplorer] save_current_document_as: Saving to '{filepath}'")
             document.save_to_file(filepath)
             
             # Update manager state
@@ -1175,7 +1162,6 @@ class FileExplorerPanel:
             self.set_current_file(filepath)
             self._load_current_directory()  # Refresh file tree
             
-            print(f"[FileExplorer] save_current_document_as: SUCCESS - saved to '{filepath}'")
             
         except Exception as e:
             print(f"[FileExplorer] save_current_document_as ERROR: {e}", file=sys.stderr)
@@ -1190,18 +1176,13 @@ class FileExplorerPanel:
         """
         try:
             if not hasattr(self, 'canvas_loader') or self.canvas_loader is None:
-                print("[FileExplorer] open_document: canvas_loader not available")
                 return
             if not hasattr(self, 'persistency') or self.persistency is None:
-                print("[FileExplorer] open_document: persistency not available")
                 return
-            print(f"[FileExplorer] open_document: Opening file dialog...")
             document, filepath = self.persistency.load_document()
             if document and filepath:
-                print(f"[FileExplorer] open_document: Loaded {filepath}")
                 self._load_document_into_canvas(document, filepath)
         except Exception as e:
-            print(f"[FileExplorer] open_document ERROR: {e}")
             import traceback
             traceback.print_exc()
 
@@ -1220,10 +1201,8 @@ class FileExplorerPanel:
         try:
             from shypn.data.canvas.document_model import DocumentModel
             document = DocumentModel.load_from_file(filepath)
-            print(f"[FileExplorer] _open_file_from_path: Loaded document from '{filepath}'")
             if document:
-                print(f"[FileExplorer] _open_file_from_path: Document has {len(document.places)} places, {len(document.transitions)} transitions, {len(document.arcs)} arcs")
-            self._load_document_into_canvas(document, filepath)
+                self._load_document_into_canvas(document, filepath)
         except Exception as e:
             import traceback
             traceback.print_exc()
@@ -1240,19 +1219,15 @@ class FileExplorerPanel:
             filepath: Full path to the file
         """
         if not document or not filepath:
-            print(f"[FileExplorer] _load_document_into_canvas: Invalid document or filepath")
             return
         import os
         filename = os.path.basename(filepath)
         base_name = os.path.splitext(filename)[0]
         
-        print(f"[FileExplorer] _load_document_into_canvas: Loading {filepath}")
-        print(f"[FileExplorer] Document has {len(document.places)} places, {len(document.transitions)} transitions, {len(document.arcs)} arcs")
         
         page_index, drawing_area = self.canvas_loader.add_document(filename=base_name)
         manager = self.canvas_loader.get_canvas_manager(drawing_area)
         if manager:
-            print(f"[FileExplorer] Got manager, loading objects...")
             # ===== UNIFIED OBJECT LOADING =====
             # Use load_objects() for consistent, unified initialization path
             # This replaces direct assignment + manual notification loop
@@ -1262,7 +1237,6 @@ class FileExplorerPanel:
                 transitions=document.transitions,
                 arcs=document.arcs
             )
-            print(f"[FileExplorer] After load_objects: manager has {len(manager.places)} places, {len(manager.transitions)} transitions, {len(manager.arcs)} arcs")
             
             # CRITICAL: Set on_changed callback on all loaded objects
             # This is required for proper object state management and dirty tracking
@@ -1288,7 +1262,6 @@ class FileExplorerPanel:
             # Initialize manager's filepath and mark as clean (just loaded)
             manager.set_filepath(filepath)
             manager.mark_clean()  # Just loaded, no unsaved changes
-            print(f"[FileExplorer] _load_document_into_canvas: Set filepath='{filepath}', marked clean")
             
             # Legacy: Also update global persistency for backward compatibility
             if hasattr(self, 'persistency') and self.persistency:
@@ -1308,21 +1281,14 @@ class FileExplorerPanel:
         """
         try:
             if not hasattr(self, 'canvas_loader') or self.canvas_loader is None:
-                print("[FileExplorer] new_document: canvas_loader not available")
                 return
             if not hasattr(self, 'persistency') or self.persistency is None:
-                print("[FileExplorer] new_document: persistency not available")
                 return
-            print(f"[FileExplorer] new_document: Checking unsaved changes...")
             if not self.persistency.check_unsaved_changes():
-                print("[FileExplorer] new_document: User cancelled due to unsaved changes")
                 return
-            print(f"[FileExplorer] new_document: Creating new document...")
             if self.persistency.new_document():
                 self.canvas_loader.add_document()
-                print("[FileExplorer] new_document: Success")
         except Exception as e:
-            print(f"[FileExplorer] new_document ERROR: {e}")
             import traceback
             traceback.print_exc()
 
