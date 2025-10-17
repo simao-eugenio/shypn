@@ -1,6 +1,6 @@
 """Unified Physics Simulator - Combines all forces for Solar System Layout.
 
-VERSION: 2.2.1 - Place Orbital Stabilization Fix
+VERSION: 2.2.2 - Selective Arc Weakening (Mass-Based)
 DATE: October 17, 2025
 STATUS: PRODUCTION STABLE
 
@@ -81,7 +81,8 @@ stable layouts without user intervention. The pulsating singularity
 ensures the system never freezes in suboptimal configurations.
 
 CHANGELOG:
-v2.2.1 (Oct 17, 2025): Place orbital fix - disable extra proximity for low-mass nodes ⭐
+v2.2.2 (Oct 17, 2025): Selective arc weakening - mass-based (places keep full strength) ⭐
+v2.2.1 (Oct 17, 2025): Place orbital fix - disable extra proximity for low-mass nodes
 v2.2.0 (Oct 17, 2025): Pulsating singularity - stochastic dynamics & variance tracking
 v2.1.0 (Oct 17, 2025): Black hole whirlwind effect - spiral orbital patterns
 v2.0.0 (Oct 17, 2025): Black hole galaxy physics with arc weakening
@@ -154,7 +155,7 @@ class UnifiedPhysicsSimulator:
     """
     
     # VERSION MARKER
-    VERSION = "2.2.1"
+    VERSION = "2.2.2"
     VERSION_DATE = "2025-10-17"
     
     # Physics constants (tuned for black hole galaxy - 94% cumulative reduction applied)
@@ -460,35 +461,56 @@ class UnifiedPhysicsSimulator:
                 arc_weight = getattr(arc, 'weight', 1.0)
             
             # ============================================================
-            # VERSION 2.0.0 - BLACK HOLE ARC WEAKENING (Oct 17, 2025)
+            # VERSION 2.2.2 - SELECTIVE ARC WEAKENING (Oct 17, 2025)
             # ============================================================
-            # CRITICAL FIX: Weaken arcs connecting to SCC nodes (black hole transitions)
-            # This prevents shared places from being pulled toward black hole
-            # and forming ternary systems that drag constellations
+            # SMART ARC WEAKENING: Only weaken hub-to-SCC arcs, not place-to-SCC
             # 
-            # PROBLEM: Shared places have arcs to BOTH:
-            #   1. Constellation hub (normal force)
-            #   2. Black hole transition (equal force)
-            # Result: 3 shared places cluster together near black hole
-            #         and drag their constellations with them
+            # EVOLUTION:
+            # v2.0.0: Weakened ALL arcs to SCC by 90%
+            #   Problem: Places couldn't orbit cycle (arc too weak: 0.12)
+            #   
+            # v2.2.1: Fixed proximity repulsion (or→and)
+            #   Problem: Places form ternary system (arc still too weak!)
+            #   
+            # v2.2.2: Selective weakening - ONLY for high-mass nodes
+            #   Solution: Places keep FULL arc strength to cycle
+            #            Hubs get WEAKENED arc to cycle
             #
-            # SOLUTION: Reduce arc force to black hole by 90%
-            #   - Arc to constellation hub: 1.2 (normal)
-            #   - Arc to black hole: 0.12 (10× weaker)
-            # Result: Shared places orbit constellation hubs like satellites
-            #         Constellations free to spread evenly around black hole
+            # LOGIC:
+            # - If BOTH nodes are high-mass (>= 500): NO weakening (hub-to-hub)
+            # - If ONE node is SCC AND other is high-mass: WEAKEN (hub-to-cycle)
+            # - If ONE node is SCC AND other is low-mass: FULL STRENGTH (place-to-cycle)
+            #
+            # RESULT:
+            # - Places orbit cycle closely (full arc: 1.2)
+            # - Hubs spread around cycle (weakened arc: 0.12)
+            # - Beautiful hierarchy!
             # ============================================================
             arc_strength_multiplier = 1.0
             if hasattr(self, 'sccs') and self.sccs:
                 for scc in self.sccs:
                     scc_nodes = set(scc.node_ids)
-                    # If either end connects to SCC, weaken the arc force
-                    if source_id in scc_nodes or target_id in scc_nodes:
-                        # Reduce arc force by 90% using SCC_ARC_WEAKENING_FACTOR
-                        arc_strength_multiplier = self.SCC_ARC_WEAKENING_FACTOR  # 0.1
+                    
+                    # Check if arc connects to SCC
+                    source_in_scc = source_id in scc_nodes
+                    target_in_scc = target_id in scc_nodes
+                    
+                    if source_in_scc or target_in_scc:
+                        # One end is in SCC - check if OTHER end is high-mass
+                        # Only weaken if connecting high-mass node to SCC
+                        other_mass = target_mass if source_in_scc else source_mass
+                        
+                        if other_mass >= self.PROXIMITY_THRESHOLD:
+                            # High-mass node (hub) connecting to SCC
+                            # Weaken to prevent constellation dragging
+                            arc_strength_multiplier = self.SCC_ARC_WEAKENING_FACTOR  # 0.1
+                        else:
+                            # Low-mass node (place) connecting to SCC
+                            # Keep FULL strength so place can orbit cycle!
+                            arc_strength_multiplier = 1.0  # FULL STRENGTH
                         break
             # ============================================================
-            # END VERSION 2.0.0 ARC WEAKENING
+            # END VERSION 2.2.2 SELECTIVE ARC WEAKENING
             # ============================================================
             
             r_eq = self._calculate_equilibrium_distance(source_mass, target_mass, arc_weight)
