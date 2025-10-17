@@ -58,6 +58,19 @@ Comprehensive test plan with:
 6. Persistence & Serialization (3 tests)
 7. Edge Cases (5 tests)
 
+### Testing Methodology
+**File:** [TESTING_METHODOLOGY.md](TESTING_METHODOLOGY.md)
+
+Complete implementation guide:
+- **pytest framework** setup
+- **Fixture-based** model generation
+- **Custom assertions** for validation
+- **Example test code** for each category
+- **Running tests** (CLI commands)
+- **CI/CD integration** (GitHub Actions)
+- **Reporting** (HTML + coverage)
+- **Performance benchmarking**
+
 ---
 
 ## Test Model
