@@ -1,8 +1,22 @@
-"""Unified Physics Simulator - Combines all forces for Solar System Layout.
+"""Unified Physics Simulator - TRUE PLANETARY ORBITAL MECHANICS
 
-VERSION: 2.2.4 - Black Hole Gravity Enabled + Arc Weight Removed from Forces
+VERSION: 3.0.0 - Planetary Physics with Orbital Mechanics ⭐ BREAKING CHANGE
 DATE: October 17, 2025
 STATUS: PRODUCTION STABLE
+
+BREAKING CHANGE FROM v2.x:
+========================
+v2.x: Mass-spring force-directed layout (oscillatory forces)
+      - Arcs = springs (attract when far, repel when close)
+      - Equilibrium distance concept
+      - Static equilibrium goal
+
+v3.0.0: TRUE PLANETARY PHYSICS (Newtonian orbital mechanics)
+        - Arcs = pure gravity (ALWAYS attractive, F = G*m1*m2/r²)
+        - NO equilibrium distance
+        - NO spring repulsion
+        - Orbits emerge from initial tangential velocities
+        - Dynamic equilibrium through orbital motion
 
 MAJOR FEATURES:
 - Black hole galaxy model with SCC cycle at center
@@ -34,17 +48,26 @@ The system never reaches static equilibrium - instead maintains dynamic
 equilibrium through high-frequency pulsations, like molecules in a liquid
 constantly rearranging while maintaining overall structure.
 
-PHYSICS MODEL:
-This simulator implements a unified physics model that combines:
-1. Oscillatory forces (arc-based attraction/repulsion with equilibrium)
-2. Proximity repulsion (all-pairs Coulomb-like repulsion with damping wave)
-3. Ambient tension (global spacing force)
-4. Hub group repulsion (prevents constellation clustering)
-5. SCC cohesion (maintains black hole cycle shape)
-6. SCC gravity (pulls constellation hubs toward black hole)
-7. SCC whirlwind (tangential forces create spiral motion)
-8. Pulsating singularity (high-frequency stochastic forces) ⭐ NEW
-9. Variance tracking (convergence detection metric) ⭐ NEW
+PHYSICS MODEL (v3.0.0 - PLANETARY):
+==================================
+This simulator implements TRUE planetary physics combining:
+1. Pure gravitational forces (arcs: F = G*m1*m2/r², always attractive)
+2. Initial orbital velocities (tangential to black hole)
+3. Velocity Verlet integration (pos and vel updates)
+4. Proximity repulsion (prevents collisions, with damping wave)
+5. Ambient tension (global spacing force)
+6. Hub group repulsion (prevents constellation clustering)
+7. SCC cohesion (maintains black hole cycle shape)
+8. SCC gravity (pulls constellation hubs toward black hole)
+9. SCC whirlwind (tangential forces create spiral motion)
+10. Pulsating singularity (high-frequency stochastic forces)
+
+Key differences from v2.x mass-spring model:
+- Arcs are NOT springs (no equilibrium, no repulsion at close range)
+- Arcs are pure gravity (always pull, never push)
+- Orbital motion requires initial tangential velocities
+- System reaches dynamic equilibrium (orbits), not static equilibrium
+- Convergence = stable orbital energy, not zero velocity
 
 Key insight: Graph properties → Physics properties
 - SCC nodes have super-massive mass (MASS_SCC_NODE = 1000) - Black hole
@@ -81,6 +104,8 @@ stable layouts without user intervention. The pulsating singularity
 ensures the system never freezes in suboptimal configurations.
 
 CHANGELOG:
+v3.0.0 (Oct 17, 2025): TRUE PLANETARY PHYSICS - Orbital mechanics ⭐ BREAKING CHANGE
+v2.2.5 (Oct 17, 2025): Reduced interaction forces 80% (arc/spring/proximity)
 v2.2.4 (Oct 17, 2025): FUNDAMENTAL FIX - Enable SCC gravity + remove arc weight from forces ⭐ CRITICAL
 v2.2.3 (Oct 17, 2025): Fixed hub mass threshold (500→150) for selective weakening
 v2.2.2 (Oct 17, 2025): Selective arc weakening - mass-based (wrong threshold)
@@ -157,25 +182,26 @@ class UnifiedPhysicsSimulator:
     """
     
     # VERSION MARKER
-    VERSION = "2.2.4"
+    VERSION = "3.0.0"
     VERSION_DATE = "2025-10-17"
     
-    # Physics constants (tuned for black hole galaxy - 94% cumulative reduction applied)
+    # Physics constants (tuned for black hole galaxy - 98.8% cumulative reduction applied)
     # CALIBRATION HISTORY:
     # - Original values (v1.0.0)
     # - First scaling: 80% reduction (v1.5.0)
     # - Second scaling: 70% reduction from scaled values (v2.0.0)
-    # - Cumulative: 94% reduction from original
+    # - Third scaling: 80% reduction from v2.2.4 values (v2.2.5) ⭐
+    # - Cumulative: 98.8% reduction from original
     
-    GRAVITY_CONSTANT = 1.2                  # Arc attraction (was 4 → now 1.2: 70% reduction)
-    SPRING_CONSTANT = 30.0                  # Spring repulsion strength (was 100 → now 30: 70% reduction)
-    PROXIMITY_CONSTANT = 6.0                # Hub-to-hub repulsion (was 20 → now 6: 70% reduction)
+    GRAVITY_CONSTANT = 0.24                 # v2.2.5: Arc attraction (was 1.2 → now 0.24: 80% reduction)
+    SPRING_CONSTANT = 6.0                   # v2.2.5: Spring repulsion (was 30 → now 6: 80% reduction)
+    PROXIMITY_CONSTANT = 1.2                # v2.2.5: Hub-to-hub repulsion (was 6 → now 1.2: 80% reduction)
     PROXIMITY_THRESHOLD = 500.0             # Mass threshold for proximity repulsion
     AMBIENT_CONSTANT = 1000.0               # Base for universal repulsion
     UNIVERSAL_REPULSION_MULTIPLIER = 2.0    # Multiplier for universal repulsion
     
     # Hub group repulsion (prevents constellation clustering)
-    HUB_GROUP_CONSTANT = 30.0               # Group repulsion strength (was 100 → now 30: 70% reduction)
+    HUB_GROUP_CONSTANT = 6.0                # v2.2.5: Group repulsion (was 30 → now 6: 80% reduction)
     
     # SCC-specific forces (Black Hole Physics v2.0.0)
     SCC_COHESION_STRENGTH = 30000.0         # Pulls SCC nodes toward centroid (was 100k → now 30k: 70% reduction)
@@ -205,7 +231,7 @@ class UnifiedPhysicsSimulator:
     
     # Simulation parameters
     TIME_STEP = 0.5                         # Integration time step
-    DAMPING = 0.9                           # Velocity damping (0-1, higher = less damping)
+    DAMPING = 0.99                          # v3.0.0: Minimal damping for orbital motion (was 0.9)
     MAX_FORCE = 100000.0                    # Maximum force per node
     MIN_DISTANCE = 1.0                      # Minimum distance for force calculations
     
@@ -267,8 +293,8 @@ class UnifiedPhysicsSimulator:
         # with accumulated weight
         consolidated_arcs = self._consolidate_parallel_arcs(arcs)
         
-        # Initialize velocities
-        self.velocities = {node_id: (0.0, 0.0) for node_id in positions.keys()}
+        # Initialize velocities with orbital motion (v3.0.0)
+        self.velocities = self._initialize_orbital_velocities(positions, masses)
         
         # Initialize pulsation state (v2.2.0)
         self.variance_history = []
@@ -358,6 +384,94 @@ class UnifiedPhysicsSimulator:
                     base_arc._consolidated_weight = total_weight
         
         return consolidated
+    
+    def _initialize_orbital_velocities(self,
+                                       positions: Dict[int, Tuple[float, float]],
+                                       masses: Dict[int, float]) -> Dict[int, Tuple[float, float]]:
+        """Initialize velocities for orbital motion (v3.0.0).
+        
+        VERSION 3.0.0 - TRUE PLANETARY PHYSICS
+        =====================================
+        
+        Give each node an initial tangential velocity perpendicular to the 
+        black hole direction. This creates orbital motion when combined with
+        gravitational attraction.
+        
+        Orbital velocity formula: v = sqrt(G * M / r)
+        Where:
+        - G = gravitational constant
+        - M = mass of central body (black hole)
+        - r = distance from black hole
+        
+        For graph layout, we use a scaled version with randomization:
+        - 50% of orbital velocity (creates elliptical orbits, not circular)
+        - Random variation (±30%) for natural diversity
+        - SCC nodes get ZERO velocity (they're the black hole!)
+        """
+        import random
+        import math
+        
+        velocities = {}
+        
+        # Find SCC center (black hole position)
+        scc_nodes = [nid for nid, mass in masses.items() if mass >= self.SCC_GRAVITY_MIN_MASS]
+        
+        if not scc_nodes:
+            # No black hole - just return zero velocities
+            return {node_id: (0.0, 0.0) for node_id in positions.keys()}
+        
+        # Calculate SCC centroid
+        scc_positions = [positions[nid] for nid in scc_nodes if nid in positions]
+        if not scc_positions:
+            return {node_id: (0.0, 0.0) for node_id in positions.keys()}
+        
+        scc_center_x = sum(p[0] for p in scc_positions) / len(scc_positions)
+        scc_center_y = sum(p[1] for p in scc_positions) / len(scc_positions)
+        
+        # Total mass of black hole
+        total_scc_mass = sum(masses[nid] for nid in scc_nodes if nid in masses)
+        
+        for node_id, pos in positions.items():
+            mass = masses.get(node_id, 100.0)
+            
+            # SCC nodes don't move (they ARE the black hole)
+            if mass >= self.SCC_GRAVITY_MIN_MASS:
+                velocities[node_id] = (0.0, 0.0)
+                continue
+            
+            # Vector from black hole to node
+            dx = pos[0] - scc_center_x
+            dy = pos[1] - scc_center_y
+            distance = math.sqrt(dx * dx + dy * dy)
+            
+            if distance < 1.0:
+                # Too close - no velocity (will be pulled in)
+                velocities[node_id] = (0.0, 0.0)
+                continue
+            
+            # Orbital velocity: v = sqrt(G * M / r)
+            # Use SCC_GRAVITY_CONSTANT for G, total_scc_mass for M
+            orbital_speed = math.sqrt(
+                (self.SCC_GRAVITY_CONSTANT * total_scc_mass) / distance
+            )
+            
+            # Scale down to 50% (creates elliptical orbits)
+            # Add random variation (±30%)
+            speed_factor = 0.5 * random.uniform(0.7, 1.3)
+            orbital_speed *= speed_factor
+            
+            # Perpendicular direction (tangent to orbit)
+            # Rotate 90 degrees: (dx, dy) → (-dy, dx)
+            tangent_x = -dy / distance
+            tangent_y = dx / distance
+            
+            # Apply velocity in tangent direction
+            vx = tangent_x * orbital_speed
+            vy = tangent_y * orbital_speed
+            
+            velocities[node_id] = (vx, vy)
+        
+        return velocities
     
     def _calculate_forces(self,
                          positions: Dict[int, Tuple[float, float]],
@@ -572,30 +686,24 @@ class UnifiedPhysicsSimulator:
     
     def _calculate_oscillatory_force(self, distance: float, r_eq: float,
                                      m1: float, m2: float, weight: float) -> float:
-        """Calculate oscillatory force (attractive or repulsive).
+        """Calculate pure gravitational force (planetary physics).
         
-        VERSION 2.2.4: Arc weight NO LONGER affects force magnitude!
-        - Arc weight only affects equilibrium distance (r_eq)
-        - Force strength based ONLY on masses and distance
-        - Prevents drift caused by weighted arc discrimination
+        VERSION 3.0.0: TRUE PLANETARY PHYSICS - Pure gravity, always attractive!
+        - Arc forces are now PURE GRAVITY: F = G * m1 * m2 / r²
+        - NO spring repulsion at close distances
+        - NO equilibrium distance concept (r_eq is ignored)
+        - Orbital motion emerges from initial velocities + gravity
+        - This is authentic Newtonian orbital mechanics
         
-        - If distance > r_eq: Gravitational attraction (pull together)
-        - If distance < r_eq: Spring repulsion (push apart)
-        - At distance = r_eq: Zero force (equilibrium)
+        BREAKING CHANGE from v2.x:
+        - Old: Oscillatory (attract far, repel close)
+        - New: Always attract (gravity only)
+        - Orbits require initial tangential velocities
         """
-        if distance > r_eq:
-            # Too far: gravitational attraction
-            # v2.2.4: REMOVED weight from force calculation
-            # F = (G * m1 * m2) / r²  (NO weight multiplier)
-            force = (self.GRAVITY_CONSTANT * m1 * m2) / (distance * distance)
-            return force  # Positive = attract
-        else:
-            # Too close: spring repulsion
-            # F = -k * (r_eq - r)
-            force = self.SPRING_CONSTANT * (r_eq - distance)
-            return -force  # Negative = repel
-            force = self.SPRING_CONSTANT * (r_eq - distance)
-            return -force  # Negative = repel
+        # v3.0.0: Pure gravitational attraction (always)
+        # F = G * m1 * m2 / r²
+        force = (self.GRAVITY_CONSTANT * m1 * m2) / (distance * distance)
+        return force  # Always positive = always attract
     
     def _calculate_proximity_repulsion(self,
                                        positions: Dict[int, Tuple[float, float]],
