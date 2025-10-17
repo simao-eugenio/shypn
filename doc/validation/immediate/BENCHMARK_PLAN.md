@@ -1016,6 +1016,394 @@ assert duration2 <= duration1
 
 ---
 
+### Category 9: UI Dialog & Data Validation ⭐ NEW
+
+**Note:** Tests for the transition properties dialog UI, ensuring correct input validation, data persistence, and property updates.
+
+#### Test 9.1: Dialog Opens Successfully
+**Setup:** Create immediate transition T1  
+**Expected:**
+- Dialog opens without errors
+- All widgets are properly loaded
+- Initial values match transition properties
+
+**Validation:**
+```python
+T1 = Transition(name="T1", transition_type="immediate")
+dialog = TransitionPropDialogLoader(T1)
+assert dialog.dialog is not None
+assert dialog.builder is not None
+```
+
+#### Test 9.2: Name Field (Read-Only)
+**Setup:** Open dialog for T1  
+**Expected:**
+- Name entry shows "T1"
+- Name field is not editable (read-only)
+- Cannot modify name through UI
+
+**Validation:**
+```python
+name_entry = dialog.builder.get_object('name_entry')
+assert name_entry.get_text() == "T1"
+assert name_entry.get_editable() == False
+```
+
+#### Test 9.3: Label Field (Editable)
+**Setup:** Open dialog, modify label  
+**Expected:**
+- Label can be edited
+- Changes persist after OK
+- Empty label becomes None
+
+**Validation:**
+```python
+label_entry = dialog.builder.get_object('transition_label_entry')
+label_entry.set_text("My Transition")
+dialog.dialog.response(Gtk.ResponseType.OK)
+assert T1.label == "My Transition"
+
+# Test empty label
+label_entry.set_text("")
+dialog.dialog.response(Gtk.ResponseType.OK)
+assert T1.label is None
+```
+
+#### Test 9.4: Transition Type Selection
+**Setup:** Change transition type via combo box  
+**Expected:**
+- All 4 types available: immediate, timed, stochastic, continuous
+- Selected type persists after OK
+- Type change updates transition object
+
+**Validation:**
+```python
+type_combo = dialog.builder.get_object('prop_transition_type_combo')
+
+# Test immediate (index 0)
+type_combo.set_active(0)
+dialog.dialog.response(Gtk.ResponseType.OK)
+assert T1.transition_type == "immediate"
+
+# Test timed (index 1)
+type_combo.set_active(1)
+dialog.dialog.response(Gtk.ResponseType.OK)
+assert T1.transition_type == "timed"
+```
+
+#### Test 9.5: Priority Spin Button Validation
+**Setup:** Modify priority value  
+**Expected:**
+- Accepts integer values
+- Positive and negative values allowed
+- Value persists after OK
+
+**Validation:**
+```python
+priority_spin = dialog.builder.get_object('priority_spin')
+
+# Test positive priority
+priority_spin.set_value(10)
+dialog.dialog.response(Gtk.ResponseType.OK)
+assert T1.priority == 10
+
+# Test negative priority
+priority_spin.set_value(-5)
+dialog.dialog.response(Gtk.ResponseType.OK)
+assert T1.priority == -5
+```
+
+#### Test 9.6: Firing Policy Selection
+**Setup:** Change firing policy via combo box  
+**Expected:**
+- Both policies available: earliest, latest
+- Selected policy persists after OK
+
+**Validation:**
+```python
+policy_combo = dialog.builder.get_object('firing_policy_combo')
+
+# Test earliest (index 0)
+policy_combo.set_active(0)
+dialog.dialog.response(Gtk.ResponseType.OK)
+assert T1.firing_policy == "earliest"
+
+# Test latest (index 1)
+policy_combo.set_active(1)
+dialog.dialog.response(Gtk.ResponseType.OK)
+assert T1.firing_policy == "latest"
+```
+
+#### Test 9.7: Source/Sink Checkboxes
+**Setup:** Toggle source and sink checkboxes  
+**Expected:**
+- Checkboxes work independently
+- Values persist after OK
+- Boolean properties updated correctly
+
+**Validation:**
+```python
+source_check = dialog.builder.get_object('is_source_check')
+sink_check = dialog.builder.get_object('is_sink_check')
+
+# Test source
+source_check.set_active(True)
+dialog.dialog.response(Gtk.ResponseType.OK)
+assert T1.is_source == True
+
+# Test sink
+sink_check.set_active(True)
+dialog.dialog.response(Gtk.ResponseType.OK)
+assert T1.is_sink == True
+
+# Test both false
+source_check.set_active(False)
+sink_check.set_active(False)
+dialog.dialog.response(Gtk.ResponseType.OK)
+assert T1.is_source == False
+assert T1.is_sink == False
+```
+
+#### Test 9.8: Rate Entry - Numeric Input
+**Setup:** Enter numeric rate value  
+**Expected:**
+- Accepts integer and float values
+- Numeric string parsed correctly
+- Value persists after OK
+
+**Validation:**
+```python
+rate_entry = dialog.builder.get_object('rate_entry')
+
+# Test integer
+rate_entry.set_text("5")
+dialog.dialog.response(Gtk.ResponseType.OK)
+assert T1.rate == 5
+
+# Test float
+rate_entry.set_text("1.5")
+dialog.dialog.response(Gtk.ResponseType.OK)
+assert T1.rate == 1.5
+```
+
+#### Test 9.9: Rate Entry - Expression Input
+**Setup:** Enter expression string for rate  
+**Expected:**
+- Expression string stored as-is
+- No premature evaluation
+- Value persists after OK
+
+**Validation:**
+```python
+rate_entry = dialog.builder.get_object('rate_entry')
+
+rate_entry.set_text("P1 * 0.5")
+dialog.dialog.response(Gtk.ResponseType.OK)
+assert T1.rate == "P1 * 0.5"
+assert isinstance(T1.rate, str)
+```
+
+#### Test 9.10: Rate Entry - Dictionary Input
+**Setup:** Enter JSON dictionary for rate  
+**Expected:**
+- JSON parsed correctly
+- Dictionary structure preserved
+- Value persists after OK
+
+**Validation:**
+```python
+rate_entry = dialog.builder.get_object('rate_entry')
+
+rate_entry.set_text('{"rate": 1.5}')
+dialog.dialog.response(Gtk.ResponseType.OK)
+assert isinstance(T1.rate, dict)
+assert T1.rate['rate'] == 1.5
+```
+
+#### Test 9.11: Rate Entry - Empty/None
+**Setup:** Clear rate entry  
+**Expected:**
+- Empty string results in None
+- Previous value cleared
+- No errors on empty input
+
+**Validation:**
+```python
+rate_entry = dialog.builder.get_object('rate_entry')
+
+T1.rate = 5.0  # Set initial value
+rate_entry.set_text("")
+dialog.dialog.response(Gtk.ResponseType.OK)
+assert T1.rate is None or T1.rate == 5.0  # May keep old value
+```
+
+#### Test 9.12: Guard TextView - Boolean Input
+**Setup:** Enter boolean guard  
+**Expected:**
+- "True" or "False" parsed as boolean expression
+- Value stored correctly
+- Persists after OK
+
+**Validation:**
+```python
+guard_textview = dialog.builder.get_object('guard_textview')
+buffer = guard_textview.get_buffer()
+
+buffer.set_text("True")
+dialog.dialog.response(Gtk.ResponseType.OK)
+assert T1.guard == "True" or T1.guard == True
+```
+
+#### Test 9.13: Guard TextView - Expression Input
+**Setup:** Enter complex guard expression  
+**Expected:**
+- Expression stored as string
+- No premature evaluation
+- Value persists after OK
+
+**Validation:**
+```python
+guard_textview = dialog.builder.get_object('guard_textview')
+buffer = guard_textview.get_buffer()
+
+buffer.set_text("P1 > 5 and P1 < 20")
+dialog.dialog.response(Gtk.ResponseType.OK)
+assert T1.guard == "P1 > 5 and P1 < 20"
+assert isinstance(T1.guard, str)
+```
+
+#### Test 9.14: Guard TextView - Math Function Input ⭐
+**Setup:** Enter guard with math function  
+**Expected:**
+- Math expression stored correctly
+- No syntax errors during storage
+- Value persists after OK
+
+**Validation:**
+```python
+guard_textview = dialog.builder.get_object('guard_textview')
+buffer = guard_textview.get_buffer()
+
+buffer.set_text("math.sqrt(P1) > 3.0")
+dialog.dialog.response(Gtk.ResponseType.OK)
+assert T1.guard == "math.sqrt(P1) > 3.0"
+```
+
+#### Test 9.15: Guard TextView - Numpy Function Input ⭐
+**Setup:** Enter guard with numpy function  
+**Expected:**
+- Numpy expression stored correctly
+- No import errors during storage
+- Value persists after OK
+
+**Validation:**
+```python
+guard_textview = dialog.builder.get_object('guard_textview')
+buffer = guard_textview.get_buffer()
+
+buffer.set_text("np.log10(P1) >= 2.0")
+dialog.dialog.response(Gtk.ResponseType.OK)
+assert T1.guard == "np.log10(P1) >= 2.0"
+```
+
+#### Test 9.16: Color Picker Integration
+**Setup:** Change transition border color  
+**Expected:**
+- Color picker widget works
+- Selected color persists after OK
+- RGB values in correct range (0.0-1.0)
+
+**Validation:**
+```python
+color_picker = dialog.color_picker
+assert color_picker is not None
+
+# Simulate color selection
+test_color = (0.5, 0.2, 0.8)  # RGB
+color_picker.emit('color-selected', test_color)
+dialog.dialog.response(Gtk.ResponseType.OK)
+assert T1.border_color == test_color
+```
+
+#### Test 9.17: Persistency - Mark Dirty
+**Setup:** Modify any property and click OK  
+**Expected:**
+- Document marked as dirty
+- Persistency manager notified
+- Unsaved changes indicator appears
+
+**Validation:**
+```python
+persistency_manager = MockPersistencyManager()
+dialog = TransitionPropDialogLoader(T1, persistency_manager=persistency_manager)
+
+label_entry = dialog.builder.get_object('transition_label_entry')
+label_entry.set_text("Modified")
+dialog.dialog.response(Gtk.ResponseType.OK)
+
+assert persistency_manager.is_dirty == True
+```
+
+#### Test 9.18: Persistency - Cancel No Changes
+**Setup:** Modify properties but click Cancel  
+**Expected:**
+- Changes discarded
+- Document NOT marked as dirty
+- Original values retained
+
+**Validation:**
+```python
+original_label = T1.label
+label_entry = dialog.builder.get_object('transition_label_entry')
+label_entry.set_text("Modified")
+dialog.dialog.response(Gtk.ResponseType.CANCEL)
+
+assert T1.label == original_label
+assert persistency_manager.is_dirty == False
+```
+
+#### Test 9.19: Properties Signal Emission
+**Setup:** Modify properties and click OK  
+**Expected:**
+- 'properties-changed' signal emitted
+- Observers notified (canvas redraw)
+- Signal emitted once per OK
+
+**Validation:**
+```python
+signal_count = 0
+def on_properties_changed():
+    nonlocal signal_count
+    signal_count += 1
+
+dialog.connect('properties-changed', lambda d: on_properties_changed())
+label_entry = dialog.builder.get_object('transition_label_entry')
+label_entry.set_text("Modified")
+dialog.dialog.response(Gtk.ResponseType.OK)
+
+assert signal_count == 1
+```
+
+#### Test 9.20: Invalid JSON Input Handling
+**Setup:** Enter malformed JSON in rate/guard  
+**Expected:**
+- Invalid JSON handled gracefully
+- Either rejected with error or treated as string
+- No crash or data corruption
+
+**Validation:**
+```python
+rate_entry = dialog.builder.get_object('rate_entry')
+
+rate_entry.set_text('{"rate": invalid}')
+dialog.dialog.response(Gtk.ResponseType.OK)
+
+# Should either keep old value, set to string, or show error
+assert T1.rate is not None  # No crash
+```
+
+---
+
 ### Category 8: Edge Cases
 
 #### Test 8.1: Enabled Flag (Disabled Transition)
@@ -1168,11 +1556,12 @@ After completing immediate transition validation:
 This benchmark plan provides a **systematic, comprehensive approach** to validating immediate transitions:
 
 ✅ **Simple P-T-P model** - Clear, isolated testing  
-✅ **8 test categories** - Complete coverage (includes rate expressions)  
-✅ **72 test cases** - Thorough validation (6 guard + 7 threshold + 20 rate expression tests added)  
+✅ **9 test categories** - Complete coverage (includes UI validation)  
+✅ **81 test cases** - Thorough validation (20 UI/dialog tests added)  
 ✅ **Incremental implementation** - Manageable workload  
 ✅ **Clear success criteria** - Measurable outcomes  
 ✅ **Complex function testing** ⭐ - Boolean guards (math, numpy, lambda) & threshold weights  
+✅ **UI validation** ⭐ **NEW** - Dialog input validation, data persistence, property updates  
 
 **Immediate transitions are the foundation** - validating them thoroughly ensures the entire simulation framework is solid! 🎯
 
@@ -1188,12 +1577,22 @@ This benchmark plan provides a **systematic, comprehensive approach** to validat
 | 4. Arc Weights | 12 | ⭐ Threshold functions | +7 complex |
 | 5. Source/Sink | 3 | Special behavior | - |
 | 6. Persistence | 3 | Save/load | - |
-| 7. Rate Expressions | 20 | Expression evaluation | (from before) |
+| 7. Rate Expressions | 20 | Expression evaluation | - |
 | 8. Edge Cases | 5 | Error handling | - |
-| **Total** | **61** | **Comprehensive** | **+13 tests** |
+| 9. UI Dialog ⭐ | 20 | **UI validation** | **+20 NEW** |
+| **Total** | **81** | **Comprehensive** | **+33 tests** |
 
 **Key Enhancements:**
 - **Category 2 (Guards):** 6→12 tests - Added complex boolean functions (math.sqrt, numpy.log10, lambda, conditionals, trig)
 - **Category 4 (Weights):** 5→12 tests - Added complex threshold functions (math.ceil, numpy.log, lambda, conditionals, trig)
+- **Category 9 (UI Dialog):** ⭐ **NEW** - 20 tests for dialog widgets, input validation, persistency
 
-**Note:** Rate expression testing is critical for establishing the evaluation framework used by all transition types!
+**UI Test Coverage:**
+- Widget loading & initialization (2 tests)
+- Property input validation (10 tests)
+- Data persistence & dirty marking (2 tests)
+- Signal emission (1 test)
+- Error handling (2 tests)
+- Complex expressions in UI (3 tests)
+
+**Note:** UI validation ensures data correctness from user input through to model persistence!

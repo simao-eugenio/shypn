@@ -59,7 +59,8 @@ tests/
 | 6 | Persistence & Serialization | 3 | 3 | 6 | - |
 | 7 | Rate Expression Evaluation | - | 20 ⭐ | 20 | - |
 | 8 | Edge Cases | 5 | 5 | 10 | - |
-| **TOTAL** | **41** | **61** | **102** | **+13** |
+| 9 | UI Dialog & Data Validation ⭐ | 20 | 20 | 40 | **+20** |
+| **TOTAL** | **61** | **81** | **142** | **+33** |
 
 ### Category Focus
 
@@ -71,6 +72,7 @@ tests/
 6. **Persistence** - Save/load property integrity
 7. **Rate Expressions** ⭐ - Numeric, string, function, lambda, dictionary forms
 8. **Edge Cases** - Disabled transitions, invalid expressions, large counts
+9. **UI Dialog** ⭐ **NEW** - Input validation, data persistence, property updates, signal emission
 
 ---
 
@@ -208,6 +210,125 @@ arc.weight = lambda m, t: int(m['P1'] * 0.1)
 ```
 
 **Total Arc Weight Tests: 12** (5 basic + 7 complex) ⭐
+
+---
+
+## 🖥️ UI Dialog & Data Validation Testing (NEW) ⭐
+
+### Transition Properties Dialog Tests
+
+The UI dialog is the primary interface for users to configure transition properties. Comprehensive testing ensures data integrity from input to persistence.
+
+#### 1. Widget Loading & Initialization (2 tests)
+```python
+# Dialog opens successfully
+dialog = TransitionPropDialogLoader(T1)
+assert dialog.dialog is not None
+
+# Name field is read-only
+name_entry = dialog.builder.get_object('name_entry')
+assert name_entry.get_editable() == False
+```
+
+#### 2. Property Input Fields (10 tests)
+```python
+# Label (editable text)
+label_entry.set_text("My Transition")
+assert T1.label == "My Transition"
+
+# Transition type (combo box)
+type_combo.set_active(0)  # immediate
+assert T1.transition_type == "immediate"
+
+# Priority (spin button)
+priority_spin.set_value(10)
+assert T1.priority == 10
+
+# Firing policy (combo box)
+policy_combo.set_active(0)  # earliest
+assert T1.firing_policy == "earliest"
+
+# Source/Sink (checkboxes)
+source_check.set_active(True)
+assert T1.is_source == True
+
+# Rate (numeric, expression, dict, empty)
+rate_entry.set_text("1.5")
+assert T1.rate == 1.5
+
+rate_entry.set_text("P1 * 0.5")
+assert T1.rate == "P1 * 0.5"
+
+# Guard (expression, math, numpy)
+guard_buffer.set_text("P1 > 5")
+assert T1.guard == "P1 > 5"
+
+guard_buffer.set_text("math.sqrt(P1) > 3.0")
+assert T1.guard == "math.sqrt(P1) > 3.0"
+```
+
+#### 3. Data Persistence (2 tests)
+```python
+# Mark dirty on OK
+label_entry.set_text("Modified")
+dialog.dialog.response(Gtk.ResponseType.OK)
+assert persistency_manager.is_dirty == True
+
+# No changes on Cancel
+label_entry.set_text("Modified")
+dialog.dialog.response(Gtk.ResponseType.CANCEL)
+assert T1.label == original_label
+assert persistency_manager.is_dirty == False
+```
+
+#### 4. Signal Emission (1 test)
+```python
+# Properties-changed signal emitted
+dialog.connect('properties-changed', on_signal)
+label_entry.set_text("Modified")
+dialog.dialog.response(Gtk.ResponseType.OK)
+assert signal_received == True
+```
+
+#### 5. Error Handling (2 tests)
+```python
+# Invalid JSON gracefully handled
+rate_entry.set_text('{"rate": invalid}')
+dialog.dialog.response(Gtk.ResponseType.OK)
+assert T1.rate is not None  # No crash
+
+# Empty input handled
+rate_entry.set_text("")
+dialog.dialog.response(Gtk.ResponseType.OK)
+# No error
+```
+
+#### 6. Complex Expressions in UI (3 tests)
+```python
+# Guard with math function
+guard_buffer.set_text("math.sqrt(P1) > 3.0")
+assert T1.guard == "math.sqrt(P1) > 3.0"
+
+# Guard with numpy
+guard_buffer.set_text("np.log10(P1) >= 2.0")
+assert T1.guard == "np.log10(P1) >= 2.0"
+
+# Color picker
+color_picker.emit('color-selected', (0.5, 0.2, 0.8))
+assert T1.border_color == (0.5, 0.2, 0.8)
+```
+
+**Total UI Dialog Tests: 20** ⭐
+
+**UI Test Coverage:**
+- Widget loading & initialization ✓
+- All property input fields ✓
+- Data persistence & dirty marking ✓
+- Signal emission to observers ✓
+- Error handling for invalid input ✓
+- Complex expressions (math, numpy) ✓
+- Color picker integration ✓
+- Cancel vs OK behavior ✓
 
 ---
 
@@ -558,17 +679,19 @@ doc/validation/
 ## 💡 Summary
 
 ### What We Have
-✅ **Complete planning** - 61 test cases across 8 categories ⭐ **UPDATED**  
+✅ **Complete planning** - 81 test cases across 9 categories ⭐ **UPDATED**  
 ✅ **Clear structure** - Validation vs benchmark separation  
 ✅ **Testing methodology** - pytest with fixtures  
 ✅ **Rate expressions** ⭐ - 20 tests for all expression types  
-✅ **Complex functions** ⭐ **NEW** - 13 tests (6 guard + 7 threshold)  
+✅ **Complex functions** ⭐ - 13 tests (6 guard + 7 threshold)  
+✅ **UI Dialog validation** ⭐ **NEW** - 20 tests for input correctness & persistence  
 ✅ **Documentation** - Comprehensive guides at multiple levels  
 
 ### What's Next
 🔄 **Implementation** - Create test infrastructure  
 🔄 **Validation** - Run first tests  
 🔄 **Benchmarking** - Performance analysis  
+🔄 **UI Testing** ⭐ **NEW** - GTK dialog testing framework  
 🔄 **Reporting** - Coverage & performance reports  
 
 ### Why It Matters
@@ -576,7 +699,8 @@ doc/validation/
 🎯 **Confidence** - Comprehensive testing ensures correctness  
 🎯 **Performance** - Benchmarks identify optimization opportunities  
 🎯 **Scalability** - Establishes patterns for other transition types  
-🎯 **Real-world** ⭐ **NEW** - Complex math/numpy functions for scientific models  
+🎯 **Real-world** ⭐ - Complex math/numpy functions for scientific models  
+🎯 **User Experience** ⭐ **NEW** - UI validation ensures data integrity from input to persistence  
 
 ---
 
