@@ -475,40 +475,18 @@
                 <property name="can-focus">False</property>
                 <property name="label-xalign">0</property>
                 <property name="shadow-type">in</property>
-                
                 <child>
-                  <object class="GtkAlignment" id="color_alignment">
+                  <object class="GtkBox" id="arc_color_picker">
                     <property name="visible">True</property>
                     <property name="can-focus">False</property>
-                    <property name="left-padding">12</property>
-                    <property name="top-padding">6</property>
-                    <property name="bottom-padding">6</property>
-                    
-                    <child>
-                      <object class="GtkBox" id="arc_color_picker">
-                        <property name="visible">True</property>
-                        <property name="can-focus">False</property>
-                        <property name="orientation">vertical</property>
-                        <property name="spacing">6</property>
-                        
-                        <child>
-                          <object class="GtkLabel" id="color_placeholder_label">
-                            <property name="visible">True</property>
-                            <property name="can-focus">False</property>
-                            <property name="label" translatable="yes">Color picker widget will be programmatically inserted here</property>
-                            <property name="xalign">0</property>
-                          </object>
-                          <packing>
-                            <property name="expand">False</property>
-                            <property name="fill">False</property>
-                            <property name="position">0</property>
-                          </packing>
-                        </child>
-                      </object>
-                    </child>
+                    <property name="orientation">vertical</property>
+                    <property name="spacing">10</property>
+                    <property name="margin-top">15</property>
+                    <property name="margin-bottom">15</property>
+                    <property name="margin-left">15</property>
+                    <property name="margin-right">15</property>
                   </object>
                 </child>
-                
                 <child type="label">
                   <object class="GtkLabel" id="color_frame_label">
                     <property name="visible">True</property>
