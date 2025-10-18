@@ -1242,7 +1242,8 @@ class FileExplorerPanel:
             # This is required for proper object state management and dirty tracking
             manager.document_controller.set_change_callback(manager._on_object_changed)
             
-            # Restore view state (zoom, pan, and rotation)
+            # Restore view state (zoom, pan, and rotation) if available
+            # NOTE: We still fit_to_page afterwards to ensure objects are visible
             if hasattr(document, 'view_state') and document.view_state:
                 manager.zoom = document.view_state.get('zoom', 1.0)
                 manager.pan_x = document.view_state.get('pan_x', 0.0)
@@ -1252,11 +1253,13 @@ class FileExplorerPanel:
                 # Restore transformations (rotation) if available
                 if 'transformations' in document.view_state:
                     manager.transformation_manager.from_dict(document.view_state['transformations'])
-            else:
-                # No saved view state - fit content to page automatically
-                # Use 30% horizontal offset to shift right (accounting for right panel)
-                # Use +10% vertical offset to shift UP in Cartesian space (increase Y)
-                manager.fit_to_page(padding_percent=10, horizontal_offset_percent=30, vertical_offset_percent=10)
+            
+            # ALWAYS fit loaded content to page to ensure visibility
+            # This centers objects in viewport regardless of saved view state
+            # Use deferred=True to wait for viewport dimensions on first draw
+            # Use 30% horizontal offset to shift right (accounting for right panel)
+            # Use +10% vertical offset to shift UP in Cartesian space (increase Y)
+            manager.fit_to_page(padding_percent=15, deferred=True, horizontal_offset_percent=30, vertical_offset_percent=10)
             
             # PHASE 1: Set per-document file state
             # Initialize manager's filepath and mark as clean (just loaded)
