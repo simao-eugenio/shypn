@@ -309,6 +309,140 @@ class Transition(PetriNetObject):
         self.horizontal = horizontal
         self._trigger_redraw()
     
+    def get_editable_fields(self) -> dict:
+        """Get which fields are editable for this transition type.
+        
+        Returns field visibility based on transition semantics:
+        - Immediate: No rate (fires instantly), has firing policy
+        - Timed: Has delay time, has firing policy
+        - Stochastic: Has rate λ, no firing policy
+        - Continuous: Has rate function, no firing policy
+        
+        Returns:
+            dict: Field name -> bool (True if should be shown/editable)
+        """
+        field_map = {
+            'immediate': {
+                'rate': False,           # No rate needed
+                'rate_function': False,  # No rate function
+                'firing_policy': True    # Earliest/Latest
+            },
+            'timed': {
+                'rate': True,            # Delay time
+                'rate_function': True,   # Can use expressions
+                'firing_policy': True    # Earliest/Latest
+            },
+            'stochastic': {
+                'rate': True,            # Rate λ
+                'rate_function': True,   # Can use expressions
+                'firing_policy': False   # N/A for stochastic
+            },
+            'continuous': {
+                'rate': True,            # Rate value/function
+                'rate_function': True,   # Rate expressions
+                'firing_policy': False   # N/A for continuous
+            }
+        }
+        
+        return field_map.get(self.transition_type, field_map['continuous'])
+    
+    def get_type_description(self) -> str:
+        """Get human-readable description of this transition type.
+        
+        Returns:
+            str: Description of transition type semantics
+        """
+        descriptions = {
+            'immediate': "Fires instantly when enabled. Use priority to resolve conflicts.",
+            'timed': "Fires after a delay time. Rate specifies the delay duration.",
+            'stochastic': "Fires with exponential distribution. Rate λ specifies average frequency.",
+            'continuous': "Fires continuously based on rate function. Rate can depend on marking."
+        }
+        
+        return descriptions.get(self.transition_type, "Unknown transition type")
+    
+    def set_rate(self, rate_value):
+        """Set rate with validation based on transition type.
+        
+        Args:
+            rate_value: Can be numeric, string expression, dict, or None
+            
+        Raises:
+            ValueError: If rate is invalid for this transition type
+        """
+        # Allow None for immediate transitions
+        if rate_value is None:
+            if self.transition_type == 'immediate':
+                self.rate = None
+                return
+            else:
+                raise ValueError(f"{self.transition_type} transitions require a rate value")
+        
+        # Handle string input
+        if isinstance(rate_value, str):
+            rate_value = rate_value.strip()
+            
+            # Empty string
+            if not rate_value:
+                if self.transition_type == 'immediate':
+                    self.rate = None
+                    return
+                else:
+                    raise ValueError(f"{self.transition_type} transitions require a rate value")
+            
+            # Try to parse as number
+            try:
+                # Try integer first
+                if '.' not in rate_value and 'e' not in rate_value.lower():
+                    rate_value = int(rate_value)
+                else:
+                    rate_value = float(rate_value)
+            except ValueError:
+                # Not a number, keep as string expression
+                pass
+        
+        # Validate numeric values
+        if isinstance(rate_value, (int, float)):
+            if rate_value < 0:
+                raise ValueError("Rate cannot be negative")
+            if rate_value == 0 and self.transition_type != 'immediate':
+                raise ValueError(f"{self.transition_type} transitions cannot have zero rate")
+        
+        # Store the value
+        self.rate = rate_value
+        
+        # For continuous transitions, also store in properties for engine
+        if self.transition_type == 'continuous':
+            if not hasattr(self, 'properties') or self.properties is None:
+                self.properties = {}
+            
+            # Store expression for evaluation
+            if isinstance(rate_value, str):
+                self.properties['rate_function'] = rate_value
+            else:
+                # Convert number to string for consistency
+                self.properties['rate_function'] = str(rate_value)
+    
+    def set_guard(self, guard_value):
+        """Set guard expression with storage for evaluation.
+        
+        Args:
+            guard_value: Can be string expression, dict, bool, or None
+        """
+        # Store the guard value
+        self.guard = guard_value
+        
+        # Also store in properties for engine evaluation
+        if guard_value is not None:
+            if not hasattr(self, 'properties') or self.properties is None:
+                self.properties = {}
+            
+            # Store for evaluation
+            if isinstance(guard_value, str):
+                self.properties['guard_function'] = guard_value
+            else:
+                self.properties['guard_function'] = str(guard_value)
+    
     def to_dict(self) -> dict:
         """Serialize transition to dictionary for persistence.
         

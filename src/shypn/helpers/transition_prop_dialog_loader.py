@@ -1,30 +1,23 @@
 """
 Transition Properties Dialog Loader
 
-**DEPRECATED**: This module provides backward compatibility wrapper.
-New code should use: from shypn.ui.dialogs.transition import TransitionPropertyDialog
-
-Maintains API compatibility with existing code while delegating to new OOP architecture.
+Loads and manages the Transition properties dialog UI.
+Follows project pattern: thin loader with business logic in data layer.
 """
-
+import os
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import GObject
-
-# Import new OOP implementation
-from shypn.ui.dialogs.transition import TransitionPropertyDialog
+from gi.repository import Gtk, GObject
+from shypn.helpers.color_picker import setup_color_picker_in_dialog
+from shypn.data.validation import ExpressionValidator
 
 
 class TransitionPropDialogLoader(GObject.GObject):
     """Loader for Transition properties dialog.
     
-    **DEPRECATED**: This is a compatibility wrapper around TransitionPropertyDialog.
-    New code should use TransitionPropertyDialog directly from:
-        from shypn.ui.dialogs.transition import TransitionPropertyDialog
-        
-    This wrapper maintains backward compatibility with existing code that uses
-    the old loader API while delegating all functionality to the new modular
-    OOP architecture.
+    This class loads and manages the Transition properties dialog UI from
+    transition_prop_dialog.ui. The dialog allows editing Transition attributes
+    with context-sensitive fields based on transition type.
     
     Signals:
         properties-changed: Emitted when properties are changed and applied
@@ -41,49 +34,375 @@ class TransitionPropDialogLoader(GObject.GObject):
         Args:
             transition_obj: Transition object to edit properties for
             parent_window: Parent window for modal dialog
-            ui_dir: Directory containing UI files (auto-detected if None)
-            persistency_manager: NetObjPersistency for document dirty tracking
-            model: ModelCanvasManager for accessing Petri net structure
-            data_collector: SimulationDataCollector for runtime diagnostics
+            ui_dir: Directory containing UI files. Defaults to project ui/dialogs/
+            persistency_manager: NetObjPersistency instance for marking document dirty
+            model: ModelCanvasManager instance for accessing Petri net structure
+            data_collector: Optional SimulationDataCollector for runtime diagnostics
         """
         super().__init__()
         
-        # Create new-style dialog instance
-        self._dialog_impl = TransitionPropertyDialog(
-            net_object=transition_obj,
-            parent_window=parent_window,
-            ui_dir=ui_dir,
-            persistency_manager=persistency_manager,
-            model=model,
-            data_collector=data_collector
+        # Resolve UI path (same pattern as place_prop_dialog_loader)
+        if ui_dir is None:
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
+            ui_dir = os.path.join(project_root, 'ui', 'dialogs')
+        
+        self.ui_dir = ui_dir
+        self.ui_path = os.path.join(ui_dir, 'transition_prop_dialog.ui')
+        self.transition_obj = transition_obj
+        self.parent_window = parent_window
+        self.persistency_manager = persistency_manager
+        self.model = model
+        self.data_collector = data_collector
+        
+        # Widget references
+        self.builder = None
+        self.dialog = None
+        self.color_picker = None
+        self.locality_widget = None
+        
+        # Load and setup
+        self._load_ui()
+        self._setup_color_picker()
+        self._populate_fields()
+        self._update_field_visibility()
+        self._setup_type_change_handler()
+        self._setup_rate_sync()
+    
+    def _load_ui(self):
+        """Load the Transition properties dialog UI from file."""
+        if not os.path.exists(self.ui_path):
+            raise FileNotFoundError(
+                f"Transition properties dialog UI file not found: {self.ui_path}"
+            )
+        
+        self.builder = Gtk.Builder.new_from_file(self.ui_path)
+        self.dialog = self.builder.get_object('transition_properties_dialog')
+        
+        if self.dialog is None:
+            raise ValueError(
+                "Object 'transition_properties_dialog' not found in transition_prop_dialog.ui"
+            )
+        
+        if self.parent_window:
+            self.dialog.set_transient_for(self.parent_window)
+        
+        self.dialog.connect('response', self._on_response)
+    
+    def _setup_color_picker(self):
+        """Setup and insert the color picker widget into the dialog."""
+        current_color = getattr(self.transition_obj, 'border_color', (0.0, 0.0, 0.0))
+        
+        self.color_picker = setup_color_picker_in_dialog(
+            self.builder,
+            'transition_color_picker',
+            current_color=current_color,
+            button_size=28
         )
         
-        # Forward properties-changed signal
-        self._dialog_impl.connect('properties-changed', self._on_properties_changed)
+        if self.color_picker:
+            self.color_picker.connect('color-selected', self._on_color_selected)
+    
+    def _on_color_selected(self, picker, color_rgb):
+        """Handle color selection from picker.
         
-        # Expose attributes for backward compatibility
-        self.dialog = self._dialog_impl.dialog
-        self.builder = self._dialog_impl.builder
-        self.transition_obj = transition_obj
-        self.ui_dir = self._dialog_impl.ui_dir
-        self.color_picker = self._dialog_impl.color_picker
+        Args:
+            picker: ColorPickerRow widget
+            color_rgb: Selected RGB tuple (0.0-1.0)
+        """
+        pass  # Color applied on OK
     
-    def _on_properties_changed(self, dialog_impl):
-        """Forward properties-changed signal from new implementation."""
-        self.emit('properties-changed')
+    def _populate_fields(self):
+        """Populate dialog fields with current Transition properties."""
+        # Name (read-only system identifier)
+        name_entry = self.builder.get_object('name_entry')
+        if name_entry and hasattr(self.transition_obj, 'name'):
+            name_entry.set_text(str(self.transition_obj.name))
+            name_entry.set_editable(False)
+            name_entry.set_can_focus(False)
+        
+        # Label (user-editable)
+        label_entry = self.builder.get_object('transition_label_entry')
+        if label_entry and hasattr(self.transition_obj, 'label'):
+            label_entry.set_text(
+                str(self.transition_obj.label) if self.transition_obj.label else ''
+            )
+        
+        # Transition type
+        type_combo = self.builder.get_object('prop_transition_type_combo')
+        if type_combo and hasattr(self.transition_obj, 'transition_type'):
+            type_map = {'immediate': 0, 'timed': 1, 'stochastic': 2, 'continuous': 3}
+            transition_type = self.transition_obj.transition_type or 'continuous'
+            type_combo.set_active(type_map.get(transition_type, 3))
+        
+        # Priority
+        priority_spin = self.builder.get_object('priority_spin')
+        if priority_spin and hasattr(self.transition_obj, 'priority'):
+            priority_spin.set_value(float(self.transition_obj.priority))
+        
+        # Firing policy
+        firing_policy_combo = self.builder.get_object('firing_policy_combo')
+        if firing_policy_combo and hasattr(self.transition_obj, 'firing_policy'):
+            policy_map = {'earliest': 0, 'latest': 1}
+            policy = self.transition_obj.firing_policy or 'earliest'
+            firing_policy_combo.set_active(policy_map.get(policy, 0))
+        
+        # Source/Sink checkboxes
+        is_source_check = self.builder.get_object('is_source_check')
+        if is_source_check and hasattr(self.transition_obj, 'is_source'):
+            is_source_check.set_active(self.transition_obj.is_source)
+        
+        is_sink_check = self.builder.get_object('is_sink_check')
+        if is_sink_check and hasattr(self.transition_obj, 'is_sink'):
+            is_sink_check.set_active(self.transition_obj.is_sink)
+        
+        # Rate (simple entry)
+        rate_entry = self.builder.get_object('rate_entry')
+        if rate_entry and hasattr(self.transition_obj, 'rate'):
+            rate_value = self.transition_obj.rate
+            if rate_value is not None:
+                rate_entry.set_text(str(rate_value))
+        
+        # Guard function (TextView)
+        guard_textview = self.builder.get_object('guard_textview')
+        if guard_textview and hasattr(self.transition_obj, 'guard'):
+            buffer = guard_textview.get_buffer()
+            guard_value = self.transition_obj.guard
+            if guard_value is not None:
+                buffer.set_text(str(guard_value))
+        
+        # Rate function (TextView)
+        rate_textview = self.builder.get_object('rate_textview')
+        if rate_textview and hasattr(self.transition_obj, 'rate'):
+            buffer = rate_textview.get_buffer()
+            rate_value = self.transition_obj.rate
+            if rate_value is not None:
+                buffer.set_text(str(rate_value))
+        
+        # Update type description
+        self._update_type_description()
     
-    def run(self):
-        """Run the dialog modally.
+    def _update_field_visibility(self):
+        """Update field visibility based on transition type.
+        
+        Delegates to transition object for business logic.
+        """
+        editable_fields = self.transition_obj.get_editable_fields()
+        
+        # Show/hide rate entry
+        rate_entry = self.builder.get_object('rate_entry')
+        if rate_entry:
+            rate_entry.set_visible(editable_fields.get('rate', True))
+        
+        # Show/hide rate function (multi-line)
+        rate_textview = self.builder.get_object('rate_textview')
+        if rate_textview:
+            parent = rate_textview.get_parent()
+            if parent:
+                parent.set_visible(editable_fields.get('rate_function', True))
+        
+        # Show/hide firing policy
+        firing_policy_combo = self.builder.get_object('firing_policy_combo')
+        if firing_policy_combo:
+            parent = firing_policy_combo.get_parent()
+            if parent:
+                parent.set_visible(editable_fields.get('firing_policy', True))
+    
+    def _update_type_description(self):
+        """Update type description label based on current type."""
+        desc_label = self.builder.get_object('type_description_label')
+        if desc_label:
+            description = self.transition_obj.get_type_description()
+            desc_label.set_text(description)
+    
+    def _setup_type_change_handler(self):
+        """Setup handler for transition type changes."""
+        type_combo = self.builder.get_object('prop_transition_type_combo')
+        if type_combo:
+            type_combo.connect('changed', self._on_type_changed)
+    
+    def _on_type_changed(self, combo):
+        """Handle transition type change - update field visibility."""
+        type_list = ['immediate', 'timed', 'stochastic', 'continuous']
+        new_type = type_list[combo.get_active()]
+        
+        # Update transition object temporarily (not persisted until OK)
+        self.transition_obj.transition_type = new_type
+        
+        # Update UI
+        self._update_field_visibility()
+        self._update_type_description()
+    
+    def _setup_rate_sync(self):
+        """Setup synchronization between rate function TextView and rate entry."""
+        rate_textview = self.builder.get_object('rate_textview')
+        rate_entry = self.builder.get_object('rate_entry')
+        
+        if rate_textview and rate_entry:
+            buffer = rate_textview.get_buffer()
+            buffer.connect('changed', lambda buf: self._sync_rate_to_entry(buf, rate_entry))
+    
+    def _sync_rate_to_entry(self, buffer, rate_entry):
+        """Sync rate function TextView to rate entry with preview.
+        
+        Shows expression preview or simplified value in the entry field.
+        """
+        start, end = buffer.get_bounds()
+        text = buffer.get_text(start, end, True).strip()
+        
+        if not text:
+            rate_entry.set_text('')
+            return
+        
+        # Validate expression
+        is_valid, error_msg, parsed = ExpressionValidator.validate_expression(text)
+        
+        if not is_valid:
+            # Show error in entry
+            rate_entry.set_text(f'[Error] {error_msg[:30]}...')
+            return
+        
+        # If it's a simple number, show it directly
+        if isinstance(parsed, (int, float)):
+            rate_entry.set_text(str(parsed))
+        else:
+            # Show expression indicator
+            rate_entry.set_text(f'[Expression] {text[:20]}...')
+    
+    def _on_response(self, dialog, response_id):
+        """Handle dialog response (OK/Cancel).
+        
+        Args:
+            dialog: The dialog widget
+            response_id: Response ID (OK, Cancel, etc.)
+        """
+        if response_id == Gtk.ResponseType.OK:
+            if self._apply_changes():
+                if self.persistency_manager:
+                    self.persistency_manager.mark_dirty()
+                self.emit('properties-changed')
+        
+        dialog.destroy()
+    
+    def _apply_changes(self):
+        """Apply changes from dialog fields to Transition object.
         
         Returns:
-            Response ID (OK, CANCEL, etc.)
+            bool: True if successful, False if validation failed
         """
-        return self._dialog_impl.run()
+        try:
+            # Label
+            label_entry = self.builder.get_object('transition_label_entry')
+            if label_entry:
+                new_label = label_entry.get_text().strip()
+                self.transition_obj.label = new_label if new_label else None
+            
+            # Transition type
+            type_combo = self.builder.get_object('prop_transition_type_combo')
+            if type_combo:
+                type_list = ['immediate', 'timed', 'stochastic', 'continuous']
+                self.transition_obj.transition_type = type_list[type_combo.get_active()]
+            
+            # Priority
+            priority_spin = self.builder.get_object('priority_spin')
+            if priority_spin:
+                self.transition_obj.priority = int(priority_spin.get_value())
+            
+            # Firing policy
+            firing_policy_combo = self.builder.get_object('firing_policy_combo')
+            if firing_policy_combo:
+                policy_list = ['earliest', 'latest']
+                policy_index = firing_policy_combo.get_active()
+                if policy_index >= 0:
+                    self.transition_obj.firing_policy = policy_list[policy_index]
+            
+            # Source/Sink
+            is_source_check = self.builder.get_object('is_source_check')
+            if is_source_check:
+                self.transition_obj.is_source = is_source_check.get_active()
+            
+            is_sink_check = self.builder.get_object('is_sink_check')
+            if is_sink_check:
+                self.transition_obj.is_sink = is_sink_check.get_active()
+            
+            # Rate - let object validate
+            rate_textview = self.builder.get_object('rate_textview')
+            if rate_textview:
+                buffer = rate_textview.get_buffer()
+                start, end = buffer.get_bounds()
+                rate_text = buffer.get_text(start, end, True).strip()
+                
+                # Use object's validation method
+                self.transition_obj.set_rate(rate_text if rate_text else None)
+            
+            # Guard - let object handle it
+            guard_textview = self.builder.get_object('guard_textview')
+            if guard_textview:
+                buffer = guard_textview.get_buffer()
+                start, end = buffer.get_bounds()
+                guard_text = buffer.get_text(start, end, True).strip()
+                
+                self.transition_obj.set_guard(guard_text if guard_text else None)
+            
+            # Color from picker
+            if self.color_picker:
+                selected_color = self.color_picker.get_selected_color()
+                self.transition_obj.border_color = selected_color
+                self.transition_obj.fill_color = selected_color
+            
+            return True
+            
+        except ValueError as e:
+            # Show error dialog
+            error_dialog = Gtk.MessageDialog(
+                transient_for=self.dialog,
+                message_type=Gtk.MessageType.ERROR,
+                buttons=Gtk.ButtonsType.OK,
+                text="Validation Error"
+            )
+            error_dialog.format_secondary_text(str(e))
+            error_dialog.run()
+            error_dialog.destroy()
+            return False
     
-    def show(self):
-        """Show the dialog non-modally."""
-        self._dialog_impl.show()
+    def run(self):
+        """Show the dialog and run it modally.
+        
+        Returns:
+            Response ID from the dialog
+        """
+        return self.dialog.run()
     
-    def destroy(self):
-        """Destroy the dialog."""
-        self._dialog_impl.destroy()
+    def get_dialog(self):
+        """Get the dialog widget.
+        
+        Returns:
+            Gtk.Dialog: The dialog widget
+        """
+        return self.dialog
+
+
+# Factory function for backward compatibility
+def create_transition_prop_dialog(transition_obj, parent_window=None, ui_dir=None,
+                                   persistency_manager=None, model=None, data_collector=None):
+    """Factory function to create a Transition properties dialog loader.
+    
+    Args:
+        transition_obj: Transition object to edit properties for
+        parent_window: Parent window for modal dialog
+        ui_dir: Directory containing UI files. Defaults to project ui/dialogs/
+        persistency_manager: NetObjPersistency instance for marking document dirty
+        model: ModelCanvasManager instance for accessing Petri net structure
+        data_collector: Optional SimulationDataCollector for runtime diagnostics
+    
+    Returns:
+        TransitionPropDialogLoader: Configured dialog loader instance
+    """
+    return TransitionPropDialogLoader(
+        transition_obj,
+        parent_window=parent_window,
+        ui_dir=ui_dir,
+        persistency_manager=persistency_manager,
+        model=model,
+        data_collector=data_collector
+    )
