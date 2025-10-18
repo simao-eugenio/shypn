@@ -80,6 +80,8 @@ class ColorPickerRow(Gtk.ScrolledWindow):
         self.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.NEVER)
         self.set_min_content_height(button_size + 10)
         self.set_max_content_height(button_size + 10)
+        # Constrain width so dialog doesn't expand to fit all buttons
+        self.set_max_content_width(450)  # Max width before scrolling
         
         # Create horizontal box for color buttons (no spacing or margins)
         self.color_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
