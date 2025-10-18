@@ -95,6 +95,9 @@ class PlacePropDialogLoader(GObject.GObject):
                 capacity_entry.set_text('inf')
             else:
                 capacity_entry.set_text(str(int(capacity_value)))
+        width_entry = self.builder.get_object('prop_place_width_entry')
+        if width_entry and hasattr(self.place_obj, 'border_width'):
+            width_entry.set_text(str(self.place_obj.border_width))
         description_text = self.builder.get_object('description_text')
         if description_text and hasattr(self.place_obj, 'label'):
             buffer = description_text.get_buffer()
@@ -148,6 +151,15 @@ class PlacePropDialogLoader(GObject.GObject):
                     else:
                         capacity_value = int(capacity_text)
                         self.place_obj.capacity = max(1, capacity_value)
+            except ValueError as e:
+                pass
+        width_entry = self.builder.get_object('prop_place_width_entry')
+        if width_entry and hasattr(self.place_obj, 'border_width'):
+            try:
+                width_text = width_entry.get_text().strip()
+                if width_text:
+                    width_value = float(width_text)
+                    self.place_obj.border_width = max(0.5, width_value)
             except ValueError as e:
                 pass
         if self.color_picker and hasattr(self.place_obj, 'border_color'):

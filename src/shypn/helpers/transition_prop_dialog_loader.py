@@ -179,6 +179,11 @@ class TransitionPropDialogLoader(GObject.GObject):
             if rate_value is not None:
                 buffer.set_text(str(rate_value))
         
+        # Line Width
+        width_entry = self.builder.get_object('prop_transition_width_entry')
+        if width_entry and hasattr(self.transition_obj, 'border_width'):
+            width_entry.set_text(str(self.transition_obj.border_width))
+        
         # Update type description
         self._update_type_description()
     
@@ -349,6 +354,17 @@ class TransitionPropDialogLoader(GObject.GObject):
                 selected_color = self.color_picker.get_selected_color()
                 self.transition_obj.border_color = selected_color
                 self.transition_obj.fill_color = selected_color
+            
+            # Line Width
+            width_entry = self.builder.get_object('prop_transition_width_entry')
+            if width_entry and hasattr(self.transition_obj, 'border_width'):
+                try:
+                    width_text = width_entry.get_text().strip()
+                    if width_text:
+                        width_value = float(width_text)
+                        self.transition_obj.border_width = max(0.5, width_value)
+                except ValueError:
+                    pass  # Keep current value if invalid
             
             return True
             
