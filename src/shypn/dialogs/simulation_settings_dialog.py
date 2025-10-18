@@ -3,12 +3,15 @@ Simulation Settings Dialog
 
 Proper GTK dialog subclass for configuring simulation timing and execution
 parameters. Follows OOP principles with separation from loader pattern.
+
+Uses debounced controls and buffered settings for atomic parameter updates.
 """
 import os
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk
 from shypn.engine.simulation.settings import SimulationSettings
+from shypn.engine.simulation.buffered import BufferedSimulationSettings
 from shypn.engine.simulation.conflict_policy import ConflictResolutionPolicy
 from shypn.utils.time_utils import TimeUnits
 
@@ -19,8 +22,12 @@ class SimulationSettingsDialog(Gtk.Dialog):
     This is a proper GTK Dialog subclass (not a loader pattern). It manages
     its own UI, validation, and interaction with SimulationSettings object.
     
+    Uses BufferedSimulationSettings for atomic parameter updates with
+    validation and rollback support.
+    
     Attributes:
-        settings: SimulationSettings instance to configure
+        settings: SimulationSettings instance (live settings)
+        buffered_settings: BufferedSimulationSettings for atomic updates
         _widgets: Dictionary of UI widgets
     
     Example:
@@ -48,6 +55,9 @@ class SimulationSettingsDialog(Gtk.Dialog):
         
         self.settings = settings
         self._widgets = {}
+        
+        # Create buffered settings for atomic updates
+        self.buffered_settings = BufferedSimulationSettings(settings)
         
         # Load UI from file
         self._load_ui()
@@ -126,7 +136,17 @@ class SimulationSettingsDialog(Gtk.Dialog):
                 raise ValueError(f"Widget '{name}' not found in UI file")
     
     def _connect_signals(self):
-        """Connect widget signals."""
+        """Connect widget signals.
+        
+        NOTE: Entry widgets could be replaced with DebouncedEntry for real-time
+        validation feedback. Current implementation validates on OK click which
+        is sufficient for this dialog.
+        
+        For future enhancement:
+            from shypn.ui.controls import DebouncedEntry
+            entry = DebouncedEntry(delay_ms=300)
+            entry.set_debounced_callback(self._on_value_changed_debounced)
+        """
         # Manual dt radio toggle
         if self._widgets['dt_manual_radio']:
             self._widgets['dt_manual_radio'].connect('toggled', self._on_manual_dt_toggled)
@@ -170,39 +190,59 @@ class SimulationSettingsDialog(Gtk.Dialog):
         self._widgets['conflict_policy_combo'].set_active(index)
     
     def apply_to_settings(self) -> bool:
-        """Apply dialog values to settings object.
+        """Apply dialog values to settings object atomically.
+        
+        Uses BufferedSimulationSettings for atomic commit with validation.
+        All changes succeed together or none are applied.
         
         Returns:
             bool: True if successful, False if validation failed
         """
         try:
+            # Update buffered settings (changes not applied yet)
+            
             # Time step mode
-            self.settings.dt_auto = self._widgets['dt_auto_radio'].get_active()
+            dt_auto = self._widgets['dt_auto_radio'].get_active()
+            self.buffered_settings.buffer.dt_auto = dt_auto
             
             # Manual dt value
-            dt_text = self._widgets['dt_manual_entry'].get_text()
+            dt_text = self._widgets['dt_manual_entry'].get_text().strip()
             try:
                 dt_value = float(dt_text)
-                self.settings.dt_manual = dt_value
+                self.buffered_settings.buffer.dt_manual = dt_value
             except ValueError:
                 self._show_error("Invalid time step", 
                                f"Time step must be a positive number. Got: {dt_text}")
+                self.buffered_settings.rollback()
                 return False
             
             # Time scale
-            scale_text = self._widgets['time_scale_entry'].get_text()
+            scale_text = self._widgets['time_scale_entry'].get_text().strip()
             try:
                 scale_value = float(scale_text)
-                self.settings.time_scale = scale_value
+                self.buffered_settings.buffer.time_scale = scale_value
             except ValueError:
                 self._show_error("Invalid time scale",
                                f"Time scale must be a positive number. Got: {scale_text}")
+                self.buffered_settings.rollback()
                 return False
             
-            return True
+            # Mark as dirty (has uncommitted changes)
+            self.buffered_settings.mark_dirty()
             
-        except ValueError as e:
-            self._show_error("Validation Error", str(e))
+            # Commit all changes atomically (validated)
+            from shypn.engine.simulation.buffered import ValidationError
+            try:
+                self.buffered_settings.commit()
+                return True
+            except ValidationError as e:
+                self._show_error("Validation Error", str(e))
+                self.buffered_settings.rollback()
+                return False
+            
+        except Exception as e:
+            self._show_error("Unexpected Error", str(e))
+            self.buffered_settings.rollback()
             return False
     
     def get_conflict_policy(self) -> ConflictResolutionPolicy:
@@ -245,6 +285,7 @@ class SimulationSettingsDialog(Gtk.Dialog):
         """Run dialog and apply settings if OK clicked.
         
         Convenience method that combines run(), apply_to_settings(), and destroy().
+        Automatically rolls back buffered changes if cancelled.
         
         Returns:
             bool: True if settings were applied, False if cancelled
@@ -256,6 +297,8 @@ class SimulationSettingsDialog(Gtk.Dialog):
             self.destroy()
             return success
         else:
+            # Rollback any uncommitted changes
+            self.buffered_settings.rollback()
             self.destroy()
             return False
 

@@ -103,11 +103,16 @@ class SimulationController:
     This controller manages the simulation of a Petri net model, handling
     transition firing, token movement, and simulation state.
     
+    Implements StateProvider interface for state detection system.
+    
     Attributes:
         model: ModelCanvasManager instance (has places, transitions, arcs lists)
         time: Current simulation time
         settings: SimulationSettings instance for timing configuration
         step_listeners: List of callbacks to notify on each step
+        state_detector: SimulationStateDetector for context-aware state queries
+        buffered_settings: BufferedSimulationSettings for atomic parameter updates
+        interaction_guard: InteractionGuard for permission-based UI control
     """
 
     def __init__(self, model):
@@ -132,6 +137,19 @@ class SimulationController:
         # Timing configuration (composition pattern)
         from shypn.engine.simulation.settings import SimulationSettings
         self.settings = SimulationSettings()
+        
+        # === NEW: Mode elimination architecture ===
+        # State detection replaces explicit mode checks
+        from shypn.engine.simulation.state import SimulationStateDetector
+        self.state_detector = SimulationStateDetector(self)
+        
+        # Buffered settings for atomic parameter updates
+        from shypn.engine.simulation.buffered import BufferedSimulationSettings
+        self.buffered_settings = BufferedSimulationSettings(self.settings)
+        
+        # Interaction guard for permission-based UI control
+        from shypn.ui.interaction import InteractionGuard
+        self.interaction_guard = InteractionGuard(self.state_detector)
         
         # Register to observe model changes (for arc transformations, deletions, etc.)
         if hasattr(model, 'register_observer'):
@@ -1538,3 +1556,23 @@ class SimulationController:
             dict: State information including time, running status, etc.
         """
         return {'time': self.time, 'running': self._running, 'enabled_transitions': len(self._find_enabled_transitions())}
+    
+    # ========== StateProvider Interface (for state detection) ==========
+    
+    @property
+    def running(self) -> bool:
+        """Check if simulation is running (StateProvider interface property).
+        
+        Returns:
+            bool: True if simulation is running, False otherwise
+        """
+        return self._running
+    
+    @property
+    def duration(self) -> Optional[float]:
+        """Get simulation duration (StateProvider interface property).
+        
+        Returns:
+            float or None: Duration in seconds, or None if not set
+        """
+        return self.settings.get_duration_seconds()

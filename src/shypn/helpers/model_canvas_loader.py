@@ -886,6 +886,13 @@ class ModelCanvasLoader:
         
         # Drawing tools (place, transition, arc)
         if tool_id in ('place', 'transition', 'arc'):
+            # TODO Phase 4: Add permission check when simulation_controller is wired
+            # if hasattr(self, 'simulation_controller') and self.simulation_controller:
+            #     if not self.simulation_controller.interaction_guard.can_activate_tool(tool_id):
+            #         reason = self.simulation_controller.interaction_guard.get_block_reason(tool_id)
+            #         self._show_info_message(reason)
+            #         return  # Don't activate the tool
+            
             canvas_manager.set_tool(tool_id)
             drawing_area.queue_draw()
         
@@ -1089,6 +1096,14 @@ class ModelCanvasLoader:
             drawing_area: GtkDrawingArea widget.
         """
         if tool_name:
+            # TODO Phase 4: Add permission check when simulation_controller is wired
+            # if hasattr(self, 'simulation_controller') and self.simulation_controller:
+            #     if not self.simulation_controller.interaction_guard.can_activate_tool(tool_name):
+            #         reason = self.simulation_controller.interaction_guard.get_block_reason(tool_name)
+            #         self._show_info_message(reason)
+            #         tools_palette.clear_selection()  # Deselect the tool button
+            #         return
+            
             manager.set_tool(tool_name)
         else:
             manager.clear_tool()
@@ -3133,6 +3148,26 @@ class ModelCanvasLoader:
             message_type=Gtk.MessageType.ERROR,
             buttons=Gtk.ButtonsType.OK,
             text="Invalid Operation"
+        )
+        dialog.set_keep_above(True)  # Ensure dialog stays on top
+        dialog.format_secondary_text(message)
+        dialog.run()
+        dialog.destroy()
+    
+    def _show_info_message(self, message):
+        """Show an informational message to the user.
+        
+        Used for permission denials and state-based restrictions.
+        
+        Args:
+            message: Information message to display
+        """
+        dialog = Gtk.MessageDialog(
+            transient_for=None,
+            flags=0,
+            message_type=Gtk.MessageType.INFO,
+            buttons=Gtk.ButtonsType.OK,
+            text="Action Not Allowed"
         )
         dialog.set_keep_above(True)  # Ensure dialog stays on top
         dialog.format_secondary_text(message)

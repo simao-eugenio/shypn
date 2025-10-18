@@ -1,19 +1,3 @@
-"""
-⚠️ DEPRECATED: Mode Palette Loader (No Longer Needed)
-
-The application no longer uses explicit edit/simulate mode switching.
-This module is kept for backward compatibility but should not be used in new code.
-
-Original file archived in: archive/mode/mode_palette_loader.py
-See documentation: doc/modes/MODE_ELIMINATION_PLAN.md
-"""
-import warnings
-warnings.warn(
-    "mode_palette_loader is deprecated. Mode switching is no longer needed.",
-    DeprecationWarning,
-    stacklevel=2
-)
-
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, GObject, Pango

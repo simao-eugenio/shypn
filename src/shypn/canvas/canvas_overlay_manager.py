@@ -232,13 +232,22 @@ class CanvasOverlayManager(BaseOverlayManager):
     def update_palette_visibility(self, mode):
         """Update which palettes are visible based on the current mode.
         
+        DEPRECATED: This method will be removed in Phase 4 when simulation
+        controls become always-visible. Mode-based palette switching is being
+        replaced with state-based permission controls.
+        
         NOTE: This method now only handles simulate palettes visibility.
         Edit palettes (tools/operations) are handled by the NEW OOP PaletteManager
         system via mode-changed signal in ModelCanvasLoader.
         
         Args:
             mode: Current mode string ('edit' or 'simulate')
+                  In future, this will be replaced with state_detector queries.
         """
+        # TODO Phase 4: Remove this method entirely. Simulation controls should
+        # be always visible, with tools disabled/enabled based on state_detector
+        # permissions rather than palette show/hide.
+        
         if mode == 'edit':
             # Hide simulate palettes when in edit mode
             if self.simulate_palette:
