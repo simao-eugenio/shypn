@@ -219,6 +219,7 @@ class TransitionBehavior(ABC):
         - None/empty: Always passes (True)
         - Boolean (True/False): Direct value
         - Numeric: Treated as threshold (> 0 passes)
+        - Callable (lambda/function): Called and result evaluated
         - String expression: Evaluated with place tokens context
         
         Returns:
@@ -248,6 +249,16 @@ class TransitionBehavior(ABC):
         if isinstance(guard_expr, (int, float)):
             passes = guard_expr > 0
             return passes, f"guard-threshold-{passes}"
+        
+        # Callable guard (lambda/function) - NEW
+        if callable(guard_expr):
+            try:
+                result = guard_expr()
+                passes = bool(result)
+                return passes, f"guard-callable-{passes}"
+            except Exception as e:
+                # Guard evaluation error - fail safe (don't fire)
+                return False, f"guard-callable-error: {e}"
         
         # String expression guard - evaluate with place tokens
         if isinstance(guard_expr, str):
