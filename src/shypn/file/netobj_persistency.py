@@ -323,10 +323,43 @@ class NetObjPersistency:
         filter_all.set_name('All files')
         filter_all.add_pattern('*')
         dialog.add_filter(filter_all)
+        
+        # Set initial folder with fallback chain
+        # Priority: last_directory → models_directory → current working directory
+        folder_set = False
+        
+        # Try last directory first
         if self._last_directory and os.path.isdir(self._last_directory):
-            dialog.set_current_folder(self._last_directory)
-        elif os.path.isdir(self.models_directory):
-            dialog.set_current_folder(self.models_directory)
+            try:
+                dialog.set_current_folder(self._last_directory)
+                folder_set = True
+            except Exception:
+                pass
+        
+        # Fallback to models_directory
+        if not folder_set:
+            # Ensure models_directory exists
+            if not os.path.exists(self.models_directory):
+                try:
+                    os.makedirs(self.models_directory, exist_ok=True)
+                except Exception:
+                    pass
+            
+            # Try to set it
+            if os.path.isdir(self.models_directory):
+                try:
+                    dialog.set_current_folder(self.models_directory)
+                    folder_set = True
+                except Exception:
+                    pass
+        
+        # Final fallback: current working directory
+        if not folder_set:
+            try:
+                dialog.set_current_folder(os.getcwd())
+            except Exception:
+                pass  # Let GTK use its default
+        
         if self.current_filepath:
             dialog.set_filename(self.current_filepath)
         else:
@@ -385,10 +418,43 @@ class NetObjPersistency:
         filter_all.set_name('All files')
         filter_all.add_pattern('*')
         dialog.add_filter(filter_all)
+        
+        # Set initial folder with fallback chain
+        # Priority: last_directory → models_directory → current working directory
+        folder_set = False
+        
+        # Try last directory first
         if self._last_directory and os.path.isdir(self._last_directory):
-            dialog.set_current_folder(self._last_directory)
-        elif os.path.isdir(self.models_directory):
-            dialog.set_current_folder(self.models_directory)
+            try:
+                dialog.set_current_folder(self._last_directory)
+                folder_set = True
+            except Exception:
+                pass
+        
+        # Fallback to models_directory
+        if not folder_set:
+            # Ensure models_directory exists
+            if not os.path.exists(self.models_directory):
+                try:
+                    os.makedirs(self.models_directory, exist_ok=True)
+                except Exception:
+                    pass
+            
+            # Try to set it
+            if os.path.isdir(self.models_directory):
+                try:
+                    dialog.set_current_folder(self.models_directory)
+                    folder_set = True
+                except Exception:
+                    pass
+        
+        # Final fallback: current working directory
+        if not folder_set:
+            try:
+                dialog.set_current_folder(os.getcwd())
+            except Exception:
+                pass  # Let GTK use its default
+        
         response = dialog.run()
         filepath = dialog.get_filename()
         dialog.destroy()
