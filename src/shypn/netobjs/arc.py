@@ -662,21 +662,24 @@ class Arc(PetriNetObject):
         raw_source_id = data["source_id"]
         raw_target_id = data["target_id"]
         
-        # Helper function to find object by ID or name
+        # Helper function to find object by ID (string or int) or name
         def find_object(raw_id, obj_dict, obj_type_name):
-            if isinstance(raw_id, str):
-                # Legacy format: string name like 'P45' or 'T12'
-                # Search by name in the object dict
-                for obj in obj_dict.values():
-                    if obj.name == raw_id:
-                        return obj
-                raise ValueError(f"{obj_type_name} not found with name: {raw_id}")
-            else:
-                # Modern format: integer ID
-                obj = obj_dict.get(int(raw_id))
-                if obj is None:
-                    raise ValueError(f"{obj_type_name} not found with ID: {raw_id}")
+            # Try looking up by ID directly (works for both string and int IDs)
+            obj = obj_dict.get(raw_id)
+            if obj is not None:
                 return obj
+            
+            # If not found, try converting to string (in case dict keys are strings)
+            obj = obj_dict.get(str(raw_id))
+            if obj is not None:
+                return obj
+            
+            # Last resort: search by name (for legacy compatibility)
+            for obj in obj_dict.values():
+                if obj.name == str(raw_id):
+                    return obj
+            
+            raise ValueError(f"{obj_type_name} not found with ID/name: {raw_id}")
         
         # Find source object
         if data["source_type"] == "place":
@@ -690,22 +693,15 @@ class Arc(PetriNetObject):
         else:
             target = find_object(raw_target_id, transitions, "Target transition")
         
-        # Handle arc ID (can also be string in legacy format)
-        raw_arc_id = data.get("id")
-        if isinstance(raw_arc_id, str):
-            import re
-            match = re.search(r'\d+', raw_arc_id)
-            arc_id = int(match.group()) if match else abs(hash(raw_arc_id)) % 100000
-            arc_name = raw_arc_id
-        else:
-            arc_id = int(raw_arc_id)
-            arc_name = str(data.get("name", f"A{arc_id}"))
+        # Handle arc ID (keep as string, don't convert to int)
+        arc_id = str(data.get("id"))  # Always store as string
+        arc_name = str(data.get("name", f"A{arc_id}"))
         
-        # Create arc with type conversion
+        # Create arc
         arc = cls(
             source=source,
             target=target,
-            id=arc_id,
+            id=arc_id,  # String ID
             name=arc_name,
             weight=int(data.get("weight", 1))
         )

@@ -221,39 +221,20 @@ class Place(PetriNetObject):
     def from_dict(cls, data: dict) -> 'Place':
         """Create place from dictionary (deserialization).
         
-        NOTE: The 'id' field in JSON can be either:
-        - An integer ID (modern format)
-        - A string name like 'P45' (legacy format, used as both id and name)
-        
-        For legacy compatibility, we extract numeric ID from string names.
-        
         Args:
             data: Dictionary containing place properties
             
         Returns:
             Place: New place instance with restored properties
         """
-        # Handle both integer IDs and string names in the 'id' field
-        raw_id = data.get("id")
-        raw_name = data.get("name")
-        
-        # Determine actual ID and name
-        if isinstance(raw_id, str):
-            # Legacy format: "id": "P45" means both id and name are derived from this
-            name = raw_id  # Use string as name (e.g., "P45")
-            # Extract numeric part for ID (e.g., "P45" -> 45)
-            import re
-            match = re.search(r'\d+', raw_id)
-            place_id = int(match.group()) if match else abs(hash(raw_id)) % 100000
-        else:
-            # Modern format: separate integer id and string name
-            place_id = int(raw_id)
-            name = str(raw_name)
+        # IDs are now always strings - just convert to string
+        place_id = str(data.get("id"))
+        name = str(data.get("name", place_id))
         
         place = cls(
             x=float(data["x"]),
             y=float(data["y"]),
-            id=place_id,
+            id=place_id,  # String ID
             name=name,
             radius=float(data.get("radius", cls.DEFAULT_RADIUS)),
             label=str(data.get("label", ""))
