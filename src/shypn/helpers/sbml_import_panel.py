@@ -342,17 +342,19 @@ class SBMLImportPanel:
         self.sbml_parse_button.set_sensitive(False)
         self._show_status(f"Fetching {biomodels_id} from BioModels...")
         
-        # Fetch in background
-        GLib.idle_add(self._fetch_biomodels_background, biomodels_id)
+        # Fetch in REAL background thread (not idle_add which blocks UI)
+        import threading
+        thread = threading.Thread(target=self._fetch_biomodels_background, args=(biomodels_id,), daemon=True)
+        thread.start()
     
     def _fetch_biomodels_background(self, biomodels_id: str):
         """Background task to fetch model from BioModels.
         
+        Runs in a separate thread to avoid blocking the UI.
+        Uses GLib.idle_add() to safely update UI from background thread.
+        
         Args:
             biomodels_id: BioModels identifier (e.g., BIOMD0000000001)
-            
-        Returns:
-            False to stop GLib.idle_add from repeating
         """
         try:
             import urllib.request
@@ -365,43 +367,58 @@ class SBMLImportPanel:
             temp_dir = tempfile.gettempdir()
             temp_filepath = os.path.join(temp_dir, f"{biomodels_id}.xml")
             
-            # Fetch the file
-            self._show_status(f"Downloading {biomodels_id}...")
+            # Update status (safe from background thread)
+            GLib.idle_add(self._show_status, f"Downloading {biomodels_id}...")
+            
+            # Fetch the file (blocking operation, but we're in a background thread)
             urllib.request.urlretrieve(url, temp_filepath)
             
             # Verify file exists and has content
             if not os.path.exists(temp_filepath) or os.path.getsize(temp_filepath) == 0:
-                self._show_status(f"Failed to download {biomodels_id}", error=True)
-                self.sbml_fetch_button.set_sensitive(True)
-                return False
+                GLib.idle_add(lambda: self._show_status(f"Failed to download {biomodels_id}", error=True))
+                GLib.idle_add(self.sbml_fetch_button.set_sensitive, True)
+                return
             
             # Store filepath
             self.current_filepath = temp_filepath
             
-            # Update file entry to show the temp path
-            if self.sbml_file_entry:
-                self.sbml_file_entry.set_text(temp_filepath)
+            # Update UI elements (must use GLib.idle_add from background thread)
+            def update_ui_success():
+                # Update file entry to show the temp path
+                if self.sbml_file_entry:
+                    self.sbml_file_entry.set_text(temp_filepath)
+                
+                # Enable parse button
+                if self.sbml_parse_button:
+                    self.sbml_parse_button.set_sensitive(True)
+                
+                # Re-enable fetch button
+                if self.sbml_fetch_button:
+                    self.sbml_fetch_button.set_sensitive(True)
+                
+                self._show_status(f"✓ Downloaded {biomodels_id} successfully")
+                return False  # Don't repeat
             
-            # Enable parse button
-            if self.sbml_parse_button:
-                self.sbml_parse_button.set_sensitive(True)
-            
-            self._show_status(f"✓ Downloaded {biomodels_id} successfully")
+            GLib.idle_add(update_ui_success)
             
         except urllib.error.HTTPError as e:
-            if e.code == 404:
-                self._show_status(f"Model {biomodels_id} not found in BioModels", error=True)
-            else:
-                self._show_status(f"HTTP error {e.code}: {e.reason}", error=True)
+            def show_http_error():
+                if e.code == 404:
+                    self._show_status(f"Model {biomodels_id} not found in BioModels", error=True)
+                else:
+                    self._show_status(f"HTTP error {e.code}: {e.reason}", error=True)
+                if self.sbml_fetch_button:
+                    self.sbml_fetch_button.set_sensitive(True)
+                return False
+            GLib.idle_add(show_http_error)
+            
         except Exception as e:
-            self._show_status(f"Fetch error: {str(e)}", error=True)
-        
-        finally:
-            # Re-enable fetch button
-            if self.sbml_fetch_button:
-                self.sbml_fetch_button.set_sensitive(True)
-        
-        return False  # Don't repeat
+            def show_error():
+                self._show_status(f"Fetch error: {str(e)}", error=True)
+                if self.sbml_fetch_button:
+                    self.sbml_fetch_button.set_sensitive(True)
+                return False
+            GLib.idle_add(show_error)
     
     def _on_scale_changed(self, spin_button):
         """Handle scale factor spin button changes - update example."""
