@@ -1,23 +1,9 @@
 """Mode and tool change events.
 
-⚠️ DEPRECATED: This module is deprecated and will be removed in a future version.
-
-The application no longer uses explicit edit/simulate modes. Instead, it uses
-context-aware behavior based on simulation state detection.
-
-For new code, use:
-    - shypn.engine.simulation.state.SimulationStateDetector
-    - shypn.engine.simulation.state.SimulationState enum
-
-Original file archived in: archive/mode/mode_events.py
-See documentation: doc/modes/MODE_ELIMINATION_PLAN.md
+This module defines events related to application mode and tool changes:
+- Mode changes (Edit ↔ Simulate)
+- Tool selection changes
 """
-import warnings
-warnings.warn(
-    "mode_events module is deprecated. Use SimulationStateDetector instead.",
-    DeprecationWarning,
-    stacklevel=2
-)
 
 from .base_event import BaseEvent
 
