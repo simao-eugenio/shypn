@@ -53,6 +53,13 @@ except ImportError as e:
     print(f'ERROR: Cannot import new OOP palettes: {e}', file=sys.stderr)
     sys.exit(1)
 
+# PHASE 4: Import simulation controller for state-based permissions
+try:
+    from shypn.engine.simulation.controller import SimulationController
+except ImportError as e:
+    print(f'ERROR: Cannot import SimulationController: {e}', file=sys.stderr)
+    sys.exit(1)
+
 
 class ModelCanvasLoader:
     """Loader and controller for the model canvas (multi-document Petri Net editor)."""
@@ -75,6 +82,13 @@ class ModelCanvasLoader:
         self.canvas_managers = {}
         self.overlay_managers = {}  # Replaces individual palette dictionaries
         self.palette_managers = {}  # New OOP palette managers
+        
+        # PHASE 4: Simulation controllers - one per canvas
+        # Canvas-centric design: Controllers stored by drawing_area, not palette.
+        # This ensures wiring survives SwissPalette refactoring.
+        # Access pattern: drawing_area → controller → state_detector, interaction_guard
+        self.simulation_controllers = {}
+        
         self.parent_window = None
         self.persistency = None
         self.right_panel_loader = None
@@ -718,10 +732,28 @@ class ModelCanvasLoader:
         swissknife_palette.connect('simulation-reset-executed', self._on_simulation_reset, drawing_area)
         swissknife_palette.connect('simulation-settings-changed', self._on_simulation_settings_changed, drawing_area)
         
+        # ============================================================
+        # PHASE 4: Create simulation controller for this canvas
+        # ============================================================
+        # Canvas-centric design: One controller per drawing_area
+        # This wiring survives SwissPalette refactoring because:
+        #   1. Controller keyed by drawing_area (stable, won't change)
+        #   2. Palette can access controller through overlay_manager
+        #   3. Signal handlers use get_canvas_controller() accessor
+        # 
+        # When SwissPalette refactoring happens:
+        #   - Controller creation stays here (unchanged)
+        #   - Signal handler names may change (easy to find and update)
+        #   - Controller access pattern stays the same (drawing_area → controller)
+        simulation_controller = SimulationController(canvas_manager)
+        self.simulation_controllers[drawing_area] = simulation_controller
+        
         # Store reference for mode switching
         if drawing_area not in self.overlay_managers:
             self.overlay_managers[drawing_area] = type('obj', (object,), {})()
         self.overlay_managers[drawing_area].swissknife_palette = swissknife_palette
+        # PHASE 4: Also store controller reference for palette access
+        self.overlay_managers[drawing_area].simulation_controller = simulation_controller
         
         # ============================================================
         # OLD PALETTE CODE - Keeping temporarily for reference
@@ -886,12 +918,14 @@ class ModelCanvasLoader:
         
         # Drawing tools (place, transition, arc)
         if tool_id in ('place', 'transition', 'arc'):
-            # TODO Phase 4: Add permission check when simulation_controller is wired
-            # if hasattr(self, 'simulation_controller') and self.simulation_controller:
-            #     if not self.simulation_controller.interaction_guard.can_activate_tool(tool_id):
-            #         reason = self.simulation_controller.interaction_guard.get_block_reason(tool_id)
-            #         self._show_info_message(reason)
-            #         return  # Don't activate the tool
+            # PHASE 4: Check permission before activating structural tools
+            # This uses canvas-centric access pattern that survives SwissPalette refactoring
+            controller = self.get_canvas_controller(drawing_area)
+            if controller:
+                allowed, reason = controller.interaction_guard.check_tool_activation(tool_id)
+                if not allowed:
+                    self._show_info_message(reason)
+                    return  # Don't activate the tool
             
             canvas_manager.set_tool(tool_id)
             drawing_area.queue_draw()
@@ -1096,13 +1130,15 @@ class ModelCanvasLoader:
             drawing_area: GtkDrawingArea widget.
         """
         if tool_name:
-            # TODO Phase 4: Add permission check when simulation_controller is wired
-            # if hasattr(self, 'simulation_controller') and self.simulation_controller:
-            #     if not self.simulation_controller.interaction_guard.can_activate_tool(tool_name):
-            #         reason = self.simulation_controller.interaction_guard.get_block_reason(tool_name)
-            #         self._show_info_message(reason)
-            #         tools_palette.clear_selection()  # Deselect the tool button
-            #         return
+            # PHASE 4: Check permission before activating tools
+            # Canvas-centric access ensures this survives SwissPalette refactoring
+            controller = self.get_canvas_controller(drawing_area)
+            if controller:
+                allowed, reason = controller.interaction_guard.check_tool_activation(tool_name)
+                if not allowed:
+                    self._show_info_message(reason)
+                    tools_palette.clear_selection()  # Deselect the tool button
+                    return
             
             manager.set_tool(tool_name)
         else:
@@ -2048,6 +2084,32 @@ class ModelCanvasLoader:
         if drawing_area is None:
             drawing_area = self.get_current_document()
         return self.canvas_managers.get(drawing_area)
+
+    def get_canvas_controller(self, drawing_area=None):
+        """Get the simulation controller for a drawing area.
+        
+        PHASE 4: Canvas-centric controller access.
+        This method provides stable access to controllers that survives
+        SwissPalette refactoring. Controllers are keyed by drawing_area,
+        which is a stable reference that won't change during UI refactoring.
+        
+        Args:
+            drawing_area: GtkDrawingArea. If None, returns controller for current document.
+            
+        Returns:
+            SimulationController: Controller instance with state_detector, 
+                                 buffered_settings, and interaction_guard.
+                                 Returns None if not found.
+        
+        Usage:
+            controller = self.get_canvas_controller(drawing_area)
+            if controller and not controller.interaction_guard.can_activate_tool('place'):
+                reason = controller.interaction_guard.get_block_reason('place')
+                show_message(reason)
+        """
+        if drawing_area is None:
+            drawing_area = self.get_current_document()
+        return self.simulation_controllers.get(drawing_area)
 
     def get_current_document(self):
         """Get the currently active document's drawing area.
