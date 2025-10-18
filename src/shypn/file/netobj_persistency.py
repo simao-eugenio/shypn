@@ -360,10 +360,16 @@ class NetObjPersistency:
             except Exception:
                 pass  # Let GTK use its default
         
-        if self.current_filepath:
-            dialog.set_filename(self.current_filepath)
+        # Set filename or name (don't use set_filename if folder was already set)
+        if self.current_filepath and os.path.exists(self.current_filepath):
+            # File exists - use set_filename to pre-fill with full path
+            try:
+                dialog.set_filename(self.current_filepath)
+            except Exception:
+                # Fallback: just set the name
+                dialog.set_current_name(os.path.basename(self.current_filepath))
         else:
-            # Use suggested filename if available (e.g., for imported documents)
+            # New file or imported - just set the name (folder already set above)
             if self.suggested_filename:
                 # Ensure suggested filename doesn't already have .shy extension
                 suggested = self.suggested_filename

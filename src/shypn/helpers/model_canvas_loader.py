@@ -359,6 +359,12 @@ class ModelCanvasLoader:
         if not tab_widget or not isinstance(tab_widget, Gtk.Box):
             return
         
+        # Ensure filename is a string (convert if needed)
+        filename = str(filename) if filename is not None else 'default'
+        
+        # Ensure is_modified is a boolean
+        is_modified = bool(is_modified)
+        
         # Use 'default.shy' if no filename provided
         if not filename or filename == 'default':
             filename = 'default.shy'

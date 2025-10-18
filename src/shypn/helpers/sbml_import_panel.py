@@ -358,7 +358,12 @@ class SBMLImportPanel:
         """
         try:
             import urllib.request
+            import urllib.error
+            import socket
             import tempfile
+            
+            # Set timeout to prevent hanging indefinitely
+            socket.setdefaulttimeout(30)  # 30 seconds timeout
             
             # BioModels REST API URL
             url = f"https://www.ebi.ac.uk/biomodels/model/download/{biomodels_id}?filename={biomodels_id}_url.xml"
@@ -368,10 +373,15 @@ class SBMLImportPanel:
             temp_filepath = os.path.join(temp_dir, f"{biomodels_id}.xml")
             
             # Update status (safe from background thread)
-            GLib.idle_add(self._show_status, f"Downloading {biomodels_id}...")
+            GLib.idle_add(lambda: self._show_status(f"Downloading {biomodels_id}..."))
             
             # Fetch the file (blocking operation, but we're in a background thread)
-            urllib.request.urlretrieve(url, temp_filepath)
+            try:
+                urllib.request.urlretrieve(url, temp_filepath)
+            except socket.timeout:
+                GLib.idle_add(lambda: self._show_status(f"Download timeout for {biomodels_id} (30s)", error=True))
+                GLib.idle_add(self.sbml_fetch_button.set_sensitive, True)
+                return
             
             # Verify file exists and has content
             if not os.path.exists(temp_filepath) or os.path.getsize(temp_filepath) == 0:
@@ -411,6 +421,14 @@ class SBMLImportPanel:
                     self.sbml_fetch_button.set_sensitive(True)
                 return False
             GLib.idle_add(show_http_error)
+            
+        except socket.timeout:
+            def show_timeout_error():
+                self._show_status(f"Network timeout while fetching {biomodels_id}", error=True)
+                if self.sbml_fetch_button:
+                    self.sbml_fetch_button.set_sensitive(True)
+                return False
+            GLib.idle_add(show_timeout_error)
             
         except Exception as e:
             def show_error():
