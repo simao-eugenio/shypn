@@ -255,14 +255,15 @@ class KEGGImportPanel:
             
             # Get enhancement options from UI
             enable_layout = self.enhancement_layout_check.get_active() if self.enhancement_layout_check else True
-            enable_arcs = self.enhancement_arcs_check.get_active() if self.enhancement_arcs_check else True
+            # KEGG import: Always use straight arcs (curved arcs disabled)
+            enable_arcs = False
             enable_metadata = self.enhancement_metadata_check.get_active() if self.enhancement_metadata_check else True
             
             # Create enhancement options
             from shypn.pathway.options import EnhancementOptions
             enhancement_options = EnhancementOptions(
                 enable_layout_optimization=enable_layout,
-                enable_arc_routing=enable_arcs,
+                enable_arc_routing=enable_arcs,  # Always False for KEGG import
                 enable_metadata_enhancement=enable_metadata
             )
             
