@@ -432,40 +432,21 @@ class Transition(PetriNetObject):
     def from_dict(cls, data: dict) -> 'Transition':
         """Create transition from dictionary (deserialization).
         
-        NOTE: The 'id' field in JSON can be either:
-        - An integer ID (modern format)
-        - A string name like 'T12' (legacy format, used as both id and name)
-        
-        For legacy compatibility, we extract numeric ID from string names.
-        
         Args:
             data: Dictionary containing transition properties
             
         Returns:
             Transition: New transition instance with restored properties
         """
-        # Handle both integer IDs and string names in the 'id' field
-        raw_id = data.get("id")
-        raw_name = data.get("name")
-        
-        # Determine actual ID and name
-        if isinstance(raw_id, str):
-            # Legacy format: "id": "T12" means both id and name are derived from this
-            name = raw_id  # Use string as name (e.g., "T12")
-            # Extract numeric part for ID (e.g., "T12" -> 12)
-            import re
-            match = re.search(r'\d+', raw_id)
-            transition_id = int(match.group()) if match else abs(hash(raw_id)) % 100000
-        else:
-            # Modern format: separate integer id and string name
-            transition_id = int(raw_id)
-            name = str(raw_name)
+        # IDs are now always strings - just convert to string
+        transition_id = str(data.get("id"))
+        name = str(data.get("name", transition_id))
         
         # Extract required properties with type conversion
         transition = cls(
             x=float(data["x"]),
             y=float(data["y"]),
-            id=transition_id,
+            id=transition_id,  # String ID
             name=name,
             width=float(data.get("width", cls.DEFAULT_WIDTH)),
             height=float(data.get("height", cls.DEFAULT_HEIGHT)),

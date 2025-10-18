@@ -431,25 +431,22 @@ class DocumentModel:
         for place_data in data.get("places", []):
             place = Place.from_dict(place_data)
             document.places.append(place)
-            places_dict[place.id] = place  # place.id is now guaranteed to be int
-            # Update next ID counter
-            document._next_place_id = max(document._next_place_id, place.id + 1)
+            places_dict[place.id] = place  # Use string ID as dict key
+            # Note: No longer updating _next_place_id since IDs are strings
         
         # Restore transitions second (they have no dependencies)
         transitions_dict = {}
         for transition_data in data.get("transitions", []):
             transition = Transition.from_dict(transition_data)
             document.transitions.append(transition)
-            transitions_dict[transition.id] = transition  # transition.id is now guaranteed to be int
-            # Update next ID counter
-            document._next_transition_id = max(document._next_transition_id, transition.id + 1)
+            transitions_dict[transition.id] = transition  # Use string ID as dict key
+            # Note: No longer updating _next_transition_id since IDs are strings
         
         # Restore arcs last (they depend on places and transitions)
         for arc_data in data.get("arcs", []):
             arc = Arc.from_dict(arc_data, places=places_dict, transitions=transitions_dict)
             document.arcs.append(arc)
-            # Update next ID counter
-            document._next_arc_id = max(document._next_arc_id, arc.id + 1)
+            # Note: No longer updating _next_arc_id since IDs are strings
         
         # Restore view state if present
         if "view_state" in data:
