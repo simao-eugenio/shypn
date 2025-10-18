@@ -573,19 +573,30 @@ class ModelCanvasLoader:
                 # Find the page widget for this drawing area
                 # Navigation: drawing_area -> GtkScrolledWindow -> GtkOverlay (page widget)
                 parent = drawing_area.get_parent()  # Should be GtkScrolledWindow
-                if parent:
-                    page_widget = parent.get_parent()  # Should be GtkOverlay
-                    if page_widget:
-                        # Get display name from manager (filename without path)
-                        display_name = manager.get_display_name()
-                        # Update tab label using existing method
-                        self._update_tab_label(page_widget, display_name, is_modified=is_dirty)
-                        
-                        # Find page number for logging
-                        page_num = self.notebook.page_num(page_widget)
+                if not parent:
+                    # Widget hierarchy not yet established - this is normal during initial setup
+                    # Callback will be triggered again later when changes occur
+                    return
+                
+                page_widget = parent.get_parent()  # Should be GtkOverlay
+                if not page_widget:
+                    # Still setting up widget hierarchy
+                    return
+                    
+                # Verify page_widget is actually in the notebook
+                page_num = self.notebook.page_num(page_widget)
+                if page_num < 0:
+                    # Not yet added to notebook
+                    return
+                
+                # Get display name from manager (filename without path)
+                display_name = manager.get_display_name()
+                # Update tab label using existing method
+                self._update_tab_label(page_widget, display_name, is_modified=is_dirty)
             except Exception as e:
-                import traceback
-                traceback.print_exc()
+                # Silently ignore errors during widget setup
+                # (e.g., if called before widget hierarchy is complete)
+                pass
         
         manager.on_dirty_changed = on_dirty_changed
         
