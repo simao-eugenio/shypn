@@ -631,13 +631,6 @@ class ModelCanvasLoader:
             overlay_manager.connect_simulation_signals(
                 self._on_simulation_step, self._on_simulation_reset, drawing_area
             )
-            overlay_manager.connect_mode_changed_signal(
-                self._on_mode_changed, drawing_area
-            )
-            # Old signal removed - mode palette no longer has edit-palettes-toggled
-            # overlay_manager.connect_edit_palettes_toggle_signal(
-            #     self._on_edit_palettes_toggled, drawing_area
-            # )
             overlay_manager.connect_edit_button_signal(
                 self._on_edit_button_toggled, drawing_area
             )
@@ -1040,71 +1033,6 @@ class ModelCanvasLoader:
         # Currently just redraw the canvas
         drawing_area.queue_draw()
 
-    def _on_mode_changed(self, mode_palette, mode, drawing_area, *args):
-        """Handle mode change between edit and simulation.
-        
-        Args:
-            mode_palette: ModePaletteLoader that emitted the signal
-            mode: New mode ('edit' or 'sim')
-            drawing_area: GtkDrawingArea widget
-            *args: Additional arguments from signal (edit_palette, etc. - ignored)
-        """
-        # Show/hide [E] and [S] buttons based on mode
-        if drawing_area in self.overlay_managers:
-            overlay_manager = self.overlay_managers[drawing_area]
-            
-            if mode == 'edit':
-                # Switching to EDIT mode:
-                # 1. Show [E] button, hide [S] button
-                if overlay_manager.edit_palette:
-                    edit_widget = overlay_manager.edit_palette.get_widget()
-                    if edit_widget:
-                        edit_widget.show()
-                        # Reset [E] button to OFF state (edit tools hidden)
-                        if overlay_manager.edit_palette.edit_toggle_button:
-                            if overlay_manager.edit_palette.edit_toggle_button.get_active():
-                                overlay_manager.edit_palette.edit_toggle_button.set_active(False)
-                if overlay_manager.simulate_palette:
-                    sim_widget = overlay_manager.simulate_palette.get_widget()
-                    if sim_widget:
-                        sim_widget.hide()
-                        # Reset [S] button to OFF state when hiding it
-                        sim_button = overlay_manager.simulate_palette.get_toggle_button()
-                        if sim_button and sim_button.get_active():
-                            sim_button.set_active(False)
-                
-                # 2. Hide any open simulation tools palette
-                if overlay_manager.simulate_tools_palette:
-                    overlay_manager.simulate_tools_palette.hide()  # Use palette's hide() method
-                
-                # 3. Hide any open edit tools palettes (ensure clean state)
-                if drawing_area in self.palette_managers:
-                    palette_manager = self.palette_managers[drawing_area]
-                    palette_manager.hide_all()
-                
-                
-            elif mode == 'sim':
-                # Switching to SIM mode:
-                # 1. Hide [E] button, show [S] button
-                if overlay_manager.edit_palette:
-                    edit_widget = overlay_manager.edit_palette.get_widget()
-                    if edit_widget:
-                        edit_widget.hide()
-                if overlay_manager.simulate_palette:
-                    sim_widget = overlay_manager.simulate_palette.get_widget()
-                    if sim_widget:
-                        sim_widget.show()
-                        # Reset [S] button to OFF state (simulation tools hidden)
-                        sim_button = overlay_manager.simulate_palette.get_toggle_button()
-                        if sim_button and sim_button.get_active():
-                            sim_button.set_active(False)
-                
-                # 2. Hide any open edit palettes
-                if drawing_area in self.palette_managers:
-                    palette_manager = self.palette_managers[drawing_area]
-                    palette_manager.hide_all()
-                
-    
     def _on_edit_button_toggled(self, edit_palette, show, drawing_area):
         """Handle [E] button toggle for showing/hiding NEW OOP edit palettes.
         

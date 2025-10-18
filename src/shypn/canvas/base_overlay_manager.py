@@ -69,15 +69,6 @@ class BaseOverlayManager(ABC):
         pass
     
     @abstractmethod
-    def update_palette_visibility(self, mode):
-        """Update which palettes are visible based on the current mode.
-        
-        Args:
-            mode: Current mode string ('edit' or 'simulate')
-        """
-        pass
-    
-    @abstractmethod
     def get_palette(self, palette_name):
         """Get a specific palette by name.
         
