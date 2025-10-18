@@ -25,10 +25,18 @@ See: `doc/modes/MODE_ELIMINATION_PLAN.md`
 - Contains: `ModeChangedEvent`, `ToolChangedEvent`
 - Replaced by: `SimulationState` enum and state detector
 
-### mode_palette_loader.py
+### mode_palette_loader.py (Original)
 - Original: `src/ui/palettes/mode/mode_palette_loader.py`
 - Contains: Mode switcher UI with [E] and [S] buttons
 - Replaced by: Always-visible simulation controls
+- **Note**: Original archived here, kept for reference
+
+### mode_palette_loader_deprecated.py (Final Version)
+- Original: `src/ui/palettes/mode/mode_palette_loader.py` (with deprecation warnings)
+- Contains: Final version with deprecation warnings added
+- Archived: October 18, 2025
+- **Note**: This is the version that was in production when removed
+- Contains deprecation warning pointing to this archive
 
 ## Migration
 
