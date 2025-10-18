@@ -21,13 +21,13 @@ class Arc(PetriNetObject):
     DEFAULT_WIDTH = 3.0  # Legacy: 3.0px line width
     ARROW_SIZE = 15.0    # Legacy: 15px arrowhead length
     
-    def __init__(self, source, target, id: int, name: str, weight: int = 1):
+    def __init__(self, source, target, id: str, name: str, weight: int = 1):
         """Initialize an Arc.
         
         Args:
             source: Source object instance (Place or Transition)
             target: Target object instance (Place or Transition)
-            id: Unique integer identifier (immutable, system-assigned)
+            id: Unique string identifier (immutable, system-assigned)
             name: Unique name in format "A1", "A2", etc. (immutable, system-assigned)
             weight: Arc weight (multiplicity)
         
@@ -37,8 +37,8 @@ class Arc(PetriNetObject):
         # Validate bipartite connection (Place↔Transition only)
         self._validate_connection(source, target)
         
-        # Initialize base class (arcs don't have user labels typically) - ensure id is int
-        super().__init__(int(id), str(name), label="")
+        # Initialize base class (arcs don't have user labels typically)
+        super().__init__(id, name, label="")
         
         # Connection (references to object instances)
         self.source = source
