@@ -61,12 +61,12 @@ class Arc(PetriNetObject):
         self.control_points: List[Tuple[float, float]] = []
     
     @property
-    def source_id(self) -> int:
+    def source_id(self) -> str:
         """Get source object ID (for behavior compatibility)."""
         return self.source.id
     
     @property
-    def target_id(self) -> int:
+    def target_id(self) -> str:
         """Get target object ID (for behavior compatibility)."""
         return self.target.id
     
