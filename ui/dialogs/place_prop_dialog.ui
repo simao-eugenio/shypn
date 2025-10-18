@@ -237,18 +237,20 @@
                         <property name="orientation">vertical</property>
                         <property name="spacing">8</property>
                         
-                        <!-- Tokens Field (Entry replaces SpinButton) -->
+                        <!-- Tokens and Capacity on same line -->
                         <child>
-                          <object class="GtkBox" id="tokens_box">
+                          <object class="GtkBox" id="tokens_capacity_row">
                             <property name="visible">True</property>
                             <property name="can_focus">False</property>
                             <property name="spacing">10</property>
+                            
+                            <!-- Tokens Field -->
                             <child>
                               <object class="GtkLabel" id="tokens_label">
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
                                 <property name="label" translatable="yes">Tokens:</property>
-                                <property name="width_chars">12</property>
+                                <property name="width_chars">8</property>
                                 <property name="xalign">1</property>
                               </object>
                               <packing>
@@ -261,6 +263,7 @@
                               <object class="GtkEntry" id="prop_place_tokens_entry">
                                 <property name="visible">True</property>
                                 <property name="can_focus">True</property>
+                                <property name="has_focus">True</property>
                                 <property name="width_chars">8</property>
                                 <property name="placeholder_text" translatable="yes">e.g. 0, 5.5</property>
                               </object>
@@ -268,6 +271,37 @@
                                 <property name="expand">False</property>
                                 <property name="fill">True</property>
                                 <property name="position">1</property>
+                              </packing>
+                            </child>
+                            
+                            <!-- Capacity Field -->
+                            <child>
+                              <object class="GtkLabel" id="capacity_label">
+                                <property name="visible">True</property>
+                                <property name="can_focus">False</property>
+                                <property name="label" translatable="yes">Capacity:</property>
+                                <property name="width_chars">8</property>
+                                <property name="xalign">1</property>
+                                <property name="tooltip_text" translatable="yes">Maximum number of tokens (inf for unlimited)</property>
+                              </object>
+                              <packing>
+                                <property name="expand">False</property>
+                                <property name="fill">True</property>
+                                <property name="position">2</property>
+                              </packing>
+                            </child>
+                            <child>
+                              <object class="GtkEntry" id="prop_place_capacity_entry">
+                                <property name="visible">True</property>
+                                <property name="can_focus">True</property>
+                                <property name="width_chars">8</property>
+                                <property name="placeholder_text" translatable="yes">inf or number</property>
+                                <property name="tooltip_text" translatable="yes">Enter a number or 'inf' for unlimited capacity</property>
+                              </object>
+                              <packing>
+                                <property name="expand">False</property>
+                                <property name="fill">True</property>
+                                <property name="position">3</property>
                               </packing>
                             </child>
                           </object>
@@ -278,19 +312,20 @@
                           </packing>
                         </child>
                         
-                        <!-- Radius Field (Entry replaces SpinButton) -->
+                        <!-- Radius and Line Width on same line -->
                         <child>
-                          <object class="GtkBox" id="radius_box">
+                          <object class="GtkBox" id="radius_width_row">
                             <property name="visible">True</property>
                             <property name="can_focus">False</property>
                             <property name="spacing">10</property>
 
+                            <!-- Radius Field -->
                             <child>
                               <object class="GtkLabel" id="radius_label">
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
                                 <property name="label" translatable="yes">Radius:</property>
-                                <property name="width_chars">12</property>
+                                <property name="width_chars">8</property>
                                 <property name="xalign">1</property>
                               </object>
                               <packing>
@@ -299,7 +334,6 @@
                                 <property name="position">0</property>
                               </packing>
                             </child>
-
                             <child>
                               <object class="GtkEntry" id="prop_place_radius_entry">
                                 <property name="visible">True</property>
@@ -313,56 +347,40 @@
                                 <property name="position">1</property>
                               </packing>
                             </child>
+                            
+                            <!-- Line Width Field -->
+                            <child>
+                              <object class="GtkLabel" id="width_label">
+                                <property name="visible">True</property>
+                                <property name="can_focus">False</property>
+                                <property name="label" translatable="yes">Width:</property>
+                                <property name="width_chars">8</property>
+                                <property name="xalign">1</property>
+                              </object>
+                              <packing>
+                                <property name="expand">False</property>
+                                <property name="fill">True</property>
+                                <property name="position">2</property>
+                              </packing>
+                            </child>
+                            <child>
+                              <object class="GtkEntry" id="prop_place_width_entry">
+                                <property name="visible">True</property>
+                                <property name="can_focus">True</property>
+                                <property name="width_chars">8</property>
+                                <property name="placeholder_text" translatable="yes">e.g. 2</property>
+                              </object>
+                              <packing>
+                                <property name="expand">False</property>
+                                <property name="fill">True</property>
+                                <property name="position">3</property>
+                              </packing>
+                            </child>
                           </object>
                           <packing>
                             <property name="expand">False</property>
                             <property name="fill">True</property>
                             <property name="position">1</property>
-                          </packing>
-                        </child>
-                        
-                        <!-- Capacity Field -->
-                        <child>
-                          <object class="GtkBox" id="capacity_box">
-                            <property name="visible">True</property>
-                            <property name="can_focus">False</property>
-                            <property name="spacing">10</property>
-
-                            <child>
-                              <object class="GtkLabel" id="capacity_label">
-                                <property name="visible">True</property>
-                                <property name="can_focus">False</property>
-                                <property name="label" translatable="yes">Capacity:</property>
-                                <property name="width_chars">12</property>
-                                <property name="xalign">1</property>
-                                <property name="tooltip_text" translatable="yes">Maximum number of tokens (inf for unlimited)</property>
-                              </object>
-                              <packing>
-                                <property name="expand">False</property>
-                                <property name="fill">True</property>
-                                <property name="position">0</property>
-                              </packing>
-                            </child>
-
-                            <child>
-                              <object class="GtkEntry" id="prop_place_capacity_entry">
-                                <property name="visible">True</property>
-                                <property name="can_focus">True</property>
-                                <property name="width_chars">8</property>
-                                <property name="placeholder_text" translatable="yes">inf or number</property>
-                                <property name="tooltip_text" translatable="yes">Enter a number or 'inf' for unlimited capacity</property>
-                              </object>
-                              <packing>
-                                <property name="expand">False</property>
-                                <property name="fill">True</property>
-                                <property name="position">1</property>
-                              </packing>
-                            </child>
-                          </object>
-                          <packing>
-                            <property name="expand">False</property>
-                            <property name="fill">True</property>
-                            <property name="position">2</property>
                           </packing>
                         </child>
                       </object>
