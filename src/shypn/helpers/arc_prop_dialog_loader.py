@@ -10,6 +10,7 @@ import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, GObject
 from shypn.helpers.color_picker import setup_color_picker_in_dialog
+from shypn.utils.arc_transform import is_inhibitor, convert_to_inhibitor, convert_to_normal
 
 class ArcPropDialogLoader(GObject.GObject):
     """Loader for Arc properties dialog.
@@ -82,6 +83,26 @@ class ArcPropDialogLoader(GObject.GObject):
             color_rgb: Selected color as RGB tuple (0.0-1.0)
         """
 
+    def _replace_arc_in_model(self):
+        """Replace the old arc with the transformed arc in the model.
+        
+        This method finds the old arc in the model's arc list and replaces it
+        with the new transformed arc object (self.arc_obj).
+        """
+        # Check if arc has a manager reference
+        if hasattr(self.arc_obj, '_manager') and self.arc_obj._manager:
+            manager = self.arc_obj._manager
+            # Find and replace in manager's arc list
+            if hasattr(manager, 'arcs'):
+                for i, arc in enumerate(manager.arcs):
+                    if arc.id == self.arc_obj.id:
+                        manager.arcs[i] = self.arc_obj
+                        break
+        
+        # Notify that the arc was transformed (for redrawing, etc.)
+        if hasattr(self.arc_obj, 'on_changed') and self.arc_obj.on_changed:
+            self.arc_obj.on_changed(self.arc_obj, 'type_transformed')
+
     def _populate_fields(self):
         """Populate dialog fields with current Arc properties."""
         name_entry = self.builder.get_object('name_entry')
@@ -99,6 +120,18 @@ class ArcPropDialogLoader(GObject.GObject):
         line_width_spin = self.builder.get_object('prop_arc_line_width_spin')
         if line_width_spin and hasattr(self.arc_obj, 'width'):
             line_width_spin.set_value(float(self.arc_obj.width))
+        
+        # Set arc type combo
+        type_combo = self.builder.get_object('prop_arc_type_combo')
+        if type_combo:
+            # Determine current arc type
+            # 0 = Normal, 1 = Inhibitor, 2 = Test
+            if is_inhibitor(self.arc_obj):
+                type_combo.set_active(1)  # Inhibitor
+            else:
+                type_combo.set_active(0)  # Normal
+            # TODO: Add Test arc detection when Test arc class is implemented
+        
         threshold_textview = self.builder.get_object('prop_arc_threshold_entry')
         if threshold_textview and hasattr(self.arc_obj, 'threshold'):
             buffer = threshold_textview.get_buffer()
@@ -181,7 +214,42 @@ class ArcPropDialogLoader(GObject.GObject):
         dialog.destroy()
 
     def _apply_changes(self):
-        """Apply changes from dialog fields to Arc object."""
+        """Apply changes from dialog fields to Arc object.
+        
+        Note: Arc type changes require transformation which creates a new arc object.
+        The caller should check if the arc object reference changed and update accordingly.
+        """
+        # Check if arc type needs to change
+        type_combo = self.builder.get_object('prop_arc_type_combo')
+        if type_combo:
+            new_type_index = type_combo.get_active()
+            # 0 = Normal, 1 = Inhibitor, 2 = Test
+            current_is_inhibitor = is_inhibitor(self.arc_obj)
+            
+            if new_type_index == 0 and current_is_inhibitor:
+                # Convert from Inhibitor to Normal
+                self.arc_obj = convert_to_normal(self.arc_obj)
+                self._replace_arc_in_model()
+            elif new_type_index == 1 and not current_is_inhibitor:
+                # Convert from Normal to Inhibitor
+                try:
+                    self.arc_obj = convert_to_inhibitor(self.arc_obj)
+                    self._replace_arc_in_model()
+                except ValueError as e:
+                    # Show error dialog if conversion invalid (e.g., Transition → Place)
+                    error_dialog = Gtk.MessageDialog(
+                        transient_for=self.dialog,
+                        flags=0,
+                        message_type=Gtk.MessageType.ERROR,
+                        buttons=Gtk.ButtonsType.OK,
+                        text="Cannot convert to Inhibitor Arc"
+                    )
+                    error_dialog.format_secondary_text(str(e))
+                    error_dialog.run()
+                    error_dialog.destroy()
+                    return  # Don't apply other changes
+            # TODO: Add Test arc conversion when Test arc class is implemented
+        
         description_text = self.builder.get_object('description_text')
         if description_text and hasattr(self.arc_obj, 'label'):
             buffer = description_text.get_buffer()
