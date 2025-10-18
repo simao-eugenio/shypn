@@ -280,7 +280,7 @@ class TimedBehavior(TransitionBehavior):
             Dictionary with timing window and current status
         """
         current_time = self._get_current_time()
-        elapsed = current_time - self._enablement_time if self._enablement_time else None
+        elapsed = current_time - self._enablement_time if self._enablement_time is not None else None
         info = {'earliest': self.earliest, 'latest': self.latest, 'enablement_time': self._enablement_time, 'current_time': current_time, 'elapsed': elapsed}
         if elapsed is not None:
             info['can_fire_earliest'] = elapsed >= self.earliest

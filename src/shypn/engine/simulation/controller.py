@@ -533,13 +533,6 @@ class SimulationController:
                 input_arcs = behavior.get_input_arcs()
                 output_arcs = behavior.get_output_arcs()
                 continuous_to_integrate.append((transition, behavior, input_arcs, output_arcs))
-        discrete_transitions = [t for t in self.model.transitions if t.transition_type in ['timed', 'stochastic']]
-        enabled_discrete = [t for t in discrete_transitions if self._is_transition_enabled(t)]
-        discrete_fired = False
-        if enabled_discrete:
-            transition = self._select_transition(enabled_discrete)
-            self._fire_transition(transition)
-            discrete_fired = True
         
         continuous_active = 0
         for transition, behavior, input_arcs, output_arcs in continuous_to_integrate:
@@ -548,7 +541,21 @@ class SimulationController:
                 continuous_active += 1
                 if self.data_collector is not None:
                     self.data_collector.on_transition_fired(transition, self.time, details)
+        
+        # Advance time BEFORE checking discrete transitions
+        # This ensures timed transitions are evaluated at the correct time
         self.time += time_step
+        
+        # Now check discrete transitions at the NEW time
+        # This allows timed transitions to fire when entering their window mid-step
+        self._update_enablement_states()
+        discrete_transitions = [t for t in self.model.transitions if t.transition_type in ['timed', 'stochastic']]
+        enabled_discrete = [t for t in discrete_transitions if self._is_transition_enabled(t)]
+        discrete_fired = False
+        if enabled_discrete:
+            transition = self._select_transition(enabled_discrete)
+            self._fire_transition(transition)
+            discrete_fired = True
         self._notify_step_listeners()
         
         # Check if simulation is complete (duration reached)
