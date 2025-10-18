@@ -779,7 +779,7 @@
                     <property name="label-xalign">0</property>
                     <property name="shadow-type">in</property>
                     <child>
-                      <object class="GtkBox" id="transition_color_picker">
+                      <object class="GtkBox" id="color_appearance_container">
                         <property name="visible">True</property>
                         <property name="can-focus">False</property>
                         <property name="orientation">vertical</property>
@@ -789,7 +789,22 @@
                         <property name="margin-left">15</property>
                         <property name="margin-right">15</property>
                         
-                        <!-- Line Width Field -->
+                        <!-- Color Picker Container (populated by Python) -->
+                        <child>
+                          <object class="GtkBox" id="transition_color_picker">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="orientation">vertical</property>
+                            <property name="spacing">10</property>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">True</property>
+                            <property name="position">0</property>
+                          </packing>
+                        </child>
+                        
+                        <!-- Line Width Field - Below color picker -->
                         <child>
                           <object class="GtkBox" id="line_width_box">
                             <property name="visible">True</property>
@@ -826,7 +841,7 @@
                           <packing>
                             <property name="expand">False</property>
                             <property name="fill">True</property>
-                            <property name="position">10</property>
+                            <property name="position">1</property>
                           </packing>
                         </child>
                       </object>
