@@ -361,8 +361,14 @@ class SBMLImportPanel:
             import urllib.error
             import tempfile
             
-            # BioModels REST API URL
-            url = f"https://www.ebi.ac.uk/biomodels/model/download/{biomodels_id}?filename={biomodels_id}_url.xml"
+            # BioModels API endpoint - try multiple formats for compatibility
+            # Format 1: Direct download (current API as of 2025)
+            # Format 2: Legacy format for backwards compatibility
+            urls = [
+                f"https://www.ebi.ac.uk/biomodels/model/download/{biomodels_id}",
+                f"https://www.ebi.ac.uk/biomodels/model/download/{biomodels_id}?filename={biomodels_id}.xml",
+                f"https://www.ebi.ac.uk/biomodels-main/download?mid={biomodels_id}",
+            ]
             
             # Download to temporary file
             temp_dir = tempfile.gettempdir()
@@ -371,28 +377,80 @@ class SBMLImportPanel:
             # Update status (safe from background thread)
             GLib.idle_add(lambda: self._show_status(f"Downloading {biomodels_id}..."))
             
-            # Fetch the file with explicit timeout (90 seconds for large models)
-            try:
-                # Use urlopen with timeout instead of urlretrieve
-                # This gives better control and works more reliably
-                response = urllib.request.urlopen(url, timeout=90)
-                
-                # Read content and write to file
-                with open(temp_filepath, 'wb') as f:
-                    f.write(response.read())
-                
-            except urllib.error.URLError as e:
-                if hasattr(e, 'reason') and 'timed out' in str(e.reason).lower():
-                    GLib.idle_add(lambda: self._show_status(f"Download timeout for {biomodels_id} (90s)", error=True))
-                    GLib.idle_add(self.sbml_fetch_button.set_sensitive, True)
-                    return
-                else:
-                    # Re-raise for generic error handling
-                    raise
+            # Try each URL format until one works
+            success = False
+            last_error = None
             
-            # Verify file exists and has content
+            for url_idx, url in enumerate(urls):
+                try:
+                    # Create request with proper headers
+                    req = urllib.request.Request(url)
+                    req.add_header('User-Agent', 'SHYpn/2.0 (Python urllib)')
+                    req.add_header('Accept', 'application/xml, text/xml, */*')
+                    
+                    # Open URL with 90 second timeout for large models
+                    response = urllib.request.urlopen(req, timeout=90)
+                    
+                    # Read content and write to file
+                    content = response.read()
+                    
+                    # Verify we got XML content
+                    if not content or len(content) < 100:
+                        raise ValueError(f"Downloaded content too small: {len(content)} bytes")
+                    
+                    if b'<?xml' not in content[:200] and b'<sbml' not in content[:500]:
+                        raise ValueError("Downloaded content does not appear to be SBML/XML")
+                    
+                    # Write to file
+                    with open(temp_filepath, 'wb') as f:
+                        f.write(content)
+                    
+                    success = True
+                    break
+                    
+                except urllib.error.URLError as e:
+                    last_error = e
+                    if hasattr(e, 'reason') and 'timed out' in str(e.reason).lower():
+                        # Timeout - try next URL
+                        continue
+                    elif hasattr(e, 'code'):
+                        # HTTP error - try next URL
+                        continue
+                    else:
+                        # Network error - try next URL
+                        continue
+                        
+                except Exception as e:
+                    last_error = e
+                    continue
+            
+            if not success:
+                # All URLs failed - provide helpful message
+                error_msg = f"⚠ BioModels download failed for {biomodels_id}"
+                
+                if last_error:
+                    if hasattr(last_error, 'reason') and 'timed out' in str(last_error.reason).lower():
+                        error_msg = f"⚠ Timeout downloading {biomodels_id}. The BioModels server may be slow or temporarily unavailable."
+                    elif hasattr(last_error, 'code'):
+                        if last_error.code == 404:
+                            error_msg = f"⚠ Model {biomodels_id} not found. Check the ID is correct."
+                        elif last_error.code >= 500:
+                            error_msg = f"⚠ BioModels server error ({last_error.code}). The service may be temporarily down."
+                        else:
+                            error_msg = f"⚠ HTTP error {last_error.code} for {biomodels_id}"
+                    else:
+                        error_msg = f"⚠ Network error: {str(last_error)}"
+                
+                # Add manual download suggestion
+                error_msg += f"\n\nTip: Visit https://www.ebi.ac.uk/biomodels/{biomodels_id} to manually download the SBML file, then use 'Browse' to load it."
+                
+                GLib.idle_add(lambda msg=error_msg: self._show_status(msg, error=True))
+                GLib.idle_add(self.sbml_fetch_button.set_sensitive, True)
+                return
+            
+            # Verify file was written successfully
             if not os.path.exists(temp_filepath) or os.path.getsize(temp_filepath) == 0:
-                GLib.idle_add(lambda: self._show_status(f"Failed to download {biomodels_id}", error=True))
+                GLib.idle_add(lambda: self._show_status(f"Failed to save {biomodels_id}", error=True))
                 GLib.idle_add(self.sbml_fetch_button.set_sensitive, True)
                 return
             
@@ -417,25 +475,6 @@ class SBMLImportPanel:
                 return False  # Don't repeat
             
             GLib.idle_add(update_ui_success)
-            
-        except urllib.error.HTTPError as e:
-            def show_http_error():
-                if e.code == 404:
-                    self._show_status(f"Model {biomodels_id} not found in BioModels", error=True)
-                else:
-                    self._show_status(f"HTTP error {e.code}: {e.reason}", error=True)
-                if self.sbml_fetch_button:
-                    self.sbml_fetch_button.set_sensitive(True)
-                return False
-            GLib.idle_add(show_http_error)
-            
-        except urllib.error.URLError as e:
-            def show_network_error():
-                self._show_status(f"Network error: {str(e.reason)}", error=True)
-                if self.sbml_fetch_button:
-                    self.sbml_fetch_button.set_sensitive(True)
-                return False
-            GLib.idle_add(show_network_error)
             
         except Exception as e:
             def show_error():
