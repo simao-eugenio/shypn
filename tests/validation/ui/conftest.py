@@ -150,7 +150,7 @@ def create_arc(document_controller, create_place, create_transition):
             from shypn.utils.arc_transform import convert_to_inhibitor
             arc = convert_to_inhibitor(arc)
         
-        arc.line_width = line_width
+        arc.width = line_width
         arc.color = color
         
         return arc
