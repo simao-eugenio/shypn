@@ -360,26 +360,40 @@ class NetObjPersistency:
             except Exception:
                 pass  # Let GTK use its default
         
-        # Set filename or name (don't use set_filename if folder was already set)
-        if self.current_filepath and os.path.exists(self.current_filepath):
-            # File exists - use set_filename to pre-fill with full path
+        # Set filename or name
+        # IMPORTANT: Only use set_filename() for files that actually exist
+        # For new files, always use set_current_name() to avoid GTK errors
+        if self.current_filepath and os.path.isfile(self.current_filepath):
+            # File exists - we can safely use set_filename
             try:
                 dialog.set_filename(self.current_filepath)
-            except Exception:
-                # Fallback: just set the name
-                dialog.set_current_name(os.path.basename(self.current_filepath))
+            except Exception as e:
+                # If set_filename fails, fall back to just setting the name
+                try:
+                    dialog.set_current_name(os.path.basename(self.current_filepath))
+                except Exception:
+                    dialog.set_current_name('default.shy')
         else:
-            # New file or imported - just set the name (folder already set above)
-            if self.suggested_filename:
-                # Ensure suggested filename doesn't already have .shy extension
+            # New file, imported file, or file doesn't exist - only set the name
+            # Don't use set_filename as it causes "no such file or directory" errors
+            if self.current_filepath:
+                # Use the basename from current_filepath if available
+                default_name = os.path.basename(self.current_filepath)
+            elif self.suggested_filename:
+                # Use suggested filename if available
                 suggested = self.suggested_filename
                 if suggested.lower().endswith('.shy'):
                     default_name = suggested
                 else:
                     default_name = f'{suggested}.shy'
             else:
+                # Ultimate fallback
                 default_name = 'default.shy'
-            dialog.set_current_name(default_name)
+            
+            try:
+                dialog.set_current_name(default_name)
+            except Exception:
+                dialog.set_current_name('default.shy')  # Final fallback
         response = dialog.run()
         filepath = dialog.get_filename()
         dialog.destroy()
