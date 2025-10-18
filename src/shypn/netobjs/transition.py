@@ -22,7 +22,7 @@ class Transition(PetriNetObject):
     DEFAULT_BORDER_COLOR = (0.0, 0.0, 0.0)  # Black border
     DEFAULT_BORDER_WIDTH = 3.0  # 3px for better visibility
     
-    def __init__(self, x: float, y: float, id: int, name: str,
+    def __init__(self, x: float, y: float, id: str, name: str,
                  width: float = None, height: float = None, 
                  label: str = "", horizontal: bool = True):
         """Initialize a Transition.
@@ -30,15 +30,15 @@ class Transition(PetriNetObject):
         Args:
             x: X coordinate in world space (center)
             y: Y coordinate in world space (center)
-            id: Unique integer identifier (immutable, system-assigned)
+            id: Unique string identifier (immutable, system-assigned)
             name: Unique name in format "T1", "T2", etc. (immutable, system-assigned)
             width: Rectangle width (default: 50.0)
             height: Rectangle height (default: 8.0)
             label: Optional user-editable text label (mutable)
             horizontal: True for horizontal bar, False for vertical
         """
-        # Initialize base class (ensure id is int)
-        super().__init__(int(id), str(name), str(label))
+        # Initialize base class
+        super().__init__(id, name, label)
         
         # Position and dimensions
         self.x = float(x)

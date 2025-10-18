@@ -14,7 +14,7 @@ class PetriNetObject:
     which provides common identity management, state tracking, and redraw callbacks.
     
     Identity Properties (immutable, system-managed):
-        - id (int): Unique internal identifier
+        - id (str): Unique internal identifier (string format supports flexible naming)
         - name (str): Human-readable unique name (P1, T1, A1, ...)
     
     User Properties (mutable):
@@ -25,17 +25,17 @@ class PetriNetObject:
         - on_changed (Callable): Callback to trigger redraw when object changes
     """
     
-    def __init__(self, id: int, name: str, label: str = ""):
+    def __init__(self, id: str, name: str, label: str = ""):
         """Initialize the base Petri net object.
         
         Args:
-            id: Unique integer identifier (immutable, system-assigned)
+            id: Unique string identifier (immutable, system-assigned)
             name: Unique name like "P1", "T1", "A1" (immutable, system-assigned)
             label: Optional user-editable text label (mutable)
         """
         # Identity properties (immutable - system managed)
-        self._id = id
-        self._name = name
+        self._id = str(id)  # Ensure ID is string
+        self._name = str(name)
         
         # User-editable properties
         self.label = label
@@ -47,11 +47,11 @@ class PetriNetObject:
         self.on_changed: Optional[Callable] = None
     
     @property
-    def id(self) -> int:
+    def id(self) -> str:
         """Get the unique identifier (read-only).
         
         Returns:
-            int: Unique internal identifier
+            str: Unique internal identifier
         """
         return self._id
     
