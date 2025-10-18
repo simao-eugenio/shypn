@@ -359,11 +359,7 @@ class SBMLImportPanel:
         try:
             import urllib.request
             import urllib.error
-            import socket
             import tempfile
-            
-            # Set timeout to prevent hanging indefinitely
-            socket.setdefaulttimeout(30)  # 30 seconds timeout
             
             # BioModels REST API URL
             url = f"https://www.ebi.ac.uk/biomodels/model/download/{biomodels_id}?filename={biomodels_id}_url.xml"
@@ -375,13 +371,24 @@ class SBMLImportPanel:
             # Update status (safe from background thread)
             GLib.idle_add(lambda: self._show_status(f"Downloading {biomodels_id}..."))
             
-            # Fetch the file (blocking operation, but we're in a background thread)
+            # Fetch the file with explicit timeout (90 seconds for large models)
             try:
-                urllib.request.urlretrieve(url, temp_filepath)
-            except socket.timeout:
-                GLib.idle_add(lambda: self._show_status(f"Download timeout for {biomodels_id} (30s)", error=True))
-                GLib.idle_add(self.sbml_fetch_button.set_sensitive, True)
-                return
+                # Use urlopen with timeout instead of urlretrieve
+                # This gives better control and works more reliably
+                response = urllib.request.urlopen(url, timeout=90)
+                
+                # Read content and write to file
+                with open(temp_filepath, 'wb') as f:
+                    f.write(response.read())
+                
+            except urllib.error.URLError as e:
+                if hasattr(e, 'reason') and 'timed out' in str(e.reason).lower():
+                    GLib.idle_add(lambda: self._show_status(f"Download timeout for {biomodels_id} (90s)", error=True))
+                    GLib.idle_add(self.sbml_fetch_button.set_sensitive, True)
+                    return
+                else:
+                    # Re-raise for generic error handling
+                    raise
             
             # Verify file exists and has content
             if not os.path.exists(temp_filepath) or os.path.getsize(temp_filepath) == 0:
@@ -422,13 +429,13 @@ class SBMLImportPanel:
                 return False
             GLib.idle_add(show_http_error)
             
-        except socket.timeout:
-            def show_timeout_error():
-                self._show_status(f"Network timeout while fetching {biomodels_id}", error=True)
+        except urllib.error.URLError as e:
+            def show_network_error():
+                self._show_status(f"Network error: {str(e.reason)}", error=True)
                 if self.sbml_fetch_button:
                     self.sbml_fetch_button.set_sensitive(True)
                 return False
-            GLib.idle_add(show_timeout_error)
+            GLib.idle_add(show_network_error)
             
         except Exception as e:
             def show_error():
