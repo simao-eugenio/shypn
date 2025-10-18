@@ -41,6 +41,8 @@
             <child>
               <object class="GtkEntry" id="new_project_name_entry">
                 <property name="visible">True</property>
+                <property name="can-focus">True</property>
+                <property name="has-focus">True</property>
                 <property name="placeholder-text">My Pathway Analysis</property>
                 <property name="hexpand">True</property>
                 <property name="activates-default">True</property>
@@ -400,6 +402,8 @@
                     <child>
                       <object class="GtkEntry" id="props_project_name_entry">
                         <property name="visible">True</property>
+                        <property name="can-focus">True</property>
+                        <property name="has-focus">True</property>
                         <property name="hexpand">True</property>
                       </object>
                       <packing>
