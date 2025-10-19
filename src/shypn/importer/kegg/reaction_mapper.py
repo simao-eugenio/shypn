@@ -64,10 +64,12 @@ class StandardReactionMapper(ReactionMapper):
             Transition object
         """
         transition_id = f"T{self.transition_counter}"
+        transition_name = f"T{self.transition_counter}"  # System-assigned name
         self.transition_counter += 1
         
-        transition = Transition(x, y, transition_id, name)
-        transition.label = name
+        # Create transition with correct arguments: (x, y, id, name)
+        # The reaction name becomes the label, not the system name
+        transition = Transition(x, y, transition_id, transition_name, label=name)
         
         # Store KEGG metadata
         if not hasattr(transition, 'metadata'):
@@ -99,10 +101,10 @@ class StandardReactionMapper(ReactionMapper):
         
         # Forward transition
         forward_id = f"T{self.transition_counter}"
+        forward_sys_name = f"T{self.transition_counter}"  # System-assigned name
         self.transition_counter += 1
-        forward_name = f"{base_name} (forward)"
-        forward = Transition(x - 10, y, forward_id, forward_name)
-        forward.label = forward_name
+        forward_label = f"{base_name} (forward)"  # User-visible label
+        forward = Transition(x - 10, y, forward_id, forward_sys_name, label=forward_label)
         
         if not hasattr(forward, 'metadata'):
             forward.metadata = {}
@@ -116,10 +118,10 @@ class StandardReactionMapper(ReactionMapper):
         
         # Backward transition
         backward_id = f"T{self.transition_counter}"
+        backward_sys_name = f"T{self.transition_counter}"  # System-assigned name
         self.transition_counter += 1
-        backward_name = f"{base_name} (backward)"
-        backward = Transition(x + 10, y, backward_id, backward_name)
-        backward.label = backward_name
+        backward_label = f"{base_name} (backward)"  # User-visible label
+        backward = Transition(x + 10, y, backward_id, backward_sys_name, label=backward_label)
         
         if not hasattr(backward, 'metadata'):
             backward.metadata = {}

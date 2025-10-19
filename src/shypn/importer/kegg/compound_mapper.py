@@ -86,15 +86,19 @@ class StandardCompoundMapper(CompoundMapper):
         # Get clean compound name from graphics
         label = self.get_compound_name(entry)
         
-        # Create place ID (P prefix + entry ID)
+        # Create place ID and name
         place_id = f"P{entry.id}"
+        place_name = f"P{entry.id}"  # Name should match ID for KEGG compounds
         
         # Determine initial marking
         marking = options.initial_tokens if options.add_initial_marking else 0
         
-        # Create place
-        place = Place(x, y, place_id, marking)
-        place.label = label
+        # Create place with correct arguments: (x, y, id, name, radius, label)
+        place = Place(x, y, place_id, place_name, label=label)
+        
+        # Set initial marking
+        place.tokens = marking
+        place.initial_marking = marking
         
         # Store KEGG metadata for traceability
         if not hasattr(place, 'metadata'):
