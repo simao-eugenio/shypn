@@ -1,414 +1,277 @@
-# Topology Analysis System
+# SHYpn Documentation
 
-**Version**: 0.1.0  
-**Date**: October 19, 2025  
-**Status**: Active Development
+Comprehensive technical documentation for the SHYpn project (430+ files).
 
----
+## Quick Navigation
 
-## 📖 Overview
-
-The topology analysis system provides comprehensive structural and behavioral analysis of Petri nets, with a focus on biochemical network applications. It replaces the previous diagnostic system with a unified, extensible topology framework.
-
-### Key Features
-
-- **🔵 Structural Analysis**: P/T-invariants, siphons, traps
-- **🔄 Graph Analysis**: Cycles, paths, SCCs, DAG detection
-- **⚡ Behavioral Analysis**: Liveness, boundedness, reachability, deadlocks
-- **🌐 Network Analysis**: Hubs, centrality, communities, clustering
+- [Recent Features](#recent-features-december-2024) - Latest additions and improvements
+- [Core Documentation](#core-documentation) - Essential project documentation
+- [Architecture](#architecture-documentation) - System architecture and design
+- [Feature Documentation](#feature-documentation) - Specific feature implementations
+- [Testing](#testing-documentation) - Test coverage and validation
+- [Cleanup](#cleanup-documentation) - Code cleanup and quality improvements
 
 ---
 
-## 🏗️ Architecture
+## Recent Features (December 2024)
 
-### Directory Structure
+### Performance Optimization
+- **[ANALYSES_PANEL_PERFORMANCE_COMPLETE.md](ANALYSES_PANEL_PERFORMANCE_COMPLETE.md)** - Complete performance analysis (95% improvement)
+- **[ANALYSES_PANEL_PERFORMANCE_FIX.md](ANALYSES_PANEL_PERFORMANCE_FIX.md)** - Initial performance fix
+- **[ANALYSES_PANEL_PERFORMANCE_FIX_V2.md](ANALYSES_PANEL_PERFORMANCE_FIX_V2.md)** - Performance optimization v2
 
-```
-src/shypn/topology/
-    base/                      # Foundation classes
-        topology_analyzer.py   # Abstract base class
-        analysis_result.py     # Result data structure
-        exceptions.py          # Custom exceptions
-    
-    structural/                # Structural properties
-        p_invariants.py        # P-invariant analysis
-        t_invariants.py        # T-invariant analysis
-        siphons.py             # Siphon detection
-        traps.py               # Trap detection
-    
-    graph/                     # Graph topology
-        cycles.py              # Cycle detection ✅ IMPLEMENTED
-        paths.py               # Path finding
-        sccs.py                # Strongly connected components
-        dag.py                 # DAG analysis
-    
-    behavioral/                # Behavioral properties
-        liveness.py            # Liveness analysis
-        boundedness.py         # Boundedness checking
-        reachability.py        # Reachability analysis
-        deadlock.py            # Deadlock detection
-    
-    network/                   # Network metrics
-        hubs.py                # Hub detection
-        centrality.py          # Centrality measures
-        communities.py         # Community detection
-        clustering.py          # Clustering coefficient
-```
+**Results**: 156ms → 7ms updates (95% faster), CPU usage 10-20% → 2-5% (75% reduction)
 
-### Design Principles
+### Locality Integration
+- **[ANALYSES_LOCALITY_AND_RESET_FIXES.md](ANALYSES_LOCALITY_AND_RESET_FIXES.md)** - Locality plotting and reset fixes
+- **[ANALYSES_LOCALITY_UI_LIST_FIX.md](ANALYSES_LOCALITY_UI_LIST_FIX.md)** - UI list display improvements
+- **[ANALYSES_COMPLETE_FIX_SUMMARY.md](ANALYSES_COMPLETE_FIX_SUMMARY.md)** - Complete fix summary
 
-1. **OOP Base Classes**: All analyzers inherit from `TopologyAnalyzer`
-2. **Separate Modules**: Each analyzer in its own file
-3. **Thin Loaders**: UI loaders delegate to analyzers
-4. **No Orphaned Widgets**: Proper GTK widget lifecycle
-5. **Wayland Compatible**: No X11-specific code
+**Results**: Complete P-T-P pattern plotting with hierarchical display
 
----
-
-## 🚀 Quick Start
-
-### Basic Usage
-
-```python
-from shypn.topology.graph import CycleAnalyzer
-
-# Create analyzer
-analyzer = CycleAnalyzer(model)
-
-# Perform analysis
-result = analyzer.analyze(max_cycles=100)
-
-# Check results
-if result.success:
-    print(result.summary)
-    
-    for cycle in result.get('cycles', []):
-        print(f"Cycle: {cycle['names']}")
-        print(f"  Length: {cycle['length']}")
-        print(f"  Type: {cycle['type']}")
-else:
-    print("Analysis failed:", result.errors)
-```
+### Dialog Integration
+- **[DIALOG_PROPERTIES_SIMULATION_INTEGRATION_ANALYSIS.md](DIALOG_PROPERTIES_SIMULATION_INTEGRATION_ANALYSIS.md)** - Comprehensive integration analysis
+- **[DIALOG_REFACTORING_INTEGRATION_ANALYSIS.md](DIALOG_REFACTORING_INTEGRATION_ANALYSIS.md)** - Dialog refactoring analysis
+- **[PROPERTY_DIALOGS_MODEL_INTEGRATION.md](PROPERTY_DIALOGS_MODEL_INTEGRATION.md)** - Model integration
 
 ### Property Dialog Integration
+- **[PLACE_DIALOG_TOPOLOGY_INTEGRATION.md](PLACE_DIALOG_TOPOLOGY_INTEGRATION.md)** - Place dialog topology
+- **[ARC_DIALOG_TOPOLOGY_INTEGRATION.md](ARC_DIALOG_TOPOLOGY_INTEGRATION.md)** - Arc dialog topology
+- **[TRANSITION_DIALOG_TOPOLOGY_INTEGRATION.md](TRANSITION_DIALOG_TOPOLOGY_INTEGRATION.md)** - Transition dialog topology
+- **[ARC_DIALOG_COMPACTNESS_REFINEMENT.md](ARC_DIALOG_COMPACTNESS_REFINEMENT.md)** - Arc dialog UI refinement
+- **[ARC_DIALOG_LOADING_FIX.md](ARC_DIALOG_LOADING_FIX.md)** - Arc dialog bug fix
 
-```python
-# In property dialog loader
-from shypn.topology.graph import CycleAnalyzer
-
-def _setup_topology_tab(self):
-    """Setup topology tab."""
-    # Create analyzer
-    cycle_analyzer = CycleAnalyzer(self.model)
-    
-    # Find cycles containing this place
-    place_cycles = cycle_analyzer.find_cycles_containing_node(self.place_obj.id)
-    
-    # Update UI
-    cycles_label = self.builder.get_object('topology_cycles_label')
-    if cycles_label:
-        if place_cycles:
-            text = f"In {len(place_cycles)} cycle(s):\n"
-            for i, cycle in enumerate(place_cycles[:5], 1):
-                names = ' → '.join(cycle['names'][:10])
-                text += f"  {i}. {names}\n"
-            cycles_label.set_text(text)
-        else:
-            cycles_label.set_text("Not in any cycles")
-```
+### Testing Results
+- **[PROPERTY_DIALOG_TESTS_100_PERCENT.md](PROPERTY_DIALOG_TESTS_100_PERCENT.md)** - 100% test coverage
+- **[PROPERTY_DIALOG_TESTING_COMPLETE.md](PROPERTY_DIALOG_TESTING_COMPLETE.md)** - Testing completion
+- **[PROPERTY_DIALOG_TESTS_CREATED.md](PROPERTY_DIALOG_TESTS_CREATED.md)** - Test creation
+- **[PROPERTY_DIALOG_TESTS_FINAL_RESULTS.md](PROPERTY_DIALOG_TESTS_FINAL_RESULTS.md)** - Final results (34/34 passing)
+- **[PROPERTY_DIALOG_TESTS_RESULTS.md](PROPERTY_DIALOG_TESTS_RESULTS.md)** - Test results
 
 ---
 
-## 📊 Analysis Results
+## Core Documentation
 
-### AnalysisResult Structure
+### Essential Guides
+- **[COORDINATE_SYSTEM.md](COORDINATE_SYSTEM.md)** - Coordinate system conventions (Cartesian vs Graphics)
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Contribution guidelines and code standards
+- **[CHANGELOG.md](CHANGELOG.md)** - Version history and changes
+- **[REFINEMENTS_LOG.md](REFINEMENTS_LOG.md)** - Detailed technical refinements
 
-All analyzers return an `AnalysisResult` object with:
+### Canvas and UI
+- **[CANVAS_CONTROLS.md](CANVAS_CONTROLS.md)** - Canvas control and interaction
+- **[ZOOM_PALETTE.md](ZOOM_PALETTE.md)** - Zoom palette implementation
+- **[FIX_EMPTY_PANEL.md](FIX_EMPTY_PANEL.md)** - Panel visibility fixes
+- **[DOCUMENTATION_UPDATE_SUMMARY.md](DOCUMENTATION_UPDATE_SUMMARY.md)** - Documentation updates
 
-```python
-@dataclass
-class AnalysisResult:
-    success: bool              # Whether analysis succeeded
-    data: Dict[str, Any]       # Analysis-specific data
-    summary: str               # Human-readable summary
-    warnings: List[str]        # Warning messages
-    errors: List[str]          # Error messages
-    metadata: Dict[str, Any]   # Timing, parameters, etc.
-```
-
-### Example Result
-
-```python
-result = analyzer.analyze()
-
-# Access data
-cycles = result.get('cycles', [])
-count = result.get('count', 0)
-
-# Check status
-if result.has_warnings():
-    for warning in result.warnings:
-        print(f"⚠️  {warning}")
-
-# Get metadata
-duration = result.metadata.get('analysis_time', 0)
-print(f"Analysis took {duration:.3f} seconds")
-```
+### Development Environment
+- **[VSCODE_SETUP_VALIDATION.md](VSCODE_SETUP_VALIDATION.md)** - VS Code setup and validation
 
 ---
 
-## 🔄 Implemented Analyzers
+## Architecture Documentation
 
-### ✅ Cycle Analyzer
+### Topology and Network Analysis
+**[topology/](topology/)** - Network topology analysis and algorithms
 
-**Module**: `topology.graph.cycles`  
-**Class**: `CycleAnalyzer`  
-**Status**: ✅ Implemented
+Key topics:
+- Graph structure analysis
+- Connectivity algorithms
+- Path finding and reachability
+- Network decomposition
 
-Detects all elementary cycles (simple cycles) in the Petri net using Johnson's algorithm.
+### Independency Analysis
+**[independency/](independency/)** - Petri net independency and concurrency
 
-**Methods**:
-- `analyze(max_cycles=100, min_length=2)`: Find all cycles
-- `find_cycles_containing_node(node_id)`: Find cycles containing specific node
+Key topics:
+- Independent transitions
+- Concurrent execution
+- Conflict resolution
+- Causality analysis
 
-**Results**:
-- `cycles`: List of cycle information dicts
-- `count`: Total number of cycles found
-- `longest_length`: Length of longest cycle
-- `truncated`: Whether results were limited
+### Cross-Model Operations
+**[crossfetch/](crossfetch/)** - Cross-model data fetching and integration
 
-**Cycle Info**:
-- `nodes`: List of node IDs in cycle
-- `names`: List of node names
-- `length`: Number of nodes
-- `place_count`: Number of places
-- `transition_count`: Number of transitions
-- `type`: Cycle classification (self-loop, balanced, place-heavy, transition-heavy)
+Key topics:
+- Multi-model queries
+- Data synchronization
+- Model comparison
+- Shared resources
 
-**Example**:
-```python
-analyzer = CycleAnalyzer(model)
-result = analyzer.analyze()
+### Heuristic Algorithms
+**[heuristic/](heuristic/)** - Heuristic algorithms for optimization
 
-for cycle in result.get('cycles', []):
-    print(f"{cycle['type']} cycle: {' → '.join(cycle['names'])}")
-```
+Key topics:
+- Graph layout heuristics
+- State space exploration
+- Performance optimization
+- Approximate solutions
 
----
+### Atomicity
+**[atomicity/](atomicity/)** - Atomic operations and transactions
 
-## 🔜 Planned Analyzers
+Key topics:
+- Atomic transitions
+- Transaction management
+- Rollback mechanisms
+- Consistency guarantees
 
-### Priority Order (Tier 1)
+### Concurrency
+**[concurrency/](concurrency/)** - Concurrency control and parallelism
 
-1. ✅ **Cycles** - COMPLETED
-2. **P-Invariants** - Next (Week 2)
-3. **Hubs** - Week 2 (wrap existing)
-4. **Paths** - Week 3
+Key topics:
+- Parallel execution
+- Thread safety
+- Synchronization
+- Race condition prevention
 
-### Tier 2 (Important)
+### Time Management
+**[time/](time/)** - Time-related functionality
 
-- Boundedness
-- T-Invariants
-- Communities
+Key topics:
+- Timed transitions
+- Continuous dynamics
+- Time step management
+- Temporal analysis
 
-### Tier 3 (Useful)
+### Project Management
+**[project/](project/)** - Project structure and management
 
-- Centrality
-- Liveness
-- Deadlocks
+Key topics:
+- Project creation
+- Workspace organization
+- File management
+- Version control integration
 
-### Tier 4 (Advanced)
+### Validation and Testing
+**[validation/](validation/)** - Validation strategies and testing
 
-- SCCs, Siphons, Traps, Reachability, DAG, Clustering
-
----
-
-## 🎨 UI Integration
-
-### Property Dialogs
-
-Topology information is integrated into property dialogs via a "Topology" tab:
-
-**Place Properties**:
-- Cycles containing this place
-- P-Invariants including this place
-- Siphons/Traps containing this place
-- Degree (in/out connections)
-- Centrality scores
-- Community membership
-
-**Transition Properties**:
-- Cycles including this transition
-- T-Invariants including this transition
-- Locality information
-- Liveness classification
-- Conflicts with other transitions
-- Centrality scores
-
-**Arc Properties**:
-- Connection information
-- Cycles using this arc
-- Critical path membership
-- Token flow statistics
-
-### Wayland Compatibility
-
-All UI code follows Wayland-safe practices:
-- ✅ Proper widget hierarchy (no orphans)
-- ✅ GTK3 standard widgets only
-- ✅ No X11-specific calls
-- ✅ Proper cleanup in destructors
+Key topics:
+- Model validation
+- Property verification
+- Test coverage
+- Quality assurance
 
 ---
 
-## 🧪 Testing
+## Feature Documentation
 
-### Unit Tests
+### Arc Implementation
+- **[ARC_REQUIREMENTS_COMPLETE.md](ARC_REQUIREMENTS_COMPLETE.md)** - Complete requirements
+- **[ARC_IMPLEMENTATION_COMPLETE.md](ARC_IMPLEMENTATION_COMPLETE.md)** - Implementation complete
+- **[ARC_TRANSFORMATION_COMPLETE.md](ARC_TRANSFORMATION_COMPLETE.md)** - Transformation implementation
+- **[ARC_GEOMETRY_CURRENT_STATE.md](ARC_GEOMETRY_CURRENT_STATE.md)** - Geometry system state
+- **[ARC_BOUNDARY_PRECISION_FIX.md](ARC_BOUNDARY_PRECISION_FIX.md)** - Boundary precision
+- **[ARC_CONTEXT_MENU_FIX.md](ARC_CONTEXT_MENU_FIX.md)** - Context menu fixes
+- **[ARC_WEIGHT_LABEL_POSITIONING.md](ARC_WEIGHT_LABEL_POSITIONING.md)** - Label positioning
 
-Location: `tests/topology/`
+### Source/Sink Implementation
+- **[ANALYSES_SOURCE_SINK_COMPLETE.md](ANALYSES_SOURCE_SINK_COMPLETE.md)** - Implementation complete
+- **[ANALYSES_SOURCE_SINK_IMPLEMENTATION.md](ANALYSES_SOURCE_SINK_IMPLEMENTATION.md)** - Implementation details
+- **[ANALYSES_SOURCE_SINK_REVIEW.md](ANALYSES_SOURCE_SINK_REVIEW.md)** - Review and verification
 
-```python
-def test_cycle_analyzer_simple():
-    """Test cycle detection on simple network."""
-    model = create_simple_cycle_model()
-    
-    analyzer = CycleAnalyzer(model)
-    result = analyzer.analyze()
-    
-    assert result.success
-    assert result.get('count') == 1
-    assert len(result.get('cycles')[0]['nodes']) == 4
+### File Operations
+- **[ANALYSIS_FILE_OPERATIONS_ARCHITECTURE.md](ANALYSIS_FILE_OPERATIONS_ARCHITECTURE.md)** - Architecture design
+- **[ANALYSIS_LEGACY_TRANSITION_DIALOG.md](ANALYSIS_LEGACY_TRANSITION_DIALOG.md)** - Legacy transition dialog
+- **[ANALYSIS_RESET_CLEAR_FIXES.md](ANALYSIS_RESET_CLEAR_FIXES.md)** - Reset and clear operations
 
-def test_cycle_analyzer_dag():
-    """Test on DAG (no cycles)."""
-    model = create_dag_model()
-    
-    analyzer = CycleAnalyzer(model)
-    result = analyzer.analyze()
-    
-    assert result.success
-    assert result.get('count') == 0
-    assert 'DAG' in result.summary
-```
+### API and Architecture
+- **[API_FLATTENING_PLAN.md](API_FLATTENING_PLAN.md)** - API simplification plan
+- **[ARCHITECTURE_CONFIRMATION.md](ARCHITECTURE_CONFIRMATION.md)** - Architecture confirmation
+- **[ARCHITECTURE_MODULAR_VS_ADAPTER.md](ARCHITECTURE_MODULAR_VS_ADAPTER.md)** - Design patterns
 
 ---
 
-## 📈 Performance
+## Testing Documentation
 
-### Caching
+### Test Suites
+See **[../tests/README.md](../tests/README.md)** for complete test suite documentation.
 
-All analyzers support caching for expensive computations:
+### Property Dialog Tests
+See **[../tests/prop_dialogs/README.md](../tests/prop_dialogs/README.md)** for dialog tests (34/34 passing).
 
-```python
-analyzer = CycleAnalyzer(model)
-
-# First call: full analysis
-result1 = analyzer.analyze()
-
-# Modify model
-model.add_place(...)
-
-# Invalidate cache
-analyzer.invalidate()
-
-# Next call: recomputes
-result2 = analyzer.analyze()
-```
-
-### Timing
-
-Analysis timing is automatically recorded:
-
-```python
-result = analyzer.analyze()
-duration = result.metadata.get('analysis_time', 0)
-print(f"Analysis took {duration:.3f} seconds")
-```
+### Coverage Reports
+- 100% property dialog integration coverage
+- Complete topology integration testing
+- Performance benchmarking results
+- Simulation integration validation
 
 ---
 
-## 🔧 Extending
+## Cleanup Documentation (October 2025)
 
-### Creating New Analyzers
+### Code Quality
+- **[INDENTATION_FIXES_COMPLETE.md](INDENTATION_FIXES_COMPLETE.md)** - Indentation fixes (27 blocks in 15 files)
+- **[cleanup/](cleanup/)** - Complete cleanup documentation
+  - Repository cleanup summary
+  - UI analysis report (20 .ui files verified)
+  - Debug print removal (107 prints removed from 26 files)
+  - Final verification results
 
-1. **Inherit from TopologyAnalyzer**:
-```python
-from shypn.topology.base import TopologyAnalyzer, AnalysisResult
-
-class MyAnalyzer(TopologyAnalyzer):
-    def analyze(self, **kwargs) -> AnalysisResult:
-        # Your implementation
-        return AnalysisResult(success=True, data={...})
-```
-
-2. **Add to appropriate submodule**:
-   - `structural/` - Conservation, structural properties
-   - `graph/` - Graph-theoretic properties
-   - `behavioral/` - Dynamic/simulation properties
-   - `network/` - Network metrics
-
-3. **Export in `__init__.py`**:
-```python
-from .my_analyzer import MyAnalyzer
-__all__ = ['MyAnalyzer']
-```
-
-4. **Write tests**:
-```python
-def test_my_analyzer():
-    analyzer = MyAnalyzer(model)
-    result = analyzer.analyze()
-    assert result.success
-```
+### Results
+- Zero syntax errors
+- Production-ready codebase
+- All debug output removed
+- Complete file organization
 
 ---
 
-## 📚 References
+## Document Organization
 
-### Algorithms
+Documentation is organized by topic:
 
-- **Cycles**: Johnson's algorithm (1975)
-- **P-Invariants**: Integer linear algebra
-- **Siphons/Traps**: Graph search algorithms
-- **Centrality**: Betweenness, closeness, PageRank
-
-### Documentation
-
-- `doc/topology/algorithms/` - Detailed algorithm descriptions
-- `doc/topology/examples/` - Usage examples
-- `doc/TOPOLOGY_TOOLS_PALETTE_PLAN.md` - Original plan
-- `doc/TOPOLOGY_DIAGNOSTIC_FLOW_ANALYSIS.md` - Comparison with diagnostics
+1. **Root level**: Core documentation, recent features, essential guides
+2. **Subdirectories**: Architecture-specific documentation by domain
+3. **Feature folders**: Implementation-specific documentation
+4. **cleanup/**: Code quality and cleanup documentation
 
 ---
 
-## 🚀 Roadmap
+## Finding Documentation
 
-### Week 1 (Current)
-- ✅ Directory structure
-- ✅ Base classes
-- ✅ Cycles analyzer
-- ✅ Documentation
-- ⬜ Tests for cycles
+### By Topic
+- **Performance**: Search for "performance", "optimization", "analysis"
+- **Arc Features**: Search for "arc", "transformation", "geometry"
+- **Dialogs**: Search for "dialog", "property", "topology"
+- **Testing**: Search for "test", "coverage", "validation"
+- **Architecture**: Browse subdirectories (topology, concurrency, etc.)
 
-### Week 2
-- ⬜ P-Invariants analyzer
-- ⬜ Hubs analyzer (wrap existing)
-- ⬜ Property dialog integration
-- ⬜ Tests
+### By Date
+- **December 2024**: Recent features section (19 files)
+- **October 2025**: Cleanup documentation
+- **Earlier**: Feature documentation and architecture
 
-### Week 3
-- ⬜ Paths analyzer
-- ⬜ T-Invariants analyzer
-- ⬜ Complete property dialog tabs
-- ⬜ Tests
-
-### Week 4
-- ⬜ Migrate locality from diagnostic/
-- ⬜ Delete old diagnostic code
-- ⬜ Unified topology system
-- ⬜ Final documentation
+### By File Type
+- **Complete**: Implementation finished and verified
+- **Analysis**: Analysis and design documents
+- **Fix**: Bug fixes and corrections
+- **Plan**: Design plans and roadmaps
+- **Review**: Code review and verification
 
 ---
 
-**Status**: Phase 1 Foundation ✅ COMPLETE  
-**Next**: Tests and P-Invariants analyzer
+## Contributing to Documentation
+
+When adding new features:
+
+1. Create feature documentation in appropriate subdirectory
+2. Add summary to recent features section
+3. Update related architecture documentation
+4. Create or update test documentation
+5. Add entry to this index
+
+See **[CONTRIBUTING.md](CONTRIBUTING.md)** for detailed guidelines.
+
+---
+
+## Statistics
+
+- **Total files**: 430+ markdown files
+- **Recent additions**: 19 files (December 2024)
+- **Architecture docs**: 9+ major subdirectories
+- **Test coverage**: 100% for property dialogs
+- **Code quality**: Production-ready, zero syntax errors
+
+---
+
+**Last Updated**: December 2024
