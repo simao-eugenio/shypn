@@ -1,0 +1,2933 @@
+{
+  "version": "2.0",
+  "metadata": {
+    "created": "2025-10-18T22:51:16.062195",
+    "object_counts": {
+      "places": 26,
+      "transitions": 34,
+      "arcs": 73
+    }
+  },
+  "view_state": {
+    "zoom": 0.3,
+    "pan_x": 1600.9412413926334,
+    "pan_y": 193.21877261969985,
+    "transformations": {
+      "rotation": {
+        "type": "rotation",
+        "angle_degrees": 0.0,
+        "enabled": true
+      }
+    }
+  },
+  "places": [
+    {
+      "id": "P45",
+      "name": "P45",
+      "label": "C00033",
+      "type": "place",
+      "x": 839.2743055555555,
+      "y": 1329.5416666666667,
+      "radius": 25.0,
+      "marking": 1,
+      "initial_marking": 1,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P88",
+      "name": "P88",
+      "label": "C00103",
+      "type": "place",
+      "x": 879.2743055555555,
+      "y": 849.5416666666667,
+      "radius": 25.0,
+      "marking": 1,
+      "initial_marking": 1,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P89",
+      "name": "P89",
+      "label": "C00631",
+      "type": "place",
+      "x": 999.2743055555555,
+      "y": 2529.541666666667,
+      "radius": 25.0,
+      "marking": 1,
+      "initial_marking": 1,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P90",
+      "name": "P90",
+      "label": "C00267",
+      "type": "place",
+      "x": 1159.2743055555557,
+      "y": 1329.5416666666667,
+      "radius": 25.0,
+      "marking": 1,
+      "initial_marking": 1,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P91",
+      "name": "P91",
+      "label": "C00221",
+      "type": "place",
+      "x": 1039.2743055555557,
+      "y": 1569.5416666666667,
+      "radius": 25.0,
+      "marking": 1,
+      "initial_marking": 1,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P92",
+      "name": "P92",
+      "label": "C00111",
+      "type": "place",
+      "x": 999.2743055555555,
+      "y": 1809.5416666666667,
+      "radius": 25.0,
+      "marking": 1,
+      "initial_marking": 1,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P93",
+      "name": "P93",
+      "label": "C01172",
+      "type": "place",
+      "x": 919.2743055555555,
+      "y": 1329.5416666666667,
+      "radius": 25.0,
+      "marking": 1,
+      "initial_marking": 1,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P94",
+      "name": "P94",
+      "label": "C00668",
+      "type": "place",
+      "x": 839.2743055555555,
+      "y": 1089.5416666666667,
+      "radius": 25.0,
+      "marking": 1,
+      "initial_marking": 1,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P95",
+      "name": "P95",
+      "label": "C00085",
+      "type": "place",
+      "x": 759.2743055555555,
+      "y": 1329.5416666666667,
+      "radius": 25.0,
+      "marking": 1,
+      "initial_marking": 1,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P96",
+      "name": "P96",
+      "label": "C00074",
+      "type": "place",
+      "x": 1079.2743055555557,
+      "y": 1089.5416666666667,
+      "radius": 25.0,
+      "marking": 1,
+      "initial_marking": 1,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P97",
+      "name": "P97",
+      "label": "C00197",
+      "type": "place",
+      "x": 919.2743055555555,
+      "y": 2529.541666666667,
+      "radius": 25.0,
+      "marking": 1,
+      "initial_marking": 1,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P98",
+      "name": "P98",
+      "label": "C00236",
+      "type": "place",
+      "x": 959.2743055555555,
+      "y": 2049.541666666667,
+      "radius": 25.0,
+      "marking": 1,
+      "initial_marking": 1,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P99",
+      "name": "P99",
+      "label": "C00186",
+      "type": "place",
+      "x": 959.2743055555555,
+      "y": 849.5416666666667,
+      "radius": 25.0,
+      "marking": 1,
+      "initial_marking": 1,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P100",
+      "name": "P100",
+      "label": "C15972",
+      "type": "place",
+      "x": 1159.2743055555557,
+      "y": 1089.5416666666667,
+      "radius": 25.0,
+      "marking": 1,
+      "initial_marking": 1,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P101",
+      "name": "P101",
+      "label": "C00469",
+      "type": "place",
+      "x": 799.2743055555555,
+      "y": 849.5416666666667,
+      "radius": 25.0,
+      "marking": 1,
+      "initial_marking": 1,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P102",
+      "name": "P102",
+      "label": "C00022",
+      "type": "place",
+      "x": 919.2743055555555,
+      "y": 1089.5416666666667,
+      "radius": 25.0,
+      "marking": 1,
+      "initial_marking": 1,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P103",
+      "name": "P103",
+      "label": "C05125",
+      "type": "place",
+      "x": 999.2743055555555,
+      "y": 1329.5416666666667,
+      "radius": 25.0,
+      "marking": 1,
+      "initial_marking": 1,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P104",
+      "name": "P104",
+      "label": "C00024",
+      "type": "place",
+      "x": 959.2743055555555,
+      "y": 1569.5416666666667,
+      "radius": 25.0,
+      "marking": 1,
+      "initial_marking": 1,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P105",
+      "name": "P105",
+      "label": "C00084",
+      "type": "place",
+      "x": 759.2743055555555,
+      "y": 1089.5416666666667,
+      "radius": 25.0,
+      "marking": 1,
+      "initial_marking": 1,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P106",
+      "name": "P106",
+      "label": "C16255",
+      "type": "place",
+      "x": 999.2743055555555,
+      "y": 1089.5416666666667,
+      "radius": 25.0,
+      "marking": 1,
+      "initial_marking": 1,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P107",
+      "name": "P107",
+      "label": "C15973",
+      "type": "place",
+      "x": 1039.2743055555557,
+      "y": 849.5416666666667,
+      "radius": 25.0,
+      "marking": 1,
+      "initial_marking": 1,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P108",
+      "name": "P108",
+      "label": "C00354",
+      "type": "place",
+      "x": 879.2743055555555,
+      "y": 1569.5416666666667,
+      "radius": 25.0,
+      "marking": 1,
+      "initial_marking": 1,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P118",
+      "name": "P118",
+      "label": "C00036",
+      "type": "place",
+      "x": 1119.2743055555557,
+      "y": 849.5416666666667,
+      "radius": 25.0,
+      "marking": 1,
+      "initial_marking": 1,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P134",
+      "name": "P134",
+      "label": "C01159",
+      "type": "place",
+      "x": 959.2743055555555,
+      "y": 2289.541666666667,
+      "radius": 25.0,
+      "marking": 1,
+      "initial_marking": 1,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P139",
+      "name": "P139",
+      "label": "C00118",
+      "type": "place",
+      "x": 919.2743055555555,
+      "y": 1809.5416666666667,
+      "radius": 25.0,
+      "marking": 1,
+      "initial_marking": 1,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "P146",
+      "name": "P146",
+      "label": "C00068",
+      "type": "place",
+      "x": 1079.2743055555557,
+      "y": 1329.5416666666667,
+      "radius": 25.0,
+      "marking": 1,
+      "initial_marking": 1,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "id": "T1",
+      "name": "T1",
+      "label": "R00710",
+      "type": "transition",
+      "x": 759.2743055555555,
+      "y": 1209.5416666666667,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "michaelis_menten(P105, 10.0, 5.0)",
+      "properties": {
+        "rate_function": "michaelis_menten(P105, 10.0, 5.0)"
+      }
+    },
+    {
+      "id": "T2",
+      "name": "T2",
+      "label": "R00711",
+      "type": "transition",
+      "x": 839.2743055555555,
+      "y": 1209.5416666666667,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "michaelis_menten(P105, 10.0, 5.0)",
+      "properties": {
+        "rate_function": "michaelis_menten(P105, 10.0, 5.0)"
+      }
+    },
+    {
+      "id": "T3",
+      "name": "T3",
+      "label": "R00746",
+      "type": "transition",
+      "x": 719.2743055555555,
+      "y": 969.5416666666667,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "michaelis_menten(P101, 10.0, 5.0)",
+      "properties": {
+        "rate_function": "michaelis_menten(P101, 10.0, 5.0)"
+      }
+    },
+    {
+      "id": "T4",
+      "name": "T4",
+      "label": "R00754",
+      "type": "transition",
+      "x": 799.2743055555555,
+      "y": 969.5416666666667,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "michaelis_menten(P101, 10.0, 5.0)",
+      "properties": {
+        "rate_function": "michaelis_menten(P101, 10.0, 5.0)"
+      }
+    },
+    {
+      "id": "T5",
+      "name": "T5",
+      "label": "R00014",
+      "type": "transition",
+      "x": 999.2743055555555,
+      "y": 1209.5416666666667,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "michaelis_menten(P146, 10.0, 5.0) * (P102 / (5.0 + P102))",
+      "properties": {
+        "rate_function": "michaelis_menten(P146, 10.0, 5.0) * (P102 / (5.0 + P102))"
+      }
+    },
+    {
+      "id": "T6",
+      "name": "T6",
+      "label": "R03270",
+      "type": "transition",
+      "x": 1159.2743055555557,
+      "y": 1209.5416666666667,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "michaelis_menten(P103, 20.0, 5.0) * (P100 / (5.0 + P100))",
+      "properties": {
+        "rate_function": "michaelis_menten(P103, 20.0, 5.0) * (P100 / (5.0 + P100))"
+      }
+    },
+    {
+      "id": "T7",
+      "name": "T7",
+      "label": "R02569",
+      "type": "transition",
+      "x": 1039.2743055555557,
+      "y": 969.5416666666667,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "michaelis_menten(P107, 10.0, 5.0) * (P104 / (5.0 + P104))",
+      "properties": {
+        "rate_function": "michaelis_menten(P107, 10.0, 5.0) * (P104 / (5.0 + P104))"
+      }
+    },
+    {
+      "id": "T8",
+      "name": "T8",
+      "label": "R00703",
+      "type": "transition",
+      "x": 959.2743055555555,
+      "y": 969.5416666666667,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "michaelis_menten(P99, 10.0, 5.0)",
+      "properties": {
+        "rate_function": "michaelis_menten(P99, 10.0, 5.0)"
+      }
+    },
+    {
+      "id": "T9",
+      "name": "T9",
+      "label": "R00200",
+      "type": "transition",
+      "x": 1079.2743055555557,
+      "y": 1209.5416666666667,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "michaelis_menten(P96, 10.0, 5.0)",
+      "properties": {
+        "rate_function": "michaelis_menten(P96, 10.0, 5.0)"
+      }
+    },
+    {
+      "id": "T10",
+      "name": "T10",
+      "label": "R00658",
+      "type": "transition",
+      "x": 959.2743055555555,
+      "y": 2649.541666666667,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "michaelis_menten(P89, 10.0, 5.0)",
+      "properties": {
+        "rate_function": "michaelis_menten(P89, 10.0, 5.0)"
+      }
+    },
+    {
+      "id": "T11",
+      "name": "T11",
+      "label": "R01518",
+      "type": "transition",
+      "x": 1039.2743055555557,
+      "y": 2649.541666666667,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "michaelis_menten(P89, 10.0, 5.0)",
+      "properties": {
+        "rate_function": "michaelis_menten(P89, 10.0, 5.0)"
+      }
+    },
+    {
+      "id": "T12",
+      "name": "T12",
+      "label": "R01061",
+      "type": "transition",
+      "x": 919.2743055555555,
+      "y": 1929.5416666666667,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "michaelis_menten(P139, 10.0, 5.0)",
+      "properties": {
+        "rate_function": "michaelis_menten(P139, 10.0, 5.0)"
+      }
+    },
+    {
+      "id": "T13",
+      "name": "T13",
+      "label": "R01015",
+      "type": "transition",
+      "x": 999.2743055555555,
+      "y": 1929.5416666666667,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "michaelis_menten(P139, 10.0, 5.0)",
+      "properties": {
+        "rate_function": "michaelis_menten(P139, 10.0, 5.0)"
+      }
+    },
+    {
+      "id": "T14",
+      "name": "T14",
+      "label": "R01068",
+      "type": "transition",
+      "x": 799.2743055555555,
+      "y": 1689.5416666666667,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "michaelis_menten(P108, 20.0, 5.0)",
+      "properties": {
+        "rate_function": "michaelis_menten(P108, 20.0, 5.0)"
+      }
+    },
+    {
+      "id": "T15",
+      "name": "T15",
+      "label": "R00756",
+      "type": "transition",
+      "x": 759.2743055555555,
+      "y": 1449.5416666666667,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "michaelis_menten(P95, 10.0, 5.0)",
+      "properties": {
+        "rate_function": "michaelis_menten(P95, 10.0, 5.0)"
+      }
+    },
+    {
+      "id": "T16",
+      "name": "T16",
+      "label": "R00762",
+      "type": "transition",
+      "x": 879.2743055555555,
+      "y": 1689.5416666666667,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "michaelis_menten(P108, 10.0, 5.0)",
+      "properties": {
+        "rate_function": "michaelis_menten(P108, 10.0, 5.0)"
+      }
+    },
+    {
+      "id": "T17",
+      "name": "T17",
+      "label": "R13199",
+      "type": "transition",
+      "x": 679.2743055555555,
+      "y": 1209.5416666666667,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "michaelis_menten(P94, 10.0, 5.0)",
+      "properties": {
+        "rate_function": "michaelis_menten(P94, 10.0, 5.0)"
+      }
+    },
+    {
+      "id": "T18",
+      "name": "T18",
+      "label": "R00959",
+      "type": "transition",
+      "x": 879.2743055555555,
+      "y": 969.5416666666667,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "michaelis_menten(P88, 10.0, 5.0)",
+      "properties": {
+        "rate_function": "michaelis_menten(P88, 10.0, 5.0)"
+      }
+    },
+    {
+      "id": "T19",
+      "name": "T19",
+      "label": "R01600",
+      "type": "transition",
+      "x": 959.2743055555555,
+      "y": 1689.5416666666667,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "michaelis_menten(P91, 10.0, 5.0)",
+      "properties": {
+        "rate_function": "michaelis_menten(P91, 10.0, 5.0)"
+      }
+    },
+    {
+      "id": "T20",
+      "name": "T20",
+      "label": "R01600",
+      "type": "transition",
+      "x": 1039.2743055555557,
+      "y": 1689.5416666666667,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "michaelis_menten(P91, 10.0, 5.0)",
+      "properties": {
+        "rate_function": "michaelis_menten(P91, 10.0, 5.0)"
+      }
+    },
+    {
+      "id": "T21",
+      "name": "T21",
+      "label": "R02739",
+      "type": "transition",
+      "x": 919.2743055555555,
+      "y": 1209.5416666666667,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "michaelis_menten(P94, 10.0, 5.0)",
+      "properties": {
+        "rate_function": "michaelis_menten(P94, 10.0, 5.0)"
+      }
+    },
+    {
+      "id": "T22",
+      "name": "T22",
+      "label": "R01602",
+      "type": "transition",
+      "x": 1159.2743055555557,
+      "y": 1449.5416666666667,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "michaelis_menten(P90, 10.0, 5.0)",
+      "properties": {
+        "rate_function": "michaelis_menten(P90, 10.0, 5.0)"
+      }
+    },
+    {
+      "id": "T23",
+      "name": "T23",
+      "label": "R01786",
+      "type": "transition",
+      "x": 919.2743055555555,
+      "y": 1449.5416666666667,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "michaelis_menten(P90, 10.0, 5.0)",
+      "properties": {
+        "rate_function": "michaelis_menten(P90, 10.0, 5.0)"
+      }
+    },
+    {
+      "id": "T24",
+      "name": "T24",
+      "label": "R01786",
+      "type": "transition",
+      "x": 999.2743055555555,
+      "y": 1449.5416666666667,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "michaelis_menten(P90, 10.0, 5.0)",
+      "properties": {
+        "rate_function": "michaelis_menten(P90, 10.0, 5.0)"
+      }
+    },
+    {
+      "id": "T25",
+      "name": "T25",
+      "label": "R01788",
+      "type": "transition",
+      "x": 1239.2743055555557,
+      "y": 1209.5416666666667,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "michaelis_menten(P94, 10.0, 5.0)",
+      "properties": {
+        "rate_function": "michaelis_menten(P94, 10.0, 5.0)"
+      }
+    },
+    {
+      "id": "T26",
+      "name": "T26",
+      "label": "R07618",
+      "type": "transition",
+      "x": 1199.2743055555557,
+      "y": 969.5416666666667,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "michaelis_menten(P107, 10.0, 5.0)",
+      "properties": {
+        "rate_function": "michaelis_menten(P107, 10.0, 5.0)"
+      }
+    },
+    {
+      "id": "T27",
+      "name": "T27",
+      "label": "R01512",
+      "type": "transition",
+      "x": 879.2743055555555,
+      "y": 2649.541666666667,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "michaelis_menten(P97, 10.0, 5.0)",
+      "properties": {
+        "rate_function": "michaelis_menten(P97, 10.0, 5.0)"
+      }
+    },
+    {
+      "id": "T28",
+      "name": "T28",
+      "label": "R00726",
+      "type": "transition",
+      "x": 1119.2743055555557,
+      "y": 969.5416666666667,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "michaelis_menten(P118, 10.0, 5.0)",
+      "properties": {
+        "rate_function": "michaelis_menten(P118, 10.0, 5.0)"
+      }
+    },
+    {
+      "id": "T29",
+      "name": "T29",
+      "label": "R01516",
+      "type": "transition",
+      "x": 919.2743055555555,
+      "y": 2409.541666666667,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "michaelis_menten(P134, 10.0, 5.0)",
+      "properties": {
+        "rate_function": "michaelis_menten(P134, 10.0, 5.0)"
+      }
+    },
+    {
+      "id": "T30",
+      "name": "T30",
+      "label": "R01662",
+      "type": "transition",
+      "x": 959.2743055555555,
+      "y": 2169.541666666667,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "michaelis_menten(P98, 10.0, 5.0)",
+      "properties": {
+        "rate_function": "michaelis_menten(P98, 10.0, 5.0)"
+      }
+    },
+    {
+      "id": "T31",
+      "name": "T31",
+      "label": "R00235",
+      "type": "transition",
+      "x": 839.2743055555555,
+      "y": 1449.5416666666667,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "michaelis_menten(P45, 10.0, 5.0)",
+      "properties": {
+        "rate_function": "michaelis_menten(P45, 10.0, 5.0)"
+      }
+    },
+    {
+      "id": "T32",
+      "name": "T32",
+      "label": "R09085",
+      "type": "transition",
+      "x": 1079.2743055555557,
+      "y": 1449.5416666666667,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "michaelis_menten(P90, 10.0, 5.0)",
+      "properties": {
+        "rate_function": "michaelis_menten(P90, 10.0, 5.0)"
+      }
+    },
+    {
+      "id": "T33",
+      "name": "T33",
+      "label": "R09086",
+      "type": "transition",
+      "x": 1119.2743055555557,
+      "y": 1689.5416666666667,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "michaelis_menten(P91, 10.0, 5.0)",
+      "properties": {
+        "rate_function": "michaelis_menten(P91, 10.0, 5.0)"
+      }
+    },
+    {
+      "id": "T34",
+      "name": "T34",
+      "label": "R09532",
+      "type": "transition",
+      "x": 999.2743055555555,
+      "y": 2409.541666666667,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "michaelis_menten(P134, 10.0, 5.0)",
+      "properties": {
+        "rate_function": "michaelis_menten(P134, 10.0, 5.0)"
+      }
+    }
+  ],
+  "arcs": [
+    {
+      "id": "A1",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P105",
+      "source_type": "place",
+      "target_id": "T1",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A2",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T1",
+      "source_type": "transition",
+      "target_id": "P45",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A3",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P105",
+      "source_type": "place",
+      "target_id": "T2",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A4",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T2",
+      "source_type": "transition",
+      "target_id": "P45",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A5",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P101",
+      "source_type": "place",
+      "target_id": "T3",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A6",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T3",
+      "source_type": "transition",
+      "target_id": "P105",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A7",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P101",
+      "source_type": "place",
+      "target_id": "T4",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A8",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T4",
+      "source_type": "transition",
+      "target_id": "P105",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A9",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P146",
+      "source_type": "place",
+      "target_id": "T5",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A10",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P102",
+      "source_type": "place",
+      "target_id": "T5",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A11",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T5",
+      "source_type": "transition",
+      "target_id": "P103",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A12",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P103",
+      "source_type": "place",
+      "target_id": "T6",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A13",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P100",
+      "source_type": "place",
+      "target_id": "T6",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A14",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T6",
+      "source_type": "transition",
+      "target_id": "P146",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A15",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T6",
+      "source_type": "transition",
+      "target_id": "P106",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A16",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P107",
+      "source_type": "place",
+      "target_id": "T7",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A17",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P104",
+      "source_type": "place",
+      "target_id": "T7",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A18",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T7",
+      "source_type": "transition",
+      "target_id": "P106",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A19",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P99",
+      "source_type": "place",
+      "target_id": "T8",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A20",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T8",
+      "source_type": "transition",
+      "target_id": "P102",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A21",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P96",
+      "source_type": "place",
+      "target_id": "T9",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A22",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T9",
+      "source_type": "transition",
+      "target_id": "P102",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A23",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P89",
+      "source_type": "place",
+      "target_id": "T10",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A24",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T10",
+      "source_type": "transition",
+      "target_id": "P96",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A25",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P89",
+      "source_type": "place",
+      "target_id": "T11",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A26",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T11",
+      "source_type": "transition",
+      "target_id": "P97",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A27",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P139",
+      "source_type": "place",
+      "target_id": "T12",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A28",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T12",
+      "source_type": "transition",
+      "target_id": "P98",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A29",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P139",
+      "source_type": "place",
+      "target_id": "T13",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A30",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T13",
+      "source_type": "transition",
+      "target_id": "P92",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A31",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P108",
+      "source_type": "place",
+      "target_id": "T14",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A32",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T14",
+      "source_type": "transition",
+      "target_id": "P139",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A33",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T14",
+      "source_type": "transition",
+      "target_id": "P92",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A34",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P95",
+      "source_type": "place",
+      "target_id": "T15",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A35",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T15",
+      "source_type": "transition",
+      "target_id": "P108",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A36",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P108",
+      "source_type": "place",
+      "target_id": "T16",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A37",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T16",
+      "source_type": "transition",
+      "target_id": "P95",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A38",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P94",
+      "source_type": "place",
+      "target_id": "T17",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A39",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T17",
+      "source_type": "transition",
+      "target_id": "P95",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A40",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P88",
+      "source_type": "place",
+      "target_id": "T18",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A41",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T18",
+      "source_type": "transition",
+      "target_id": "P94",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A42",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P91",
+      "source_type": "place",
+      "target_id": "T19",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A43",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T19",
+      "source_type": "transition",
+      "target_id": "P93",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A44",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P91",
+      "source_type": "place",
+      "target_id": "T20",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A45",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T20",
+      "source_type": "transition",
+      "target_id": "P93",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A46",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P94",
+      "source_type": "place",
+      "target_id": "T21",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A47",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T21",
+      "source_type": "transition",
+      "target_id": "P93",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A48",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P90",
+      "source_type": "place",
+      "target_id": "T22",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A49",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T22",
+      "source_type": "transition",
+      "target_id": "P91",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A50",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P90",
+      "source_type": "place",
+      "target_id": "T23",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A51",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T23",
+      "source_type": "transition",
+      "target_id": "P94",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A52",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P90",
+      "source_type": "place",
+      "target_id": "T24",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A53",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T24",
+      "source_type": "transition",
+      "target_id": "P94",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A54",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P94",
+      "source_type": "place",
+      "target_id": "T25",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A55",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T25",
+      "source_type": "transition",
+      "target_id": "P90",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A56",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P107",
+      "source_type": "place",
+      "target_id": "T26",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A57",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T26",
+      "source_type": "transition",
+      "target_id": "P100",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A58",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P97",
+      "source_type": "place",
+      "target_id": "T27",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A59",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T27",
+      "source_type": "transition",
+      "target_id": "P98",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A60",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P118",
+      "source_type": "place",
+      "target_id": "T28",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A61",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T28",
+      "source_type": "transition",
+      "target_id": "P96",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A62",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P134",
+      "source_type": "place",
+      "target_id": "T29",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A63",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T29",
+      "source_type": "transition",
+      "target_id": "P97",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A64",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P98",
+      "source_type": "place",
+      "target_id": "T30",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A65",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T30",
+      "source_type": "transition",
+      "target_id": "P134",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A66",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P45",
+      "source_type": "place",
+      "target_id": "T31",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A67",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T31",
+      "source_type": "transition",
+      "target_id": "P104",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A68",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P90",
+      "source_type": "place",
+      "target_id": "T32",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A69",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T32",
+      "source_type": "transition",
+      "target_id": "P94",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A70",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P91",
+      "source_type": "place",
+      "target_id": "T33",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A71",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T33",
+      "source_type": "transition",
+      "target_id": "P93",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A72",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "P134",
+      "source_type": "place",
+      "target_id": "T34",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A73",
+      "name": "",
+      "label": "",
+      "type": "arc",
+      "source_id": "T34",
+      "source_type": "transition",
+      "target_id": "P89",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    }
+  ]
+}
