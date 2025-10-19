@@ -155,7 +155,7 @@ def enhance_kegg_transitions(
     
     Uses hybrid three-tier database:
     - Tier 1: Local cache (fast)
-    - Tier 2: External APIs (SABIO-RK/BRENDA, if online)
+    - Tier 2: External APIs (BRENDA - future, if online)
     - Tier 3: Fallback database (10 glycolysis enzymes)
     
     Args:

@@ -33,7 +33,7 @@ class KineticsAssigner:
     
     Uses hybrid three-tier database system:
     - Tier 1: Local cache (fast, <10ms)
-    - Tier 2: External APIs (SABIO-RK/BRENDA, comprehensive)
+    - Tier 2: External APIs (BRENDA - future, comprehensive)
     - Tier 3: Fallback database (10 glycolysis enzymes, offline)
     
     Usage:
@@ -193,7 +193,7 @@ class KineticsAssigner:
         
         Uses hybrid three-tier system:
         1. Local cache (SQLite) - Fast repeated lookups
-        2. External API (SABIO-RK/BRENDA) - Comprehensive, always current
+        2. External API (BRENDA - future) - Comprehensive, always current
         3. Fallback database (10 glycolysis enzymes) - Offline support
         
         Returns:
