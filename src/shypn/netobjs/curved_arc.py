@@ -499,7 +499,7 @@ class CurvedArc(Arc):
             dict: Dictionary containing all arc properties with type 'curved_arc'
         """
         data = super().to_dict()
-        data["type"] = "curved_arc"  # Override type to distinguish from Arc
+        data["object_type"] = "curved_arc"  # Override object_type to distinguish from Arc
         return data
     
     def __repr__(self):
