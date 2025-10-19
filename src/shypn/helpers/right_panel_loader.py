@@ -136,7 +136,8 @@ class RightPanelLoader:
                 transitions_container.remove(child)
             
             # Instantiate and add transition rate panel with expand=True to fill vertical space
-            self.transition_panel = TransitionRatePanel(self.data_collector)
+            # Pass place_panel reference for locality plotting support
+            self.transition_panel = TransitionRatePanel(self.data_collector, place_panel=self.place_panel)
             transitions_container.pack_start(self.transition_panel, True, True, 0)
             
             # Register panel to observe model changes (for automatic cleanup of deleted objects)

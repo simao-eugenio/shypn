@@ -70,9 +70,10 @@ class AnalysisPlotPanel(Gtk.Box):
         self.rate_calculator = RateCalculator()
         self.selected_objects: List[Any] = []
         self.needs_update = False
-        self.update_interval = 100
+        self.update_interval = 250  # Increased from 100ms to 250ms for better performance
         self.last_data_length = {}
         self._model_manager = None  # Will be set by register_with_model()
+        self._plot_lines = {}  # Cache matplotlib line objects for efficient updates
         self._setup_ui()
         GLib.timeout_add(self.update_interval, self._periodic_update)
         # Periodic cleanup of stale objects (safety net)
@@ -116,8 +117,9 @@ class AnalysisPlotPanel(Gtk.Box):
         self.selected_objects = [o for o in self.selected_objects 
                                 if o is not obj and o.id != obj.id]
         
-        # If we removed something, trigger UI update
+        # If we removed something, trigger full UI update
         if len(self.selected_objects) < before_count:
+            self._update_objects_list()
             self.needs_update = True
 
     def _cleanup_stale_objects(self):
@@ -144,8 +146,9 @@ class AnalysisPlotPanel(Gtk.Box):
         self.selected_objects = [o for o in self.selected_objects 
                                 if o.id in valid_ids]
         
-        # If we removed something, trigger UI update
+        # If we removed something, trigger full UI update
         if len(self.selected_objects) < before_count:
+            self._update_objects_list()
             self.needs_update = True
         
         return True  # Continue periodic callbacks
@@ -229,6 +232,8 @@ class AnalysisPlotPanel(Gtk.Box):
         if any((o.id == obj.id for o in self.selected_objects)):
             return
         self.selected_objects.append(obj)
+        # Add UI row immediately without full rebuild
+        self._add_object_row(obj, len(self.selected_objects) - 1)
         self.needs_update = True
 
     def remove_object(self, obj: Any):
@@ -238,10 +243,57 @@ class AnalysisPlotPanel(Gtk.Box):
             obj: Place or Transition object to remove
         """
         self.selected_objects = [o for o in self.selected_objects if o.id != obj.id]
+        # Full rebuild needed since colors/indices change
+        self._update_objects_list()
         self.needs_update = True
 
+    def _add_object_row(self, obj: Any, index: int):
+        """Add a single object row to the UI list (optimized for incremental adds).
+        
+        Args:
+            obj: Object to add
+            index: Index in selected_objects list
+        """
+        # If we're adding first object, clear the "No objects selected" message
+        if len(self.selected_objects) == 1:
+            for child in self.objects_listbox.get_children():
+                self.objects_listbox.remove(child)
+        
+        row = Gtk.ListBoxRow()
+        hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        hbox.set_margin_start(6)
+        hbox.set_margin_end(6)
+        hbox.set_margin_top(3)
+        hbox.set_margin_bottom(3)
+        color_box = Gtk.DrawingArea()
+        color_box.set_size_request(20, 20)
+        color = self._get_color(index)
+        color_box.connect('draw', self._draw_color_box, color)
+        hbox.pack_start(color_box, False, False, 0)
+        obj_name = getattr(obj, 'name', f'{self.object_type.title()}{obj.id}')
+        if self.object_type == 'transition':
+            transition_type = getattr(obj, 'transition_type', 'continuous')
+            type_abbrev = {'immediate': 'IMM', 'timed': 'TIM', 'stochastic': 'STO', 'continuous': 'CON'}.get(transition_type, transition_type[:3].upper())
+            label_text = f'{obj_name} [{type_abbrev}] ({self.object_type[0].upper()}{obj.id})'
+        else:
+            label_text = f'{obj_name} ({self.object_type[0].upper()}{obj.id})'
+        label = Gtk.Label(label=label_text)
+        label.set_xalign(0)
+        hbox.pack_start(label, True, True, 0)
+        remove_btn = Gtk.Button(label='✕')
+        remove_btn.set_relief(Gtk.ReliefStyle.NONE)
+        remove_btn.connect('clicked', self._on_remove_clicked, obj)
+        hbox.pack_start(remove_btn, False, False, 0)
+        row.add(hbox)
+        self.objects_listbox.add(row)
+        self.objects_listbox.show_all()
+
     def _update_objects_list(self):
-        """Update the UI list of selected objects."""
+        """Rebuild the entire UI list of selected objects (full refresh).
+        
+        This is only called when necessary (e.g., after removal, clear, or reordering).
+        For adding new objects, use _add_object_row() instead for better performance.
+        """
         for child in self.objects_listbox.get_children():
             self.objects_listbox.remove(child)
         if not self.selected_objects:
@@ -313,6 +365,7 @@ class AnalysisPlotPanel(Gtk.Box):
         """Handle clear button click - clear selection and blank canvas."""
         self.selected_objects.clear()
         self.last_data_length.clear()
+        self._plot_lines.clear()
         self._show_empty_state()
         self._update_objects_list()
 
@@ -362,48 +415,90 @@ class AnalysisPlotPanel(Gtk.Box):
                 data_changed = True
                 self.last_data_length[obj.id] = current_length
         if data_changed or self.needs_update:
-            if self.needs_update:
-                self._update_objects_list()
+            # Only update plot, UI list is updated immediately in add_object()
             self.update_plot()
             self.needs_update = False
         return True
 
     def update_plot(self):
-        """Update the plot with current data.
+        """Update the plot with current data using efficient line updates.
         
-        This is the main plotting method that subclasses should call
-        or override to customize plotting behavior.
+        Uses matplotlib's set_data() for fast updates instead of axes.clear() + replot.
+        Only does full redraw when object list changes.
         """
-        DEBUG_UPDATE_PLOT = False
-        if DEBUG_UPDATE_PLOT:
-            pass
-        self.axes.clear()
         if not self.selected_objects:
-            if DEBUG_UPDATE_PLOT:
-                pass
             self._show_empty_state()
             return
+        
+        # Check if we need a full redraw (object list changed)
+        current_ids = [obj.id for obj in self.selected_objects]
+        cached_ids = list(self._plot_lines.keys())
+        
+        if current_ids != cached_ids:
+            # Full redraw needed - object list changed
+            self._full_redraw()
+            return
+        
+        # Fast update - just update existing line data
         for i, obj in enumerate(self.selected_objects):
-            if DEBUG_UPDATE_PLOT:
-                obj_name = getattr(obj, 'name', f'{self.object_type}{obj.id}')
             rate_data = self._get_rate_data(obj.id)
+            if rate_data and obj.id in self._plot_lines:
+                times = [t for t, r in rate_data]
+                rates = [r for t, r in rate_data]
+                line = self._plot_lines[obj.id]
+                line.set_data(times, rates)
+        
+        # Update axis limits efficiently
+        self.axes.relim()
+        self.axes.autoscale_view()
+        
+        # Force immediate draw for smooth continuous curves
+        # draw_idle() can sometimes be too lazy during rapid updates
+        self.canvas.draw()
+    
+    def _full_redraw(self):
+        """Perform a full plot redraw when object list changes."""
+        self.axes.clear()
+        self._plot_lines.clear()
+        
+        if not self.selected_objects:
+            self._show_empty_state()
+            return
+        
+        # Track if any data was plotted
+        has_data = False
+        
+        for i, obj in enumerate(self.selected_objects):
+            rate_data = self._get_rate_data(obj.id)
+            color = self._get_color(i)
+            obj_name = getattr(obj, 'name', f'{self.object_type.title()}{obj.id}')
+            
+            if self.object_type == 'transition':
+                transition_type = getattr(obj, 'transition_type', 'continuous')
+                type_abbrev = {'immediate': 'IMM', 'timed': 'TIM', 'stochastic': 'STO', 'continuous': 'CON'}.get(transition_type, transition_type[:3].upper())
+                legend_label = f'{obj_name} [{type_abbrev}]'
+            else:
+                legend_label = f'{obj_name} ({self.object_type[0].upper()}{obj.id})'
+            
             if rate_data:
                 times = [t for t, r in rate_data]
                 rates = [r for t, r in rate_data]
-                color = self._get_color(i)
-                obj_name = getattr(obj, 'name', f'{self.object_type.title()}{obj.id}')
-                if self.object_type == 'transition':
-                    transition_type = getattr(obj, 'transition_type', 'continuous')
-                    type_abbrev = {'immediate': 'IMM', 'timed': 'TIM', 'stochastic': 'STO', 'continuous': 'CON'}.get(transition_type, transition_type[:3].upper())
-                    legend_label = f'{obj_name} [{type_abbrev}]'
-                else:
-                    legend_label = f'{obj_name} ({self.object_type[0].upper()}{obj.id})'
-                self.axes.plot(times, rates, label=legend_label, color=color, linewidth=2)
+                line, = self.axes.plot(times, rates, label=legend_label, color=color, linewidth=2)
+                self._plot_lines[obj.id] = line
+                has_data = True
+            else:
+                # Plot empty line to maintain legend and color consistency
+                line, = self.axes.plot([], [], label=legend_label, color=color, linewidth=2)
+                self._plot_lines[obj.id] = line
+        
         self._format_plot()
         self.canvas.draw()
 
     def _show_empty_state(self):
         """Show empty state message when no objects selected."""
+        # Clear the axes first to remove any existing plots
+        self.axes.clear()
+        
         self.axes.text(0.5, 0.5, f'No {self.object_type}s selected\nAdd {self.object_type}s to analyze', ha='center', va='center', transform=self.axes.transAxes, fontsize=12, color='gray')
         self.axes.set_xticks([])
         self.axes.set_yticks([])
@@ -425,7 +520,12 @@ class AnalysisPlotPanel(Gtk.Box):
             y_range = ylim[1] - ylim[0]
             if y_range > 0:
                 self.axes.set_ylim(ylim[0] - y_range * 0.1, ylim[1] + y_range * 0.1)
-        self.figure.tight_layout()
+        # tight_layout is expensive - only call on full redraw
+        # (this method is only called from _full_redraw now)
+        try:
+            self.figure.tight_layout()
+        except:
+            pass  # Ignore tight_layout errors
 
     def _get_color(self, index: int) -> str:
         """Get color for object at index.

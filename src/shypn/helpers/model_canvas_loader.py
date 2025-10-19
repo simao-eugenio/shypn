@@ -2709,7 +2709,7 @@ class ModelCanvasLoader:
         from shypn.helpers.arc_prop_dialog_loader import create_arc_prop_dialog
         dialog_loader = None
         if isinstance(obj, Place):
-            dialog_loader = create_place_prop_dialog(obj, parent_window=self.parent_window, persistency_manager=self.persistency)
+            dialog_loader = create_place_prop_dialog(obj, parent_window=self.parent_window, persistency_manager=self.persistency, model=manager)
         elif isinstance(obj, Transition):
             data_collector = None
             if drawing_area in self.overlay_managers:
@@ -2724,7 +2724,7 @@ class ModelCanvasLoader:
                             data_collector = simulate_tools.data_collector
             dialog_loader = create_transition_prop_dialog(obj, parent_window=self.parent_window, persistency_manager=self.persistency, model=manager, data_collector=data_collector)
         elif isinstance(obj, Arc):
-            dialog_loader = create_arc_prop_dialog(obj, parent_window=self.parent_window, persistency_manager=self.persistency)
+            dialog_loader = create_arc_prop_dialog(obj, parent_window=self.parent_window, persistency_manager=self.persistency, model=manager)
         else:
             return
         if isinstance(obj, Arc):

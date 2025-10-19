@@ -60,6 +60,7 @@ class TransitionPropDialogLoader(GObject.GObject):
         self.dialog = None
         self.color_picker = None
         self.locality_widget = None
+        self.topology_loader = None
         
         # Load and setup
         self._load_ui()
@@ -68,6 +69,7 @@ class TransitionPropDialogLoader(GObject.GObject):
         self._update_field_visibility()
         self._setup_type_change_handler()
         self._setup_rate_sync()
+        self._setup_topology_tab()
     
     def _load_ui(self):
         """Load the Transition properties dialog UI from file."""
@@ -397,12 +399,52 @@ class TransitionPropDialogLoader(GObject.GObject):
         """
         return self.dialog
     
+    def _setup_topology_tab(self):
+        """Setup topology information tab using TransitionTopologyTabLoader.
+        
+        Loads the topology tab from XML and populates it with analysis
+        for this transition (if model is available).
+        """
+        # Skip if no model available
+        if not self.model:
+            return
+        
+        try:
+            from shypn.ui.topology_tab_loader import TransitionTopologyTabLoader
+            
+            # Create topology tab loader
+            self.topology_loader = TransitionTopologyTabLoader(
+                model=self.model,
+                element_id=self.transition_obj.id
+            )
+            
+            # Populate with analysis
+            self.topology_loader.populate()
+            
+            # Get the topology widget
+            topology_widget = self.topology_loader.get_root_widget()
+            
+            # Get the topology tab container and add the widget
+            container = self.builder.get_object('topology_tab_container')
+            if container and topology_widget:
+                container.pack_start(topology_widget, True, True, 0)
+                topology_widget.show_all()
+        
+        except ImportError as e:
+            # Topology module not available - silently skip
+            print(f"Topology tab not available: {e}")
+    
     def destroy(self):
         """Destroy dialog and clean up all widget references.
         
         This ensures proper cleanup to prevent orphaned widgets that can
         cause Wayland focus issues and application crashes.
         """
+        # Clean up topology loader first
+        if self.topology_loader:
+            self.topology_loader.destroy()
+            self.topology_loader = None
+        
         if self.dialog:
             self.dialog.destroy()
             self.dialog = None
