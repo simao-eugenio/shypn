@@ -1,5 +1,5 @@
 """Structural topology analyzers."""
 
-# Placeholder - to be implemented
+from .p_invariants import PInvariantAnalyzer
 
-__all__ = []
+__all__ = ['PInvariantAnalyzer']
