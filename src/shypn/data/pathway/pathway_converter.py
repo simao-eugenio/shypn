@@ -26,6 +26,7 @@ from shypn.data.canvas.document_model import DocumentModel
 from shypn.netobjs.place import Place
 from shypn.netobjs.transition import Transition
 from shypn.netobjs.arc import Arc
+from shypn.heuristic import EstimatorFactory
 
 
 class BaseConverter:
@@ -230,6 +231,7 @@ class ReactionConverter(BaseConverter):
         Strategies:
         - michaelis_menten: Create rate_function with michaelis_menten(substrate, Vmax, Km)
         - mass_action: Set to stochastic with lambda rate
+        - No kinetic law: Use heuristic estimation (Michaelis-Menten for biochemical)
         - Other: Continuous with simple rate
         
         Args:
@@ -237,10 +239,8 @@ class ReactionConverter(BaseConverter):
             reaction: The reaction with kinetic law
         """
         if not reaction.kinetic_law:
-            # No kinetic law - use default continuous
-            transition.transition_type = "continuous"
-            transition.rate = 1.0
-            self.logger.debug(f"  No kinetic law, defaulting to continuous rate=1.0")
+            # No kinetic law - use heuristic estimation
+            self._setup_heuristic_kinetics(transition, reaction)
             return
         
         kinetic = reaction.kinetic_law
@@ -364,6 +364,83 @@ class ReactionConverter(BaseConverter):
                 rate_func = f"mass_action({reactant_places[0].name}, {reactant_places[1].name}, {k})"
                 transition.properties['rate_function'] = rate_func
                 self.logger.info(f"    Rate function: '{rate_func}'")
+    
+    def _setup_heuristic_kinetics(self, transition: Transition, reaction: Reaction) -> None:
+        """
+        Setup kinetics using heuristic parameter estimation.
+        
+        When no kinetic law is provided in SBML, use intelligent heuristics
+        to estimate parameters from stoichiometry and initial concentrations.
+        
+        Default: Michaelis-Menten for biochemical reactions (most common)
+        
+        Args:
+            transition: Transition to configure
+            reaction: Reaction data (without kinetic law)
+        """
+        # Get substrate and product places
+        substrate_places = []
+        product_places = []
+        
+        for species_id, _ in reaction.reactants:
+            place = self.species_to_place.get(species_id)
+            if place:
+                substrate_places.append(place)
+        
+        for species_id, _ in reaction.products:
+            place = self.species_to_place.get(species_id)
+            if place:
+                product_places.append(place)
+        
+        if not substrate_places:
+            # No substrates - use simple default
+            transition.transition_type = "continuous"
+            transition.rate = 1.0
+            self.logger.warning(
+                f"  No kinetic law and no substrates found, using default continuous rate=1.0"
+            )
+            return
+        
+        # Create Michaelis-Menten estimator (most common for biochemical reactions)
+        estimator = EstimatorFactory.create('michaelis_menten')
+        
+        if not estimator:
+            # Fallback if factory fails
+            transition.transition_type = "continuous"
+            transition.rate = 1.0
+            self.logger.error(
+                f"  Failed to create heuristic estimator, using default continuous rate=1.0"
+            )
+            return
+        
+        try:
+            # Estimate parameters and build rate function
+            params, rate_func = estimator.estimate_and_build(
+                reaction,
+                substrate_places,
+                product_places
+            )
+            
+            # Configure transition
+            transition.transition_type = "continuous"
+            transition.properties['rate_function'] = rate_func
+            transition.rate = params.get('vmax', 1.0)  # Fallback for display
+            
+            self.logger.info(
+                f"  Heuristic estimation (Michaelis-Menten): "
+                f"Vmax={params.get('vmax'):.2f}, Km={params.get('km'):.2f}"
+            )
+            self.logger.info(
+                f"    Rate function: '{rate_func}'"
+            )
+            
+        except Exception as e:
+            # Fallback on any error
+            transition.transition_type = "continuous"
+            transition.rate = 1.0
+            self.logger.error(
+                f"  Heuristic estimation failed: {e}, using default continuous rate=1.0"
+            )
 
 
 class ArcConverter(BaseConverter):
