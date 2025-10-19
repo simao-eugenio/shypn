@@ -1,9 +1,13 @@
 """Standard reaction to transition mapping strategy."""
 
+import logging
 from typing import List, Tuple
 from shypn.netobjs import Transition
 from .converter_base import ReactionMapper, ConversionOptions
 from .models import KEGGPathway, KEGGReaction, KEGGEntry
+from shypn.data.kegg_ec_fetcher import get_default_fetcher
+
+logger = logging.getLogger(__name__)
 
 
 class StandardReactionMapper(ReactionMapper):
@@ -83,6 +87,18 @@ class StandardReactionMapper(ReactionMapper):
         if hasattr(reaction, 'type'):
             transition.metadata['reaction_type'] = reaction.type
         
+        # Fetch EC numbers from KEGG API
+        # This enriches transitions with enzyme classification data
+        try:
+            fetcher = get_default_fetcher()
+            ec_numbers = fetcher.fetch_ec_numbers(reaction.id)
+            
+            if ec_numbers:
+                transition.metadata['ec_numbers'] = ec_numbers
+                logger.debug(f"Fetched EC numbers for {reaction.id}: {ec_numbers}")
+        except Exception as e:
+            logger.warning(f"Failed to fetch EC numbers for {reaction.id}: {e}")
+        
         return transition
     
     def _create_split_reversible(self, reaction: KEGGReaction, x: float, y: float,
@@ -99,6 +115,16 @@ class StandardReactionMapper(ReactionMapper):
         """
         transitions = []
         
+        # Fetch EC numbers once for both directions
+        ec_numbers = []
+        try:
+            fetcher = get_default_fetcher()
+            ec_numbers = fetcher.fetch_ec_numbers(reaction.id)
+            if ec_numbers:
+                logger.debug(f"Fetched EC numbers for {reaction.id}: {ec_numbers}")
+        except Exception as e:
+            logger.warning(f"Failed to fetch EC numbers for {reaction.id}: {e}")
+        
         # Forward transition
         forward_id = f"T{self.transition_counter}"
         forward_sys_name = f"T{self.transition_counter}"  # System-assigned name
@@ -113,6 +139,8 @@ class StandardReactionMapper(ReactionMapper):
         forward.metadata['source'] = 'KEGG'
         forward.metadata['reversible'] = True
         forward.metadata['direction'] = 'forward'
+        if ec_numbers:
+            forward.metadata['ec_numbers'] = ec_numbers
         
         transitions.append(forward)
         
@@ -130,6 +158,8 @@ class StandardReactionMapper(ReactionMapper):
         backward.metadata['source'] = 'KEGG'
         backward.metadata['reversible'] = True
         backward.metadata['direction'] = 'reverse'
+        if ec_numbers:
+            backward.metadata['ec_numbers'] = ec_numbers
         
         transitions.append(backward)
         
