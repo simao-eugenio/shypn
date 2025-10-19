@@ -484,6 +484,10 @@ class Transition(PetriNetObject):
         if hasattr(self, 'properties') and self.properties:
             data["properties"] = self.properties
         
+        # Serialize metadata (EC numbers, enzyme info, kinetics data)
+        if hasattr(self, 'metadata') and self.metadata:
+            data["metadata"] = self.metadata
+        
         return data
     
     def validate_source_sink_structure(self, arcs_list) -> tuple:
@@ -627,5 +631,9 @@ class Transition(PetriNetObject):
             transition.is_source = data["is_source"]
         if "is_sink" in data:
             transition.is_sink = data["is_sink"]
+        
+        # Restore metadata (EC numbers, enzyme info, kinetics data)
+        if "metadata" in data:
+            transition.metadata = data["metadata"]
         
         return transition
