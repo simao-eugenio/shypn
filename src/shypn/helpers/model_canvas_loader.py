@@ -2751,7 +2751,16 @@ class ModelCanvasLoader:
                         if obj in self.right_panel_loader.transition_panel.selected_objects:
                             self.right_panel_loader.transition_panel.needs_update = True
         dialog_loader.connect('properties-changed', on_properties_changed)
-        response = dialog_loader.run()
+        
+        try:
+            response = dialog_loader.run()
+            
+            if response == Gtk.ResponseType.OK:
+                drawing_area.queue_draw()
+        finally:
+            # CRITICAL: Always destroy dialog to prevent orphaned widgets
+            # Orphaned widgets cause Wayland focus issues and app crashes
+            dialog_loader.destroy()
         
         # Restore original tool if we switched it
         if original_tool == 'arc':
@@ -2763,11 +2772,6 @@ class ModelCanvasLoader:
         if arc_state:
             arc_state['source'] = None
             arc_state['cursor_pos'] = (0, 0)
-        
-        if isinstance(obj, Arc):
-            pass
-        if response == Gtk.ResponseType.OK:
-            drawing_area.queue_draw()
 
     def _on_transition_type_change(self, transition, new_type, manager, drawing_area):
         """Handle transition type change from context menu.

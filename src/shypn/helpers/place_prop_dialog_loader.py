@@ -115,7 +115,7 @@ class PlacePropDialogLoader(GObject.GObject):
             if self.persistency_manager:
                 self.persistency_manager.mark_dirty()
             self.emit('properties-changed')
-        dialog.destroy()
+        # Don't destroy here - let explicit destroy() method handle it
 
     def _apply_changes(self):
         """Apply changes from dialog fields to Place object."""
@@ -189,6 +189,23 @@ class PlacePropDialogLoader(GObject.GObject):
             Gtk.Dialog: The dialog widget.
         """
         return self.dialog
+    
+    def destroy(self):
+        """Destroy dialog and clean up all widget references.
+        
+        This ensures proper cleanup to prevent orphaned widgets that can
+        cause Wayland focus issues and application crashes.
+        """
+        if self.dialog:
+            self.dialog.destroy()
+            self.dialog = None
+        
+        # Clean up widget references to prevent memory leaks
+        self.color_picker = None
+        self.builder = None
+        self.place_obj = None
+        self.parent_window = None
+        self.persistency_manager = None
 
 def create_place_prop_dialog(place_obj, parent_window=None, ui_dir: str=None, persistency_manager=None):
     """Factory function to create a Place properties dialog loader.
