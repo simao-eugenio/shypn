@@ -46,8 +46,9 @@ class MassActionEstimator(KineticEstimator):
         # Cache results
         self.parameter_cache[cache_key] = parameters
         
+        reaction_id = reaction.id if reaction and hasattr(reaction, 'id') else 'external'
         self.logger.info(
-            f"Estimated mass action parameter for {reaction.id}: k={k:.2f}"
+            f"Estimated mass action parameter for {reaction_id}: k={k:.2f}"
         )
         
         return parameters
@@ -86,7 +87,11 @@ class MassActionEstimator(KineticEstimator):
         - Bimolecular: k = 0.1 (slower)
         - Trimolecular: k = 0.01 (much slower)
         """
-        num_reactants = len(reaction.reactants)
+        if reaction is None or not hasattr(reaction, 'reactants'):
+            # For external conversions, use substrate count
+            num_reactants = len(substrate_places) if substrate_places else 1
+        else:
+            num_reactants = len(reaction.reactants)
         
         if num_reactants == 1:
             return 1.0  # Unimolecular

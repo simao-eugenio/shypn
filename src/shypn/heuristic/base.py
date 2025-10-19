@@ -93,6 +93,10 @@ class KineticEstimator(ABC):
     
     def _make_cache_key(self, reaction) -> str:
         """Create cache key from reaction properties."""
+        if reaction is None:
+            # For KEGG/external conversions where we don't have Reaction objects
+            import random
+            return f"external_{random.randint(0, 1000000)}"
         reactants = tuple(sorted(rid for rid, _ in reaction.reactants))
         products = tuple(sorted(pid for pid, _ in reaction.products))
         return f"{reaction.name}_{reactants}_{products}"
