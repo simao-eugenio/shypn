@@ -21,7 +21,7 @@ class PlacePropDialogLoader(GObject.GObject):
     """
     __gsignals__ = {'properties-changed': (GObject.SignalFlags.RUN_FIRST, None, ())}
 
-    def __init__(self, place_obj, parent_window=None, ui_dir: str=None, persistency_manager=None):
+    def __init__(self, place_obj, parent_window=None, ui_dir: str=None, persistency_manager=None, model=None):
         """Initialize the Place properties dialog loader.
         
         Args:
@@ -29,6 +29,7 @@ class PlacePropDialogLoader(GObject.GObject):
             parent_window: Parent window for modal dialog.
             ui_dir: Directory containing UI files. Defaults to project ui/dialogs/.
             persistency_manager: NetObjPersistency instance for marking document dirty
+            model: PetriNetModel instance for topology analysis (optional)
         """
         super().__init__()
         if ui_dir is None:
@@ -40,12 +41,14 @@ class PlacePropDialogLoader(GObject.GObject):
         self.place_obj = place_obj
         self.parent_window = parent_window
         self.persistency_manager = persistency_manager
+        self.model = model
         self.builder = None
         self.dialog = None
         self.color_picker = None
         self._load_ui()
         self._setup_color_picker()
         self._populate_fields()
+        self._setup_topology_tab()
 
     def _load_ui(self):
         """Load the Place properties dialog UI from file."""
@@ -174,6 +177,69 @@ class PlacePropDialogLoader(GObject.GObject):
             new_description = buffer.get_text(start_iter, end_iter, True).strip()
             self.place_obj.label = new_description if new_description else None
 
+    def _setup_topology_tab(self):
+        """Setup topology information tab.
+        
+        Populates the topology tab with cycle and P-invariant information
+        for this place (if model is available).
+        """
+        # Skip if no model available
+        if not self.model:
+            return
+        
+        try:
+            from shypn.topology.graph import CycleAnalyzer
+            from shypn.topology.structural import PInvariantAnalyzer
+            
+            # Get topology labels
+            cycles_label = self.builder.get_object('topology_cycles_label')
+            p_inv_label = self.builder.get_object('topology_p_invariants_label')
+            
+            # Analyze cycles
+            if cycles_label:
+                try:
+                    cycle_analyzer = CycleAnalyzer(self.model)
+                    place_cycles = cycle_analyzer.find_cycles_containing_node(self.place_obj.id)
+                    
+                    if place_cycles:
+                        text = f"Part of {len(place_cycles)} cycle(s):\n\n"
+                        for i, cycle in enumerate(place_cycles[:5], 1):
+                            names = ' → '.join(cycle['names'][:10])
+                            if len(cycle['names']) > 10:
+                                names += ' ...'
+                            text += f"{i}. {names}\n"
+                            text += f"   Length: {cycle['length']}, Type: {cycle['type']}\n\n"
+                        if len(place_cycles) > 5:
+                            text += f"... and {len(place_cycles) - 5} more cycle(s)\n"
+                        cycles_label.set_text(text.strip())
+                    else:
+                        cycles_label.set_text("Not part of any cycles")
+                except Exception as e:
+                    cycles_label.set_text(f"Analysis error: {str(e)}")
+            
+            # Analyze P-invariants
+            if p_inv_label:
+                try:
+                    p_inv_analyzer = PInvariantAnalyzer(self.model)
+                    place_invariants = p_inv_analyzer.find_invariants_containing_place(self.place_obj.id)
+                    
+                    if place_invariants:
+                        text = f"In {len(place_invariants)} P-invariant(s):\n\n"
+                        for i, inv in enumerate(place_invariants[:5], 1):
+                            text += f"{i}. {inv['sum_expression']}\n"
+                            text += f"   Conserved value: {inv['conserved_value']}\n\n"
+                        if len(place_invariants) > 5:
+                            text += f"... and {len(place_invariants) - 5} more invariant(s)\n"
+                        p_inv_label.set_text(text.strip())
+                    else:
+                        p_inv_label.set_text("Not in any P-invariants")
+                except Exception as e:
+                    p_inv_label.set_text(f"Analysis error: {str(e)}")
+        
+        except ImportError:
+            # Topology module not available - silently skip
+            pass
+
     def run(self):
         """Show the dialog and run it modally.
         
@@ -207,7 +273,7 @@ class PlacePropDialogLoader(GObject.GObject):
         self.parent_window = None
         self.persistency_manager = None
 
-def create_place_prop_dialog(place_obj, parent_window=None, ui_dir: str=None, persistency_manager=None):
+def create_place_prop_dialog(place_obj, parent_window=None, ui_dir: str=None, persistency_manager=None, model=None):
     """Factory function to create a Place properties dialog loader.
     
     Args:
@@ -215,8 +281,10 @@ def create_place_prop_dialog(place_obj, parent_window=None, ui_dir: str=None, pe
         parent_window: Parent window for modal dialog.
         ui_dir: Directory containing UI files. Defaults to project ui/dialogs/.
         persistency_manager: NetObjPersistency instance for marking document dirty
+        model: PetriNetModel instance for topology analysis (optional)
     
     Returns:
         PlacePropDialogLoader: Configured dialog loader instance.
     """
-    return PlacePropDialogLoader(place_obj, parent_window=parent_window, ui_dir=ui_dir, persistency_manager=persistency_manager)
+    return PlacePropDialogLoader(place_obj, parent_window=parent_window, ui_dir=ui_dir, 
+                                  persistency_manager=persistency_manager, model=model)
