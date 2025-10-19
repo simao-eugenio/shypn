@@ -3,5 +3,6 @@
 from .deadlocks import DeadlockAnalyzer
 from .boundedness import BoundednessAnalyzer
 from .liveness import LivenessAnalyzer
+from .fairness import FairnessAnalyzer
 
-__all__ = ['DeadlockAnalyzer', 'BoundednessAnalyzer', 'LivenessAnalyzer']
+__all__ = ['DeadlockAnalyzer', 'BoundednessAnalyzer', 'LivenessAnalyzer', 'FairnessAnalyzer']
