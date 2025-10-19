@@ -1,12 +1,13 @@
 """Main pathway converter implementation."""
 
 import logging
-from typing import Dict
+from typing import Dict, Optional, Callable
 from shypn.data.canvas.document_model import DocumentModel
 from shypn.netobjs import Place, Transition
 from .converter_base import ConversionStrategy, ConversionOptions
 from .models import KEGGPathway
 from shypn.heuristic import KineticsAssigner
+from shypn.data.kegg_ec_fetcher import fetch_ec_numbers_parallel
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -70,6 +71,26 @@ class StandardConversionStrategy(ConversionStrategy):
                     document.places.append(place)
                     place_map[entry.id] = place
         
+        
+        # Phase 1.5: Pre-fetch EC numbers in parallel (if metadata enhancement enabled)
+        if options.enhance_kinetics:
+            reaction_ids = [r.name for r in pathway.reactions]
+            logger.info(f"Pre-fetching EC numbers for {len(reaction_ids)} reactions...")
+            
+            try:
+                # Fetch all EC numbers in parallel
+                ec_cache = fetch_ec_numbers_parallel(
+                    reaction_ids,
+                    max_workers=5,
+                    progress_callback=None  # TODO: Add UI progress callback
+                )
+                
+                # Pass cache to reaction mapper
+                self.reaction_mapper.set_ec_cache(ec_cache)
+                logger.info(f"Pre-fetched EC numbers for {len(ec_cache)} reactions")
+            except Exception as e:
+                logger.warning(f"Failed to pre-fetch EC numbers: {e}")
+                logger.info("Will fall back to fetching EC numbers individually")
         
         # Phase 2: Create transitions and arcs from reactions
         reaction_transition_map = {}  # Track reactions for kinetics enhancement
