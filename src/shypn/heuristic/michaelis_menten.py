@@ -110,7 +110,15 @@ class MichaelisMentenEstimator(KineticEstimator):
             return self.default_vmax
         
         # Get maximum product stoichiometry
-        max_stoich = max(stoich for _, stoich in reaction.products)
+        # Handle both SBML (products as tuples) and KEGG (products as objects)
+        max_stoich = 1
+        for product in reaction.products:
+            if isinstance(product, tuple):
+                # SBML format: (id, stoichiometry)
+                max_stoich = max(max_stoich, product[1])
+            elif hasattr(product, 'stoichiometry'):
+                # KEGG format: KEGGProduct with stoichiometry attribute
+                max_stoich = max(max_stoich, product.stoichiometry)
         
         # Base Vmax
         vmax = self.default_vmax * max_stoich
@@ -118,6 +126,9 @@ class MichaelisMentenEstimator(KineticEstimator):
         # Adjust for reversibility
         if hasattr(reaction, 'reversible') and reaction.reversible:
             vmax *= 0.8  # Reversible reactions slightly slower
+        elif hasattr(reaction, 'is_reversible') and callable(reaction.is_reversible):
+            if reaction.is_reversible():
+                vmax *= 0.8
         
         return vmax
     

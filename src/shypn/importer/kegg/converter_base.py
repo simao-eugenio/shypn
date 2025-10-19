@@ -36,6 +36,11 @@ class ConversionOptions:
             When True, excludes compounds that appear in KEGG but aren't connected to reactions
             This significantly reduces model size and clutter (typically removes 15-30% of compounds)
         
+        enhance_kinetics: Apply heuristic kinetics enhancement to transitions (default: True)
+            When True, analyzes reaction structure to assign appropriate kinetic types
+            (stochastic vs continuous) and reasonable parameter defaults
+            Uses the heuristic system to fill gaps since KEGG lacks explicit kinetic data
+        
         center_x: X coordinate offset for positioning (default: 0.0)
         center_y: Y coordinate offset for positioning (default: 0.0)
         initial_tokens: Number of tokens to add to each place when add_initial_marking is True (default: 1)
@@ -45,6 +50,7 @@ class ConversionOptions:
     split_reversible: bool = False
     add_initial_marking: bool = True  # Auto-add tokens for testing/experimentation
     filter_isolated_compounds: bool = True
+    enhance_kinetics: bool = True  # Auto-enhance kinetics for better simulation
     center_x: float = 0.0
     center_y: float = 0.0
     initial_tokens: int = 1

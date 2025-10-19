@@ -6,6 +6,7 @@ from shypn.data.canvas.document_model import DocumentModel
 from shypn.netobjs import Place, Transition
 from .converter_base import ConversionStrategy, ConversionOptions
 from .models import KEGGPathway
+from shypn.heuristic import KineticsAssigner
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -71,12 +72,15 @@ class StandardConversionStrategy(ConversionStrategy):
         
         
         # Phase 2: Create transitions and arcs from reactions
+        reaction_transition_map = {}  # Track reactions for kinetics enhancement
+        
         for reaction in pathway.reactions:
             # Create transition(s)
             transitions = self.reaction_mapper.create_transitions(reaction, pathway, options)
             
             for transition in transitions:
                 document.transitions.append(transition)
+                reaction_transition_map[transition] = reaction
                 
                 # Create arcs for this transition
                 arcs = self.arc_builder.create_arcs(
@@ -84,6 +88,9 @@ class StandardConversionStrategy(ConversionStrategy):
                 )
                 document.arcs.extend(arcs)
         
+        # Phase 3: Enhance transitions with kinetic properties
+        if options.enhance_kinetics:
+            self._enhance_transition_kinetics(document, reaction_transition_map, pathway)
         
         # Update ID counters
         if document.places:
@@ -144,6 +151,97 @@ class StandardConversionStrategy(ConversionStrategy):
             
             logger.error(error_msg)
             raise ValueError(error_msg)
+    
+    def _enhance_transition_kinetics(self, document: DocumentModel,
+                                     reaction_transition_map: Dict,
+                                     pathway: KEGGPathway):
+        """Enhance transitions with kinetic properties using heuristics.
+        
+        This method applies the kinetics assignment system to transitions
+        created from KEGG reactions. Since KEGG lacks explicit kinetic data,
+        heuristics are used to assign reasonable defaults based on reaction
+        structure and annotations.
+        
+        Args:
+            document: DocumentModel with transitions to enhance
+            reaction_transition_map: Mapping of transitions to their source reactions
+            pathway: Original KEGG pathway
+        """
+        logger.info(f"Enhancing kinetics for {len(document.transitions)} transitions")
+        
+        assigner = KineticsAssigner()
+        enhancement_stats = {
+            'total': 0,
+            'enhanced': 0,
+            'skipped': 0,
+            'failed': 0,
+            'by_confidence': {'high': 0, 'medium': 0, 'low': 0}
+        }
+        
+        for transition in document.transitions:
+            # Skip source/sink transitions
+            if hasattr(transition, 'is_source') and transition.is_source:
+                enhancement_stats['skipped'] += 1
+                continue
+            if hasattr(transition, 'is_sink') and transition.is_sink:
+                enhancement_stats['skipped'] += 1
+                continue
+            
+            enhancement_stats['total'] += 1
+            
+            # Get corresponding reaction
+            reaction = reaction_transition_map.get(transition)
+            
+            # Get substrate and product places from arcs
+            substrate_places = []
+            product_places = []
+            
+            for arc in document.arcs:
+                if arc.target == transition:
+                    # Input arc: Place → Transition
+                    substrate_places.append(arc.source)
+                elif arc.source == transition:
+                    # Output arc: Transition → Place
+                    product_places.append(arc.target)
+            
+            # Assign kinetics
+            try:
+                result = assigner.assign(
+                    transition=transition,
+                    reaction=reaction,
+                    substrate_places=substrate_places,
+                    product_places=product_places,
+                    source='kegg'
+                )
+                
+                if result.success:
+                    enhancement_stats['enhanced'] += 1
+                    enhancement_stats['by_confidence'][result.confidence.value] += 1
+                    logger.debug(
+                        f"Enhanced {transition.name}: {result.confidence.value} "
+                        f"confidence, rule={result.rule}"
+                    )
+                else:
+                    enhancement_stats['skipped'] += 1
+                    logger.debug(f"Skipped {transition.name}: {result.message}")
+                    
+            except Exception as e:
+                enhancement_stats['failed'] += 1
+                logger.warning(
+                    f"Failed to enhance {transition.name}: {e}",
+                    exc_info=True
+                )
+        
+        # Log summary
+        logger.info(
+            f"Kinetics enhancement complete: "
+            f"{enhancement_stats['enhanced']}/{enhancement_stats['total']} enhanced "
+            f"(High: {enhancement_stats['by_confidence']['high']}, "
+            f"Medium: {enhancement_stats['by_confidence']['medium']}, "
+            f"Low: {enhancement_stats['by_confidence']['low']}), "
+            f"{enhancement_stats['skipped']} skipped, "
+            f"{enhancement_stats['failed']} failed"
+        )
     
     def _log_conversion_statistics(self, document: DocumentModel, pathway: KEGGPathway):
         """Log conversion statistics for debugging and monitoring.
