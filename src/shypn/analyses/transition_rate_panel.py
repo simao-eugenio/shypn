@@ -70,17 +70,45 @@ class TransitionRatePanel(AnalysisPlotPanel):
         # Panel automatically adapts visualization per transition type
     """
     
-    def __init__(self, data_collector):
+    def __init__(self, data_collector, place_panel=None):
         """Initialize the transition behavior analysis panel.
         
         Args:
             data_collector: SimulationDataCollector instance
+            place_panel: Optional PlaceRatePanel instance for locality plotting
         """
         super().__init__('transition', data_collector)
         
         # Locality plotting support
         self._locality_places = {}  # Maps transition_id -> {input_places, output_places}
+        self._place_panel = place_panel  # Reference to PlaceRatePanel for adding locality places
+    
+    def set_place_panel(self, place_panel):
+        """Set the PlaceRatePanel reference for locality plotting.
         
+        This allows setting the reference after initialization, which is useful
+        when panels are created independently.
+        
+        Args:
+            place_panel: PlaceRatePanel instance
+        """
+        self._place_panel = place_panel
+    
+    def add_object(self, obj):
+        """Add a transition to the selected list for plotting.
+        
+        Overrides parent to use full list rebuild instead of incremental add,
+        because we need to show locality places under each transition.
+        
+        Args:
+            obj: Transition object to add
+        """
+        if any((o.id == obj.id for o in self.selected_objects)):
+            return
+        self.selected_objects.append(obj)
+        # Use full rebuild to show locality places in UI list
+        self._update_objects_list()
+        self.needs_update = True
     
     def _get_rate_data(self, transition_id: Any) -> List[Tuple[float, float]]:
         """Get behavior-specific data for a transition.
@@ -350,19 +378,36 @@ class TransitionRatePanel(AnalysisPlotPanel):
     def add_locality_places(self, transition, locality):
         """Add locality places for a transition to plot with it.
         
-        This stores the locality places so they can be plotted
-        together with the transition, showing the complete P-T-P pattern.
+        This stores the locality places and actually adds them to the PlaceRatePanel
+        so they can be plotted together with the transition, showing the complete 
+        P-T-P pattern.
         
         Args:
             transition: Transition object
             locality: Locality object with input/output places
         """
+        if not locality.is_valid:
+            return
+        
+        # Store locality information
         self._locality_places[transition.id] = {
             'input_places': list(locality.input_places),
             'output_places': list(locality.output_places),
             'transition': transition
         }
         
+        # Actually add the locality places to the PlaceRatePanel for plotting
+        if self._place_panel is not None:
+            # Add input places
+            for place in locality.input_places:
+                self._place_panel.add_object(place)
+            
+            # Add output places
+            for place in locality.output_places:
+                self._place_panel.add_object(place)
+        
+        # Update the UI list to show locality places under the transition
+        self._update_objects_list()
         
         # Trigger plot update
         self.needs_update = True

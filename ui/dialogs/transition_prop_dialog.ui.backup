@@ -75,7 +75,7 @@
             </child>
             <child>
               <object class="GtkButton" id="ok_button">
-                <property name="label" translatable="yes">Apply</property>
+                <property name="label" translatable="yes">OK</property>
                 <property name="visible">True</property>
                 <property name="can-focus">True</property>
                 <property name="receives-default">True</property>
@@ -874,20 +874,103 @@
               </packing>
             </child>
             
-            <!-- Topology Tab - Container for dynamic loading -->
+            <!-- Diagnostics Tab -->
             <child>
-              <object class="GtkBox" id="topology_tab_container">
+              <object class="GtkBox" id="diagnostics_tab_content">
                 <property name="visible">True</property>
                 <property name="can-focus">False</property>
                 <property name="orientation">vertical</property>
-                <!-- Content loaded dynamically by TransitionTopologyTabLoader -->
+                <property name="spacing">15</property>
+                <property name="margin-top">15</property>
+                <property name="margin-bottom">15</property>
+                <property name="margin-left">15</property>
+                <property name="margin-right">15</property>
+                
+                <!-- Locality Information Frame -->
+                <child>
+                  <object class="GtkFrame" id="locality_frame">
+                    <property name="visible">True</property>
+                    <property name="can-focus">False</property>
+                    <property name="label-xalign">0</property>
+                    <property name="shadow-type">in</property>
+                    <child>
+                      <object class="GtkBox" id="locality_info_container">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="orientation">vertical</property>
+                        <property name="spacing">10</property>
+                        <property name="margin-top">15</property>
+                        <property name="margin-bottom">15</property>
+                        <property name="margin-left">15</property>
+                        <property name="margin-right">15</property>
+                      </object>
+                    </child>
+                    <child type="label">
+                      <object class="GtkLabel" id="locality_label">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="label" translatable="yes">Locality Information</property>
+                      </object>
+                    </child>
+                  </object>
+                  <packing>
+                    <property name="expand">False</property>
+                    <property name="fill">True</property>
+                    <property name="position">0</property>
+                  </packing>
+                </child>
+                
+                <!-- Diagnostic Report Frame -->
+                <child>
+                  <object class="GtkFrame" id="diagnostic_report_frame">
+                    <property name="visible">True</property>
+                    <property name="can-focus">False</property>
+                    <property name="label-xalign">0</property>
+                    <property name="shadow-type">in</property>
+                    <child>
+                      <object class="GtkScrolledWindow" id="diagnostic_scrolled_window">
+                        <property name="visible">True</property>
+                        <property name="can-focus">True</property>
+                        <property name="shadow-type">in</property>
+                        <property name="min-content-height">200</property>
+                        <property name="hscrollbar-policy">automatic</property>
+                        <property name="vscrollbar-policy">automatic</property>
+                        <child>
+                          <object class="GtkTextView" id="diagnostic_report_textview">
+                            <property name="visible">True</property>
+                            <property name="can-focus">True</property>
+                            <property name="editable">False</property>
+                            <property name="wrap-mode">word</property>
+                            <property name="left-margin">10</property>
+                            <property name="right-margin">10</property>
+                            <property name="top-margin">10</property>
+                            <property name="bottom-margin">10</property>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                    <child type="label">
+                      <object class="GtkLabel" id="diagnostic_report_label">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="label" translatable="yes">Diagnostic Report</property>
+                      </object>
+                    </child>
+                  </object>
+                  <packing>
+                    <property name="expand">True</property>
+                    <property name="fill">True</property>
+                    <property name="position">1</property>
+                  </packing>
+                </child>
+                
               </object>
             </child>
             <child type="tab">
-              <object class="GtkLabel" id="topology_tab_label">
+              <object class="GtkLabel" id="diagnostics_tab_label">
                 <property name="visible">True</property>
                 <property name="can-focus">False</property>
-                <property name="label" translatable="yes">Topology</property>
+                <property name="label" translatable="yes">Diagnostics</property>
               </object>
               <packing>
                 <property name="tab-fill">False</property>

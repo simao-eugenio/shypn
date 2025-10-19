@@ -24,7 +24,7 @@ class ArcPropDialogLoader(GObject.GObject):
     """
     __gsignals__ = {'properties-changed': (GObject.SignalFlags.RUN_FIRST, None, ())}
 
-    def __init__(self, arc_obj, parent_window=None, ui_dir: str=None, persistency_manager=None):
+    def __init__(self, arc_obj, parent_window=None, ui_dir: str=None, persistency_manager=None, model=None):
         """Initialize the Arc properties dialog loader.
         
         Args:
@@ -32,6 +32,7 @@ class ArcPropDialogLoader(GObject.GObject):
             parent_window: Parent window for modal dialog.
             ui_dir: Directory containing UI files. Defaults to project ui/dialogs/.
             persistency_manager: NetObjPersistency instance for marking document dirty
+            model: PetriNetModel instance for topology analysis (optional)
         """
         super().__init__()
         if ui_dir is None:
@@ -43,12 +44,15 @@ class ArcPropDialogLoader(GObject.GObject):
         self.arc_obj = arc_obj
         self.parent_window = parent_window
         self.persistency_manager = persistency_manager
+        self.model = model
         self.builder = None
         self.dialog = None
         self.color_picker = None
+        self.topology_loader = None
         self._load_ui()
         self._setup_color_picker()
         self._populate_fields()
+        self._setup_topology_tab()
 
     def _load_ui(self):
         """Load the Arc properties dialog UI from file."""
@@ -297,12 +301,52 @@ class ArcPropDialogLoader(GObject.GObject):
         """
         return self.dialog
     
+    def _setup_topology_tab(self):
+        """Setup topology information tab using ArcTopologyTabLoader.
+        
+        Loads the topology tab from XML and populates it with analysis
+        for this arc (if model is available).
+        """
+        # Skip if no model available
+        if not self.model:
+            return
+        
+        try:
+            from shypn.ui.topology_tab_loader import ArcTopologyTabLoader
+            
+            # Create topology tab loader
+            self.topology_loader = ArcTopologyTabLoader(
+                model=self.model,
+                element_id=self.arc_obj.id
+            )
+            
+            # Populate with analysis
+            self.topology_loader.populate()
+            
+            # Get the topology widget
+            topology_widget = self.topology_loader.get_root_widget()
+            
+            # Get the topology tab container and add the widget
+            container = self.builder.get_object('topology_tab_container')
+            if container and topology_widget:
+                container.pack_start(topology_widget, True, True, 0)
+                topology_widget.show_all()
+        
+        except ImportError as e:
+            # Topology module not available - silently skip
+            print(f"Topology tab not available: {e}")
+    
     def destroy(self):
         """Destroy dialog and clean up all widget references.
         
         This ensures proper cleanup to prevent orphaned widgets that can
         cause Wayland focus issues and application crashes.
         """
+        # Clean up topology loader first
+        if self.topology_loader:
+            self.topology_loader.destroy()
+            self.topology_loader = None
+        
         if self.dialog:
             self.dialog.destroy()
             self.dialog = None
@@ -314,7 +358,7 @@ class ArcPropDialogLoader(GObject.GObject):
         self.parent_window = None
         self.persistency_manager = None
 
-def create_arc_prop_dialog(arc_obj, parent_window=None, ui_dir: str=None, persistency_manager=None):
+def create_arc_prop_dialog(arc_obj, parent_window=None, ui_dir: str=None, persistency_manager=None, model=None):
     """Factory function to create an Arc properties dialog loader.
     
     Args:
@@ -322,8 +366,10 @@ def create_arc_prop_dialog(arc_obj, parent_window=None, ui_dir: str=None, persis
         parent_window: Parent window for modal dialog.
         ui_dir: Directory containing UI files. Defaults to project ui/dialogs/.
         persistency_manager: NetObjPersistency instance for marking document dirty
+        model: PetriNetModel instance for topology analysis (optional)
     
     Returns:
         ArcPropDialogLoader: Configured dialog loader instance.
     """
-    return ArcPropDialogLoader(arc_obj, parent_window=parent_window, ui_dir=ui_dir, persistency_manager=persistency_manager)
+    return ArcPropDialogLoader(arc_obj, parent_window=parent_window, ui_dir=ui_dir, 
+                               persistency_manager=persistency_manager, model=model)

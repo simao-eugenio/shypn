@@ -45,6 +45,7 @@ class PlacePropDialogLoader(GObject.GObject):
         self.builder = None
         self.dialog = None
         self.color_picker = None
+        self.topology_loader = None
         self._load_ui()
         self._setup_color_picker()
         self._populate_fields()
@@ -178,9 +179,9 @@ class PlacePropDialogLoader(GObject.GObject):
             self.place_obj.label = new_description if new_description else None
 
     def _setup_topology_tab(self):
-        """Setup topology information tab.
+        """Setup topology information tab using PlaceTopologyTabLoader.
         
-        Populates the topology tab with cycle and P-invariant information
+        Loads the topology tab from XML and populates it with analysis
         for this place (if model is available).
         """
         # Skip if no model available
@@ -188,106 +189,29 @@ class PlacePropDialogLoader(GObject.GObject):
             return
         
         try:
-            from shypn.topology.graph import CycleAnalyzer, PathAnalyzer
-            from shypn.topology.structural import PInvariantAnalyzer
-            from shypn.topology.network import HubAnalyzer
+            from shypn.ui.topology_tab_loader import PlaceTopologyTabLoader
             
-            # Get topology labels
-            cycles_label = self.builder.get_object('topology_cycles_label')
-            p_inv_label = self.builder.get_object('topology_p_invariants_label')
-            paths_label = self.builder.get_object('topology_paths_label')
-            hub_label = self.builder.get_object('topology_hub_label')
+            # Create topology tab loader
+            self.topology_loader = PlaceTopologyTabLoader(
+                model=self.model,
+                element_id=self.place_obj.id
+            )
             
-            # Analyze cycles
-            if cycles_label:
-                try:
-                    cycle_analyzer = CycleAnalyzer(self.model)
-                    place_cycles = cycle_analyzer.find_cycles_containing_node(self.place_obj.id)
-                    
-                    if place_cycles:
-                        text = f"Part of {len(place_cycles)} cycle(s):\n\n"
-                        for i, cycle in enumerate(place_cycles[:5], 1):
-                            names = ' → '.join(cycle['names'][:10])
-                            if len(cycle['names']) > 10:
-                                names += ' ...'
-                            text += f"{i}. {names}\n"
-                            text += f"   Length: {cycle['length']}, Type: {cycle['type']}\n\n"
-                        if len(place_cycles) > 5:
-                            text += f"... and {len(place_cycles) - 5} more cycle(s)\n"
-                        cycles_label.set_text(text.strip())
-                    else:
-                        cycles_label.set_text("Not part of any cycles")
-                except Exception as e:
-                    cycles_label.set_text(f"Analysis error: {str(e)}")
+            # Populate with analysis
+            self.topology_loader.populate()
             
-            # Analyze P-invariants
-            if p_inv_label:
-                try:
-                    p_inv_analyzer = PInvariantAnalyzer(self.model)
-                    place_invariants = p_inv_analyzer.find_invariants_containing_place(self.place_obj.id)
-                    
-                    if place_invariants:
-                        text = f"In {len(place_invariants)} P-invariant(s):\n\n"
-                        for i, inv in enumerate(place_invariants[:5], 1):
-                            text += f"{i}. {inv['sum_expression']}\n"
-                            text += f"   Conserved value: {inv['conserved_value']}\n\n"
-                        if len(place_invariants) > 5:
-                            text += f"... and {len(place_invariants) - 5} more invariant(s)\n"
-                        p_inv_label.set_text(text.strip())
-                    else:
-                        p_inv_label.set_text("Not in any P-invariants")
-                except Exception as e:
-                    p_inv_label.set_text(f"Analysis error: {str(e)}")
+            # Get the topology widget
+            topology_widget = self.topology_loader.get_root_widget()
             
-            # Analyze paths
-            if paths_label:
-                try:
-                    path_analyzer = PathAnalyzer(self.model)
-                    path_result = path_analyzer.find_paths_through_node(self.place_obj.id, max_paths=50)
-                    
-                    if path_result.success and path_result.data.get('paths'):
-                        paths = path_result.data['paths']
-                        path_count = len(paths)
-                        if path_count >= 50:
-                            text = f"≥50 paths pass through this place\n(limited to first 50)"
-                        else:
-                            avg_length = sum(len(p) for p in paths) / len(paths) if paths else 0
-                            text = f"{path_count} path(s) pass through this place\n"
-                            text += f"Average path length: {avg_length:.1f} nodes"
-                        paths_label.set_text(text)
-                    else:
-                        paths_label.set_text("Not in any paths")
-                except Exception as e:
-                    paths_label.set_text(f"Analysis error: {str(e)}")
-            
-            # Analyze hub status
-            if hub_label:
-                try:
-                    hub_analyzer = HubAnalyzer(self.model)
-                    hub_result = hub_analyzer.get_node_degree_info(self.place_obj.id)
-                    
-                    if hub_result.success:
-                        hub_data = hub_result.data
-                        is_hub = hub_data.get('is_hub', False)
-                        degree = hub_data.get('degree', 0)
-                        in_deg = hub_data.get('in_degree', 0)
-                        out_deg = hub_data.get('out_degree', 0)
-                        
-                        if is_hub:
-                            text = f"⭐ HUB (degree {degree})\n"
-                            text += f"Incoming: {in_deg} arcs, Outgoing: {out_deg} arcs"
-                        else:
-                            text = f"Regular place (degree {degree})\n"
-                            text += f"Incoming: {in_deg} arcs, Outgoing: {out_deg} arcs"
-                        hub_label.set_text(text)
-                    else:
-                        hub_label.set_text("Unable to analyze hub status")
-                except Exception as e:
-                    hub_label.set_text(f"Analysis error: {str(e)}")
+            # Get the topology tab container and add the widget
+            container = self.builder.get_object('topology_tab_container')
+            if container and topology_widget:
+                container.pack_start(topology_widget, True, True, 0)
+                topology_widget.show_all()
         
-        except ImportError:
+        except ImportError as e:
             # Topology module not available - silently skip
-            pass
+            print(f"Topology tab not available: {e}")
 
     def run(self):
         """Show the dialog and run it modally.
@@ -311,6 +235,11 @@ class PlacePropDialogLoader(GObject.GObject):
         This ensures proper cleanup to prevent orphaned widgets that can
         cause Wayland focus issues and application crashes.
         """
+        # Clean up topology loader first
+        if self.topology_loader:
+            self.topology_loader.destroy()
+            self.topology_loader = None
+        
         if self.dialog:
             self.dialog.destroy()
             self.dialog = None
