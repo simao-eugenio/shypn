@@ -1,5 +1,5 @@
 """Network topology analyzers."""
 
-# Placeholder - to be implemented
+from .hubs import HubAnalyzer
 
-__all__ = []
+__all__ = ['HubAnalyzer']

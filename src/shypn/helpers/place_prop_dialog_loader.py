@@ -188,12 +188,15 @@ class PlacePropDialogLoader(GObject.GObject):
             return
         
         try:
-            from shypn.topology.graph import CycleAnalyzer
+            from shypn.topology.graph import CycleAnalyzer, PathAnalyzer
             from shypn.topology.structural import PInvariantAnalyzer
+            from shypn.topology.network import HubAnalyzer
             
             # Get topology labels
             cycles_label = self.builder.get_object('topology_cycles_label')
             p_inv_label = self.builder.get_object('topology_p_invariants_label')
+            paths_label = self.builder.get_object('topology_paths_label')
+            hub_label = self.builder.get_object('topology_hub_label')
             
             # Analyze cycles
             if cycles_label:
@@ -235,6 +238,52 @@ class PlacePropDialogLoader(GObject.GObject):
                         p_inv_label.set_text("Not in any P-invariants")
                 except Exception as e:
                     p_inv_label.set_text(f"Analysis error: {str(e)}")
+            
+            # Analyze paths
+            if paths_label:
+                try:
+                    path_analyzer = PathAnalyzer(self.model)
+                    path_result = path_analyzer.find_paths_through_node(self.place_obj.id, max_paths=50)
+                    
+                    if path_result.success and path_result.data.get('paths'):
+                        paths = path_result.data['paths']
+                        path_count = len(paths)
+                        if path_count >= 50:
+                            text = f"≥50 paths pass through this place\n(limited to first 50)"
+                        else:
+                            avg_length = sum(len(p) for p in paths) / len(paths) if paths else 0
+                            text = f"{path_count} path(s) pass through this place\n"
+                            text += f"Average path length: {avg_length:.1f} nodes"
+                        paths_label.set_text(text)
+                    else:
+                        paths_label.set_text("Not in any paths")
+                except Exception as e:
+                    paths_label.set_text(f"Analysis error: {str(e)}")
+            
+            # Analyze hub status
+            if hub_label:
+                try:
+                    hub_analyzer = HubAnalyzer(self.model)
+                    hub_result = hub_analyzer.get_node_degree_info(self.place_obj.id)
+                    
+                    if hub_result.success:
+                        hub_data = hub_result.data
+                        is_hub = hub_data.get('is_hub', False)
+                        degree = hub_data.get('degree', 0)
+                        in_deg = hub_data.get('in_degree', 0)
+                        out_deg = hub_data.get('out_degree', 0)
+                        
+                        if is_hub:
+                            text = f"⭐ HUB (degree {degree})\n"
+                            text += f"Incoming: {in_deg} arcs, Outgoing: {out_deg} arcs"
+                        else:
+                            text = f"Regular place (degree {degree})\n"
+                            text += f"Incoming: {in_deg} arcs, Outgoing: {out_deg} arcs"
+                        hub_label.set_text(text)
+                    else:
+                        hub_label.set_text("Unable to analyze hub status")
+                except Exception as e:
+                    hub_label.set_text(f"Analysis error: {str(e)}")
         
         except ImportError:
             # Topology module not available - silently skip
