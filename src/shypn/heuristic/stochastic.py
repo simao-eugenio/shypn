@@ -50,8 +50,9 @@ class StochasticEstimator(KineticEstimator):
         # Cache results
         self.parameter_cache[cache_key] = parameters
         
+        reaction_id = reaction.id if reaction and hasattr(reaction, 'id') else 'external'
         self.logger.info(
-            f"Estimated stochastic parameters for {reaction.id}: "
+            f"Estimated stochastic parameters for {reaction_id}: "
             f"lambda={lambda_rate:.2f}"
         )
         
@@ -85,11 +86,12 @@ class StochasticEstimator(KineticEstimator):
         - Scale by total reactant stoichiometry
         - Adjust for substrate availability
         """
-        if not reaction.reactants:
-            return self.default_lambda
-        
-        # Sum of reactant stoichiometries
-        total_stoich = sum(stoich for _, stoich in reaction.reactants)
+        if reaction is None or not hasattr(reaction, 'reactants') or not reaction.reactants:
+            # For external conversions, use substrate count
+            total_stoich = len(substrate_places) if substrate_places else 1
+        else:
+            # Sum of reactant stoichiometries
+            total_stoich = sum(stoich for _, stoich in reaction.reactants)
         
         # Base lambda scaled by stoichiometry
         lambda_rate = self.default_lambda * total_stoich

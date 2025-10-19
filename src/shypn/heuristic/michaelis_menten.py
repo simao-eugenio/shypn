@@ -51,8 +51,9 @@ class MichaelisMentenEstimator(KineticEstimator):
         # Cache results
         self.parameter_cache[cache_key] = parameters
         
+        reaction_id = reaction.id if reaction and hasattr(reaction, 'id') else 'external'
         self.logger.info(
-            f"Estimated MM parameters for {reaction.id}: "
+            f"Estimated MM parameters for {reaction_id}: "
             f"Vmax={vmax:.2f}, Km={km:.2f}"
         )
         
@@ -102,7 +103,10 @@ class MichaelisMentenEstimator(KineticEstimator):
         
         Rule: Vmax = 10.0 * max(product_stoichiometry)
         """
-        if not reaction.products:
+        if reaction is None or not hasattr(reaction, 'products') or not reaction.products:
+            # For external conversions (KEGG), use default based on product count
+            if product_places:
+                return self.default_vmax * len(product_places)
             return self.default_vmax
         
         # Get maximum product stoichiometry
@@ -112,7 +116,7 @@ class MichaelisMentenEstimator(KineticEstimator):
         vmax = self.default_vmax * max_stoich
         
         # Adjust for reversibility
-        if reaction.reversible:
+        if hasattr(reaction, 'reversible') and reaction.reversible:
             vmax *= 0.8  # Reversible reactions slightly slower
         
         return vmax
