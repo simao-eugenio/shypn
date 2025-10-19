@@ -595,15 +595,36 @@ class ModelCanvasManager:
         
         
         # Update ID counters to avoid collisions
+        # Handle both numeric IDs (int) and string IDs ("P123", "T45", "A12")
         if places:
-            max_place_id = max(p.id for p in self.places)
-            self.document_controller._next_place_id = max_place_id + 1
+            place_ids = []
+            for p in self.places:
+                if isinstance(p.id, int):
+                    place_ids.append(p.id)
+                elif isinstance(p.id, str) and len(p.id) > 1 and p.id[1:].isdigit():
+                    place_ids.append(int(p.id[1:]))
+            if place_ids:
+                self.document_controller._next_place_id = max(place_ids) + 1
+        
         if transitions:
-            max_transition_id = max(t.id for t in self.transitions)
-            self.document_controller._next_transition_id = max_transition_id + 1
+            trans_ids = []
+            for t in self.transitions:
+                if isinstance(t.id, int):
+                    trans_ids.append(t.id)
+                elif isinstance(t.id, str) and len(t.id) > 1 and t.id[1:].isdigit():
+                    trans_ids.append(int(t.id[1:]))
+            if trans_ids:
+                self.document_controller._next_transition_id = max(trans_ids) + 1
+        
         if arcs:
-            max_arc_id = max(a.id for a in self.arcs)
-            self.document_controller._next_arc_id = max_arc_id + 1
+            arc_ids = []
+            for a in self.arcs:
+                if isinstance(a.id, int):
+                    arc_ids.append(a.id)
+                elif isinstance(a.id, str) and len(a.id) > 1 and a.id[1:].isdigit():
+                    arc_ids.append(int(a.id[1:]))
+            if arc_ids:
+                self.document_controller._next_arc_id = max(arc_ids) + 1
         
         # Mark document as dirty (unsaved changes) and trigger redraw
         self.mark_dirty()  # Document dirty tracking for save state

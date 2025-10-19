@@ -71,7 +71,7 @@ def create_model_canvas_manager(model_data: Dict[str, Any]):
             trans_data['name']
         )
         trans.label = trans_data.get('label', '')
-        trans.type = trans_data.get('type', 'immediate')
+        trans.transition_type = trans_data.get('type', 'immediate')
         trans.rate = trans_data.get('rate', 1.0)
         trans.guard = trans_data.get('guard', 1)
         trans.priority = trans_data.get('priority', 1)
@@ -110,10 +110,14 @@ def create_model_canvas_manager(model_data: Dict[str, Any]):
             doc_model.arcs.append(arc)
     
     # Create canvas manager (without actual canvas)
-    canvas_manager = ModelCanvasManager(canvas_width=2000, canvas_height=2000, filename="imported")
-    canvas_manager.places = doc_model.places
-    canvas_manager.transitions = doc_model.transitions
-    canvas_manager.arcs = doc_model.arcs
+    canvas_manager = ModelCanvasManager(filename="imported")
+    
+    # Use load_objects() for proper initialization and observer notification
+    canvas_manager.load_objects(
+        places=doc_model.places,
+        transitions=doc_model.transitions,
+        arcs=doc_model.arcs
+    )
     
     return canvas_manager
 
@@ -142,7 +146,7 @@ def test_simulation_controller():
         p2.marking = 0
         
         t1 = Transition(50, 0, "T1", "T1")
-        t1.type = "immediate"
+        t1.transition_type = "immediate"
         t1.rate = 1.0
         t1.guard = 1
         
@@ -153,10 +157,14 @@ def test_simulation_controller():
         doc_model.transitions = [t1]
         doc_model.arcs = [a1, a2]
         
-        canvas_manager = ModelCanvasManager(None, None, filename="test")
-        canvas_manager.places = doc_model.places
-        canvas_manager.transitions = doc_model.transitions
-        canvas_manager.arcs = doc_model.arcs
+        canvas_manager = ModelCanvasManager(filename="test")
+        
+        # Use load_objects() for proper initialization and observer notification
+        canvas_manager.load_objects(
+            places=doc_model.places,
+            transitions=doc_model.transitions,
+            arcs=doc_model.arcs
+        )
         
         # Create simulation controller
         controller = SimulationController(canvas_manager)
@@ -431,7 +439,7 @@ def test_stochastic_sources():
         
         # Model: SOURCE (stochastic) -> P1
         source = Transition(0, 0, "SOURCE", "SOURCE")
-        source.type = "stochastic"
+        source.transition_type = "stochastic"
         source.rate = 1.0  # High rate for testing
         source.guard = 1
         
@@ -444,10 +452,15 @@ def test_stochastic_sources():
         doc_model.transitions = [source]
         doc_model.arcs = [a1]
         
-        canvas_manager = ModelCanvasManager(canvas_width=200, canvas_height=200, filename="test_source")
-        canvas_manager.places = doc_model.places
-        canvas_manager.transitions = doc_model.transitions
-        canvas_manager.arcs = doc_model.arcs
+        canvas_manager = ModelCanvasManager(filename="test_source")
+        
+        # Use load_objects() for proper initialization
+        canvas_manager.load_objects(
+            places=doc_model.places,
+            transitions=doc_model.transitions,
+            arcs=doc_model.arcs
+        )
+        
         controller = SimulationController(canvas_manager)
         
         print(f"Model: Stochastic source -> Place")
