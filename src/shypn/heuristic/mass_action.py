@@ -67,10 +67,11 @@ class MassActionEstimator(KineticEstimator):
         """
         k = parameters['k']
         
+        # Build rate function based on number of substrates
         if len(substrate_places) >= 2:
-            return f"mass_action({substrate_places[0].name}, {substrate_places[1].name}, {k})"
+            return f"mass_action({str(substrate_places[0].name)}, {str(substrate_places[1].name)}, {k})"
         elif len(substrate_places) == 1:
-            return f"mass_action({substrate_places[0].name}, 1.0, {k})"
+            return f"mass_action({str(substrate_places[0].name)}, 1.0, {k})"
         else:
             return f"{k}"
     

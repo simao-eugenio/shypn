@@ -28,8 +28,9 @@ class ConversionOptions:
         split_reversible: Split reversible reactions into two transitions (default: False)
             When True, creates forward and backward transitions for reversible reactions
         
-        add_initial_marking: Add initial tokens to places (default: False)
-            When True, adds one token to each place for immediate simulation
+        add_initial_marking: Add initial tokens to places (default: True)
+            When True, adds one token to each place for immediate simulation/testing
+            KEGG pathways don't specify initial states, so this enables quick experimentation
         
         filter_isolated_compounds: Remove compounds not involved in any reaction (default: True)
             When True, excludes compounds that appear in KEGG but aren't connected to reactions
@@ -42,7 +43,7 @@ class ConversionOptions:
     coordinate_scale: float = 2.5
     include_cofactors: bool = True
     split_reversible: bool = False
-    add_initial_marking: bool = False
+    add_initial_marking: bool = True  # Auto-add tokens for testing/experimentation
     filter_isolated_compounds: bool = True
     center_x: float = 0.0
     center_y: float = 0.0
