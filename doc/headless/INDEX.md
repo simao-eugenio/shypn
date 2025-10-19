@@ -60,8 +60,17 @@ This directory contains documentation for headless simulation testing - testing 
 **Contents:**
 - Root cause: Place ID context mapping bug (string IDs → double P prefix)
 - Fix: Handle both string IDs (`"P105"`) and numeric IDs properly
-- Impact: All imported models (KEGG, SBML) affected
+- Impact: KEGG imports affected, SBML was already working
 - Verification: All 26 places now active in Glycolysis
+
+### [PLACE_ID_ANALYSIS.md](PLACE_ID_ANALYSIS.md) 🆕
+**Import method analysis** - Why bug only affected KEGG imports
+
+**Contents:**
+- KEGG uses string IDs ("P88", "P105") - was affected
+- SBML uses numeric IDs (88, 105) - was not affected
+- Guard expressions also fixed (transition_behavior.py)
+- Future considerations for ID type standardization
 
 ## Test Suite Structure
 

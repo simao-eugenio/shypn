@@ -269,10 +269,16 @@ class TransitionBehavior(ABC):
                 context = {'t': self._get_current_time()}
                 context.update(FUNCTION_CATALOG)
                 
-                # Add place tokens as P1, P2, ...
+                # Add place tokens as P1, P2, ... (or P88, P105 if ID already has P)
                 if hasattr(self.model, 'places'):
                     for place_id, place in self.model.places.items():
-                        context[f'P{place_id}'] = place.tokens
+                        # Handle both numeric IDs (1, 2, 3) and string IDs ("P88", "P105")
+                        if isinstance(place_id, str) and place_id.startswith('P'):
+                            # ID already has P prefix (e.g., "P105")
+                            context[place_id] = place.tokens
+                        else:
+                            # Numeric ID needs P prefix (e.g., 1 → P1)
+                            context[f'P{place_id}'] = place.tokens
                 
                 # Evaluate expression safely
                 result = eval(guard_expr, {"__builtins__": {}}, context)
