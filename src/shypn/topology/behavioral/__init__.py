@@ -1,5 +1,5 @@
 """Behavioral topology analyzers."""
 
-# Placeholder - to be implemented
+from .deadlocks import DeadlockAnalyzer
 
-__all__ = []
+__all__ = ['DeadlockAnalyzer']
