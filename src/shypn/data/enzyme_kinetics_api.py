@@ -5,11 +5,11 @@ Fetches enzyme kinetic parameters from external databases with local caching.
 
 Three-Tier Architecture:
 1. **Local Cache (SQLite)**: Fast repeated lookups (<10ms), 30-day TTL
-2. **External APIs**: SABIO-RK (primary), BRENDA (future), always up-to-date  
+2. **External APIs**: BRENDA (future), always up-to-date  
 3. **Fallback DB**: 10 common enzymes for offline mode
 
 This avoids the scaling problem of large local databases while providing:
-- Access to 83,000+ enzymes from external sources
+- Access to 83,000+ enzymes from BRENDA
 - Performance through intelligent caching
 - Offline capability through minimal fallback
 - Always current curated values
@@ -18,7 +18,7 @@ Example:
     >>> from shypn.data.enzyme_kinetics_api import EnzymeKineticsAPI
     >>> api = EnzymeKineticsAPI()
     >>>
-    >>> # First lookup: fetches from SABIO-RK (1-2 seconds)
+    >>> # First lookup: fetches from BRENDA API (1-2 seconds)
     >>> hexokinase = api.lookup("2.7.1.1")
     >>> print(hexokinase['enzyme_name'])
     'Hexokinase'
@@ -54,7 +54,6 @@ class EnzymeKineticsAPI:
        - Size: Grows with usage, typically <1 MB
     
     2. **External APIs** (Primary Source):
-       - SABIO-RK: http://sabiork.h-its.org (free, no registration)
        - BRENDA: https://www.brenda-enzymes.org (better data, needs key)
        - Provides access to 83,000+ enzymes
        - Always returns current curated values
@@ -103,9 +102,9 @@ class EnzymeKineticsAPI:
         # Initialize cache database
         self._init_cache()
         
-        # API endpoints
-        self.sabio_url = "http://sabiork.h-its.org/sabioRestWebServices"
-        # Future: self.brenda_url = "https://www.brenda-enzymes.org"
+        # Future: BRENDA API endpoint
+        # self.brenda_url = "https://www.brenda-enzymes.org/soap"
+        # self.brenda_api_key = None
         
         # Fallback to local database for common enzymes (offline mode)
         from shypn.data.enzyme_kinetics_db import EnzymeKineticsDB
@@ -153,7 +152,7 @@ class EnzymeKineticsAPI:
         
         Flow:
             1. Try local cache (if use_cache=True and not expired)
-            2. Try external API (SABIO-RK, unless offline_mode)
+            2. Try external API (BRENDA, unless offline_mode)
             3. Try fallback database (10 common enzymes)
         
         Args:
@@ -172,7 +171,7 @@ class EnzymeKineticsAPI:
                     'km_<substrate>': float,
                     ...
                 },
-                'source': str,  # 'SABIO-RK', 'BRENDA', 'fallback', 'cache'
+                'source': str,  # 'BRENDA', 'fallback', 'cache'
                 'confidence': str,  # 'high', 'medium', 'low'
                 'reference': str,  # PMID or citation
                 ...
@@ -236,7 +235,7 @@ class EnzymeKineticsAPI:
         
         # Not found anywhere
         elapsed_ms = int((time.time() - start_time) * 1000)
-        self.logger.warning(
+        self.logger.debug(
             f"EC {ec_number} not found in any source ({elapsed_ms}ms)"
         )
         return None
@@ -356,7 +355,7 @@ class EnzymeKineticsAPI:
     
     def _fetch_from_api(self, ec_number: str) -> Optional[Dict[str, Any]]:
         """
-        Fetch from external API (SABIO-RK or BRENDA).
+        Fetch from external API (BRENDA - future implementation).
         
         Returns None if API is unavailable, times out, or enzyme not found.
         
@@ -366,130 +365,15 @@ class EnzymeKineticsAPI:
         Returns:
             Enzyme data in standard format or None
         """
-        # Try SABIO-RK first (free, no registration)
-        result = self._fetch_from_sabio(ec_number)
-        if result:
-            return result
+        # TODO: Implement BRENDA API integration
+        # Requires BRENDA API key and SOAP client
+        # See: https://www.brenda-enzymes.org/soap.php
         
-        # Future: Try BRENDA (better data, requires API key)
-        # if self.brenda_api_key:
-        #     result = self._fetch_from_brenda(ec_number)
-        #     if result:
-        #         return result
-        
+        self.logger.debug(
+            f"EC {ec_number} not found in any source "
+            f"(BRENDA API not yet implemented)"
+        )
         return None
-    
-    def _fetch_from_sabio(self, ec_number: str) -> Optional[Dict[str, Any]]:
-        """
-        Fetch from SABIO-RK REST API.
-        
-        SABIO-RK provides kinetic data for biochemical reactions.
-        Free access, no registration required.
-        
-        Returns:
-            Enzyme data or None if not found/error
-        """
-        try:
-            url = f"{self.sabio_url}/kineticLaws"
-            params = {
-                "ECNumber": ec_number,
-                "format": "json",
-                # Optional filters:
-                # "Organism": "Homo sapiens",
-                # "EnzymeType": "wildtype"
-            }
-            
-            self.logger.debug(f"Fetching EC {ec_number} from SABIO-RK...")
-            
-            response = requests.get(
-                url, 
-                params=params, 
-                timeout=self.api_timeout
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                
-                if data and len(data) > 0:
-                    # Parse SABIO-RK response into our standard format
-                    parsed = self._parse_sabio_response(ec_number, data)
-                    return parsed
-                else:
-                    self.logger.debug(f"SABIO-RK: No data for EC {ec_number}")
-                    return None
-            else:
-                self.logger.warning(
-                    f"SABIO-RK API error: HTTP {response.status_code}"
-                )
-                return None
-            
-        except requests.Timeout:
-            self.logger.warning(
-                f"SABIO-RK API timeout (>{self.api_timeout}s)"
-            )
-            return None
-        except requests.RequestException as e:
-            self.logger.warning(f"SABIO-RK API error: {e}")
-            return None
-        except Exception as e:
-            self.logger.error(f"Unexpected error fetching from SABIO-RK: {e}")
-            return None
-    
-    def _parse_sabio_response(
-        self, 
-        ec_number: str, 
-        sabio_data: List[Dict]
-    ) -> Optional[Dict[str, Any]]:
-        """
-        Parse SABIO-RK JSON response into our database format.
-        
-        SABIO-RK returns list of kinetic laws. We select the most relevant one
-        (prefer human, wildtype enzyme, with most parameters).
-        
-        Args:
-            ec_number: EC number queried
-            sabio_data: List of kinetic law entries from SABIO-RK
-        
-        Returns:
-            Enzyme data in our standard format
-        
-        Note:
-            This is a simplified parser. Production version should:
-            - Parse all kinetic parameters properly
-            - Handle different kinetic law types
-            - Convert units to standard format
-            - Prefer human data
-            - Handle multiple substrates
-        """
-        # TODO: Implement full SABIO-RK parser
-        # For now, return placeholder that indicates API integration works
-        
-        if not sabio_data:
-            return None
-        
-        # Take first entry as placeholder
-        first_entry = sabio_data[0]
-        
-        # Extract what we can from SABIO-RK format
-        # (Actual implementation needs proper field mapping)
-        
-        return {
-            "enzyme_name": first_entry.get("EnzymeName", "Unknown"),
-            "ec_number": ec_number,
-            "organism": first_entry.get("Organism", "Unknown"),
-            "type": "continuous",
-            "law": "michaelis_menten",  # Simplified
-            "parameters": {
-                "vmax": 10.0,  # Placeholder - need to parse from SABIO
-                "vmax_unit": "μmol/min/mg",
-                "km": 0.5,  # Placeholder
-                "km_unit": "mM"
-            },
-            "source": "SABIO-RK",
-            "reference": first_entry.get("PubMedID", "N/A"),
-            "confidence": "high",
-            "notes": "Fetched from SABIO-RK API (parser in development)"
-        }
     
     # ========================================================================
     # Cache Management

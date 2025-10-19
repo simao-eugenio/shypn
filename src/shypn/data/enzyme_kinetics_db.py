@@ -5,7 +5,7 @@ Curated database of enzyme kinetic parameters from literature sources.
 
 Primary Sources:
 - BRENDA (www.brenda-enzymes.org)
-- SABIO-RK (sabio.h-its.org)
+- BRENDA (brenda-enzymes.org)
 - Primary literature (PubMed)
 
 Focus: Human enzymes from major metabolic pathways
@@ -367,7 +367,7 @@ class EnzymeKineticsDB:
     Database of enzyme kinetic parameters from literature.
     
     Provides lookup methods for retrieving kinetic parameters by EC number.
-    All entries are curated from scientific literature (BRENDA, SABIO-RK, PubMed).
+    All entries are curated from scientific literature (BRENDA, PubMed).
     
     Example:
         >>> db = EnzymeKineticsDB()

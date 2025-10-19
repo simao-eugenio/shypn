@@ -167,7 +167,7 @@ def demo_multiple_enrichments():
         },
         {
             "data_type": "kinetics",
-            "source": "SABIO-RK",
+            "source": "BRENDA",
             "quality_score": 0.90,
             "fields_enriched": ["reactions[0].kinetic_law"]
         },

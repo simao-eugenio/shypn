@@ -3,7 +3,7 @@ Test EnzymeKineticsAPI - Hybrid Architecture
 
 Tests three-tier system:
 1. Cache lookup
-2. API fetch (SABIO-RK)
+2. API fetch (BRENDA - future)
 3. Fallback database
 
 Run with: python -m pytest test_enzyme_api.py -v
@@ -41,7 +41,7 @@ class TestEnzymeKineticsAPI:
     
     @pytest.fixture
     def api_online(self, temp_cache_dir):
-        """Create API instance in online mode (can fetch from SABIO-RK)."""
+        """Create API instance in online mode (BRENDA API not yet implemented)."""
         return EnzymeKineticsAPI(
             cache_dir=temp_cache_dir,
             offline_mode=False,
@@ -157,12 +157,12 @@ class TestEnzymeKineticsAPI:
         assert stats is not None
     
     # ========================================================================
-    # TIER 2: API Tests (Online Mode)
+    # TIER 2: API Tests (Disabled - BRENDA not yet implemented)
     # ========================================================================
     
-    @pytest.mark.skip(reason="Online API tests - enable manually with pytest -k test_api_fetch_sabio")
-    def test_api_fetch_sabio(self, api_online):
-        """Test fetching from SABIO-RK API (requires internet)."""
+    @pytest.mark.skip(reason="BRENDA API not yet implemented")
+    def test_api_fetch_brenda(self, api_online):
+        """Test fetching from BRENDA API (future implementation)."""
         # Try to fetch hexokinase
         result = api_online.lookup("2.7.1.1", use_cache=False)
         
@@ -170,12 +170,12 @@ class TestEnzymeKineticsAPI:
             # API returned data
             assert result['ec_number'] == "2.7.1.1"
             assert 'parameters' in result
-            assert result.get('source') in ['SABIO-RK', 'fallback']
+            assert result.get('source') in ['BRENDA', 'fallback']
         else:
-            # API unavailable, should fall back
-            pytest.skip("SABIO-RK API unavailable")
+            # API not implemented, should fall back
+            pytest.skip("BRENDA API not yet implemented")
     
-    @pytest.mark.skip(reason="Online API tests - enable manually")
+    @pytest.mark.skip(reason="BRENDA API not yet implemented")
     def test_api_caching(self, api_online):
         """Test that API results are cached."""
         # First lookup (from API)
@@ -184,7 +184,7 @@ class TestEnzymeKineticsAPI:
         time1 = time.time() - start1
         
         if result1 is None:
-            pytest.skip("SABIO-RK API unavailable")
+            pytest.skip("BRENDA API not yet implemented")
         
         # Second lookup (from cache)
         start2 = time.time()
