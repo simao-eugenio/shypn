@@ -196,8 +196,20 @@ class KineticsAssigner:
             self.logger.debug("Database not available")
             return AssignmentResult.failed("Database not available")
         
-        # Extract EC number from reaction
-        ec_numbers = getattr(reaction, 'ec_numbers', [])
+        # Extract EC number - prefer transition metadata (from KEGG enrichment)
+        ec_numbers = []
+        
+        # First: Check transition metadata (KEGG EC enrichment)
+        if hasattr(transition, 'metadata') and 'ec_numbers' in transition.metadata:
+            ec_numbers = transition.metadata['ec_numbers']
+            self.logger.debug(f"Using EC numbers from transition metadata: {ec_numbers}")
+        
+        # Fallback: Check reaction object (legacy)
+        if not ec_numbers and reaction:
+            ec_numbers = getattr(reaction, 'ec_numbers', [])
+            if ec_numbers:
+                self.logger.debug(f"Using EC numbers from reaction object: {ec_numbers}")
+        
         if not ec_numbers:
             return AssignmentResult.failed("No EC number")
         
