@@ -287,7 +287,7 @@ class TransitionPropDialogLoader(GObject.GObject):
                     self.persistency_manager.mark_dirty()
                 self.emit('properties-changed')
         
-        dialog.destroy()
+        # Don't destroy here - let explicit destroy() method handle it
     
     def _apply_changes(self):
         """Apply changes from dialog fields to Transition object.
@@ -396,6 +396,26 @@ class TransitionPropDialogLoader(GObject.GObject):
             Gtk.Dialog: The dialog widget
         """
         return self.dialog
+    
+    def destroy(self):
+        """Destroy dialog and clean up all widget references.
+        
+        This ensures proper cleanup to prevent orphaned widgets that can
+        cause Wayland focus issues and application crashes.
+        """
+        if self.dialog:
+            self.dialog.destroy()
+            self.dialog = None
+        
+        # Clean up widget references to prevent memory leaks
+        self.color_picker = None
+        self.locality_widget = None
+        self.builder = None
+        self.transition_obj = None
+        self.parent_window = None
+        self.persistency_manager = None
+        self.model = None
+        self.data_collector = None
 
 
 # Factory function for backward compatibility
