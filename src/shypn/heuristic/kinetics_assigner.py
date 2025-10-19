@@ -107,7 +107,15 @@ class KineticsAssigner:
             return self._assign_explicit(transition, reaction)
         
         # Tier 2: Database lookup (if EC number available)
-        if hasattr(reaction, 'ec_numbers') and reaction.ec_numbers:
+        # Check transition metadata first (from KEGG EC enrichment)
+        # then fallback to reaction.ec_numbers (legacy)
+        has_ec = False
+        if hasattr(transition, 'metadata') and 'ec_numbers' in transition.metadata:
+            has_ec = bool(transition.metadata['ec_numbers'])
+        elif hasattr(reaction, 'ec_numbers'):
+            has_ec = bool(reaction.ec_numbers)
+        
+        if has_ec:
             result = self._assign_from_database(
                 transition, reaction, substrate_places, product_places
             )
