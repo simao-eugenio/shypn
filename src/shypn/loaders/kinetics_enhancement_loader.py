@@ -26,12 +26,19 @@ class KineticsEnhancementLoader:
     Thin loader for kinetics enhancement.
     
     Minimal logic - just delegates to KineticsAssigner.
+    Supports hybrid API database with offline mode.
     """
     
-    def __init__(self):
-        """Initialize loader."""
-        self.assigner = KineticsAssigner()
+    def __init__(self, offline_mode: bool = False):
+        """
+        Initialize loader.
+        
+        Args:
+            offline_mode: If True, skip API calls (cache + fallback only)
+        """
+        self.assigner = KineticsAssigner(offline_mode=offline_mode)
         self.logger = logging.getLogger(__name__)
+        self.offline_mode = offline_mode
     
     def enhance_transitions(
         self,
@@ -122,36 +129,51 @@ class KineticsEnhancementLoader:
 # Convenience functions for importers
 
 _loader = None
+_offline_mode = False
 
-def _get_loader() -> KineticsEnhancementLoader:
-    """Get singleton loader instance."""
-    global _loader
-    if _loader is None:
-        _loader = KineticsEnhancementLoader()
+def _get_loader(offline_mode: bool = False) -> KineticsEnhancementLoader:
+    """
+    Get singleton loader instance.
+    
+    Args:
+        offline_mode: If True, skip API calls (cache + fallback only)
+    """
+    global _loader, _offline_mode
+    if _loader is None or _offline_mode != offline_mode:
+        _loader = KineticsEnhancementLoader(offline_mode=offline_mode)
+        _offline_mode = offline_mode
     return _loader
 
 
 def enhance_kegg_transitions(
     transitions: List,
-    reactions: Optional[List] = None
+    reactions: Optional[List] = None,
+    offline_mode: bool = False
 ) -> Dict[str, AssignmentResult]:
     """
     Enhance KEGG-imported transitions with kinetic properties.
     
+    Uses hybrid three-tier database:
+    - Tier 1: Local cache (fast)
+    - Tier 2: External APIs (SABIO-RK/BRENDA, if online)
+    - Tier 3: Fallback database (10 glycolysis enzymes)
+    
     Args:
         transitions: List of Transition objects from KEGG import
         reactions: List of KEGG reaction objects (optional)
+        offline_mode: If True, skip API calls (default: False)
     
     Returns:
         Dict mapping transition.name → AssignmentResult
     """
-    loader = _get_loader()
+    loader = _get_loader(offline_mode=offline_mode)
     return loader.enhance_transitions(transitions, reactions, source='kegg')
 
 
 def enhance_sbml_transitions(
     transitions: List,
-    reactions: Optional[List] = None
+    reactions: Optional[List] = None,
+    offline_mode: bool = False
 ) -> Dict[str, AssignmentResult]:
     """
     Enhance SBML-imported transitions with kinetic properties.
@@ -162,17 +184,19 @@ def enhance_sbml_transitions(
     Args:
         transitions: List of Transition objects from SBML import
         reactions: List of SBML reaction objects (optional)
+        offline_mode: If True, skip API calls (default: False)
     
     Returns:
         Dict mapping transition.name → AssignmentResult
     """
-    loader = _get_loader()
+    loader = _get_loader(offline_mode=offline_mode)
     return loader.enhance_transitions(transitions, reactions, source='sbml')
 
 
 def enhance_biomodels_transitions(
     transitions: List,
-    reactions: Optional[List] = None
+    reactions: Optional[List] = None,
+    offline_mode: bool = False
 ) -> Dict[str, AssignmentResult]:
     """
     Enhance BioModels-imported transitions with kinetic properties.
@@ -180,9 +204,10 @@ def enhance_biomodels_transitions(
     Args:
         transitions: List of Transition objects from BioModels import
         reactions: List of reaction objects (optional)
+        offline_mode: If True, skip API calls (default: False)
     
     Returns:
         Dict mapping transition.name → AssignmentResult
     """
-    loader = _get_loader()
+    loader = _get_loader(offline_mode=offline_mode)
     return loader.enhance_transitions(transitions, reactions, source='biomodels')

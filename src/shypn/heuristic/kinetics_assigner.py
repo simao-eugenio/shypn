@@ -19,20 +19,53 @@ from .assignment_result import AssignmentResult, ConfidenceLevel, AssignmentSour
 from .metadata import KineticsMetadata
 from .factory import EstimatorFactory
 
+# Import hybrid API for enzyme kinetics lookup
+try:
+    from shypn.data.enzyme_kinetics_api import EnzymeKineticsAPI
+    API_AVAILABLE = True
+except ImportError:
+    API_AVAILABLE = False
+
 
 class KineticsAssigner:
     """
     Assigns kinetic properties to transitions using tiered strategy.
     
+    Uses hybrid three-tier database system:
+    - Tier 1: Local cache (fast, <10ms)
+    - Tier 2: External APIs (SABIO-RK/BRENDA, comprehensive)
+    - Tier 3: Fallback database (10 glycolysis enzymes, offline)
+    
     Usage:
         assigner = KineticsAssigner()
         result = assigner.assign(transition, reaction, source='kegg')
+        
+        # Offline mode (no API calls):
+        assigner = KineticsAssigner(offline_mode=True)
     """
     
-    def __init__(self):
-        """Initialize kinetics assigner."""
+    def __init__(self, offline_mode: bool = False):
+        """
+        Initialize kinetics assigner.
+        
+        Args:
+            offline_mode: If True, skip API calls (use cache + fallback only)
+        """
         self.logger = logging.getLogger(__name__)
-        self.database = None  # Future: EC number database
+        self.offline_mode = offline_mode
+        
+        # Initialize hybrid API database
+        if API_AVAILABLE:
+            self.database = EnzymeKineticsAPI(offline_mode=offline_mode)
+            self.logger.info(
+                f"Initialized EnzymeKineticsAPI "
+                f"(offline_mode={offline_mode})"
+            )
+        else:
+            self.database = None
+            self.logger.warning(
+                "EnzymeKineticsAPI not available - database lookup disabled"
+            )
     
     def assign(
         self,
@@ -150,16 +183,139 @@ class KineticsAssigner:
         """
         Assign from EC number database lookup.
         
-        Future implementation: Query BRENDA/SABIO-RK for kinetic parameters.
-        """
-        # Future: Implement database lookup
-        # For now, return failure to fall through to heuristics
+        Uses hybrid three-tier system:
+        1. Local cache (SQLite) - Fast repeated lookups
+        2. External API (SABIO-RK/BRENDA) - Comprehensive, always current
+        3. Fallback database (10 glycolysis enzymes) - Offline support
         
-        self.logger.debug(
-            f"Database lookup not yet implemented for {transition.name}"
+        Returns:
+            AssignmentResult with database parameters or failed result
+        """
+        # Check if database available
+        if not self.database:
+            self.logger.debug("Database not available")
+            return AssignmentResult.failed("Database not available")
+        
+        # Extract EC number from reaction
+        ec_numbers = getattr(reaction, 'ec_numbers', [])
+        if not ec_numbers:
+            return AssignmentResult.failed("No EC number")
+        
+        ec_number = ec_numbers[0]  # Use first EC number
+        
+        # Lookup in database (tries cache → API → fallback)
+        try:
+            db_entry = self.database.lookup(ec_number)
+        except Exception as e:
+            self.logger.error(f"Database lookup error for EC {ec_number}: {e}")
+            return AssignmentResult.failed(f"Database error: {e}")
+        
+        if not db_entry:
+            self.logger.debug(
+                f"EC {ec_number} not found "
+                f"(tried cache + {'API + ' if not self.offline_mode else ''}fallback)"
+            )
+            return AssignmentResult.failed(f"EC {ec_number} not found in database")
+        
+        # Found in database!
+        source = db_entry.get('_lookup_source', db_entry.get('source', 'database'))
+        self.logger.info(
+            f"Found EC {ec_number} in {source}: {db_entry.get('enzyme_name', 'Unknown')}"
         )
         
-        return AssignmentResult.failed("Database lookup not implemented")
+        # Extract parameters and build rate function
+        params = db_entry.get('parameters', {})
+        kinetic_law = db_entry.get('law', 'michaelis_menten')
+        
+        # Determine transition type and build rate function
+        if kinetic_law == 'michaelis_menten':
+            transition.transition_type = "continuous"
+            
+            # Get Vmax (or kcat)
+            vmax = params.get('vmax', params.get('kcat', 10.0))
+            
+            # Get Km for substrate
+            # Try to match substrate-specific Km (e.g., km_glucose)
+            km = None
+            if substrate_places:
+                substrate_name = substrate_places[0].name.lower()
+                # Try to find matching km parameter
+                for key, value in params.items():
+                    if key.startswith('km_') and substrate_name in key.lower():
+                        km = value
+                        break
+            
+            # Fallback to generic km
+            if km is None:
+                km = params.get('km', 0.5)
+            
+            # Build rate function
+            if substrate_places:
+                substrate_place = substrate_places[0]
+                rate_function = f"michaelis_menten({substrate_place.name}, {vmax}, {km})"
+            else:
+                rate_function = f"michaelis_menten(substrate, {vmax}, {km})"
+            
+            # Store rate function
+            if not hasattr(transition, 'properties'):
+                transition.properties = {}
+            transition.properties['rate_function'] = rate_function
+            
+            # Create result
+            result = AssignmentResult.from_database(
+                parameters={
+                    'vmax': vmax,
+                    'km': km,
+                    **{k: v for k, v in params.items() if k not in ['vmax', 'km']}
+                },
+                rate_function=rate_function,
+                ec_number=ec_number
+            )
+            
+            # Add metadata about lookup source
+            result.metadata['lookup_source'] = source
+            result.metadata['enzyme_name'] = db_entry.get('enzyme_name', 'Unknown')
+            if 'reference' in db_entry:
+                result.metadata['reference'] = db_entry['reference']
+            
+            # Set metadata on transition
+            KineticsMetadata.set_from_result(transition, result)
+            
+            self.logger.info(
+                f"Assigned database kinetics to {transition.name}: "
+                f"EC {ec_number}, Vmax={vmax}, Km={km}, "
+                f"source={source}"
+            )
+            
+            return result
+            
+        elif kinetic_law == 'mass_action':
+            transition.transition_type = "stochastic"
+            k = params.get('k', params.get('rate_constant', 1.0))
+            transition.rate = k
+            
+            result = AssignmentResult.from_database(
+                parameters={'k': k},
+                rate_function=str(k),
+                ec_number=ec_number
+            )
+            
+            result.metadata['lookup_source'] = source
+            KineticsMetadata.set_from_result(transition, result)
+            
+            self.logger.info(
+                f"Assigned mass action kinetics to {transition.name}: "
+                f"EC {ec_number}, k={k}, source={source}"
+            )
+            
+            return result
+        
+        else:
+            # Unsupported kinetic law
+            self.logger.warning(
+                f"Unsupported kinetic law '{kinetic_law}' for EC {ec_number}"
+            )
+            return AssignmentResult.failed(f"Unsupported kinetic law: {kinetic_law}")
     
     def _assign_heuristic(
         self,
