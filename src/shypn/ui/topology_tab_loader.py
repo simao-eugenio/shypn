@@ -85,6 +85,7 @@ class TopologyTabLoader(ABC):
         self.t_inv_label = None
         self.arc_info_label = None
         self.critical_label = None
+        self.behavioral_label = None  # For behavioral properties section
         
         # Action buttons
         self.highlight_button = None
@@ -148,6 +149,7 @@ class TopologyTabLoader(ABC):
         self.t_inv_label = self.builder.get_object('topology_t_invariants_label')
         self.arc_info_label = self.builder.get_object('topology_arc_info_label')
         self.critical_label = self.builder.get_object('topology_critical_label')
+        self.behavioral_label = self.builder.get_object('topology_behavioral_label')
         
         # Action buttons
         self.highlight_button = self.builder.get_object('highlight_button')
@@ -280,6 +282,7 @@ class TopologyTabLoader(ABC):
         self.t_inv_label = None
         self.arc_info_label = None
         self.critical_label = None
+        self.behavioral_label = None
         self.highlight_button = None
         self.export_button = None
         
@@ -410,13 +413,127 @@ class PlaceTopologyTabLoader(TopologyTabLoader):
                     else:
                         self.hub_label.set_text("Unable to analyze hub status")
                 except Exception as e:
-                    self.hub_label.set_text(f"Analysis error: {str(e)}")
+                        self.hub_label.set_text(f"Analysis error: {str(e)}")
         
         except ImportError:
             # Topology module not available
             pass
-
-
+        
+        # Analyze behavioral properties
+        self._populate_behavioral_properties()
+    
+    def _populate_behavioral_properties(self):
+        """Populate behavioral properties section for this place.
+        
+        Analyzes the net and displays how this place affects behavioral properties:
+        - Boundedness (is this place bounded?)
+        - Deadlocks (is this place involved in deadlocks?)
+        - Siphons/Traps (is this place part of any siphons or traps?)
+        - Reachability (what markings are reachable for this place?)
+        """
+        if not self.behavioral_label or not self.model:
+            return
+        
+        try:
+            from shypn.topology.behavioral import (
+                BoundednessAnalyzer,
+                DeadlockAnalyzer,
+                ReachabilityAnalyzer
+            )
+            
+            text_parts = []
+            
+            # Boundedness analysis for this place
+            try:
+                bound_analyzer = BoundednessAnalyzer(self.model)
+                bound_result = bound_analyzer.analyze()
+                
+                if bound_result.success:
+                    is_bounded = bound_result.get('is_bounded', False)
+                    k_bound = bound_result.get('k_bound', 'unknown')
+                    unbounded_places = bound_result.get('unbounded_places', [])
+                    
+                    # Check if this place is in the unbounded list
+                    place_unbounded = self.element_id in unbounded_places
+                    
+                    if place_unbounded:
+                        text_parts.append(f"⚠ Unbounded Place")
+                        text_parts.append("This place can accumulate unlimited tokens")
+                    else:
+                        if is_bounded:
+                            text_parts.append(f"✓ Bounded (k={k_bound})")
+                            text_parts.append(f"Maximum tokens: {k_bound}")
+                        else:
+                            text_parts.append(f"✓ Bounded (net analysis)")
+                    text_parts.append("")
+            except Exception as e:
+                text_parts.append(f"Boundedness: Error - {str(e)[:50]}")
+                text_parts.append("")
+            
+            # Deadlock analysis
+            try:
+                deadlock_analyzer = DeadlockAnalyzer(self.model)
+                deadlock_result = deadlock_analyzer.analyze()
+                
+                if deadlock_result.success:
+                    can_deadlock = deadlock_result.get('can_deadlock', False)
+                    deadlock_marking = deadlock_result.get('deadlock_marking', {})
+                    
+                    if can_deadlock:
+                        # Check if this place is involved in the deadlock
+                        place_id_str = str(self.element_id)
+                        if place_id_str in deadlock_marking:
+                            tokens_at_deadlock = deadlock_marking[place_id_str]
+                            text_parts.append(f"⚠ Involved in Deadlock")
+                            text_parts.append(f"Tokens at deadlock: {tokens_at_deadlock}")
+                        else:
+                            text_parts.append(f"⚠ Net can deadlock (but not this place)")
+                    else:
+                        text_parts.append(f"✓ Deadlock-Free")
+                    text_parts.append("")
+            except Exception as e:
+                text_parts.append(f"Deadlock: Error - {str(e)[:50]}")
+                text_parts.append("")
+            
+            # Reachability analysis for this place
+            try:
+                reach_analyzer = ReachabilityAnalyzer(self.model)
+                reach_result = reach_analyzer.analyze(max_states=100, max_depth=50)
+                
+                if reach_result.success:
+                    total_states = reach_result.get('total_states', 0)
+                    
+                    # Try to extract marking range for this place
+                    states = reach_result.get('states', [])
+                    if states:
+                        place_markings = []
+                        place_id_str = str(self.element_id)
+                        for state in states:
+                            if place_id_str in state:
+                                place_markings.append(state[place_id_str])
+                        
+                        if place_markings:
+                            min_tokens = min(place_markings)
+                            max_tokens = max(place_markings)
+                            text_parts.append(f"Reachability Analysis ({total_states} states):")
+                            text_parts.append(f"Token range: {min_tokens} to {max_tokens}")
+                        else:
+                            text_parts.append(f"Reachability: {total_states} states explored")
+                    else:
+                        text_parts.append(f"Reachability: {total_states} states")
+            except Exception as e:
+                text_parts.append(f"Reachability: Error - {str(e)[:50]}")
+            
+            # Set the combined text
+            if text_parts:
+                self.behavioral_label.set_text('\n'.join(text_parts))
+            else:
+                self.behavioral_label.set_text("No behavioral analysis available")
+        
+        except ImportError as e:
+            self.behavioral_label.set_text("Behavioral analyzers not available")
+        except Exception as e:
+            self.behavioral_label.set_text(f"Behavioral analysis error: {str(e)[:100]}")
 class TransitionTopologyTabLoader(TopologyTabLoader):
     """Topology tab loader for transitions (reactions).
     
@@ -515,12 +632,127 @@ class TransitionTopologyTabLoader(TopologyTabLoader):
                     else:
                         self.hub_label.set_text("Unable to analyze hub status")
                 except Exception as e:
-                    self.hub_label.set_text(f"Analysis error: {str(e)}")
+                        self.hub_label.set_text(f"Analysis error: {str(e)}")
         
         except ImportError:
             pass
-
-
+        
+        # Analyze behavioral properties for this transition
+        self._populate_behavioral_properties()
+    
+    def _populate_behavioral_properties(self):
+        """Populate behavioral properties section for this transition.
+        
+        Analyzes the net and displays transition-specific behavioral properties:
+        - Liveness (what liveness level does this transition have?)
+        - Fairness (is this transition subject to starvation?)
+        - Deadlock participation (is this transition involved in deadlocks?)
+        """
+        if not self.behavioral_label or not self.model:
+            return
+        
+        try:
+            from shypn.topology.behavioral import (
+                LivenessAnalyzer,
+                FairnessAnalyzer,
+                DeadlockAnalyzer
+            )
+            
+            text_parts = []
+            
+            # Liveness analysis for this transition
+            try:
+                liveness_analyzer = LivenessAnalyzer(self.model)
+                liveness_result = liveness_analyzer.analyze(check_deadlocks=False)  # Skip deadlock for performance
+                
+                if liveness_result.success:
+                    liveness_level = liveness_result.get('liveness_level', 'L0')
+                    is_live = liveness_result.get('is_live', False)
+                    transition_levels = liveness_result.get('transition_liveness', {})
+                    
+                    trans_id_str = str(self.element_id)
+                    trans_liveness = transition_levels.get(trans_id_str, {})
+                    trans_level = trans_liveness.get('level', 'L0')
+                    
+                    liveness_desc = {
+                        'L0': 'Dead (never fires)',
+                        'L1': 'Potentially firable',
+                        'L2': 'Fires infinitely often',
+                        'L3': 'Unbounded fireable',
+                        'L4': 'Live (always eventually fireable)'
+                    }
+                    
+                    status_icon = '✓' if trans_level not in ['L0'] else '⚠'
+                    text_parts.append(f"{status_icon} Liveness: {trans_level}")
+                    text_parts.append(f"{liveness_desc.get(trans_level, 'Unknown')}")
+                    text_parts.append("")
+            except Exception as e:
+                text_parts.append(f"Liveness: Error - {str(e)[:50]}")
+                text_parts.append("")
+            
+            # Fairness analysis for this transition
+            try:
+                fairness_analyzer = FairnessAnalyzer(self.model)
+                fairness_result = fairness_analyzer.analyze()
+                
+                if fairness_result.success:
+                    fairness_class = fairness_result.get('fairness_classification', 'none')
+                    conflicts = fairness_result.get('conflicts', [])
+                    violations = fairness_result.get('fairness_violations', [])
+                    
+                    # Check if this transition has conflicts
+                    trans_id_str = str(self.element_id)
+                    trans_conflicts = [c for c in conflicts if trans_id_str in c.get('transitions', [])]
+                    trans_violations = [v for v in violations if v.get('transition') == trans_id_str]
+                    
+                    if trans_conflicts:
+                        text_parts.append(f"⚠ In Conflict Set")
+                        text_parts.append(f"Conflicts with {len(trans_conflicts[0].get('transitions', [])) - 1} other transition(s)")
+                        
+                        if trans_violations:
+                            starvation_risk = trans_violations[0].get('starvation_risk', 'unknown')
+                            text_parts.append(f"Starvation risk: {starvation_risk}")
+                    else:
+                        text_parts.append(f"✓ No Conflicts Detected")
+                    
+                    text_parts.append(f"Net fairness: {fairness_class}")
+                    text_parts.append("")
+            except Exception as e:
+                text_parts.append(f"Fairness: Error - {str(e)[:50]}")
+                text_parts.append("")
+            
+            # Deadlock analysis
+            try:
+                deadlock_analyzer = DeadlockAnalyzer(self.model)
+                deadlock_result = deadlock_analyzer.analyze()
+                
+                if deadlock_result.success:
+                    can_deadlock = deadlock_result.get('can_deadlock', False)
+                    disabled_transitions = deadlock_result.get('disabled_transitions', [])
+                    
+                    trans_id_str = str(self.element_id)
+                    is_disabled = trans_id_str in disabled_transitions
+                    
+                    if is_disabled:
+                        text_parts.append(f"⚠ Structurally Disabled")
+                        text_parts.append("This transition can never fire")
+                    elif can_deadlock:
+                        text_parts.append(f"⚠ Net can deadlock")
+                    else:
+                        text_parts.append(f"✓ Deadlock-Free")
+            except Exception as e:
+                text_parts.append(f"Deadlock: Error - {str(e)[:50]}")
+            
+            # Set the combined text
+            if text_parts:
+                self.behavioral_label.set_text('\n'.join(text_parts))
+            else:
+                self.behavioral_label.set_text("No behavioral analysis available")
+        
+        except ImportError as e:
+            self.behavioral_label.set_text("Behavioral analyzers not available")
+        except Exception as e:
+            self.behavioral_label.set_text(f"Behavioral analysis error: {str(e)[:100]}")
 class ArcTopologyTabLoader(TopologyTabLoader):
     """Topology tab loader for arcs (connections).
     
