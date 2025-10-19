@@ -106,6 +106,13 @@ class KEGGECFetcher:
         except requests.exceptions.Timeout:
             logger.warning(f"KEGG API timeout for {reaction_id}")
             return []
+        except requests.exceptions.HTTPError as e:
+            # 400 Bad Request is expected for invalid reaction IDs (e.g., entry IDs)
+            if e.response.status_code == 400:
+                logger.debug(f"Invalid KEGG reaction ID: {reaction_id}")
+            else:
+                logger.warning(f"KEGG API HTTP error for {reaction_id}: {e}")
+            return []
         except requests.exceptions.RequestException as e:
             logger.warning(f"KEGG API error for {reaction_id}: {e}")
             return []

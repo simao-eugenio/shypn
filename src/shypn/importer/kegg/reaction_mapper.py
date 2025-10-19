@@ -89,15 +89,17 @@ class StandardReactionMapper(ReactionMapper):
         
         # Fetch EC numbers from KEGG API
         # This enriches transitions with enzyme classification data
+        # Use reaction.name (KEGG reaction ID like "rn:R00710")
+        # not reaction.id (internal entry ID like "61")
         try:
             fetcher = get_default_fetcher()
-            ec_numbers = fetcher.fetch_ec_numbers(reaction.id)
+            ec_numbers = fetcher.fetch_ec_numbers(reaction.name)
             
             if ec_numbers:
                 transition.metadata['ec_numbers'] = ec_numbers
-                logger.debug(f"Fetched EC numbers for {reaction.id}: {ec_numbers}")
+                logger.debug(f"Fetched EC numbers for {reaction.name}: {ec_numbers}")
         except Exception as e:
-            logger.warning(f"Failed to fetch EC numbers for {reaction.id}: {e}")
+            logger.warning(f"Failed to fetch EC numbers for {reaction.name}: {e}")
         
         return transition
     
@@ -116,14 +118,16 @@ class StandardReactionMapper(ReactionMapper):
         transitions = []
         
         # Fetch EC numbers once for both directions
+        # Use reaction.name (KEGG reaction ID like "rn:R00710")
+        # not reaction.id (internal entry ID like "61")
         ec_numbers = []
         try:
             fetcher = get_default_fetcher()
-            ec_numbers = fetcher.fetch_ec_numbers(reaction.id)
+            ec_numbers = fetcher.fetch_ec_numbers(reaction.name)
             if ec_numbers:
-                logger.debug(f"Fetched EC numbers for {reaction.id}: {ec_numbers}")
+                logger.debug(f"Fetched EC numbers for {reaction.name}: {ec_numbers}")
         except Exception as e:
-            logger.warning(f"Failed to fetch EC numbers for {reaction.id}: {e}")
+            logger.warning(f"Failed to fetch EC numbers for {reaction.name}: {e}")
         
         # Forward transition
         forward_id = f"T{self.transition_counter}"
