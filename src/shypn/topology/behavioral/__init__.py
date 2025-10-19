@@ -2,5 +2,6 @@
 
 from .deadlocks import DeadlockAnalyzer
 from .boundedness import BoundednessAnalyzer
+from .liveness import LivenessAnalyzer
 
-__all__ = ['DeadlockAnalyzer', 'BoundednessAnalyzer']
+__all__ = ['DeadlockAnalyzer', 'BoundednessAnalyzer', 'LivenessAnalyzer']
