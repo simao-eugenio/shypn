@@ -48,7 +48,8 @@ class AssignmentResult:
         rule: Optional[str] = None,
         parameters: Optional[Dict[str, Any]] = None,
         rate_function: Optional[str] = None,
-        message: Optional[str] = None
+        message: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None
     ):
         """
         Initialize assignment result.
@@ -61,6 +62,7 @@ class AssignmentResult:
             parameters: Kinetic parameters dict
             rate_function: Rate function string
             message: Description of the assignment
+            metadata: Additional metadata (e.g., enzyme name, reference)
         """
         self.success = success
         self.confidence = confidence
@@ -69,6 +71,7 @@ class AssignmentResult:
         self.parameters = parameters or {}
         self.rate_function = rate_function
         self.message = message or self._generate_message()
+        self.metadata = metadata or {}  # Store additional information
     
     def _generate_message(self) -> str:
         """Generate default message based on result."""
