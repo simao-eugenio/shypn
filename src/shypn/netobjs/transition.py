@@ -55,7 +55,7 @@ class Transition(PetriNetObject):
         # Behavioral properties
         self.transition_type = 'continuous'  # Transition type: immediate, timed, stochastic, continuous (default: continuous)
         self.enabled = True  # Can this transition fire?
-        self.guard = None  # Guard function/expression (enables/disables transition) - defaults to no guard
+        self.guard = 1  # Guard function/expression (enables/disables transition) - defaults to 1 (always enabled)
         self.rate = 1.0  # Rate/delay for timed/stochastic/continuous transitions - defaults to 1.0
         self.priority = 0  # Priority for conflict resolution (higher = higher priority)
         self.firing_policy = 'earliest'  # Firing policy: 'earliest' or 'latest' (default: earliest)
@@ -426,11 +426,19 @@ class Transition(PetriNetObject):
     def set_guard(self, guard_value):
         """Set guard expression with storage for evaluation.
         
+        Scientific Convention: Guards default to 1 (always enabled).
+        Only explicit user input or system state changes should modify this value.
+        
         Args:
-            guard_value: Can be string expression, dict, bool, or None
+            guard_value: Can be string expression, dict, bool, int, or None
+                - None: Reset to default (1 = always enabled)
+                - 1: Always enabled (default initial state)
+                - 0: Always disabled
+                - string: Expression to evaluate
+                - dict: Complex guard specification
         """
-        # Store the guard value
-        self.guard = guard_value
+        # Store the guard value (None resets to default = 1)
+        self.guard = 1 if guard_value is None else guard_value
         
         # Also store in properties for engine evaluation
         if guard_value is not None:
@@ -606,7 +614,9 @@ class Transition(PetriNetObject):
         if "firing_policy" in data:
             transition.firing_policy = data["firing_policy"]
         if "guard" in data:
-            transition.guard = data["guard"]
+            # Convert None to 1 (scientific convention: guards default to enabled)
+            guard_value = data["guard"]
+            transition.guard = 1 if guard_value is None else guard_value
         if "rate" in data:
             transition.rate = data["rate"]
         if "properties" in data:
