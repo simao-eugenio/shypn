@@ -459,7 +459,7 @@ class Transition(PetriNetObject):
         """
         data = super().to_dict()  # Get base properties (id, name, label)
         data.update({
-            "type": "transition",
+            "object_type": "transition",  # Renamed from "type" to avoid confusion with transition_type
             "x": self.x,
             "y": self.y,
             "width": self.width,

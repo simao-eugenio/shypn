@@ -16,10 +16,12 @@ This helps identify if simulation issues are in the engine or GUI layer.
 import sys
 import os
 import json
+from pathlib import Path
 from typing import Dict, List, Any
 
-# Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+# Add src to path (go up 3 levels: headless -> validate -> tests -> project_root)
+project_root = Path(__file__).parent.parent.parent.parent
+sys.path.insert(0, str(project_root / 'src'))
 
 def load_model(model_path: str) -> Dict[str, Any]:
     """Load .shy model file.
@@ -199,7 +201,7 @@ def test_transition_enablement(controller, canvas_manager):
         print(f"Initial state:")
         print(f"  P1 tokens: {p1.marking}")
         print(f"  P2 tokens: {p2.marking}")
-        print(f"  T1 type: {t1.type}")
+        print(f"  T1 type: {t1.transition_type}")
         print(f"  T1 guard: {t1.guard}")
         print()
         
@@ -210,7 +212,8 @@ def test_transition_enablement(controller, canvas_manager):
         enabled = []
         for trans in canvas_manager.transitions:
             behavior = controller.get_behavior(trans)
-            if behavior.is_structurally_enabled():
+            can_fire, reason = behavior.can_fire()
+            if can_fire:
                 enabled.append(trans)
         
         print(f"Enabled transitions: {len(enabled)}")
@@ -353,7 +356,7 @@ def test_glycolysis_model(model_path: str):
         source_transitions = [t for t in canvas_manager.transitions if t.name.startswith('SOURCE_')]
         print(f"Source transitions: {len(source_transitions)}")
         for src in source_transitions:
-            print(f"  - {src.name} (type: {src.type}, rate: {src.rate})")
+            print(f"  - {src.name} (type: {src.transition_type}, rate: {src.rate})")
         print()
         
         # Check enabled transitions
@@ -362,7 +365,8 @@ def test_glycolysis_model(model_path: str):
         for trans in canvas_manager.transitions:
             try:
                 behavior = controller.get_behavior(trans)
-                if behavior.is_structurally_enabled():
+                can_fire, reason = behavior.can_fire()
+                if can_fire:
                     enabled_count += 1
             except Exception as e:
                 print(f"  Warning: Could not check {trans.name}: {e}")

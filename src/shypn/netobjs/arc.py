@@ -624,7 +624,7 @@ class Arc(PetriNetObject):
         
         data = super().to_dict()  # Get base properties (id, name, label)
         data.update({
-            "type": "arc",
+            "object_type": "arc",  # Renamed from "type" to avoid confusion
             "source_id": self.source.id,
             "source_type": "place" if isinstance(self.source, Place) else "transition",
             "target_id": self.target.id,
@@ -734,7 +734,8 @@ class Arc(PetriNetObject):
         Raises:
             ValueError: If source or target objects not found
         """
-        arc_type = data.get("type", "arc")
+        # Support both old "type" and new "object_type" for backward compatibility
+        arc_type = data.get("object_type", data.get("type", "arc"))
         
         # Import subclasses here to avoid circular imports
         if arc_type == "inhibitor_arc":

@@ -205,7 +205,7 @@ class Place(PetriNetObject):
         """
         data = super().to_dict()  # Get base properties (id, name, label)
         data.update({
-            "type": "place",
+            "object_type": "place",  # Renamed from "type" to avoid confusion
             "x": self.x,
             "y": self.y,
             "radius": self.radius,

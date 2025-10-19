@@ -77,9 +77,9 @@ def test_serialization():
     print("\nSerializing arcs...")
     for arc, expected_type in arcs:
         data = arc.to_dict()
-        actual_type = data.get("type")
+        actual_type = data.get("object_type")  # Changed from "type" to "object_type"
         status = "✓" if actual_type == expected_type else "✗"
-        print(f"  {status} {arc.__class__.__name__}: type='{actual_type}' (expected '{expected_type}')")
+        print(f"  {status} {arc.__class__.__name__}: object_type='{actual_type}' (expected '{expected_type}')")
         if actual_type != expected_type:
             print(f"      ERROR: Type mismatch!")
             return False

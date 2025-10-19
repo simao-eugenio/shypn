@@ -289,7 +289,7 @@ class CurvedInhibitorArc(CurvedArc):
             dict: Dictionary containing all arc properties with type 'curved_inhibitor_arc'
         """
         data = super().to_dict()
-        data["type"] = "curved_inhibitor_arc"  # Override type
+        data["object_type"] = "curved_inhibitor_arc"  # Override object_type
         return data
     
     def __repr__(self):

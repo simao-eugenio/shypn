@@ -426,7 +426,7 @@ class InhibitorArc(Arc):
             dict: Dictionary containing all arc properties with type 'inhibitor_arc'
         """
         data = super().to_dict()
-        data["type"] = "inhibitor_arc"  # Override type to distinguish from Arc
+        data["object_type"] = "inhibitor_arc"  # Override object_type to distinguish from Arc
         return data
     
     def __repr__(self):
