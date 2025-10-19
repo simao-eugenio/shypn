@@ -88,11 +88,17 @@ class MassActionEstimator(KineticEstimator):
         - Bimolecular: k = 0.1 (slower)
         - Trimolecular: k = 0.01 (much slower)
         """
-        if reaction is None or not hasattr(reaction, 'reactants'):
+        if reaction is None:
             # For external conversions, use substrate count
             num_reactants = len(substrate_places) if substrate_places else 1
-        else:
+        elif hasattr(reaction, 'reactants'):
+            # SBML format
             num_reactants = len(reaction.reactants)
+        elif hasattr(reaction, 'substrates'):
+            # KEGG format
+            num_reactants = len(reaction.substrates)
+        else:
+            num_reactants = 1
         
         if num_reactants == 1:
             return 1.0  # Unimolecular

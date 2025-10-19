@@ -97,9 +97,36 @@ class KineticEstimator(ABC):
             # For KEGG/external conversions where we don't have Reaction objects
             import random
             return f"external_{random.randint(0, 1000000)}"
-        reactants = tuple(sorted(rid for rid, _ in reaction.reactants))
-        products = tuple(sorted(pid for pid, _ in reaction.products))
-        return f"{reaction.name}_{reactants}_{products}"
+        
+        # Try to build key from reaction structure
+        # Handle both SBML (reactants/products as tuples) and KEGG (substrates/products as objects)
+        try:
+            reactants = tuple()
+            products = tuple()
+            
+            if hasattr(reaction, 'reactants') and reaction.reactants:
+                # SBML format: [(id, stoich), ...]
+                reactants = tuple(sorted(rid for rid, _ in reaction.reactants))
+            elif hasattr(reaction, 'substrates') and reaction.substrates:
+                # KEGG format: [KEGGSubstrate(id, name, stoichiometry), ...]
+                reactants = tuple(sorted(s.id for s in reaction.substrates))
+            
+            if hasattr(reaction, 'products') and reaction.products:
+                if isinstance(reaction.products[0], tuple):
+                    # SBML format
+                    products = tuple(sorted(pid for pid, _ in reaction.products))
+                else:
+                    # KEGG format
+                    products = tuple(sorted(p.id for p in reaction.products))
+            
+            # Use reaction ID if available, otherwise name
+            reaction_id = getattr(reaction, 'id', getattr(reaction, 'name', 'unknown'))
+            return f"{reaction_id}_{reactants}_{products}"
+            
+        except Exception:
+            # Fallback to simple random key if structure parsing fails
+            import random
+            return f"reaction_{random.randint(0, 1000000)}"
     
     def _setup_logger(self):
         """Setup logger for this estimator."""
