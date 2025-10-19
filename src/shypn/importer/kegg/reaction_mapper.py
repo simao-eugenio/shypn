@@ -1,7 +1,7 @@
 """Standard reaction to transition mapping strategy."""
 
 import logging
-from typing import List, Tuple
+from typing import List, Tuple, Dict, Optional
 from shypn.netobjs import Transition
 from .converter_base import ReactionMapper, ConversionOptions
 from .models import KEGGPathway, KEGGReaction, KEGGEntry
@@ -18,11 +18,26 @@ class StandardReactionMapper(ReactionMapper):
     - Optionally splits reversible reactions into forward/backward transitions
     - Calculates transition position from substrate/product locations
     - Extracts enzyme/reaction names
+    - Supports pre-fetched EC numbers for performance
     """
     
     def __init__(self):
         """Initialize reaction mapper."""
         self.transition_counter = 1
+        self.ec_cache: Dict[str, List[str]] = {}  # Cache for pre-fetched EC numbers
+    
+    def set_ec_cache(self, ec_cache: Dict[str, List[str]]):
+        """
+        Set pre-fetched EC numbers cache.
+        
+        This allows the pathway converter to pre-fetch all EC numbers
+        in parallel, then pass them to the mapper for fast lookup.
+        
+        Args:
+            ec_cache: Dictionary mapping reaction name → EC numbers
+        """
+        self.ec_cache = ec_cache
+        logger.debug(f"EC cache set with {len(ec_cache)} entries")
     
     def create_transitions(self, reaction: KEGGReaction, pathway: KEGGPathway,
                           options: ConversionOptions) -> List[Transition]:
@@ -87,19 +102,29 @@ class StandardReactionMapper(ReactionMapper):
         if hasattr(reaction, 'type'):
             transition.metadata['reaction_type'] = reaction.type
         
-        # Fetch EC numbers from KEGG API
-        # This enriches transitions with enzyme classification data
+        # Get EC numbers (from pre-fetched cache or fetch now)
         # Use reaction.name (KEGG reaction ID like "rn:R00710")
         # not reaction.id (internal entry ID like "61")
-        try:
-            fetcher = get_default_fetcher()
-            ec_numbers = fetcher.fetch_ec_numbers(reaction.name)
-            
-            if ec_numbers:
-                transition.metadata['ec_numbers'] = ec_numbers
-                logger.debug(f"Fetched EC numbers for {reaction.name}: {ec_numbers}")
-        except Exception as e:
-            logger.warning(f"Failed to fetch EC numbers for {reaction.name}: {e}")
+        ec_numbers = []
+        
+        # Try pre-fetched cache first (fast)
+        if reaction.name in self.ec_cache:
+            ec_numbers = self.ec_cache[reaction.name]
+            logger.debug(f"Using cached EC numbers for {reaction.name}: {ec_numbers}")
+        else:
+            # Fall back to fetching now (slower, but still works)
+            try:
+                fetcher = get_default_fetcher()
+                ec_numbers = fetcher.fetch_ec_numbers(reaction.name)
+                
+                if ec_numbers:
+                    logger.debug(f"Fetched EC numbers for {reaction.name}: {ec_numbers}")
+            except Exception as e:
+                logger.warning(f"Failed to fetch EC numbers for {reaction.name}: {e}")
+        
+        # Store EC numbers in metadata
+        if ec_numbers:
+            transition.metadata['ec_numbers'] = ec_numbers
         
         return transition
     
@@ -117,17 +142,24 @@ class StandardReactionMapper(ReactionMapper):
         """
         transitions = []
         
-        # Fetch EC numbers once for both directions
+        # Get EC numbers once for both directions (from cache or fetch)
         # Use reaction.name (KEGG reaction ID like "rn:R00710")
         # not reaction.id (internal entry ID like "61")
         ec_numbers = []
-        try:
-            fetcher = get_default_fetcher()
-            ec_numbers = fetcher.fetch_ec_numbers(reaction.name)
-            if ec_numbers:
-                logger.debug(f"Fetched EC numbers for {reaction.name}: {ec_numbers}")
-        except Exception as e:
-            logger.warning(f"Failed to fetch EC numbers for {reaction.name}: {e}")
+        
+        # Try pre-fetched cache first (fast)
+        if reaction.name in self.ec_cache:
+            ec_numbers = self.ec_cache[reaction.name]
+            logger.debug(f"Using cached EC numbers for {reaction.name}: {ec_numbers}")
+        else:
+            # Fall back to fetching now
+            try:
+                fetcher = get_default_fetcher()
+                ec_numbers = fetcher.fetch_ec_numbers(reaction.name)
+                if ec_numbers:
+                    logger.debug(f"Fetched EC numbers for {reaction.name}: {ec_numbers}")
+            except Exception as e:
+                logger.warning(f"Failed to fetch EC numbers for {reaction.name}: {e}")
         
         # Forward transition
         forward_id = f"T{self.transition_counter}"
