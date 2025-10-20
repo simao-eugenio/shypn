@@ -418,8 +418,12 @@ class TransitionPropDialogLoader(GObject.GObject):
                 element_id=self.transition_obj.id
             )
             
-            # Populate with analysis
-            self.topology_loader.populate()
+            # NOTE: Do NOT call populate() here - it can hang on large models!
+            # CycleAnalyzer uses nx.simple_cycles() which has exponential complexity.
+            # For complex models (e.g., Glycolysis with 60 nodes), this can freeze
+            # the application indefinitely.
+            # TODO: Implement lazy loading - populate when user switches to Topology tab
+            # self.topology_loader.populate()  # ❌ REMOVED - causes freeze
             
             # Get the topology widget
             topology_widget = self.topology_loader.get_root_widget()
@@ -429,6 +433,13 @@ class TransitionPropDialogLoader(GObject.GObject):
             if container and topology_widget:
                 container.pack_start(topology_widget, True, True, 0)
                 topology_widget.show_all()
+                
+                # Show "Click to analyze" message in topology tab
+                if hasattr(self.topology_loader, 'cycles_label'):
+                    self.topology_loader.cycles_label.set_markup(
+                        "<i>Topology analysis available.\n"
+                        "Click 'Analyze' button to run analysis.</i>"
+                    )
         
         except ImportError as e:
             # Topology module not available - silently skip
