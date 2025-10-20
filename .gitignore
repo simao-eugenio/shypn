@@ -78,3 +78,6 @@ Token.txt
 # workspace/projects/ and workspace/cache/ are user-specific
 workspace/projects/
 workspace/cache/
+
+# Legacy backups (pre-UI work safety backups)
+legacy/
