@@ -374,6 +374,7 @@ class RightPanelLoader:
             container: Gtk.Box or other container to embed content into.
             parent_window: Optional parent window (stored for float button).
         """
+        print(f"[ATTACH] RightPanel attach_to() called, is_attached={self.is_attached}", file=sys.stderr)
         
         if self.window is None:
             self.load()
@@ -381,9 +382,12 @@ class RightPanelLoader:
         # WAYLAND FIX: Prevent rapid attach/detach race conditions
         if self.is_attached and self.parent_container == container:
             # Already attached to this container, just ensure visibility
+            print(f"[ATTACH] RightPanel already attached, ensuring visibility", file=sys.stderr)
             container.set_visible(True)
             self.content.set_visible(True)
             return
+        
+        print(f"[ATTACH] RightPanel scheduling deferred attach", file=sys.stderr)
         
         # Store parent window and container for float button callback
         if parent_window:
