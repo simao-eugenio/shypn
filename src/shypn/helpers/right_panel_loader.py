@@ -46,6 +46,7 @@ class RightPanelLoader:
         self.parent_container = None
         self.parent_window = None  # Track parent window for float button
         self._updating_button = False  # Flag to prevent recursive toggle events
+        self._attach_in_progress = False  # WAYLAND FIX: Prevent concurrent attach operations
         self.on_float_callback = None  # Callback to notify when panel floats
         self.on_attach_callback = None  # Callback to notify when panel attaches
         
@@ -387,12 +388,25 @@ class RightPanelLoader:
             if self.content.get_parent() != container:
                 print(f"[ATTACH] RightPanel content was removed, re-adding to container", file=sys.stderr)
                 container.add(self.content)
-            container.set_visible(True)
-            self.content.set_visible(True)
-            self.content.show_all()  # Ensure all children are visible
+            # WAYLAND FIX: Don't call set_visible repeatedly - can cause protocol errors
+            if not container.get_visible():
+                container.set_visible(True)
+            # Content should already be visible if we're in fast path
+            return
+        
+        # WAYLAND FIX: Prevent concurrent attach operations
+        if self._attach_in_progress:
+            print(f"[ATTACH] RightPanel attach already in progress, ignoring", file=sys.stderr)
             return
         
         print(f"[ATTACH] RightPanel scheduling deferred attach", file=sys.stderr)
+        
+        # Set flag BEFORE scheduling idle to prevent concurrent attach attempts
+        self._attach_in_progress = True
+        
+        # WAYLAND FIX: Set is_attached=True NOW to prevent duplicate attach_to() calls
+        # The idle callback will complete the actual reparenting operation
+        self.is_attached = True
         
         # Store parent window and container for float button callback
         if parent_window:
@@ -433,7 +447,10 @@ class RightPanelLoader:
                     self.float_button.set_active(False)
                     self._updating_button = False
                 
-                self.is_attached = True
+                # NOTE: is_attached was already set to True before scheduling idle
+                
+                # WAYLAND FIX: Clear attach operation flag
+                self._attach_in_progress = False
                 
                 # Notify that panel is attached (to expand paned)
                 if self.on_attach_callback:
@@ -489,6 +506,7 @@ class RightPanelLoader:
                             self.parent_container.remove(self.content)
                         self.content.set_visible(False)
                         # Don't hide container - other panels might use it
+                    # NOTE: Keep is_attached=True so next attach_to() can use fast path
                     print(f"[HIDE] RightPanel hidden (attached mode)", file=sys.stderr)
                 elif self.window:
                     # When floating, hide the window

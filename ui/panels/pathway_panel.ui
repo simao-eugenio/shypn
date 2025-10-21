@@ -28,27 +28,10 @@
             <property name="margin-bottom">6</property>
             
             <child>
-              <object class="GtkToggleButton" id="float_button">
-                <property name="visible">True</property>
-                <property name="label">⇲</property>
-                <property name="tooltip-text">Float/Dock panel toggle</property>
-                <property name="halign">start</property>
-                <property name="active">False</property>
-                <style>
-                  <class name="flat"/>
-                </style>
-              </object>
-              <packing>
-                <property name="expand">False</property>
-                <property name="fill">False</property>
-              </packing>
-            </child>
-            
-            <child>
               <object class="GtkLabel" id="panel_title">
                 <property name="visible">True</property>
                 <property name="label">Pathway Operations</property>
-                <property name="halign">end</property>
+                <property name="halign">start</property>
                 <property name="hexpand">True</property>
                 <style>
                   <class name="heading"/>
@@ -57,6 +40,23 @@
               <packing>
                 <property name="expand">True</property>
                 <property name="fill">True</property>
+              </packing>
+            </child>
+            
+            <child>
+              <object class="GtkToggleButton" id="float_button">
+                <property name="visible">True</property>
+                <property name="label">⇱</property>
+                <property name="tooltip-text">Float/Dock panel toggle</property>
+                <property name="halign">end</property>
+                <property name="active">False</property>
+                <style>
+                  <class name="flat"/>
+                </style>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">False</property>
               </packing>
             </child>
           </object>
