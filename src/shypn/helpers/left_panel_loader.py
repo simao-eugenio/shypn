@@ -248,6 +248,9 @@ class LeftPanelLoader:
                     self.project_controller.set_parent_window(parent)
                 if parent and self.file_explorer and hasattr(self.file_explorer, 'persistency') and self.file_explorer.persistency:
                     self.file_explorer.persistency.parent_window = parent
+                # WAYLAND FIX: Also update file_explorer's parent_window for its own dialogs
+                if parent and self.file_explorer:
+                    self.file_explorer.set_parent_window(parent)
                 
                 # Update float button state
                 if self.float_button and not self.float_button.get_active():
@@ -319,6 +322,9 @@ class LeftPanelLoader:
             # WAYLAND FIX: Also update file explorer persistency parent window
             if self.file_explorer and hasattr(self.file_explorer, 'persistency') and self.file_explorer.persistency:
                 self.file_explorer.persistency.parent_window = parent_window
+            # WAYLAND FIX: Also update file_explorer's parent_window for its own dialogs
+            if self.file_explorer:
+                self.file_explorer.set_parent_window(parent_window)
         self.parent_container = container
         
         def _do_attach():
