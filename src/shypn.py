@@ -269,6 +269,12 @@ def main(argv=None):
 				workspace_settings=workspace_settings
 			)
 			
+			# WAYLAND FIX: Set parent window for SBML Import panel immediately
+			# This ensures FileChooserDialog has valid parent before panel is attached
+			if pathway_panel_loader and hasattr(pathway_panel_loader, 'sbml_import_controller'):
+				if pathway_panel_loader.sbml_import_controller:
+					pathway_panel_loader.sbml_import_controller.set_parent_window(window)
+			
 			# Wire topology panel to pathway import events (if both panels loaded)
 			if topology_panel_loader and topology_panel_loader.controller and pathway_panel_loader:
 				# KEGG Import: Wrap import completion callback to notify topology

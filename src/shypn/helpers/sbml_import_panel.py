@@ -297,12 +297,22 @@ class SBMLImportPanel:
         filter_all.add_pattern("*")
         dialog.add_filter(filter_all)
         
-        # Run dialog
-        response = dialog.run()
+        # WAYLAND FIX: Use async signal-based approach instead of blocking run()
+        # This avoids Error 71 (Protocol error) on Wayland
+        result_container = [None]  # Mutable container for result
         
-        if response == Gtk.ResponseType.OK:
-            filepath = dialog.get_filename()
-            
+        def on_response(dlg, response_id):
+            if response_id == Gtk.ResponseType.OK:
+                result_container[0] = dlg.get_filename()
+            dlg.destroy()
+            Gtk.main_quit()  # Exit nested main loop
+        
+        dialog.connect('response', on_response)
+        dialog.show()
+        Gtk.main()  # Run nested event loop until dialog responds
+        
+        filepath = result_container[0]
+        if filepath:
             # Update entry
             if self.sbml_file_entry:
                 self.sbml_file_entry.set_text(filepath)
@@ -324,8 +334,6 @@ class SBMLImportPanel:
                 buffer.set_text("")
             
             self._show_status(f"Selected: {os.path.basename(filepath)}")
-        
-        dialog.destroy()
     
     def _on_fetch_clicked(self, button):
         """Handle fetch button click - download model from BioModels."""
