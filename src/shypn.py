@@ -44,8 +44,10 @@ try:
 	from shypn.helpers.left_panel_loader import create_left_panel
 	from shypn.helpers.right_panel_loader import create_right_panel
 	from shypn.helpers.pathway_panel_loader import create_pathway_panel
+	from shypn.helpers.topology_panel_loader import TopologyPanelLoader
 	from shypn.helpers.model_canvas_loader import create_model_canvas
 	from shypn.file import create_persistency_manager
+	from shypn.ui import MasterPalette
 except ImportError as e:
 	print(f'ERROR: Cannot import loaders: {e}', file=sys.stderr)
 	sys.exit(1)
@@ -130,14 +132,13 @@ def main(argv=None):
 		canvas_container = model_canvas_loader.container
 		main_workspace.pack_start(canvas_container, True, True, 0)  # GTK3 uses pack_start
 		
-		# Create and add status bar at bottom (after canvas)
-		status_bar = Gtk.Statusbar()
-		status_bar.set_visible(True)
-		status_bar.set_margin_start(6)
-		status_bar.set_margin_end(6)
-		status_bar.set_margin_top(3)
-		status_bar.set_margin_bottom(3)
-		main_workspace.pack_start(status_bar, False, True, 0)  # Non-expanding, stays at bottom
+		# Get status bar from main_window.ui (now defined in XML)
+		status_bar = main_builder.get_object('status_bar')
+		if not status_bar:
+			# Fallback: create status bar if not in UI file (shouldn't happen)
+			status_bar = Gtk.Statusbar()
+			status_bar.set_visible(True)
+			print("Warning: status_bar not found in UI, creating fallback", file=sys.stderr)
 		
 		# Initialize status bar context
 		status_context_id = status_bar.get_context_id("main")
@@ -204,15 +205,106 @@ def main(argv=None):
 			print(f'ERROR: Failed to load right panel: {e}', file=sys.stderr)
 			sys.exit(5)
 		
+		# Load topology panel FIRST (needed by pathway panel wiring)
+		try:
+			# Topology panel doesn't need model at init - will get it at analysis time
+			topology_panel_loader = TopologyPanelLoader(model=None)
+			# Wire model_canvas_loader so topology can access current model
+			if hasattr(topology_panel_loader, 'controller') and topology_panel_loader.controller:
+				topology_panel_loader.controller.model_canvas_loader = model_canvas_loader
+				
+				# ===================================================================
+				# WIRE TOPOLOGY PANEL TO MODEL LIFECYCLE EVENTS
+				# This ensures cache is invalidated when models change/switch
+				# ===================================================================
+				
+				# Event 1: Tab Switching (user creates multiple models and switches)
+				# Connect to notebook's page-changed signal
+				def on_canvas_tab_switched(notebook, page, page_num):
+					"""Called when user switches to different model tab."""
+					drawing_area = model_canvas_loader.get_current_document()
+					if drawing_area and topology_panel_loader.controller:
+						topology_panel_loader.controller.on_tab_switched(drawing_area)
+				
+				if model_canvas_loader.notebook:
+					model_canvas_loader.notebook.connect('switch-page', on_canvas_tab_switched)
+				
+				# Event 2: File Operations (user opens .shy file)
+				# Wire to file explorer's open callback
+				if file_explorer:
+					original_on_file_open = file_explorer.on_file_open_requested
+					
+					def on_file_open_with_topology_notify(filepath):
+						"""Wrapper that notifies topology panel after file opens."""
+						# Call original file open handler
+						if original_on_file_open:
+							original_on_file_open(filepath)
+						
+						# Notify topology panel that model changed
+						drawing_area = model_canvas_loader.get_current_document()
+						if drawing_area and topology_panel_loader.controller:
+							topology_panel_loader.controller.on_file_opened(drawing_area)
+					
+					file_explorer.on_file_open_requested = on_file_open_with_topology_notify
+				
+				# Event 3: Pathway Import (KEGG/SBML import)
+				# Will be wired after pathway_panel_loader is created (see below)
+				
+		except Exception as e:
+			print(f'WARNING: Failed to load topology panel: {e}', file=sys.stderr)
+			topology_panel_loader = None
+		
 		# Load pathway panel via its loader
 		try:
 			pathway_panel_loader = create_pathway_panel(
 				model_canvas=model_canvas_loader,
 				workspace_settings=workspace_settings
 			)
+			
+			# Wire topology panel to pathway import events (if both panels loaded)
+			if topology_panel_loader and topology_panel_loader.controller and pathway_panel_loader:
+				# KEGG Import: Wrap import completion to notify topology
+				if hasattr(pathway_panel_loader, 'kegg_import_controller') and pathway_panel_loader.kegg_import_controller:
+					kegg_ctrl = pathway_panel_loader.kegg_import_controller
+					original_kegg_import = kegg_ctrl._import_pathway_background
+					
+					def kegg_import_with_topology_notify():
+						"""Wrapper for KEGG import that notifies topology panel."""
+						# Run original import
+						result = original_kegg_import()
+						
+						# Notify topology that model was imported
+						drawing_area = model_canvas_loader.get_current_document()
+						if drawing_area and topology_panel_loader.controller:
+							GLib.idle_add(topology_panel_loader.controller.on_pathway_imported, drawing_area)
+						
+						return result
+					
+					kegg_ctrl._import_pathway_background = kegg_import_with_topology_notify
+				
+				# SBML Import: Wrap load completion to notify topology
+				if hasattr(pathway_panel_loader, 'sbml_import_controller') and pathway_panel_loader.sbml_import_controller:
+					sbml_ctrl = pathway_panel_loader.sbml_import_controller
+					original_sbml_load = sbml_ctrl._quick_load_to_canvas
+					
+					def sbml_load_with_topology_notify():
+						"""Wrapper for SBML import that notifies topology panel."""
+						# Run original load
+						result = original_sbml_load()
+						
+						# Notify topology that model was imported
+						drawing_area = model_canvas_loader.get_current_document()
+						if drawing_area and topology_panel_loader.controller:
+							GLib.idle_add(topology_panel_loader.controller.on_pathway_imported, drawing_area)
+						
+						return result
+					
+					sbml_ctrl._quick_load_to_canvas = sbml_load_with_topology_notify
+				
 		except Exception as e:
 			print(f'WARNING: Failed to load pathway panel: {e}', file=sys.stderr)
 			pathway_panel_loader = None
+			topology_panel_loader = None
 		
 		# Wire right panel loader to canvas loader
 		# This allows tab switching to update the right panel's data collector
@@ -228,26 +320,17 @@ def main(argv=None):
 		if file_explorer:
 			model_canvas_loader.set_file_explorer_panel(file_explorer)
 
-		# Get left dock area from main window
+		# Get left dock area from main window (ALL panels dock here now)
 		left_dock_area = main_builder.get_object('left_dock_area')
 		if left_dock_area is None:
 			print('ERROR: left_dock_area not found in main window', file=sys.stderr)
 			sys.exit(6)
 
-		# Get right dock area from main window
-		right_dock_area = main_builder.get_object('right_dock_area')
-		if right_dock_area is None:
-			print('ERROR: right_dock_area not found in main window', file=sys.stderr)
-			sys.exit(7)
+		# Note: right_dock_area removed - all panels now dock to left_dock_area
 
 		# Get paned widgets for curtain resize control
 		left_paned = main_builder.get_object('left_paned')
-		right_paned = main_builder.get_object('right_paned')
-
-		# Get toggle buttons first (needed for callbacks)
-		left_toggle = main_builder.get_object('left_panel_toggle')
-		right_toggle = main_builder.get_object('right_panel_toggle')
-		pathway_toggle = main_builder.get_object('pathway_panel_toggle')
+		# Note: right_paned removed - all panels now dock to left_dock_area
 
 		# WAYLAND FIX: Present window BEFORE defining complex callbacks
 		# This ensures the window is fully shown and its Wayland surface is active
@@ -260,23 +343,44 @@ def main(argv=None):
 			w.add(window)  # GTK3 uses add() instead of set_child()
 			window.show_all()  # Show all widgets
 
-		# Define toggle handlers (needed for callbacks to reference)
-		def on_left_toggle(button):
-			is_active = button.get_active()
+		# ====================================================================
+		# Create Master Palette (vertical toolbar on far left)
+		# IMPORTANT: Must be created AFTER window.show_all() to be visible
+		# ====================================================================
+		master_palette = MasterPalette()
+		
+		# Get palette slot and insert palette
+		master_palette_slot = main_builder.get_object('master_palette_slot')
+		if master_palette_slot:
+			# Clear any existing children (shouldn't be any)
+			for child in master_palette_slot.get_children():
+				master_palette_slot.remove(child)
+			# Add palette widget
+			palette_widget = master_palette.get_widget()
+			master_palette_slot.pack_start(palette_widget, True, True, 0)
+			# Ensure visibility
+			palette_widget.show_all()
+		else:
+			print("ERROR: master_palette_slot not found in UI", file=sys.stderr)
+			sys.exit(20)
+
+		# Define toggle handlers (work with palette buttons - all panels dock LEFT)
+		def on_left_toggle(is_active):
+			"""Handle Files panel toggle from palette."""
 			if is_active:
-				# Attach to extreme left of main window
+				# Hide other panels (MasterPalette already handles button exclusivity)
+				right_panel_loader.hide()
+				if pathway_panel_loader:
+					pathway_panel_loader.hide()
+				if topology_panel_loader:
+					topology_panel_loader.hide()
+				
+				# Attach Files panel to left dock
 				left_panel_loader.attach_to(left_dock_area, parent_window=window)
 				# Adjust paned position to show panel (250px default)
 				if left_paned:
 					try:
 						left_paned.set_position(250)
-					except Exception:
-						pass  # Ignore paned errors
-				# If right panel is hidden, ensure its paned is collapsed
-				if right_toggle and not right_toggle.get_active() and right_paned:
-					try:
-						paned_width = right_paned.get_width()
-						right_paned.set_position(paned_width)
 					except Exception:
 						pass  # Ignore paned errors
 			else:
@@ -289,142 +393,182 @@ def main(argv=None):
 					except Exception:
 						pass  # Ignore paned errors
 
-		def on_right_toggle(button):
-			is_active = button.get_active()
+		def on_right_toggle(is_active):
+			"""Handle Analyses panel toggle from palette (now docks LEFT)."""
 			if is_active:
-				# Hide pathway panel if visible
-				if pathway_toggle and pathway_toggle.get_active():
-					pathway_toggle.handler_block_by_func(on_pathway_toggle)
-					pathway_toggle.set_active(False)
-					pathway_toggle.handler_unblock_by_func(on_pathway_toggle)
-					if pathway_panel_loader:
-						pathway_panel_loader.hide()
+				# Hide other panels (MasterPalette already handles button exclusivity)
+				left_panel_loader.hide()
+				if pathway_panel_loader:
+					pathway_panel_loader.hide()
+				if topology_panel_loader:
+					topology_panel_loader.hide()
 				
-				# Attach to extreme right of main window
-				right_panel_loader.attach_to(right_dock_area, parent_window=window)
-				# Adjust paned position to show panel (show last 280px for right panel)
-				if right_paned:
+				# Attach Analyses panel to LEFT dock (changed from right)
+				right_panel_loader.attach_to(left_dock_area, parent_window=window)
+				# Adjust paned position to show panel (280px for analyses panel)
+				if left_paned:
 					try:
-						# Get current paned width and set position to leave space for panel
-						paned_width = right_paned.get_width()
-						if paned_width > 280:
-							right_paned.set_position(paned_width - 280)
-					except Exception:
-						pass  # Ignore paned errors
-				# If left panel is hidden, ensure its paned is collapsed
-				if left_toggle and not left_toggle.get_active() and left_paned:
-					try:
-						left_paned.set_position(0)
+						left_paned.set_position(280)
 					except Exception:
 						pass  # Ignore paned errors
 			else:
 				# Detach and hide
 				right_panel_loader.hide()
-				# Reset paned position to hide panel (full width)
-				if right_paned:
+				# Reset paned position to hide panel
+				if left_paned:
 					try:
-						paned_width = right_paned.get_width()
-						right_paned.set_position(paned_width)
+						left_paned.set_position(0)
 					except Exception:
 						pass  # Ignore paned errors
 
 		# Set up callbacks to manage paned position when panels float/attach
 		def on_left_float():
-			"""Collapse left paned when panel floats."""
+			"""Collapse left paned when Files panel floats."""
 			if left_paned:
 				try:
 					left_paned.set_position(0)
 				except Exception:
 					pass  # Ignore paned errors
+			# Sync palette button to off when panel floats
+			master_palette.set_active('files', False)
 		
 		def on_left_attach():
-			"""Expand left paned when panel attaches."""
+			"""Expand left paned when Files panel attaches."""
 			if left_paned:
 				try:
 					left_paned.set_position(250)
 				except Exception:
 					pass  # Ignore paned errors
+			# Sync palette button to on when panel attaches
+			master_palette.set_active('files', True)
 		
 		def on_right_float():
-			"""Collapse right paned when panel floats."""
-			if right_paned:
+			"""Collapse left paned when Analyses panel floats (now docks LEFT)."""
+			if left_paned:
 				try:
-					paned_width = right_paned.get_width()
-					right_paned.set_position(paned_width)
+					left_paned.set_position(0)
 				except Exception:
 					pass  # Ignore paned errors
-			# Sync header toggle button to off when panel floats
-			if right_toggle and right_toggle.get_active():
-				right_toggle.handler_block_by_func(on_right_toggle)
-				right_toggle.set_active(False)
-				right_toggle.handler_unblock_by_func(on_right_toggle)
+			# Sync palette button to off when panel floats
+			master_palette.set_active('analyses', False)
 		
 		def on_right_attach():
-			"""Expand right paned when panel attaches."""
-			if right_paned:
+			"""Expand left paned when Analyses panel attaches (now docks LEFT)."""
+			if left_paned:
 				try:
-					paned_width = right_paned.get_width()
-					if paned_width > 280:
-						right_paned.set_position(paned_width - 280)
+					left_paned.set_position(280)
 				except Exception:
 					pass  # Ignore paned errors
-			# Sync header toggle button to on when panel attaches
-			if right_toggle and not right_toggle.get_active():
-				right_toggle.handler_block_by_func(on_right_toggle)
-				right_toggle.set_active(True)
-				right_toggle.handler_unblock_by_func(on_right_toggle)
+			# Sync palette button to on when panel attaches
+			master_palette.set_active('analyses', True)
 		
-		# Define pathway panel toggle handler (if panel loaded)
-		def on_pathway_toggle(button):
-			"""Toggle pathway panel docked in right area (mutually exclusive with Analyses)."""
+		# Define pathway panel toggle handler (if panel loaded - now docks LEFT)
+		def on_pathway_toggle(is_active):
+			"""Toggle pathway panel docked in LEFT area (mutually exclusive with others)."""
 			if not pathway_panel_loader:
 				return  # Panel not loaded
 			
-			is_active = button.get_active()
 			if is_active:
-				# Hide analyses panel if visible
-				if right_toggle and right_toggle.get_active():
-					right_toggle.handler_block_by_func(on_right_toggle)
-					right_toggle.set_active(False)
-					right_toggle.handler_unblock_by_func(on_right_toggle)
-					right_panel_loader.hide()
+				# Hide other panels (MasterPalette already handles button exclusivity)
+				left_panel_loader.hide()
+				right_panel_loader.hide()
+				if topology_panel_loader:
+					topology_panel_loader.hide()
 				
-				# Attach pathway panel to right dock area
-				pathway_panel_loader.attach_to(right_dock_area, parent_window=window)
-				# Adjust paned position to show right panel (show last 320px for pathway panel)
-				if right_paned:
+				# Attach pathway panel to LEFT dock (changed from right)
+				pathway_panel_loader.attach_to(left_dock_area, parent_window=window)
+				# Adjust paned position to show panel (320px for pathway panel)
+				if left_paned:
 					try:
-						paned_width = right_paned.get_width()
-						if paned_width > 320:
-							right_paned.set_position(paned_width - 320)
+						left_paned.set_position(320)
 					except Exception:
 						pass  # Ignore paned errors
 			else:
 				# Detach and hide
 				pathway_panel_loader.hide()
-				# Reset paned position to hide panel (full width)
-				if right_paned:
+				# Reset paned position to hide panel
+				if left_paned:
 					try:
-						paned_width = right_paned.get_width()
-						right_paned.set_position(paned_width)
+						left_paned.set_position(0)
 					except Exception:
 						pass  # Ignore paned errors
+		
+		# Define topology panel toggle handler (if panel loaded - now docks LEFT)
+		def on_topology_toggle(is_active):
+			"""Toggle topology panel docked in LEFT area (mutually exclusive with others)."""
+			if not topology_panel_loader:
+				return  # Panel not loaded
+			
+			if is_active:
+				# Hide other panels (MasterPalette already handles button exclusivity)
+				left_panel_loader.hide()
+				right_panel_loader.hide()
+				if pathway_panel_loader:
+					pathway_panel_loader.hide()
+				
+				# Attach topology panel to LEFT dock
+				topology_panel_loader.attach_to(left_dock_area, parent_window=window)
+				# Adjust paned position to show panel (400px for topology panel)
+				if left_paned:
+					try:
+						left_paned.set_position(400)
+					except Exception:
+						pass  # Ignore paned errors
+			else:
+				# Detach and hide
+				topology_panel_loader.hide()
+				# Reset paned position to hide panel
+				if left_paned:
+					try:
+						left_paned.set_position(0)
+					except Exception:
+						pass  # Ignore paned errors
+		
+		# Define float/attach callbacks for topology panel
+		def on_topology_float():
+			"""Collapse left paned when Topology panel floats."""
+			if left_paned:
+				try:
+					left_paned.set_position(0)
+				except Exception:
+					pass  # Ignore paned errors
+			# Sync palette button to off when panel floats
+			master_palette.set_active('topology', False)
+		
+		def on_topology_attach():
+			"""Expand left paned when Topology panel attaches."""
+			if left_paned:
+				try:
+					left_paned.set_position(400)
+				except Exception:
+					pass  # Ignore paned errors
+			# Sync palette button to on when panel attaches
+			master_palette.set_active('topology', True)
 		
 		# Wire up callbacks
 		left_panel_loader.on_float_callback = on_left_float
 		left_panel_loader.on_attach_callback = on_left_attach
 		right_panel_loader.on_float_callback = on_right_float
 		right_panel_loader.on_attach_callback = on_right_attach
+		if topology_panel_loader:
+			topology_panel_loader.on_float_callback = on_topology_float
+			topology_panel_loader.on_attach_callback = on_topology_attach
 
-		# Connect toggle buttons to handlers
-		if left_toggle is not None:
-			left_toggle.connect('toggled', on_left_toggle)
-
-		if right_toggle is not None:
-			right_toggle.connect('toggled', on_right_toggle)
+		# ====================================================================
+		# Wire Master Palette buttons to toggle handlers
+		# ====================================================================
+		# Connect palette buttons directly to toggle handlers
+		master_palette.connect('files', on_left_toggle)
+		master_palette.connect('pathways', on_pathway_toggle)
+		master_palette.connect('analyses', on_right_toggle)
+		master_palette.connect('topology', on_topology_toggle)
 		
-		if pathway_toggle is not None and pathway_panel_loader:
-			pathway_toggle.connect('toggled', on_pathway_toggle)
+		# Enable topology button if panel loaded successfully
+		if topology_panel_loader:
+			master_palette.set_sensitive('topology', True)
+			# Update tooltip to remove "Coming Soon"
+			if 'topology' in master_palette.buttons:
+				master_palette.buttons['topology'].widget.set_tooltip_text('Topology Analysis')
 		
 		# Get minimize/maximize buttons
 		minimize_button = main_builder.get_object('minimize_button')
