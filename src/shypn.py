@@ -367,7 +367,9 @@ def main(argv=None):
 		# Define toggle handlers (work with palette buttons - all panels dock LEFT)
 		def on_left_toggle(is_active):
 			"""Handle Files panel toggle from palette."""
+			print(f"[HANDLER] on_left_toggle({is_active})", file=sys.stderr)
 			if is_active:
+				print(f"[HANDLER]   Hiding other panels...", file=sys.stderr)
 				# Hide other panels (MasterPalette already handles button exclusivity)
 				right_panel_loader.hide()
 				if pathway_panel_loader:
@@ -375,15 +377,18 @@ def main(argv=None):
 				if topology_panel_loader:
 					topology_panel_loader.hide()
 				
+				print(f"[HANDLER]   Attaching Files panel...", file=sys.stderr)
 				# Attach Files panel to left dock
 				left_panel_loader.attach_to(left_dock_area, parent_window=window)
 				# Adjust paned position to show panel (250px default)
 				if left_paned:
 					try:
 						left_paned.set_position(250)
-					except Exception:
-						pass  # Ignore paned errors
+						print(f"[HANDLER]   Set paned position to 250", file=sys.stderr)
+					except Exception as e:
+						print(f"[HANDLER]   Error setting paned: {e}", file=sys.stderr)
 			else:
+				print(f"[HANDLER]   Deactivating Files (hiding panel)", file=sys.stderr)
 				# Detach and hide
 				left_panel_loader.hide()
 				# Reset paned position to hide panel
@@ -395,6 +400,7 @@ def main(argv=None):
 
 		def on_right_toggle(is_active):
 			"""Handle Analyses panel toggle from palette (now docks LEFT)."""
+			print(f"[HANDLER] on_right_toggle({is_active})", file=sys.stderr)
 			if is_active:
 				# Hide other panels (MasterPalette already handles button exclusivity)
 				left_panel_loader.hide()
@@ -461,6 +467,7 @@ def main(argv=None):
 		# Define pathway panel toggle handler (if panel loaded - now docks LEFT)
 		def on_pathway_toggle(is_active):
 			"""Toggle pathway panel docked in LEFT area (mutually exclusive with others)."""
+			print(f"[HANDLER] on_pathway_toggle({is_active})", file=sys.stderr)
 			if not pathway_panel_loader:
 				return  # Panel not loaded
 			
@@ -492,6 +499,7 @@ def main(argv=None):
 		# Define topology panel toggle handler (if panel loaded - now docks LEFT)
 		def on_topology_toggle(is_active):
 			"""Toggle topology panel docked in LEFT area (mutually exclusive with others)."""
+			print(f"[HANDLER] on_topology_toggle({is_active})", file=sys.stderr)
 			if not topology_panel_loader:
 				return  # Panel not loaded
 			
