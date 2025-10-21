@@ -1,0 +1,155 @@
+"""Minimal Topology Panel Loader.
+
+Clean OOP architecture:
+- Inherits Wayland-safe operations from base
+- Delegates business logic to controller
+- Just loads UI and wires signals
+
+Author: Simão Eugénio
+Date: 2025-10-20
+"""
+
+import sys
+
+import gi
+gi.require_version('Gtk', '3.0')
+from gi.repository import Gtk
+
+from shypn.ui.topology_panel_base import TopologyPanelBase
+from shypn.ui.topology_panel_controller import TopologyPanelController
+
+
+class TopologyPanelLoader(TopologyPanelBase):
+    """Minimal loader for Topology Panel.
+    
+    Responsibilities (MINIMAL):
+    - Load UI
+    - Get widget references
+    - Delegate to controller
+    
+    NOT responsible for:
+    - Analyzer logic (handled by controller)
+    - Business logic (handled by analyzers)
+    - Results caching (handled by controller)
+    """
+    
+    def __init__(self, model):
+        """Initialize topology panel loader.
+        
+        Args:
+            model: The ShypnModel instance
+        """
+        # Store model
+        self.model = model
+        
+        # Controller (created after UI loads)
+        self.controller = None
+        
+        # Widget references for accordion (12 analyzers)
+        self.analyze_buttons = {}
+        self.highlight_buttons = {}
+        self.expand_buttons = {}     # Toggle buttons ([V]/[^])
+        self.expand_icons = {}        # Icon widgets for expand buttons
+        self.result_labels = {}       # Summary labels
+        self.detail_revealers = {}    # GtkRevealer widgets
+        self.detail_labels = {}       # Detail report labels
+        
+        # Initialize base
+        super().__init__()
+        
+        # Load UI
+        self.load()
+    
+    def _init_widgets(self):
+        """Get widget references for all 12 analyzers.
+        
+        Called by base class after UI loads.
+        """
+        # Analyzer names
+        analyzers = [
+            # Structural (4)
+            'p_invariants',
+            't_invariants',
+            'siphons',
+            'traps',
+            # Graph (2)
+            'cycles',
+            'paths',
+            # Network (1)
+            'hubs',
+            # Behavioral (5)
+            'reachability',
+            'boundedness',
+            'liveness',
+            'deadlocks',
+            'fairness',
+        ]
+        
+        # Get references for each analyzer
+        for analyzer in analyzers:
+            # Analyze button
+            analyze_btn = self.builder.get_object(f'{analyzer}_analyze_btn')
+            if analyze_btn:
+                self.analyze_buttons[analyzer] = analyze_btn
+            
+            # Highlight button
+            highlight_btn = self.builder.get_object(f'{analyzer}_highlight_btn')
+            if highlight_btn:
+                self.highlight_buttons[analyzer] = highlight_btn
+            
+            # Expand toggle button ([V]/[^])
+            expand_btn = self.builder.get_object(f'{analyzer}_expand_btn')
+            if expand_btn:
+                self.expand_buttons[analyzer] = expand_btn
+            
+            # Expand icon (for updating arrow direction)
+            expand_icon = self.builder.get_object(f'{analyzer}_expand_icon')
+            if expand_icon:
+                self.expand_icons[analyzer] = expand_icon
+            
+            # Result label (summary view)
+            result_label = self.builder.get_object(f'{analyzer}_result')
+            if result_label:
+                self.result_labels[analyzer] = result_label
+            
+            # Detail revealer (GtkRevealer for accordion)
+            revealer = self.builder.get_object(f'{analyzer}_revealer')
+            if revealer:
+                self.detail_revealers[analyzer] = revealer
+            
+            # Detail report label
+            detail_label = self.builder.get_object(f'{analyzer}_detail_label')
+            if detail_label:
+                self.detail_labels[analyzer] = detail_label
+    
+    def _connect_signals(self):
+        """Connect button signals to controller methods.
+        
+        Called by base class after widgets are initialized.
+        """
+        # Create controller with all widgets
+        self.controller = TopologyPanelController(
+            model=self.model,
+            analyze_buttons=self.analyze_buttons,
+            highlight_buttons=self.highlight_buttons,
+            result_labels=self.result_labels,
+            expand_buttons=self.expand_buttons,
+            expand_icons=self.expand_icons,
+            detail_revealers=self.detail_revealers,
+            detail_labels=self.detail_labels,
+        )
+        
+        # Connect analyze buttons (delegate to controller)
+        for analyzer, button in self.analyze_buttons.items():
+            button.connect('clicked', self.controller.on_analyze_clicked, analyzer)
+        
+        # Connect highlight buttons (delegate to controller)
+        for analyzer, button in self.highlight_buttons.items():
+            button.connect('clicked', self.controller.on_highlight_clicked, analyzer)
+        
+        # Connect expand toggle buttons ([V]/[^])
+        for analyzer, button in self.expand_buttons.items():
+            button.connect('toggled', self.controller.on_expand_clicked, analyzer)
+
+
+__all__ = ['TopologyPanelLoader']

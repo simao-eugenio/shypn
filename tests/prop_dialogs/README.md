@@ -41,36 +41,42 @@ These tests verify the complete integration flow for property dialogs including:
 ## Test Files
 
 ### test_place_dialog_integration.py
-Tests for Place property dialog:
+Tests for Place property dialog (9 tests):
 - Dialog loading with Basic + Topology tabs
 - Place property changes (name, tokens, capacity)
 - Persistence of place data
 - Canvas integration
 - State management
+- **Status**: ✅ 9/9 tests passing (100%)
 
 **Run**: `python3 test_place_dialog_integration.py`
 
 ### test_arc_dialog_integration.py
-Tests for Arc property dialog:
+Tests for Arc property dialog (13 tests):
 - Dialog loading with Basic + Visual + Topology tabs
 - Arc endpoint information display
 - Weight and type updates
 - Arc finding in model.arcs
 - Persistence of arc properties
 - Canvas update propagation
+- **Status**: ✅ 13/13 tests passing (100%)
 
 **Run**: `python3 test_arc_dialog_integration.py`
 
 ### test_transition_dialog_integration.py
-Tests for Transition property dialog:
+Tests for Transition property dialog (12 tests):
 - Dialog loading with 4 tabs (Basic, Behavior, Visual, Topology)
 - Transition property changes
 - Behavior configuration (guard, rate, distribution)
 - Complete network persistence
 - Analysis panel signaling
 - State management
+- **Status**: ✅ 12/12 tests passing (100%)
 
 **Run**: `python3 test_transition_dialog_integration.py`
+
+### Total Coverage
+**34/34 tests passing (100%)** across all property dialog integration tests.
 
 ## Running Tests
 

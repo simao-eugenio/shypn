@@ -103,7 +103,7 @@ class MasterPalette:
         self.buttons = {}
         self._callbacks = {}
         self._css_applied = False
-        self._updating = False  # Guard flag to prevent callback loops
+        self._in_handler = False  # Single guard flag to prevent re-entrance
 
         self._load_ui()
         self._create_buttons()
@@ -192,25 +192,34 @@ class MasterPalette:
             raise KeyError(f"Unknown category: {category}")
         self._callbacks[category] = callback
         
-        # Wrap callback to implement exclusive button behavior
+        # Wrap callback to implement exclusive radio-button behavior
         def exclusive_callback(active):
-            # Prevent recursive callback loops
-            if self._updating:
+            # Prevent re-entrance from programmatic set_active() calls
+            if self._in_handler:
                 return
             
+            self._in_handler = True
             try:
-                self._updating = True
-                
                 if active:
-                    # When button is activated, deactivate all other buttons
+                    # User clicked this button to activate it
+                    # Deactivate all other buttons (silently, without triggering their callbacks)
                     for btn_name, btn in self.buttons.items():
                         if btn_name != category and btn.get_active():
                             btn.set_active(False)
-                
-                # Call original callback only if not in update loop
-                callback(active)
+                    
+                    # Call the activation callback for this button
+                    callback(True)
+                else:
+                    # User clicked active button to try to deactivate it
+                    # For radio behavior, prevent deactivation by re-activating it
+                    self.buttons[category].set_active(True)
+                    # Don't call callback - button stays active, no state change
+            except Exception as e:
+                print(f"[ERROR] Master Palette callback failed for {category}: {e}", file=sys.stderr)
+                import traceback
+                traceback.print_exc()
             finally:
-                self._updating = False
+                self._in_handler = False
         
         self.buttons[category].connect_toggled(exclusive_callback)
 
@@ -219,12 +228,18 @@ class MasterPalette:
         if category not in self.buttons:
             return
         
-        # Use guard flag to prevent triggering callbacks during programmatic changes
+        # Guard to prevent triggering callbacks during programmatic changes
+        # Only set the guard if we're not already in a handler (avoid nested flag manipulation)
+        was_in_handler = self._in_handler
+        if not was_in_handler:
+            self._in_handler = True
+        
         try:
-            self._updating = True
             self.buttons[category].set_active(active)
         finally:
-            self._updating = False
+            # Only reset if we set it
+            if not was_in_handler:
+                self._in_handler = False
 
     def set_sensitive(self, category: str, sensitive: bool):
         """Enable/disable a button (e.g., disable Topology until implemented)."""
