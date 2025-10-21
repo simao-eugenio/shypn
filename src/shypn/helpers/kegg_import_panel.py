@@ -15,6 +15,7 @@ This follows the MVC pattern:
 """
 import os
 import sys
+import threading
 from typing import Optional
 
 try:
@@ -147,49 +148,60 @@ class KEGGImportPanel:
         # Disable buttons during fetch
         self.fetch_button.set_sensitive(False)
         self.import_button.set_sensitive(False)
-        self._show_status(f"Fetching pathway {pathway_id}...")
+        self._show_status(f"🔄 Fetching pathway {pathway_id} from KEGG...")
         
-        # Fetch in background to avoid blocking UI
-        GLib.idle_add(self._fetch_pathway_background, pathway_id)
+        # Fetch in background thread to avoid blocking UI
+        def fetch_thread():
+            try:
+                # Fetch KGML from API (BLOCKING network request)
+                kgml_data = self.api_client.fetch_kgml(pathway_id)
+                
+                if not kgml_data:
+                    # Update UI in main thread
+                    GLib.idle_add(self._on_fetch_failed, pathway_id)
+                    return
+                
+                # Parse KGML
+                parsed_pathway = self.parser.parse(kgml_data)
+                
+                # Update UI in main thread
+                GLib.idle_add(self._on_fetch_complete, pathway_id, kgml_data, parsed_pathway)
+                
+            except Exception as e:
+                # Show error in main thread
+                GLib.idle_add(self._on_fetch_error, pathway_id, str(e))
+        
+        # Start daemon thread (non-blocking)
+        threading.Thread(target=fetch_thread, daemon=True).start()
     
-    def _fetch_pathway_background(self, pathway_id: str):
-        """Background task to fetch pathway from KEGG.
+    def _on_fetch_complete(self, pathway_id, kgml_data, parsed_pathway):
+        """Called in main thread after fetch completes successfully."""
+        self.current_kgml = kgml_data
+        self.current_pathway = parsed_pathway
         
-        Args:
-            pathway_id: KEGG pathway ID (e.g., "hsa00010")
-            
-        Returns:
-            False to stop GLib.idle_add from repeating
-        """
-        try:
-            # Fetch KGML from API
-            kgml_data = self.api_client.fetch_kgml(pathway_id)
-            
-            if not kgml_data:
-                self._show_status(f"Failed to fetch pathway {pathway_id}", error=True)
-                self.fetch_button.set_sensitive(True)
-                return False
-            
-            # Parse KGML
-            self.current_kgml = kgml_data
-            self.current_pathway = self.parser.parse(kgml_data)
-            
-            # Update preview
-            self._update_preview()
-            
-            # Enable import button
-            self.import_button.set_sensitive(True)
-            self._show_status(f"Pathway {pathway_id} loaded successfully")
-            
-        except Exception as e:
-            self._show_status(f"Error: {str(e)}", error=True)
-            self.current_pathway = None
-            self.current_kgml = None
+        # Update preview
+        self._update_preview()
         
-        finally:
-            # Re-enable fetch button
-            self.fetch_button.set_sensitive(True)
+        # Enable import button
+        self.import_button.set_sensitive(True)
+        self._show_status(f"✅ Pathway {pathway_id} loaded successfully")
         
+        # Re-enable fetch button
+        self.fetch_button.set_sensitive(True)
+        return False  # Don't repeat
+    
+    def _on_fetch_failed(self, pathway_id):
+        """Called in main thread when fetch fails."""
+        self._show_status(f"❌ Failed to fetch pathway {pathway_id}", error=True)
+        self.fetch_button.set_sensitive(True)
+        return False  # Don't repeat
+    
+    def _on_fetch_error(self, pathway_id, error_msg):
+        """Called in main thread when fetch encounters an error."""
+        self._show_status(f"❌ Error: {error_msg}", error=True)
+        self.current_pathway = None
+        self.current_kgml = None
+        self.fetch_button.set_sensitive(True)
         return False  # Don't repeat
     
     def _update_preview(self):
@@ -237,46 +249,51 @@ class KEGGImportPanel:
         # Disable buttons during import
         self.fetch_button.set_sensitive(False)
         self.import_button.set_sensitive(False)
-        self._show_status("Converting pathway to Petri net...")
+        self._show_status("🔄 Converting pathway to Petri net...")
         
-        # Import in background
-        GLib.idle_add(self._import_pathway_background)
+        # Import in background thread to avoid blocking UI
+        def import_thread():
+            try:
+                # Get conversion options from UI (must read from main thread before thread starts)
+                filter_cofactors = self.filter_cofactors_check.get_active()
+                coordinate_scale = self.scale_spin.get_value()
+                enable_layout = self.enhancement_layout_check.get_active() if self.enhancement_layout_check else True
+                enable_arcs = False  # KEGG import: Always use straight arcs
+                enable_metadata = self.enhancement_metadata_check.get_active() if self.enhancement_metadata_check else True
+                
+                # Create enhancement options
+                from shypn.pathway.options import EnhancementOptions
+                enhancement_options = EnhancementOptions(
+                    enable_layout_optimization=enable_layout,
+                    enable_arc_routing=enable_arcs,
+                    enable_metadata_enhancement=enable_metadata
+                )
+                
+                # Convert pathway to DocumentModel (BLOCKING operation)
+                from shypn.importer.kegg.pathway_converter import convert_pathway_enhanced
+                document_model = convert_pathway_enhanced(
+                    self.current_pathway,
+                    coordinate_scale=coordinate_scale,
+                    include_cofactors=filter_cofactors,
+                    enhancement_options=enhancement_options
+                )
+                
+                # Update UI in main thread
+                GLib.idle_add(self._on_import_complete, document_model)
+                
+            except Exception as e:
+                # Show error in main thread
+                GLib.idle_add(self._on_import_error, str(e))
+                import traceback
+                traceback.print_exc()
+        
+        # Start daemon thread (non-blocking)
+        threading.Thread(target=import_thread, daemon=True).start()
     
-    def _import_pathway_background(self):
-        """Background task to convert pathway and load into canvas.
-        
-        Returns:
-            False to stop GLib.idle_add from repeating
-        """
+    def _on_import_complete(self, document_model):
+        """Called in main thread after import completes successfully."""
         try:
-            # Get conversion options from UI
-            filter_cofactors = self.filter_cofactors_check.get_active()
-            coordinate_scale = self.scale_spin.get_value()
-            
-            # Get enhancement options from UI
-            enable_layout = self.enhancement_layout_check.get_active() if self.enhancement_layout_check else True
-            # KEGG import: Always use straight arcs (curved arcs disabled)
-            enable_arcs = False
-            enable_metadata = self.enhancement_metadata_check.get_active() if self.enhancement_metadata_check else True
-            
-            # Create enhancement options
-            from shypn.pathway.options import EnhancementOptions
-            enhancement_options = EnhancementOptions(
-                enable_layout_optimization=enable_layout,
-                enable_arc_routing=enable_arcs,  # Always False for KEGG import
-                enable_metadata_enhancement=enable_metadata
-            )
-            
-            # Convert pathway to DocumentModel with enhancements
-            from shypn.importer.kegg.pathway_converter import convert_pathway_enhanced
-            document_model = convert_pathway_enhanced(
-                self.current_pathway,
-                coordinate_scale=coordinate_scale,
-                include_cofactors=filter_cofactors,
-                enhancement_options=enhancement_options
-            )
-            
-            # Load into canvas using the same method as file operations
+            # Load into canvas
             if self.model_canvas:
                 # Create a new tab for this pathway
                 pathway_name = self.current_pathway.title or self.current_pathway.name
@@ -285,41 +302,32 @@ class KEGGImportPanel:
                 # Get the canvas manager for this tab
                 manager = self.model_canvas.get_canvas_manager(drawing_area)
                 if manager:
-                    # ===== UNIFIED OBJECT LOADING =====
-                    # Use load_objects() for consistent, unified initialization path
-                    # This replaces direct assignment + manual notification loop
-                    # Benefits: Single code path, automatic notifications, proper references
+                    # Load objects using unified path
                     manager.load_objects(
                         places=document_model.places,
                         transitions=document_model.transitions,
                         arcs=document_model.arcs
                     )
                     
-                    # CRITICAL: Set on_changed callback on all loaded objects
-                    # This is required for proper object state management and dirty tracking
+                    # Set change callback for object state management
                     manager.document_controller.set_change_callback(manager._on_object_changed)
                     
-                    # Fit imported content to page (KEGG models often have extreme coordinates)
-                    # Use 15% padding for better visibility of large imported models
-                    # Use 30% horizontal offset to shift right (accounting for right panel)
-                    # Use +10% vertical offset to shift UP in Cartesian space (increase Y)
-                    # Offsets are calculated in screen space, so they remain constant regardless of zoom
-                    # DEFERRED: Wait until viewport dimensions are set on first draw
+                    # Fit imported content to page
                     manager.fit_to_page(padding_percent=15, deferred=True, horizontal_offset_percent=30, vertical_offset_percent=10)
                     
-                    # Mark as imported so "Save" triggers "Save As" behavior
+                    # Mark as imported
                     manager.mark_as_imported(pathway_name)
                     
-                    self._show_status(f"Pathway imported: {len(document_model.places)} places, "
+                    self._show_status(f"✅ Pathway imported: {len(document_model.places)} places, "
                                     f"{len(document_model.transitions)} transitions, "
                                     f"{len(document_model.arcs)} arcs")
                 else:
-                    self._show_status("Error: Could not get canvas manager", error=True)
+                    self._show_status("❌ Error: Could not get canvas manager", error=True)
             else:
-                self._show_status("Error: No canvas available for import", error=True)
-            
+                self._show_status("❌ Error: No canvas available for import", error=True)
+        
         except Exception as e:
-            self._show_status(f"Import error: {str(e)}", error=True)
+            self._show_status(f"❌ Import error: {str(e)}", error=True)
             import traceback
             traceback.print_exc()
         
@@ -328,6 +336,13 @@ class KEGGImportPanel:
             self.fetch_button.set_sensitive(True)
             self.import_button.set_sensitive(True)
         
+        return False  # Don't repeat
+    
+    def _on_import_error(self, error_msg):
+        """Called in main thread when import encounters an error."""
+        self._show_status(f"❌ Import error: {error_msg}", error=True)
+        self.fetch_button.set_sensitive(True)
+        self.import_button.set_sensitive(True)
         return False  # Don't repeat
     
     def _show_status(self, message: str, error: bool = False):
