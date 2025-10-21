@@ -331,7 +331,12 @@ class LeftPanelLoader:
             """Deferred attach operation for Wayland safety."""
             print(f"[ATTACH] LeftPanel _do_attach() executing", file=sys.stderr)
             try:
-                # Extract content from window first
+                # WAYLAND FIX: Hide window FIRST before any reparenting
+                # This ensures Wayland compositor cleans up surface state before we move widgets
+                if self.window and self.window.get_visible():
+                    self.window.hide()
+                
+                # Extract content from window
                 current_parent = self.content.get_parent()
                 if current_parent == self.window:
                     self.window.remove(self.content)  # GTK3 uses remove()
@@ -339,33 +344,39 @@ class LeftPanelLoader:
                     # Content is in another container, remove it first
                     current_parent.remove(self.content)
                 
-                # WAYLAND FIX: Hide window BEFORE reparenting to avoid surface issues
-                if self.window:
-                    self.window.hide()
+                # WAYLAND FIX: Add content to container in a separate idle callback
+                # This gives Wayland compositor time to process the remove operation
+                def _do_add_content():
+                    try:
+                        # Only append if not already in container
+                        if self.content.get_parent() != container:
+                            container.add(self.content)  # GTK3 uses add() instead of append()
+                        
+                        # Make container visible when panel is attached
+                        container.set_visible(True)
+                        
+                        # Make sure content is visible
+                        self.content.set_visible(True)
+                        
+                        print(f"[ATTACH] LeftPanel attached successfully, content visible", file=sys.stderr)
+                        
+                        # Update float button state
+                        if self.float_button and self.float_button.get_active():
+                            self._updating_button = True
+                            self.float_button.set_active(False)
+                            self._updating_button = False
+                        
+                        self.is_attached = True
+                        
+                        # Notify that panel is attached (to expand paned)
+                        if self.on_attach_callback:
+                            self.on_attach_callback()
+                    except Exception as e:
+                        print(f"Warning: Error during panel add content: {e}", file=sys.stderr)
+                    return False
                 
-                # Only append if not already in container
-                if self.content.get_parent() != container:
-                    container.add(self.content)  # GTK3 uses add() instead of append()
-                
-                # Make container visible when panel is attached
-                container.set_visible(True)
-                
-                # Make sure content is visible
-                self.content.set_visible(True)
-                
-                print(f"[ATTACH] LeftPanel attached successfully, content visible", file=sys.stderr)
-                
-                # Update float button state
-                if self.float_button and self.float_button.get_active():
-                    self._updating_button = True
-                    self.float_button.set_active(False)
-                    self._updating_button = False
-                
-                self.is_attached = True
-                
-                # Notify that panel is attached (to expand paned)
-                if self.on_attach_callback:
-                    self.on_attach_callback()
+                # Schedule add operation with lower priority to ensure remove completes first
+                GLib.idle_add(_do_add_content, priority=GLib.PRIORITY_DEFAULT_IDLE)
             except Exception as e:
                 print(f"Warning: Error during panel attach: {e}", file=sys.stderr)
             
