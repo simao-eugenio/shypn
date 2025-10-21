@@ -521,18 +521,11 @@ class SBMLImportPanel:
         elif active_index == 2 and self.sbml_force_params_box:
             self.sbml_force_params_box.set_visible(True)
     
-    def _quick_load_to_canvas(self):
-        """Load parsed pathway to canvas with arbitrary positions.
+    def _on_load_clicked(self, button):
+        """Handle load button click - convert and load to canvas.
         
-        New Simplified Workflow (v2.0):
-        1. Parse SBML → PathwayData (species, reactions, connections)
-        2. Post-process with minimal PathwayPostProcessor (arbitrary positions, colors, units)
-        3. Convert to Petri net (places, transitions, arcs with stoichiometry weights)
-        4. Load to canvas
-        5. User applies Swiss Palette → Force-Directed for physics-based layout
-        
-        IMPORTANT: Initial positions are ARBITRARY - force-directed will recalculate everything.
-        This is now the MAIN import path (not a testing mode anymore).
+        This is called after successful parse to load the pathway to canvas.
+        Operations run in background thread to avoid blocking UI.
         """
         if not self.parsed_pathway:
             self.logger.warning("No parsed pathway to load")
@@ -542,33 +535,49 @@ class SBMLImportPanel:
             self.logger.warning("Canvas or converter not available for load")
             return
         
+        self._show_status("🔄 Converting to Petri net...")
+        
+        # Get parameters from UI (in main thread)
+        scale_factor = self.sbml_scale_spin.get_value() if self.sbml_scale_spin else 1.0
+        pathway_name = self.parsed_pathway.metadata.get('name', 'Pathway')
+        parsed_pathway = self.parsed_pathway
+        
+        # Load in background thread to avoid blocking UI
+        def load_thread():
+            try:
+                # Post-process: arbitrary positions, colors, unit normalization
+                from shypn.data.pathway.pathway_postprocessor import PathwayPostProcessor
+                postprocessor = PathwayPostProcessor(scale_factor=scale_factor)
+                processed = postprocessor.process(parsed_pathway)
+                
+                # Convert ProcessedPathwayData to Petri net
+                document_model = self.converter.convert(processed)
+                
+                # Pass results back to main thread
+                GLib.idle_add(self._on_load_complete, document_model, pathway_name)
+                
+            except Exception as e:
+                GLib.idle_add(self._on_load_error, str(e))
+        
+        import threading
+        threading.Thread(target=load_thread, daemon=True).start()
+    
+    def _on_load_complete(self, document_model, pathway_name):
+        """Handle successful load completion (called in main thread).
+        
+        Args:
+            document_model: The converted DocumentModel with places/transitions/arcs
+            pathway_name: Name for the pathway tab
+            
+        Returns:
+            False to stop GLib.idle_add from repeating
+        """
         try:
-            self.logger.info("Loading pathway to canvas with arbitrary positions")
-            
-            # Get scale factor from UI
-            scale_factor = self.sbml_scale_spin.get_value() if self.sbml_scale_spin else 1.0
-            
-            # Post-process: arbitrary positions, colors, unit normalization
-            # This uses the NEW simplified PathwayPostProcessor (v2.0)
-            self._show_status("Preparing pathway data...")
-            from shypn.data.pathway.pathway_postprocessor import PathwayPostProcessor
-            postprocessor = PathwayPostProcessor(scale_factor=scale_factor)
-            processed = postprocessor.process(self.parsed_pathway)
-            
-            self.logger.info(f"Post-processing complete: {len(processed.positions)} arbitrary positions")
-            
-            # Convert ProcessedPathwayData to Petri net
-            self._show_status("Converting to Petri net...")
-            document_model = self.converter.convert(processed)
-            self.logger.info(f"Converted to Petri net: {len(document_model.places)} places, {len(document_model.transitions)} transitions")
-            
             # Load to canvas - create new tab
-            self._show_status("Loading to canvas...")
-            pathway_name = self.parsed_pathway.metadata.get('name', 'Pathway')
+            self._show_status("🔄 Loading to canvas...")
             page_index, drawing_area = self.model_canvas.add_document(filename=pathway_name)
             
             # Wire sbml_panel to ModelCanvasLoader (if not already wired)
-            # This allows Swiss Palette Layout tools to read parameters from SBML Import Options
             if not hasattr(self.model_canvas, 'sbml_panel') or self.model_canvas.sbml_panel is None:
                 self.model_canvas.sbml_panel = self
                 self.logger.info("Wired SBML panel to ModelCanvasLoader")
@@ -577,45 +586,51 @@ class SBMLImportPanel:
             manager = self.model_canvas.get_canvas_manager(drawing_area)
             
             if manager:
-                # ===== UNIFIED OBJECT LOADING =====
-                # Use load_objects() for consistent, unified initialization path
-                # This replaces direct assignment + manual notification loop
-                # Benefits: Single code path, automatic notifications, proper references
+                # Load objects using unified loading path
                 manager.load_objects(
                     places=document_model.places,
                     transitions=document_model.transitions,
                     arcs=document_model.arcs
                 )
                 
-                # CRITICAL: Set on_changed callback on all loaded objects
-                # This is required for proper object state management and dirty tracking
+                # Set change callback for object state management
                 manager.document_controller.set_change_callback(manager._on_object_changed)
                 
-                # Fit imported content to page (SBML models often have extreme coordinates)
-                # Use 15% padding for better visibility of large imported models
-                # Use 30% horizontal offset to shift right (accounting for right panel)
-                # Use +10% vertical offset to shift UP in Cartesian space (increase Y)
-                # Offsets are calculated in screen space, so they remain constant regardless of zoom
-                # DEFERRED: Wait until viewport dimensions are set on first draw
-                manager.fit_to_page(padding_percent=15, deferred=True, horizontal_offset_percent=30, vertical_offset_percent=10)
+                # Fit imported content to page with offsets
+                manager.fit_to_page(padding_percent=15, deferred=True, 
+                                   horizontal_offset_percent=30, vertical_offset_percent=10)
                 
-                # Mark as imported so "Save" triggers "Save As" behavior
+                # Mark as imported so "Save" triggers "Save As"
                 manager.mark_as_imported(pathway_name)
                 
                 # Trigger redraw
                 drawing_area.queue_draw()
                 
                 self.logger.info(f"Canvas loaded: {len(manager.places)} places, {len(manager.transitions)} transitions")
-                self._show_status(f"✓ Loaded {len(manager.places)} places, {len(manager.transitions)} transitions - Use Swiss Palette → Force-Directed for layout")
+                self._show_status(f"✅ Loaded {len(manager.places)} places, {len(manager.transitions)} transitions")
             else:
                 self.logger.error("Failed to get canvas manager")
-                self._show_status("Error: Failed to get canvas manager", error=True)
-            
+                self._show_status("❌ Error: Failed to get canvas manager", error=True)
+                
         except Exception as e:
             self.logger.error(f"Load failed: {e}")
-            self._show_status(f"Load error: {str(e)}", error=True)
+            self._show_status(f"❌ Load error: {str(e)}", error=True)
             import traceback
             traceback.print_exc()
+        
+        return False
+    
+    def _on_load_error(self, error_message):
+        """Handle load error (called in main thread).
+        
+        Args:
+            error_message: The error message string
+            
+        Returns:
+            False to stop GLib.idle_add from repeating
+        """
+        self._show_status(f"❌ Load error: {error_message}", error=True)
+        return False
     
     def _on_parse_clicked(self, button):
         """Handle parse button click - parse and validate SBML file."""
@@ -634,75 +649,89 @@ class SBMLImportPanel:
         
         # Disable parse button during parsing
         self.sbml_parse_button.set_sensitive(False)
-        self._show_status(f"Parsing {os.path.basename(self.current_filepath)}...")
+        filepath = self.current_filepath
+        filename = os.path.basename(filepath)
+        self._show_status(f"🔄 Parsing {filename}...")
         
-        # Parse in background to avoid blocking UI
-        GLib.idle_add(self._parse_pathway_background)
+        # Parse in background thread to avoid blocking UI
+        def parse_thread():
+            try:
+                # Parse SBML file
+                parsed_pathway = self.parser.parse_file(filepath)
+                
+                if not parsed_pathway:
+                    GLib.idle_add(self._on_parse_error, "Failed to parse SBML file")
+                    return
+                
+                # Validate pathway
+                validation_result = self.validator.validate(parsed_pathway)
+                
+                # Pass results back to main thread
+                GLib.idle_add(self._on_parse_complete, parsed_pathway, validation_result)
+                
+            except Exception as e:
+                GLib.idle_add(self._on_parse_error, str(e))
+        
+        import threading
+        threading.Thread(target=parse_thread, daemon=True).start()
     
-    def _parse_pathway_background(self):
-        """Background task to parse and validate SBML file.
+    def _on_parse_complete(self, parsed_pathway, validation_result):
+        """Handle successful parse completion (called in main thread).
         
+        Args:
+            parsed_pathway: The parsed PathwayData object
+            validation_result: ValidationResult with errors and warnings
+            
         Returns:
             False to stop GLib.idle_add from repeating
         """
-        try:
-            # Parse SBML file directly (enrichment removed - heterogeneity intractable)
-            self._show_status(f"Parsing SBML...")
-            self.parsed_pathway = self.parser.parse_file(self.current_filepath)
-            
-            if not self.parsed_pathway:
-                self._show_status("Failed to parse SBML file", error=True)
-                self.sbml_parse_button.set_sensitive(True)
-                return False
-            
-            # Validate pathway
-            validation_result = self.validator.validate(self.parsed_pathway)
-            
-            # Check for errors
-            if not validation_result.is_valid:
-                # Show errors in status
-                error_count = len(validation_result.errors)
-                warning_count = len(validation_result.warnings)
-                
-                error_msg = f"Validation failed: {error_count} error(s), {warning_count} warning(s)"
-                self._show_status(error_msg, error=True)
-                
-                # Show detailed errors in preview
-                self._show_validation_errors(validation_result)
-                
-                self.sbml_parse_button.set_sensitive(True)
-                return False
-            
-            # Show warnings if any
-            if validation_result.warnings:
-                warning_count = len(validation_result.warnings)
-                self._show_status(f"✓ Parsed with {warning_count} warning(s)")
-            else:
-                self._show_status(f"✓ Parsed and validated successfully")
-            
-            # Update preview with pathway info
-            self._update_preview()
-            
-            # Load to canvas after parse (NEW: always enabled, not a testing mode)
-            if self.model_canvas:
-                self.logger.info("Auto-loading to canvas after parse")
-                GLib.idle_add(self._quick_load_to_canvas)
-            else:
-                self.logger.debug("Canvas not available, skipping auto-load")
-            
-        except Exception as e:
-            self._show_status(f"Parse error: {str(e)}", error=True)
-            self.parsed_pathway = None
-            
-            import traceback
-            traceback.print_exc()
+        self.parsed_pathway = parsed_pathway
         
-        finally:
-            # Re-enable parse button
-            if self.sbml_parse_button:
-                self.sbml_parse_button.set_sensitive(True)
+        # Check for validation errors
+        if not validation_result.is_valid:
+            error_count = len(validation_result.errors)
+            warning_count = len(validation_result.warnings)
+            error_msg = f"❌ Validation failed: {error_count} error(s), {warning_count} warning(s)"
+            self._show_status(error_msg, error=True)
+            self._show_validation_errors(validation_result)
+            self.sbml_parse_button.set_sensitive(True)
+            return False
         
-        return False  # Don't repeat
+        # Show warnings if any
+        if validation_result.warnings:
+            warning_count = len(validation_result.warnings)
+            self._show_status(f"✅ Parsed with {warning_count} warning(s)")
+        else:
+            self._show_status(f"✅ Parsed and validated successfully")
+        
+        # Update preview with pathway info
+        self._update_preview()
+        
+        # Re-enable parse button
+        self.sbml_parse_button.set_sensitive(True)
+        
+        # Load to canvas after parse (NEW: always enabled, not a testing mode)
+        if self.model_canvas:
+            self.logger.info("Auto-loading to canvas after parse")
+            self._on_load_clicked(None)
+        else:
+            self.logger.debug("Canvas not available, skipping auto-load")
+        
+        return False
+    
+    def _on_parse_error(self, error_message):
+        """Handle parse error (called in main thread).
+        
+        Args:
+            error_message: The error message string
+            
+        Returns:
+            False to stop GLib.idle_add from repeating
+        """
+        self._show_status(f"❌ Parse error: {error_message}", error=True)
+        self.parsed_pathway = None
+        self.sbml_parse_button.set_sensitive(True)
+        return False
     
     def _show_validation_errors(self, validation_result):
         """Show validation errors and warnings in preview area.
