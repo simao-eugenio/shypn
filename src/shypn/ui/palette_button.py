@@ -42,15 +42,21 @@ class PaletteButton:
         style_context = self._button.get_style_context()
         style_context.add_class('palette-button')
 
-        # Create an image from icon name (symbolic) - fallback safe
-        try:
-            image = Gtk.Image.new_from_icon_name(icon_name, Gtk.IconSize.DIALOG)
-            image.set_pixel_size(self.ICON_SIZE)
-            self._button.add(image)
-        except Exception:
-            # If icon fails, use a label
-            label = Gtk.Label(label=name[:1].upper())
-            self._button.add(label)
+        # TEMPORARY: Use text labels instead of icons
+        # Map button names to display text
+        text_labels = {
+            'files': 'Files',
+            'pathways': 'Path',
+            'analyses': 'Anal',
+            'topology': 'Topo'
+        }
+        
+        label_text = text_labels.get(name, name[:4].title())
+        label = Gtk.Label(label=label_text)
+        label.set_justify(Gtk.Justification.CENTER)
+        label.set_line_wrap(True)
+        label.set_max_width_chars(5)
+        self._button.add(label)
 
         # Connect to toggled to manage CSS classes
         self._button.connect('toggled', self._on_toggled_internal)
