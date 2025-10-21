@@ -134,8 +134,13 @@ class TopologyPanelBase(ABC):
         # WAYLAND FIX: Prevent redundant attach
         if self.is_attached and self.parent_container == container:
             print(f"[ATTACH] TopologyPanel already attached, ensuring visibility", file=sys.stderr)
+            # Check if content was removed by hide() - if so, re-add it
+            if self.content.get_parent() != container:
+                print(f"[ATTACH] TopologyPanel content was removed, re-adding to container", file=sys.stderr)
+                container.add(self.content)
             container.set_visible(True)
             self.content.set_visible(True)
+            self.content.show_all()  # Ensure all children are visible
             return
         
         print(f"[ATTACH] TopologyPanel attach_to() called, is_attached={self.is_attached}", file=sys.stderr)

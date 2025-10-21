@@ -299,8 +299,13 @@ class LeftPanelLoader:
         if self.is_attached and self.parent_container == container:
             # Already attached to this container, just ensure visibility
             print(f"[ATTACH] LeftPanel already attached, ensuring visibility", file=sys.stderr)
+            # Check if content was removed by hide() - if so, re-add it
+            if self.content.get_parent() != container:
+                print(f"[ATTACH] LeftPanel content was removed, re-adding to container", file=sys.stderr)
+                container.add(self.content)
             container.set_visible(True)
             self.content.set_visible(True)
+            self.content.show_all()  # Ensure all children are visible
             return
         
         print(f"[ATTACH] LeftPanel scheduling deferred attach", file=sys.stderr)
