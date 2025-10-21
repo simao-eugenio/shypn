@@ -2084,6 +2084,30 @@ class ModelCanvasLoader:
                 return child
         return None
 
+    def get_current_model(self):
+        """Get the current canvas manager as model for topology analysis.
+        
+        The ModelCanvasManager IS the model - it has places, transitions, arcs
+        attributes that satisfy the TopologyAnalyzer duck-typed interface.
+        
+        This method is used by the Topology Panel to get the model for analysis.
+        
+        Returns:
+            ModelCanvasManager: The active canvas manager (which is the model),
+                               or None if no document is open.
+        
+        Example:
+            # From Topology Panel Controller:
+            model = model_canvas_loader.get_current_model()
+            if model:
+                analyzer = PInvariantAnalyzer(model)
+                result = analyzer.analyze()
+        """
+        drawing_area = self.get_current_document()
+        if drawing_area is None:
+            return None
+        return self.get_canvas_manager(drawing_area)
+
     def get_notebook(self):
         """Get the notebook widget for direct access.
         

@@ -429,8 +429,7 @@ def main(argv=None):
 					left_paned.set_position(0)
 				except Exception:
 					pass  # Ignore paned errors
-			# Sync palette button to off when panel floats
-			master_palette.set_active('files', False)
+			# NOTE: Do NOT call master_palette.set_active() here - creates circular callbacks
 		
 		def on_left_attach():
 			"""Expand left paned when Files panel attaches."""
@@ -439,8 +438,7 @@ def main(argv=None):
 					left_paned.set_position(250)
 				except Exception:
 					pass  # Ignore paned errors
-			# Sync palette button to on when panel attaches
-			master_palette.set_active('files', True)
+			# NOTE: Do NOT call master_palette.set_active() here - creates circular callbacks
 		
 		def on_right_float():
 			"""Collapse left paned when Analyses panel floats (now docks LEFT)."""
@@ -449,8 +447,7 @@ def main(argv=None):
 					left_paned.set_position(0)
 				except Exception:
 					pass  # Ignore paned errors
-			# Sync palette button to off when panel floats
-			master_palette.set_active('analyses', False)
+			# NOTE: Do NOT call master_palette.set_active() here - creates circular callbacks
 		
 		def on_right_attach():
 			"""Expand left paned when Analyses panel attaches (now docks LEFT)."""
@@ -459,8 +456,7 @@ def main(argv=None):
 					left_paned.set_position(280)
 				except Exception:
 					pass  # Ignore paned errors
-			# Sync palette button to on when panel attaches
-			master_palette.set_active('analyses', True)
+			# NOTE: Do NOT call master_palette.set_active() here - creates circular callbacks
 		
 		# Define pathway panel toggle handler (if panel loaded - now docks LEFT)
 		def on_pathway_toggle(is_active):
@@ -532,8 +528,7 @@ def main(argv=None):
 					left_paned.set_position(0)
 				except Exception:
 					pass  # Ignore paned errors
-			# Sync palette button to off when panel floats
-			master_palette.set_active('topology', False)
+			# NOTE: Do NOT call master_palette.set_active() here - creates circular callbacks
 		
 		def on_topology_attach():
 			"""Expand left paned when Topology panel attaches."""
@@ -542,8 +537,7 @@ def main(argv=None):
 					left_paned.set_position(400)
 				except Exception:
 					pass  # Ignore paned errors
-			# Sync palette button to on when panel attaches
-			master_palette.set_active('topology', True)
+			# NOTE: Do NOT call master_palette.set_active() here - creates circular callbacks
 		
 		# Wire up callbacks
 		left_panel_loader.on_float_callback = on_left_float

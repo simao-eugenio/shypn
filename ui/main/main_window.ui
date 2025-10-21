@@ -9,23 +9,12 @@
     <property name="default-height">600</property>
     <property name="visible">True</property>
 
-    <!-- Header Bar with panel toggle buttons -->
+    <!-- Header Bar with window controls -->
     <child type="titlebar">
       <object class="GtkHeaderBar" id="header_bar">
         <property name="show-close-button">True</property>
         <property name="visible">True</property>
         <property name="title">Shypn</property>
-        <child>
-          <object class="GtkToggleButton" id="left_panel_toggle">
-            <property name="label">File Ops</property>
-            <property name="active">False</property>
-            <property name="tooltip-text">Toggle File Operations panel (attach/detach)</property>
-            <property name="visible">True</property>
-          </object>
-          <packing>
-            <property name="pack-type">start</property>
-          </packing>
-        </child>
         <child>
           <object class="GtkButton" id="maximize_button">
             <property name="visible">True</property>
@@ -62,98 +51,104 @@
             <property name="position">1</property>
           </packing>
         </child>
-        <child>
-          <object class="GtkToggleButton" id="pathway_panel_toggle">
-            <property name="label">Pathways</property>
-            <property name="active">False</property>
-            <property name="tooltip-text">Toggle Pathway Operations panel (attach/detach)</property>
-            <property name="visible">True</property>
-          </object>
-          <packing>
-            <property name="pack-type">end</property>
-            <property name="position">3</property>
-          </packing>
-        </child>
-        <child>
-          <object class="GtkToggleButton" id="right_panel_toggle">
-            <property name="label">Analyses</property>
-            <property name="active">False</property>
-            <property name="tooltip-text">Toggle Dynamic Analyses panel (attach/detach)</property>
-            <property name="visible">True</property>
-          </object>
-          <packing>
-            <property name="pack-type">end</property>
-            <property name="position">2</property>
-          </packing>
-        </child>
       </object>
     </child>
 
-    <!-- Main content area: paned layout with left dock + workspace + right dock -->
+    <!-- Main content area: horizontal box with master palette + content -->
     <child>
-      <object class="GtkPaned" id="left_paned">
+      <object class="GtkBox" id="root_container">
         <property name="orientation">horizontal</property>
-        <property name="position">0</property>
         <property name="visible">True</property>
-        <property name="can-focus">True</property>
+        <property name="hexpand">True</property>
+        <property name="vexpand">True</property>
         
-        <!-- Left dock area for attachable panels (extreme left) -->
+        <!-- Master Palette Container (54px wide: 48px buttons + 6px padding, far left) -->
         <child>
-          <object class="GtkBox" id="left_dock_area">
+          <object class="GtkBox" id="master_palette_slot">
             <property name="orientation">vertical</property>
-            <property name="spacing">0</property>
-            <property name="width-request">0</property>
-            <property name="visible">False</property>
-            <!-- Panel content will be attached here dynamically -->
+            <property name="visible">True</property>
+            <property name="width-request">54</property>
+            <property name="hexpand">False</property>
+            <property name="vexpand">True</property>
+            <!-- MasterPalette widget will be inserted here programmatically -->
           </object>
           <packing>
-            <property name="resize">False</property>
-            <property name="shrink">False</property>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
           </packing>
         </child>
         
-        <!-- Right side: another paned for workspace + right dock -->
+        <!-- Content area: vertical box with paned layout + status bar -->
         <child>
-          <object class="GtkPaned" id="right_paned">
-            <property name="orientation">horizontal</property>
-            <property name="position">10000</property>
+          <object class="GtkBox" id="content_with_statusbar">
+            <property name="orientation">vertical</property>
             <property name="visible">True</property>
-            <property name="can-focus">True</property>
+            <property name="hexpand">True</property>
+            <property name="vexpand">True</property>
             
-            <!-- Main workspace area -->
+            <!-- Paned layout: left dock + main workspace (no right dock) -->
             <child>
-              <object class="GtkBox" id="main_workspace">
-                <property name="orientation">vertical</property>
-                <property name="hexpand">True</property>
-                <property name="vexpand">True</property>
+              <object class="GtkPaned" id="left_paned">
+                <property name="orientation">horizontal</property>
+                <property name="position">0</property>
                 <property name="visible">True</property>
-                <!-- Canvas and status bar will be added programmatically -->
+                <property name="can-focus">True</property>
+                <property name="vexpand">True</property>
+                
+                <!-- Left dock area for ALL panels (Files, Analyses, Pathways, Topology) -->
+                <child>
+                  <object class="GtkBox" id="left_dock_area">
+                    <property name="orientation">vertical</property>
+                    <property name="spacing">0</property>
+                    <property name="width-request">0</property>
+                    <property name="visible">False</property>
+                    <!-- All panel content will be attached here dynamically -->
+                  </object>
+                  <packing>
+                    <property name="resize">False</property>
+                    <property name="shrink">False</property>
+                  </packing>
+                </child>
+                
+                <!-- Main workspace area (canvas only, no right dock) -->
+                <child>
+                  <object class="GtkBox" id="main_workspace">
+                    <property name="orientation">vertical</property>
+                    <property name="hexpand">True</property>
+                    <property name="vexpand">True</property>
+                    <property name="visible">True</property>
+                    <!-- Canvas will be added programmatically -->
+                  </object>
+                  <packing>
+                    <property name="resize">True</property>
+                    <property name="shrink">False</property>
+                  </packing>
+                </child>
+                
               </object>
               <packing>
-                <property name="resize">True</property>
-                <property name="shrink">False</property>
+                <property name="expand">True</property>
+                <property name="fill">True</property>
               </packing>
             </child>
             
-            <!-- Right dock area for attachable panels (extreme right) -->
+            <!-- Status Bar (at bottom, always visible) -->
             <child>
-              <object class="GtkBox" id="right_dock_area">
-                <property name="orientation">vertical</property>
-                <property name="spacing">0</property>
-                <property name="width-request">0</property>
-                <property name="visible">False</property>
-                <!-- Panel content will be attached here dynamically -->
+              <object class="GtkStatusbar" id="status_bar">
+                <property name="visible">True</property>
+                <property name="vexpand">False</property>
+                <property name="hexpand">True</property>
               </object>
               <packing>
-                <property name="resize">False</property>
-                <property name="shrink">False</property>
+                <property name="expand">False</property>
+                <property name="fill">True</property>
               </packing>
             </child>
             
           </object>
           <packing>
-            <property name="resize">True</property>
-            <property name="shrink">False</property>
+            <property name="expand">True</property>
+            <property name="fill">True</property>
           </packing>
         </child>
         

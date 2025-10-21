@@ -293,6 +293,8 @@ class RightPanelLoader:
     def float(self, parent_window=None):
         """Float panel as a separate window (detach if currently attached).
         
+        WAYLAND SAFE: Uses idle callbacks for reparenting and window operations.
+        
         Args:
             parent_window: Optional parent window to set as transient.
         """
@@ -300,33 +302,58 @@ class RightPanelLoader:
         if self.window is None:
             self.load()
         
-        # If currently attached, unattach first (moves content back to window)
-        if self.is_attached:
-            self.unattach()
-            # Hide the container after unattaching
-            if self.parent_container:
-                self.parent_container.set_visible(False)
+        # Store parent window reference
+        if parent_window:
+            self.parent_window = parent_window
         
-        # WAYLAND FIX: Always set parent, use stored parent if not provided
-        parent = parent_window if parent_window else self.parent_window
-        if parent:
-            self.window.set_transient_for(parent)
-        else:
-            # No parent available - try to set to None explicitly
-            self.window.set_transient_for(None)
+        def _do_float():
+            """Deferred float operation for Wayland safety."""
+            try:
+                # If currently attached, unattach first (moves content back to window)
+                if self.is_attached:
+                    # Remove from container
+                    if self.parent_container and self.content.get_parent() == self.parent_container:
+                        self.parent_container.remove(self.content)
+                    
+                    # Return content to window
+                    if self.content.get_parent() != self.window:
+                        self.window.add(self.content)
+                    
+                    self.is_attached = False
+                    
+                    # Hide the container after unattaching
+                    if self.parent_container:
+                        self.parent_container.set_visible(False)
+                
+                # WAYLAND FIX: Always set parent, use stored parent if not provided
+                parent = parent_window if parent_window else self.parent_window
+                if parent:
+                    self.window.set_transient_for(parent)
+                else:
+                    # No parent available - try to set to None explicitly
+                    self.window.set_transient_for(None)
+                
+                # Update float button state
+                if self.float_button and not self.float_button.get_active():
+                    self._updating_button = True
+                    self.float_button.set_active(True)
+                    self._updating_button = False
+                
+                # Notify that panel is floating (to collapse paned)
+                if self.on_float_callback:
+                    self.on_float_callback()
+                
+                # WAYLAND FIX: Ensure content is visible before showing window
+                self.content.set_visible(True)
+                # GTK3: use show_all() instead of present() to ensure all widgets are visible
+                self.window.show_all()
+            except Exception as e:
+                print(f"Warning: Error during panel float: {e}", file=sys.stderr)
+            
+            return False  # Don't repeat
         
-        # Update float button state
-        if self.float_button and not self.float_button.get_active():
-            self._updating_button = True
-            self.float_button.set_active(True)
-            self._updating_button = False
-        
-        # Notify that panel is floating (to collapse paned)
-        if self.on_float_callback:
-            self.on_float_callback()
-        
-        # GTK3: use show_all() instead of present() to ensure all widgets are visible
-        self.window.show_all()
+        # WAYLAND FIX: Use idle callback to defer float operation
+        GLib.idle_add(_do_float)
     
     def detach(self, parent_window=None):
         """Detach panel to show as a floating window.
@@ -340,6 +367,9 @@ class RightPanelLoader:
     def attach_to(self, container, parent_window=None):
         """Attach panel to container (embed content in extreme right, hide window).
         
+        WAYLAND SAFE: Uses idle callbacks to ensure widgets are properly realized
+        before reparenting operations.
+        
         Args:
             container: Gtk.Box or other container to embed content into.
             parent_window: Optional parent window (stored for float button).
@@ -348,46 +378,61 @@ class RightPanelLoader:
         if self.window is None:
             self.load()
         
+        # WAYLAND FIX: Prevent rapid attach/detach race conditions
+        if self.is_attached and self.parent_container == container:
+            # Already attached to this container, just ensure visibility
+            container.set_visible(True)
+            self.content.set_visible(True)
+            return
+        
         # Store parent window and container for float button callback
         if parent_window:
             self.parent_window = parent_window
         self.parent_container = container
         
-        # Extract content from window first
-        current_parent = self.content.get_parent()
-        if current_parent == self.window:
-            self.window.remove(self.content)  # GTK3 uses remove()
-        elif current_parent and current_parent != container:
-            current_parent.remove(self.content)
+        def _do_attach():
+            """Deferred attach operation for Wayland safety."""
+            try:
+                # Extract content from window first
+                current_parent = self.content.get_parent()
+                if current_parent == self.window:
+                    self.window.remove(self.content)  # GTK3 uses remove()
+                elif current_parent and current_parent != container:
+                    current_parent.remove(self.content)
+                
+                # WAYLAND FIX: Hide window BEFORE reparenting to avoid surface issues
+                if self.window and self.window.get_visible():
+                    self.window.hide()
+                
+                # Only add if not already in container
+                if self.content.get_parent() != container:
+                    container.add(self.content)  # GTK3 uses add() instead of append()
+                
+                # Make container visible when panel is attached
+                container.set_visible(True)
+                
+                # Make sure content is visible
+                self.content.set_visible(True)
+                self.content.show_all()  # Ensure all child widgets are visible
+                
+                # Update float button state
+                if self.float_button and self.float_button.get_active():
+                    self._updating_button = True
+                    self.float_button.set_active(False)
+                    self._updating_button = False
+                
+                self.is_attached = True
+                
+                # Notify that panel is attached (to expand paned)
+                if self.on_attach_callback:
+                    self.on_attach_callback()
+            except Exception as e:
+                print(f"Warning: Error during panel attach: {e}", file=sys.stderr)
+            
+            return False  # Don't repeat
         
-        # Hide the window but DON'T destroy it - we need it to float again
-        if self.window and self.window.get_visible():
-            self.window.hide()
-        
-        # Only add if not already in container
-        if self.content.get_parent() != container:
-            container.add(self.content)  # GTK3 uses add() instead of append()
-        else:
-            pass
-        
-        # Make container visible when panel is attached
-        container.set_visible(True)
-        
-        # Make sure content is visible
-        self.content.set_visible(True)
-        self.content.show_all()  # Ensure all child widgets are visible
-        
-        # Update float button state
-        if self.float_button and self.float_button.get_active():
-            self._updating_button = True
-            self.float_button.set_active(False)
-            self._updating_button = False
-        
-        self.is_attached = True
-        
-        # Notify that panel is attached (to expand paned)
-        if self.on_attach_callback:
-            self.on_attach_callback()
+        # WAYLAND FIX: Use idle callback to defer reparenting
+        GLib.idle_add(_do_attach)
         
     
     def unattach(self):
@@ -410,14 +455,28 @@ class RightPanelLoader:
         # Don't clear parent_container - we need it to dock back
     
     def hide(self):
-        """Hide panel (works for both attached and detached states)."""
-        if self.is_attached:
-            # When attached, hide both content and container
-            self.content.set_visible(False)
-            if self.parent_container:
-                self.parent_container.set_visible(False)
-        elif self.window:
-            self.window.set_visible(False)
+        """Hide panel (works for both attached and detached states).
+        
+        WAYLAND SAFE: Uses idle callbacks to avoid surface issues.
+        """
+        def _do_hide():
+            """Deferred hide operation for Wayland safety."""
+            try:
+                if self.is_attached:
+                    # When attached, hide content first, then container
+                    if self.content:
+                        self.content.set_visible(False)
+                    if self.parent_container:
+                        self.parent_container.set_visible(False)
+                elif self.window:
+                    # When floating, hide the window
+                    self.window.hide()
+            except Exception as e:
+                print(f"Warning: Error during panel hide: {e}", file=sys.stderr)
+            return False  # Don't repeat
+        
+        # WAYLAND FIX: Use idle callback to defer hide operation
+        GLib.idle_add(_do_hide)
 
 
 def create_right_panel(ui_path=None, data_collector=None):

@@ -6,6 +6,8 @@ definitions from business logic, following clean architecture principles.
 Modules:
     topology_tab_loader: Loaders for topology analysis tabs in property dialogs
     highlighting_manager: Manager for canvas highlighting features
+    master_palette: Main vertical toolbar for panel category buttons
+    palette_button: Individual button widget used in master palette
 
 Architecture:
     - UI definitions: /ui/*.ui (GTK XML files)
@@ -42,6 +44,9 @@ from .highlighting_manager import (
     STYLE_T_INV,
 )
 
+from .master_palette import MasterPalette
+from .palette_button import PaletteButton
+
 __all__ = [
     # Topology tab loaders
     'TopologyTabLoader',
@@ -62,4 +67,7 @@ __all__ = [
     'STYLE_HUB',
     'STYLE_P_INV',
     'STYLE_T_INV',
+    # Master palette
+    'MasterPalette',
+    'PaletteButton',
 ]

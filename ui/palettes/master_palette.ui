@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+  <!-- Master Palette container: vertical box where buttons will be packed from top -->
+  <object class="GtkBox" id="master_palette_container">
+    <property name="visible">True</property>
+    <property name="orientation">vertical</property>
+    <property name="spacing">0</property>
+    <property name="width-request">54</property>
+    <property name="hexpand">False</property>
+    <property name="vexpand">True</property>
+    <!-- spacer will be added programmatically or via packing -->
+  </object>
+</interface>
