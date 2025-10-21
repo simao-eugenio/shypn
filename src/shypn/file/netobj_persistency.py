@@ -281,8 +281,6 @@ class NetObjPersistency:
         dialog.add_button('Discard Changes', Gtk.ResponseType.NO)
         dialog.add_button('Save', Gtk.ResponseType.YES)
         dialog.set_default_response(Gtk.ResponseType.YES)
-        # WAYLAND FIX: Show dialog before run() to ensure surface is created
-        dialog.show()
         response = dialog.run()
         dialog.destroy()
         if response == Gtk.ResponseType.YES:
@@ -312,7 +310,12 @@ class NetObjPersistency:
         """
         # Ensure parent window is set (fixes Wayland crash)
         parent = self.parent_window if self.parent_window else None
-        dialog = Gtk.FileChooserDialog(title='Save Petri Net', parent=parent, action=Gtk.FileChooserAction.SAVE)
+        dialog = Gtk.FileChooserDialog(
+            title='Save Petri Net',
+            parent=parent,
+            action=Gtk.FileChooserAction.SAVE
+        )
+        dialog.set_modal(True)  # WAYLAND FIX: Ensure modal behavior
         dialog.set_keep_above(True)  # Ensure dialog stays on top
         dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_SAVE, Gtk.ResponseType.OK)
         dialog.set_default_response(Gtk.ResponseType.OK)
@@ -397,8 +400,6 @@ class NetObjPersistency:
             except Exception:
                 dialog.set_current_name('default.shy')  # Final fallback
         
-        # WAYLAND FIX: Show dialog before run() to ensure surface is created
-        dialog.show()
         response = dialog.run()
         filepath = dialog.get_filename()
         dialog.destroy()
@@ -416,8 +417,6 @@ class NetObjPersistency:
             warning_dialog = Gtk.MessageDialog(parent=parent, modal=True, message_type=Gtk.MessageType.WARNING, buttons=Gtk.ButtonsType.YES_NO, text="Save as 'default.shy'?")
             warning_dialog.set_keep_above(True)  # Ensure dialog stays on top
             warning_dialog.format_secondary_text("You are about to save with the default filename 'default.shy'.\n\nThis may overwrite existing default files or make it hard to identify this model later.\n\nDo you want to continue with this filename?")
-            # WAYLAND FIX: Show dialog before run() to ensure surface is created
-            warning_dialog.show()
             warning_response = warning_dialog.run()
             warning_dialog.destroy()
             if warning_response != Gtk.ResponseType.YES:
@@ -433,7 +432,12 @@ class NetObjPersistency:
         """
         # Ensure parent window is set (fixes Wayland crash)
         parent = self.parent_window if self.parent_window else None
-        dialog = Gtk.FileChooserDialog(title='Open Petri Net', parent=parent, action=Gtk.FileChooserAction.OPEN)
+        dialog = Gtk.FileChooserDialog(
+            title='Open Petri Net',
+            parent=parent,
+            action=Gtk.FileChooserAction.OPEN
+        )
+        dialog.set_modal(True)  # WAYLAND FIX: Ensure modal behavior
         dialog.set_keep_above(True)  # Ensure dialog stays on top
         dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.OK)
         dialog.set_default_response(Gtk.ResponseType.OK)
@@ -482,8 +486,6 @@ class NetObjPersistency:
             except Exception:
                 pass  # Let GTK use its default
         
-        # WAYLAND FIX: Show dialog before run() to ensure surface is created
-        dialog.show()
         response = dialog.run()
         filepath = dialog.get_filename()
         dialog.destroy()
@@ -504,8 +506,6 @@ class NetObjPersistency:
         dialog = Gtk.MessageDialog(parent=parent, modal=True, message_type=Gtk.MessageType.INFO, buttons=Gtk.ButtonsType.OK, text=title)
         dialog.set_keep_above(True)  # Ensure dialog stays on top
         dialog.format_secondary_text(message)
-        # WAYLAND FIX: Show dialog before run() to ensure surface is created
-        dialog.show()
         dialog.run()
         dialog.destroy()
 
@@ -521,8 +521,6 @@ class NetObjPersistency:
         dialog = Gtk.MessageDialog(parent=parent, modal=True, message_type=Gtk.MessageType.ERROR, buttons=Gtk.ButtonsType.OK, text=title)
         dialog.set_keep_above(True)  # Ensure dialog stays on top
         dialog.format_secondary_text(message)
-        # WAYLAND FIX: Show dialog before run() to ensure surface is created
-        dialog.show()
         dialog.run()
         dialog.destroy()
 
