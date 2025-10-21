@@ -658,52 +658,408 @@ class TopologyPanelController:
         return '\n'.join(lines)
     
     def _format_cycles_report(self, result) -> str:
-        """Format Elementary Cycles analysis report (PLACEHOLDER)."""
-        return ("<b>Elementary Cycles Analysis</b>\n\n"
-                "<i>Full implementation pending.\n\n"
-                "Will show cycle paths with arrows.</i>")
+        """Format Elementary Cycles analysis report."""
+        if not result or not result.success:
+            return "<b>Elementary Cycles Analysis</b>\n\n<i>Analysis failed or no data.</i>"
+        
+        cycles = result.get('cycles', [])
+        count = result.get('count', len(cycles))
+        longest_length = result.get('longest_length', 0)
+        truncated = result.get('truncated', False)
+        
+        lines = [f"<b>Elementary Cycles Analysis Results</b>\n"]
+        lines.append(f"Found: <b>{count}</b> cycle{'s' if count != 1 else ''}")
+        if longest_length > 0:
+            lines.append(f"Longest: <b>{longest_length}</b> nodes")
+        if truncated:
+            lines.append("<i>(results truncated)</i>")
+        lines.append("")
+        
+        if cycles:
+            lines.append("\n<b>Cycles:</b>")
+            for i, cycle in enumerate(cycles[:10], 1):
+                names = cycle.get('names', [])
+                length = cycle.get('length', len(names))
+                cycle_type = cycle.get('type', 'unknown')
+                place_count = cycle.get('place_count', 0)
+                trans_count = cycle.get('transition_count', 0)
+                
+                lines.append(f"\n<b>Cycle {i}:</b> ({length} nodes, {cycle_type})")
+                lines.append(f"  Places: {place_count}, Transitions: {trans_count}")
+                if names:
+                    path = " → ".join(names[:10])
+                    if len(names) > 10:
+                        path += f" ... (+{len(names) - 10} more)"
+                    lines.append(f"  Path: {path}")
+            
+            if count > 10:
+                lines.append(f"\n<i>... and {count - 10} more cycles</i>")
+        
+        return '\n'.join(lines)
     
     def _format_paths_report(self, result) -> str:
-        """Format Critical Paths analysis report (PLACEHOLDER)."""
-        return ("<b>Critical Paths Analysis</b>\n\n"
-                "<i>Full implementation pending.\n\n"
-                "Will show source → target routes.</i>")
+        """Format Critical Paths analysis report."""
+        if not result or not result.success:
+            return "<b>Critical Paths Analysis</b>\n\n<i>Analysis failed or no data.</i>"
+        
+        # Check if this is a specific path query or general analysis
+        path = result.get('path')
+        if path:
+            # Specific path between source and target
+            length = result.get('length', 0)
+            exists = result.get('exists', True)
+            
+            lines = [f"<b>Path Analysis Results</b>\n"]
+            if exists:
+                names = path.get('names', [])
+                place_count = path.get('place_count', 0)
+                trans_count = path.get('transition_count', 0)
+                
+                lines.append(f"Path found: <b>{length}</b> step{'s' if length != 1 else ''}")
+                lines.append(f"Places: {place_count}, Transitions: {trans_count}\n")
+                
+                if names:
+                    path_str = " → ".join(names)
+                    lines.append(f"<b>Route:</b>\n{path_str}")
+            else:
+                lines.append("<i>No path exists between specified nodes.</i>")
+        else:
+            # General path analysis
+            paths = result.get('paths', [])
+            count = result.get('count', len(paths))
+            
+            lines = [f"<b>Path Analysis Results</b>\n"]
+            lines.append(f"Found: <b>{count}</b> path{'s' if count != 1 else ''}\n")
+            
+            if paths:
+                lines.append("\n<b>Paths:</b>")
+                for i, p in enumerate(paths[:8], 1):
+                    names = p.get('names', [])
+                    length = p.get('length', 0)
+                    lines.append(f"\n<b>Path {i}:</b> ({length} steps)")
+                    if names:
+                        route = " → ".join(names[:8])
+                        if len(names) > 8:
+                            route += f" ... (+{len(names) - 8} more)"
+                        lines.append(f"  {route}")
+                
+                if count > 8:
+                    lines.append(f"\n<i>... and {count - 8} more paths</i>")
+        
+        return '\n'.join(lines)
     
     def _format_hubs_report(self, result) -> str:
-        """Format Network Hubs analysis report (PLACEHOLDER)."""
-        return ("<b>Network Hubs Analysis</b>\n\n"
-                "<i>Full implementation pending.\n\n"
-                "Will show degree statistics.</i>")
+        """Format Network Hubs analysis report."""
+        if not result or not result.success:
+            return "<b>Network Hubs Analysis</b>\n\n<i>Analysis failed or no data.</i>"
+        
+        hubs = result.get('hubs', [])
+        count = result.get('count', len(hubs))
+        max_degree = result.get('max_degree', 0)
+        avg_degree = result.get('avg_degree', 0)
+        
+        lines = [f"<b>Network Hubs Analysis Results</b>\n"]
+        lines.append(f"Found: <b>{count}</b> hub{'s' if count != 1 else ''}")
+        lines.append(f"Max degree: <b>{max_degree}</b>")
+        lines.append(f"Avg degree: <b>{avg_degree:.1f}</b>\n")
+        
+        if hubs:
+            lines.append("\n<b>Top Hubs:</b>")
+            for i, hub in enumerate(hubs[:12], 1):
+                name = hub.get('name', 'Unknown')
+                degree = hub.get('degree', 0)
+                in_deg = hub.get('in_degree', 0)
+                out_deg = hub.get('out_degree', 0)
+                node_type = hub.get('type', 'unknown')
+                
+                lines.append(f"\n<b>{i}. {name}</b> ({node_type})")
+                lines.append(f"  Degree: {degree} (in: {in_deg}, out: {out_deg})")
+            
+            if count > 12:
+                lines.append(f"\n<i>... and {count - 12} more hubs</i>")
+        
+        return '\n'.join(lines)
     
     def _format_reachability_report(self, result) -> str:
-        """Format Reachability Analysis report (PLACEHOLDER)."""
-        return ("<b>Reachability Analysis</b>\n\n"
-                "<i>Full implementation pending.\n\n"
-                "Will show state space exploration stats.</i>")
+        """Format Reachability Analysis report."""
+        if not result or not result.success:
+            return "<b>Reachability Analysis</b>\n\n<i>Analysis failed or no data.</i>"
+        
+        total_states = result.get('total_states', 0)
+        total_transitions = result.get('total_transitions', 0)
+        max_depth = result.get('max_depth_reached', 0)
+        is_bounded = result.get('is_bounded', True)
+        deadlock_states = result.get('deadlock_states', [])
+        
+        lines = [f"<b>Reachability Analysis Results</b>\n"]
+        lines.append(f"Reachable states: <b>{total_states}</b>")
+        lines.append(f"State transitions: <b>{total_transitions}</b>")
+        lines.append(f"Max depth: <b>{max_depth}</b>")
+        lines.append(f"Bounded: <b>{'Yes' if is_bounded else 'No'}</b>\n")
+        
+        if deadlock_states:
+            lines.append(f"\n<b>⚠ Deadlock States Found: {len(deadlock_states)}</b>")
+            for i, state in enumerate(deadlock_states[:5], 1):
+                marking = state.get('marking', {})
+                if marking:
+                    # Show first few places with tokens
+                    tokens_str = ", ".join([f"{k}: {v}" for k, v in list(marking.items())[:5]])
+                    if len(marking) > 5:
+                        tokens_str += "..."
+                    lines.append(f"  State {i}: [{tokens_str}]")
+            
+            if len(deadlock_states) > 5:
+                lines.append(f"  <i>... and {len(deadlock_states) - 5} more deadlock states</i>")
+        else:
+            lines.append("\n<b>✓ No deadlock states detected</b>")
+        
+        return '\n'.join(lines)
     
     def _format_boundedness_report(self, result) -> str:
-        """Format Boundedness Analysis report (PLACEHOLDER)."""
-        return ("<b>Boundedness Analysis</b>\n\n"
-                "<i>Full implementation pending.\n\n"
-                "Will show token limits per place.</i>")
+        """Format Boundedness Analysis report."""
+        if not result or not result.success:
+            return "<b>Boundedness Analysis</b>\n\n<i>Analysis failed or no data.</i>"
+        
+        is_bounded = result.get('is_bounded', False)
+        boundedness_level = result.get('boundedness_level', 0)
+        is_safe = result.get('is_safe', False)
+        is_conservative = result.get('is_conservative', False)
+        unbounded_places = result.get('unbounded_places', [])
+        place_bounds = result.get('place_bounds', {})
+        overflow_risk = result.get('overflow_risk', False)
+        
+        lines = [f"<b>Boundedness Analysis Results</b>\n"]
+        
+        if is_bounded:
+            if is_safe:
+                lines.append("<b>✓ Net is SAFE (1-bounded)</b>")
+            else:
+                lines.append(f"<b>✓ Net is {boundedness_level}-BOUNDED</b>")
+        else:
+            lines.append("<b>⚠ Net is UNBOUNDED</b>")
+        
+        lines.append(f"Conservative: <b>{'Yes' if is_conservative else 'No'}</b>")
+        lines.append(f"Overflow risk: <b>{'Yes' if overflow_risk else 'No'}</b>\n")
+        
+        if unbounded_places:
+            lines.append(f"\n<b>⚠ Unbounded Places ({len(unbounded_places)}):</b>")
+            for place_info in unbounded_places[:10]:
+                if isinstance(place_info, dict):
+                    name = place_info.get('name', 'Unknown')
+                    lines.append(f"  • {name}")
+                else:
+                    lines.append(f"  • {place_info}")
+            
+            if len(unbounded_places) > 10:
+                lines.append(f"  <i>... and {len(unbounded_places) - 10} more</i>")
+        
+        if place_bounds and is_bounded:
+            max_bound = max(place_bounds.values()) if place_bounds else 0
+            lines.append(f"\n<b>Place Bounds:</b>")
+            lines.append(f"Maximum tokens: <b>{max_bound}</b>")
+            
+            # Show places with highest bounds
+            sorted_places = sorted(place_bounds.items(), key=lambda x: x[1], reverse=True)
+            for place_id, bound in sorted_places[:8]:
+                lines.append(f"  • Place {place_id}: {bound} tokens")
+            
+            if len(place_bounds) > 8:
+                lines.append(f"  <i>... and {len(place_bounds) - 8} more places</i>")
+        
+        return '\n'.join(lines)
     
     def _format_liveness_report(self, result) -> str:
-        """Format Liveness Analysis report (PLACEHOLDER)."""
-        return ("<b>Liveness Analysis</b>\n\n"
-                "<i>Full implementation pending.\n\n"
-                "Will show liveness levels and dead transitions.</i>")
+        """Format Liveness Analysis report."""
+        if not result or not result.success:
+            return "<b>Liveness Analysis</b>\n\n<i>Analysis failed or no data.</i>"
+        
+        is_live = result.get('is_live', False)
+        liveness_levels = result.get('liveness_levels', {})
+        dead_transitions = result.get('dead_transitions', [])
+        live_transitions = result.get('live_transitions', [])
+        total_transitions = result.get('total_transitions', 0)
+        
+        lines = [f"<b>Liveness Analysis Results</b>\n"]
+        
+        if is_live:
+            lines.append("<b>✓ Net is LIVE</b>")
+            lines.append("<i>All transitions can fire infinitely often.</i>\n")
+        else:
+            lines.append("<b>⚠ Net is NOT LIVE</b>")
+            if dead_transitions:
+                lines.append(f"<i>{len(dead_transitions)} dead transition(s) detected.</i>\n")
+        
+        lines.append(f"Total transitions: <b>{total_transitions}</b>")
+        lines.append(f"Live transitions: <b>{len(live_transitions)}</b>")
+        lines.append(f"Dead transitions: <b>{len(dead_transitions)}</b>\n")
+        
+        if dead_transitions:
+            lines.append("\n<b>⚠ Dead Transitions (L0):</b>")
+            for trans_info in dead_transitions[:10]:
+                if isinstance(trans_info, dict):
+                    name = trans_info.get('name', 'Unknown')
+                    reason = trans_info.get('reason', 'Cannot fire')
+                    lines.append(f"  • {name}: {reason}")
+                else:
+                    lines.append(f"  • {trans_info}")
+            
+            if len(dead_transitions) > 10:
+                lines.append(f"  <i>... and {len(dead_transitions) - 10} more</i>")
+        
+        # Show liveness level distribution
+        if liveness_levels:
+            level_counts = {'L0': 0, 'L1': 0, 'L2': 0, 'L3': 0, 'L4': 0}
+            for level in liveness_levels.values():
+                if level in level_counts:
+                    level_counts[level] += 1
+            
+            if any(level_counts.values()):
+                lines.append("\n<b>Liveness Levels:</b>")
+                for level, count in level_counts.items():
+                    if count > 0:
+                        lines.append(f"  {level}: {count} transition(s)")
+        
+        return '\n'.join(lines)
     
     def _format_deadlocks_report(self, result) -> str:
-        """Format Deadlock Detection report (PLACEHOLDER)."""
-        return ("<b>Deadlock Detection</b>\n\n"
-                "<i>Full implementation pending.\n\n"
-                "Will show deadlock states with markings.</i>")
+        """Format Deadlock Detection report."""
+        if not result or not result.success:
+            return "<b>Deadlock Detection</b>\n\n<i>Analysis failed or no data.</i>"
+        
+        has_deadlock = result.get('has_deadlock', False)
+        deadlock_type = result.get('deadlock_type', 'none')
+        empty_siphons = result.get('empty_siphons', [])
+        disabled_transitions = result.get('disabled_transitions', [])
+        deadlock_places = result.get('deadlock_places', [])
+        severity = result.get('severity', 'none')
+        recovery_suggestions = result.get('recovery_suggestions', [])
+        
+        lines = [f"<b>Deadlock Detection Results</b>\n"]
+        
+        if has_deadlock:
+            lines.append(f"<b>⚠ DEADLOCK DETECTED</b>")
+            lines.append(f"Type: <b>{deadlock_type.upper()}</b>")
+            lines.append(f"Severity: <b>{severity.upper()}</b>\n")
+        else:
+            lines.append("<b>✓ NO DEADLOCK DETECTED</b>")
+            lines.append("<i>All transitions can be enabled.</i>\n")
+        
+        if empty_siphons:
+            lines.append(f"\n<b>Empty Siphons ({len(empty_siphons)}):</b>")
+            lines.append("<i>Structural deadlock - once empty, stays empty</i>")
+            for siphon in empty_siphons[:5]:
+                if isinstance(siphon, dict):
+                    places = siphon.get('places', [])
+                    lines.append(f"  • Siphon with {len(places)} places")
+                else:
+                    lines.append(f"  • {siphon}")
+            
+            if len(empty_siphons) > 5:
+                lines.append(f"  <i>... and {len(empty_siphons) - 5} more</i>")
+        
+        if disabled_transitions:
+            lines.append(f"\n<b>Disabled Transitions ({len(disabled_transitions)}):</b>")
+            for trans in disabled_transitions[:10]:
+                if isinstance(trans, dict):
+                    name = trans.get('name', 'Unknown')
+                    reason = trans.get('reason', 'Not enabled')
+                    lines.append(f"  • {name}: {reason}")
+                else:
+                    lines.append(f"  • {trans}")
+            
+            if len(disabled_transitions) > 10:
+                lines.append(f"  <i>... and {len(disabled_transitions) - 10} more</i>")
+        
+        if deadlock_places:
+            lines.append(f"\n<b>Deadlock Places ({len(deadlock_places)}):</b>")
+            for place in deadlock_places[:10]:
+                lines.append(f"  • {place}")
+            
+            if len(deadlock_places) > 10:
+                lines.append(f"  <i>... and {len(deadlock_places) - 10} more</i>")
+        
+        if recovery_suggestions:
+            lines.append("\n<b>Recovery Suggestions:</b>")
+            for suggestion in recovery_suggestions[:5]:
+                lines.append(f"  • {suggestion}")
+        
+        return '\n'.join(lines)
     
     def _format_fairness_report(self, result) -> str:
-        """Format Fairness Analysis report (PLACEHOLDER)."""
-        return ("<b>Fairness Analysis</b>\n\n"
-                "<i>Full implementation pending.\n\n"
-                "Will show conflict resolution details.</i>")
+        """Format Fairness Analysis report."""
+        if not result or not result.success:
+            return "<b>Fairness Analysis</b>\n\n<i>Analysis failed or no data.</i>"
+        
+        is_fair = result.get('is_fair', False)
+        fairness_level = result.get('fairness_level', 'none')
+        conflicting_transitions = result.get('conflicting_transitions', [])
+        starvation_risk = result.get('starvation_risk', [])
+        priority_conflicts = result.get('priority_conflicts', [])
+        fairness_violations = result.get('fairness_violations', [])
+        total_transitions = result.get('total_transitions', 0)
+        
+        lines = [f"<b>Fairness Analysis Results</b>\n"]
+        
+        if is_fair:
+            lines.append(f"<b>✓ Net has {fairness_level.upper()} FAIRNESS</b>")
+            lines.append("<i>Transitions get fair firing opportunities.</i>\n")
+        else:
+            lines.append("<b>⚠ Net lacks FAIRNESS guarantees</b>")
+            lines.append("<i>Some transitions may be starved.</i>\n")
+        
+        lines.append(f"Fairness level: <b>{fairness_level}</b>")
+        lines.append(f"Total transitions: <b>{total_transitions}</b>\n")
+        
+        if conflicting_transitions:
+            lines.append(f"\n<b>Conflicting Transition Sets ({len(conflicting_transitions)}):</b>")
+            for i, conflict in enumerate(conflicting_transitions[:8], 1):
+                if isinstance(conflict, dict):
+                    transitions = conflict.get('transitions', [])
+                    place = conflict.get('place', 'Unknown')
+                    lines.append(f"  {i}. Conflict at {place}: {len(transitions)} transitions")
+                elif isinstance(conflict, (list, set)):
+                    lines.append(f"  {i}. Conflict: {len(conflict)} transitions")
+                else:
+                    lines.append(f"  {i}. {conflict}")
+            
+            if len(conflicting_transitions) > 8:
+                lines.append(f"  <i>... and {len(conflicting_transitions) - 8} more conflicts</i>")
+        
+        if starvation_risk:
+            lines.append(f"\n<b>⚠ Starvation Risk ({len(starvation_risk)}):</b>")
+            for trans in starvation_risk[:10]:
+                if isinstance(trans, dict):
+                    name = trans.get('name', 'Unknown')
+                    reason = trans.get('reason', 'Low priority')
+                    lines.append(f"  • {name}: {reason}")
+                else:
+                    lines.append(f"  • {trans}")
+            
+            if len(starvation_risk) > 10:
+                lines.append(f"  <i>... and {len(starvation_risk) - 10} more</i>")
+        
+        if fairness_violations:
+            lines.append(f"\n<b>Fairness Violations ({len(fairness_violations)}):</b>")
+            for violation in fairness_violations[:5]:
+                lines.append(f"  • {violation}")
+            
+            if len(fairness_violations) > 5:
+                lines.append(f"  <i>... and {len(fairness_violations) - 5} more</i>")
+        
+        if priority_conflicts:
+            lines.append(f"\n<b>Priority Conflicts ({len(priority_conflicts)}):</b>")
+            for conflict in priority_conflicts[:5]:
+                if isinstance(conflict, dict):
+                    trans1 = conflict.get('transition1', 'T1')
+                    trans2 = conflict.get('transition2', 'T2')
+                    lines.append(f"  • {trans1} vs {trans2}")
+                else:
+                    lines.append(f"  • {conflict}")
+            
+            if len(priority_conflicts) > 5:
+                lines.append(f"  <i>... and {len(priority_conflicts) - 5} more</i>")
+        
+        return '\n'.join(lines)
 
 
 # Module exports
