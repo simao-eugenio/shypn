@@ -174,8 +174,16 @@ def main(argv=None):
 		file_explorer = left_panel_loader.file_explorer
 		
 		if file_explorer:
+			# WAYLAND FIX: Set parent window IMMEDIATELY so dialogs work even before panel is attached
+			# This prevents crashes when user clicks toolbar buttons before toggling panel on
+			file_explorer.set_parent_window(window)
+			
 			# Wire persistency manager to file explorer for UI updates and file operations
 			file_explorer.set_persistency_manager(persistency)
+			
+			# WAYLAND FIX: Also ensure persistency has parent window reference
+			if hasattr(file_explorer, 'persistency') and file_explorer.persistency:
+				file_explorer.persistency.parent_window = window
 			
 			# Wire canvas loader to file explorer for document operations
 			# This allows file explorer to access canvas managers and their is_default_filename() flag
