@@ -26,7 +26,7 @@ from pathlib import Path
 try:
     import gi
     gi.require_version('Gtk', '3.0')
-    from gi.repository import Gtk
+    from gi.repository import Gtk, GLib, Gdk
 except Exception as e:
     print(f'ERROR: GTK3 not available in netobj_persistency: {e}', file=sys.stderr)
     sys.exit(1)
@@ -70,6 +70,13 @@ class NetObjPersistency:
         self.on_file_saved: Optional[Callable[[str], None]] = None
         self.on_file_loaded: Optional[Callable[[str, any], None]] = None
         self.on_dirty_changed: Optional[Callable[[bool], None]] = None
+        self.suggested_filename: Optional[str] = None
+        self._last_directory: Optional[str] = None
+        
+        # WAYLAND FIX: Detect if running on Wayland
+        self._is_wayland = os.environ.get('WAYLAND_DISPLAY') is not None
+        if self._is_wayland:
+            print("[PERSISTENCY] Wayland detected - using workaround for FileChooser", file=sys.stderr)
         
         # Determine models directory
         if models_directory is None:
@@ -305,21 +312,26 @@ class NetObjPersistency:
     def _show_save_dialog(self) -> Optional[str]:
         """Show save file chooser dialog.
         
+        Uses async signal-based approach to avoid dialog.run() which causes
+        Error 71 (Protocol error) on Wayland.
+        
         Returns:
             str: Selected filepath, or None if cancelled
         """
-        # Ensure parent window is set (fixes Wayland crash)
+        # Ensure parent window is set
         parent = self.parent_window if self.parent_window else None
+        
+        # Create dialog
         dialog = Gtk.FileChooserDialog(
             title='Save Petri Net',
             parent=parent,
             action=Gtk.FileChooserAction.SAVE
         )
-        dialog.set_modal(True)  # WAYLAND FIX: Ensure modal behavior
-        dialog.set_keep_above(True)  # Ensure dialog stays on top
         dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_SAVE, Gtk.ResponseType.OK)
         dialog.set_default_response(Gtk.ResponseType.OK)
         dialog.set_do_overwrite_confirmation(True)
+        
+        # Add file filters
         filter_shy = Gtk.FileFilter()
         filter_shy.set_name('SHYpn Petri Net files (*.shy)')
         filter_shy.add_pattern('*.shy')
@@ -330,10 +342,7 @@ class NetObjPersistency:
         dialog.add_filter(filter_all)
         
         # Set initial folder with fallback chain
-        # Priority: last_directory → models_directory → current working directory
         folder_set = False
-        
-        # Try last directory first
         if self._last_directory and os.path.isdir(self._last_directory):
             try:
                 dialog.set_current_folder(self._last_directory)
@@ -341,16 +350,12 @@ class NetObjPersistency:
             except Exception:
                 pass
         
-        # Fallback to models_directory
         if not folder_set:
-            # Ensure models_directory exists
             if not os.path.exists(self.models_directory):
                 try:
                     os.makedirs(self.models_directory, exist_ok=True)
                 except Exception:
                     pass
-            
-            # Try to set it
             if os.path.isdir(self.models_directory):
                 try:
                     dialog.set_current_folder(self.models_directory)
@@ -358,89 +363,133 @@ class NetObjPersistency:
                 except Exception:
                     pass
         
-        # Final fallback: current working directory
         if not folder_set:
             try:
                 dialog.set_current_folder(os.getcwd())
             except Exception:
-                pass  # Let GTK use its default
+                pass
         
         # Set filename or name
-        # IMPORTANT: Only use set_filename() for files that actually exist
-        # For new files, always use set_current_name() to avoid GTK errors
         if self.current_filepath and os.path.isfile(self.current_filepath):
-            # File exists - we can safely use set_filename
             try:
                 dialog.set_filename(self.current_filepath)
-            except Exception as e:
-                # If set_filename fails, fall back to just setting the name
+            except Exception:
                 try:
                     dialog.set_current_name(os.path.basename(self.current_filepath))
                 except Exception:
                     dialog.set_current_name('default.shy')
         else:
-            # New file, imported file, or file doesn't exist - only set the name
-            # Don't use set_filename as it causes "no such file or directory" errors
             if self.current_filepath:
-                # Use the basename from current_filepath if available
                 default_name = os.path.basename(self.current_filepath)
             elif self.suggested_filename:
-                # Use suggested filename if available
                 suggested = self.suggested_filename
                 if suggested.lower().endswith('.shy'):
                     default_name = suggested
                 else:
                     default_name = f'{suggested}.shy'
             else:
-                # Ultimate fallback
                 default_name = 'default.shy'
             
             try:
                 dialog.set_current_name(default_name)
             except Exception:
-                dialog.set_current_name('default.shy')  # Final fallback
+                dialog.set_current_name('default.shy')
         
-        response = dialog.run()
-        filepath = dialog.get_filename()
-        dialog.destroy()
-        if response != Gtk.ResponseType.OK or not filepath:
+        # Use async signal-based approach instead of blocking run()
+        result_container = [None]  # Mutable container for result
+        
+        def on_response(dlg, response_id):
+            if response_id == Gtk.ResponseType.OK:
+                result_container[0] = dlg.get_filename()
+            dlg.destroy()
+            Gtk.main_quit()  # Exit nested main loop
+        
+        dialog.connect('response', on_response)
+        dialog.show()
+        Gtk.main()  # Run nested event loop until dialog responds
+        
+        filepath = result_container[0]
+        if not filepath:
             return None
         
-        # Ensure .shy extension is present (case-insensitive check)
+        # Ensure .shy extension is present
         if not filepath.lower().endswith('.shy'):
             filepath += '.shy'
         elif not filepath.endswith('.shy'):
-            # Handle case where user typed .SHY or .Shy - normalize to .shy
             filepath = filepath[:-4] + '.shy'
+        
+        # Warn about default.shy filename
         filename = os.path.basename(filepath)
         if filename.lower() == 'default.shy':
-            warning_dialog = Gtk.MessageDialog(parent=parent, modal=True, message_type=Gtk.MessageType.WARNING, buttons=Gtk.ButtonsType.YES_NO, text="Save as 'default.shy'?")
-            warning_dialog.set_keep_above(True)  # Ensure dialog stays on top
-            warning_dialog.format_secondary_text("You are about to save with the default filename 'default.shy'.\n\nThis may overwrite existing default files or make it hard to identify this model later.\n\nDo you want to continue with this filename?")
-            warning_response = warning_dialog.run()
-            warning_dialog.destroy()
-            if warning_response != Gtk.ResponseType.YES:
+            warning_dialog = Gtk.MessageDialog(
+                parent=parent, 
+                modal=True, 
+                message_type=Gtk.MessageType.WARNING, 
+                buttons=Gtk.ButtonsType.YES_NO, 
+                text="Save as 'default.shy'?"
+            )
+            warning_dialog.format_secondary_text(
+                "You are about to save with the default filename 'default.shy'.\n\n"
+                "This may overwrite existing default files or make it hard to identify this model later.\n\n"
+                "Do you want to continue with this filename?"
+            )
+            
+            # Use async for warning dialog too
+            warning_result = [Gtk.ResponseType.NO]
+            
+            def on_warning_response(dlg, response_id):
+                warning_result[0] = response_id
+                dlg.destroy()
+                Gtk.main_quit()
+            
+            warning_dialog.connect('response', on_warning_response)
+            warning_dialog.show()
+            Gtk.main()
+            
+            if warning_result[0] != Gtk.ResponseType.YES:
                 return self._show_save_dialog()
+        
         self._last_directory = os.path.dirname(filepath)
         return filepath
+
+    def _run_dialog_async(self, dialog: Gtk.Dialog, callback: Callable[[int], None]) -> None:
+        """Run dialog asynchronously using signals instead of blocking run().
+        
+        This avoids Error 71 (Protocol error) on Wayland that occurs with dialog.run().
+        
+        Args:
+            dialog: The dialog to show
+            callback: Function to call with response ID when dialog completes
+        """
+        def on_response(dlg, response_id):
+            callback(response_id)
+            dlg.destroy()
+        
+        dialog.connect('response', on_response)
+        dialog.show()
 
     def _show_open_dialog(self) -> Optional[str]:
         """Show open file chooser dialog.
         
+        Uses async signal-based approach to avoid dialog.run() which causes
+        Error 71 (Protocol error) on Wayland.
+        
         Returns:
             str: Selected filepath, or None if cancelled
         """
-        # Ensure parent window is set (fixes Wayland crash)
+        # Ensure parent window is set
         parent = self.parent_window if self.parent_window else None
+        
+        # Create dialog
         dialog = Gtk.FileChooserDialog(
             title='Open Petri Net',
             parent=parent,
             action=Gtk.FileChooserAction.OPEN
         )
-        dialog.set_modal(True)  # WAYLAND FIX: Ensure modal behavior
-        dialog.set_keep_above(True)  # Ensure dialog stays on top
         dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.OK)
         dialog.set_default_response(Gtk.ResponseType.OK)
+        
+        # Add file filters
         filter_shy = Gtk.FileFilter()
         filter_shy.set_name('SHYpn Petri Net files (*.shy)')
         filter_shy.add_pattern('*.shy')
@@ -451,10 +500,7 @@ class NetObjPersistency:
         dialog.add_filter(filter_all)
         
         # Set initial folder with fallback chain
-        # Priority: last_directory → models_directory → current working directory
         folder_set = False
-        
-        # Try last directory first
         if self._last_directory and os.path.isdir(self._last_directory):
             try:
                 dialog.set_current_folder(self._last_directory)
@@ -462,16 +508,12 @@ class NetObjPersistency:
             except Exception:
                 pass
         
-        # Fallback to models_directory
         if not folder_set:
-            # Ensure models_directory exists
             if not os.path.exists(self.models_directory):
                 try:
                     os.makedirs(self.models_directory, exist_ok=True)
                 except Exception:
                     pass
-            
-            # Try to set it
             if os.path.isdir(self.models_directory):
                 try:
                     dialog.set_current_folder(self.models_directory)
@@ -479,19 +521,28 @@ class NetObjPersistency:
                 except Exception:
                     pass
         
-        # Final fallback: current working directory
         if not folder_set:
             try:
                 dialog.set_current_folder(os.getcwd())
             except Exception:
-                pass  # Let GTK use its default
+                pass
         
-        response = dialog.run()
-        filepath = dialog.get_filename()
-        dialog.destroy()
-        if response != Gtk.ResponseType.OK or not filepath:
-            return None
-        self._last_directory = os.path.dirname(filepath)
+        # Use async signal-based approach instead of blocking run()
+        result_container = [None]  # Mutable container for result
+        
+        def on_response(dlg, response_id):
+            if response_id in (Gtk.ResponseType.OK, Gtk.ResponseType.ACCEPT):
+                result_container[0] = dlg.get_filename()
+            dlg.destroy()
+            Gtk.main_quit()  # Exit nested main loop
+        
+        dialog.connect('response', on_response)
+        dialog.show()
+        Gtk.main()  # Run nested event loop until dialog responds
+        
+        filepath = result_container[0]
+        if filepath:
+            self._last_directory = os.path.dirname(filepath)
         return filepath
 
     def _show_success_dialog(self, title: str, message: str) -> None:
