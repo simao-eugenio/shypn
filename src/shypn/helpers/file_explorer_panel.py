@@ -73,6 +73,8 @@ class FileExplorerPanel:
         self.clipboard_path: Optional[str] = None
         self.clipboard_operation: Optional[str] = None
         self.on_file_open_requested: Optional[Callable[[str], None]] = None
+        # WAYLAND FIX: Store parent window reference for dialogs
+        self.parent_window: Optional[Gtk.Window] = None
         self._get_widgets()
         self._configure_tree_view()
         self._setup_context_menu()
@@ -833,9 +835,9 @@ class FileExplorerPanel:
 
     def _show_new_folder_dialog(self):
         """Show dialog to create a new folder."""
-        window = self.tree_view.get_toplevel()
-        # Ensure window is valid before use (required for Wayland)
-        parent = window if isinstance(window, Gtk.Window) else None
+        # WAYLAND FIX: Use stored parent_window instead of get_toplevel()
+        # get_toplevel() may return the wrong window when panel is reparented
+        parent = self.parent_window if self.parent_window else None
         dialog = Gtk.Dialog(title='New Folder', transient_for=parent, modal=True)
         dialog.set_modal(True)
         dialog.set_keep_above(True)  # Ensure dialog stays on top
@@ -873,9 +875,8 @@ class FileExplorerPanel:
 
     def _show_rename_dialog(self):
         """Show dialog to rename selected item."""
-        window = self.tree_view.get_toplevel()
-        # Ensure window is valid before use (required for Wayland)
-        parent = window if isinstance(window, Gtk.Window) else None
+        # WAYLAND FIX: Use stored parent_window instead of get_toplevel()
+        parent = self.parent_window if self.parent_window else None
         dialog = Gtk.Dialog(title='Rename', transient_for=parent, modal=True)
         dialog.set_modal(True)
         dialog.set_keep_above(True)  # Ensure dialog stays on top
@@ -913,9 +914,8 @@ class FileExplorerPanel:
 
     def _show_delete_confirmation(self):
         """Show confirmation dialog for delete operation."""
-        window = self.tree_view.get_toplevel()
-        # Ensure window is valid before use (required for Wayland)
-        parent = window if isinstance(window, Gtk.Window) else None
+        # WAYLAND FIX: Use stored parent_window instead of get_toplevel()
+        parent = self.parent_window if self.parent_window else None
         dialog = Gtk.MessageDialog(transient_for=parent, modal=True, message_type=Gtk.MessageType.WARNING, buttons=Gtk.ButtonsType.YES_NO, text=f"Delete '{self.selected_item_name}'?")
         dialog.set_keep_above(True)  # Ensure dialog stays on top
         if self.selected_item_is_dir:
@@ -941,9 +941,8 @@ class FileExplorerPanel:
         info = self.explorer.get_file_info(self.selected_item_path)
         if not info:
             return
-        window = self.tree_view.get_toplevel()
-        # Ensure window is valid before use (required for Wayland)
-        parent = window if isinstance(window, Gtk.Window) else None
+        # WAYLAND FIX: Use stored parent_window instead of get_toplevel()
+        parent = self.parent_window if self.parent_window else None
         dialog = Gtk.Dialog(title=f"Properties - {info['name']}", transient_for=parent, modal=True)
         dialog.set_modal(True)
         dialog.set_keep_above(True)  # Ensure dialog stays on top
@@ -1025,6 +1024,18 @@ class FileExplorerPanel:
         persistency.on_file_saved = self._on_file_saved_callback
         persistency.on_file_loaded = self._on_file_loaded_callback
         persistency.on_dirty_changed = self._on_dirty_changed_callback
+
+    def set_parent_window(self, parent_window: Optional[Gtk.Window]):
+        """Set parent window for dialogs (WAYLAND FIX).
+        
+        This should be called when the panel attaches/floats to ensure
+        all dialogs (New Folder, Rename, Delete, Properties) use the
+        correct parent window.
+        
+        Args:
+            parent_window: The main window or floating panel window
+        """
+        self.parent_window = parent_window
 
     def set_canvas_loader(self, canvas_loader):
         """Wire file explorer to canvas loader for document operations integration.
