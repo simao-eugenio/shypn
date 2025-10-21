@@ -192,13 +192,16 @@ class MasterPalette:
             raise KeyError(f"Unknown category: {category}")
         self._callbacks[category] = callback
         
-        # Wrap callback to implement exclusive radio-button behavior
+        # Wrap callback to implement exclusive toggle behavior
         def exclusive_callback(active):
             print(f"[MP] {category} toggled: active={active}, _in_handler={self._in_handler}", file=sys.stderr)
             
-            # Prevent re-entrance from programmatic set_active() calls
-            if self._in_handler:
-                print(f"[MP] {category} BLOCKED (already in handler)", file=sys.stderr)
+            # Only block if we're in a handler AND this is a deactivation from exclusive logic
+            # Allow: activation always, deactivation from user click
+            if self._in_handler and not active:
+                # This deactivation is triggered by another button activating (exclusive logic)
+                # Don't call the callback - the new button's activation will handle panel switching
+                print(f"[MP] {category} BLOCKED (deactivation from exclusive logic)", file=sys.stderr)
                 return
             
             self._in_handler = True
@@ -218,11 +221,11 @@ class MasterPalette:
                     callback(True)
                     print(f"[MP] {category} callback returned", file=sys.stderr)
                 else:
-                    # User clicked active button to try to deactivate it
-                    # For radio behavior, prevent deactivation by re-activating it
-                    print(f"[MP] {category} re-activating (radio behavior)", file=sys.stderr)
-                    self.buttons[category].set_active(True)
-                    # Don't call callback - button stays active, no state change
+                    # User clicked active button to deactivate it (not blocked because _in_handler was False)
+                    # Allow deactivation and call callback with False
+                    print(f"[MP] {category} deactivating, calling callback(False)", file=sys.stderr)
+                    callback(False)
+                    print(f"[MP] {category} callback returned", file=sys.stderr)
             except Exception as e:
                 print(f"[ERROR] Master Palette callback failed for {category}: {e}", file=sys.stderr)
                 import traceback
