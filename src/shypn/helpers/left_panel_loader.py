@@ -391,11 +391,14 @@ class LeftPanelLoader:
             print(f"[HIDE] LeftPanel _do_hide() executing", file=sys.stderr)
             try:
                 if self.is_attached:
-                    # When attached, hide content first, then container
-                    if self.content:
+                    # When attached, remove content from container and hide it
+                    if self.content and self.parent_container:
+                        current_parent = self.content.get_parent()
+                        if current_parent == self.parent_container:
+                            print(f"[HIDE] LeftPanel removing content from container", file=sys.stderr)
+                            self.parent_container.remove(self.content)
                         self.content.set_visible(False)
-                    if self.parent_container:
-                        self.parent_container.set_visible(False)
+                    # Don't hide the container - other panels might use it
                     print(f"[HIDE] LeftPanel hidden (attached mode)", file=sys.stderr)
                 elif self.window:
                     # When floating, hide the window

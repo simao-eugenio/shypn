@@ -396,6 +396,7 @@ class RightPanelLoader:
         
         def _do_attach():
             """Deferred attach operation for Wayland safety."""
+            print(f"[ATTACH] RightPanel _do_attach() executing", file=sys.stderr)
             try:
                 # Extract content from window first
                 current_parent = self.content.get_parent()
@@ -419,6 +420,8 @@ class RightPanelLoader:
                 self.content.set_visible(True)
                 self.content.show_all()  # Ensure all child widgets are visible
                 
+                print(f"[ATTACH] RightPanel attached successfully, content visible", file=sys.stderr)
+                
                 # Update float button state
                 if self.float_button and self.float_button.get_active():
                     self._updating_button = True
@@ -431,7 +434,9 @@ class RightPanelLoader:
                 if self.on_attach_callback:
                     self.on_attach_callback()
             except Exception as e:
-                print(f"Warning: Error during panel attach: {e}", file=sys.stderr)
+                print(f"[ERROR] RightPanel attach failed: {e}", file=sys.stderr)
+                import traceback
+                traceback.print_exc()
             
             return False  # Don't repeat
         
