@@ -135,10 +135,12 @@ class PathwayPanelLoader:
             from shypn.helpers.sbml_import_panel import SBMLImportPanel
             
             # Instantiate controller with builder and model_canvas
+            # WAYLAND FIX: Pass None for parent_window initially, will be set when panel attaches
             self.sbml_import_controller = SBMLImportPanel(
                 self.builder,
                 self.model_canvas,
-                self.workspace_settings
+                self.workspace_settings,
+                parent_window=None
             )
             
         except ImportError as e:
@@ -231,6 +233,12 @@ class PathwayPanelLoader:
         # Store parent window reference
         if parent_window:
             self.parent_window = parent_window
+            # WAYLAND FIX: Update SBML controller's parent window for FileChooser dialogs
+            if self.sbml_import_controller:
+                self.sbml_import_controller.set_parent_window(parent_window)
+            # WAYLAND FIX: Update KEGG controller's parent window if needed
+            if self.kegg_import_controller and hasattr(self.kegg_import_controller, 'set_parent_window'):
+                self.kegg_import_controller.set_parent_window(parent_window)
         
         def _do_float():
             """Deferred float operation for Wayland safety."""
@@ -321,6 +329,12 @@ class PathwayPanelLoader:
         # Store parent window and container for float button callback
         if parent_window:
             self.parent_window = parent_window
+            # WAYLAND FIX: Update SBML controller's parent window for FileChooser dialogs
+            if self.sbml_import_controller:
+                self.sbml_import_controller.set_parent_window(parent_window)
+            # WAYLAND FIX: Update KEGG controller's parent window if needed
+            if self.kegg_import_controller and hasattr(self.kegg_import_controller, 'set_parent_window'):
+                self.kegg_import_controller.set_parent_window(parent_window)
         self.parent_container = container
         
         print(f"[ATTACH] PathwayPanel scheduling deferred attach", file=sys.stderr)

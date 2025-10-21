@@ -60,17 +60,19 @@ class SBMLImportPanel:
         processed_pathway: Post-processed PathwayData with layout and colors
     """
     
-    def __init__(self, builder: Gtk.Builder, model_canvas=None, workspace_settings=None):
+    def __init__(self, builder: Gtk.Builder, model_canvas=None, workspace_settings=None, parent_window=None):
         """Initialize the SBML import panel controller.
         
         Args:
             builder: GTK Builder with loaded pathway_panel.ui
             model_canvas: Optional ModelCanvasManager for loading pathways
             workspace_settings: Optional WorkspaceSettings for remembering last query
+            parent_window: Optional parent window for dialogs (WAYLAND FIX)
         """
         self.builder = builder
         self.model_canvas = model_canvas
         self.workspace_settings = workspace_settings
+        self.parent_window = parent_window  # WAYLAND FIX: Store parent for dialogs
         self.logger = logging.getLogger(self.__class__.__name__)
         
         # Initialize backend components
@@ -272,9 +274,10 @@ class SBMLImportPanel:
     
     def _on_browse_clicked(self, button):
         """Handle browse button click - open file chooser."""
-        # Create file chooser dialog
+        # WAYLAND FIX: Use parent window for dialog
         dialog = Gtk.FileChooserDialog(
             title="Select SBML File",
+            parent=self.parent_window,
             action=Gtk.FileChooserAction.OPEN,
             buttons=(
                 Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
@@ -849,6 +852,14 @@ class SBMLImportPanel:
             self.sbml_status_label.set_markup(f'<span foreground="red">{message}</span>')
         else:
             self.sbml_status_label.set_text(message)
+    
+    def set_parent_window(self, window):
+        """Set parent window for dialogs (WAYLAND FIX).
+        
+        Args:
+            window: Parent window for FileChooser and other dialogs
+        """
+        self.parent_window = window
     
     def get_layout_parameters_for_algorithm(self, algorithm: str) -> dict:
         """Get layout parameters from UI for the specified algorithm.
