@@ -306,17 +306,23 @@ class PathwayPanelLoader:
         # WAYLAND FIX: Prevent rapid attach/detach race conditions
         if self.is_attached and self.parent_container == container:
             # Already attached to this container, just ensure visibility
+            print(f"[ATTACH] PathwayPanel already attached, ensuring visibility", file=sys.stderr)
             container.set_visible(True)
             self.content.set_visible(True)
             return
+        
+        print(f"[ATTACH] PathwayPanel attach_to() called, is_attached={self.is_attached}", file=sys.stderr)
         
         # Store parent window and container for float button callback
         if parent_window:
             self.parent_window = parent_window
         self.parent_container = container
         
+        print(f"[ATTACH] PathwayPanel scheduling deferred attach", file=sys.stderr)
+        
         def _do_attach():
             """Deferred attach operation for Wayland safety."""
+            print(f"[ATTACH] PathwayPanel _do_attach() executing", file=sys.stderr)
             try:
                 # Extract content from window first
                 current_parent = self.content.get_parent()
@@ -338,6 +344,8 @@ class PathwayPanelLoader:
                 
                 # Make sure content is visible
                 self.content.set_visible(True)
+                
+                print(f"[ATTACH] PathwayPanel attached successfully, content visible", file=sys.stderr)
                 
                 # Update float button state
                 if self.float_button and self.float_button.get_active():
@@ -378,20 +386,29 @@ class PathwayPanelLoader:
         
         WAYLAND SAFE: Uses idle callbacks to avoid surface issues.
         """
+        print(f"[HIDE] PathwayPanel hide() called, is_attached={self.is_attached}", file=sys.stderr)
+        
         def _do_hide():
             """Deferred hide operation for Wayland safety."""
+            print(f"[HIDE] PathwayPanel _do_hide() executing", file=sys.stderr)
             try:
                 if self.is_attached:
-                    # When attached, hide content first, then container
-                    if self.content:
+                    # CRITICAL: Remove content from container instead of hiding container
+                    # All panels share left_dock_area, so hiding container prevents other panels from showing
+                    if self.content and self.parent_container:
+                        current_parent = self.content.get_parent()
+                        if current_parent == self.parent_container:
+                            print(f"[HIDE] PathwayPanel removing content from container", file=sys.stderr)
+                            self.parent_container.remove(self.content)
                         self.content.set_visible(False)
-                    if self.parent_container:
-                        self.parent_container.set_visible(False)
+                        # Don't hide container - other panels might use it
+                    print(f"[HIDE] PathwayPanel hidden (attached mode)", file=sys.stderr)
                 elif self.window:
                     # When floating, hide the window
                     self.window.hide()
+                    print(f"[HIDE] PathwayPanel hidden (floating mode)", file=sys.stderr)
             except Exception as e:
-                print(f"Warning: Error during panel hide: {e}", file=sys.stderr)
+                print(f"[ERROR] Error during panel hide: {e}", file=sys.stderr)
             return False  # Don't repeat
         
         # WAYLAND FIX: Use idle callback to defer hide operation
