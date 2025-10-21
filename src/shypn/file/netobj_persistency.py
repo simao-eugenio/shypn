@@ -281,6 +281,8 @@ class NetObjPersistency:
         dialog.add_button('Discard Changes', Gtk.ResponseType.NO)
         dialog.add_button('Save', Gtk.ResponseType.YES)
         dialog.set_default_response(Gtk.ResponseType.YES)
+        # WAYLAND FIX: Show dialog before run() to ensure surface is created
+        dialog.show()
         response = dialog.run()
         dialog.destroy()
         if response == Gtk.ResponseType.YES:
@@ -394,6 +396,9 @@ class NetObjPersistency:
                 dialog.set_current_name(default_name)
             except Exception:
                 dialog.set_current_name('default.shy')  # Final fallback
+        
+        # WAYLAND FIX: Show dialog before run() to ensure surface is created
+        dialog.show()
         response = dialog.run()
         filepath = dialog.get_filename()
         dialog.destroy()
@@ -411,6 +416,8 @@ class NetObjPersistency:
             warning_dialog = Gtk.MessageDialog(parent=parent, modal=True, message_type=Gtk.MessageType.WARNING, buttons=Gtk.ButtonsType.YES_NO, text="Save as 'default.shy'?")
             warning_dialog.set_keep_above(True)  # Ensure dialog stays on top
             warning_dialog.format_secondary_text("You are about to save with the default filename 'default.shy'.\n\nThis may overwrite existing default files or make it hard to identify this model later.\n\nDo you want to continue with this filename?")
+            # WAYLAND FIX: Show dialog before run() to ensure surface is created
+            warning_dialog.show()
             warning_response = warning_dialog.run()
             warning_dialog.destroy()
             if warning_response != Gtk.ResponseType.YES:
@@ -475,6 +482,8 @@ class NetObjPersistency:
             except Exception:
                 pass  # Let GTK use its default
         
+        # WAYLAND FIX: Show dialog before run() to ensure surface is created
+        dialog.show()
         response = dialog.run()
         filepath = dialog.get_filename()
         dialog.destroy()
@@ -495,6 +504,8 @@ class NetObjPersistency:
         dialog = Gtk.MessageDialog(parent=parent, modal=True, message_type=Gtk.MessageType.INFO, buttons=Gtk.ButtonsType.OK, text=title)
         dialog.set_keep_above(True)  # Ensure dialog stays on top
         dialog.format_secondary_text(message)
+        # WAYLAND FIX: Show dialog before run() to ensure surface is created
+        dialog.show()
         dialog.run()
         dialog.destroy()
 
@@ -510,6 +521,8 @@ class NetObjPersistency:
         dialog = Gtk.MessageDialog(parent=parent, modal=True, message_type=Gtk.MessageType.ERROR, buttons=Gtk.ButtonsType.OK, text=title)
         dialog.set_keep_above(True)  # Ensure dialog stays on top
         dialog.format_secondary_text(message)
+        # WAYLAND FIX: Show dialog before run() to ensure surface is created
+        dialog.show()
         dialog.run()
         dialog.destroy()
 
