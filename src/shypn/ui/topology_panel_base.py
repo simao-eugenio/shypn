@@ -133,9 +133,12 @@ class TopologyPanelBase(ABC):
         
         # WAYLAND FIX: Prevent redundant attach
         if self.is_attached and self.parent_container == container:
+            print(f"[ATTACH] TopologyPanel already attached, ensuring visibility", file=sys.stderr)
             container.set_visible(True)
             self.content.set_visible(True)
             return
+        
+        print(f"[ATTACH] TopologyPanel attach_to() called, is_attached={self.is_attached}", file=sys.stderr)
         
         # Store references
         if parent_window:
@@ -144,6 +147,7 @@ class TopologyPanelBase(ABC):
         
         def _do_attach():
             """Deferred attach operation for Wayland safety."""
+            print(f"[ATTACH] TopologyPanel _do_attach() executing", file=sys.stderr)
             try:
                 # Extract content from window
                 current_parent = self.content.get_parent()
@@ -163,6 +167,8 @@ class TopologyPanelBase(ABC):
                 # Show container and content
                 container.set_visible(True)
                 self.content.set_visible(True)
+                
+                print(f"[ATTACH] TopologyPanel attached successfully, content visible", file=sys.stderr)
                 
                 # Update float button state
                 if self.float_button and self.float_button.get_active():
@@ -250,20 +256,29 @@ class TopologyPanelBase(ABC):
         
         WAYLAND SAFE: Uses idle callback for deferred operations.
         """
+        print(f"[HIDE] TopologyPanel hide() called, is_attached={self.is_attached}", file=sys.stderr)
+        
         def _do_hide():
             """Deferred hide operation for Wayland safety."""
+            print(f"[HIDE] TopologyPanel _do_hide() executing", file=sys.stderr)
             try:
                 if self.is_attached:
-                    # Hide content and container
-                    if self.content:
+                    # CRITICAL: Remove content from container instead of hiding container
+                    # All panels share left_dock_area, so hiding container prevents other panels from showing
+                    if self.content and self.parent_container:
+                        current_parent = self.content.get_parent()
+                        if current_parent == self.parent_container:
+                            print(f"[HIDE] TopologyPanel removing content from container", file=sys.stderr)
+                            self.parent_container.remove(self.content)
                         self.content.set_visible(False)
-                    if self.parent_container:
-                        self.parent_container.set_visible(False)
+                        # Don't hide container - other panels might use it
+                    print(f"[HIDE] TopologyPanel hidden (attached mode)", file=sys.stderr)
                 elif self.window:
                     # Hide floating window
                     self.window.hide()
+                    print(f"[HIDE] TopologyPanel hidden (floating mode)", file=sys.stderr)
             except Exception as e:
-                print(f"Warning: Error during topology panel hide: {e}", file=sys.stderr)
+                print(f"[ERROR] Error during topology panel hide: {e}", file=sys.stderr)
             
             return False  # Don't repeat
         
