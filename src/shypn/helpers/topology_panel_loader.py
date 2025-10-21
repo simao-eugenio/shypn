@@ -13,7 +13,7 @@ import sys
 
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk
+from gi.repository import Gtk, Gdk
 
 from shypn.ui.topology_panel_base import TopologyPanelBase
 from shypn.ui.topology_panel_controller import TopologyPanelController
@@ -131,7 +131,7 @@ class TopologyPanelLoader(TopologyPanelBase):
         css = b"""
         /* Topology Panel - Vertical Tabs Styling */
         
-        /* Add thin borders to expanders */
+        /* Add BOLD VISIBLE borders to all expanders */
         #p_invariants_expander,
         #t_invariants_expander,
         #siphons_expander,
@@ -144,13 +144,14 @@ class TopologyPanelLoader(TopologyPanelBase):
         #liveness_expander,
         #deadlocks_expander,
         #fairness_expander {
-            border: 1px solid alpha(@theme_fg_color, 0.2);
-            border-radius: 4px;
-            margin-bottom: 2px;
-            padding: 4px;
+            border: 2px solid #4a5568;
+            border-radius: 6px;
+            margin: 4px;
+            padding: 8px;
+            background-color: #f7fafc;
         }
         
-        /* Highlight expanded expander */
+        /* Highlight expanded expander - BOLD and CLEAR */
         #p_invariants_expander:checked,
         #t_invariants_expander:checked,
         #siphons_expander:checked,
@@ -163,8 +164,10 @@ class TopologyPanelLoader(TopologyPanelBase):
         #liveness_expander:checked,
         #deadlocks_expander:checked,
         #fairness_expander:checked {
-            background-color: alpha(@theme_selected_bg_color, 0.1);
-            border-color: @theme_selected_bg_color;
+            background-color: #e6f7ff;
+            border-color: #1890ff;
+            border-width: 3px;
+            box-shadow: 0 0 0 1px #69c0ff;
         }
         """
         
@@ -172,10 +175,19 @@ class TopologyPanelLoader(TopologyPanelBase):
             css_provider = Gtk.CssProvider()
             css_provider.load_from_data(css)
             
-            # Apply to all expanders
-            for expander in self.expanders.values():
-                context = expander.get_style_context()
-                context.add_provider(css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+            # Apply globally to the screen (not just individual widgets)
+            screen = Gdk.Screen.get_default()
+            if screen:
+                Gtk.StyleContext.add_provider_for_screen(
+                    screen,
+                    css_provider,
+                    Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+                )
+            else:
+                # Fallback: apply to individual expanders if no screen
+                for expander in self.expanders.values():
+                    context = expander.get_style_context()
+                    context.add_provider(css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         except Exception as e:
             print(f"Warning: Could not apply topology panel CSS styling: {e}", file=sys.stderr)
 
