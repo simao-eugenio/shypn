@@ -74,6 +74,7 @@ class LeftPanelLoader:
         self.parent_container = None
         self.parent_window = None  # Track parent window for float button
         self._updating_button = False  # Flag to prevent recursive toggle events
+        self._attach_in_progress = False  # WAYLAND FIX: Prevent concurrent attach operations
         self.on_float_callback = None  # Callback to notify when panel floats
         self.on_attach_callback = None  # Callback to notify when panel attaches
         self.on_quit_callback = None  # Callback when quit button is clicked
@@ -293,6 +294,11 @@ class LeftPanelLoader:
             container: Gtk.Box or other container to embed content into.
             parent_window: Optional parent window (stored for float button).
         """
+        # WAYLAND FIX: Check attach_in_progress FIRST, before any other logic
+        if self._attach_in_progress:
+            print(f"[ATTACH] LeftPanel attach ALREADY IN PROGRESS, ignoring duplicate call", file=sys.stderr)
+            return
+        
         print(f"[ATTACH] LeftPanel attach_to() called, is_attached={self.is_attached}", file=sys.stderr)
         
         if self.window is None:
@@ -306,12 +312,20 @@ class LeftPanelLoader:
             if self.content.get_parent() != container:
                 print(f"[ATTACH] LeftPanel content was removed, re-adding to container", file=sys.stderr)
                 container.add(self.content)
-            container.set_visible(True)
-            self.content.set_visible(True)
-            self.content.show_all()  # Ensure all children are visible
+            # WAYLAND FIX: Don't call set_visible repeatedly - can cause protocol errors
+            if not container.get_visible():
+                container.set_visible(True)
+            # Content should already be visible if we're in fast path
             return
         
         print(f"[ATTACH] LeftPanel scheduling deferred attach", file=sys.stderr)
+        
+        # Set flag BEFORE scheduling idle to prevent concurrent attach attempts
+        self._attach_in_progress = True
+        
+        # WAYLAND FIX: Set is_attached=True NOW to prevent duplicate attach_to() calls
+        # The idle callback will complete the actual reparenting operation
+        self.is_attached = True
         
         # Store parent window and container for float button callback
         if parent_window:
@@ -331,52 +345,41 @@ class LeftPanelLoader:
             """Deferred attach operation for Wayland safety."""
             print(f"[ATTACH] LeftPanel _do_attach() executing", file=sys.stderr)
             try:
-                # WAYLAND FIX: Hide window FIRST before any reparenting
-                # This ensures Wayland compositor cleans up surface state before we move widgets
-                if self.window and self.window.get_visible():
-                    self.window.hide()
-                
-                # Extract content from window
+                # Extract content from window first
                 current_parent = self.content.get_parent()
                 if current_parent == self.window:
-                    self.window.remove(self.content)  # GTK3 uses remove()
+                    self.window.remove(self.content)
                 elif current_parent and current_parent != container:
-                    # Content is in another container, remove it first
                     current_parent.remove(self.content)
                 
-                # WAYLAND FIX: Add content to container in a separate idle callback
-                # This gives Wayland compositor time to process the remove operation
-                def _do_add_content():
-                    try:
-                        # Only append if not already in container
-                        if self.content.get_parent() != container:
-                            container.add(self.content)  # GTK3 uses add() instead of append()
-                        
-                        # Make container visible when panel is attached
-                        container.set_visible(True)
-                        
-                        # Make sure content is visible
-                        self.content.set_visible(True)
-                        
-                        print(f"[ATTACH] LeftPanel attached successfully, content visible", file=sys.stderr)
-                        
-                        # Update float button state
-                        if self.float_button and self.float_button.get_active():
-                            self._updating_button = True
-                            self.float_button.set_active(False)
-                            self._updating_button = False
-                        
-                        self.is_attached = True
-                        
-                        # Notify that panel is attached (to expand paned)
-                        if self.on_attach_callback:
-                            self.on_attach_callback()
-                    except Exception as e:
-                        print(f"Warning: Error during panel add content: {e}", file=sys.stderr)
-                    return False
+                # WAYLAND FIX: Hide window BEFORE adding to container
+                if self.window:
+                    self.window.hide()
                 
-                # Schedule add operation with lower priority to ensure remove completes first
-                GLib.idle_add(_do_add_content, priority=GLib.PRIORITY_DEFAULT_IDLE)
+                # Add content to container
+                if self.content.get_parent() != container:
+                    container.add(self.content)
+                
+                # Make container and content visible
+                container.set_visible(True)
+                self.content.set_visible(True)
+                
+                print(f"[ATTACH] LeftPanel attached successfully, content visible", file=sys.stderr)
+                
+                # Update float button state
+                if self.float_button and self.float_button.get_active():
+                    self._updating_button = True
+                    self.float_button.set_active(False)
+                    self._updating_button = False
+                
+                self.is_attached = True
+                
+                # WAYLAND FIX: Clear attach operation flag
+                self._attach_in_progress = False
+                
+                # Notify that panel is attached (to expand paned)
+                if self.on_attach_callback:
+                    self.on_attach_callback()
             except Exception as e:
                 print(f"Warning: Error during panel attach: {e}", file=sys.stderr)
             
@@ -413,14 +416,17 @@ class LeftPanelLoader:
             print(f"[HIDE] LeftPanel _do_hide() executing", file=sys.stderr)
             try:
                 if self.is_attached:
-                    # When attached, remove content from container and hide it
+                    # WAYLAND FIX: Just remove content from container, DON'T call set_visible(False)
+                    # Setting visibility can cause unrealize/realize cycles on embedded widgets
                     if self.content and self.parent_container:
                         current_parent = self.content.get_parent()
                         if current_parent == self.parent_container:
                             print(f"[HIDE] LeftPanel removing content from container", file=sys.stderr)
                             self.parent_container.remove(self.content)
-                        self.content.set_visible(False)
-                    # Don't hide the container - other panels might use it
+                        # CRITICAL: Don't call self.content.set_visible(False) - causes Wayland issues
+                        # Content stays realized and ready for fast re-attach
+                        # Don't hide container - other panels might use it
+                    # NOTE: Keep is_attached=True so next attach_to() can use fast path
                     print(f"[HIDE] LeftPanel hidden (attached mode)", file=sys.stderr)
                 elif self.window:
                     # When floating, hide the window
