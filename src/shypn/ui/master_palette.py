@@ -194,24 +194,33 @@ class MasterPalette:
         
         # Wrap callback to implement exclusive radio-button behavior
         def exclusive_callback(active):
+            print(f"[MP] {category} toggled: active={active}, _in_handler={self._in_handler}", file=sys.stderr)
+            
             # Prevent re-entrance from programmatic set_active() calls
             if self._in_handler:
+                print(f"[MP] {category} BLOCKED (already in handler)", file=sys.stderr)
                 return
             
             self._in_handler = True
+            print(f"[MP] {category} PROCESSING (set _in_handler=True)", file=sys.stderr)
             try:
                 if active:
                     # User clicked this button to activate it
+                    print(f"[MP] {category} activating, deactivating others", file=sys.stderr)
                     # Deactivate all other buttons (silently, without triggering their callbacks)
                     for btn_name, btn in self.buttons.items():
                         if btn_name != category and btn.get_active():
+                            print(f"[MP]   deactivating {btn_name}", file=sys.stderr)
                             btn.set_active(False)
                     
                     # Call the activation callback for this button
+                    print(f"[MP] {category} calling callback(True)", file=sys.stderr)
                     callback(True)
+                    print(f"[MP] {category} callback returned", file=sys.stderr)
                 else:
                     # User clicked active button to try to deactivate it
                     # For radio behavior, prevent deactivation by re-activating it
+                    print(f"[MP] {category} re-activating (radio behavior)", file=sys.stderr)
                     self.buttons[category].set_active(True)
                     # Don't call callback - button stays active, no state change
             except Exception as e:
@@ -219,6 +228,7 @@ class MasterPalette:
                 import traceback
                 traceback.print_exc()
             finally:
+                print(f"[MP] {category} DONE (reset _in_handler=False)", file=sys.stderr)
                 self._in_handler = False
         
         self.buttons[category].connect_toggled(exclusive_callback)
