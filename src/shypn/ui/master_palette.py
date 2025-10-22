@@ -15,6 +15,65 @@ from pathlib import Path
 from .palette_button import PaletteButton
 
 
+class PanelManager:
+    """Manages panel switching for Master Palette.
+    
+    SIMPLIFIED ARCHITECTURE:
+    - Panels are windows parented to Master Palette
+    - Show/hide panels by calling panel_loader.show() / hide()
+    - Panels positioned next to palette
+    - No widget reparenting = No Error 71!
+    
+    This keeps panel control logic centralized instead of scattered in main app.
+    """
+    
+    def __init__(self, palette_widget):
+        """Initialize panel manager.
+        
+        Args:
+            palette_widget: The Master Palette container widget (for positioning panels)
+        """
+        self.panels = {}  # {category: panel_loader}
+        self.active_panel = None
+        self.palette_widget = palette_widget
+    
+    def register_panel(self, category, panel_loader):
+        """Register a panel with the manager.
+        
+        Args:
+            category: Panel category name ('files', 'analyses', etc.)
+            panel_loader: Panel loader instance with show()/hide() methods
+        """
+        self.panels[category] = panel_loader
+    
+    def show_panel(self, category):
+        """Show a specific panel (hide others).
+        
+        Args:
+            category: Panel category to show
+        """
+        if category not in self.panels:
+            return
+        
+        panel_loader = self.panels[category]
+        
+        # Hide all other panels
+        for cat, loader in self.panels.items():
+            if cat != category:
+                loader.hide()
+        
+        # Show the requested panel
+        panel_loader.show()
+        
+        self.active_panel = category
+    
+    def hide_all(self):
+        """Hide all panels."""
+        for loader in self.panels.values():
+            loader.hide()
+        self.active_panel = None
+
+
 UI_PATH = Path(__file__).parents[3] / 'ui' / 'palettes' / 'master_palette.ui'
 
 
@@ -104,6 +163,8 @@ class MasterPalette:
         self._callbacks = {}
         self._css_applied = False
         self._in_handler = False  # Single guard flag to prevent re-entrance
+        self.panel_manager = None  # Will be set by setup_panel_manager()
+        self.parent_window = None  # Parent window for panels
 
         self._load_ui()
         self._create_buttons()
@@ -134,6 +195,10 @@ class MasterPalette:
         WAYLAND SAFE: Only applies CSS if not already applied and screen is available.
         This should be called after widget is realized to avoid Wayland surface issues.
         """
+        # TESTING: Disable CSS completely to see if it causes Wayland Error 71
+        print("[CSS] MasterPalette CSS application DISABLED for testing", file=sys.stderr)
+        return
+        
         if self._css_applied:
             return  # Already applied
         
@@ -192,73 +257,96 @@ class MasterPalette:
             raise KeyError(f"Unknown category: {category}")
         self._callbacks[category] = callback
         
-        # Wrap callback to implement exclusive toggle behavior
-        def exclusive_callback(active):
-            print(f"[MP] {category} toggled: active={active}, _in_handler={self._in_handler}", file=sys.stderr)
-            
-            # Only block if we're in a handler AND this is a deactivation from exclusive logic
-            # Allow: activation always, deactivation from user click
-            if self._in_handler and not active:
-                # This deactivation is triggered by another button activating (exclusive logic)
-                # Don't call the callback - the new button's activation will handle panel switching
-                print(f"[MP] {category} BLOCKED (deactivation from exclusive logic)", file=sys.stderr)
+        # Wrapper with re-entrance protection
+        def protected_callback(active):
+            if self._in_handler:
+                # Already in a handler - don't trigger nested calls
                 return
             
             self._in_handler = True
-            print(f"[MP] {category} PROCESSING (set _in_handler=True)", file=sys.stderr)
             try:
-                if active:
-                    # User clicked this button to activate it
-                    print(f"[MP] {category} activating, deactivating others", file=sys.stderr)
-                    # Deactivate all other buttons (silently, without triggering their callbacks)
-                    for btn_name, btn in self.buttons.items():
-                        if btn_name != category and btn.get_active():
-                            print(f"[MP]   deactivating {btn_name}", file=sys.stderr)
-                            btn.set_active(False)
-                    
-                    # Call the activation callback for this button
-                    print(f"[MP] {category} calling callback(True)", file=sys.stderr)
-                    callback(True)
-                    print(f"[MP] {category} callback returned", file=sys.stderr)
-                else:
-                    # User clicked active button to deactivate it (not blocked because _in_handler was False)
-                    # Allow deactivation and call callback with False
-                    print(f"[MP] {category} deactivating, calling callback(False)", file=sys.stderr)
-                    callback(False)
-                    print(f"[MP] {category} callback returned", file=sys.stderr)
+                callback(active)
             except Exception as e:
                 print(f"[ERROR] Master Palette callback failed for {category}: {e}", file=sys.stderr)
                 import traceback
                 traceback.print_exc()
             finally:
-                print(f"[MP] {category} DONE (reset _in_handler=False)", file=sys.stderr)
                 self._in_handler = False
         
-        self.buttons[category].connect_toggled(exclusive_callback)
+        self.buttons[category].connect_toggled(protected_callback)
 
     def set_active(self, category: str, active: bool):
-        """Set button active state programmatically (e.g., when panel floats/docks)."""
+        """Set button active state programmatically (e.g., for initial activation).
+        
+        This method blocks the callback to prevent re-entrance when called from within
+        a toggle handler (e.g., when one button deactivates others).
+        """
         if category not in self.buttons:
             return
         
-        # Guard to prevent triggering callbacks during programmatic changes
-        # Only set the guard if we're not already in a handler (avoid nested flag manipulation)
-        was_in_handler = self._in_handler
-        if not was_in_handler:
-            self._in_handler = True
+        # Block handler during programmatic set to avoid recursion
+        button = self.buttons[category]
+        if button.get_active() == active:
+            return  # Already in desired state, nothing to do
         
+        # Use handler lock to prevent callback during programmatic change
+        was_in_handler = self._in_handler
+        self._in_handler = True
         try:
-            self.buttons[category].set_active(active)
+            button.set_active(active)
         finally:
-            # Only reset if we set it
-            if not was_in_handler:
-                self._in_handler = False
+            self._in_handler = was_in_handler
 
     def set_sensitive(self, category: str, sensitive: bool):
         """Enable/disable a button (e.g., disable Topology until implemented)."""
         if category not in self.buttons:
             return
         self.buttons[category].set_sensitive(sensitive)
+    
+    def setup_panel_manager(self):
+        """Setup integrated panel management.
+        
+        This method configures the palette to automatically manage panels using
+        the PanelManager. Call this instead of manually connecting callbacks.
+        
+        Example:
+            palette.setup_panel_manager()
+            palette.register_panel('files', left_panel_loader)
+            palette.register_panel('analyses', right_panel_loader)
+        """
+        self.panel_manager = PanelManager(self.container)
+    
+    def register_panel(self, category, panel_loader):
+        """Register a panel with integrated management.
+        
+        Must call setup_panel_manager() first!
+        
+        Args:
+            category: Panel category ('files', 'analyses', 'pathways', 'topology')
+            panel_loader: Panel loader with show()/hide() methods
+        """
+        if not self.panel_manager:
+            raise RuntimeError("Call setup_panel_manager() before register_panel()")
+        
+        # Set palette widget as parent for panel positioning
+        panel_loader.set_palette_parent(self.container)
+        
+        self.panel_manager.register_panel(category, panel_loader)
+        
+        # Auto-connect toggle handler
+        def toggle_handler(is_active):
+            if is_active:
+                # Deactivate other buttons
+                for cat in self.buttons:
+                    if cat != category:
+                        self.set_active(cat, False)
+                # Show this panel
+                self.panel_manager.show_panel(category)
+            else:
+                # Hide all panels
+                self.panel_manager.hide_all()
+        
+        self.connect(category, toggle_handler)
     
     def _on_realize(self, widget):
         """Called when palette widget is realized (Wayland safe).

@@ -491,6 +491,8 @@ class ModelCanvasLoader:
         Returns:
             tuple: (page_index, drawing_area) for the new document.
         """
+        print(f"[CANVAS] add_document() called, filename={filename}", file=sys.stderr)
+        
         if self.notebook is None:
             raise RuntimeError('Canvas not loaded. Call load() first.')
         
@@ -546,7 +548,9 @@ class ModelCanvasLoader:
         tab_box.show_all()
         
         page_index = self.notebook.append_page(overlay, tab_box)
+        print(f"[CANVAS] Tab appended, calling overlay.show_all()", file=sys.stderr)
         overlay.show_all()
+        print(f"[CANVAS] overlay.show_all() complete", file=sys.stderr)
         self._setup_canvas_manager(drawing, overlay_box, overlay, filename=filename)
         self.notebook.set_current_page(page_index)
         return (page_index, drawing)

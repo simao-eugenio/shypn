@@ -1,0 +1,244 @@
+#!/usr/bin/env python3
+"""Left panel loader - loads file explorer panel into GtkStack container.
+
+ARCHITECTURE:
+- Panel content is loaded into main window's GtkStack container
+- Content is moved to stack BEFORE window.show_all() to avoid Wayland Error 71
+- Master Palette controls stack visibility via set_visible_child_name()
+- Float button in panel can detach to separate window
+"""
+
+import gi
+gi.require_version('Gtk', '3.0')
+from gi.repository import Gtk
+
+from shypn.ui.file_explorer_panel import FileExplorerPanel
+
+def create_left_panel(main_builder, stack_container_id):
+	"""Factory function to create left panel (File Explorer).
+	
+	Args:
+		main_builder: GtkBuilder for main window (to access stack containers)
+		stack_container_id: ID of the GtkBox container in the stack (e.g., 'files_panel_container')
+	
+	Returns:
+		Left panel loader instance with:
+		- .file_explorer: FileExplorerPanel instance
+		- .load(): Method to initialize panel content (embeds in stack)
+		- .show(): Method to make panel visible (sets stack child)
+		- .hide(): Method to hide panel (switches stack child)
+	"""
+	return LeftPanelLoader(main_builder, stack_container_id)
+import os
+import sys
+from pathlib import Path
+
+try:
+    import gi
+    gi.require_version('Gtk', '3.0')
+    from gi.repository import Gtk, GLib
+except Exception as e:
+    print('ERROR: GTK3 not available in left_panel loader:', e, file=sys.stderr)
+    sys.exit(1)
+
+# Import sub-controllers (OOP: composition over inheritance)
+from shypn.helpers.file_explorer_panel import FileExplorerPanel
+from shypn.helpers.project_actions_controller import ProjectActionsController
+
+
+class LeftPanelLoader:
+	"""Loader for the left panel (File Explorer).
+	
+	CRITICAL: Panel content is embedded in main window's GtkStack BEFORE window.show_all()
+	to avoid Wayland Error 71. No post-realization reparenting!
+	"""
+	
+	def __init__(self, main_builder, stack_container_id):
+		"""Initialize left panel loader.
+		
+		Args:
+			main_builder: GtkBuilder for main window (to access stack containers)
+			stack_container_id: ID of the GtkBox container in stack (e.g., 'files_panel_container')
+		"""
+		self.file_explorer = None
+		self.main_builder = main_builder
+		self.stack_container_id = stack_container_id
+		self.panel_window = None  # For float mode (detached window)
+		self.is_floating = False
+
+	def load(self):
+		"""Initialize the File Explorer panel and embed in stack container.
+		
+		CRITICAL: Content is moved to stack BEFORE main window.show_all() to avoid
+		Wayland Error 71 (Protocol error) from post-realization widget reparenting.
+		
+		Returns:
+			FileExplorerPanel instance
+		"""
+		# Create FileExplorerPanel (this initially builds UI in its own window)
+		self.file_explorer = FileExplorerPanel()
+		
+		# Get the panel's content widget (the main VBox containing all UI)
+		panel_content_widget = self.file_explorer.builder.get_object('left_panel_root')
+		if not panel_content_widget:
+			raise RuntimeError("left_panel_root not found in left_panel.ui")
+		
+		# Get stack container from main window
+		stack_container = self.main_builder.get_object(self.stack_container_id)
+		if not stack_container:
+			raise RuntimeError(f"Stack container '{self.stack_container_id}' not found in main window")
+		
+		# CRITICAL: Move content to stack BEFORE any window.show_all()
+		# This avoids post-realization reparenting (Wayland Error 71)
+		panel_parent = panel_content_widget.get_parent()
+		if panel_parent:
+			panel_parent.remove(panel_content_widget)
+		stack_container.pack_start(panel_content_widget, True, True, 0)
+		
+		# Store reference to original window (for float mode later)
+		self.panel_window = self.file_explorer.window
+		
+		return self.file_explorer
+
+	def show(self):
+		"""Show the panel (make visible in stack)."""
+		if not self.is_floating:
+			# Panel is docked: set stack to show this panel's container
+			left_dock_stack = self.main_builder.get_object('left_dock_stack')
+			if left_dock_stack:
+				left_dock_stack.set_visible_child_name(self.stack_container_id)
+
+	def hide(self):
+		"""Hide the panel (switch stack to different child)."""
+		if not self.is_floating:
+			# Panel is docked: switching to another panel will hide this one
+			# This is controlled by Master Palette when user clicks a different button
+			pass    # ===============================
+    # Project Integration Callbacks (Minimal - just navigation)
+    # ===============================
+    
+    def _on_project_created(self, project):
+        """Handle project creation - update file explorer to project location.
+        
+        Args:
+            project: The newly created Project instance
+        """
+        if self.file_explorer and project:
+            # Navigate file explorer to new project directory
+            self.file_explorer.navigate_to(project.base_path)
+    
+    def _on_project_opened(self, project):
+        """Handle project open - update file explorer to project location.
+        
+        Args:
+            project: The opened Project instance
+        """
+        if self.file_explorer and project:
+            # Navigate file explorer to opened project directory
+            self.file_explorer.navigate_to(project.base_path)
+    
+    def _on_project_closed(self):
+        """Handle project closed event.
+
+        When a project is closed, navigate back to workspace root.
+        """
+        if self.file_explorer:
+            # Navigate to workspace root (safe user directory)
+            workspace_root = os.path.join(self.repo_root, 'workspace')
+            self.file_explorer.navigate_to(workspace_root)
+    
+    # ===============================
+    # Panel Control Methods
+    # ===============================
+    
+    def set_palette_parent(self, palette_widget):
+        """Set the Master Palette widget as parent for positioning.
+        
+        Args:
+            palette_widget: The Master Palette container widget
+        """
+        self.palette_widget = palette_widget
+        
+        # Get the toplevel window containing the palette
+        if palette_widget:
+            toplevel = palette_widget.get_toplevel()
+            if toplevel and isinstance(toplevel, Gtk.Window):
+                self.window.set_transient_for(toplevel)
+    
+    def attach(self, main_window):
+        """Simplified attach: connect panel window to main app.
+        
+        Panel stays in its own window. This method connects it to the main app
+        for coordinated show/hide and positioning.
+        
+        Args:
+            main_window: The main application window
+        """
+        if not self.is_loaded:
+            raise RuntimeError("Panel must be loaded before attaching")
+        
+        # Store main window reference for positioning
+        self.main_window = main_window
+        
+        # Set main window as transient parent (keeps panel on top)
+        self.window.set_transient_for(main_window)
+        
+        # Update project controller parent for dialogs
+        if self.project_controller:
+            self.project_controller.parent_window = main_window
+        
+        # Update file explorer parent for dialogs
+        if self.file_explorer:
+            self.file_explorer.set_parent_window(main_window)
+            if hasattr(self.file_explorer, 'persistency') and self.file_explorer.persistency:
+                self.file_explorer.persistency.parent_window = main_window
+        
+        print(f"[ATTACH] Files panel attached to main window", file=sys.stderr)
+    
+    def hide(self):
+        """Hide panel window."""
+        print(f"[HIDE] Files panel hiding window", file=sys.stderr)
+        if self.window:
+            self.window.hide()
+    
+    def show(self):
+        """Show panel window positioned next to palette (right of palette, left of main window)."""
+        print(f"[SHOW] Files panel showing window", file=sys.stderr)
+        if self.window:
+            # Position panel next to the Master Palette
+            if self.palette_widget and self.main_window:
+                # Get palette position relative to main window
+                palette_alloc = self.palette_widget.get_allocation()
+                palette_width = palette_alloc.width
+                
+                # Get main window position
+                main_x, main_y = self.main_window.get_position()
+                main_width, main_height = self.main_window.get_size()
+                
+                # Position panel to the right of palette (which is on the left edge)
+                panel_width = 250  # Default panel width
+                self.window.set_default_size(panel_width, main_height)
+                # Palette is at main_x, panel goes right after it
+                self.window.move(main_x + palette_width, main_y)
+            
+            self.window.show_all()
+
+
+def create_left_panel(ui_path=None, base_path=None):
+    """Convenience function to create and load the left panel loader.
+    
+    Args:
+        ui_path: Optional path to left_panel.ui.
+        base_path: Optional base path for file explorer (default: workspace directory).
+        
+    Returns:
+        LeftPanelLoader: The loaded left panel loader instance.
+        
+    Example:
+        loader = create_left_panel(base_path="/home/user/projects/workspace")
+        loader.attach(main_window)
+        loader.show()  # Show panel window
+    """
+    loader = LeftPanelLoader(ui_path, base_path)
+    loader.load()
+    return loader
