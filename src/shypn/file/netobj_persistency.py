@@ -321,6 +321,12 @@ class NetObjPersistency:
         # Ensure parent window is set
         parent = self.parent_window if self.parent_window else None
         
+        # DEBUG: Log parent window for troubleshooting
+        import sys
+        print(f"[DIALOG] Creating Save dialog with parent={parent}", file=sys.stderr)
+        if parent:
+            print(f"[DIALOG]   Parent visible={parent.get_visible()}, realized={parent.get_realized()}", file=sys.stderr)
+        
         # Create dialog
         dialog = Gtk.FileChooserDialog(
             title='Save Petri Net',
@@ -479,6 +485,12 @@ class NetObjPersistency:
         """
         # Ensure parent window is set
         parent = self.parent_window if self.parent_window else None
+        
+        # DEBUG: Log parent window for troubleshooting
+        import sys
+        print(f"[DIALOG] Creating Open dialog with parent={parent}", file=sys.stderr)
+        if parent:
+            print(f"[DIALOG]   Parent visible={parent.get_visible()}, realized={parent.get_realized()}", file=sys.stderr)
         
         # Create dialog
         dialog = Gtk.FileChooserDialog(

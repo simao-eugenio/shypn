@@ -95,14 +95,70 @@
                 <property name="can-focus">True</property>
                 <property name="vexpand">True</property>
                 
-                <!-- Left dock area for ALL panels (Files, Analyses, Pathways, Topology) -->
+                <!-- Left dock area - GtkStack for panel switching (NO reparenting!) -->
                 <child>
-                  <object class="GtkBox" id="left_dock_area">
-                    <property name="orientation">vertical</property>
-                    <property name="spacing">0</property>
-                    <property name="width-request">0</property>
+                  <object class="GtkStack" id="left_dock_stack">
                     <property name="visible">False</property>
-                    <!-- All panel content will be attached here dynamically -->
+                    <property name="vexpand">True</property>
+                    <property name="hexpand">False</property>
+                    <property name="transition-type">none</property>
+                    
+                    <!-- Files Panel Container -->
+                    <child>
+                      <object class="GtkBox" id="files_panel_container">
+                        <property name="orientation">vertical</property>
+                        <property name="visible">True</property>
+                        <property name="vexpand">True</property>
+                        <property name="hexpand">True</property>
+                        <!-- Content loaded from left_panel.ui at startup -->
+                      </object>
+                      <packing>
+                        <property name="name">files</property>
+                      </packing>
+                    </child>
+                    
+                    <!-- Analyses Panel Container -->
+                    <child>
+                      <object class="GtkBox" id="analyses_panel_container">
+                        <property name="orientation">vertical</property>
+                        <property name="visible">True</property>
+                        <property name="vexpand">True</property>
+                        <property name="hexpand">True</property>
+                        <!-- Content loaded from right_panel.ui at startup -->
+                      </object>
+                      <packing>
+                        <property name="name">analyses</property>
+                      </packing>
+                    </child>
+                    
+                    <!-- Pathways Panel Container -->
+                    <child>
+                      <object class="GtkBox" id="pathways_panel_container">
+                        <property name="orientation">vertical</property>
+                        <property name="visible">True</property>
+                        <property name="vexpand">True</property>
+                        <property name="hexpand">True</property>
+                        <!-- Content loaded from pathway_panel.ui at startup -->
+                      </object>
+                      <packing>
+                        <property name="name">pathways</property>
+                      </packing>
+                    </child>
+                    
+                    <!-- Topology Panel Container -->
+                    <child>
+                      <object class="GtkBox" id="topology_panel_container">
+                        <property name="orientation">vertical</property>
+                        <property name="visible">True</property>
+                        <property name="vexpand">True</property>
+                        <property name="hexpand">True</property>
+                        <!-- Content loaded from topology_panel.ui at startup -->
+                      </object>
+                      <packing>
+                        <property name="name">topology</property>
+                      </packing>
+                    </child>
+                    
                   </object>
                   <packing>
                     <property name="resize">False</property>

@@ -48,26 +48,21 @@ class TopologyPanelBase(ABC):
         
         # GTK components
         self.builder = Gtk.Builder()
-        self.window = None  # Floating window
-        self.content = None  # Content widget (shared between window and attached)
-        self.float_button = None
+        self.window = None  # Panel window
+        self.content = None  # Content widget
+        self.main_window = None  # Reference to main window
+        self.palette_widget = None  # Reference to Master Palette widget
         
         # State tracking
-        self.is_attached = False
-        self.parent_container = None
-        self.parent_window = None
-        
-        # Callbacks
-        self.on_float_callback = None
-        self.on_attach_callback = None
-        
-        # Internal state
-        self._updating_button = False
+        self.is_loaded = False  # Track if load() has been called
     
     def load(self):
-        """Load UI from XML file.
+        """Load UI from XML file - panel stays in its own window.
         
-        WAYLAND SAFE: Proper widget initialization order.
+        SIMPLIFIED ARCHITECTURE:
+        - Panel content stays in panel window (no reparenting)
+        - Panel responds to show/hide signals from main app
+        - No widget tree modifications = No Error 71!
         """
         if not self.ui_path.exists():
             raise FileNotFoundError(f"UI file not found: {self.ui_path}")
@@ -79,14 +74,12 @@ class TopologyPanelBase(ABC):
             # Get main widgets
             self.window = self.builder.get_object('topology_window')
             self.content = self.builder.get_object('topology_content')
-            self.float_button = self.builder.get_object('topology_float_button')
             
             if not self.window or not self.content:
                 raise RuntimeError("Required widgets not found in UI file")
             
-            # Connect float button
-            if self.float_button:
-                self.float_button.connect('toggled', self._on_float_button_toggled)
+            # Panel content stays in its own window - no reparenting
+            print(f"[LOAD] Topology panel loaded (content stays in panel window)", file=sys.stderr)
             
             # Connect window delete event
             self.window.connect('delete-event', self._on_window_delete)
@@ -96,6 +89,13 @@ class TopologyPanelBase(ABC):
             
             # Connect signals
             self._connect_signals()
+            
+            # Hide window by default (will be shown when toggled)
+            self.window.set_visible(False)
+            
+            # Mark as loaded
+            self.is_loaded = True
+            print(f"[LOAD] Topology panel load() complete, is_loaded=True", file=sys.stderr)
             
         except Exception as e:
             print(f"Error loading topology panel UI: {e}", file=sys.stderr)
@@ -119,210 +119,75 @@ class TopologyPanelBase(ABC):
         """
         pass
     
-    def attach_to(self, container, parent_window=None):
-        """Attach panel to container.
-        
-        WAYLAND SAFE: Uses idle callback for deferred reparenting.
-        
-        Args:
-            container: Gtk.Box or other container to embed content
-            parent_window: Optional parent window reference
-        """
-        if self.window is None:
-            self.load()
-        
-        # WAYLAND FIX: Prevent redundant attach
-        if self.is_attached and self.parent_container == container:
-            print(f"[ATTACH] TopologyPanel already attached, ensuring visibility", file=sys.stderr)
-            # Check if content was removed by hide() - if so, re-add it
-            if self.content.get_parent() != container:
-                print(f"[ATTACH] TopologyPanel content was removed, re-adding to container", file=sys.stderr)
-                container.add(self.content)
-            container.set_visible(True)
-            self.content.set_visible(True)
-            self.content.show_all()  # Ensure all children are visible
-            return
-        
-        print(f"[ATTACH] TopologyPanel attach_to() called, is_attached={self.is_attached}", file=sys.stderr)
-        
-        # Store references
-        if parent_window:
-            self.parent_window = parent_window
-        self.parent_container = container
-        
-        def _do_attach():
-            """Deferred attach operation for Wayland safety."""
-            print(f"[ATTACH] TopologyPanel _do_attach() executing", file=sys.stderr)
-            try:
-                # Extract content from window
-                current_parent = self.content.get_parent()
-                if current_parent == self.window:
-                    self.window.remove(self.content)
-                elif current_parent and current_parent != container:
-                    current_parent.remove(self.content)
-                
-                # WAYLAND FIX: Hide window BEFORE reparenting
-                if self.window:
-                    self.window.hide()
-                
-                # Add to container
-                if self.content.get_parent() != container:
-                    container.add(self.content)
-                
-                # Show container and content
-                container.set_visible(True)
-                self.content.set_visible(True)
-                
-                print(f"[ATTACH] TopologyPanel attached successfully, content visible", file=sys.stderr)
-                
-                # Update float button state
-                if self.float_button and self.float_button.get_active():
-                    self._updating_button = True
-                    self.float_button.set_active(False)
-                    self._updating_button = False
-                
-                self.is_attached = True
-                
-                # Notify callback
-                if self.on_attach_callback:
-                    self.on_attach_callback()
-                    
-            except Exception as e:
-                print(f"Warning: Error during topology panel attach: {e}", file=sys.stderr)
-            
-            return False  # Don't repeat
-        
-        # WAYLAND FIX: Defer reparenting
-        GLib.idle_add(_do_attach)
+    # ===============================
+    # Panel Control Methods
+    # ===============================
     
-    def float(self, parent_window=None):
-        """Float panel as separate window.
-        
-        WAYLAND SAFE: Uses idle callback for deferred operations.
+    def set_palette_parent(self, palette_widget):
+        """Set the Master Palette widget as parent for positioning.
         
         Args:
-            parent_window: Optional parent window to set as transient
+            palette_widget: The Master Palette container widget
         """
-        if self.window is None:
-            self.load()
+        self.palette_widget = palette_widget
         
-        # Store parent reference
-        if parent_window:
-            self.parent_window = parent_window
+        # Get the toplevel window containing the palette
+        if palette_widget:
+            toplevel = palette_widget.get_toplevel()
+            if toplevel and isinstance(toplevel, Gtk.Window):
+                self.window.set_transient_for(toplevel)
+    
+    def attach(self, main_window):
+        """Simplified attach: connect panel window to main app.
         
-        def _do_float():
-            """Deferred float operation for Wayland safety."""
-            try:
-                # If attached, unattach first
-                if self.is_attached:
-                    # Remove from container
-                    if self.parent_container and self.content.get_parent() == self.parent_container:
-                        self.parent_container.remove(self.content)
-                    
-                    # Return content to window
-                    if self.content.get_parent() != self.window:
-                        self.window.add(self.content)
-                    
-                    self.is_attached = False
-                    
-                    # Hide container
-                    if self.parent_container:
-                        self.parent_container.set_visible(False)
-                
-                # WAYLAND FIX: Set transient parent
-                parent = parent_window if parent_window else self.parent_window
-                if parent:
-                    self.window.set_transient_for(parent)
-                
-                # Update float button state
-                if self.float_button and not self.float_button.get_active():
-                    self._updating_button = True
-                    self.float_button.set_active(True)
-                    self._updating_button = False
-                
-                # Notify callback
-                if self.on_float_callback:
-                    self.on_float_callback()
-                
-                # WAYLAND FIX: Ensure content visible before showing window
-                self.content.set_visible(True)
-                self.window.show_all()
-                
-            except Exception as e:
-                print(f"Warning: Error during topology panel float: {e}", file=sys.stderr)
-            
-            return False  # Don't repeat
+        Panel stays in its own window. This method connects it to the main app
+        for coordinated show/hide.
         
-        # WAYLAND FIX: Defer float operation
-        GLib.idle_add(_do_float)
+        Args:
+            main_window: The main application window
+        """
+        if not self.is_loaded:
+            raise RuntimeError("Panel must be loaded before attaching")
+        
+        # Store main window reference
+        self.main_window = main_window
+        
+        # Set main window as transient parent (keeps panel on top)
+        self.window.set_transient_for(main_window)
+        
+        print(f"[ATTACH] Topology panel attached to main window", file=sys.stderr)
     
     def hide(self):
-        """Hide panel (both attached and floating states).
-        
-        WAYLAND SAFE: Uses idle callback for deferred operations.
-        """
-        print(f"[HIDE] TopologyPanel hide() called, is_attached={self.is_attached}", file=sys.stderr)
-        
-        def _do_hide():
-            """Deferred hide operation for Wayland safety."""
-            print(f"[HIDE] TopologyPanel _do_hide() executing", file=sys.stderr)
-            try:
-                if self.is_attached:
-                    # CRITICAL: Remove content from container instead of hiding container
-                    # All panels share left_dock_area, so hiding container prevents other panels from showing
-                    if self.content and self.parent_container:
-                        current_parent = self.content.get_parent()
-                        if current_parent == self.parent_container:
-                            print(f"[HIDE] TopologyPanel removing content from container", file=sys.stderr)
-                            self.parent_container.remove(self.content)
-                        self.content.set_visible(False)
-                        # Don't hide container - other panels might use it
-                    print(f"[HIDE] TopologyPanel hidden (attached mode)", file=sys.stderr)
-                elif self.window:
-                    # Hide floating window
-                    self.window.hide()
-                    print(f"[HIDE] TopologyPanel hidden (floating mode)", file=sys.stderr)
-            except Exception as e:
-                print(f"[ERROR] Error during topology panel hide: {e}", file=sys.stderr)
-            
-            return False  # Don't repeat
-        
-        # WAYLAND FIX: Defer hide operation
-        GLib.idle_add(_do_hide)
+        """Hide panel window."""
+        print(f"[HIDE] Topology panel hiding window", file=sys.stderr)
+        if self.window:
+            self.window.hide()
     
     def show(self):
-        """Show panel in current state (attached or floating)."""
-        if self.is_attached:
-            if self.parent_container:
-                self.parent_container.set_visible(True)
-            if self.content:
-                self.content.set_visible(True)
-        elif self.window:
+        """Show panel window positioned next to palette."""
+        print(f"[SHOW] Topology panel showing window", file=sys.stderr)
+        if self.window:
+            # Position panel next to the Master Palette
+            if self.palette_widget and self.main_window:
+                # Get palette position relative to main window
+                palette_alloc = self.palette_widget.get_allocation()
+                palette_width = palette_alloc.width
+                
+                # Get main window position
+                main_x, main_y = self.main_window.get_position()
+                main_width, main_height = self.main_window.get_size()
+                
+                # Position panel to the right of palette
+                panel_width = 400  # Default panel width for topology
+                self.window.set_default_size(panel_width, main_height)
+                self.window.move(main_x + palette_width, main_y)
+            
             self.window.show_all()
-    
-    def _on_float_button_toggled(self, button):
-        """Handle float button toggle.
-        
-        Args:
-            button: The toggle button that was clicked
-        """
-        if self._updating_button:
-            return  # Ignore programmatic changes
-        
-        is_active = button.get_active()
-        
-        if is_active:
-            # Float the panel
-            self.float(self.parent_window)
-        else:
-            # Attach the panel back
-            if self.parent_container and self.parent_window:
-                self.attach_to(self.parent_container, self.parent_window)
     
     def _on_window_delete(self, window, event):
         """Handle window close button.
         
-        Instead of destroying, we hide and update button state.
+        Instead of destroying, we hide the window.
         
         Args:
             window: The window being closed
@@ -331,21 +196,9 @@ class TopologyPanelBase(ABC):
         Returns:
             True to prevent destruction
         """
-        # Hide window
+        # Hide window instead of destroying
         window.hide()
-        
-        # Update float button
-        if self.float_button and self.float_button.get_active():
-            self._updating_button = True
-            self.float_button.set_active(False)
-            self._updating_button = False
-        
-        # Notify callback
-        if self.on_float_callback:
-            self.on_float_callback()
-        
-        # Prevent destruction
-        return True
+        return True  # Prevent destruction
 
 
 __all__ = ['TopologyPanelBase']
