@@ -181,7 +181,7 @@ class MasterPalette:
         self.buttons = {}
         self._callbacks = {}
         self._css_applied = False
-        self._in_handler = False  # Single guard flag to prevent re-entrance
+        self._in_handler = {}  # Per-button guard flags to prevent re-entrance: {category: bool}
         self.panel_manager = None  # Will be set by setup_panel_manager()
         self.parent_window = None  # Parent window for panels
 
@@ -285,13 +285,16 @@ class MasterPalette:
             raise KeyError(f"Unknown category: {category}")
         self._callbacks[category] = callback
         
-        # Wrapper with re-entrance protection
+        # Initialize per-button handler lock
+        self._in_handler[category] = False
+        
+        # Wrapper with per-button re-entrance protection
         def protected_callback(active):
-            if self._in_handler:
-                # Already in a handler - don't trigger nested calls
+            if self._in_handler.get(category, False):
+                # Already in this button's handler - don't trigger nested calls
                 return
             
-            self._in_handler = True
+            self._in_handler[category] = True
             try:
                 callback(active)
             except Exception as e:
@@ -299,31 +302,38 @@ class MasterPalette:
                 import traceback
                 traceback.print_exc()
             finally:
-                self._in_handler = False
+                self._in_handler[category] = False
         
         self.buttons[category].connect_toggled(protected_callback)
 
     def set_active(self, category: str, active: bool):
         """Set button active state programmatically (e.g., for initial activation).
         
-        This method blocks the callback to prevent re-entrance when called from within
-        a toggle handler (e.g., when one button deactivates others).
+        This method allows deactivation handlers to run (for proper panel hiding),
+        but prevents re-activating the same button to avoid recursion.
         """
         if category not in self.buttons:
             return
         
-        # Block handler during programmatic set to avoid recursion
         button = self.buttons[category]
         if button.get_active() == active:
             return  # Already in desired state, nothing to do
         
-        # Use handler lock to prevent callback during programmatic change
-        was_in_handler = self._in_handler
-        self._in_handler = True
-        try:
+        # Only block if we're activating AND already in this button's handler
+        # This prevents infinite recursion while allowing deactivation handlers to run
+        should_block = active and self._in_handler.get(category, False)
+        
+        if should_block:
+            # Block handler to prevent recursion when re-activating same button
+            was_in_handler = self._in_handler[category]
+            self._in_handler[category] = True
+            try:
+                button.set_active(active)
+            finally:
+                self._in_handler[category] = was_in_handler
+        else:
+            # Allow handler to run (especially for deactivation)
             button.set_active(active)
-        finally:
-            self._in_handler = was_in_handler
 
     def set_sensitive(self, category: str, sensitive: bool):
         """Enable/disable a button (e.g., disable Topology until implemented)."""
