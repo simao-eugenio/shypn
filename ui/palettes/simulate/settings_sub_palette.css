@@ -72,18 +72,21 @@
     padding: 6px 8px;
     font-size: 13px;
     font-weight: bold;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
 .speed-preset-button:hover {
     background-color: #34495e;
     color: #ffffff;
     border-color: #3498db;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
 .speed-preset-button:checked {
-    background-color: #3498db;
+    background-color: #2980b9;
     color: #ffffff;
-    border-color: #2980b9;
+    border-color: #1c5985;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
 }
 
 /* Spin button */
@@ -116,21 +119,25 @@
     padding: 8px 12px;
     font-size: 13px;
     font-weight: bold;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
 .settings-button:hover {
     background-color: #34495e;
     color: #ffffff;
     border-color: #3498db;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
 .settings-button-primary {
-    background-color: #3498db;
+    background-color: #2980b9;
     color: #ffffff;
-    border-color: #2980b9;
+    border-color: #1c5985;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
 }
 
 .settings-button-primary:hover {
-    background-color: #52a8e0;
-    border-color: #3498db;
+    background-color: #3498db;
+    border-color: #2980b9;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
 }

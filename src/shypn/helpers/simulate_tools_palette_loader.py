@@ -512,9 +512,10 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         
         /* Duration controls */
         .sim-control-label {
-            color: white;
+            color: #ffffff;
             font-size: 11px;
             font-weight: bold;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
         }
         
         .sim-control-entry {
@@ -524,6 +525,7 @@ class SimulateToolsPaletteLoader(GObject.GObject):
             font-size: 11px;
             padding: 2px 4px;
             min-width: 60px;
+            color: #000000;
         }
         
         .sim-control-combo {
@@ -550,7 +552,7 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         
         /* Time display */
         .sim-time-display {
-            color: white;
+            color: #ffffff;
             font-size: 11px;
             font-weight: bold;
             text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);

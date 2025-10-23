@@ -4,6 +4,8 @@
     background-color: rgba(45, 55, 65, 0.95);
     border-radius: 6px;
     padding: 4px;
+    max-width: 350px;
+    min-width: 350px;
 }
 
 .bright-label {

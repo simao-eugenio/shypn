@@ -82,6 +82,8 @@ class ParameterPanelManager:
         # Stack to hold multiple parameter panels (only one visible at a time)
         self.parameter_stack = Gtk.Stack()
         self.parameter_stack.set_transition_type(Gtk.StackTransitionType.NONE)  # Instant switch
+        self.parameter_stack.set_hexpand(False)  # Don't expand horizontally
+        self.parameter_stack.set_halign(Gtk.Align.CENTER)  # Center the stack
         self.parameter_revealer.add(self.parameter_stack)
         
         # Insert parameter revealer at TOP of main_container (index 0)
