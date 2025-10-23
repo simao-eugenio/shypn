@@ -722,6 +722,7 @@ class ModelCanvasLoader:
         swissknife_palette.connect('simulation-step-executed', self._on_simulation_step, drawing_area)
         swissknife_palette.connect('simulation-reset-executed', self._on_simulation_reset, drawing_area)
         swissknife_palette.connect('simulation-settings-changed', self._on_simulation_settings_changed, drawing_area)
+        swissknife_palette.connect('float-toggled', self._on_swissknife_float_toggled, swissknife_widget)
         
         # ============================================================
         # PHASE 4: Create simulation controller for this canvas
@@ -981,6 +982,30 @@ class ModelCanvasLoader:
         # if requested_mode != current_mode:
         #     self._switch_canvas_mode(drawing_area, requested_mode)
         pass
+    
+    def _on_swissknife_float_toggled(self, palette, is_floating, widget):
+        """Handle float/attach toggle from SwissKnifePalette.
+        
+        Repositions the palette between floating (center/variable) and 
+        attached (bottom/center) states.
+        
+        Args:
+            palette: SwissKnifePalette instance
+            is_floating: True if now floating, False if attached
+            widget: The palette widget to reposition
+        """
+        if is_floating:
+            # Floating mode: stays where it was dragged (no alignment change needed)
+            # User can drag it anywhere, so we don't reset position
+            pass
+        else:
+            # Attached mode: move to bottom center
+            widget.set_halign(Gtk.Align.CENTER)
+            widget.set_valign(Gtk.Align.END)
+            widget.set_margin_bottom(20)
+            widget.set_margin_top(0)
+            widget.set_margin_start(0)
+            widget.set_margin_end(0)
 
     def _on_simulation_step(self, palette, time, drawing_area):
         """Handle simulation step - redraw canvas to show updated token state.
