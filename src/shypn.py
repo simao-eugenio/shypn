@@ -382,6 +382,8 @@ def main(argv=None):
 		# This allows keyboard shortcuts (Ctrl+S, Ctrl+Shift+S) to trigger save operations
 		if file_explorer:
 			model_canvas_loader.set_file_explorer_panel(file_explorer)
+			# Wire file explorer panel to menu actions for File menu operations
+			menu_actions.set_file_explorer_panel(file_explorer)
 
 		# Get the GtkStack that contains all panel containers
 		left_dock_stack = main_builder.get_object('left_dock_stack')
