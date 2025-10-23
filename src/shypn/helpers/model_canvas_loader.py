@@ -712,6 +712,7 @@ class ModelCanvasLoader:
         swissknife_widget.set_valign(Gtk.Align.END)
         swissknife_widget.set_margin_bottom(20)  # 20px from bottom
         swissknife_widget.set_hexpand(False)
+        swissknife_widget.set_vexpand(False)
         
         # Add to overlay
         overlay_widget.add_overlay(swissknife_widget)
@@ -996,13 +997,19 @@ class ModelCanvasLoader:
             widget: The palette widget to reposition
         """
         if is_floating:
-            # Floating mode: remove alignment constraints to allow manual positioning
-            widget.set_halign(Gtk.Align.FILL)
-            widget.set_valign(Gtk.Align.FILL)
+            # Floating mode: use START alignment to allow margin-based positioning
+            # START + margins = absolute positioning from top-left
+            widget.set_halign(Gtk.Align.START)
+            widget.set_valign(Gtk.Align.START)
+            widget.set_hexpand(False)
+            widget.set_vexpand(False)
+            # Keep current position (margins stay as they are)
         else:
             # Attached mode: move to bottom center
             widget.set_halign(Gtk.Align.CENTER)
             widget.set_valign(Gtk.Align.END)
+            widget.set_hexpand(False)
+            widget.set_vexpand(False)
             widget.set_margin_bottom(20)
             widget.set_margin_top(0)
             widget.set_margin_start(0)
