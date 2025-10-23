@@ -723,8 +723,8 @@ class ModelCanvasLoader:
         swissknife_palette.connect('simulation-step-executed', self._on_simulation_step, drawing_area)
         swissknife_palette.connect('simulation-reset-executed', self._on_simulation_reset, drawing_area)
         swissknife_palette.connect('simulation-settings-changed', self._on_simulation_settings_changed, drawing_area)
-        swissknife_palette.connect('float-toggled', self._on_swissknife_float_toggled, swissknife_widget)
-        swissknife_palette.connect('position-changed', self._on_swissknife_position_changed, swissknife_widget)
+        swissknife_palette.connect('float-toggled', self._on_swissknife_float_toggled, swissknife_widget, drawing_area)
+        swissknife_palette.connect('position-changed', self._on_swissknife_position_changed, swissknife_widget, drawing_area)
         
         # ============================================================
         # PHASE 4: Create simulation controller for this canvas
@@ -985,7 +985,7 @@ class ModelCanvasLoader:
         #     self._switch_canvas_mode(drawing_area, requested_mode)
         pass
     
-    def _on_swissknife_float_toggled(self, palette, is_floating, widget):
+    def _on_swissknife_float_toggled(self, palette, is_floating, widget, drawing_area):
         """Handle float/attach toggle from SwissKnifePalette.
         
         Repositions the palette between floating (center/variable) and 
@@ -995,6 +995,7 @@ class ModelCanvasLoader:
             palette: SwissKnifePalette instance
             is_floating: True if now floating, False if attached
             widget: The palette widget to reposition
+            drawing_area: GtkDrawingArea for viewport dimensions
         """
         if is_floating:
             # Floating mode: use START alignment to allow margin-based positioning
@@ -1010,48 +1011,63 @@ class ModelCanvasLoader:
             widget.set_valign(Gtk.Align.END)
             widget.set_hexpand(False)
             widget.set_vexpand(False)
-            widget.set_margin_bottom(20)
+            
+            # Ensure margin keeps palette visible in viewport
+            viewport_height = drawing_area.get_allocated_height()
+            palette_height = widget.get_allocated_height()
+            
+            # Calculate safe margin (keep at least 10px from bottom)
+            min_margin = 20
+            max_margin = max(min_margin, viewport_height - palette_height - 10)
+            margin = min(min_margin, max_margin)
+            
+            widget.set_margin_bottom(margin)
             widget.set_margin_top(0)
             widget.set_margin_start(0)
             widget.set_margin_end(0)
     
-    def _on_swissknife_position_changed(self, palette, dx, dy, widget):
+    def _on_swissknife_position_changed(self, palette, dx, dy, widget, drawing_area):
         """Handle position change from SwissKnifePalette drag.
         
         Updates the widget margins to move it by the delta amounts.
-        
-        TODO: Canvas transformation awareness
-        ─────────────────────────────────────
-        The overlay position must be adjusted for canvas transformations:
-        - Pan: When canvas is panned, overlay should stay in place relative to viewport
-        - Zoom: When canvas is zoomed, overlay should maintain screen position
-        - Rotation: If rotation is active, drag deltas need coordinate transformation
-        
-        Current implementation: Direct delta application (no transformation awareness)
-        Required: Query canvas_manager.zoom, pan_x, pan_y and adjust positioning
-        
-        Implementation strategy:
-        1. Get canvas_manager from palette or drawing_area
-        2. Check if transformations are active (zoom != 1.0 or pan != 0.0)
-        3. Adjust dx/dy based on current transformation state
-        4. Consider: Should floating palettes stay in world space or screen space?
-           - Screen space (current): Palette stays at fixed screen position
-           - World space: Palette would move with canvas (probably not desired)
+        Uses viewport-aware bounds to keep palette mostly visible.
         
         Args:
             palette: SwissKnifePalette instance
             dx: Horizontal delta from drag (screen space)
             dy: Vertical delta from drag (screen space)
             widget: The palette widget to reposition
+            drawing_area: GtkDrawingArea for viewport dimensions
         """
+        # Get viewport dimensions
+        viewport_width = drawing_area.get_allocated_width()
+        viewport_height = drawing_area.get_allocated_height()
+        
+        # Get palette dimensions
+        palette_width = widget.get_allocated_width()
+        palette_height = widget.get_allocated_height()
+        
         # Get current margins
         current_left = widget.get_margin_start()
         current_top = widget.get_margin_top()
         
-        # Apply delta (with reasonable bounds to keep mostly on screen)
-        # TODO: Add canvas transformation compensation here
-        new_left = max(-100, min(1000, int(current_left + dx)))
-        new_top = max(-50, min(800, int(current_top + dy)))
+        # Apply delta with viewport-aware bounds
+        # Keep at least min_visible pixels of palette on screen
+        min_visible = 50  # Minimum pixels that must stay visible
+        
+        # Calculate bounds
+        # Left bound: palette can go left until only min_visible pixels show
+        min_left = -palette_width + min_visible
+        # Right bound: palette can go right until only min_visible pixels show
+        max_left = viewport_width - min_visible
+        # Top bound: palette can go up until only min_visible pixels show
+        min_top = -palette_height + min_visible
+        # Bottom bound: palette can go down until only min_visible pixels show
+        max_top = viewport_height - min_visible
+        
+        # Apply delta and clamp to bounds
+        new_left = max(min_left, min(max_left, int(current_left + dx)))
+        new_top = max(min_top, min(max_top, int(current_top + dy)))
         
         widget.set_margin_start(new_left)
         widget.set_margin_top(new_top)
