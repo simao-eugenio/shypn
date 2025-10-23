@@ -40,8 +40,10 @@ class SwissKnifePaletteUI:
         self.main_container.get_style_context().add_class('swissknife-container')
         
         # Sub-palette area (stack of revealers) - FIRST (on top, toward canvas)
+        # PHASE 2: Force constant 50px height for all sub-palettes
         self.sub_palette_area = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         self.sub_palette_area.set_margin_bottom(25)  # Space between sub-palettes and category buttons
+        self.sub_palette_area.set_size_request(-1, 50)  # CONSTANT 50px HEIGHT
         
         self.main_container.pack_start(self.sub_palette_area, False, False, 0)
         
@@ -123,7 +125,11 @@ class SwissKnifePaletteUI:
         }
     
     def create_widget_palette_container(self, cat_id, widget_instance):
-        """Create container for widget palette (e.g., SimulateToolsPalette).
+        """Create widget palette container with revealer.
+        
+        PHASE 2: Widget palettes (like SimulateToolsPaletteLoader) now return
+        ONLY their tool controls (fitting 50px height). Settings panels are
+        extracted and will be managed by universal parameter panel (Phase 3).
         
         Args:
             cat_id: Category ID
