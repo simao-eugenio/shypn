@@ -42,7 +42,7 @@ class SwissKnifePaletteUI:
         # Sub-palette area (stack of revealers) - FIRST (on top, toward canvas)
         # PHASE 2: Force constant 50px height for all sub-palettes
         self.sub_palette_area = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
-        self.sub_palette_area.set_margin_bottom(25)  # Space between sub-palettes and category buttons
+        self.sub_palette_area.set_margin_bottom(12)  # Space between sub-palettes and category buttons (reduced by half)
         self.sub_palette_area.set_size_request(-1, 50)  # CONSTANT 50px HEIGHT
         
         self.main_container.pack_start(self.sub_palette_area, False, False, 0)

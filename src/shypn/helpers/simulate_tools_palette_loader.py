@@ -147,6 +147,14 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         """
         # For Phase 2: widget_container is just the tools container (no settings)
         # Settings panel will be extracted in Phase 3 to universal parameter panel
+        
+        # IMPORTANT: Remove simulate_tools_container from its parent revealer
+        # (from UI file) to avoid "widget already in container" warning
+        if self.simulate_tools_container:
+            parent = self.simulate_tools_container.get_parent()
+            if parent:
+                parent.remove(self.simulate_tools_container)
+        
         self.widget_container = self.simulate_tools_container
         
         # Note: settings_revealer still loaded but not included in widget_container
