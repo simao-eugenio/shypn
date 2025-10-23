@@ -9,10 +9,10 @@
 /* Bright white labels for all text - force bright white in all states */
 .layout-settings-panel label,
 .layout-settings-panel label:backdrop,
-.layout-settings-panel label:insensitive,
+.layout-settings-panel label:disabled,
 .bright-label,
 .bright-label:backdrop,
-.bright-label:insensitive {
+.bright-label:disabled {
     font-weight: 500;
     color: #ffffff !important;
     font-size: 13px;
@@ -40,8 +40,8 @@ entry#spacing_entry,
 entry#iterations_entry,
 #spacing_entry:backdrop,
 #iterations_entry:backdrop,
-#spacing_entry:insensitive,
-#iterations_entry:insensitive {
+#spacing_entry:disabled,
+#iterations_entry:disabled {
     min-width: 45px !important;
     max-width: 45px !important;
     width: 45px !important;
