@@ -1,0 +1,402 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- GTK3 File Explorer panel - VS Code Explorer style with collapsible categories -->
+<interface>
+  <requires lib="gtk+" version="3.0"/>
+
+  <object class="GtkWindow" id="left_panel_window">
+    <property name="visible">False</property>
+    <property name="title">File Explorer</property>
+    <property name="default-width">300</property>
+    <property name="default-height">600</property>
+    <property name="resizable">True</property>
+    
+    <child>
+      <object class="GtkBox" id="left_panel_content">
+        <property name="visible">True</property>
+        <property name="orientation">vertical</property>
+        <property name="spacing">0</property>
+        
+        <!-- Panel Header with Title and Float Button -->
+        <child>
+          <object class="GtkBox" id="panel_header">
+            <property name="visible">True</property>
+            <property name="orientation">horizontal</property>
+            <property name="spacing">6</property>
+            <property name="margin-start">6</property>
+            <property name="margin-end">6</property>
+            <property name="margin-top">6</property>
+            <property name="margin-bottom">6</property>
+            
+            <child>
+              <object class="GtkLabel" id="panel_title">
+                <property name="visible">True</property>
+                <property name="label">Explorer</property>
+                <property name="halign">start</property>
+                <property name="hexpand">True</property>
+                <style>
+                  <class name="heading"/>
+                </style>
+              </object>
+              <packing>
+                <property name="expand">True</property>
+                <property name="fill">True</property>
+              </packing>
+            </child>
+            
+            <child>
+              <object class="GtkToggleButton" id="float_button">
+                <property name="visible">True</property>
+                <property name="label">⇱</property>
+                <property name="tooltip-text">Float/Dock panel toggle</property>
+                <property name="halign">end</property>
+                <property name="active">False</property>
+                <style>
+                  <class name="flat"/>
+                </style>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">False</property>
+              </packing>
+            </child>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+          </packing>
+        </child>
+        
+        <child>
+          <object class="GtkSeparator">
+            <property name="visible">True</property>
+            <property name="orientation">horizontal</property>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+          </packing>
+        </child>
+        
+        <!-- Main content: Will contain CategoryFrames added programmatically -->
+        <child>
+          <object class="GtkBox" id="categories_container">
+            <property name="visible">True</property>
+            <property name="orientation">vertical</property>
+            <property name="spacing">0</property>
+            <property name="vexpand">True</property>
+            
+            <!-- Categories will be added programmatically:
+                 1. Files Category (expanded by default)
+                 2. Project Information Category (collapsed)
+                 3. Project Actions Category (collapsed)
+            -->
+            
+          </object>
+          <packing>
+            <property name="expand">True</property>
+            <property name="fill">True</property>
+          </packing>
+        </child>
+        
+      </object>
+    </child>
+  </object>
+  
+  <!-- Widgets for Files Category (to be added to category programmatically) -->
+  
+  <!-- Breadcrumb Navigation Bar -->
+  <object class="GtkBox" id="files_breadcrumb_bar">
+    <property name="visible">True</property>
+    <property name="orientation">horizontal</property>
+    <property name="spacing">3</property>
+    <property name="margin-start">6</property>
+    <property name="margin-end">6</property>
+    <property name="margin-top">3</property>
+    <property name="margin-bottom">3</property>
+    
+    <child>
+      <object class="GtkButton" id="nav_home_button">
+        <property name="visible">True</property>
+        <property name="label">Home</property>
+        <property name="tooltip-text">Go to workspace root</property>
+        <style>
+          <class name="flat"/>
+        </style>
+      </object>
+      <packing>
+        <property name="expand">False</property>
+        <property name="fill">False</property>
+      </packing>
+    </child>
+    
+    <child>
+      <object class="GtkLabel" id="breadcrumb_path_label">
+        <property name="visible">True</property>
+        <property name="label">workspace/examples</property>
+        <property name="halign">start</property>
+        <property name="ellipsize">middle</property>
+        <property name="single-line-mode">True</property>
+        <style>
+          <class name="dim-label"/>
+        </style>
+      </object>
+      <packing>
+        <property name="expand">True</property>
+        <property name="fill">True</property>
+      </packing>
+    </child>
+    
+    <child>
+      <object class="GtkButton" id="nav_refresh_button">
+        <property name="visible">True</property>
+        <property name="label">↻</property>
+        <property name="tooltip-text">Refresh file tree</property>
+        <style>
+          <class name="flat"/>
+        </style>
+      </object>
+      <packing>
+        <property name="expand">False</property>
+        <property name="fill">False</property>
+      </packing>
+    </child>
+  </object>
+  
+  <!-- File Browser TreeView -->
+  <object class="GtkScrolledWindow" id="file_browser_scroll">
+    <property name="visible">True</property>
+    <property name="hscrollbar-policy">automatic</property>
+    <property name="vscrollbar-policy">automatic</property>
+    <property name="shadow-type">in</property>
+    <property name="vexpand">True</property>
+    
+    <child>
+      <object class="GtkTreeView" id="file_browser_tree">
+        <property name="visible">True</property>
+        <property name="headers-visible">True</property>
+        <property name="enable-tree-lines">True</property>
+        <property name="show-expanders">True</property>
+        <property name="enable-grid-lines">none</property>
+        <property name="activate-on-single-click">False</property>
+      </object>
+    </child>
+  </object>
+  
+  <!-- File Tree Status Bar -->
+  <object class="GtkBox" id="files_status_bar">
+    <property name="visible">True</property>
+    <property name="orientation">horizontal</property>
+    <property name="spacing">6</property>
+    <property name="margin-start">6</property>
+    <property name="margin-end">6</property>
+    <property name="margin-top">3</property>
+    <property name="margin-bottom">3</property>
+    
+    <child>
+      <object class="GtkLabel" id="file_browser_status">
+        <property name="visible">True</property>
+        <property name="label">Ready</property>
+        <property name="halign">start</property>
+        <property name="xalign">0</property>
+        <style>
+          <class name="dim-label"/>
+        </style>
+      </object>
+      <packing>
+        <property name="expand">True</property>
+        <property name="fill">True</property>
+      </packing>
+    </child>
+  </object>
+  
+  <!-- Widgets for Project Information Category -->
+  
+  <object class="GtkBox" id="project_info_content">
+    <property name="visible">True</property>
+    <property name="orientation">vertical</property>
+    <property name="spacing">8</property>
+    <property name="margin-start">12</property>
+    <property name="margin-end">12</property>
+    <property name="margin-top">8</property>
+    <property name="margin-bottom">8</property>
+    
+    <child>
+      <object class="GtkBox">
+        <property name="visible">True</property>
+        <property name="orientation">horizontal</property>
+        <property name="spacing">6</property>
+        <child>
+          <object class="GtkLabel">
+            <property name="visible">True</property>
+            <property name="label">Name:</property>
+            <property name="halign">start</property>
+            <property name="width-chars">10</property>
+            <style>
+              <class name="dim-label"/>
+            </style>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">False</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkLabel" id="project_name_label">
+            <property name="visible">True</property>
+            <property name="label">—</property>
+            <property name="halign">start</property>
+            <property name="ellipsize">end</property>
+          </object>
+          <packing>
+            <property name="expand">True</property>
+            <property name="fill">True</property>
+          </packing>
+        </child>
+      </object>
+    </child>
+    
+    <child>
+      <object class="GtkBox">
+        <property name="visible">True</property>
+        <property name="orientation">horizontal</property>
+        <property name="spacing">6</property>
+        <child>
+          <object class="GtkLabel">
+            <property name="visible">True</property>
+            <property name="label">Path:</property>
+            <property name="halign">start</property>
+            <property name="width-chars">10</property>
+            <style>
+              <class name="dim-label"/>
+            </style>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">False</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkLabel" id="project_path_label">
+            <property name="visible">True</property>
+            <property name="label">—</property>
+            <property name="halign">start</property>
+            <property name="ellipsize">middle</property>
+          </object>
+          <packing>
+            <property name="expand">True</property>
+            <property name="fill">True</property>
+          </packing>
+        </child>
+      </object>
+    </child>
+    
+    <child>
+      <object class="GtkBox">
+        <property name="visible">True</property>
+        <property name="orientation">horizontal</property>
+        <property name="spacing">6</property>
+        <child>
+          <object class="GtkLabel">
+            <property name="visible">True</property>
+            <property name="label">Status:</property>
+            <property name="halign">start</property>
+            <property name="width-chars">10</property>
+            <style>
+              <class name="dim-label"/>
+            </style>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">False</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkLabel" id="project_status_label">
+            <property name="visible">True</property>
+            <property name="label">No project open</property>
+            <property name="halign">start</property>
+          </object>
+          <packing>
+            <property name="expand">True</property>
+            <property name="fill">True</property>
+          </packing>
+        </child>
+      </object>
+    </child>
+  </object>
+  
+  <!-- Widgets for Project Actions Category -->
+  
+  <object class="GtkBox" id="project_actions_content">
+    <property name="visible">True</property>
+    <property name="orientation">vertical</property>
+    <property name="spacing">6</property>
+    <property name="margin-start">12</property>
+    <property name="margin-end">12</property>
+    <property name="margin-top">8</property>
+    <property name="margin-bottom">8</property>
+    
+    <child>
+      <object class="GtkButton" id="new_project_button">
+        <property name="visible">True</property>
+        <property name="label">New Project</property>
+        <property name="tooltip-text">Create a new shypn project</property>
+      </object>
+      <packing>
+        <property name="expand">False</property>
+        <property name="fill">True</property>
+      </packing>
+    </child>
+    
+    <child>
+      <object class="GtkButton" id="open_project_button">
+        <property name="visible">True</property>
+        <property name="label">Open Project</property>
+        <property name="tooltip-text">Open an existing project</property>
+      </object>
+      <packing>
+        <property name="expand">False</property>
+        <property name="fill">True</property>
+      </packing>
+    </child>
+    
+    <child>
+      <object class="GtkButton" id="project_settings_button">
+        <property name="visible">True</property>
+        <property name="label">Project Settings</property>
+        <property name="tooltip-text">Edit project properties</property>
+        <property name="sensitive">False</property>
+      </object>
+      <packing>
+        <property name="expand">False</property>
+        <property name="fill">True</property>
+      </packing>
+    </child>
+    
+    <child>
+      <object class="GtkSeparator">
+        <property name="visible">True</property>
+        <property name="orientation">horizontal</property>
+        <property name="margin-top">6</property>
+        <property name="margin-bottom">6</property>
+      </object>
+      <packing>
+        <property name="expand">False</property>
+        <property name="fill">True</property>
+      </packing>
+    </child>
+    
+    <child>
+      <object class="GtkButton" id="quit_button">
+        <property name="visible">True</property>
+        <property name="label">Quit Application</property>
+        <property name="tooltip-text">Exit shypn (prompts to save unsaved changes)</property>
+      </object>
+      <packing>
+        <property name="expand">False</property>
+        <property name="fill">True</property>
+      </packing>
+    </child>
+  </object>
+  
+</interface>
