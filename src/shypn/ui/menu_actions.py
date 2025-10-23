@@ -172,41 +172,46 @@ class MenuActions:
 		"""Register all menu actions with the application."""
 		
 		# File menu actions
-		self._register_action("new", self.on_file_new)
-		self._register_action("open", self.on_file_open)
-		self._register_action("save", self.on_file_save)
-		self._register_action("save-as", self.on_file_save_as)
-		self._register_action("quit", self.on_file_quit)
+		self._register_action("new", self.on_file_new, "<Primary>n")
+		self._register_action("open", self.on_file_open, "<Primary>o")
+		self._register_action("save", self.on_file_save, "<Primary>s")
+		self._register_action("save-as", self.on_file_save_as, "<Primary><Shift>s")
+		self._register_action("quit", self.on_file_quit, "<Primary>q")
 		
 		# Edit menu actions
-		self._register_action("undo", self.on_edit_undo)
-		self._register_action("redo", self.on_edit_redo)
-		self._register_action("cut", self.on_edit_cut)
-		self._register_action("copy", self.on_edit_copy)
-		self._register_action("paste", self.on_edit_paste)
+		self._register_action("undo", self.on_edit_undo, "<Primary>z")
+		self._register_action("redo", self.on_edit_redo, "<Primary><Shift>z")
+		self._register_action("cut", self.on_edit_cut, "<Primary>x")
+		self._register_action("copy", self.on_edit_copy, "<Primary>c")
+		self._register_action("paste", self.on_edit_paste, "<Primary>v")
 		self._register_action("preferences", self.on_edit_preferences)
 		
 		# View menu actions
-		self._register_action("zoom-in", self.on_view_zoom_in)
-		self._register_action("zoom-out", self.on_view_zoom_out)
-		self._register_action("zoom-reset", self.on_view_zoom_reset)
-		self._register_action("fullscreen", self.on_view_fullscreen)
+		self._register_action("zoom-in", self.on_view_zoom_in, "<Primary>plus")
+		self._register_action("zoom-out", self.on_view_zoom_out, "<Primary>minus")
+		self._register_action("zoom-reset", self.on_view_zoom_reset, "<Primary>0")
+		self._register_action("fullscreen", self.on_view_fullscreen, "F11")
 		
 		# Help menu actions
-		self._register_action("help", self.on_help_contents)
-		self._register_action("shortcuts", self.on_help_shortcuts)
+		self._register_action("help", self.on_help_contents, "F1")
+		self._register_action("shortcuts", self.on_help_shortcuts, "<Primary>question")
 		self._register_action("about", self.on_help_about)
 	
-	def _register_action(self, name, callback):
+	def _register_action(self, name, callback, accelerator=None):
 		"""Helper to register a single action.
 		
 		Args:
 			name: Action name (e.g., "new", "open")
 			callback: Method to call when action is activated
+			accelerator: Keyboard shortcut (e.g., "<Primary>n" for Ctrl+N)
 		"""
 		action = Gio.SimpleAction.new(name, None)
 		action.connect("activate", callback)
 		self.app.add_action(action)
+		
+		# Set keyboard accelerator if provided
+		if accelerator:
+			self.app.set_accels_for_action(f"app.{name}", [accelerator])
 
 
 __all__ = ['MenuActions']
