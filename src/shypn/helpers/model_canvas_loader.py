@@ -998,12 +998,19 @@ class ModelCanvasLoader:
             drawing_area: GtkDrawingArea for canvas reference (unused now)
         """
         if is_floating:
-            # Floating mode: use START alignment to allow margin-based positioning
-            # START + margins = absolute positioning from top-left
-            widget.set_halign(Gtk.Align.START)
-            widget.set_valign(Gtk.Align.START)
+            # Floating mode: use FILL alignment to prevent automatic resizing at edges
+            # FILL with hexpand/vexpand=False keeps natural size while allowing margin positioning
+            widget.set_halign(Gtk.Align.FILL)
+            widget.set_valign(Gtk.Align.FILL)
             widget.set_hexpand(False)
             widget.set_vexpand(False)
+            
+            # Lock widget size to its natural (allocated) size to prevent edge adaptation
+            current_width = widget.get_allocated_width()
+            current_height = widget.get_allocated_height()
+            if current_width > 0 and current_height > 0:
+                widget.set_size_request(current_width, current_height)
+            
             # Keep current position (margins stay as they are)
         else:
             # Attached mode: move to bottom center
@@ -1011,6 +1018,9 @@ class ModelCanvasLoader:
             widget.set_valign(Gtk.Align.END)
             widget.set_hexpand(False)
             widget.set_vexpand(False)
+            
+            # Clear size request to allow natural sizing in attached mode
+            widget.set_size_request(-1, -1)
             
             # Get overlay widget (viewport container) - this is the actual visible area
             # Navigation: widget (palette) -> overlay (viewport container)
