@@ -47,7 +47,8 @@ try:
     from shypn.edit.tools_palette_new import ToolsPalette
     from shypn.edit.operations_palette_new import OperationsPalette
     # SwissKnifePalette - unified palette replacing ToolsPalette + OperationsPalette
-    from shypn.helpers.swissknife_palette import SwissKnifePalette
+    # PHASE 3 COMPLETE: Using new modular architecture with constant height + parameter panels
+    from shypn.helpers.swissknife_palette_new import SwissKnifePalette
     from shypn.helpers.swissknife_tool_registry import ToolRegistry
 except ImportError as e:
     print(f'ERROR: Cannot import new OOP palettes: {e}', file=sys.stderr)
