@@ -723,6 +723,7 @@ class ModelCanvasLoader:
         swissknife_palette.connect('simulation-reset-executed', self._on_simulation_reset, drawing_area)
         swissknife_palette.connect('simulation-settings-changed', self._on_simulation_settings_changed, drawing_area)
         swissknife_palette.connect('float-toggled', self._on_swissknife_float_toggled, swissknife_widget)
+        swissknife_palette.connect('position-changed', self._on_swissknife_position_changed, swissknife_widget)
         
         # ============================================================
         # PHASE 4: Create simulation controller for this canvas
@@ -995,9 +996,9 @@ class ModelCanvasLoader:
             widget: The palette widget to reposition
         """
         if is_floating:
-            # Floating mode: stays where it was dragged (no alignment change needed)
-            # User can drag it anywhere, so we don't reset position
-            pass
+            # Floating mode: remove alignment constraints to allow manual positioning
+            widget.set_halign(Gtk.Align.FILL)
+            widget.set_valign(Gtk.Align.FILL)
         else:
             # Attached mode: move to bottom center
             widget.set_halign(Gtk.Align.CENTER)
@@ -1006,6 +1007,28 @@ class ModelCanvasLoader:
             widget.set_margin_top(0)
             widget.set_margin_start(0)
             widget.set_margin_end(0)
+    
+    def _on_swissknife_position_changed(self, palette, dx, dy, widget):
+        """Handle position change from SwissKnifePalette drag.
+        
+        Updates the widget margins to move it by the delta amounts.
+        
+        Args:
+            palette: SwissKnifePalette instance
+            dx: Horizontal delta from drag
+            dy: Vertical delta from drag
+            widget: The palette widget to reposition
+        """
+        # Get current margins
+        current_left = widget.get_margin_start()
+        current_top = widget.get_margin_top()
+        
+        # Apply delta (with reasonable bounds to keep mostly on screen)
+        new_left = max(-100, min(1000, int(current_left + dx)))
+        new_top = max(-50, min(800, int(current_top + dy)))
+        
+        widget.set_margin_start(new_left)
+        widget.set_margin_top(new_top)
 
     def _on_simulation_step(self, palette, time, drawing_area):
         """Handle simulation step - redraw canvas to show updated token state.

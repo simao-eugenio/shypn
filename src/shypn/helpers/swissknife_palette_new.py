@@ -278,18 +278,20 @@ class SwissKnifePalette(GObject.GObject):
     def _update_position(self):
         """Update palette position based on drag offsets.
         
-        Uses margin properties to reposition the floating palette.
+        Emits position-changed signal with delta values for parent to handle.
+        The parent (model_canvas_loader) will update the widget margins.
         """
-        # Get current margins
-        main_widget = self.get_widget()
+        # Emit delta, not cumulative (so parent can add to current position)
+        # Get the delta since last update
+        dx = self.drag_offset_x
+        dy = self.drag_offset_y
         
-        # Calculate new margins (clamped to reasonable bounds)
-        # Note: This works because palette is in an overlay
-        # Negative margins move left/up, positive move right/down
+        # Reset offsets after emitting (we work with deltas)
+        self.drag_offset_x = 0
+        self.drag_offset_y = 0
         
-        # For now, just emit a signal that position changed
-        # The actual repositioning will be handled by the parent overlay
-        self.emit('position-changed', self.drag_offset_x, self.drag_offset_y)
+        # Emit signal for parent to handle
+        self.emit('position-changed', dx, dy)
     
     def _create_layout_settings_loader(self):
         """Create layout settings loader for parameter panel.
