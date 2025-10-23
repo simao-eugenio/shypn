@@ -52,6 +52,7 @@
             <property name="halign">center</property>
             <property name="xalign">0.5</property>
             <property name="hexpand">False</property>
+            <property name="width-request">45</property>
           </object>
           <packing>
             <property name="expand">False</property>
@@ -100,6 +101,7 @@
             <property name="halign">center</property>
             <property name="xalign">0.5</property>
             <property name="hexpand">False</property>
+            <property name="width-request">45</property>
           </object>
           <packing>
             <property name="expand">False</property>

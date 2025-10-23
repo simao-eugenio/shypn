@@ -14,6 +14,14 @@
 /* Force compact width for parameter entries */
 #spacing_entry,
 #iterations_entry {
-    min-width: 40px;
-    max-width: 40px;
+    min-width: 45px;
+    max-width: 45px;
+    font-size: 13px;
+    font-weight: bold;
+}
+
+#spacing_entry entry,
+#iterations_entry entry {
+    min-width: 45px;
+    max-width: 45px;
 }
