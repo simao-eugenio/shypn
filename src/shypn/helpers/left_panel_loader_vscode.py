@@ -234,10 +234,175 @@ class LeftPanelLoaderVSCode:
                 base_path=self.base_path,
                 root_boundary=workspace_boundary
             )
+            
+            # Enhance context menu with VS Code-style operations
+            self._enhance_context_menu()
+            
+            # Connect keyboard shortcuts for file operations
+            self._setup_keyboard_shortcuts()
+            
         except Exception as e:
             print(f"[LEFT_PANEL] Failed to initialize file explorer: {e}", file=sys.stderr)
             import traceback
             traceback.print_exc()
+    
+    def _enhance_context_menu(self):
+        """Enhance context menu with VS Code-style operations."""
+        if not self.file_explorer or not self.file_explorer.context_menu:
+            return
+        
+        # Clear existing menu items
+        for child in self.file_explorer.context_menu.get_children():
+            self.file_explorer.context_menu.remove(child)
+        
+        # Build comprehensive VS Code-style context menu
+        menu_items = [
+            ('Open', self.file_explorer._on_context_open_clicked),
+            ('---', None),
+            ('Rename', self.file_explorer._on_rename_clicked),
+            ('Delete', self.file_explorer._on_delete_clicked),
+            ('---', None),
+            ('Cut', self.file_explorer._on_cut_clicked),
+            ('Copy', self.file_explorer._on_copy_clicked),
+            ('Paste', self.file_explorer._on_paste_clicked),
+            ('---', None),
+            ('Copy Path', self._on_copy_path_clicked),
+            ('Copy Relative Path', self._on_copy_relative_path_clicked),
+            ('---', None),
+            ('Reveal in File Manager', self._on_reveal_in_file_manager),
+            ('Properties', self.file_explorer._on_properties_clicked),
+        ]
+        
+        for label, callback in menu_items:
+            if label == '---':
+                separator = Gtk.SeparatorMenuItem()
+                self.file_explorer.context_menu.append(separator)
+            else:
+                menu_item = Gtk.MenuItem(label=label)
+                if callback:
+                    menu_item.connect('activate', callback)
+                self.file_explorer.context_menu.append(menu_item)
+        
+        self.file_explorer.context_menu.show_all()
+    
+    def _on_copy_path_clicked(self, menu_item):
+        """Copy absolute path to clipboard."""
+        if not self.file_explorer or not self.file_explorer.selected_item_path:
+            return
+        
+        from gi.repository import Gdk
+        clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
+        clipboard.set_text(self.file_explorer.selected_item_path, -1)
+        print(f"[FILES] Copied path: {self.file_explorer.selected_item_path}", file=sys.stderr)
+    
+    def _on_copy_relative_path_clicked(self, menu_item):
+        """Copy workspace-relative path to clipboard."""
+        if not self.file_explorer or not self.file_explorer.selected_item_path:
+            return
+        
+        from gi.repository import Gdk
+        import os
+        abs_path = self.file_explorer.selected_item_path
+        workspace_path = os.path.join(self.repo_root, 'workspace')
+        
+        try:
+            rel_path = os.path.relpath(abs_path, workspace_path)
+            clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
+            clipboard.set_text(rel_path, -1)
+            print(f"[FILES] Copied relative path: {rel_path}", file=sys.stderr)
+        except ValueError:
+            # File is outside workspace, copy absolute path
+            clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
+            clipboard.set_text(abs_path, -1)
+    
+    def _on_reveal_in_file_manager(self, menu_item):
+        """Open file manager and select the file."""
+        if not self.file_explorer or not self.file_explorer.selected_item_path:
+            return
+        
+        import subprocess
+        import os
+        
+        path = self.file_explorer.selected_item_path
+        
+        try:
+            # Use xdg-open to open the parent directory
+            parent_dir = os.path.dirname(path) if os.path.isfile(path) else path
+            subprocess.Popen(['xdg-open', parent_dir])
+            print(f"[FILES] Revealed in file manager: {parent_dir}", file=sys.stderr)
+        except Exception as e:
+            print(f"[FILES] Failed to reveal in file manager: {e}", file=sys.stderr)
+    
+    def _setup_keyboard_shortcuts(self):
+        """Setup keyboard shortcuts for file operations (F2=Rename, Del=Delete, etc.)."""
+        if not self.file_explorer or not self.file_explorer.tree_view:
+            return
+        
+        tree_view = self.file_explorer.tree_view
+        
+        # Connect key-press-event
+        tree_view.connect('key-press-event', self._on_tree_key_press)
+    
+    def _on_tree_key_press(self, widget, event):
+        """Handle keyboard shortcuts in file tree.
+        
+        Shortcuts:
+        - F2: Rename selected file/folder (inline)
+        - Delete: Delete selected file/folder
+        - Ctrl+C: Copy
+        - Ctrl+X: Cut
+        - Ctrl+V: Paste
+        - Ctrl+N: New file (inline)
+        - Ctrl+Shift+N: New folder (inline)
+        """
+        from gi.repository import Gdk
+        
+        keyval = event.keyval
+        state = event.state
+        ctrl = state & Gdk.ModifierType.CONTROL_MASK
+        shift = state & Gdk.ModifierType.SHIFT_MASK
+        
+        # F2 - Rename
+        if keyval == Gdk.KEY_F2:
+            if self.file_explorer and self.file_explorer.selected_item_path:
+                self.file_explorer._on_rename_clicked(None)
+            return True
+        
+        # Delete - Delete file/folder
+        elif keyval == Gdk.KEY_Delete:
+            if self.file_explorer and self.file_explorer.selected_item_path:
+                self.file_explorer._on_delete_clicked(None)
+            return True
+        
+        # Ctrl+C - Copy
+        elif ctrl and keyval == Gdk.KEY_c:
+            if self.file_explorer and self.file_explorer.selected_item_path:
+                self.file_explorer._on_copy_clicked(None)
+            return True
+        
+        # Ctrl+X - Cut
+        elif ctrl and keyval == Gdk.KEY_x:
+            if self.file_explorer and self.file_explorer.selected_item_path:
+                self.file_explorer._on_cut_clicked(None)
+            return True
+        
+        # Ctrl+V - Paste
+        elif ctrl and keyval == Gdk.KEY_v:
+            if self.file_explorer:
+                self.file_explorer._on_paste_clicked(None)
+            return True
+        
+        # Ctrl+N - New file (inline)
+        elif ctrl and not shift and keyval == Gdk.KEY_n:
+            self._on_new_file_clicked()
+            return True
+        
+        # Ctrl+Shift+N - New folder (inline)
+        elif ctrl and shift and keyval == Gdk.KEY_N:
+            self._on_new_folder_clicked()
+            return True
+        
+        return False
     
     def _init_project_controller(self):
         """Initialize project actions controller."""
@@ -250,15 +415,18 @@ class LeftPanelLoaderVSCode:
     # Button handlers for Files category
     
     def _on_new_file_clicked(self):
-        """Handle New File button click."""
-        print("[FILES] New File clicked", file=sys.stderr)
-        # TODO: Implement new file creation
+        """Handle New File button click - creates file with inline editing."""
+        print("[FILES] New File clicked - starting inline edit", file=sys.stderr)
+        if self.file_explorer:
+            # Use existing inline editing infrastructure
+            self.file_explorer._start_inline_edit_new_file()
     
     def _on_new_folder_clicked(self):
-        """Handle New Folder button click."""
-        print("[FILES] New Folder clicked", file=sys.stderr)
+        """Handle New Folder button click - creates folder with inline editing."""
+        print("[FILES] New Folder clicked - starting inline edit", file=sys.stderr)
         if self.file_explorer:
-            self.file_explorer._on_file_new_folder_clicked(None)
+            # Use existing inline editing infrastructure
+            self.file_explorer._start_inline_edit_new_folder()
     
     def _on_refresh_clicked(self):
         """Handle Refresh button click."""
