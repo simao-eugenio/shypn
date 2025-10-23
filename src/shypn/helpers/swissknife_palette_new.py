@@ -6,9 +6,15 @@ Main coordinator class that integrates all modules:
 - SwissKnifePaletteAnimator: Animation state machine
 - SwissKnifePaletteController: Signal coordination
 - SubPaletteRegistry: Plugin management
+- ParameterPanelManager: Universal parameter panel lifecycle (Phase 3)
 
 This refactored version maintains 100% compatibility with the old API
 while providing clean separation of concerns.
+
+PHASE 3: Universal Parameter Panel Architecture
+================================================
+Parameter panels now slide UP above sub-palettes, maintaining constant
+114px main palette height (50px sub-palette + 64px buttons).
 """
 
 from gi.repository import Gtk, Gdk, GObject
@@ -17,6 +23,7 @@ from shypn.helpers.swissknife_palette_ui import SwissKnifePaletteUI
 from shypn.helpers.swissknife_palette_animator import SwissKnifePaletteAnimator
 from shypn.helpers.swissknife_palette_controller import SwissKnifePaletteController
 from shypn.helpers.swissknife_palette_registry import SubPaletteRegistry
+from shypn.helpers.parameter_panel_manager import ParameterPanelManager
 
 
 class SwissKnifePalette(GObject.GObject):
@@ -79,6 +86,15 @@ class SwissKnifePalette(GObject.GObject):
         # Create animator with sub-palettes
         self.animator = SwissKnifePaletteAnimator(self.registry.get_all_sub_palettes())
         
+        # PHASE 3: Create parameter panel manager
+        self.parameter_manager = ParameterPanelManager(
+            self.ui.main_container,
+            self.ui.sub_palette_area
+        )
+        
+        # Register parameter panels from widget palettes
+        self._register_parameter_panels()
+        
         # Create controller with UI and animator
         self.controller = SwissKnifePaletteController(self.ui, self.animator, mode)
         
@@ -102,6 +118,23 @@ class SwissKnifePalette(GObject.GObject):
         """
         from shypn.ui.swissknife_tool_registry import ToolRegistry
         return ToolRegistry()
+    
+    def _register_parameter_panels(self):
+        """Register parameter panels from widget palettes.
+        
+        PHASE 3: Extract parameter panel factories from widget palettes
+        and register them with the parameter panel manager.
+        """
+        # Register simulate category parameter panel (settings)
+        simulate_loader = self.registry.get_widget_palette_instance('simulate')
+        if simulate_loader and hasattr(simulate_loader, 'create_settings_panel'):
+            self.parameter_manager.register_parameter_panel(
+                'simulate',
+                simulate_loader.create_settings_panel
+            )
+        
+        # Future: Register other parameter panels here
+        # self.parameter_manager.register_parameter_panel('layout', layout_loader.create_params_panel)
     
     def _connect_controller_signals(self):
         """Connect controller signals to forward them."""
@@ -148,6 +181,16 @@ class SwissKnifePalette(GObject.GObject):
             sim_palette: Simulation palette instance
         """
         self.emit('simulation-settings-changed')
+    
+    def _on_settings_toggle_requested(self, sim_palette):
+        """Handle settings toggle request from simulation palette.
+        
+        PHASE 3: Toggle parameter panel via ParameterPanelManager.
+        
+        Args:
+            sim_palette: Simulation palette instance
+        """
+        self.parameter_manager.toggle_panel('simulate')
     
     def _apply_css(self):
         """Apply CSS styles to palette."""

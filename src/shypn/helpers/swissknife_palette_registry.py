@@ -123,3 +123,5 @@ class SubPaletteRegistry:
             sim_palette.connect('step-executed', signal_handler._on_simulation_step)
             sim_palette.connect('reset-executed', signal_handler._on_simulation_reset)
             sim_palette.connect('settings-changed', signal_handler._on_simulation_settings_changed)
+            # PHASE 3: Connect settings toggle signal for parameter panel
+            sim_palette.connect('settings-toggle-requested', signal_handler._on_settings_toggle_requested)
