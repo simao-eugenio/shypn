@@ -998,16 +998,15 @@ class ModelCanvasLoader:
             drawing_area: GtkDrawingArea for canvas reference (unused now)
         """
         if is_floating:
-            # Floating mode: use FILL alignment to prevent automatic resizing at edges
-            # FILL with hexpand/vexpand=False keeps natural size while allowing margin positioning
-            widget.set_halign(Gtk.Align.FILL)
-            widget.set_valign(Gtk.Align.FILL)
+            # Floating mode: use START alignment for absolute positioning via margins
+            # Combined with hexpand/vexpand=False to maintain natural size
+            widget.set_halign(Gtk.Align.START)
+            widget.set_valign(Gtk.Align.START)
             widget.set_hexpand(False)
             widget.set_vexpand(False)
             
-            # DON'T set size_request - it locks the size and prevents natural expansion/collapse
-            # The FILL alignment with hexpand/vexpand=False is sufficient to prevent edge adaptation
-            # while still allowing sub-palettes and parameter panels to expand/collapse naturally
+            # DON'T set size_request - let widget maintain its natural size
+            # This allows sub-palettes and parameter panels to expand/collapse naturally
             
             # Keep current position (margins stay as they are)
         else:
