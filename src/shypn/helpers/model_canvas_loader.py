@@ -995,7 +995,7 @@ class ModelCanvasLoader:
             palette: SwissKnifePalette instance
             is_floating: True if now floating, False if attached
             widget: The palette widget to reposition
-            drawing_area: GtkDrawingArea for viewport dimensions
+            drawing_area: GtkDrawingArea for canvas reference (unused now)
         """
         if is_floating:
             # Floating mode: use START alignment to allow margin-based positioning
@@ -1012,16 +1012,24 @@ class ModelCanvasLoader:
             widget.set_hexpand(False)
             widget.set_vexpand(False)
             
-            # Ensure margin keeps palette visible in viewport
-            viewport_height = drawing_area.get_allocated_height()
-            palette_height = widget.get_allocated_height()
+            # Get overlay widget (viewport container) - this is the actual visible area
+            # Navigation: widget (palette) -> overlay (viewport container)
+            overlay_widget = widget.get_parent()
+            if overlay_widget:
+                # Ensure margin keeps palette visible in viewport
+                viewport_height = overlay_widget.get_allocated_height()
+                palette_height = widget.get_allocated_height()
+                
+                # Calculate safe margin (keep at least 10px from bottom)
+                min_margin = 20
+                max_margin = max(min_margin, viewport_height - palette_height - 10)
+                margin = min(min_margin, max_margin)
+                
+                widget.set_margin_bottom(margin)
+            else:
+                # Fallback if parent not available
+                widget.set_margin_bottom(20)
             
-            # Calculate safe margin (keep at least 10px from bottom)
-            min_margin = 20
-            max_margin = max(min_margin, viewport_height - palette_height - 10)
-            margin = min(min_margin, max_margin)
-            
-            widget.set_margin_bottom(margin)
             widget.set_margin_top(0)
             widget.set_margin_start(0)
             widget.set_margin_end(0)
@@ -1037,11 +1045,17 @@ class ModelCanvasLoader:
             dx: Horizontal delta from drag (screen space)
             dy: Vertical delta from drag (screen space)
             widget: The palette widget to reposition
-            drawing_area: GtkDrawingArea for viewport dimensions
+            drawing_area: GtkDrawingArea for canvas reference (unused now)
         """
-        # Get viewport dimensions
-        viewport_width = drawing_area.get_allocated_width()
-        viewport_height = drawing_area.get_allocated_height()
+        # Get overlay widget (viewport container) - this is the actual visible area
+        # Navigation: widget (palette) -> overlay (viewport container)
+        overlay_widget = widget.get_parent()
+        if not overlay_widget:
+            return
+        
+        # Get viewport dimensions from overlay (actual window size)
+        viewport_width = overlay_widget.get_allocated_width()
+        viewport_height = overlay_widget.get_allocated_height()
         
         # Get palette dimensions
         palette_width = widget.get_allocated_width()
