@@ -83,6 +83,19 @@ class TopologyPanelBase(ABC):
             # Connect window delete event
             self.window.connect('delete-event', self._on_window_delete)
             
+            # WAYLAND FIX: Realize window and set event mask for multi-monitor support
+            self.window.realize()
+            if self.window.get_window():
+                try:
+                    from gi.repository import Gdk
+                    self.window.get_window().set_events(
+                        self.window.get_window().get_events() | 
+                        Gdk.EventMask.STRUCTURE_MASK |
+                        Gdk.EventMask.PROPERTY_CHANGE_MASK
+                    )
+                except Exception as e:
+                    print(f"[TOPOLOGY_PANEL] Could not set window event mask: {e}", file=sys.stderr)
+            
             # Initialize subclass-specific widgets
             self._init_widgets()
             
@@ -90,9 +103,7 @@ class TopologyPanelBase(ABC):
             self._connect_signals()
             
             # Hide window by default (will be shown when toggled)
-            self.window.set_visible(False)
-            
-            # Mark as loaded
+            self.window.set_visible(False)            # Mark as loaded
             self.is_loaded = True
             
         except Exception as e:
