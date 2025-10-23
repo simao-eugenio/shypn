@@ -50,8 +50,8 @@ class LayoutSettingsLoader(GObject.GObject):
         
         # UI widgets
         self.settings_revealer = None
-        self.spacing_spin = None
-        self.iterations_spin = None
+        self.spacing_entry = None
+        self.iterations_entry = None
         
         self._load_ui()
     
@@ -67,18 +67,20 @@ class LayoutSettingsLoader(GObject.GObject):
             
             # Get widgets
             self.settings_revealer = builder.get_object('layout_settings_revealer')
-            self.spacing_spin = builder.get_object('spacing_spin')
-            self.iterations_spin = builder.get_object('iterations_spin')
+            self.spacing_entry = builder.get_object('spacing_entry')
+            self.iterations_entry = builder.get_object('iterations_entry')
             
             if not self.settings_revealer:
                 print('Warning: layout_settings_revealer not found in UI file')
                 return
             
             # Connect signals - auto-emit on value change (no apply button needed)
-            if self.spacing_spin:
-                self.spacing_spin.connect('value-changed', self._on_spacing_changed)
-            if self.iterations_spin:
-                self.iterations_spin.connect('value-changed', self._on_iterations_changed)
+            if self.spacing_entry:
+                self.spacing_entry.connect('changed', self._on_spacing_changed)
+                self.spacing_entry.connect('activate', self._on_spacing_changed)
+            if self.iterations_entry:
+                self.iterations_entry.connect('changed', self._on_iterations_changed)
+                self.iterations_entry.connect('activate', self._on_iterations_changed)
             
             # Load CSS
             self._load_css()
@@ -111,15 +113,29 @@ class LayoutSettingsLoader(GObject.GObject):
         except Exception as e:
             print(f'Warning: Failed to load layout settings CSS: {e}')
     
-    def _on_spacing_changed(self, spin_button):
-        """Handle spacing value change - auto-emit signal."""
-        self.spacing = int(spin_button.get_value())
-        self.emit('settings-changed')
+    def _on_spacing_changed(self, entry):
+        """Handle spacing entry change - auto-emit signal."""
+        try:
+            value = int(entry.get_text())
+            # Clamp to valid range
+            value = max(20, min(500, value))
+            self.spacing = value
+            self.emit('settings-changed')
+        except ValueError:
+            # Invalid input - ignore
+            pass
     
-    def _on_iterations_changed(self, spin_button):
-        """Handle iterations value change - auto-emit signal."""
-        self.iterations = int(spin_button.get_value())
-        self.emit('settings-changed')
+    def _on_iterations_changed(self, entry):
+        """Handle iterations entry change - auto-emit signal."""
+        try:
+            value = int(entry.get_text())
+            # Clamp to valid range
+            value = max(10, min(200, value))
+            self.iterations = value
+            self.emit('settings-changed')
+        except ValueError:
+            # Invalid input - ignore
+            pass
     
     def get_settings(self):
         """Get current layout settings.
