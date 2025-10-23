@@ -4,6 +4,20 @@ Simulate Tools Palette Loader
 Loads and manages the simulation tools palette UI (Run, Step, Stop, Reset, Settings buttons).
 This palette appears below the main [S] simulate button when toggled.
 
+PHASE 2 REFACTOR: Constant Height Architecture
+===============================================
+The loader now returns ONLY the tool buttons container (50px max height) via get_widget().
+The settings panel is separated and available via create_settings_panel() factory method.
+
+ARCHITECTURE:
+- get_widget() → Returns simulate_tools_container ONLY (buttons: R, P, S, T, ⚙)
+- create_settings_panel() → Returns settings_revealer (for Phase 3 parameter panel)
+
+This separation allows:
+1. Main palette maintains constant 50px height (no more jumps!)
+2. Settings panel can be managed by universal parameter panel manager (Phase 3)
+3. Consistent height across all sub-palettes (Edit, Simulate, Layout)
+
 The palette directly manages the SimulationController - buttons call controller
 methods directly rather than emitting signals for external handling.
 """
@@ -120,31 +134,21 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         self._create_widget_container()
     
     def _create_widget_container(self):
-        """Create a container that holds both the simulate tools and settings panels.
+        """Create a container for the simulate tools palette.
         
-        This container will be returned by get_widget() and added to the SwissKnife
-        sub_palette_area. The settings panel will slide up above the tools palette.
+        PHASE 2 REFACTOR: This now returns ONLY the tool buttons container,
+        not the settings panel. Settings panel will be managed separately
+        by the universal parameter panel manager (Phase 3).
+        
+        The widget_container will be returned by get_widget() and must fit
+        within the 50px constant height constraint.
         """
-        # Create a vertical box to hold both palettes
-        self.widget_container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        # For Phase 2: widget_container is just the tools container (no settings)
+        # Settings panel will be extracted in Phase 3 to universal parameter panel
+        self.widget_container = self.simulate_tools_container
         
-        # Add settings revealer first (on top)
-        if hasattr(self, 'settings_revealer') and self.settings_revealer:
-            self.widget_container.pack_end(self.settings_revealer, False, False, 0)
-        
-        # Remove simulate tools container from its parent revealer (from UI file)
-        # and add it to our widget_container
-        if self.simulate_tools_container:
-            parent = self.simulate_tools_container.get_parent()
-            if parent:
-                parent.remove(self.simulate_tools_container)
-            self.widget_container.pack_end(self.simulate_tools_container, False, False, 0)
-        
-        self.widget_container.show_all()
-        
-        # Hide settings revealer initially
-        if hasattr(self, 'settings_revealer') and self.settings_revealer:
-            self.settings_revealer.set_visible(False)
+        # Note: settings_revealer still loaded but not included in widget_container
+        # It will be accessed via create_settings_panel() factory method (Phase 3)
 
     def _load_settings_panel(self):
         """Load the inline settings panel UI from separate file.
@@ -911,13 +915,24 @@ class SimulateToolsPaletteLoader(GObject.GObject):
     def get_widget(self):
         """Get the root widget for adding to container.
         
-        Returns a container with both the simulate tools palette and the settings panel.
-        The settings panel will slide up above the tools palette when opened.
+        PHASE 2 REFACTOR: Returns ONLY the tools palette (50px max height).
+        Settings panel is available via create_settings_panel() factory method.
         
         Returns:
-            Gtk.Widget: Container with tools palette and settings panel.
+            Gtk.Widget: Tools palette container (buttons only, fits 50px height).
         """
         return self.widget_container
+    
+    def create_settings_panel(self):
+        """Factory method to create settings panel widget.
+        
+        PHASE 3: This will be called by the universal parameter panel manager
+        to get the settings panel widget for display above the sub-palette.
+        
+        Returns:
+            Gtk.Revealer: Settings panel revealer, or None if not available.
+        """
+        return getattr(self, 'settings_revealer', None)
 
     def is_simulation_running(self):
         """Check if simulation is currently running.
