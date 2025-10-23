@@ -27,19 +27,21 @@ class SwissKnifePaletteController(GObject.GObject):
         'mode-change-requested': (GObject.SignalFlags.RUN_FIRST, None, (str,)),
     }
     
-    def __init__(self, ui, animator, mode):
+    def __init__(self, ui, animator, mode='edit', parameter_manager=None):
         """Initialize controller.
         
         Args:
             ui: SwissKnifePaletteUI instance
             animator: SwissKnifePaletteAnimator instance
             mode: Current mode ('edit' or 'simulate')
+            parameter_manager: ParameterPanelManager instance (optional)
         """
         super().__init__()
         
         self.ui = ui
         self.animator = animator
         self.mode = mode
+        self.parameter_manager = parameter_manager
         
         # Connect animator callbacks
         self.animator.on_show_complete = self._on_animation_show_complete
@@ -73,10 +75,14 @@ class SwissKnifePaletteController(GObject.GObject):
         active_category = self.animator.get_active_category()
         
         if active_category == cat_id:
-            # Toggle off
+            # Toggle off - hide parameter panel if open
+            if self.parameter_manager and self.parameter_manager.is_panel_visible(cat_id):
+                self.parameter_manager.hide_panel(cat_id)
             self._hide_category(cat_id)
         elif active_category:
-            # Switch to different category
+            # Switch to different category - hide any open parameter panel
+            if self.parameter_manager and self.parameter_manager.is_panel_visible():
+                self.parameter_manager.hide_all_panels()
             self._switch_category(active_category, cat_id)
         else:
             # Show new category

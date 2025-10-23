@@ -98,8 +98,13 @@ class SwissKnifePalette(GObject.GObject):
         # Register parameter panels from widget palettes
         self._register_parameter_panels()
         
-        # Create controller with UI and animator
-        self.controller = SwissKnifePaletteController(self.ui, self.animator, mode)
+        # Create controller with UI, animator, and parameter manager
+        self.controller = SwissKnifePaletteController(
+            self.ui, 
+            self.animator, 
+            mode,
+            self.parameter_manager  # Pass parameter manager for auto-hide
+        )
         
         # Connect controller signals to forward them
         self._connect_controller_signals()
