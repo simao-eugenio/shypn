@@ -78,10 +78,13 @@ class SwissKnifePalette(GObject.GObject):
         
         # Drag state for floating palette
         self.drag_active = False
+        self.drag_pending = False  # Button pressed but not yet dragging
         self.drag_start_x = 0
         self.drag_start_y = 0
         self.drag_offset_x = 0
         self.drag_offset_y = 0
+        self.drag_threshold = 5  # Minimum pixels to move before drag starts
+        self.ignore_next_release = False  # Flag to ignore release after double-click
         
         # Create modular components
         self.ui = SwissKnifePaletteUI(self.categories, self.tools)
@@ -179,42 +182,70 @@ class SwissKnifePalette(GObject.GObject):
         self.draggable_container = self.drag_event_box
     
     def _on_button_press(self, widget, event):
-        """Handle button press event - start drag or detect double-click.
+        """Handle button press event - prepare for drag or detect double-click.
+        
+        IMPROVED: Uses press-and-hold + movement for drag initiation.
+        Drag only starts when mouse moves beyond threshold while button is held.
+        This prevents conflict with double-click and accidental drags.
         
         Args:
             widget: EventBox widget
-            event: Button press event (event.type: BUTTON_PRESS or 2BUTTON_PRESS)
+            event: Button press event (event.type: BUTTON_PRESS or DOUBLE_BUTTON_PRESS)
         """
         if event.button == 1:  # Left click
-            # Check for double-click
+            # Check for double-click FIRST (before processing as single click)
             if event.type == Gdk.EventType.DOUBLE_BUTTON_PRESS:
                 # Double-click: toggle float/attach
+                # Cancel any pending drag from the first click
+                self.drag_pending = False
+                self.drag_active = False
+                
+                # Toggle floating state
                 self.is_floating = not self.is_floating
                 self.emit('float-toggled', self.is_floating)
-                return True
-            
-            # Single click: prepare for potential drag (only when floating)
-            elif event.type == Gdk.EventType.BUTTON_PRESS and self.is_floating:
-                self.drag_active = True
-                self.drag_start_x = event.x_root
-                self.drag_start_y = event.y_root
                 
-                # Change cursor to grabbing
-                widget.get_window().set_cursor(Gdk.Cursor.new_from_name(widget.get_display(), 'grabbing'))
+                # Set flag to ignore the upcoming BUTTON_RELEASE
+                # (GTK sends BUTTON_RELEASE after DOUBLE_BUTTON_PRESS)
+                self.ignore_next_release = True
+                
+                return True  # Event handled, stop propagation
+            
+            # Single button press: prepare for potential drag (only when floating)
+            elif event.type == Gdk.EventType.BUTTON_PRESS:
+                # Only set pending if we're floating AND not ignoring events
+                if self.is_floating and not self.ignore_next_release:
+                    # Set pending state - drag will start only if mouse moves
+                    self.drag_pending = True
+                    self.drag_active = False
+                    self.drag_start_x = event.x_root
+                    self.drag_start_y = event.y_root
+                
+                # Reset ignore flag for single clicks
+                self.ignore_next_release = False
+                
                 return False  # Allow event to propagate to children (buttons still work)
         
         return False
     
     def _on_button_release(self, widget, event):
-        """Handle button release event - end drag.
+        """Handle button release event - end drag or cancel pending drag.
         
         Args:
             widget: EventBox widget
             event: Button release event
         """
         if event.button == 1:
+            # Check if we should ignore this release (after double-click)
+            if self.ignore_next_release:
+                self.ignore_next_release = False
+                self.drag_pending = False
+                self.drag_active = False
+                return True  # Consume the event
+            
+            # If we were dragging, end it
             if self.drag_active:
                 self.drag_active = False
+                self.drag_pending = False
                 
                 # Restore cursor
                 if self.is_floating:
@@ -222,11 +253,25 @@ class SwissKnifePalette(GObject.GObject):
                 else:
                     widget.get_window().set_cursor(None)
                 return True
+            
+            # If drag was pending but never activated (quick click), just cancel
+            elif self.drag_pending:
+                self.drag_pending = False
+                return False  # Let click propagate to children
         
         return False
     
     def _on_drag_motion(self, widget, event):
         """Handle drag motion event.
+        
+        IMPROVED: Drag activates only after mouse moves beyond threshold.
+        This prevents accidental drags from quick clicks and makes the
+        distinction between click and drag-intent clear.
+        
+        Behavior:
+        - Button pressed but not moved → drag_pending (no visual change)
+        - Button pressed + moved > threshold → drag_active (cursor changes, palette moves)
+        - This makes drag distinct from double-click
         
         TODO: Canvas transformation awareness
         ─────────────────────────────────────
@@ -246,23 +291,40 @@ class SwissKnifePalette(GObject.GObject):
             widget: EventBox widget
             event: Motion event with screen coordinates
         """
-        if self.drag_active:
-            # Calculate delta in screen space
-            # TODO: If rotation is active, these deltas should be rotated
-            dx = event.x_root - self.drag_start_x
-            dy = event.y_root - self.drag_start_y
+        # Check if button is pressed (pending or active drag)
+        if self.drag_pending or self.drag_active:
+            # Calculate delta from initial press
+            dx_from_start = event.x_root - self.drag_start_x
+            dy_from_start = event.y_root - self.drag_start_y
+            distance = (dx_from_start**2 + dy_from_start**2)**0.5
             
-            # Update offsets
-            self.drag_offset_x += dx
-            self.drag_offset_y += dy
+            # If pending and movement exceeds threshold, activate drag
+            if self.drag_pending and distance > self.drag_threshold:
+                self.drag_active = True
+                self.drag_pending = False
+                
+                # NOW change cursor to grabbing (user is clearly dragging)
+                widget.get_window().set_cursor(Gdk.Cursor.new_from_name(widget.get_display(), 'grabbing'))
             
-            # Update start position for next delta
-            self.drag_start_x = event.x_root
-            self.drag_start_y = event.y_root
-            
-            # Update widget position
-            self._update_position()
-            return True
+            # If drag is active, update position
+            if self.drag_active:
+                # Calculate delta from last position
+                # (drag_start gets updated after each move for smooth incremental updates)
+                dx = event.x_root - self.drag_start_x
+                dy = event.y_root - self.drag_start_y
+                
+                # Update offsets
+                self.drag_offset_x += dx
+                self.drag_offset_y += dy
+                
+                # Update start position for next delta
+                self.drag_start_x = event.x_root
+                self.drag_start_y = event.y_root
+                
+                # Update widget position
+                self._update_position()
+                return True
+        
         return False
     
     def _update_position(self):
