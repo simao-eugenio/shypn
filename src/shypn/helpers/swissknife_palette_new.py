@@ -53,8 +53,9 @@ class SwissKnifePalette(GObject.GObject):
         'simulation-step-executed': (GObject.SignalFlags.RUN_FIRST, None, (float,)),
         'simulation-reset-executed': (GObject.SignalFlags.RUN_FIRST, None, ()),
         'simulation-settings-changed': (GObject.SignalFlags.RUN_FIRST, None, ()),
-        # Drag and drop signal
+        # Drag and drop signals
         'position-changed': (GObject.SignalFlags.RUN_FIRST, None, (float, float)),
+        'float-toggled': (GObject.SignalFlags.RUN_FIRST, None, (bool,)),
     }
     
     def __init__(self, mode='edit', model=None, tool_registry=None):
@@ -140,20 +141,51 @@ class SwissKnifePalette(GObject.GObject):
         return ToolRegistry()
     
     def _wrap_in_draggable_container(self):
-        """Wrap main container in draggable EventBox with drag handle.
+        """Wrap main container in draggable EventBox with drag handle and controls.
         
-        Creates a visual drag handle at the top of the palette and connects
-        mouse events for drag-and-drop functionality.
+        Creates a control bar at the top with:
+        - Visual drag handle (grip dots)
+        - Float/Attach toggle button
         """
-        # Create drag handle (small grip area)
-        drag_handle = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
-        drag_handle.set_size_request(-1, 8)
-        drag_handle.get_style_context().add_class('palette-drag-handle')
+        # Create control bar container
+        control_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        control_bar.set_size_request(-1, 20)
+        control_bar.get_style_context().add_class('palette-control-bar')
         
-        # Create EventBox for mouse events
+        # Create drag grip area (expandable to take most space)
+        drag_grip = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        drag_grip.set_hexpand(True)
+        drag_grip.get_style_context().add_class('palette-drag-grip')
+        
+        # Add grip dots label (⋮⋮ or ≡)
+        grip_label = Gtk.Label()
+        grip_label.set_markup('<span foreground="#888888">≡≡≡</span>')
+        grip_label.set_halign(Gtk.Align.CENTER)
+        grip_label.set_valign(Gtk.Align.CENTER)
+        drag_grip.pack_start(grip_label, True, True, 0)
+        
+        # Create float/attach toggle button
+        self.float_toggle_button = Gtk.Button()
+        self.float_toggle_button.set_relief(Gtk.ReliefStyle.NONE)
+        self.float_toggle_button.set_size_request(24, 20)
+        self.float_toggle_button.set_tooltip_text('Float/Attach Palette')
+        self.is_floating = True  # Default to floating (already in overlay)
+        
+        # Icon for float/attach (📌 pin or ✕ close)
+        self.float_icon = Gtk.Label()
+        self._update_float_icon()
+        self.float_toggle_button.add(self.float_icon)
+        self.float_toggle_button.get_style_context().add_class('float-toggle-button')
+        self.float_toggle_button.connect('clicked', self._on_float_toggle_clicked)
+        
+        # Pack control bar
+        control_bar.pack_start(drag_grip, True, True, 0)
+        control_bar.pack_end(self.float_toggle_button, False, False, 2)
+        
+        # Create EventBox for drag events (only on grip area)
         self.drag_event_box = Gtk.EventBox()
         self.drag_event_box.set_above_child(False)
-        self.drag_event_box.add(drag_handle)
+        self.drag_event_box.add(control_bar)
         
         # Enable events
         self.drag_event_box.add_events(
@@ -169,7 +201,7 @@ class SwissKnifePalette(GObject.GObject):
         
         # Change cursor on hover
         self.drag_event_box.connect('enter-notify-event', 
-            lambda w, e: w.get_window().set_cursor(Gdk.Cursor.new_from_name(w.get_display(), 'grab')))
+            lambda w, e: w.get_window().set_cursor(Gdk.Cursor.new_from_name(w.get_display(), 'grab')) if self.is_floating else None)
         self.drag_event_box.connect('leave-notify-event', 
             lambda w, e: w.get_window().set_cursor(None) if not self.drag_active else None)
         
@@ -178,6 +210,27 @@ class SwissKnifePalette(GObject.GObject):
         self.draggable_container.pack_start(self.drag_event_box, False, False, 0)
         self.draggable_container.pack_start(self.ui.main_container, True, True, 0)
     
+    def _update_float_icon(self):
+        """Update float/attach button icon based on current state."""
+        if self.is_floating:
+            # Show pin icon when floating (click to attach)
+            self.float_icon.set_markup('<span foreground="#ffffff" size="small">📌</span>')
+        else:
+            # Show unpin icon when attached (click to float)
+            self.float_icon.set_markup('<span foreground="#ffffff" size="small">📍</span>')
+    
+    def _on_float_toggle_clicked(self, button):
+        """Handle float/attach toggle button click.
+        
+        Args:
+            button: Toggle button widget
+        """
+        self.is_floating = not self.is_floating
+        self._update_float_icon()
+        
+        # Emit signal for parent to handle repositioning
+        self.emit('float-toggled', self.is_floating)
+    
     def _on_drag_start(self, widget, event):
         """Handle drag start event.
         
@@ -185,7 +238,7 @@ class SwissKnifePalette(GObject.GObject):
             widget: EventBox widget
             event: Button press event
         """
-        if event.button == 1:  # Left click only
+        if event.button == 1 and self.is_floating:  # Left click only, and only when floating
             self.drag_active = True
             self.drag_start_x = event.x_root
             self.drag_start_y = event.y_root
@@ -387,20 +440,40 @@ class SwissKnifePalette(GObject.GObject):
             padding: 4px;
         }
         
-        /* Drag handle styling */
-        .palette-drag-handle {
+        /* Control bar styling */
+        .palette-control-bar {
             background: linear-gradient(to bottom, 
-                rgba(100, 110, 120, 0.6),
-                rgba(70, 80, 90, 0.4));
+                rgba(90, 100, 110, 0.9),
+                rgba(70, 80, 90, 0.9));
             border-top-left-radius: 8px;
             border-top-right-radius: 8px;
-            min-height: 8px;
+            min-height: 20px;
+            border-bottom: 1px solid rgba(50, 60, 70, 0.5);
         }
         
-        .palette-drag-handle:hover {
-            background: linear-gradient(to bottom, 
-                rgba(120, 130, 140, 0.7),
-                rgba(90, 100, 110, 0.5));
+        .palette-drag-grip {
+            padding: 2px 8px;
+        }
+        
+        .palette-drag-grip:hover {
+            background: rgba(100, 110, 120, 0.3);
+        }
+        
+        .float-toggle-button {
+            background: transparent;
+            border: none;
+            padding: 0px 4px;
+            min-width: 24px;
+            min-height: 20px;
+        }
+        
+        .float-toggle-button:hover {
+            background: rgba(120, 130, 140, 0.5);
+            border-radius: 3px;
+        }
+        
+        .float-toggle-button:active {
+            background: rgba(140, 150, 160, 0.6);
         }
         """
         
