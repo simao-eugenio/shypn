@@ -958,6 +958,10 @@ class ModelCanvasLoader:
         
         elif tool_id == 'layout_force':
             self._on_layout_force_clicked(None, drawing_area, canvas_manager)
+        
+        elif tool_id == 'layout_settings':
+            # Toggle layout parameter panel
+            palette.parameter_manager.toggle_panel('layout')
     
     def _on_swissknife_mode_change_requested(self, palette, requested_mode, canvas_manager, drawing_area):
         """Handle mode change request from SwissKnifePalette.
