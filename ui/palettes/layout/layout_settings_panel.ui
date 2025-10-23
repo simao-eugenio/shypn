@@ -44,6 +44,7 @@
             <property name="tooltip-text">Node spacing (px)</property>
             <property name="halign">center</property>
             <property name="xalign">0.5</property>
+            <property name="hexpand">False</property>
           </object>
         </child>
 
@@ -77,6 +78,7 @@
             <property name="tooltip-text">Force-directed iterations</property>
             <property name="halign">center</property>
             <property name="xalign">0.5</property>
+            <property name="hexpand">False</property>
           </object>
         </child>
 
