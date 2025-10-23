@@ -76,12 +76,12 @@ class SwissKnifePaletteController(GObject.GObject):
         
         if active_category == cat_id:
             # Toggle off - hide parameter panel if open
-            if self.parameter_manager and self.parameter_manager.is_panel_visible(cat_id):
-                self.parameter_manager.hide_panel(cat_id)
+            if self.parameter_manager:
+                self.parameter_manager.hide_all_panels()
             self._hide_category(cat_id)
         elif active_category:
-            # Switch to different category - hide any open parameter panel
-            if self.parameter_manager and self.parameter_manager.is_panel_visible():
+            # Switch to different category - FORCE hide any open parameter panel
+            if self.parameter_manager:
                 self.parameter_manager.hide_all_panels()
             self._switch_category(active_category, cat_id)
         else:

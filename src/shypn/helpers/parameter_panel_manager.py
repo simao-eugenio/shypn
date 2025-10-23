@@ -182,14 +182,13 @@ class ParameterPanelManager:
         # Hide with animation
         self.parameter_revealer.set_reveal_child(False)
         
-        # Clear current panel after animation
-        def on_hide_complete():
-            self.current_panel_id = None
-            if callback:
-                callback(panel_id)
-            return False
+        # Clear current panel IMMEDIATELY (don't wait for animation)
+        # This ensures is_panel_visible() returns False right away
+        self.current_panel_id = None
         
-        GLib.timeout_add(650, on_hide_complete)
+        # Call callback after animation completes
+        if callback:
+            GLib.timeout_add(650, lambda: (callback(panel_id), False)[1])
     
     def toggle_panel(self, panel_id, callback=None):
         """Toggle parameter panel visibility.
