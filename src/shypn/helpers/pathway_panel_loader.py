@@ -101,6 +101,19 @@ class PathwayPanelLoader:
         self._setup_import_tab()
         self._setup_sbml_tab()
         
+        # WAYLAND FIX: Realize window and set event mask for multi-monitor support
+        self.window.realize()
+        if self.window.get_window():
+            try:
+                from gi.repository import Gdk
+                self.window.get_window().set_events(
+                    self.window.get_window().get_events() | 
+                    Gdk.EventMask.STRUCTURE_MASK |
+                    Gdk.EventMask.PROPERTY_CHANGE_MASK
+                )
+            except Exception as e:
+                print(f"[PATHWAY_PANEL] Could not set window event mask: {e}", file=sys.stderr)
+        
         # Hide window by default (will be shown when toggled)
         self.window.set_visible(False)
         
@@ -378,11 +391,6 @@ class PathwayPanelLoader:
             self.window.show_all()
             print(f"[PATHWAY_PANEL] Window shown")
     
-
-        
-        # WAYLAND FIX: Use idle callback to defer hide operation
-        GLib.idle_add(_do_hide)
-    
     # ========================================================================
     # PHASE 4: GtkStack Integration Methods
     # New architecture: Panels live in GtkStack, controlled by Master Palette
@@ -435,10 +443,11 @@ class PathwayPanelLoader:
         # Set this panel as active child
         self._stack.set_visible_child_name(self._stack_panel_name)
         
-        # Re-enable show_all and make content visible
+        # WAYLAND FIX: Use show() instead of show_all() to avoid protocol errors
+        # The content widgets were already made visible during load() or initialization
         if self.content:
             self.content.set_no_show_all(False)  # Re-enable show_all
-            self.content.show_all()  # Show all child widgets recursively
+            self.content.show()  # Show just the container, not all children recursively
         
         # Make container visible too
         if self.parent_container:
@@ -456,6 +465,7 @@ class PathwayPanelLoader:
         # Hide container too
         if self.parent_container:
             self.parent_container.set_visible(False)
+
         
 
 

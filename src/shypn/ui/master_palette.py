@@ -87,40 +87,51 @@ PALETTE_CSS = """
     padding: 2px;
 }
 
-/* Palette Buttons - Base State (40x40px for 32x32px icons) */
+/* Palette Buttons - Base State (squared 40x40px buttons) */
 .palette-button {
     background-color: #37474F;
     border: 2px solid #455A64;
-    border-radius: 6px;
+    border-radius: 4px;
     color: #FFFFFF;
-    transition: all 150ms ease;
+    transition: all 200ms cubic-bezier(0.4, 0.0, 0.2, 1);
     margin: 3px;
     min-width: 40px;
     min-height: 40px;
+    padding: 0;
 }
 
+/* Hover State - Bright highlight */
 .palette-button:hover {
     background-color: #4CAF50;
     border-color: #66BB6A;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4),
+                0 0 0 1px rgba(76, 175, 80, 0.5);
 }
 
-.palette-button:active,
-.palette-button:checked {
+/* Pressed State */
+.palette-button:active {
     background-color: #388E3C;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
-/* Active State (toggled on) - Bold orange to stand out */
+/* Active/Checked State (toggled on) - Bold orange */
+.palette-button:checked,
 .palette-button-active {
     background-color: #FF9800;
     border-color: #FFB74D;
-    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4),
-                inset 0 0 0 2px #FFA726;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5),
+                inset 0 0 0 2px #FFA726,
+                0 0 0 1px rgba(255, 152, 0, 0.6);
 }
 
+/* Active Hover State */
+.palette-button:checked:hover,
 .palette-button-active:hover {
     background-color: #FB8C00;
     border-color: #FFA726;
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.5),
+                inset 0 0 0 2px #FFB74D,
+                0 0 0 1px rgba(251, 140, 0, 0.7);
 }
 
 /* Disabled State */
@@ -129,6 +140,13 @@ PALETTE_CSS = """
     background-color: #37474F;
     border-color: #455A64;
     color: #78909C;
+    box-shadow: none;
+}
+
+/* Icon styling */
+.palette-button image {
+    min-width: 32px;
+    min-height: 32px;
 }
 """
 
@@ -192,15 +210,11 @@ class MasterPalette:
             self.container.set_visible(True)
 
     def _apply_css(self):
-        """Apply Nord-themed CSS to palette widgets.
+        """Apply Material Design CSS to palette widgets.
         
         WAYLAND SAFE: Only applies CSS if not already applied and screen is available.
         This should be called after widget is realized to avoid Wayland surface issues.
         """
-        # TESTING: Disable CSS completely to see if it causes Wayland Error 71
-        print("[CSS] MasterPalette CSS application DISABLED for testing", file=sys.stderr)
-        return
-        
         if self._css_applied:
             return  # Already applied
         
@@ -221,6 +235,7 @@ class MasterPalette:
                 Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
             )
             self._css_applied = True
+            print("[CSS] MasterPalette styles applied (squared buttons with hover effects)", file=sys.stderr)
         except Exception as e:
             # CSS load failed, continue without styling
             print(f"Warning: Could not load palette CSS: {e}", file=sys.stderr)

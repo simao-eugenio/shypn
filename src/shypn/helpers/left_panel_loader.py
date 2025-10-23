@@ -142,6 +142,22 @@ class LeftPanelLoader:
         except Exception as e:
             self.project_controller = None
         
+                # Connect delete-event to prevent window destruction
+        self.window.connect('delete-event', self._on_delete_event)
+        
+        # WAYLAND FIX: Realize window and set event mask for multi-monitor support
+        self.window.realize()
+        if self.window.get_window():
+            try:
+                from gi.repository import Gdk
+                self.window.get_window().set_events(
+                    self.window.get_window().get_events() | 
+                    Gdk.EventMask.STRUCTURE_MASK |
+                    Gdk.EventMask.PROPERTY_CHANGE_MASK
+                )
+            except Exception as e:
+                print(f"[LEFT_PANEL] Could not set window event mask: {e}", file=sys.stderr)
+        
         # Hide window by default (will be shown when toggled)
         self.window.set_visible(False)
         
@@ -419,6 +435,7 @@ class LeftPanelLoader:
         # Hide container too
         if self.parent_container:
             self.parent_container.set_visible(False)
+
         
     
     def float_from_stack(self):

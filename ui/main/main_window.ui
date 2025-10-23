@@ -57,15 +57,268 @@
     </child>
 
     <!-- Phase 2: Master Palette Architecture -->
-    <!-- Layout: Master Palette (48px) → GtkStack (left dock) → Canvas (expands) -->
+    <!-- Layout: Menu Bar → Master Palette (48px) → GtkStack (left dock) → Canvas (expands) -->
     <child>
-      <object class="GtkBox" id="root_container">
-        <property name="orientation">horizontal</property>
+      <object class="GtkBox" id="main_vertical_container">
+        <property name="orientation">vertical</property>
         <property name="visible">True</property>
         <property name="hexpand">True</property>
         <property name="vexpand">True</property>
         
-        <!-- Master Palette slot (48px vertical toolbar, far left) -->
+        <!-- Canonical Menu Bar: File, Edit, View, Help -->
+        <child>
+          <object class="GtkMenuBar" id="main_menu_bar">
+            <property name="visible">True</property>
+            <property name="height-request">32</property>
+            <style>
+              <class name="bold-menubar"/>
+            </style>
+            
+            <!-- File Menu -->
+            <child>
+              <object class="GtkMenuItem" id="file_menu_item">
+                <property name="visible">True</property>
+                <property name="label">_File</property>
+                <property name="use-underline">True</property>
+                <child type="submenu">
+                  <object class="GtkMenu" id="file_menu">
+                    <property name="visible">True</property>
+                    <child>
+                      <object class="GtkMenuItem" id="file_new">
+                        <property name="visible">True</property>
+                        <property name="label">_New</property>
+                        <property name="use-underline">True</property>
+                        <property name="action-name">app.new</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkMenuItem" id="file_open">
+                        <property name="visible">True</property>
+                        <property name="label">_Open...</property>
+                        <property name="use-underline">True</property>
+                        <property name="action-name">app.open</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkSeparatorMenuItem">
+                        <property name="visible">True</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkMenuItem" id="file_save">
+                        <property name="visible">True</property>
+                        <property name="label">_Save</property>
+                        <property name="use-underline">True</property>
+                        <property name="action-name">app.save</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkMenuItem" id="file_save_as">
+                        <property name="visible">True</property>
+                        <property name="label">Save _As...</property>
+                        <property name="use-underline">True</property>
+                        <property name="action-name">app.save-as</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkSeparatorMenuItem">
+                        <property name="visible">True</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkMenuItem" id="file_quit">
+                        <property name="visible">True</property>
+                        <property name="label">_Quit</property>
+                        <property name="use-underline">True</property>
+                        <property name="action-name">app.quit</property>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+              </object>
+            </child>
+            
+            <!-- Edit Menu -->
+            <child>
+              <object class="GtkMenuItem" id="edit_menu_item">
+                <property name="visible">True</property>
+                <property name="label">_Edit</property>
+                <property name="use-underline">True</property>
+                <child type="submenu">
+                  <object class="GtkMenu" id="edit_menu">
+                    <property name="visible">True</property>
+                    <child>
+                      <object class="GtkMenuItem" id="edit_undo">
+                        <property name="visible">True</property>
+                        <property name="label">_Undo</property>
+                        <property name="use-underline">True</property>
+                        <property name="action-name">app.undo</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkMenuItem" id="edit_redo">
+                        <property name="visible">True</property>
+                        <property name="label">_Redo</property>
+                        <property name="use-underline">True</property>
+                        <property name="action-name">app.redo</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkSeparatorMenuItem">
+                        <property name="visible">True</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkMenuItem" id="edit_cut">
+                        <property name="visible">True</property>
+                        <property name="label">Cu_t</property>
+                        <property name="use-underline">True</property>
+                        <property name="action-name">app.cut</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkMenuItem" id="edit_copy">
+                        <property name="visible">True</property>
+                        <property name="label">_Copy</property>
+                        <property name="use-underline">True</property>
+                        <property name="action-name">app.copy</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkMenuItem" id="edit_paste">
+                        <property name="visible">True</property>
+                        <property name="label">_Paste</property>
+                        <property name="use-underline">True</property>
+                        <property name="action-name">app.paste</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkSeparatorMenuItem">
+                        <property name="visible">True</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkMenuItem" id="edit_preferences">
+                        <property name="visible">True</property>
+                        <property name="label">_Preferences</property>
+                        <property name="use-underline">True</property>
+                        <property name="action-name">app.preferences</property>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+              </object>
+            </child>
+            
+            <!-- View Menu -->
+            <child>
+              <object class="GtkMenuItem" id="view_menu_item">
+                <property name="visible">True</property>
+                <property name="label">_View</property>
+                <property name="use-underline">True</property>
+                <child type="submenu">
+                  <object class="GtkMenu" id="view_menu">
+                    <property name="visible">True</property>
+                    <child>
+                      <object class="GtkMenuItem" id="view_zoom_in">
+                        <property name="visible">True</property>
+                        <property name="label">Zoom _In</property>
+                        <property name="use-underline">True</property>
+                        <property name="action-name">app.zoom-in</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkMenuItem" id="view_zoom_out">
+                        <property name="visible">True</property>
+                        <property name="label">Zoom _Out</property>
+                        <property name="use-underline">True</property>
+                        <property name="action-name">app.zoom-out</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkMenuItem" id="view_zoom_reset">
+                        <property name="visible">True</property>
+                        <property name="label">_Reset Zoom</property>
+                        <property name="use-underline">True</property>
+                        <property name="action-name">app.zoom-reset</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkSeparatorMenuItem">
+                        <property name="visible">True</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkMenuItem" id="view_fullscreen">
+                        <property name="visible">True</property>
+                        <property name="label">_Fullscreen</property>
+                        <property name="use-underline">True</property>
+                        <property name="action-name">app.fullscreen</property>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+              </object>
+            </child>
+            
+            <!-- Help Menu -->
+            <child>
+              <object class="GtkMenuItem" id="help_menu_item">
+                <property name="visible">True</property>
+                <property name="label">_Help</property>
+                <property name="use-underline">True</property>
+                <child type="submenu">
+                  <object class="GtkMenu" id="help_menu">
+                    <property name="visible">True</property>
+                    <child>
+                      <object class="GtkMenuItem" id="help_contents">
+                        <property name="visible">True</property>
+                        <property name="label">_Contents</property>
+                        <property name="use-underline">True</property>
+                        <property name="action-name">app.help</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkMenuItem" id="help_shortcuts">
+                        <property name="visible">True</property>
+                        <property name="label">_Keyboard Shortcuts</property>
+                        <property name="use-underline">True</property>
+                        <property name="action-name">app.shortcuts</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkSeparatorMenuItem">
+                        <property name="visible">True</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkMenuItem" id="help_about">
+                        <property name="visible">True</property>
+                        <property name="label">_About Shypn</property>
+                        <property name="use-underline">True</property>
+                        <property name="action-name">app.about</property>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+              </object>
+            </child>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+          </packing>
+        </child>
+        
+        <!-- Horizontal container with Master Palette + Content -->
+        <child>
+          <object class="GtkBox" id="root_container">
+            <property name="orientation">horizontal</property>
+            <property name="visible">True</property>
+            <property name="hexpand">True</property>
+            <property name="vexpand">True</property>
+            
+            <!-- Master Palette slot (48px vertical toolbar, far left) -->
         <child>
           <object class="GtkBox" id="master_palette_slot">
             <property name="orientation">vertical</property>
@@ -197,6 +450,10 @@
                 <property name="visible">True</property>
                 <property name="vexpand">False</property>
                 <property name="hexpand">True</property>
+                <property name="height-request">28</property>
+                <style>
+                  <class name="compact-statusbar"/>
+                </style>
               </object>
               <packing>
                 <property name="expand">False</property>
@@ -212,5 +469,13 @@
         </child>
         
       </object>
-    </child>  </object>
+      <packing>
+        <property name="expand">True</property>
+        <property name="fill">True</property>
+      </packing>
+    </child>
+    
+  </object>
+</child>
+</object>
 </interface>

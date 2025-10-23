@@ -1,0 +1,13 @@
+/* Main Window Styling */
+
+/* Bold menu bar with increased height */
+.bold-menubar {
+    min-height: 32px;
+    font-weight: bold;
+}
+
+.bold-menubar > * {
+    font-weight: bold;
+    padding-top: 4px;
+    padding-bottom: 4px;
+}
