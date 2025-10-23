@@ -47,7 +47,7 @@ mode-aware interface with animated sub-palettes:
 
 Architecture:
 - Category buttons (Edit, Simulate, Layout) at bottom
-- Sub-palettes reveal upward from bottom with 600ms slide animation
+- Sub-palettes reveal downward from top with 600ms slide animation
 - Widget palette integration pattern for complex palettes (e.g., simulation)
 - CSS-styled with dark blue-gray theme
 """
@@ -180,9 +180,9 @@ class SwissKnifePalette(GObject.GObject):
         Returns:
             dict: {'revealer': GtkRevealer, 'tools': [tool_ids], 'widget_palette': loader_instance or None}
         """
-        # Revealer for animation (SLIDE_UP = reveals upward from bottom)
+        # Revealer for animation (SLIDE_DOWN = reveals downward from top)
         revealer = Gtk.Revealer()
-        revealer.set_transition_type(Gtk.RevealerTransitionType.SLIDE_UP)
+        revealer.set_transition_type(Gtk.RevealerTransitionType.SLIDE_DOWN)
         revealer.set_transition_duration(600)  # 600ms animation
         revealer.set_reveal_child(False)  # Hidden by default
         

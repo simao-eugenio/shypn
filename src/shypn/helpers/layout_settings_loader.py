@@ -78,9 +78,15 @@ class LayoutSettingsLoader(GObject.GObject):
             if self.spacing_entry:
                 self.spacing_entry.connect('changed', self._on_spacing_changed)
                 self.spacing_entry.connect('activate', self._on_spacing_changed)
+                # Force sensitive state and visible
+                self.spacing_entry.set_sensitive(True)
+                self.spacing_entry.set_can_focus(True)
             if self.iterations_entry:
                 self.iterations_entry.connect('changed', self._on_iterations_changed)
                 self.iterations_entry.connect('activate', self._on_iterations_changed)
+                # Force sensitive state and visible
+                self.iterations_entry.set_sensitive(True)
+                self.iterations_entry.set_can_focus(True)
             
             # Load CSS
             self._load_css()

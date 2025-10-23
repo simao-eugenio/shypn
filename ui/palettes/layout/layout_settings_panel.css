@@ -6,9 +6,17 @@
     padding: 4px;
 }
 
-.bright-label {
+/* Bright white labels for all text - force bright white in all states */
+.layout-settings-panel label,
+.layout-settings-panel label:backdrop,
+.layout-settings-panel label:insensitive,
+.bright-label,
+.bright-label:backdrop,
+.bright-label:insensitive {
     font-weight: 500;
-    color: #ffffff;
+    color: #ffffff !important;
+    font-size: 13px;
+    opacity: 1.0 !important;
 }
 
 /* Force compact width for parameter entries - prevent any stretching */
@@ -19,20 +27,32 @@
     width: 45px !important;
     font-size: 13px;
     font-weight: bold;
-    color: #ffffff;
+    color: #ffffff !important;
     background-color: #2c3e50;
     border: 1px solid #34495e;
+    opacity: 1.0 !important;
 }
 
+/* GTK3 Entry text styling - force white text in all states */
 #spacing_entry entry,
-#iterations_entry entry {
+#iterations_entry entry,
+entry#spacing_entry,
+entry#iterations_entry,
+#spacing_entry:backdrop,
+#iterations_entry:backdrop,
+#spacing_entry:insensitive,
+#iterations_entry:insensitive {
     min-width: 45px !important;
     max-width: 45px !important;
     width: 45px !important;
-    color: #ffffff;
+    color: #ffffff !important;
+    caret-color: #ffffff;
+    opacity: 1.0 !important;
 }
 
+/* Container - prevent expansion */
 #layout_settings_container {
     min-width: 280px !important;
     max-width: 280px !important;
+    opacity: 1.0 !important;
 }

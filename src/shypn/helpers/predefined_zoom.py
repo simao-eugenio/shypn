@@ -150,98 +150,112 @@ class PredefinedZoom:
             self.target_height = 28
     
     def _apply_styling(self):
-        """Apply custom CSS styling to the zoom palette."""
+        """Apply custom CSS styling to the zoom palette.
+        
+        Matches SwissKnifePalette style:
+        - Dark blue-gray background (#3d4e6a → #2c3a52)
+        - Soft rounded corners (8px)
+        - Subtle shadow for floating effect
+        - Light gray/white buttons matching Swiss palette
+        """
         css = f"""
+        /* Main zoom palette container - matches SwissKnifePalette */
         .zoom-palette {{
-            background: linear-gradient(to bottom, #667eea 0%, #764ba2 100%);
-            border: 2px solid #5568d3;
+            background: linear-gradient(to bottom, #3d4e6a 0%, #2c3a52 100%);
+            border: 1px solid rgba(255, 255, 255, 0.15);
             border-radius: 8px;
-            padding: 3px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4),
-                        0 2px 4px rgba(0, 0, 0, 0.3),
-                        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            padding: 4px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25),
+                        0 1px 3px rgba(0, 0, 0, 0.15);
         }}
         
+        /* Zoom +/- buttons - match Swiss palette button style */
         .zoom-button {{
-            background: linear-gradient(to bottom, #ffffff 0%, #f0f0f5 100%);
-            border: 2px solid #5568d3;
-            border-radius: 5px;
-            font-size: 18px;
-            font-weight: bold;
-            color: #667eea;
+            background: linear-gradient(to bottom, #f8f9fa 0%, #e9ecef 100%);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            color: #3d4e6a;
             min-width: {self.target_height}px;
             min-height: {self.target_height}px;
             padding: 0;
             margin: 0;
-            transition: all 200ms ease;
+            transition: all 150ms ease;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
         }}
         
         .zoom-button:hover {{
-            background: linear-gradient(to bottom, #e8f0ff 0%, #d5e5ff 100%);
-            border-color: #667eea;
-            color: #5568d3;
-            box-shadow: 0 0 8px rgba(102, 126, 234, 0.5);
+            background: linear-gradient(to bottom, #ffffff 0%, #f8f9fa 100%);
+            border-color: rgba(255, 255, 255, 0.5);
+            color: #2c3a52;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
         }}
         
         .zoom-button:active {{
-            background: linear-gradient(to bottom, #d0e0ff 0%, #c0d5ff 100%);
-            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+            background: linear-gradient(to bottom, #e9ecef 0%, #dee2e6 100%);
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.15);
         }}
         
+        /* Zoom display button - shows current zoom level */
         .zoom-display {{
-            background: linear-gradient(to bottom, #ffffff 0%, #f8f8fc 100%);
-            border: 2px solid #5568d3;
-            border-radius: 5px;
-            font-size: 13px;
-            font-weight: bold;
-            color: #667eea;
-            min-width: {int(self.target_height * 1.8)}px;
+            background: linear-gradient(to bottom, #f8f9fa 0%, #e9ecef 100%);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #3d4e6a;
+            min-width: {int(self.target_height * 2)}px;
             min-height: {self.target_height}px;
-            padding: 0;
+            padding: 0 6px;
             margin: 0;
-            transition: all 200ms ease;
+            transition: all 150ms ease;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
         }}
         
         .zoom-display:hover {{
-            background: linear-gradient(to bottom, #e8f0ff 0%, #dce8ff 100%);
-            border-color: #667eea;
-            color: #5568d3;
-            box-shadow: 0 0 8px rgba(102, 126, 234, 0.5);
+            background: linear-gradient(to bottom, #ffffff 0%, #f8f9fa 100%);
+            border-color: rgba(255, 255, 255, 0.5);
+            color: #2c3a52;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
         }}
         
+        /* Revealer content - expanded zoom options */
         .zoom-revealer-content {{
-            background: linear-gradient(to bottom, #667eea 0%, #764ba2 100%);
-            border: 2px solid #5568d3;
+            background: linear-gradient(to bottom, #3d4e6a 0%, #2c3a52 100%);
+            border: 1px solid rgba(255, 255, 255, 0.15);
             border-radius: 8px;
             padding: 6px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4),
-                        0 2px 4px rgba(0, 0, 0, 0.3),
-                        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            margin-top: 4px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25),
+                        0 1px 3px rgba(0, 0, 0, 0.15);
         }}
         
+        /* Zoom level buttons in revealer */
         .zoom-level-button {{
-            background: linear-gradient(to bottom, #ffffff 0%, #f0f0f5 100%);
-            border: 2px solid #5568d3;
+            background: linear-gradient(to bottom, #f8f9fa 0%, #e9ecef 100%);
+            border: 1px solid rgba(255, 255, 255, 0.3);
             border-radius: 4px;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 600;
-            color: #667eea;
-            min-height: {int(self.target_height * 0.85)}px;
-            padding: 3px 8px;
+            color: #3d4e6a;
+            min-height: {int(self.target_height * 0.9)}px;
+            padding: 4px 10px;
             margin: 2px;
-            transition: all 200ms ease;
+            transition: all 150ms ease;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
         }}
         
         .zoom-level-button:hover {{
-            background: linear-gradient(to bottom, #e8f0ff 0%, #d5e5ff 100%);
-            border-color: #667eea;
-            color: #5568d3;
-            box-shadow: 0 0 6px rgba(102, 126, 234, 0.4);
+            background: linear-gradient(to bottom, #ffffff 0%, #f8f9fa 100%);
+            border-color: rgba(255, 255, 255, 0.5);
+            color: #2c3a52;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
         }}
         
         .zoom-level-button:active {{
-            background: linear-gradient(to bottom, #d0e0ff 0%, #c0d5ff 100%);
-            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+            background: linear-gradient(to bottom, #e9ecef 0%, #dee2e6 100%);
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.15);
         }}
         """
         
@@ -346,10 +360,23 @@ class PredefinedZoom:
             self.zoom_revealer.set_reveal_child(False)
     
     def _update_zoom_display(self):
-        """Update the zoom level display in the display button."""
-        if self.canvas_manager and self.zoom_display_button:
-            zoom_percent = self.canvas_manager.get_zoom_percentage()
-            self.zoom_display_button.set_label(zoom_percent)
+        """Update the zoom display button with current zoom level.
+        
+        Shows magnitude in format: 1.5× or 100%
+        """
+        if self.canvas_manager:
+            zoom = self.canvas_manager.zoom
+            # Format as magnitude (e.g., "1.5×") for better visual clarity
+            if zoom == 1.0:
+                self.zoom_display_button.set_label("1×")
+            elif zoom < 1.0:
+                # For zoom < 1, show as magnitude (e.g., 0.5× or 50%)
+                self.zoom_display_button.set_label(f"{zoom:.2g}×")
+            else:
+                # For zoom > 1, show as magnitude (e.g., 1.5× or 2×)
+                self.zoom_display_button.set_label(f"{zoom:.3g}×")
+        else:
+            self.zoom_display_button.set_label("1×")
     
     def update_zoom_display(self):
         """Public method to update zoom display (called externally after zoom changes)."""
