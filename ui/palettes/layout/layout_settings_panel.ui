@@ -18,6 +18,8 @@
         <property name="spacing">8</property>
         <property name="margin">8</property>
         <property name="halign">center</property>
+        <property name="hexpand">False</property>
+        <property name="homogeneous">False</property>
         <style>
           <class name="layout-settings-panel"/>
         </style>
@@ -27,10 +29,15 @@
           <object class="GtkLabel">
             <property name="visible">True</property>
             <property name="label">Spacing:</property>
+            <property name="hexpand">False</property>
             <style>
               <class name="bright-label"/>
             </style>
           </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">False</property>
+          </packing>
         </child>
 
         <child>
@@ -46,6 +53,10 @@
             <property name="xalign">0.5</property>
             <property name="hexpand">False</property>
           </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">False</property>
+          </packing>
         </child>
 
         <!-- Separator -->
@@ -53,7 +64,12 @@
           <object class="GtkSeparator">
             <property name="visible">True</property>
             <property name="orientation">vertical</property>
+            <property name="hexpand">False</property>
           </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">False</property>
+          </packing>
         </child>
 
         <!-- Iterations Parameter -->
@@ -61,10 +77,15 @@
           <object class="GtkLabel">
             <property name="visible">True</property>
             <property name="label">Iterations:</property>
+            <property name="hexpand">False</property>
             <style>
               <class name="bright-label"/>
             </style>
           </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">False</property>
+          </packing>
         </child>
 
         <child>
@@ -80,6 +101,10 @@
             <property name="xalign">0.5</property>
             <property name="hexpand">False</property>
           </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">False</property>
+          </packing>
         </child>
 
       </object>

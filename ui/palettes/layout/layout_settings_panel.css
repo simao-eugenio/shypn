@@ -10,3 +10,10 @@
     font-weight: 500;
     color: #ffffff;
 }
+
+/* Force compact width for parameter entries */
+#spacing_entry,
+#iterations_entry {
+    min-width: 40px;
+    max-width: 40px;
+}
