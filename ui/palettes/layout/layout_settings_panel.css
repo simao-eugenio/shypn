@@ -6,8 +6,7 @@
     padding: 4px;
 }
 
-.settings-title {
-    font-weight: bold;
-    font-size: 11pt;
-    color: #e0e0e0;
+.bright-label {
+    font-weight: 500;
+    color: #ffffff;
 }

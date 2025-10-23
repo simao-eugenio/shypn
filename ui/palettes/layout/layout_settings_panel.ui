@@ -28,19 +28,22 @@
             <property name="visible">True</property>
             <property name="label">Spacing:</property>
             <style>
-              <class name="dim-label"/>
+              <class name="bright-label"/>
             </style>
           </object>
         </child>
 
         <child>
-          <object class="GtkSpinButton" id="spacing_spin">
+          <object class="GtkEntry" id="spacing_entry">
             <property name="visible">True</property>
-            <property name="adjustment">spacing_adjustment</property>
-            <property name="digits">0</property>
-            <property name="value">100</property>
-            <property name="width-chars">4</property>
+            <property name="text">100</property>
+            <property name="width-chars">3</property>
+            <property name="max-width-chars">3</property>
+            <property name="max-length">3</property>
+            <property name="input-purpose">number</property>
             <property name="tooltip-text">Node spacing (px)</property>
+            <property name="halign">center</property>
+            <property name="xalign">0.5</property>
           </object>
         </child>
 
@@ -58,19 +61,22 @@
             <property name="visible">True</property>
             <property name="label">Iterations:</property>
             <style>
-              <class name="dim-label"/>
+              <class name="bright-label"/>
             </style>
           </object>
         </child>
 
         <child>
-          <object class="GtkSpinButton" id="iterations_spin">
+          <object class="GtkEntry" id="iterations_entry">
             <property name="visible">True</property>
-            <property name="adjustment">iterations_adjustment</property>
-            <property name="digits">0</property>
-            <property name="value">50</property>
-            <property name="width-chars">4</property>
+            <property name="text">50</property>
+            <property name="width-chars">3</property>
+            <property name="max-width-chars">3</property>
+            <property name="max-length">3</property>
+            <property name="input-purpose">number</property>
             <property name="tooltip-text">Force-directed iterations</property>
+            <property name="halign">center</property>
+            <property name="xalign">0.5</property>
           </object>
         </child>
 
