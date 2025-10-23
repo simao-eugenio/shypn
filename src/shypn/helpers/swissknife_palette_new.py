@@ -83,6 +83,9 @@ class SwissKnifePalette(GObject.GObject):
         # Create all sub-palettes
         self.registry.create_all_sub_palettes(model)
         
+        # Create layout settings loader (for parameter panel)
+        self._create_layout_settings_loader()
+        
         # Create animator with sub-palettes
         self.animator = SwissKnifePaletteAnimator(self.registry.get_all_sub_palettes())
         
@@ -119,6 +122,21 @@ class SwissKnifePalette(GObject.GObject):
         from shypn.ui.swissknife_tool_registry import ToolRegistry
         return ToolRegistry()
     
+    def _create_layout_settings_loader(self):
+        """Create layout settings loader for parameter panel.
+        
+        Creates an instance of LayoutSettingsLoader to provide parameter
+        panel for layout algorithms.
+        """
+        try:
+            from shypn.helpers.layout_settings_loader import LayoutSettingsLoader
+            self.layout_settings_loader = LayoutSettingsLoader()
+        except Exception as e:
+            import traceback
+            print(f'Warning: Failed to create layout settings loader: {e}')
+            traceback.print_exc()
+            self.layout_settings_loader = None
+    
     def _register_parameter_panels(self):
         """Register parameter panels from widget palettes.
         
@@ -133,8 +151,12 @@ class SwissKnifePalette(GObject.GObject):
                 simulate_loader.create_settings_panel
             )
         
-        # Future: Register other parameter panels here
-        # self.parameter_manager.register_parameter_panel('layout', layout_loader.create_params_panel)
+        # Register layout category parameter panel (settings)
+        if self.layout_settings_loader and hasattr(self.layout_settings_loader, 'create_settings_panel'):
+            self.parameter_manager.register_parameter_panel(
+                'layout',
+                self.layout_settings_loader.create_settings_panel
+            )
     
     def _connect_controller_signals(self):
         """Connect controller signals to forward them."""

@@ -104,6 +104,7 @@ class ToolRegistry:
         'layout_auto': ('Auto', 'Auto Layout\n\nAutomatically arrange nodes'),
         'layout_hierarchical': ('Hier', 'Hierarchical Layout\n\nArrange nodes in hierarchy'),
         'layout_force': ('Force', 'Force-Directed Layout\n\nArrange nodes using force simulation'),
+        'layout_settings': ('⚙', 'Layout Settings\n\nConfigure layout parameters'),
     }
     
     # Category configurations for Edit mode
@@ -123,7 +124,7 @@ class ToolRegistry:
         'layout': {
             'label': 'Layout',
             'tooltip': 'Layout Tools\n\nArrange nodes automatically',
-            'tools': ['layout_auto', 'layout_hierarchical', 'layout_force'],
+            'tools': ['layout_auto', 'layout_hierarchical', 'layout_force', 'layout_settings'],
             'widget_palette': False
         }
     }

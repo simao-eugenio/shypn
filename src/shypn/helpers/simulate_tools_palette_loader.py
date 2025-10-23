@@ -929,7 +929,14 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         Returns:
             Gtk.Revealer: Settings panel revealer, or None if not available.
         """
-        return getattr(self, 'settings_revealer', None)
+        settings_revealer = getattr(self, 'settings_revealer', None)
+        if settings_revealer:
+            # Ensure revealer is visible and revealed when parameter panel shows it
+            settings_revealer.set_visible(True)
+            settings_revealer.set_reveal_child(True)
+            # Sync current settings to UI
+            self._sync_settings_to_ui()
+        return settings_revealer
 
     def is_simulation_running(self):
         """Check if simulation is currently running.

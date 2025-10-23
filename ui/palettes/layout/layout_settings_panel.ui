@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Layout Settings Panel - Parameter panel for layout algorithms -->
+<interface>
+  <requires lib="gtk+" version="3.0"/>
+
+  <!-- Settings Revealer -->
+  <object class="GtkRevealer" id="layout_settings_revealer">
+    <property name="visible">True</property>
+    <property name="reveal-child">True</property>
+    <property name="transition-type">none</property>
+    <property name="transition-duration">0</property>
+
+    <child>
+      <!-- Main Settings Container -->
+      <object class="GtkBox" id="layout_settings_container">
+        <property name="visible">True</property>
+        <property name="orientation">vertical</property>
+        <property name="spacing">8</property>
+        <property name="margin">12</property>
+        <style>
+          <class name="layout-settings-panel"/>
+        </style>
+
+        <!-- Title Label -->
+        <child>
+          <object class="GtkLabel">
+            <property name="visible">True</property>
+            <property name="label">Layout Parameters</property>
+            <property name="xalign">0</property>
+            <style>
+              <class name="settings-title"/>
+            </style>
+          </object>
+        </child>
+
+        <!-- Spacing Parameter -->
+        <child>
+          <object class="GtkBox">
+            <property name="visible">True</property>
+            <property name="orientation">horizontal</property>
+            <property name="spacing">12</property>
+
+            <child>
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="label">Node Spacing:</property>
+                <property name="xalign">0</property>
+                <property name="width-chars">15</property>
+              </object>
+            </child>
+
+            <child>
+              <object class="GtkSpinButton" id="spacing_spin">
+                <property name="visible">True</property>
+                <property name="adjustment">spacing_adjustment</property>
+                <property name="digits">0</property>
+                <property name="value">100</property>
+                <property name="tooltip-text">Distance between nodes (pixels)</property>
+              </object>
+            </child>
+          </object>
+        </child>
+
+        <!-- Iterations Parameter (for Force-Directed) -->
+        <child>
+          <object class="GtkBox">
+            <property name="visible">True</property>
+            <property name="orientation">horizontal</property>
+            <property name="spacing">12</property>
+
+            <child>
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="label">Iterations:</property>
+                <property name="xalign">0</property>
+                <property name="width-chars">15</property>
+              </object>
+            </child>
+
+            <child>
+              <object class="GtkSpinButton" id="iterations_spin">
+                <property name="visible">True</property>
+                <property name="adjustment">iterations_adjustment</property>
+                <property name="digits">0</property>
+                <property name="value">50</property>
+                <property name="tooltip-text">Number of iterations for force-directed algorithm</property>
+              </object>
+            </child>
+          </object>
+        </child>
+
+        <!-- Action Buttons -->
+        <child>
+          <object class="GtkBox">
+            <property name="visible">True</property>
+            <property name="orientation">horizontal</property>
+            <property name="spacing">8</property>
+            <property name="margin-top">8</property>
+            <property name="halign">end</property>
+
+            <child>
+              <object class="GtkButton" id="layout_apply_button">
+                <property name="visible">True</property>
+                <property name="label">Apply</property>
+                <property name="tooltip-text">Apply current settings</property>
+                <style>
+                  <class name="suggested-action"/>
+                </style>
+              </object>
+            </child>
+
+            <child>
+              <object class="GtkButton" id="layout_reset_button">
+                <property name="visible">True</property>
+                <property name="label">Reset</property>
+                <property name="tooltip-text">Reset to default values</property>
+              </object>
+            </child>
+          </object>
+        </child>
+
+      </object>
+    </child>
+  </object>
+
+  <!-- Adjustments -->
+  <object class="GtkAdjustment" id="spacing_adjustment">
+    <property name="lower">20</property>
+    <property name="upper">500</property>
+    <property name="step-increment">10</property>
+    <property name="page-increment">50</property>
+    <property name="value">100</property>
+  </object>
+
+  <object class="GtkAdjustment" id="iterations_adjustment">
+    <property name="lower">10</property>
+    <property name="upper">200</property>
+    <property name="step-increment">5</property>
+    <property name="page-increment">10</property>
+    <property name="value">50</property>
+  </object>
+
+</interface>
