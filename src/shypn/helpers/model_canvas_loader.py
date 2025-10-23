@@ -119,45 +119,28 @@ class ModelCanvasLoader:
         if self.notebook is None:
             raise ValueError("Object 'canvas_notebook' not found in model_canvas.ui")
         
-        # Apply CSS styling to notebook for bordered appearance
+        # Override theme's notebook styling - use light, clean colors
         css_provider = Gtk.CssProvider()
         css = b"""
-        notebook {
-            border: 1px solid #ccc;
-            border-radius: 6px;
-            background: #f5f5f5;
-            padding: 0;
+        #canvas_notebook {
+            background: white;
         }
-        notebook > header {
-            background: transparent;
-            border-bottom: 1px solid #ccc;
-            padding: 2px;
+        #canvas_notebook > header {
+            background: white;
         }
-        notebook > header > tabs > tab {
-            border: none;
-            background: transparent;
-            padding: 0;
-            outline: none;
+        #canvas_notebook > header > tabs > tab {
+            background: white;
         }
-        notebook > header > tabs > tab:hover {
-            background: transparent;
+        #canvas_notebook > header > tabs > tab:checked {
+            background: white;
         }
-        notebook > header > tabs > tab:checked {
-            background: transparent;
-        }
-        notebook > header > tabs > tab separator {
-            min-width: 0;
-            min-height: 0;
-            background: transparent;
-        }
-        notebook > stack {
-            border: none;
+        #canvas_notebook > stack {
             background: white;
         }
         """
         css_provider.load_from_data(css)
         style_context = self.notebook.get_style_context()
-        style_context.add_provider(css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        style_context.add_provider(css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION + 1)
         
         self.document_count = self.notebook.get_n_pages()
         if self.document_count > 0:
@@ -280,28 +263,21 @@ class ModelCanvasLoader:
             border: 1px solid #ccc;
             border-bottom: none;
             border-radius: 6px 6px 0 0;
-            background: linear-gradient(to bottom, #f5f5f5, #e8e8e8);
+            background: #f5f5f5;
             min-height: 32px;
             margin-top: 0;
             margin-bottom: -1px;
             margin-left: 0;
             margin-right: -1px;
-            box-shadow: 0 -2px 4px rgba(0,0,0,0.1);
         }
         .tab-box:hover {
-            background: linear-gradient(to bottom, #fff, #f0f0f0);
+            background: #ffffff;
             border-color: #999;
-            box-shadow: 0 -2px 6px rgba(0,0,0,0.15);
         }
         .tab-box.active {
-            background: linear-gradient(to bottom, #4a5f7f, #3a4f6f);
-            border-color: #2c3e50;
-            border-width: 2px;
-            margin-top: -3px;
-            margin-bottom: -2px;
-            padding-top: 11px;
-            box-shadow: 0 -4px 12px rgba(0,0,0,0.3), 0 2px 8px rgba(0,0,0,0.2);
-            color: white;
+            background: #ffffff;
+            border-color: #aaa;
+            border-width: 1px;
             font-weight: bold;
         }
         .tab-box.active label {

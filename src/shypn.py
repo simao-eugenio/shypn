@@ -80,12 +80,32 @@ def main(argv=None):
 		from shypn.workspace_settings import WorkspaceSettings
 		workspace_settings = WorkspaceSettings()
 		
+		# Load CSS for main window styling
+		css_path = os.path.join(REPO_ROOT, 'ui', 'main', 'main_window.css')
+		if os.path.exists(css_path):
+			css_provider = Gtk.CssProvider()
+			css_provider.load_from_path(css_path)
+			screen = Gdk.Screen.get_default()
+			style_context = Gtk.StyleContext()
+			style_context.add_provider_for_screen(
+				screen,
+				css_provider,
+				Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+			)
+			print("[CSS] Main window styles loaded", file=sys.stderr)
+		
 		# Load main window
 		main_builder = Gtk.Builder.new_from_file(UI_PATH)
 		window = main_builder.get_object('main_window')
 		if window is None:
 			print('ERROR: `main_window` object not found in UI file.', file=sys.stderr)
 			sys.exit(3)
+		
+		# Setup menu actions (File, Edit, View, Help)
+		from shypn.ui.menu_actions import MenuActions
+		menu_actions = MenuActions(a, window)
+		menu_actions.register_all_actions()
+		print("[INIT] Menu actions registered", file=sys.stderr)
 		
 		# Restore window geometry
 		geom = workspace_settings.get_window_geometry()
@@ -98,6 +118,18 @@ def main(argv=None):
 		# WAYLAND FIX: Realize window early to establish window surface
 		# This ensures parent window is available for dialogs/menus during initialization
 		window.realize()
+		
+		# WAYLAND FIX: Add event mask for multi-monitor support
+		# This prevents Error 71 when moving mouse between monitors
+		if window.get_window():
+			try:
+				window.get_window().set_events(
+					window.get_window().get_events() | 
+					Gdk.EventMask.STRUCTURE_MASK |
+					Gdk.EventMask.PROPERTY_CHANGE_MASK
+				)
+			except Exception as e:
+				print(f"[WAYLAND] Could not set window event mask: {e}", file=sys.stderr)
 		
 		# Add double-click on header bar to toggle maximize
 		header_bar = main_builder.get_object('header_bar')
@@ -542,6 +574,9 @@ def main(argv=None):
 						pass
 			else:
 				left_panel_loader.hide_in_stack()
+				# Hide stack when no panels are visible
+				if left_dock_stack:
+					left_dock_stack.set_visible(False)
 				# Collapse paned when no panel is active
 				if left_paned:
 					try:
@@ -575,6 +610,9 @@ def main(argv=None):
 						pass
 			else:
 				right_panel_loader.hide_in_stack()
+				# Hide stack when no panels are visible
+				if left_dock_stack:
+					left_dock_stack.set_visible(False)
 				# Collapse paned when no panel is active
 				if left_paned:
 					try:
@@ -608,6 +646,9 @@ def main(argv=None):
 						pass
 			else:
 				pathway_panel_loader.hide_in_stack()
+				# Hide stack when no panels are visible
+				if left_dock_stack:
+					left_dock_stack.set_visible(False)
 				# Collapse paned when no panel is active
 				if left_paned:
 					try:
@@ -641,6 +682,9 @@ def main(argv=None):
 						pass
 			else:
 				topology_panel_loader.hide_in_stack()
+				# Hide stack when no panels are visible
+				if left_dock_stack:
+					left_dock_stack.set_visible(False)
 				# Collapse paned when no panel is active
 				if left_paned:
 					try:
