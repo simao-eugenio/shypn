@@ -86,7 +86,7 @@
                     <child>
                       <object class="GtkMenuItem" id="file_new">
                         <property name="visible">True</property>
-                        <property name="label">_New	Ctrl+N</property>
+                        <property name="label">_New                    	Ctrl+N</property>
                         <property name="use-underline">True</property>
                         <property name="action-name">app.new</property>
                       </object>
@@ -94,7 +94,7 @@
                     <child>
                       <object class="GtkMenuItem" id="file_open">
                         <property name="visible">True</property>
-                        <property name="label">_Open...	Ctrl+O</property>
+                        <property name="label">_Open                   	Ctrl+O</property>
                         <property name="use-underline">True</property>
                         <property name="action-name">app.open</property>
                       </object>
@@ -107,7 +107,7 @@
                     <child>
                       <object class="GtkMenuItem" id="file_save">
                         <property name="visible">True</property>
-                        <property name="label">_Save	Ctrl+S</property>
+                        <property name="label">_Save                   	Ctrl+S</property>
                         <property name="use-underline">True</property>
                         <property name="action-name">app.save</property>
                       </object>
@@ -115,7 +115,7 @@
                     <child>
                       <object class="GtkMenuItem" id="file_save_as">
                         <property name="visible">True</property>
-                        <property name="label">Save _As...	Ctrl+Shift+S</property>
+                        <property name="label">Save _As                	Ctrl+Shift+S</property>
                         <property name="use-underline">True</property>
                         <property name="action-name">app.save-as</property>
                       </object>
@@ -128,7 +128,7 @@
                     <child>
                       <object class="GtkMenuItem" id="file_quit">
                         <property name="visible">True</property>
-                        <property name="label">_Quit	Ctrl+Q</property>
+                        <property name="label">_Quit                   	Ctrl+Q</property>
                         <property name="use-underline">True</property>
                         <property name="action-name">app.quit</property>
                       </object>
@@ -150,7 +150,7 @@
                     <child>
                       <object class="GtkMenuItem" id="edit_undo">
                         <property name="visible">True</property>
-                        <property name="label">_Undo	Ctrl+Z</property>
+                        <property name="label">_Undo                   	Ctrl+Z</property>
                         <property name="use-underline">True</property>
                         <property name="action-name">app.undo</property>
                       </object>
@@ -158,7 +158,7 @@
                     <child>
                       <object class="GtkMenuItem" id="edit_redo">
                         <property name="visible">True</property>
-                        <property name="label">_Redo	Ctrl+Shift+Z</property>
+                        <property name="label">_Redo                   	Ctrl+Shift+Z</property>
                         <property name="use-underline">True</property>
                         <property name="action-name">app.redo</property>
                       </object>
@@ -171,7 +171,7 @@
                     <child>
                       <object class="GtkMenuItem" id="edit_cut">
                         <property name="visible">True</property>
-                        <property name="label">Cu_t	Ctrl+X</property>
+                        <property name="label">Cu_t                    	Ctrl+X</property>
                         <property name="use-underline">True</property>
                         <property name="action-name">app.cut</property>
                       </object>
@@ -179,7 +179,7 @@
                     <child>
                       <object class="GtkMenuItem" id="edit_copy">
                         <property name="visible">True</property>
-                        <property name="label">_Copy	Ctrl+C</property>
+                        <property name="label">_Copy                   	Ctrl+C</property>
                         <property name="use-underline">True</property>
                         <property name="action-name">app.copy</property>
                       </object>
@@ -187,7 +187,7 @@
                     <child>
                       <object class="GtkMenuItem" id="edit_paste">
                         <property name="visible">True</property>
-                        <property name="label">_Paste	Ctrl+V</property>
+                        <property name="label">_Paste                  	Ctrl+V</property>
                         <property name="use-underline">True</property>
                         <property name="action-name">app.paste</property>
                       </object>

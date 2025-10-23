@@ -11,3 +11,23 @@
     padding-top: 4px;
     padding-bottom: 4px;
 }
+
+/* Menu item styling - two-column layout with better spacing */
+menuitem {
+    min-height: 32px;
+    padding-top: 6px;
+    padding-bottom: 6px;
+    padding-left: 12px;
+    padding-right: 12px;
+}
+
+menuitem label {
+    padding-right: 40px;
+}
+
+/* Separator styling */
+separator.horizontal {
+    min-height: 1px;
+    margin-top: 4px;
+    margin-bottom: 4px;
+}
