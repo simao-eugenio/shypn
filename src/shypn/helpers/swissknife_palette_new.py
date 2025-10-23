@@ -141,130 +141,88 @@ class SwissKnifePalette(GObject.GObject):
         return ToolRegistry()
     
     def _wrap_in_draggable_container(self):
-        """Add drag handle and float/attach control INSIDE the palette container.
+        """Wrap main container in EventBox for drag and double-click interactions.
         
-        Places controls at top-right between sub-palette area and category buttons,
-        without adding extra height to the palette.
+        NEW APPROACH: No separate controls - use intuitive gestures on palette itself
+        - Single-click + drag on empty space → drag palette (when floating)
+        - Double-click on empty space → toggle float/attach
+        
+        This eliminates the need for separate drag handle and button controls.
         """
-        # Create a horizontal box for drag handle + button
-        control_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=2)
-        
-        # Create drag handle (separate from button for clear interaction)
-        drag_handle = Gtk.Label()
-        drag_handle.set_markup('<span foreground="#cccccc" font="12">⋮⋮</span>')
-        drag_handle.set_tooltip_text('Drag to move palette')
-        drag_handle.set_size_request(20, 32)
-        drag_handle.set_halign(Gtk.Align.CENTER)
-        drag_handle.set_valign(Gtk.Align.CENTER)
-        
-        # Wrap drag handle in EventBox for drag functionality
+        # Wrap main container in EventBox to capture mouse events
         self.drag_event_box = Gtk.EventBox()
-        self.drag_event_box.add(drag_handle)
+        self.drag_event_box.add(self.ui.main_container)
         self.drag_event_box.set_above_child(False)
-        self.drag_event_box.get_style_context().add_class('drag-handle')
         
-        # Enable events for drag
+        # Enable events for drag and double-click
         self.drag_event_box.add_events(
             Gdk.EventMask.BUTTON_PRESS_MASK |
             Gdk.EventMask.BUTTON_RELEASE_MASK |
             Gdk.EventMask.POINTER_MOTION_MASK
         )
         
-        # Connect drag events
-        self.drag_event_box.connect('button-press-event', self._on_drag_start)
-        self.drag_event_box.connect('button-release-event', self._on_drag_end)
+        # Connect events
+        self.drag_event_box.connect('button-press-event', self._on_button_press)
+        self.drag_event_box.connect('button-release-event', self._on_button_release)
         self.drag_event_box.connect('motion-notify-event', self._on_drag_motion)
         
-        # Change cursor on hover for drag handle
+        # State for float/attach
+        self.is_floating = False  # Default to attached (bottom-center)
+        
+        # Change cursor on hover when floating
         self.drag_event_box.connect('enter-notify-event', 
             lambda w, e: w.get_window().set_cursor(Gdk.Cursor.new_from_name(w.get_display(), 'grab')) if self.is_floating else None)
         self.drag_event_box.connect('leave-notify-event', 
             lambda w, e: w.get_window().set_cursor(None) if not self.drag_active else None)
         
-        # Create float/attach toggle button (separate from drag handle)
-        self.float_toggle_button = Gtk.Button()
-        self.float_toggle_button.set_relief(Gtk.ReliefStyle.NONE)
-        self.float_toggle_button.set_size_request(28, 32)
-        self.float_toggle_button.set_tooltip_text('Click to Float/Attach')
-        self.is_floating = False  # Default to attached (bottom-center)
-        
-        # Icon for float/attach
-        self.float_icon = Gtk.Label()
-        self._update_float_icon()
-        self.float_toggle_button.add(self.float_icon)
-        self.float_toggle_button.get_style_context().add_class('float-toggle-button')
-        self.float_toggle_button.connect('clicked', self._on_float_toggle_clicked)
-        
-        # Pack drag handle and button together
-        control_box.pack_start(self.drag_event_box, False, False, 0)
-        control_box.pack_start(self.float_toggle_button, False, False, 0)
-        control_box.get_style_context().add_class('control-box')
-        
-        # Create overlay to position controls at top-right of palette
-        overlay = Gtk.Overlay()
-        overlay.add(self.ui.main_container)
-        overlay.add_overlay(control_box)
-        
-        # Position at top-right
-        control_box.set_halign(Gtk.Align.END)
-        control_box.set_valign(Gtk.Align.START)
-        control_box.set_margin_top(4)
-        control_box.set_margin_end(4)
-        
-        # Set overlay as the draggable container
-        self.draggable_container = overlay
+        # Set EventBox as the draggable container
+        self.draggable_container = self.drag_event_box
     
-    def _update_float_icon(self):
-        """Update float/attach button icon based on current state."""
-        if self.is_floating:
-            # Show pin down icon when floating (click to attach/pin down)
-            self.float_icon.set_markup('<span foreground="#ffffff" font="12">📌</span>')
-        else:
-            # Show float/release icon when attached (click to float/unpin)
-            self.float_icon.set_markup('<span foreground="#ffffff" font="12">↖</span>')
-    
-    def _on_float_toggle_clicked(self, button):
-        """Handle float/attach toggle button click.
-        
-        Args:
-            button: Toggle button widget
-        """
-        self.is_floating = not self.is_floating
-        self._update_float_icon()
-        
-        # Emit signal for parent to handle repositioning
-        self.emit('float-toggled', self.is_floating)
-    
-    def _on_drag_start(self, widget, event):
-        """Handle drag start event.
+    def _on_button_press(self, widget, event):
+        """Handle button press event - start drag or detect double-click.
         
         Args:
             widget: EventBox widget
-            event: Button press event
+            event: Button press event (event.type: BUTTON_PRESS or 2BUTTON_PRESS)
         """
-        if event.button == 1 and self.is_floating:  # Left click only, and only when floating
-            self.drag_active = True
-            self.drag_start_x = event.x_root
-            self.drag_start_y = event.y_root
+        if event.button == 1:  # Left click
+            # Check for double-click
+            if event.type == Gdk.EventType.DOUBLE_BUTTON_PRESS:
+                # Double-click: toggle float/attach
+                self.is_floating = not self.is_floating
+                self.emit('float-toggled', self.is_floating)
+                return True
             
-            # Change cursor
-            widget.get_window().set_cursor(Gdk.Cursor.new_from_name(widget.get_display(), 'grabbing'))
-            return True
+            # Single click: prepare for potential drag (only when floating)
+            elif event.type == Gdk.EventType.BUTTON_PRESS and self.is_floating:
+                self.drag_active = True
+                self.drag_start_x = event.x_root
+                self.drag_start_y = event.y_root
+                
+                # Change cursor to grabbing
+                widget.get_window().set_cursor(Gdk.Cursor.new_from_name(widget.get_display(), 'grabbing'))
+                return False  # Allow event to propagate to children (buttons still work)
+        
         return False
     
-    def _on_drag_end(self, widget, event):
-        """Handle drag end event.
+    def _on_button_release(self, widget, event):
+        """Handle button release event - end drag.
         
         Args:
             widget: EventBox widget
             event: Button release event
         """
         if event.button == 1:
-            self.drag_active = False
-            
-            # Restore cursor
-            widget.get_window().set_cursor(Gdk.Cursor.new_from_name(widget.get_display(), 'grab'))
-            return True
+            if self.drag_active:
+                self.drag_active = False
+                
+                # Restore cursor
+                if self.is_floating:
+                    widget.get_window().set_cursor(Gdk.Cursor.new_from_name(widget.get_display(), 'grab'))
+                else:
+                    widget.get_window().set_cursor(None)
+                return True
+        
         return False
     
     def _on_drag_motion(self, widget, event):
@@ -477,45 +435,6 @@ class SwissKnifePalette(GObject.GObject):
             background-color: rgba(50, 60, 70, 0.9);
             border-radius: 6px;
             padding: 4px;
-        }
-        
-        /* Control box container */
-        .control-box {
-            background: rgba(60, 70, 80, 0.85);
-            border: 1px solid rgba(100, 110, 120, 0.6);
-            border-radius: 4px;
-            padding: 2px;
-        }
-        
-        /* Drag handle */
-        .drag-handle {
-            background: transparent;
-            padding: 4px 2px;
-            min-width: 20px;
-            min-height: 32px;
-        }
-        
-        .drag-handle:hover {
-            background: rgba(120, 130, 140, 0.5);
-            border-radius: 3px;
-        }
-        
-        /* Float/Attach toggle button */
-        .float-toggle-button {
-            background: transparent;
-            border: none;
-            padding: 4px;
-            min-width: 28px;
-            min-height: 32px;
-        }
-        
-        .float-toggle-button:hover {
-            background: rgba(120, 130, 140, 0.5);
-            border-radius: 3px;
-        }
-        
-        .float-toggle-button:active {
-            background: rgba(140, 150, 160, 0.6);
         }
         """
         
