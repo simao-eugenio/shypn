@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Layout Settings Panel - Compact parameter panel for layout algorithms -->
+<interface>
+  <requires lib="gtk+" version="3.0"/>
+
+  <!-- Settings Revealer -->
+  <object class="GtkRevealer" id="layout_settings_revealer">
+    <property name="visible">True</property>
+    <property name="reveal-child">True</property>
+    <property name="transition-type">none</property>
+    <property name="transition-duration">0</property>
+    <property name="hexpand">False</property>
+    <property name="halign">center</property>
+
+    <child>
+      <!-- Main Settings Container - Compact single line -->
+      <object class="GtkBox" id="layout_settings_container">
+        <property name="visible">True</property>
+        <property name="orientation">horizontal</property>
+        <property name="spacing">8</property>
+        <property name="margin">8</property>
+        <property name="halign">center</property>
+        <property name="hexpand">False</property>
+        <property name="vexpand">False</property>
+        <property name="homogeneous">False</property>
+        <property name="width-request">280</property>
+        <style>
+          <class name="layout-settings-panel"/>
+        </style>
+
+        <!-- Spacing Parameter -->
+        <child>
+          <object class="GtkLabel">
+            <property name="visible">True</property>
+            <property name="label">Spacing:</property>
+            <property name="hexpand">False</property>
+            <style>
+              <class name="bright-label"/>
+            </style>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">False</property>
+          </packing>
+        </child>
+
+        <child>
+          <object class="GtkEntry" id="spacing_entry">
+            <property name="visible">True</property>
+            <property name="text">100</property>
+            <property name="width-chars">3</property>
+            <property name="max-width-chars">3</property>
+            <property name="max-length">3</property>
+            <property name="input-purpose">number</property>
+            <property name="tooltip-text">Node spacing (px)</property>
+            <property name="halign">center</property>
+            <property name="xalign">0.5</property>
+            <property name="hexpand">False</property>
+            <property name="width-request">45</property>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">False</property>
+          </packing>
+        </child>
+
+        <!-- Separator -->
+        <child>
+          <object class="GtkSeparator">
+            <property name="visible">True</property>
+            <property name="orientation">vertical</property>
+            <property name="hexpand">False</property>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">False</property>
+          </packing>
+        </child>
+
+        <!-- Iterations Parameter -->
+        <child>
+          <object class="GtkLabel">
+            <property name="visible">True</property>
+            <property name="label">Iterations:</property>
+            <property name="hexpand">False</property>
+            <style>
+              <class name="bright-label"/>
+            </style>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">False</property>
+          </packing>
+        </child>
+
+        <child>
+          <object class="GtkEntry" id="iterations_entry">
+            <property name="visible">True</property>
+            <property name="text">50</property>
+            <property name="width-chars">3</property>
+            <property name="max-width-chars">3</property>
+            <property name="max-length">3</property>
+            <property name="input-purpose">number</property>
+            <property name="tooltip-text">Force-directed iterations</property>
+            <property name="halign">center</property>
+            <property name="xalign">0.5</property>
+            <property name="hexpand">False</property>
+            <property name="width-request">45</property>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">False</property>
+          </packing>
+        </child>
+
+      </object>
+    </child>
+  </object>
+
+  <!-- Adjustments -->
+  <object class="GtkAdjustment" id="spacing_adjustment">
+    <property name="lower">20</property>
+    <property name="upper">500</property>
+    <property name="step-increment">10</property>
+    <property name="page-increment">50</property>
+    <property name="value">100</property>
+  </object>
+
+  <object class="GtkAdjustment" id="iterations_adjustment">
+    <property name="lower">10</property>
+    <property name="upper">200</property>
+    <property name="step-increment">5</property>
+    <property name="page-increment">10</property>
+    <property name="value">50</property>
+  </object>
+
+</interface>

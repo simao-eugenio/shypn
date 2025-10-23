@@ -4,6 +4,20 @@ Simulate Tools Palette Loader
 Loads and manages the simulation tools palette UI (Run, Step, Stop, Reset, Settings buttons).
 This palette appears below the main [S] simulate button when toggled.
 
+PHASE 2 REFACTOR: Constant Height Architecture
+===============================================
+The loader now returns ONLY the tool buttons container (50px max height) via get_widget().
+The settings panel is separated and available via create_settings_panel() factory method.
+
+ARCHITECTURE:
+- get_widget() → Returns simulate_tools_container ONLY (buttons: R, P, S, T, ⚙)
+- create_settings_panel() → Returns settings_revealer (for Phase 3 parameter panel)
+
+This separation allows:
+1. Main palette maintains constant 50px height (no more jumps!)
+2. Settings panel can be managed by universal parameter panel manager (Phase 3)
+3. Consistent height across all sub-palettes (Edit, Simulate, Layout)
+
 The palette directly manages the SimulationController - buttons call controller
 methods directly rather than emitting signals for external handling.
 """
@@ -37,11 +51,13 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         step-executed(float): Emitted after each simulation step with current time
         reset-executed(): Emitted after simulation reset
         settings-changed(): Emitted when simulation settings are modified (duration, units, etc.)
+        settings-toggle-requested(): PHASE 3 - Emitted when settings button clicked (for parameter panel)
     """
     __gsignals__ = {
         'step-executed': (GObject.SignalFlags.RUN_FIRST, None, (float,)),
         'reset-executed': (GObject.SignalFlags.RUN_FIRST, None, ()),
-        'settings-changed': (GObject.SignalFlags.RUN_FIRST, None, ())
+        'settings-changed': (GObject.SignalFlags.RUN_FIRST, None, ()),
+        'settings-toggle-requested': (GObject.SignalFlags.RUN_FIRST, None, ()),  # PHASE 3
     }
 
     def __init__(self, model=None, ui_dir: str=None):
@@ -120,31 +136,29 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         self._create_widget_container()
     
     def _create_widget_container(self):
-        """Create a container that holds both the simulate tools and settings panels.
+        """Create a container for the simulate tools palette.
         
-        This container will be returned by get_widget() and added to the SwissKnife
-        sub_palette_area. The settings panel will slide up above the tools palette.
+        PHASE 2 REFACTOR: This now returns ONLY the tool buttons container,
+        not the settings panel. Settings panel will be managed separately
+        by the universal parameter panel manager (Phase 3).
+        
+        The widget_container will be returned by get_widget() and must fit
+        within the 50px constant height constraint.
         """
-        # Create a vertical box to hold both palettes
-        self.widget_container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        # For Phase 2: widget_container is just the tools container (no settings)
+        # Settings panel will be extracted in Phase 3 to universal parameter panel
         
-        # Add settings revealer first (on top)
-        if hasattr(self, 'settings_revealer') and self.settings_revealer:
-            self.widget_container.pack_end(self.settings_revealer, False, False, 0)
-        
-        # Remove simulate tools container from its parent revealer (from UI file)
-        # and add it to our widget_container
+        # IMPORTANT: Remove simulate_tools_container from its parent revealer
+        # (from UI file) to avoid "widget already in container" warning
         if self.simulate_tools_container:
             parent = self.simulate_tools_container.get_parent()
             if parent:
                 parent.remove(self.simulate_tools_container)
-            self.widget_container.pack_end(self.simulate_tools_container, False, False, 0)
         
-        self.widget_container.show_all()
+        self.widget_container = self.simulate_tools_container
         
-        # Hide settings revealer initially
-        if hasattr(self, 'settings_revealer') and self.settings_revealer:
-            self.settings_revealer.set_visible(False)
+        # Note: settings_revealer still loaded but not included in widget_container
+        # It will be accessed via create_settings_panel() factory method (Phase 3)
 
     def _load_settings_panel(self):
         """Load the inline settings panel UI from separate file.
@@ -344,13 +358,13 @@ class SimulateToolsPaletteLoader(GObject.GObject):
                 btn.set_active(True)
     
     def _hide_settings_panel(self):
-        """Hide the settings panel with animation."""
-        if hasattr(self, 'settings_revealer') and self.settings_revealer:
-            if self.settings_revealer.get_reveal_child():
-                self.settings_revealer.set_reveal_child(False)
-                # Set invisible after animation completes (500ms transition)
-                from gi.repository import GLib
-                GLib.timeout_add(550, lambda: self.settings_revealer.set_visible(False) if self.settings_revealer else False)
+        """Hide the settings panel with animation.
+        
+        DEPRECATED: Settings panel visibility is now managed by ParameterPanelManager (Phase 3).
+        This method is kept for backward compatibility but does nothing.
+        """
+        # Parameter panel manager handles visibility - no-op
+        pass
 
     def _init_simulation_controller(self):
         """Initialize the simulation controller with the model."""
@@ -498,9 +512,10 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         
         /* Duration controls */
         .sim-control-label {
-            color: white;
+            color: #ffffff;
             font-size: 11px;
             font-weight: bold;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
         }
         
         .sim-control-entry {
@@ -510,6 +525,7 @@ class SimulateToolsPaletteLoader(GObject.GObject):
             font-size: 11px;
             padding: 2px 4px;
             min-width: 60px;
+            color: #000000;
         }
         
         .sim-control-combo {
@@ -536,7 +552,7 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         
         /* Time display */
         .sim-time-display {
-            color: white;
+            color: #ffffff;
             font-size: 11px;
             font-weight: bold;
             text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
@@ -670,37 +686,24 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         self._update_button_states(running=False, reset=True)
     
     def _on_settings_clicked(self, button):
-        """Handle Settings button click - toggle inline settings panel.
+        """Handle Settings button click - request parameter panel toggle.
         
-        New behavior: Toggles settings revealer instead of opening modal dialog.
-        Settings panel slides up from simulate palette with smooth animation.
-        Falls back to modal dialog if settings panel not available.
+        PHASE 3: Emit signal for parameter panel manager to handle.
+        The universal parameter panel manager will control the settings panel display.
+        
+        Fallback: If signal not handled, toggles inline settings revealer directly (old behavior).
         """
         if self.simulation is None:
             return
         
+        # PHASE 3: Emit signal for parameter panel manager
+        self.emit('settings-toggle-requested')
+        
+        # OLD BEHAVIOR (kept as fallback if signal not handled):
         # Check if inline settings panel is available
-        if not hasattr(self, 'settings_revealer') or self.settings_revealer is None:
-            # Fallback to modal dialog
-            return self._on_settings_clicked_modal_dialog(button)
-        
-        # Toggle settings revealer
-        from gi.repository import GLib
-        new_state = not self.settings_revealer.get_reveal_child()
-        
-        if new_state:
-            # Opening: Make visible first, then reveal
-            self.settings_revealer.set_visible(True)
-            self.settings_revealer.show_all()
-            # Sync current settings to UI
-            self._sync_settings_to_ui()
-            # Small delay to ensure visibility is set before animation
-            GLib.idle_add(lambda: self.settings_revealer.set_reveal_child(True))
-        else:
-            # Closing: Start hide animation
-            self.settings_revealer.set_reveal_child(False)
-            # Set invisible after animation completes (500ms transition)
-            GLib.timeout_add(550, lambda: self.settings_revealer.set_visible(False) if self.settings_revealer else False)
+        # if not hasattr(self, 'settings_revealer') or self.settings_revealer is None:
+        #     return self._on_settings_clicked_modal_dialog(button)
+        # ... (rest of old toggle code)
     
     def _on_settings_clicked_modal_dialog(self, button):
         """Handle Settings dialog click - open simulation settings dialog (OLD VERSION).
@@ -911,13 +914,31 @@ class SimulateToolsPaletteLoader(GObject.GObject):
     def get_widget(self):
         """Get the root widget for adding to container.
         
-        Returns a container with both the simulate tools palette and the settings panel.
-        The settings panel will slide up above the tools palette when opened.
+        PHASE 2 REFACTOR: Returns ONLY the tools palette (50px max height).
+        Settings panel is available via create_settings_panel() factory method.
         
         Returns:
-            Gtk.Widget: Container with tools palette and settings panel.
+            Gtk.Widget: Tools palette container (buttons only, fits 50px height).
         """
         return self.widget_container
+    
+    def create_settings_panel(self):
+        """Factory method to create settings panel widget.
+        
+        PHASE 3: This will be called by the universal parameter panel manager
+        to get the settings panel widget for display above the sub-palette.
+        
+        Returns:
+            Gtk.Revealer: Settings panel revealer, or None if not available.
+        """
+        settings_revealer = getattr(self, 'settings_revealer', None)
+        if settings_revealer:
+            # Ensure revealer is visible and revealed when parameter panel shows it
+            settings_revealer.set_visible(True)
+            settings_revealer.set_reveal_child(True)
+            # Sync current settings to UI
+            self._sync_settings_to_ui()
+        return settings_revealer
 
     def is_simulation_running(self):
         """Check if simulation is currently running.

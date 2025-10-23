@@ -12,38 +12,39 @@
 /* Settings container */
 .settings-panel {
     background-color: #3e5266;
-    color: #ecf0f1;
+    color: #ffffff;
 }
 
 .settings-header {
     font-size: 14px;
     font-weight: bold;
-    color: #ecf0f1;
+    color: #ffffff;
     padding: 4px 0;
 }
 
 .settings-section-label {
     font-size: 10px;
     font-weight: bold;
-    color: #95a5a6;
+    color: #ffffff;
     letter-spacing: 0.5px;
     padding: 2px 0;
 }
 
 .settings-label-small {
     font-size: 11px;
-    color: #bdc3c7;
+    color: #ffffff;
+    font-weight: 500;
 }
 
 .settings-unit {
     font-size: 11px;
-    color: #95a5a6;
+    color: #ffffff;
     font-weight: bold;
 }
 
 /* Radio buttons */
 .settings-radio {
-    color: #ecf0f1;
+    color: #ffffff;
     padding: 4px 8px;
 }
 
@@ -54,7 +55,7 @@
 /* Entry fields */
 .settings-entry-small {
     background-color: #2c3e50;
-    color: #ecf0f1;
+    color: #ffffff;
     border: 1px solid #34495e;
     border-radius: 4px;
     padding: 4px 6px;
@@ -63,31 +64,35 @@
 
 /* Speed preset buttons */
 .speed-preset-button {
-    background-color: #34495e;
-    color: #bdc3c7;
-    border: 1px solid #1a252f;
+    background-color: #2c3e50;
+    color: #ffffff;
+    border: 2px solid #1a252f;
     border-radius: 4px;
     min-height: 36px;
     padding: 6px 8px;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: bold;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
 .speed-preset-button:hover {
-    background-color: #3e5266;
-    color: #ecf0f1;
+    background-color: #34495e;
+    color: #ffffff;
+    border-color: #3498db;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
 .speed-preset-button:checked {
-    background-color: #3498db;
-    color: white;
-    border-color: #2980b9;
+    background-color: #2980b9;
+    color: #ffffff;
+    border-color: #1c5985;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
 }
 
 /* Spin button */
 .settings-spin {
     background-color: #2c3e50;
-    color: #ecf0f1;
+    color: #ffffff;
     border: 1px solid #34495e;
     border-radius: 4px;
     padding: 4px 6px;
@@ -97,7 +102,7 @@
 /* Combo box */
 .settings-combo {
     background-color: #2c3e50;
-    color: #ecf0f1;
+    color: #ffffff;
     border: 1px solid #34495e;
     border-radius: 4px;
     padding: 6px 8px;
@@ -106,27 +111,33 @@
 
 /* Action buttons */
 .settings-button {
-    background-color: #34495e;
-    color: #bdc3c7;
-    border: 1px solid #1a252f;
+    background-color: #2c3e50;
+    color: #ffffff;
+    border: 2px solid #1a252f;
     border-radius: 4px;
     min-height: 40px;
     padding: 8px 12px;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: bold;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
 .settings-button:hover {
-    background-color: #3e5266;
-    color: #ecf0f1;
+    background-color: #34495e;
+    color: #ffffff;
+    border-color: #3498db;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
 .settings-button-primary {
-    background-color: #3498db;
-    color: white;
-    border-color: #2980b9;
+    background-color: #2980b9;
+    color: #ffffff;
+    border-color: #1c5985;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
 }
 
 .settings-button-primary:hover {
-    background-color: #52a8e0;
+    background-color: #3498db;
+    border-color: #2980b9;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
 }

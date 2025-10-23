@@ -1,6 +1,44 @@
 #!/usr/bin/env python3
 """SwissKnifePalette - Unified multi-mode palette for Petri net editing and simulation.
 
+⚠️  DEPRECATED - This file contains the original monolithic implementation (571 lines).
+⚠️  Use swissknife_palette_new.py instead - clean modular architecture.
+
+MIGRATION GUIDE:
+===============
+The new implementation is 100% API-compatible. To migrate:
+
+1. Change import:
+   OLD: from shypn.helpers.swissknife_palette import SwissKnifePalette
+   NEW: from shypn.helpers.swissknife_palette_new import SwissKnifePalette
+
+2. All signals, methods, and behavior preserved:
+   - get_widget() → main container
+   - set_mode(mode) → switch edit/simulate
+   - All signals work identically
+   - Animation timing unchanged (600ms)
+
+3. New modular architecture (6 separate files):
+   - swissknife_palette_new.py: Main coordinator (this replaces old monolith)
+   - swissknife_palette_ui.py: Widget construction
+   - swissknife_palette_animator.py: Animation state machine
+   - swissknife_palette_controller.py: Signal coordination
+   - swissknife_palette_registry.py: Plugin management
+   - parameter_panel_manager.py: Universal parameter panel (Phase 3)
+
+WHY REFACTORED:
+===============
+- OLD: 571-line monolith, all concerns in one class
+- NEW: Clean OOP, 6 focused modules, testable, extensible
+- BENEFIT: Foundation for constant-height architecture (Phase 2/3)
+- GOAL: Eliminate 70px height jump (Edit: 139px → Simulate: 209px)
+
+This original implementation will be kept temporarily for reference,
+then removed after Phase 2/3 completion and testing.
+
+---
+
+Original Documentation:
 This palette consolidates edit and simulate functionality into a single, 
 mode-aware interface with animated sub-palettes:
 - Edit sub-palette: Place, Transition, Arc, Select, Lasso tools
