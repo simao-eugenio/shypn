@@ -9,12 +9,14 @@
     <property name="default-height">600</property>
     <property name="visible">True</property>
 
-    <!-- Header Bar with window controls -->
+    <!-- Header Bar with window controls ONLY (no panel toggles) -->
     <child type="titlebar">
       <object class="GtkHeaderBar" id="header_bar">
         <property name="show-close-button">True</property>
         <property name="visible">True</property>
         <property name="title">Shypn</property>
+        
+        <!-- Window Control Buttons -->
         <child>
           <object class="GtkButton" id="maximize_button">
             <property name="visible">True</property>
@@ -54,7 +56,8 @@
       </object>
     </child>
 
-    <!-- Main content area: horizontal box with master palette + content -->
+    <!-- Phase 2: Master Palette Architecture -->
+    <!-- Layout: Master Palette (48px) → GtkStack (left dock) → Canvas (expands) -->
     <child>
       <object class="GtkBox" id="root_container">
         <property name="orientation">horizontal</property>
@@ -62,15 +65,15 @@
         <property name="hexpand">True</property>
         <property name="vexpand">True</property>
         
-        <!-- Master Palette Container (54px wide: 48px buttons + 6px padding, far left) -->
+        <!-- Master Palette slot (48px vertical toolbar, far left) -->
         <child>
           <object class="GtkBox" id="master_palette_slot">
             <property name="orientation">vertical</property>
             <property name="visible">True</property>
-            <property name="width-request">54</property>
-            <property name="hexpand">False</property>
+            <property name="width-request">48</property>
             <property name="vexpand">True</property>
-            <!-- MasterPalette widget will be inserted here programmatically -->
+            <property name="hexpand">False</property>
+            <!-- Master Palette widget will be added programmatically in Phase 3 -->
           </object>
           <packing>
             <property name="expand">False</property>
@@ -86,16 +89,16 @@
             <property name="hexpand">True</property>
             <property name="vexpand">True</property>
             
-            <!-- Paned layout: left dock + main workspace (no right dock) -->
+            <!-- Paned layout: left dock GtkStack + main workspace (no right dock) -->
             <child>
-              <object class="GtkPaned" id="left_paned">
+              <object class="GtkPaned" id="main_paned">
                 <property name="orientation">horizontal</property>
                 <property name="position">0</property>
                 <property name="visible">True</property>
                 <property name="can-focus">True</property>
                 <property name="vexpand">True</property>
                 
-                <!-- Left dock area - GtkStack for panel switching (NO reparenting!) -->
+                <!-- Left dock area - GtkStack for ALL 4 panels (Files, Pathways, Analyses, Topology) -->
                 <child>
                   <object class="GtkStack" id="left_dock_stack">
                     <property name="visible">False</property>
@@ -117,20 +120,6 @@
                       </packing>
                     </child>
                     
-                    <!-- Analyses Panel Container -->
-                    <child>
-                      <object class="GtkBox" id="analyses_panel_container">
-                        <property name="orientation">vertical</property>
-                        <property name="visible">True</property>
-                        <property name="vexpand">True</property>
-                        <property name="hexpand">True</property>
-                        <!-- Content loaded from right_panel.ui at startup -->
-                      </object>
-                      <packing>
-                        <property name="name">analyses</property>
-                      </packing>
-                    </child>
-                    
                     <!-- Pathways Panel Container -->
                     <child>
                       <object class="GtkBox" id="pathways_panel_container">
@@ -142,6 +131,20 @@
                       </object>
                       <packing>
                         <property name="name">pathways</property>
+                      </packing>
+                    </child>
+                    
+                    <!-- Analyses Panel Container -->
+                    <child>
+                      <object class="GtkBox" id="analyses_panel_container">
+                        <property name="orientation">vertical</property>
+                        <property name="visible">True</property>
+                        <property name="vexpand">True</property>
+                        <property name="hexpand">True</property>
+                        <!-- Content loaded from right_panel.ui at startup -->
+                      </object>
+                      <packing>
+                        <property name="name">analyses</property>
                       </packing>
                     </child>
                     
@@ -166,7 +169,7 @@
                   </packing>
                 </child>
                 
-                <!-- Main workspace area (canvas only, no right dock) -->
+                <!-- Main workspace area (canvas) -->
                 <child>
                   <object class="GtkBox" id="main_workspace">
                     <property name="orientation">vertical</property>

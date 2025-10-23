@@ -401,20 +401,20 @@ class NetObjPersistency:
             except Exception:
                 dialog.set_current_name('default.shy')
         
-        # Use async signal-based approach instead of blocking run()
-        result_container = [None]  # Mutable container for result
+        # WAYLAND FIX: Use dialog.run() instead of nested Gtk.main()
+        # Nested event loops cause Error 71 on Wayland
+        dialog.set_modal(True)
+        if parent:
+            dialog.set_transient_for(parent)
         
-        def on_response(dlg, response_id):
-            if response_id == Gtk.ResponseType.OK:
-                result_container[0] = dlg.get_filename()
-            dlg.destroy()
-            Gtk.main_quit()  # Exit nested main loop
+        response = dialog.run()
+        filepath = None
         
-        dialog.connect('response', on_response)
-        dialog.show()
-        Gtk.main()  # Run nested event loop until dialog responds
+        if response == Gtk.ResponseType.OK:
+            filepath = dialog.get_filename()
         
-        filepath = result_container[0]
+        dialog.destroy()
+        
         if not filepath:
             return None
         
@@ -539,20 +539,20 @@ class NetObjPersistency:
             except Exception:
                 pass
         
-        # Use async signal-based approach instead of blocking run()
-        result_container = [None]  # Mutable container for result
+        # WAYLAND FIX: Use dialog.run() instead of nested Gtk.main()
+        # Nested event loops cause Error 71 on Wayland
+        dialog.set_modal(True)
+        if parent:
+            dialog.set_transient_for(parent)
         
-        def on_response(dlg, response_id):
-            if response_id in (Gtk.ResponseType.OK, Gtk.ResponseType.ACCEPT):
-                result_container[0] = dlg.get_filename()
-            dlg.destroy()
-            Gtk.main_quit()  # Exit nested main loop
+        response = dialog.run()
+        filepath = None
         
-        dialog.connect('response', on_response)
-        dialog.show()
-        Gtk.main()  # Run nested event loop until dialog responds
+        if response in (Gtk.ResponseType.OK, Gtk.ResponseType.ACCEPT):
+            filepath = dialog.get_filename()
         
-        filepath = result_container[0]
+        dialog.destroy()
+        
         if filepath:
             self._last_directory = os.path.dirname(filepath)
         return filepath

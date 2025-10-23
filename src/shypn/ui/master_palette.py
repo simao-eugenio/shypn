@@ -78,15 +78,16 @@ UI_PATH = Path(__file__).parents[3] / 'ui' / 'palettes' / 'master_palette.ui'
 
 
 # Material Design inspired CSS for master palette - high contrast, bold colors
+# Width: 48px = 40px button + 6px margin + 2px padding
 PALETTE_CSS = """
-/* Master Palette Container */
+/* Master Palette Container - 48px total width */
 #master_palette_container {
     background-color: #263238;
     border-right: 2px solid #37474F;
-    padding: 4px;
+    padding: 2px;
 }
 
-/* Palette Buttons - Base State */
+/* Palette Buttons - Base State (40x40px for 32x32px icons) */
 .palette-button {
     background-color: #37474F;
     border: 2px solid #455A64;
@@ -94,8 +95,8 @@ PALETTE_CSS = """
     color: #FFFFFF;
     transition: all 150ms ease;
     margin: 3px;
-    min-width: 50px;
-    min-height: 50px;
+    min-width: 40px;
+    min-height: 40px;
 }
 
 .palette-button:hover {
@@ -181,9 +182,10 @@ class MasterPalette:
 
         if not self.container:
             # Create fallback container
+            # Width calculation: 40px button + 6px margin (3px each) + 2px padding (1px each) = 48px
             self.container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
             self.container.set_name('master_palette_container')
-            self.container.set_size_request(54, -1)
+            self.container.set_size_request(48, -1)
             self.container.set_spacing(0)
             self.container.set_hexpand(False)
             self.container.set_vexpand(True)
@@ -225,10 +227,21 @@ class MasterPalette:
 
     def _create_buttons(self):
         """Pack buttons from top using pack_start; spacer at end."""
-        for name, icon, tooltip in self.BUTTON_ORDER:
+        # Add top margin for better aesthetics
+        top_spacer = Gtk.Box()
+        top_spacer.set_size_request(-1, 10)
+        self.container.pack_start(top_spacer, False, False, 0)
+        
+        for i, (name, icon, tooltip) in enumerate(self.BUTTON_ORDER):
             pb = PaletteButton(name, icon, tooltip)
             self.buttons[name] = pb
             self.container.pack_start(pb.widget, False, False, 0)
+            
+            # Add spacing between buttons (8px between each button)
+            if i < len(self.BUTTON_ORDER) - 1:
+                separator = Gtk.Box()
+                separator.set_size_request(-1, 8)
+                self.container.pack_start(separator, False, False, 0)
 
         # Disable topology button by default (not implemented yet)
         if 'topology' in self.buttons:

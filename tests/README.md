@@ -5,7 +5,7 @@
 
 This directory contains all test scripts and test modules for the SHYpn project. **110+ test files** covering various aspects of the application.
 
-## Test Status
+## Test Status (October 2025)
 
 **Property Dialog Tests**: ✅ 34/34 passing (100%)
 - Place dialogs: 9/9 passing
@@ -13,6 +13,8 @@ This directory contains all test scripts and test modules for the SHYpn project.
 - Transition dialogs: 12/12 passing
 
 **Overall Coverage**: High coverage across all major components
+
+**Repository Organization**: All test files consolidated into this directory (October 2025)
 
 ## Organization
 
@@ -26,27 +28,45 @@ Tests are organized by functionality:
 - **Performance tests**: Analysis panel optimization validation
 - **Check scripts**: Validation scripts for specific features
 
-## Recent Changes (December 2024)
+## Recent Changes
 
-### Property Dialog Tests (New)
+### October 2025 Updates
+
+#### Test Consolidation
+All test files consolidated from repository root into this directory:
+- ✅ **13 test Python files** moved from root (October 22, 2025)
+- ✅ Files organized into logical categories
+- ✅ All tests maintain 100% functionality
+- ✅ Clean repository structure achieved
+
+**Files moved**:
+- `test_dialog_speed.py` - Dialog performance testing
+- `test_dialogs.py` - Dialog functionality tests
+- `test_exclusive_master_palette.py` - Master Palette exclusive button logic
+- `test_file_chooser.py` - File chooser tests
+- `test_file_chooser_app.py` - File chooser application tests
+- `test_float_button.py` - Panel float button functionality
+- `test_gtk_toggle_behavior.py` - GTK toggle button behavior
+- `test_headless_dialog_import.py` - Headless dialog import tests
+- `test_master_palette_integration.py` - Master Palette integration
+- `test_master_palette_logic.py` - Master Palette logic tests
+- `test_master_palette_visual.py` - Master Palette visual tests
+- `test_phase6_master_palette.py` - Phase 6 Master Palette tests
+- `test_real_model.py` - Real model testing
+
+### December 2024 Updates
+
+#### Property Dialog Tests
 - ✅ **34/34 tests passing (100%)** - Complete property dialog integration
 - Place dialog tests: Dialog loading, topology integration, persistence
 - Arc dialog tests: Endpoint display, weight updates, canvas integration
 - Transition dialog tests: Behavior configuration, analysis signaling, state management
 - See **[prop_dialogs/README.md](prop_dialogs/README.md)** for details
 
-### Performance Validation
+#### Performance Validation
 - ✅ Analysis panel optimization verified (95% improvement)
 - ✅ Update frequency validation (250ms confirmed)
 - ✅ CPU usage reduction verified (75% improvement)
-
-### October 2025 Updates
-
-### Test Consolidation
-All test files consolidated from repository root into this directory:
-- 18 `.py` test files moved from root
-- 1 `.sh` test script moved from root
-- Organized into logical groupings
 
 ### Test Categories
 
@@ -103,7 +123,13 @@ tests/
 │   ├── test_transition_dialog_integration.py (12 tests)
 │   └── run_all_tests.sh
 ├── test_*_model_integration.py  # Model integration tests
-├── test_*.py         # Individual test modules (100+)
+├── test_*.py         # Individual test modules (120+)
+│   ├── test_dialog_*.py          # Dialog tests (moved from root Oct 2025)
+│   ├── test_master_palette_*.py  # Master Palette tests (moved from root Oct 2025)
+│   ├── test_file_chooser*.py     # File chooser tests (moved from root Oct 2025)
+│   ├── test_float_button.py      # Float button tests (moved from root Oct 2025)
+│   ├── test_exclusive_master_palette.py  # Exclusive button logic (moved from root Oct 2025)
+│   └── ...
 ├── check_*.py        # Validation scripts
 └── *.sh              # Shell test scripts
 ```

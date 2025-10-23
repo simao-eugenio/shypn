@@ -79,7 +79,6 @@ class TopologyPanelBase(ABC):
                 raise RuntimeError("Required widgets not found in UI file")
             
             # Panel content stays in its own window - no reparenting
-            print(f"[LOAD] Topology panel loaded (content stays in panel window)", file=sys.stderr)
             
             # Connect window delete event
             self.window.connect('delete-event', self._on_window_delete)
@@ -95,7 +94,6 @@ class TopologyPanelBase(ABC):
             
             # Mark as loaded
             self.is_loaded = True
-            print(f"[LOAD] Topology panel load() complete, is_loaded=True", file=sys.stderr)
             
         except Exception as e:
             print(f"Error loading topology panel UI: {e}", file=sys.stderr)
@@ -199,6 +197,170 @@ class TopologyPanelBase(ABC):
         # Hide window instead of destroying
         window.hide()
         return True  # Prevent destruction
+    
+    # ========================================================================
+    # PHASE 4: GtkStack Integration Methods
+    # New architecture: Panels live in GtkStack, controlled by Master Palette
+    # ========================================================================
+    
+    def add_to_stack(self, stack, container, panel_name='topology'):
+        """Add panel content to a GtkStack container (Phase 4: new architecture).
+        
+        Args:
+            stack: GtkStack widget that will contain all panels
+            container: GtkBox container within the stack for this panel
+            panel_name: Name identifier for this panel in the stack ('topology')
+        """
+        
+        if self.window is None:
+            self.load()
+        
+        # Extract content from window
+        current_parent = self.content.get_parent()
+        if current_parent == self.window:
+            self.window.remove(self.content)
+        elif current_parent and current_parent != container:
+            current_parent.remove(self.content)
+        
+        # Add content to stack container
+        if self.content.get_parent() != container:
+            container.add(self.content)
+        
+        # Mark as hanged in stack mode (skeleton pattern)
+        self.is_hanged = True
+        self.parent_container = container
+        self._stack = stack
+        self._stack_panel_name = panel_name
+        
+        # Hide window (not needed in stack mode)
+        if self.window:
+            self.window.hide()
+        
+    
+    def show_in_stack(self):
+        """Show this panel in the GtkStack (Phase 4: Master Palette control)."""
+        
+        if not hasattr(self, '_stack') or not self._stack:
+            return
+        
+        # Make stack visible
+        if not self._stack.get_visible():
+            self._stack.set_visible(True)
+        
+        # Set this panel as active child
+        self._stack.set_visible_child_name(self._stack_panel_name)
+        
+        # Re-enable show_all and make content visible
+        if self.content:
+            self.content.set_no_show_all(False)  # Re-enable show_all
+            self.content.show_all()  # Show all child widgets recursively
+        
+        # Make container visible too
+        if self.parent_container:
+            self.parent_container.set_visible(True)
+        
+    
+    def hide_in_stack(self):
+        """Hide this panel in the GtkStack (Phase 4: Master Palette control)."""
+        
+        # Hide the content using no_show_all to prevent show_all from revealing it
+        if self.content:
+            self.content.set_no_show_all(True)
+            self.content.hide()
+        
+        # Hide container too
+        if self.parent_container:
+            self.parent_container.set_visible(False)
+        
+    
+    # ========================================================================
+    # Float/Detach Support (Skeleton Pattern)
+    # ========================================================================
+    
+    def detach(self):
+        """Detach panel from container and show as floating window.
+        
+        Skeleton pattern: synchronous, simple state flag.
+        """
+        print(f"[TOPOLOGY] detach() called", file=sys.stderr)
+        
+        if not hasattr(self, 'is_hanged') or not self.is_hanged:
+            print(f"[TOPOLOGY] Already detached, nothing to do", file=sys.stderr)
+            return
+        
+        # Remove content from container
+        if self.parent_container:
+            self.parent_container.remove(self.content)
+            self.parent_container.set_visible(False)  # Hide empty container
+        
+        # Hide the stack if this was the active panel
+        if hasattr(self, '_stack') and self._stack:
+            self._stack.set_visible(False)
+        
+        # Add content to window
+        self.window.add(self.content)
+        
+        # Update state
+        self.is_hanged = False
+        
+        # Update float button state (if it exists)
+        if hasattr(self, 'float_button') and self.float_button:
+            self._updating_button = True
+            self.float_button.set_active(True)
+            self._updating_button = False
+        
+        # Show floating window
+        self.window.show_all()
+        
+        print(f"[TOPOLOGY] Panel detached and floating", file=sys.stderr)
+    
+    def float(self):
+        """Alias for detach() - make panel float as separate window."""
+        self.detach()
+    
+    def hang_on(self, container):
+        """Attach panel to container (opposite of detach).
+        
+        Args:
+            container: GtkBox or container to attach to
+        """
+        print(f"[TOPOLOGY] hang_on() called", file=sys.stderr)
+        
+        if hasattr(self, 'is_hanged') and self.is_hanged:
+            print(f"[TOPOLOGY] Already attached, nothing to do", file=sys.stderr)
+            return
+        
+        # Hide floating window
+        self.window.hide()
+        
+        # Remove content from window
+        self.window.remove(self.content)
+        
+        # Add content to container
+        container.pack_start(self.content, True, True, 0)
+        container.set_visible(True)  # Show container with content
+        
+        # Update state and references
+        self.is_hanged = True
+        self.parent_container = container
+        
+        # Update float button state (if it exists)
+        if hasattr(self, 'float_button') and self.float_button:
+            self._updating_button = True
+            self.float_button.set_active(False)
+            self._updating_button = False
+        
+        # Show the stack if available
+        if hasattr(self, '_stack') and self._stack:
+            self._stack.set_visible(True)
+            if hasattr(self, '_stack_panel_name'):
+                self._stack.set_visible_child_name(self._stack_panel_name)
+        
+        print(f"[TOPOLOGY] Panel attached to container", file=sys.stderr)
+    
+    def attach_to(self, container):
+        """Alias for hang_on() - attach panel to container."""
+        self.hang_on(container)
 
 
 __all__ = ['TopologyPanelBase']

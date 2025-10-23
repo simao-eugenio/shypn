@@ -3,12 +3,14 @@
 
 A GTK-based visual editor for Stochastic Hybrid Petri Nets with advanced modeling capabilities.
 
-## Project Status (December 2024)
+## Project Status (October 2025)
 
 **Current State**: Active development - Feature-rich Petri net editor
 - ✅ GTK3 stable implementation with Wayland support
 - ✅ Multi-document canvas system with tabbed interface
-- ✅ Dockable/undockable left and right panels
+- ✅ Master Palette unified panel control system
+- ✅ Dockable/undockable panels with float/attach functionality
+- ✅ File Panel V3 with normalized XML UI architecture
 - ✅ File explorer with hierarchical tree view and file operations
 - ✅ SwissKnife unified palette (Edit/Simulate/Layout tools)
 - ✅ Property dialogs for all Petri net objects with topology integration
@@ -19,8 +21,15 @@ A GTK-based visual editor for Stochastic Hybrid Petri Nets with advanced modelin
 - ✅ Project management system
 - ✅ Canvas context menus with rich functionality
 - ✅ **Production-ready codebase** (all debug output removed, zero syntax errors)
+- ✅ **Clean repository structure** (test files organized, shell scripts archived)
 
-**Recent Updates** (December 2024):
+**Recent Updates** (October 2025):
+- ✅ **Master Palette system** - Unified panel control with exclusive button logic
+- ✅ **Panel architecture refactoring** - All 5 panels use skeleton pattern (synchronous float/attach)
+- ✅ **File Panel V3** - Normalized XML UI + OOP architecture (Base → Loader → Controller)
+- ✅ **CategoryFrame structure** - Programmatic collapsible categories with exclusive expansion
+- ✅ **Float/attach functionality** - All panels support detach to floating window
+- ✅ **Repository organization** - Test files moved to tests/, shell scripts archived to archive/sh/
 - ✅ **Project organization** - Moved files to proper directories (doc/, tests/, scripts/)
 - ✅ **Analysis panel performance optimization** - 95% faster updates (156ms → 7ms)
 - ✅ **Locality integration fix** - Complete P-T-P pattern plotting in analyses
@@ -91,8 +100,9 @@ shypn/
 │       ├── pathway/       # Pathway enhancement pipeline
 │       ├── ui/            # UI component classes
 │       └── utils/         # Utility functions
-├── tests/          # Complete test suite (110+ test files)
+├── tests/          # Complete test suite (120+ test files)
 │   ├── prop_dialogs/      # Property dialog integration tests (34 tests)
+│   ├── test_*.py          # All test files (moved from root Oct 2025)
 │   ├── test_arc_model_integration.py
 │   ├── test_place_model_integration.py
 │   ├── test_transition_model_integration.py
@@ -112,17 +122,20 @@ shypn/
 **Key Directories**:
 - `src/shypn/`: Main application source code (Python) - Production ready
   - `analyses/`: Real-time plotting with 95% performance improvement
-  - `helpers/`: Property dialog loaders with complete topology integration
-- `ui/`: GTK UI definition files (Glade XML format) - All 20 files actively used
-- `tests/`: Complete test suite (110+ files, 34 property dialog tests)
+  - `helpers/`: Panel loaders (Files V3, Analyses, Pathways, Topology) with skeleton pattern
+  - `ui/`: UI component classes (FilePanelBase, CategoryFrame, dialogs, controllers)
+- `ui/`: GTK UI definition files (Glade XML format) - All files actively used
+  - `panels/`: Panel UI definitions including file_panel_v3.ui
+- `tests/`: Complete test suite (120+ files, 34 property dialog tests)
+  - All test files consolidated here (moved from root Oct 2025)
   - `prop_dialogs/`: Integration tests for Place, Arc, and Transition dialogs (100% passing)
 - `scripts/`: Utility scripts (6 files) - KEGG inspection, topology comparison, headless testing
 - `workspace/`: User workspace with examples and projects
 - `doc/`: Comprehensive technical documentation (430+ files)
-  - Recent additions: 19 files covering performance optimization, locality integration, dialog testing
+  - Recent additions: Panel architecture, File Panel V3, Master Palette system
 - `archive/`: Archived and deprecated code (not for active use)
   - `deprecated/`: 6 unused Python files
-  - `ui_removed/`: Deprecated UI files (none yet)
+  - `sh/`: Historical test shell scripts (4 files, moved Oct 2025)
   - Legacy analysis and debug scripts
 
 ## Installation
