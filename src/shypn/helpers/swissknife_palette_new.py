@@ -303,13 +303,20 @@ class SwissKnifePalette(GObject.GObject):
                 self.drag_active = True
                 self.drag_pending = False
                 
-                # NOW change cursor to grabbing (user is clearly dragging)
+                # IMPORTANT: Reset start position to current position
+                # This prevents the initial jump when drag activates
+                self.drag_start_x = event.x_root
+                self.drag_start_y = event.y_root
+                
+                # Change cursor to grabbing (user is clearly dragging)
                 widget.get_window().set_cursor(Gdk.Cursor.new_from_name(widget.get_display(), 'grabbing'))
+                
+                # Don't update position on activation - just set up state
+                return True
             
             # If drag is active, update position
             if self.drag_active:
                 # Calculate delta from last position
-                # (drag_start gets updated after each move for smooth incremental updates)
                 dx = event.x_root - self.drag_start_x
                 dy = event.y_root - self.drag_start_y
                 
