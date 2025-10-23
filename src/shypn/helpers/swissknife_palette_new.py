@@ -146,26 +146,24 @@ class SwissKnifePalette(GObject.GObject):
         Places controls at top-right between sub-palette area and category buttons,
         without adding extra height to the palette.
         """
-        # Create float/attach toggle button
-        self.float_toggle_button = Gtk.Button()
-        self.float_toggle_button.set_relief(Gtk.ReliefStyle.NONE)
-        self.float_toggle_button.set_size_request(32, 32)
-        self.float_toggle_button.set_tooltip_text('Drag to move | Click to Float/Attach')
-        self.is_floating = True  # Default to floating (already in overlay)
+        # Create a horizontal box for drag handle + button
+        control_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=2)
         
-        # Icon for float/attach (📌 pin or ✕ close)
-        self.float_icon = Gtk.Label()
-        self._update_float_icon()
-        self.float_toggle_button.add(self.float_icon)
-        self.float_toggle_button.get_style_context().add_class('float-toggle-button')
-        self.float_toggle_button.connect('clicked', self._on_float_toggle_clicked)
+        # Create drag handle (separate from button for clear interaction)
+        drag_handle = Gtk.Label()
+        drag_handle.set_markup('<span foreground="#cccccc" font="12">⋮⋮</span>')
+        drag_handle.set_tooltip_text('Drag to move palette')
+        drag_handle.set_size_request(20, 32)
+        drag_handle.set_halign(Gtk.Align.CENTER)
+        drag_handle.set_valign(Gtk.Align.CENTER)
         
-        # Wrap button in EventBox for drag functionality
+        # Wrap drag handle in EventBox for drag functionality
         self.drag_event_box = Gtk.EventBox()
-        self.drag_event_box.add(self.float_toggle_button)
+        self.drag_event_box.add(drag_handle)
         self.drag_event_box.set_above_child(False)
+        self.drag_event_box.get_style_context().add_class('drag-handle')
         
-        # Enable events
+        # Enable events for drag
         self.drag_event_box.add_events(
             Gdk.EventMask.BUTTON_PRESS_MASK |
             Gdk.EventMask.BUTTON_RELEASE_MASK |
@@ -177,22 +175,41 @@ class SwissKnifePalette(GObject.GObject):
         self.drag_event_box.connect('button-release-event', self._on_drag_end)
         self.drag_event_box.connect('motion-notify-event', self._on_drag_motion)
         
-        # Change cursor on hover
+        # Change cursor on hover for drag handle
         self.drag_event_box.connect('enter-notify-event', 
-            lambda w, e: w.get_window().set_cursor(Gdk.Cursor.new_from_name(w.get_display(), 'all-scroll')) if self.is_floating else None)
+            lambda w, e: w.get_window().set_cursor(Gdk.Cursor.new_from_name(w.get_display(), 'grab')) if self.is_floating else None)
         self.drag_event_box.connect('leave-notify-event', 
             lambda w, e: w.get_window().set_cursor(None) if not self.drag_active else None)
         
-        # Create overlay to position button at top-right of palette
+        # Create float/attach toggle button (separate from drag handle)
+        self.float_toggle_button = Gtk.Button()
+        self.float_toggle_button.set_relief(Gtk.ReliefStyle.NONE)
+        self.float_toggle_button.set_size_request(28, 32)
+        self.float_toggle_button.set_tooltip_text('Click to Float/Attach')
+        self.is_floating = False  # Default to attached (bottom-center)
+        
+        # Icon for float/attach
+        self.float_icon = Gtk.Label()
+        self._update_float_icon()
+        self.float_toggle_button.add(self.float_icon)
+        self.float_toggle_button.get_style_context().add_class('float-toggle-button')
+        self.float_toggle_button.connect('clicked', self._on_float_toggle_clicked)
+        
+        # Pack drag handle and button together
+        control_box.pack_start(self.drag_event_box, False, False, 0)
+        control_box.pack_start(self.float_toggle_button, False, False, 0)
+        control_box.get_style_context().add_class('control-box')
+        
+        # Create overlay to position controls at top-right of palette
         overlay = Gtk.Overlay()
         overlay.add(self.ui.main_container)
-        overlay.add_overlay(self.drag_event_box)
+        overlay.add_overlay(control_box)
         
         # Position at top-right
-        self.drag_event_box.set_halign(Gtk.Align.END)
-        self.drag_event_box.set_valign(Gtk.Align.START)
-        self.drag_event_box.set_margin_top(4)
-        self.drag_event_box.set_margin_end(4)
+        control_box.set_halign(Gtk.Align.END)
+        control_box.set_valign(Gtk.Align.START)
+        control_box.set_margin_top(4)
+        control_box.set_margin_end(4)
         
         # Set overlay as the draggable container
         self.draggable_container = overlay
@@ -200,11 +217,11 @@ class SwissKnifePalette(GObject.GObject):
     def _update_float_icon(self):
         """Update float/attach button icon based on current state."""
         if self.is_floating:
-            # Show arrows icon when floating (indicates draggable + click to attach)
-            self.float_icon.set_markup('<span foreground="#ffffff" font="14">⇔</span>')
+            # Show pin down icon when floating (click to attach/pin down)
+            self.float_icon.set_markup('<span foreground="#ffffff" font="12">📌</span>')
         else:
-            # Show pin icon when attached (click to float)
-            self.float_icon.set_markup('<span foreground="#ffffff" font="14">�</span>')
+            # Show float/release icon when attached (click to float/unpin)
+            self.float_icon.set_markup('<span foreground="#ffffff" font="12">↖</span>')
     
     def _on_float_toggle_clicked(self, button):
         """Handle float/attach toggle button click.
@@ -429,24 +446,43 @@ class SwissKnifePalette(GObject.GObject):
             padding: 4px;
         }
         
-        /* Float/Attach toggle button (overlaid at top-right) */
-        .float-toggle-button {
+        /* Control box container */
+        .control-box {
             background: rgba(60, 70, 80, 0.85);
             border: 1px solid rgba(100, 110, 120, 0.6);
             border-radius: 4px;
+            padding: 2px;
+        }
+        
+        /* Drag handle */
+        .drag-handle {
+            background: transparent;
+            padding: 4px 2px;
+            min-width: 20px;
+            min-height: 32px;
+        }
+        
+        .drag-handle:hover {
+            background: rgba(120, 130, 140, 0.5);
+            border-radius: 3px;
+        }
+        
+        /* Float/Attach toggle button */
+        .float-toggle-button {
+            background: transparent;
+            border: none;
             padding: 4px;
-            min-width: 32px;
+            min-width: 28px;
             min-height: 32px;
         }
         
         .float-toggle-button:hover {
-            background: rgba(80, 90, 100, 0.95);
-            border-color: rgba(120, 130, 140, 0.8);
+            background: rgba(120, 130, 140, 0.5);
+            border-radius: 3px;
         }
         
         .float-toggle-button:active {
-            background: rgba(100, 110, 120, 0.95);
-            border-color: rgba(140, 150, 160, 0.9);
+            background: rgba(140, 150, 160, 0.6);
         }
         """
         
