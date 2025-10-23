@@ -47,7 +47,8 @@ try:
     from shypn.edit.tools_palette_new import ToolsPalette
     from shypn.edit.operations_palette_new import OperationsPalette
     # SwissKnifePalette - unified palette replacing ToolsPalette + OperationsPalette
-    from shypn.helpers.swissknife_palette import SwissKnifePalette
+    # PHASE 3 COMPLETE: Using new modular architecture with constant height + parameter panels
+    from shypn.helpers.swissknife_palette_new import SwissKnifePalette
     from shypn.helpers.swissknife_tool_registry import ToolRegistry
 except ImportError as e:
     print(f'ERROR: Cannot import new OOP palettes: {e}', file=sys.stderr)
@@ -957,6 +958,10 @@ class ModelCanvasLoader:
         
         elif tool_id == 'layout_force':
             self._on_layout_force_clicked(None, drawing_area, canvas_manager)
+        
+        elif tool_id == 'layout_settings':
+            # Toggle layout parameter panel
+            palette.parameter_manager.toggle_panel('layout')
     
     def _on_swissknife_mode_change_requested(self, palette, requested_mode, canvas_manager, drawing_area):
         """Handle mode change request from SwissKnifePalette.
