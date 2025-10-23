@@ -460,19 +460,29 @@ class LeftPanelLoaderVSCode:
         if self.project_controller:
             self.project_controller.set_parent_window(window)
     
-    def add_to_stack(self, stack, panel_name='files'):
-        """Add panel content to GtkStack for docked mode."""
-        if not self.content or not stack:
+    def add_to_stack(self, stack, container, panel_name='files'):
+        """Add panel content to GtkStack for docked mode.
+        
+        Args:
+            stack: GtkStack widget that will contain all panels
+            container: GtkBox container within the stack for this panel
+            panel_name: Name identifier for this panel in the stack ('files')
+        """
+        if not self.content or not container:
             return
         
+        # Remove from current parent
         parent = self.content.get_parent()
         if parent == self.window:
             self.window.remove(self.content)
-        elif parent:
+        elif parent and parent != container:
             parent.remove(self.content)
         
-        stack.add_named(self.content, panel_name)
-        self.parent_container = stack
+        # Add content to container
+        if self.content.get_parent() != container:
+            container.add(self.content)
+        
+        self.parent_container = container
         self._stack = stack
         self._stack_panel_name = panel_name
         print(f"[STACK] FilePanel (VS Code) add_to_stack() called for panel '{panel_name}'", file=sys.stderr)
@@ -506,3 +516,24 @@ class LeftPanelLoaderVSCode:
             self.parent_container.set_visible(False)
         
         print("[STACK] FilePanel (VS Code) hidden in stack", file=sys.stderr)
+
+
+def create_left_panel(ui_path=None, base_path=None):
+    """Convenience function to create and load the VS Code-style left panel.
+    
+    Args:
+        ui_path: Optional path to left_panel_vscode.ui (default: auto-detected).
+        base_path: Optional base path for file explorer (default: models directory).
+        
+    Returns:
+        LeftPanelLoaderVSCode: The loaded left panel loader instance.
+        
+    Example:
+        loader = create_left_panel(base_path="/home/user/projects/models")
+        loader.window.show_all()  # Show as floating
+        # or
+        loader.add_to_stack(stack, container)  # Attach to GtkStack
+    """
+    loader = LeftPanelLoaderVSCode(ui_path, base_path)
+    loader.load()  # Make sure to load the UI
+    return loader

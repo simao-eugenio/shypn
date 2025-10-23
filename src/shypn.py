@@ -41,13 +41,17 @@ except Exception as e:
 
 # TEST MODE: Check which file panel to use
 USE_SIMPLE_TEST_PANEL = os.environ.get('SHYPN_USE_SIMPLE_PANEL', '0') == '1'
-USE_FILE_PANEL_V2 = os.environ.get('SHYPN_USE_FILE_PANEL_V2', '1') == '1'  # Default to V2
+USE_FILE_PANEL_V2 = os.environ.get('SHYPN_USE_FILE_PANEL_V2', '0') == '1'  # Old V2 panel
+USE_VSCODE_PANEL = os.environ.get('SHYPN_USE_VSCODE_PANEL', '1') == '1'  # Default to VS Code panel
 
 # Import panel loaders from src/shypn/helpers/
 try:
 	if USE_SIMPLE_TEST_PANEL:
 		# Simple test panel will be defined later (skip import)
 		pass
+	elif USE_VSCODE_PANEL:
+		from shypn.helpers.left_panel_loader_vscode import create_left_panel
+		print("[INIT] Using VS Code-style File Panel (Explorer)", file=sys.stderr)
 	elif USE_FILE_PANEL_V2:
 		from shypn.helpers.file_panel_v3_loader import create_file_panel_v3 as create_left_panel
 		print("[INIT] Using File Panel V3 (XML UI + OOP)", file=sys.stderr)
