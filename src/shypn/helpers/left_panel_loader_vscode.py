@@ -178,13 +178,24 @@ class LeftPanelLoaderVSCode:
         self.categories.append(self.files_category)
     
     def _create_project_info_category(self, container):
-        """Create Project Information category."""
+        """Create Project Information category.
+        
+        TODO: Create ProjectInfoController to populate this category with live data:
+              - Project name
+              - Project path
+              - Created date
+              - Last modified date
+              - Models count
+              - Project status
+              - Git status (if applicable)
+              Controller should update when project changes or files are added/removed.
+        """
         self.project_info_category = CategoryFrame(
             title="PROJECT INFORMATION",
             expanded=False  # Collapsed by default
         )
         
-        # Get project info content from builder
+        # Get project info content from builder (currently static placeholder)
         project_info_content = self.builder.get_object('project_info_content')
         if project_info_content:
             self.project_info_category.set_content(project_info_content)
@@ -405,7 +416,21 @@ class LeftPanelLoaderVSCode:
         return False
     
     def _init_project_controller(self):
-        """Initialize project actions controller."""
+        """Initialize project actions controller.
+        
+        TODO: Add ProjectInfoController to populate PROJECT INFORMATION category.
+              This controller should:
+              1. Monitor workspace for changes (file additions/deletions)
+              2. Display current project statistics (models count, etc.)
+              3. Show project metadata (name, path, dates)
+              4. Update live when project state changes
+              5. Integrate with persistency manager for project data
+              
+              Implementation:
+              - Create src/shypn/helpers/project_info_controller.py
+              - Wire to project_info_content widget
+              - Connect to file_explorer signals for updates
+        """
         try:
             self.project_controller = ProjectActionsController(self.builder, parent_window=None)
             self.project_controller.on_quit_requested = self._on_quit_requested
