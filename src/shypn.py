@@ -39,9 +39,21 @@ except Exception as e:
 	print('ERROR: GTK3 (PyGObject) not available:', e, file=sys.stderr)
 	sys.exit(1)
 
+# TEST MODE: Check which file panel to use
+USE_SIMPLE_TEST_PANEL = os.environ.get('SHYPN_USE_SIMPLE_PANEL', '0') == '1'
+USE_FILE_PANEL_V2 = os.environ.get('SHYPN_USE_FILE_PANEL_V2', '1') == '1'  # Default to V2
+
 # Import panel loaders from src/shypn/helpers/
 try:
-	from shypn.helpers.left_panel_loader import create_left_panel
+	if USE_SIMPLE_TEST_PANEL:
+		# Simple test panel will be defined later (skip import)
+		pass
+	elif USE_FILE_PANEL_V2:
+		from shypn.helpers.file_panel_v3_loader import create_file_panel_v3 as create_left_panel
+		print("[INIT] Using File Panel V3 (XML UI + OOP)", file=sys.stderr)
+	else:
+		from shypn.helpers.left_panel_loader import create_left_panel
+		print("[INIT] Using original File Panel", file=sys.stderr)
 	from shypn.helpers.right_panel_loader import create_right_panel
 	from shypn.helpers.pathway_panel_loader import create_pathway_panel
 	from shypn.helpers.topology_panel_loader import TopologyPanelLoader
@@ -350,68 +362,30 @@ def main(argv=None):
 		left_paned = main_builder.get_object('left_paned')
 
 		# ====================================================================
-		# WAYLAND FIX: Pre-dock panels BEFORE window.show_all()
-		# Attach panel content to stack containers NOW to avoid Error 71
+		# Skeleton Pattern: Add panels to GtkStack BEFORE window shows
+		# Each panel is added to its container in the stack
 		# ====================================================================
-		print("[INIT] Pre-docking panels to stack containers BEFORE window shows...", file=sys.stderr)
+		print("[INIT] Adding panels to GtkStack BEFORE window shows...", file=sys.stderr)
 		
-		# WAYLAND FIX: Don't reparent panels - use them as transient windows instead
-		# Reparenting widgets built in one window to another causes Error 71 on Wayland
-		# Solution: Show panels as separate windows positioned to look docked
-		if left_panel_loader and left_panel_loader.window:
-			# Keep window alive but hidden
-			left_panel_loader.window.hide()
-			# Set as transient for main window
-			left_panel_loader.window.set_transient_for(window)
-			left_panel_loader.window.set_modal(False)
-			# Remove decorations to look like a docked panel
-			left_panel_loader.window.set_decorated(False)
-			# Set type hint to make it behave like a utility window
-			left_panel_loader.window.set_type_hint(Gdk.WindowTypeHint.UTILITY)
-			# Track that it's "attached" (really just transient)
-			left_panel_loader.is_attached = True
-			left_panel_loader.parent_window = window
-			
-			# WAYLAND FIX: Ensure file_explorer and persistency use main window for dialogs
-			if left_panel_loader.file_explorer:
-				left_panel_loader.file_explorer.set_parent_window(window)
-				if hasattr(left_panel_loader.file_explorer, 'persistency') and left_panel_loader.file_explorer.persistency:
-					left_panel_loader.file_explorer.persistency.parent_window = window
-			if left_panel_loader.project_controller:
-				left_panel_loader.project_controller.set_parent_window(window)
-			
-			print("[INIT]   Files panel configured as transient window", file=sys.stderr)
+		# Add Files panel to stack
+		if left_panel_loader:
+			left_panel_loader.add_to_stack(left_dock_stack, files_panel_container, 'files')
+			print("[INIT]   Files panel added to stack", file=sys.stderr)
 		
-		# Configure Analyses panel as transient window (same approach as Files)
-		if right_panel_loader and right_panel_loader.window:
-			right_panel_loader.window.hide()
-			right_panel_loader.window.set_transient_for(window)
-			right_panel_loader.window.set_modal(False)
-			right_panel_loader.window.set_decorated(False)
-			right_panel_loader.window.set_type_hint(Gdk.WindowTypeHint.UTILITY)
-			right_panel_loader.is_attached = True
-			right_panel_loader.parent_window = window
-			print("[INIT]   Analyses panel configured as transient window", file=sys.stderr)
+		# Add Pathways panel to stack
+		if pathway_panel_loader:
+			pathway_panel_loader.add_to_stack(left_dock_stack, pathways_panel_container, 'pathways')
+			print("[INIT]   Pathways panel added to stack", file=sys.stderr)
 		
-		# Configure Pathways panel as transient window
-		if pathway_panel_loader and pathway_panel_loader.window:
-			pathway_panel_loader.window.hide()
-			pathway_panel_loader.window.set_transient_for(window)
-			pathway_panel_loader.window.set_modal(False)
-			pathway_panel_loader.window.set_decorated(False)
-			pathway_panel_loader.window.set_type_hint(Gdk.WindowTypeHint.UTILITY)
-			pathway_panel_loader.is_attached = True
-			pathway_panel_loader.parent_window = window
-			print("[INIT]   Pathways panel configured as transient window", file=sys.stderr)		# Configure Topology panel as transient window
-		if topology_panel_loader and topology_panel_loader.window:
-			topology_panel_loader.window.hide()
-			topology_panel_loader.window.set_transient_for(window)
-			topology_panel_loader.window.set_modal(False)
-			topology_panel_loader.window.set_decorated(False)
-			topology_panel_loader.window.set_type_hint(Gdk.WindowTypeHint.UTILITY)
-			topology_panel_loader.is_attached = True
-			topology_panel_loader.parent_window = window
-			print("[INIT]   Topology panel configured as transient window", file=sys.stderr)
+		# Add Analyses panel to stack
+		if right_panel_loader:
+			right_panel_loader.add_to_stack(left_dock_stack, analyses_panel_container, 'analyses')
+			print("[INIT]   Analyses panel added to stack", file=sys.stderr)
+		
+		# Add Topology panel to stack
+		if topology_panel_loader:
+			topology_panel_loader.add_to_stack(left_dock_stack, topology_panel_container, 'topology')
+			print("[INIT]   Topology panel added to stack", file=sys.stderr)
 		
 		# Debug: Verify panel content is in containers
 		print(f"[INIT] Verifying docked content:", file=sys.stderr)
@@ -513,46 +487,168 @@ def main(argv=None):
 			topology_panel_container.set_no_show_all(False)
 		print("[INIT] All panels hidden at startup", file=sys.stderr)
 
+		# ====================================================================
+		# Set parent windows for dialogs (AFTER window.show_all())
+		# ====================================================================
+		print("[INIT] Setting parent windows for panels...", file=sys.stderr)
+		if left_panel_loader:
+			left_panel_loader.parent_window = window
+			# Also set for file_explorer and persistency if using File Panel V3
+			if hasattr(left_panel_loader, 'file_explorer') and left_panel_loader.file_explorer:
+				left_panel_loader.file_explorer.parent_window = window
+				if hasattr(left_panel_loader.file_explorer, 'persistency') and left_panel_loader.file_explorer.persistency:
+					left_panel_loader.file_explorer.persistency.parent_window = window
+		
+		if right_panel_loader:
+			right_panel_loader.parent_window = window
+		
+		if pathway_panel_loader:
+			pathway_panel_loader.parent_window = window
+		
+		if topology_panel_loader:
+			topology_panel_loader.parent_window = window
+		
+		print("[INIT] Parent windows set for all panels", file=sys.stderr)
+
 		# Define toggle handlers (show/hide panel windows as transient windows)
+		# ====================================================================
+		# Skeleton Pattern: Master Palette toggle handlers
+		# Use show_in_stack() / hide_in_stack() to control panel visibility
+		# ====================================================================
+		
 		def on_left_toggle(is_active):
-			"""Handle Files panel toggle from palette."""
+			"""Handle Files panel toggle from Master Palette (Skeleton Pattern).
+			
+			EXCLUSIVITY: When activated, deactivates all other panel buttons.
+			Only one panel can be visible at a time in the GtkStack.
+			"""
 			print(f"[HANDLER] on_left_toggle({is_active})", file=sys.stderr)
+			if not left_panel_loader:
+				return
+			
 			if is_active:
-				# Show Files panel window as transient, positioned on left
-				if left_panel_loader and left_panel_loader.window:
-					# Position next to main window on the left
-					main_x, main_y = window.get_position()
-					panel_width = 300
-					left_panel_loader.window.resize(panel_width, 700)
-					left_panel_loader.window.move(main_x - panel_width, main_y)
-					left_panel_loader.window.show_all()
-					print(f"[HANDLER]   Files panel window shown", file=sys.stderr)
+				# EXCLUSIVITY: Deactivate other buttons
+				master_palette.set_active('pathways', False)
+				master_palette.set_active('analyses', False)
+				master_palette.set_active('topology', False)
+				
+				# Show this panel in stack
+				left_panel_loader.show_in_stack()
+				# Expand left paned to show stack
+				if left_paned:
+					try:
+						left_paned.set_position(250)
+					except Exception:
+						pass
 			else:
-				# Hide panel window
-				if left_panel_loader and left_panel_loader.window:
-					left_panel_loader.window.hide()
-					print(f"[HANDLER]   Files panel window hidden", file=sys.stderr)
+				left_panel_loader.hide_in_stack()
+				# Collapse paned when no panel is active
+				if left_paned:
+					try:
+						left_paned.set_position(0)
+					except Exception:
+						pass
 
 		def on_right_toggle(is_active):
-			"""Handle Analyses panel toggle from palette."""
+			"""Handle Analyses panel toggle from Master Palette (Skeleton Pattern).
+			
+			EXCLUSIVITY: When activated, deactivates all other panel buttons.
+			Only one panel can be visible at a time in the GtkStack.
+			"""
 			print(f"[HANDLER] on_right_toggle({is_active})", file=sys.stderr)
+			if not right_panel_loader:
+				return
+			
 			if is_active:
-				# Show Analyses panel window as transient, positioned on right
-				if right_panel_loader and right_panel_loader.window:
-					main_x, main_y = window.get_position()
-					main_width = window.get_allocated_width()
-					panel_width = 350
-					right_panel_loader.window.resize(panel_width, 700)
-					right_panel_loader.window.move(main_x + main_width, main_y)
-					right_panel_loader.window.show_all()
-					print(f"[HANDLER]   Analyses panel window shown", file=sys.stderr)
+				# EXCLUSIVITY: Deactivate other buttons
+				master_palette.set_active('files', False)
+				master_palette.set_active('pathways', False)
+				master_palette.set_active('topology', False)
+				
+				# Show this panel in stack
+				right_panel_loader.show_in_stack()
+				# Expand left paned to show stack (Analyses now docks LEFT)
+				if left_paned:
+					try:
+						left_paned.set_position(280)
+					except Exception:
+						pass
 			else:
-				# Hide Analyses panel window
-				if right_panel_loader and right_panel_loader.window:
-					right_panel_loader.window.hide()
-					print(f"[HANDLER]   Analyses panel window hidden", file=sys.stderr)
+				right_panel_loader.hide_in_stack()
+				# Collapse paned when no panel is active
+				if left_paned:
+					try:
+						left_paned.set_position(0)
+					except Exception:
+						pass
 
-		# Set up callbacks to manage paned position when panels float/attach
+		def on_pathway_toggle(is_active):
+			"""Handle Pathways panel toggle from Master Palette (Skeleton Pattern).
+			
+			EXCLUSIVITY: When activated, deactivates all other panel buttons.
+			Only one panel can be visible at a time in the GtkStack.
+			"""
+			print(f"[HANDLER] on_pathway_toggle({is_active})", file=sys.stderr)
+			if not pathway_panel_loader:
+				return
+			
+			if is_active:
+				# EXCLUSIVITY: Deactivate other buttons
+				master_palette.set_active('files', False)
+				master_palette.set_active('analyses', False)
+				master_palette.set_active('topology', False)
+				
+				# Show this panel in stack
+				pathway_panel_loader.show_in_stack()
+				# Expand left paned to show stack
+				if left_paned:
+					try:
+						left_paned.set_position(270)
+					except Exception:
+						pass
+			else:
+				pathway_panel_loader.hide_in_stack()
+				# Collapse paned when no panel is active
+				if left_paned:
+					try:
+						left_paned.set_position(0)
+					except Exception:
+						pass
+
+		def on_topology_toggle(is_active):
+			"""Handle Topology panel toggle from Master Palette (Skeleton Pattern).
+			
+			EXCLUSIVITY: When activated, deactivates all other panel buttons.
+			Only one panel can be visible at a time in the GtkStack.
+			"""
+			print(f"[HANDLER] on_topology_toggle({is_active})", file=sys.stderr)
+			if not topology_panel_loader:
+				return
+			
+			if is_active:
+				# EXCLUSIVITY: Deactivate other buttons
+				master_palette.set_active('files', False)
+				master_palette.set_active('pathways', False)
+				master_palette.set_active('analyses', False)
+				
+				# Show this panel in stack
+				topology_panel_loader.show_in_stack()
+				# Expand left paned to show stack
+				if left_paned:
+					try:
+						left_paned.set_position(350)
+					except Exception:
+						pass
+			else:
+				topology_panel_loader.hide_in_stack()
+				# Collapse paned when no panel is active
+				if left_paned:
+					try:
+						left_paned.set_position(0)
+					except Exception:
+						pass
+
+		# Set up callbacks to manage paned position when panels float/attach (detach button)
 		def on_left_float():
 			"""Collapse left paned when Files panel floats."""
 			if left_paned:
@@ -589,51 +685,6 @@ def main(argv=None):
 					pass  # Ignore paned errors
 			# NOTE: DO NOT call master_palette.set_active() here - creates circular callbacks
 		
-		# Define pathway panel toggle handler
-		def on_pathway_toggle(is_active):
-			"""Toggle pathway panel as transient window."""
-			print(f"[HANDLER] on_pathway_toggle({is_active})", file=sys.stderr)
-			if not pathway_panel_loader:
-				return  # Panel not loaded
-			
-			if is_active:
-				# Show Pathways panel window as transient, positioned on left (below Files)
-				if pathway_panel_loader and pathway_panel_loader.window:
-					main_x, main_y = window.get_position()
-					panel_width = 320
-					pathway_panel_loader.window.resize(panel_width, 600)
-					pathway_panel_loader.window.move(main_x - panel_width, main_y + 100)
-					pathway_panel_loader.window.show_all()
-					print(f"[HANDLER]   Pathways panel window shown", file=sys.stderr)
-			else:
-				# Hide Pathways panel window
-				if pathway_panel_loader and pathway_panel_loader.window:
-					pathway_panel_loader.window.hide()
-					print(f"[HANDLER]   Pathways panel window hidden", file=sys.stderr)
-		
-		# Define topology panel toggle handler
-		def on_topology_toggle(is_active):
-			"""Toggle topology panel as transient window."""
-			print(f"[HANDLER] on_topology_toggle({is_active})", file=sys.stderr)
-			if not topology_panel_loader:
-				return  # Panel not loaded
-			
-			if is_active:
-				# Show Topology panel window as transient, positioned on right (below Analyses)
-				if topology_panel_loader and topology_panel_loader.window:
-					main_x, main_y = window.get_position()
-					main_width = window.get_allocated_width()
-					panel_width = 400
-					topology_panel_loader.window.resize(panel_width, 600)
-					topology_panel_loader.window.move(main_x + main_width, main_y + 100)
-					topology_panel_loader.window.show_all()
-					print(f"[HANDLER]   Topology panel window shown", file=sys.stderr)
-			else:
-				# Hide Topology panel window
-				if topology_panel_loader and topology_panel_loader.window:
-					topology_panel_loader.window.hide()
-					print(f"[HANDLER]   Topology panel window hidden", file=sys.stderr)
-
 		# Define float/attach callbacks for topology panel
 		def on_topology_float():
 			"""Collapse left paned when Topology panel floats."""

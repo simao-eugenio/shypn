@@ -1,12 +1,11 @@
-"""Base class for Topology Panel.
+#!/usr/bin/env python3
+"""File Panel Base - Abstract base class for file panel.
 
-Clean OOP architecture:
-- Base class handles UI lifecycle and Wayland safety
-- Controller subclass handles analyzer coordination
-- Minimal code in loader (wrapper only)
+Provides common UI loading and widget management infrastructure.
+Follows the same pattern as TopologyPanelBase for consistency.
 
 Author: Simão Eugénio
-Date: 2025-10-20
+Date: 2025-10-22
 """
 
 import sys
@@ -15,34 +14,35 @@ from pathlib import Path
 
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk, GLib
+from gi.repository import Gtk
 
 
-class TopologyPanelBase(ABC):
-    """Base class for Topology Panel.
+class FilePanelBase(ABC):
+    """Abstract base class for File Panel.
     
-    Responsibilities:
-    - Load UI from XML
-    - Manage widget lifecycle (Wayland safe)
-    - Handle attach/detach/float operations
-    - Coordinate with master palette
+    Provides:
+    - UI file loading (skeleton pattern)
+    - Widget reference management
+    - Window and content separation
+    - Float/detach support
+    - GtkStack integration
     
-    NOT responsible for:
-    - Analyzer logic (handled by controller subclass)
-    - Business logic (handled by analyzers themselves)
+    Subclasses must implement:
+    - _init_widgets(): Get widget references from builder
+    - _connect_signals(): Connect widget signals to handlers
     """
     
     def __init__(self, ui_path=None):
-        """Initialize topology panel base.
+        """Initialize file panel base.
         
         Args:
-            ui_path: Optional path to UI file (defaults to ui/panels/topology_panel.ui)
+            ui_path: Optional path to UI file (defaults to ui/panels/file_panel_v2.ui)
         """
         # Determine UI path
         if ui_path is None:
             current_dir = Path(__file__).parent
             project_root = current_dir.parent.parent.parent
-            ui_path = project_root / 'ui' / 'panels' / 'topology_panel.ui'
+            ui_path = project_root / 'ui' / 'panels' / 'file_panel_v3.ui'
         
         self.ui_path = Path(ui_path)
         
@@ -60,9 +60,9 @@ class TopologyPanelBase(ABC):
         """Load UI from XML file - panel stays in its own window.
         
         SIMPLIFIED ARCHITECTURE:
-        - Panel content stays in panel window (no reparenting)
+        - Panel content stays in panel window (no reparenting initially)
         - Panel responds to show/hide signals from main app
-        - No widget tree modifications = No Error 71!
+        - No premature widget tree modifications = No Error 71!
         """
         if not self.ui_path.exists():
             raise FileNotFoundError(f"UI file not found: {self.ui_path}")
@@ -72,13 +72,14 @@ class TopologyPanelBase(ABC):
             self.builder.add_from_file(str(self.ui_path))
             
             # Get main widgets
-            self.window = self.builder.get_object('topology_window')
-            self.content = self.builder.get_object('topology_content')
+            self.window = self.builder.get_object('file_panel_window')
+            self.content = self.builder.get_object('file_panel_content')
             
             if not self.window or not self.content:
                 raise RuntimeError("Required widgets not found in UI file")
             
             # Panel content stays in its own window - no reparenting
+            print(f"[LOAD] File Panel loaded (content stays in panel window)", file=sys.stderr)
             
             # Connect window delete event
             self.window.connect('delete-event', self._on_window_delete)
@@ -94,9 +95,10 @@ class TopologyPanelBase(ABC):
             
             # Mark as loaded
             self.is_loaded = True
+            print(f"[LOAD] File Panel load() complete, is_loaded=True", file=sys.stderr)
             
         except Exception as e:
-            print(f"Error loading topology panel UI: {e}", file=sys.stderr)
+            print(f"Error loading file panel UI: {e}", file=sys.stderr)
             raise
     
     @abstractmethod
@@ -131,70 +133,20 @@ class TopologyPanelBase(ABC):
         
         # Get the toplevel window containing the palette
         if palette_widget:
-            toplevel = palette_widget.get_toplevel()
-            if toplevel and isinstance(toplevel, Gtk.Window):
-                self.window.set_transient_for(toplevel)
-    
-    def attach(self, main_window):
-        """Simplified attach: connect panel window to main app.
-        
-        Panel stays in its own window. This method connects it to the main app
-        for coordinated show/hide.
-        
-        Args:
-            main_window: The main application window
-        """
-        if not self.is_loaded:
-            raise RuntimeError("Panel must be loaded before attaching")
-        
-        # Store main window reference
-        self.main_window = main_window
-        
-        # Set main window as transient parent (keeps panel on top)
-        self.window.set_transient_for(main_window)
-        
-        print(f"[ATTACH] Topology panel attached to main window", file=sys.stderr)
-    
-    def hide(self):
-        """Hide panel window."""
-        print(f"[HIDE] Topology panel hiding window", file=sys.stderr)
-        if self.window:
-            self.window.hide()
-    
-    def show(self):
-        """Show panel window positioned next to palette."""
-        print(f"[SHOW] Topology panel showing window", file=sys.stderr)
-        if self.window:
-            # Position panel next to the Master Palette
-            if self.palette_widget and self.main_window:
-                # Get palette position relative to main window
-                palette_alloc = self.palette_widget.get_allocation()
-                palette_width = palette_alloc.width
-                
-                # Get main window position
-                main_x, main_y = self.main_window.get_position()
-                main_width, main_height = self.main_window.get_size()
-                
-                # Position panel to the right of palette
-                panel_width = 400  # Default panel width for topology
-                self.window.set_default_size(panel_width, main_height)
-                self.window.move(main_x + palette_width, main_y)
-            
-            self.window.show_all()
+            self.main_window = palette_widget.get_toplevel()
     
     def _on_window_delete(self, window, event):
-        """Handle window close button.
-        
-        Instead of destroying, we hide the window.
+        """Handle window delete event - hide instead of destroy.
         
         Args:
             window: The window being closed
             event: The delete event
             
         Returns:
-            True to prevent destruction
+            True to prevent window destruction
         """
-        # Hide window instead of destroying
+        # Just hide the window instead of destroying it
+        # This prevents Error 71 and allows re-showing later
         window.hide()
         return True  # Prevent destruction
     
@@ -203,14 +155,15 @@ class TopologyPanelBase(ABC):
     # New architecture: Panels live in GtkStack, controlled by Master Palette
     # ========================================================================
     
-    def add_to_stack(self, stack, container, panel_name='topology'):
+    def add_to_stack(self, stack, container, panel_name='files'):
         """Add panel content to a GtkStack container (Phase 4: new architecture).
         
         Args:
             stack: GtkStack widget that will contain all panels
             container: GtkBox container within the stack for this panel
-            panel_name: Name identifier for this panel in the stack ('topology')
+            panel_name: Name identifier for this panel in the stack ('files')
         """
+        print(f"[STACK] FilePanel add_to_stack() called for panel '{panel_name}'", file=sys.stderr)
         
         if self.window is None:
             self.load()
@@ -236,11 +189,14 @@ class TopologyPanelBase(ABC):
         if self.window:
             self.window.hide()
         
+        print(f"[STACK] FilePanel content added to stack container '{panel_name}'", file=sys.stderr)
     
     def show_in_stack(self):
         """Show this panel in the GtkStack (Phase 4: Master Palette control)."""
+        print(f"[STACK] FilePanel show_in_stack() called", file=sys.stderr)
         
         if not hasattr(self, '_stack') or not self._stack:
+            print(f"[STACK] WARNING: FilePanel not added to stack yet", file=sys.stderr)
             return
         
         # Make stack visible
@@ -259,9 +215,11 @@ class TopologyPanelBase(ABC):
         if self.parent_container:
             self.parent_container.set_visible(True)
         
+        print(f"[STACK] FilePanel now visible in stack", file=sys.stderr)
     
     def hide_in_stack(self):
         """Hide this panel in the GtkStack (Phase 4: Master Palette control)."""
+        print(f"[STACK] FilePanel hide_in_stack() called", file=sys.stderr)
         
         # Hide the content using no_show_all to prevent show_all from revealing it
         if self.content:
@@ -272,6 +230,7 @@ class TopologyPanelBase(ABC):
         if self.parent_container:
             self.parent_container.set_visible(False)
         
+        print(f"[STACK] FilePanel hidden in stack (content remains for fast re-show)", file=sys.stderr)
     
     # ========================================================================
     # Float/Detach Support (Skeleton Pattern)
@@ -282,10 +241,10 @@ class TopologyPanelBase(ABC):
         
         Skeleton pattern: synchronous, simple state flag.
         """
-        print(f"[TOPOLOGY] detach() called", file=sys.stderr)
+        print(f"[FILE_PANEL] detach() called", file=sys.stderr)
         
         if not hasattr(self, 'is_hanged') or not self.is_hanged:
-            print(f"[TOPOLOGY] Already detached, nothing to do", file=sys.stderr)
+            print(f"[FILE_PANEL] Already detached, nothing to do", file=sys.stderr)
             return
         
         # Remove content from container
@@ -312,7 +271,7 @@ class TopologyPanelBase(ABC):
         # Show floating window
         self.window.show_all()
         
-        print(f"[TOPOLOGY] Panel detached and floating", file=sys.stderr)
+        print(f"[FILE_PANEL] Panel detached and floating", file=sys.stderr)
     
     def float(self):
         """Alias for detach() - make panel float as separate window."""
@@ -324,10 +283,10 @@ class TopologyPanelBase(ABC):
         Args:
             container: GtkBox or container to attach to
         """
-        print(f"[TOPOLOGY] hang_on() called", file=sys.stderr)
+        print(f"[FILE_PANEL] hang_on() called", file=sys.stderr)
         
         if hasattr(self, 'is_hanged') and self.is_hanged:
-            print(f"[TOPOLOGY] Already attached, nothing to do", file=sys.stderr)
+            print(f"[FILE_PANEL] Already attached, nothing to do", file=sys.stderr)
             return
         
         # Hide floating window
@@ -356,11 +315,11 @@ class TopologyPanelBase(ABC):
             if hasattr(self, '_stack_panel_name'):
                 self._stack.set_visible_child_name(self._stack_panel_name)
         
-        print(f"[TOPOLOGY] Panel attached to container", file=sys.stderr)
+        print(f"[FILE_PANEL] Panel attached to container", file=sys.stderr)
     
     def attach_to(self, container):
         """Alias for hang_on() - attach panel to container."""
         self.hang_on(container)
 
 
-__all__ = ['TopologyPanelBase']
+__all__ = ['FilePanelBase']

@@ -5,6 +5,7 @@ This directory contains deprecated and archived code that has been removed from 
 ## Structure
 
 - **`deprecated/`** - Python files that are no longer used in the current codebase
+- **`sh/`** - Historical test shell scripts (moved from root October 2025)
 - **`ui_removed/`** - UI definition files (.ui) that have been deprecated
 - **Utility scripts** - Legacy utility scripts moved from the repository root
 
@@ -19,6 +20,14 @@ Files that are no longer invoked from the current codebase:
 4. **`debug_arc_creation.py`** - Old arc creation debugging tool
 5. **`debug_arc_rendering.py`** - Old arc rendering debugging tool
 6. **`deep_investigate_arcs.py`** - Deep arc investigation utility
+
+### Historical Test Shell Scripts (4 items)
+Test and debug shell scripts moved from root (October 22, 2025):
+
+1. **`sh/test_button_debug.sh`** - Debug script for Master Palette buttons
+2. **`sh/test_buttons_interactive.sh`** - Interactive test for Master Palette buttons
+3. **`sh/test_manual.sh`** - Manual test instructions for property dialogs
+4. **`sh/test_manual_dialog_fix.sh`** - Manual test for dialog freeze fix verification
 
 ### Additional Archived Scripts
 Legacy utility and debugging scripts from previous development phases:
@@ -44,9 +53,10 @@ These files are kept for:
 
 ⚠️ **DO NOT USE** - These files are not maintained and may not work with the current codebase.
 
-## Cleanup Date
+## Cleanup Dates
 
-- **Archived:** October 17, 2025
+- **Initial Archive:** October 17, 2025 - Deprecated Python files and legacy scripts
+- **Shell Scripts Archive:** October 22, 2025 - Historical test shell scripts moved to archive/sh/
 - **Reason:** Repository cleanup - removed unused code and deprecated utilities
 - **Related Documentation:** See `doc/cleanup/` for cleanup reports
 

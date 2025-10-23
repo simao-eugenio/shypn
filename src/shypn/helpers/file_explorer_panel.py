@@ -1036,6 +1036,11 @@ class FileExplorerPanel:
             parent_window: The main window or floating panel window
         """
         self.parent_window = parent_window
+        
+        # CRITICAL FIX: Also update persistency manager's parent window
+        # This ensures FileChooser dialogs (Open/Save) use correct parent
+        if hasattr(self, 'persistency') and self.persistency:
+            self.persistency.parent_window = parent_window
 
     def set_canvas_loader(self, canvas_loader):
         """Wire file explorer to canvas loader for document operations integration.

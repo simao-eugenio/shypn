@@ -48,11 +48,10 @@ class PathwayPanelLoader:
         self.builder = None
         self.window = None
         self.content = None
-        self.is_attached = False
+        self.is_hanged = False  # Simple state flag (skeleton pattern)
         self.parent_container = None
         self.parent_window = None  # Track parent window for float button
         self._updating_button = False  # Flag to prevent recursive toggle events
-        self._attach_in_progress = False  # WAYLAND FIX: Prevent concurrent attach operations
         self.on_float_callback = None  # Callback to notify when panel floats
         self.on_attach_callback = None  # Callback to notify when panel attaches
         
@@ -183,12 +182,12 @@ class PathwayPanelLoader:
             
         is_active = button.get_active()
         if is_active:
-            # Button is now active -> float the panel
-            self.float(self.parent_window)
+            # Button is now active → detach the panel (float)
+            self.detach()
         else:
-            # Button is now inactive -> dock the panel back
+            # Button is now inactive → attach the panel back
             if self.parent_container:
-                self.attach_to(self.parent_container, self.parent_window)
+                self.hang_on(self.parent_container)
     
     def _on_delete_event(self, window, event):
         """Handle window close button (X) - hide instead of destroy.
@@ -219,240 +218,245 @@ class PathwayPanelLoader:
         # Return True to prevent window destruction
         return True
     
-    def float(self, parent_window=None):
-        """Float panel as a separate window (detach if currently attached).
+    def detach(self):
+        """Detach from container and restore as independent window (skeleton pattern)."""
+        print(f"[PATHWAY_PANEL] Detaching from container...")
         
-        WAYLAND SAFE: Uses idle callbacks for reparenting and window operations.
+        if not self.is_hanged:
+            print(f"[PATHWAY_PANEL] Already detached")
+            return
+        
+        # Remove from container
+        if self.parent_container:
+            self.parent_container.remove(self.content)
+            # Hide the container after unattaching
+            self.parent_container.set_visible(False)
+        
+        # Hide the stack if this was the active panel
+        if hasattr(self, '_stack') and self._stack:
+            self._stack.set_visible(False)
+        
+        # Return content to independent window
+        self.window.add(self.content)
+        
+        # Set transient for main window if available
+        if self.parent_window:
+            self.window.set_transient_for(self.parent_window)
+        
+        # Update state
+        self.is_hanged = False
+        
+        # Update float button state
+        if self.float_button and not self.float_button.get_active():
+            self._updating_button = True
+            self.float_button.set_active(True)
+            self._updating_button = False
+        
+        # Notify that panel is floating
+        if self.on_float_callback:
+            self.on_float_callback()
+        
+        # Show window
+        self.window.show_all()
+        
+        print(f"[PATHWAY_PANEL] Detached successfully")
+    
+    def float(self, parent_window=None):
+        """Float panel as a separate window (alias for detach for backward compatibility).
         
         Args:
             parent_window: Optional parent window to set as transient.
         """
-        # If window doesn't exist, load the UI
-        if self.window is None:
-            self.load()
-        
-        # Store parent window reference
         if parent_window:
             self.parent_window = parent_window
-            # WAYLAND FIX: Update SBML controller's parent window for FileChooser dialogs
+            # Update SBML controller's parent window for FileChooser dialogs
             if self.sbml_import_controller:
                 self.sbml_import_controller.set_parent_window(parent_window)
-            # WAYLAND FIX: Update KEGG controller's parent window if needed
+            # Update KEGG controller's parent window if needed
             if self.kegg_import_controller and hasattr(self.kegg_import_controller, 'set_parent_window'):
                 self.kegg_import_controller.set_parent_window(parent_window)
-        
-        def _do_float():
-            """Deferred float operation for Wayland safety."""
-            try:
-                # If currently attached, unattach first (moves content back to window)
-                if self.is_attached:
-                    # Remove from container
-                    if self.parent_container and self.content.get_parent() == self.parent_container:
-                        self.parent_container.remove(self.content)
-                    
-                    # Return content to window
-                    if self.content.get_parent() != self.window:
-                        self.window.add(self.content)
-                    
-                    self.is_attached = False
-                    
-                    # Hide the container after unattaching
-                    if self.parent_container:
-                        self.parent_container.set_visible(False)
-                
-                # WAYLAND FIX: Always set parent, use stored parent if not provided
-                parent = parent_window if parent_window else self.parent_window
-                if parent:
-                    self.window.set_transient_for(parent)
-                else:
-                    # No parent available - try to set to None explicitly
-                    self.window.set_transient_for(None)
-                
-                # Update float button state
-                if self.float_button and not self.float_button.get_active():
-                    self._updating_button = True
-                    self.float_button.set_active(True)
-                    self._updating_button = False
-                
-                # Notify that panel is floating (to collapse paned)
-                if self.on_float_callback:
-                    self.on_float_callback()
-                
-                # WAYLAND FIX: Ensure content is visible before showing window
-                self.content.set_visible(True)
-                # GTK3: use show_all() instead of present()
-                self.window.show_all()
-            except Exception as e:
-                print(f"Warning: Error during panel float: {e}", file=sys.stderr)
-            
-            return False  # Don't repeat
-        
-        # WAYLAND FIX: Use idle callback to defer float operation
-        GLib.idle_add(_do_float)
+        self.detach()
     
-    def detach(self, parent_window=None):
-        """Detach panel to show as a floating window.
+    def hang_on(self, container):
+        """Hang this panel on a container (attach - skeleton pattern).
         
         Args:
-            parent_window: Optional parent window to set as transient.
+            container: Gtk.Box or other container to embed content into.
         """
-        # Detach is now an alias for float
-        self.float(parent_window)
+        print(f"[PATHWAY_PANEL] Hanging on container...")
+        
+        if self.is_hanged:
+            print(f"[PATHWAY_PANEL] Already hanged, just showing")
+            if not self.content.get_visible():
+                self.content.show_all()
+            # Make sure container is visible when re-showing
+            if not container.get_visible():
+                container.set_visible(True)
+            return
+        
+        # Hide independent window
+        self.window.hide()
+        
+        # Remove content from window
+        self.window.remove(self.content)
+        
+        # Hang content on container
+        container.pack_start(self.content, True, True, 0)
+        self.content.show_all()
+        
+        # Make container visible (it was hidden when detached)
+        container.set_visible(True)
+        
+        self.is_hanged = True
+        self.parent_container = container
+        
+        # Update float button state
+        if self.float_button and self.float_button.get_active():
+            self._updating_button = True
+            self.float_button.set_active(False)
+            self._updating_button = False
+        
+        # Show the stack if available
+        if hasattr(self, '_stack') and self._stack:
+            self._stack.set_visible(True)
+            if hasattr(self, '_stack_panel_name'):
+                self._stack.set_visible_child_name(self._stack_panel_name)
+        
+        # Notify that panel is attached
+        if self.on_attach_callback:
+            self.on_attach_callback()
+        
+        print(f"[PATHWAY_PANEL] Hanged successfully")
     
     def attach_to(self, container, parent_window=None):
-        """Attach panel to container (embed content, hide window).
-        
-        WAYLAND SAFE: Uses idle callbacks to ensure widgets are properly realized
-        before reparenting operations.
+        """Attach panel to container (alias for hang_on for backward compatibility).
         
         Args:
             container: Gtk.Box or other container to embed content into.
             parent_window: Optional parent window (stored for float button).
         """
-        print(f"[ATTACH] PathwayPanel attach_to() called, is_attached={self.is_attached}", file=sys.stderr)
+        if parent_window:
+            self.parent_window = parent_window
+            # Update SBML controller's parent window for FileChooser dialogs
+            if self.sbml_import_controller:
+                self.sbml_import_controller.set_parent_window(parent_window)
+            # Update KEGG controller's parent window if needed
+            if self.kegg_import_controller and hasattr(self.kegg_import_controller, 'set_parent_window'):
+                self.kegg_import_controller.set_parent_window(parent_window)
+        
+        self.hang_on(container)
+    
+    def unattach(self):
+        """Unattach panel from container (alias for detach for backward compatibility)."""
+        self.detach()
+    
+    def hide(self):
+        """Hide the panel (keep hanged but invisible - skeleton pattern)."""
+        print(f"[PATHWAY_PANEL] Hiding panel...")
+        
+        if self.is_hanged and self.parent_container:
+            # Hide content while keeping it hanged
+            self.content.set_no_show_all(True)  # Prevent show_all from revealing it
+            self.content.hide()
+            print(f"[PATHWAY_PANEL] Hidden (still hanged)")
+        else:
+            # Hide floating window
+            self.window.hide()
+            print(f"[PATHWAY_PANEL] Window hidden")
+    
+    def show(self):
+        """Show the panel (reveal if hanged, show window if floating - skeleton pattern)."""
+        print(f"[PATHWAY_PANEL] Showing panel...")
+        
+        if self.is_hanged and self.parent_container:
+            # Re-enable show_all and show content (reveal)
+            self.content.set_no_show_all(False)
+            self.content.show_all()
+            print(f"[PATHWAY_PANEL] Revealed (hanged)")
+        else:
+            # Show floating window
+            self.window.show_all()
+            print(f"[PATHWAY_PANEL] Window shown")
+    
+
+        
+        # WAYLAND FIX: Use idle callback to defer hide operation
+        GLib.idle_add(_do_hide)
+    
+    # ========================================================================
+    # PHASE 4: GtkStack Integration Methods
+    # New architecture: Panels live in GtkStack, controlled by Master Palette
+    # ========================================================================
+    
+    def add_to_stack(self, stack, container, panel_name='pathways'):
+        """Add panel content to a GtkStack container (Phase 4: new architecture).
+        
+        Args:
+            stack: GtkStack widget that will contain all panels
+            container: GtkBox container within the stack for this panel
+            panel_name: Name identifier for this panel in the stack ('pathways')
+        """
         
         if self.window is None:
             self.load()
         
-        # WAYLAND FIX: Prevent rapid attach/detach race conditions
-        if self.is_attached and self.parent_container == container:
-            # Already attached to this container, just ensure visibility
-            print(f"[ATTACH] PathwayPanel already attached, ensuring visibility", file=sys.stderr)
-            # Check if content was removed by hide() - if so, re-add it
-            if self.content.get_parent() != container:
-                print(f"[ATTACH] PathwayPanel content was removed, re-adding to container", file=sys.stderr)
-                container.add(self.content)
-            # WAYLAND FIX: Don't call set_visible repeatedly - can cause protocol errors
-            if not container.get_visible():
-                container.set_visible(True)
-            # Content should already be visible if we're in fast path
-            return
+        # Extract content from window
+        current_parent = self.content.get_parent()
+        if current_parent == self.window:
+            self.window.remove(self.content)
+        elif current_parent and current_parent != container:
+            current_parent.remove(self.content)
         
-        # WAYLAND FIX: Prevent concurrent attach operations
-        if self._attach_in_progress:
-            print(f"[ATTACH] PathwayPanel attach already in progress, ignoring", file=sys.stderr)
-            return
+        # Add content to stack container
+        if self.content.get_parent() != container:
+            container.add(self.content)
         
-        print(f"[ATTACH] PathwayPanel scheduling deferred attach", file=sys.stderr)
-        
-        # Set flag BEFORE scheduling idle to prevent concurrent attach attempts
-        self._attach_in_progress = True
-        
-        # WAYLAND FIX: Set is_attached=True NOW to prevent duplicate attach_to() calls
-        # The idle callback will complete the actual reparenting operation
-        self.is_attached = True
-        
-        # Store parent window and container for float button callback
-        if parent_window:
-            self.parent_window = parent_window
-            # WAYLAND FIX: Update SBML controller's parent window for FileChooser dialogs
-            if self.sbml_import_controller:
-                self.sbml_import_controller.set_parent_window(parent_window)
-            # WAYLAND FIX: Update KEGG controller's parent window if needed
-            if self.kegg_import_controller and hasattr(self.kegg_import_controller, 'set_parent_window'):
-                self.kegg_import_controller.set_parent_window(parent_window)
+        # Mark as hanged in stack mode
+        self.is_hanged = True
         self.parent_container = container
+        self._stack = stack
+        self._stack_panel_name = panel_name
         
-        print(f"[ATTACH] PathwayPanel scheduling deferred attach", file=sys.stderr)
+        # Hide window (not needed in stack mode)
+        if self.window:
+            self.window.hide()
         
-        def _do_attach():
-            """Deferred attach operation for Wayland safety."""
-            print(f"[ATTACH] PathwayPanel _do_attach() executing", file=sys.stderr)
-            try:
-                # Extract content from window first
-                current_parent = self.content.get_parent()
-                if current_parent == self.window:
-                    self.window.remove(self.content)  # GTK3 uses remove()
-                elif current_parent and current_parent != container:
-                    current_parent.remove(self.content)
-                
-                # WAYLAND FIX: Hide window BEFORE reparenting to avoid surface issues
-                if self.window:
-                    self.window.hide()
-                
-                # Only append if not already in container
-                if self.content.get_parent() != container:
-                    container.add(self.content)  # GTK3 uses add() instead of append()
-                
-                # Make container visible when panel is attached
-                container.set_visible(True)
-                
-                # Make sure content is visible
-                self.content.set_visible(True)
-                
-                print(f"[ATTACH] PathwayPanel attached successfully, content visible", file=sys.stderr)
-                
-                # Update float button state
-                if self.float_button and self.float_button.get_active():
-                    self._updating_button = True
-                    self.float_button.set_active(False)
-                    self._updating_button = False
-                
-                # NOTE: is_attached was already set to True before scheduling idle
-                
-                # WAYLAND FIX: Clear attach operation flag
-                self._attach_in_progress = False
-                
-                # Notify that panel is attached (to expand paned)
-                if self.on_attach_callback:
-                    self.on_attach_callback()
-            except Exception as e:
-                print(f"Warning: Error during panel attach: {e}", file=sys.stderr)
-            
-            return False  # Don't repeat
-        
-        # WAYLAND FIX: Use idle callback to defer reparenting
-        GLib.idle_add(_do_attach)
     
-    def unattach(self):
-        """Unattach panel from container (return content to window)."""
-        if not self.is_attached:
+    def show_in_stack(self):
+        """Show this panel in the GtkStack (Phase 4: Master Palette control)."""
+        
+        if not hasattr(self, '_stack') or not self._stack:
             return
         
-        # Remove from container
-        if self.parent_container and self.content.get_parent() == self.parent_container:
-            self.parent_container.remove(self.content)
+        # Make stack visible
+        if not self._stack.get_visible():
+            self._stack.set_visible(True)
         
-        # Return content to window
-        self.window.add(self.content)  # GTK3 uses add() instead of set_child()
+        # Set this panel as active child
+        self._stack.set_visible_child_name(self._stack_panel_name)
         
-        self.is_attached = False
-        # Don't clear parent_container - we need it to dock back
+        # Re-enable show_all and make content visible
+        if self.content:
+            self.content.set_no_show_all(False)  # Re-enable show_all
+            self.content.show_all()  # Show all child widgets recursively
+        
+        # Make container visible too
+        if self.parent_container:
+            self.parent_container.set_visible(True)
+        
     
-    def hide(self):
-        """Hide panel (works for both attached and detached states).
+    def hide_in_stack(self):
+        """Hide this panel in the GtkStack (Phase 4: Master Palette control)."""
         
-        WAYLAND SAFE: Uses idle callbacks to avoid surface issues.
-        """
-        print(f"[HIDE] PathwayPanel hide() called, is_attached={self.is_attached}", file=sys.stderr)
+        # Hide the content using no_show_all to prevent show_all from revealing it
+        if self.content:
+            self.content.set_no_show_all(True)
+            self.content.hide()
         
-        def _do_hide():
-            """Deferred hide operation for Wayland safety."""
-            print(f"[HIDE] PathwayPanel _do_hide() executing", file=sys.stderr)
-            try:
-                if self.is_attached:
-                    # WAYLAND FIX: Just remove content from container, DON'T call set_visible(False)
-                    # Setting visibility can cause unrealize/realize cycles on embedded widgets (SBML panel!)
-                    if self.content and self.parent_container:
-                        current_parent = self.content.get_parent()
-                        if current_parent == self.parent_container:
-                            print(f"[HIDE] PathwayPanel removing content from container", file=sys.stderr)
-                            self.parent_container.remove(self.content)
-                        # CRITICAL: Don't call self.content.set_visible(False) - causes Wayland issues
-                        # Content stays realized and ready for fast re-attach
-                        # Don't hide container - other panels might use it
-                    # NOTE: Keep is_attached=True so next attach_to() can use fast path
-                    print(f"[HIDE] PathwayPanel hidden (attached mode)", file=sys.stderr)
-                elif self.window:
-                    # When floating, hide the window
-                    self.window.hide()
-                    print(f"[HIDE] PathwayPanel hidden (floating mode)", file=sys.stderr)
-            except Exception as e:
-                print(f"[ERROR] Error during panel hide: {e}", file=sys.stderr)
-            return False  # Don't repeat
+        # Hide container too
+        if self.parent_container:
+            self.parent_container.set_visible(False)
         
-        # WAYLAND FIX: Use idle callback to defer hide operation
-        GLib.idle_add(_do_hide)
 
 
 def create_pathway_panel(ui_path=None, model_canvas=None, workspace_settings=None):

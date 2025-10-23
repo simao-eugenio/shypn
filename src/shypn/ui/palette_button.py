@@ -22,10 +22,16 @@ class PaletteButton:
         .get_active() -> bool
         .connect_toggled(callback)
         .set_sensitive(bool)
+    
+    Dimensions optimized for 32x32px icons:
+        - ICON_SIZE = 32px (icon itself)
+        - BUTTON_SIZE = 40px (icon + 4px padding each side)
+        - Margin = 3px (defined in CSS)
+        - Total container width = 48px (40 + 6 margin + 2 padding)
     """
 
-    BUTTON_SIZE = 48
-    ICON_SIZE = 40
+    BUTTON_SIZE = 40  # 32px icon + 8px padding (4px each side)
+    ICON_SIZE = 32    # Standard icon size
 
     def __init__(self, name: str, icon_name: str, tooltip: str = ""):
         self.name = name

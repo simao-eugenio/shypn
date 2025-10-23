@@ -123,8 +123,32 @@ class TopologyPanelLoader(TopologyPanelBase):
         for analyzer, expander in self.expanders.items():
             expander.connect('notify::expanded', self.controller.on_expander_toggled, analyzer)
         
+        # Connect float button if present
+        float_button = self.builder.get_object('topology_float_button')
+        if float_button:
+            float_button.connect('toggled', self._on_float_toggled)
+            self.float_button = float_button
+            self._updating_button = False  # Flag to prevent recursive toggle events
+        else:
+            self.float_button = None
+        
         # Apply CSS styling for vertical tabs appearance
         self._apply_css_styling()
+    
+    def _on_float_toggled(self, button):
+        """Internal callback when float toggle button is clicked."""
+        # Prevent recursive calls when we update the button state programmatically
+        if self._updating_button:
+            return
+            
+        is_active = button.get_active()
+        if is_active:
+            # Button is now active → detach the panel (float)
+            self.detach()
+        else:
+            # Button is now inactive → attach the panel back
+            if hasattr(self, 'parent_container') and self.parent_container:
+                self.hang_on(self.parent_container)
     
     def _apply_css_styling(self):
         """Apply CSS styling to give expanders a vertical tabs appearance."""

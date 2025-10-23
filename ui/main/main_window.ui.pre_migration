@@ -1,0 +1,2578 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<interface>
+  <requires lib="gtk+" version="3.0" />
+
+  <object class="GtkAdjustment" id="pathway_scale_adjustment">
+    <property name="lower">0.5</property>
+    <property name="upper">10.0</property>
+    <property name="step-increment">0.1</property>
+    <property name="page-increment">1.0</property>
+    <property name="value">2.5</property>
+  </object>
+  
+  
+  <object class="GtkAdjustment" id="pathway_sbml_scale_adjustment">
+    <property name="lower">0.1</property>
+    <property name="upper">10.0</property>
+    <property name="step-increment">0.1</property>
+    <property name="page-increment">1.0</property>
+    <property name="value">1.0</property>
+  </object>
+<object class="GtkApplicationWindow" id="main_window">
+    <property name="title">Shypn</property>
+    <property name="default-width">1200</property>
+    <property name="default-height">800</property>
+    <property name="visible">True</property>
+
+    
+    <child type="titlebar">
+      <object class="GtkHeaderBar" id="header_bar">
+        <property name="show-close-button">True</property>
+        <property name="visible">True</property>
+        <property name="title">Shypn</property>
+        
+        
+        <child>
+          <object class="GtkButton" id="minimize_button">
+            <property name="visible">True</property>
+            <property name="can-focus">False</property>
+            <property name="tooltip-text">Minimize window</property>
+            <child>
+              <object class="GtkImage">
+                <property name="visible">True</property>
+                <property name="icon-name">window-minimize-symbolic</property>
+                <property name="icon-size">1</property>
+              </object>
+            </child>
+          </object>
+          <packing>
+            <property name="pack-type">end</property>
+            <property name="position">1</property>
+          </packing>
+        </child>
+        
+        <child>
+          <object class="GtkButton" id="maximize_button">
+            <property name="visible">True</property>
+            <property name="can-focus">False</property>
+            <property name="tooltip-text">Maximize window</property>
+            <child>
+              <object class="GtkImage" id="maximize_image">
+                <property name="visible">True</property>
+                <property name="icon-name">window-maximize-symbolic</property>
+                <property name="icon-size">1</property>
+              </object>
+            </child>
+          </object>
+          <packing>
+            <property name="pack-type">end</property>
+            <property name="position">0</property>
+          </packing>
+        </child>
+      </object>
+    </child>
+
+    
+    <child>
+      <object class="GtkBox" id="root_container">
+        <property name="orientation">horizontal</property>
+        <property name="visible">True</property>
+        <property name="hexpand">True</property>
+        <property name="vexpand">True</property>
+        
+        
+        <child>
+          <object class="GtkBox" id="master_palette_slot">
+            <property name="orientation">vertical</property>
+            <property name="visible">True</property>
+            <property name="width-request">48</property>
+            <property name="hexpand">False</property>
+            <property name="vexpand">True</property>
+            
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+          </packing>
+        </child>
+        
+        
+        <child>
+          <object class="GtkBox" id="content_with_statusbar">
+            <property name="orientation">vertical</property>
+            <property name="visible">True</property>
+            <property name="hexpand">True</property>
+            <property name="vexpand">True</property>
+            
+            
+            <child>
+              <object class="GtkPaned" id="left_paned">
+                <property name="orientation">horizontal</property>
+                <property name="position">0</property>
+                <property name="visible">True</property>
+                <property name="can-focus">True</property>
+                <property name="vexpand">True</property>
+                
+                
+                <child>
+                  <object class="GtkRevealer" id="panels_revealer">
+                    <property name="visible">True</property>
+                    <property name="reveal-child">False</property>
+                    <property name="transition-type">slide-right</property>
+                    <property name="transition-duration">250</property>
+                    <property name="vexpand">True</property>
+                    <property name="hexpand">False</property>
+                    
+                    <child>
+                      
+                      <object class="GtkStack" id="panels_stack">
+                        <property name="visible">True</property>
+                        <property name="vexpand">True</property>
+                        <property name="hexpand">False</property>
+                        <property name="transition-type">none</property>
+                        
+                        
+                        <child>
+                          <object class="GtkBox" id="files_panel_container">
+                            <property name="orientation">vertical</property>
+                            <property name="visible">True</property>
+                            <property name="vexpand">True</property>
+                            <property name="hexpand">False</property>
+                            <property name="width-request">300</property>
+                            
+                          <child>
+          <object class="GtkBox" id="file_operations_toolbar">
+            <property name="visible">True</property>
+            <property name="orientation">horizontal</property>
+            <property name="spacing">3</property>
+            <property name="margin-start">6</property>
+            <property name="margin-end">6</property>
+            <property name="margin-top">3</property>
+            <property name="margin-bottom">3</property>
+            
+            <child>
+              <object class="GtkButton" id="file_new_button">
+                <property name="visible">True</property>
+                <property name="label">New</property>
+                <property name="tooltip-text">New File (Ctrl+N)</property>
+                <style>
+                  <class name="flat" />
+                </style>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">False</property>
+              </packing>
+            </child>
+            
+            <child>
+              <object class="GtkButton" id="file_open_button">
+                <property name="visible">True</property>
+                <property name="label">Open</property>
+                <property name="tooltip-text">Open File (Ctrl+O)</property>
+                <style>
+                  <class name="flat" />
+                </style>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">False</property>
+              </packing>
+            </child>
+            
+            <child>
+              <object class="GtkButton" id="file_save_button">
+                <property name="visible">True</property>
+                <property name="label">Save</property>
+                <property name="tooltip-text">Save File (Ctrl+S)</property>
+                <style>
+                  <class name="flat" />
+                </style>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">False</property>
+              </packing>
+            </child>
+            
+            <child>
+              <object class="GtkButton" id="file_save_as_button">
+                <property name="visible">True</property>
+                <property name="label">Save As...</property>
+                <property name="tooltip-text">Save As... (Ctrl+Shift+S)</property>
+                <style>
+                  <class name="flat" />
+                </style>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">False</property>
+              </packing>
+            </child>
+            
+            <child>
+              <object class="GtkSeparator">
+                <property name="visible">True</property>
+                <property name="orientation">vertical</property>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">False</property>
+              </packing>
+            </child>
+            
+            <child>
+              <object class="GtkButton" id="file_new_folder_button">
+                <property name="visible">True</property>
+                <property name="label">New Folder</property>
+                <property name="tooltip-text">Create New Folder</property>
+                <style>
+                  <class name="flat" />
+                </style>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">False</property>
+              </packing>
+            </child>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+          </packing>
+        </child>
+        
+        <child>
+          <object class="GtkSeparator">
+            <property name="visible">True</property>
+            <property name="orientation">horizontal</property>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+          </packing>
+        </child>
+        
+        
+        <child>
+          <object class="GtkBox" id="navigation_toolbar">
+            <property name="visible">True</property>
+            <property name="orientation">horizontal</property>
+            <property name="spacing">3</property>
+            <property name="margin-start">6</property>
+            <property name="margin-end">6</property>
+            <property name="margin-top">3</property>
+            <property name="margin-bottom">3</property>
+            
+            
+            <child>
+              <object class="GtkButton" id="nav_home_button">
+                <property name="visible">True</property>
+                <property name="label">Home</property>
+                <property name="tooltip-text">Go to Models Home</property>
+                <style>
+                  <class name="flat" />
+                </style>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">False</property>
+              </packing>
+            </child>
+            
+            <child>
+              <object class="GtkSeparator">
+                <property name="visible">True</property>
+                <property name="orientation">vertical</property>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">False</property>
+              </packing>
+            </child>
+            
+            <child>
+              <object class="GtkButton" id="nav_back_button">
+                <property name="visible">True</property>
+                <property name="label">◀</property>
+                <property name="tooltip-text">Back</property>
+                <property name="sensitive">False</property>
+                <style>
+                  <class name="flat" />
+                </style>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">False</property>
+              </packing>
+            </child>
+            
+            
+            <child>
+              <object class="GtkEntry" id="current_file_entry">
+                <property name="visible">True</property>
+                <property name="editable">False</property>
+                <property name="text">workspace/examples/simple.shy</property>
+                <property name="has-frame">True</property>
+                <property name="width-chars">20</property>
+                <style>
+                  <class name="flat" />
+                </style>
+              </object>
+              <packing>
+                <property name="expand">True</property>
+                <property name="fill">True</property>
+              </packing>
+            </child>
+            
+            <child>
+              <object class="GtkButton" id="nav_forward_button">
+                <property name="visible">True</property>
+                <property name="label">▶</property>
+                <property name="tooltip-text">Forward</property>
+                <property name="sensitive">False</property>
+                <style>
+                  <class name="flat" />
+                </style>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">False</property>
+              </packing>
+            </child>
+            
+            <child>
+              <object class="GtkSeparator">
+                <property name="visible">True</property>
+                <property name="orientation">vertical</property>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">False</property>
+              </packing>
+            </child>
+            
+            <child>
+              <object class="GtkButton" id="nav_refresh_button">
+                <property name="visible">True</property>
+                <property name="label">Refresh</property>
+                <property name="tooltip-text">Refresh / Toggle Hierarchical View</property>
+                <style>
+                  <class name="flat" />
+                </style>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">False</property>
+              </packing>
+            </child>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+          </packing>
+        </child>
+        
+        <child>
+          <object class="GtkSeparator">
+            <property name="visible">True</property>
+            <property name="orientation">horizontal</property>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+          </packing>
+        </child>
+        
+        
+        <child>
+          <object class="GtkScrolledWindow" id="file_browser_scroll">
+            <property name="visible">True</property>
+            <property name="hscrollbar-policy">automatic</property>
+            <property name="vscrollbar-policy">automatic</property>
+            <property name="shadow-type">in</property>
+            <property name="height-request">600</property>
+            
+            <child>
+              <object class="GtkTreeView" id="file_browser_tree">
+                <property name="visible">True</property>
+                <property name="headers-visible">True</property>
+                <property name="enable-tree-lines">True</property>
+                <property name="show-expanders">True</property>
+                <property name="enable-grid-lines">none</property>
+                <property name="activate-on-single-click">False</property>
+                
+              </object>
+            </child>
+          </object>
+          <packing>
+            <property name="expand">True</property>
+            <property name="fill">True</property>
+          </packing>
+        </child>
+        
+        <child>
+          <object class="GtkSeparator">
+            <property name="visible">True</property>
+            <property name="orientation">horizontal</property>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+          </packing>
+        </child>
+        
+        
+        <child>
+          <object class="GtkFrame" id="project_actions_frame">
+            <property name="visible">True</property>
+            <property name="label-xalign">0</property>
+            <property name="shadow-type">none</property>
+            <property name="margin-start">6</property>
+            <property name="margin-end">6</property>
+            <property name="margin-top">6</property>
+            <property name="margin-bottom">3</property>
+            
+            <child type="label">
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="label">Project Actions</property>
+                <style>
+                  <class name="dim-label" />
+                </style>
+              </object>
+            </child>
+            
+            <child>
+              <object class="GtkBox" id="project_actions_box">
+                <property name="visible">True</property>
+                <property name="orientation">vertical</property>
+                <property name="spacing">3</property>
+                <property name="margin-start">12</property>
+                <property name="margin-end">12</property>
+                <property name="margin-top">6</property>
+                <property name="margin-bottom">6</property>
+                
+                <child>
+                  <object class="GtkButton" id="new_project_button">
+                    <property name="visible">True</property>
+                    <property name="label">New Project</property>
+                    <property name="tooltip-text">Create a new shypn project</property>
+                    <property name="always-show-image">True</property>
+                  </object>
+                  <packing>
+                    <property name="expand">False</property>
+                    <property name="fill">True</property>
+                  </packing>
+                </child>
+                
+                <child>
+                  <object class="GtkButton" id="open_project_button">
+                    <property name="visible">True</property>
+                    <property name="label">Open Project</property>
+                    <property name="tooltip-text">Open an existing project or import archive</property>
+                    <property name="always-show-image">True</property>
+                  </object>
+                  <packing>
+                    <property name="expand">False</property>
+                    <property name="fill">True</property>
+                  </packing>
+                </child>
+                
+                <child>
+                  <object class="GtkButton" id="project_settings_button">
+                    <property name="visible">True</property>
+                    <property name="label">Project Settings</property>
+                    <property name="tooltip-text">View and edit project properties</property>
+                    <property name="sensitive">False</property>
+                    <property name="always-show-image">True</property>
+                  </object>
+                  <packing>
+                    <property name="expand">False</property>
+                    <property name="fill">True</property>
+                  </packing>
+                </child>
+                
+              </object>
+            </child>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+          </packing>
+        </child>
+        
+        <child>
+          <object class="GtkSeparator">
+            <property name="visible">True</property>
+            <property name="orientation">horizontal</property>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+          </packing>
+        </child>
+        
+        
+        <child>
+          <object class="GtkButton" id="quit_button">
+            <property name="visible">True</property>
+            <property name="label">Quit Application</property>
+            <property name="tooltip-text">Exit shypn (prompts to save unsaved changes)</property>
+            <property name="margin-start">6</property>
+            <property name="margin-end">6</property>
+            <property name="margin-top">3</property>
+            <property name="margin-bottom">3</property>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+          </packing>
+        </child>
+        
+        <child>
+          <object class="GtkSeparator">
+            <property name="visible">True</property>
+            <property name="orientation">horizontal</property>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+          </packing>
+        </child>
+        
+        
+        <child>
+          <object class="GtkBox" id="left_status_bar">
+            <property name="visible">True</property>
+            <property name="orientation">horizontal</property>
+            <property name="spacing">6</property>
+            <property name="margin-start">6</property>
+            <property name="margin-end">6</property>
+            <property name="margin-top">3</property>
+            <property name="margin-bottom">3</property>
+            
+            <child>
+              <object class="GtkLabel" id="file_browser_status">
+                <property name="visible">True</property>
+                <property name="label">Ready</property>
+                <property name="halign">start</property>
+                <property name="xalign">0</property>
+                <style>
+                  <class name="dim-label" />
+                </style>
+              </object>
+              <packing>
+                <property name="expand">True</property>
+                <property name="fill">True</property>
+              </packing>
+            </child>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+          </packing>
+        </child>
+        
+      </object>
+                          <packing>
+                            <property name="name">files</property>
+                          </packing>
+                        </child>
+                        
+                        
+                        <child>
+                          <object class="GtkBox" id="analyses_panel_container">
+                            <property name="orientation">vertical</property>
+                            <property name="visible">True</property>
+                            <property name="vexpand">True</property>
+                            <property name="hexpand">False</property>
+                            <property name="width-request">350</property>
+                            
+                          <child>
+          <object class="GtkBox" id="analyses_content">
+            <property name="visible">True</property>
+            <property name="orientation">vertical</property>
+            <property name="spacing">6</property>
+            <property name="margin-start">6</property>
+            <property name="margin-end">6</property>
+            <property name="margin-top">6</property>
+            <property name="margin-bottom">6</property>
+            <property name="vexpand">True</property>
+            <property name="hexpand">True</property>
+                
+                
+                <child>
+                  <object class="GtkExpander" id="topological_analyses_expander">
+                    <property name="visible">True</property>
+                    <property name="expanded">False</property>
+                    <child type="label">
+                      <object class="GtkLabel">
+                        <property name="visible">True</property>
+                        <property name="label">Topologic Analyses</property>
+                        <property name="xalign">0</property>
+                        <attributes>
+                          <attribute name="weight" value="bold" />
+                        </attributes>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkBox" id="topological_content">
+                        <property name="visible">True</property>
+                        <property name="orientation">vertical</property>
+                        <property name="spacing">6</property>
+                        <property name="margin-start">12</property>
+                        <property name="margin-top">6</property>
+                        <property name="margin-bottom">6</property>
+                        <child>
+                          <object class="GtkLabel">
+                            <property name="visible">True</property>
+                            <property name="label">Topologic analysis tools will appear here</property>
+                            <property name="xalign">0</property>
+                            <style>
+                              <class name="dim-label" />
+                            </style>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                  </object>
+                  <packing>
+                    <property name="expand">False</property>
+                    <property name="fill">True</property>
+                  </packing>
+                </child>
+                
+                
+                <child>
+                  <object class="GtkExpander" id="dynamic_analyses_expander">
+                    <property name="visible">True</property>
+                    <property name="expanded">True</property>
+                    <child type="label">
+                      <object class="GtkLabel">
+                        <property name="visible">True</property>
+                        <property name="label">Dynamic Analyses</property>
+                        <property name="xalign">1</property>
+                        <attributes>
+                          <attribute name="weight" value="bold" />
+                        </attributes>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkNotebook" id="internal_dynamic_analyses">
+                        <property name="visible">True</property>
+                        <property name="show-border">True</property>
+                        <property name="show-tabs">True</property>
+                        <property name="scrollable">False</property>
+                        <property name="vexpand">True</property>
+                        <property name="hexpand">True</property>
+                        
+                        
+                        <child>
+                          <object class="GtkBox" id="transitions_page">
+                            <property name="visible">True</property>
+                            <property name="orientation">vertical</property>
+                            <property name="spacing">6</property>
+                            <property name="margin-start">6</property>
+                            <property name="margin-end">6</property>
+                            <property name="margin-top">6</property>
+                            <property name="margin-bottom">6</property>
+                            
+                            
+                            <child>
+                              <object class="GtkBox">
+                                <property name="visible">True</property>
+                                <property name="orientation">horizontal</property>
+                                <property name="spacing">6</property>
+                                <child>
+                                  <object class="GtkEntry" id="transitions_search_entry">
+                                    <property name="visible">True</property>
+                                    <property name="hexpand">True</property>
+                                    <property name="placeholder-text">Search transitions...</property>
+                                  </object>
+                                  <packing>
+                                    <property name="expand">True</property>
+                                    <property name="fill">True</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkButton" id="transitions_search_button">
+                                    <property name="visible">True</property>
+                                    <property name="label">Search</property>
+                                  </object>
+                                  <packing>
+                                    <property name="expand">False</property>
+                                    <property name="fill">False</property>
+                                  </packing>
+                                </child>
+                              </object>
+                            </child>
+                            
+                            
+                            <child>
+                              <object class="GtkLabel" id="transitions_result_label">
+                                <property name="visible">True</property>
+                                <property name="label" />
+                                <property name="xalign">0</property>
+                                <property name="selectable">True</property>
+                                <property name="ellipsize">end</property>
+                                <style>
+                                  <class name="dim-label" />
+                                </style>
+                              </object>
+                            </child>
+                            
+                            
+                            <child>
+                              <object class="GtkBox" id="transitions_canvas_container">
+                                <property name="visible">True</property>
+                                <property name="orientation">vertical</property>
+                                <property name="vexpand">True</property>
+                                <property name="hexpand">True</property>
+                                <child>
+                                  <object class="GtkLabel">
+                                    <property name="visible">True</property>
+                                    <property name="label">Real-time transition data plot</property>
+                                    <property name="xalign">0.5</property>
+                                    <property name="yalign">0.5</property>
+                                    <property name="vexpand">True</property>
+                                    <style>
+                                      <class name="dim-label" />
+                                    </style>
+                                  </object>
+                                </child>
+                              </object>
+                            </child>
+                            
+                          </object>
+                        </child>
+                        <child type="tab">
+                          <object class="GtkLabel">
+                            <property name="visible">True</property>
+                            <property name="label">Transitions</property>
+                          </object>
+                        </child>
+                        
+                        
+                        <child>
+                          <object class="GtkBox" id="places_page">
+                            <property name="visible">True</property>
+                            <property name="orientation">vertical</property>
+                            <property name="spacing">6</property>
+                            <property name="margin-start">6</property>
+                            <property name="margin-end">6</property>
+                            <property name="margin-top">6</property>
+                            <property name="margin-bottom">6</property>
+                            
+                            
+                            <child>
+                              <object class="GtkBox">
+                                <property name="visible">True</property>
+                                <property name="orientation">horizontal</property>
+                                <property name="spacing">6</property>
+                                <child>
+                                  <object class="GtkEntry" id="places_search_entry">
+                                    <property name="visible">True</property>
+                                    <property name="hexpand">True</property>
+                                    <property name="placeholder-text">Search places...</property>
+                                  </object>
+                                  <packing>
+                                    <property name="expand">True</property>
+                                    <property name="fill">True</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkButton" id="places_search_button">
+                                    <property name="visible">True</property>
+                                    <property name="label">Search</property>
+                                  </object>
+                                  <packing>
+                                    <property name="expand">False</property>
+                                    <property name="fill">False</property>
+                                  </packing>
+                                </child>
+                              </object>
+                            </child>
+                            
+                            
+                            <child>
+                              <object class="GtkLabel" id="places_result_label">
+                                <property name="visible">True</property>
+                                <property name="label" />
+                                <property name="xalign">0</property>
+                                <property name="selectable">True</property>
+                                <property name="ellipsize">end</property>
+                                <style>
+                                  <class name="dim-label" />
+                                </style>
+                              </object>
+                            </child>
+                            
+                            
+                            <child>
+                              <object class="GtkBox" id="places_canvas_container">
+                                <property name="visible">True</property>
+                                <property name="orientation">vertical</property>
+                                <property name="vexpand">True</property>
+                                <property name="hexpand">True</property>
+                                <child>
+                                  <object class="GtkLabel">
+                                    <property name="visible">True</property>
+                                    <property name="label">Real-time place data plot</property>
+                                    <property name="xalign">0.5</property>
+                                    <property name="yalign">0.5</property>
+                                    <property name="vexpand">True</property>
+                                    <style>
+                                      <class name="dim-label" />
+                                    </style>
+                                  </object>
+                                </child>
+                              </object>
+                            </child>
+                            
+                          </object>
+                        </child>
+                        <child type="tab">
+                          <object class="GtkLabel">
+                            <property name="visible">True</property>
+                            <property name="label">Places</property>
+                          </object>
+                        </child>
+                        
+                        
+                        <child>
+                          <object class="GtkBox" id="diagnostics_page">
+                            <property name="visible">True</property>
+                            <property name="orientation">vertical</property>
+                            <property name="spacing">6</property>
+                            <property name="margin-start">6</property>
+                            <property name="margin-end">6</property>
+                            <property name="margin-top">6</property>
+                            <property name="margin-bottom">6</property>
+                            
+                            
+                            <child>
+                              <object class="GtkLabel" id="diagnostics_selection_label">
+                                <property name="visible">True</property>
+                                <property name="label">Select a transition to view diagnostics</property>
+                                <property name="xalign">0</property>
+                                <property name="selectable">True</property>
+                                <property name="wrap">True</property>
+                                <style>
+                                  <class name="dim-label" />
+                                </style>
+                              </object>
+                            </child>
+                            
+                            
+                            <child>
+                              <object class="GtkScrolledWindow" id="diagnostics_scrolled">
+                                <property name="visible">True</property>
+                                <property name="vexpand">True</property>
+                                <property name="hexpand">True</property>
+                                <property name="shadow-type">in</property>
+                                <property name="min-content-height">200</property>
+                                <child>
+                                  <object class="GtkBox" id="diagnostics_content_container">
+                                    <property name="visible">True</property>
+                                    <property name="orientation">vertical</property>
+                                    <property name="spacing">0</property>
+                                    <property name="margin">10</property>
+                                    <child>
+                                      <object class="GtkLabel" id="diagnostics_placeholder">
+                                        <property name="visible">True</property>
+                                        <property name="label">No transition selected</property>
+                                        <property name="xalign">0.5</property>
+                                        <property name="yalign">0.5</property>
+                                        <property name="vexpand">True</property>
+                                        <style>
+                                          <class name="dim-label" />
+                                        </style>
+                                      </object>
+                                    </child>
+                                  </object>
+                                </child>
+                              </object>
+                            </child>
+                            
+                          </object>
+                        </child>
+                        <child type="tab">
+                          <object class="GtkLabel">
+                            <property name="visible">True</property>
+                            <property name="label">Diagnostics</property>
+                          </object>
+                        </child>
+                        
+                      </object>
+                    </child>
+                  </object>
+                  <packing>
+                    <property name="expand">True</property>
+                    <property name="fill">True</property>
+                  </packing>
+                </child>
+                
+              </object>
+          <packing>
+            <property name="expand">True</property>
+            <property name="fill">True</property>
+          </packing>
+        </child>
+        
+      </object>
+                          <packing>
+                            <property name="name">analyses</property>
+                          </packing>
+                        </child>
+                        
+                        
+                        <child>
+                          <object class="GtkBox" id="pathways_panel_container">
+                            <property name="orientation">vertical</property>
+                            <property name="visible">True</property>
+                            <property name="vexpand">True</property>
+                            <property name="hexpand">False</property>
+                            <property name="width-request">320</property>
+                            
+                          <child>
+          <object class="GtkNotebook" id="pathway_notebook">
+            <property name="visible">True</property>
+            <property name="vexpand">True</property>
+            <property name="hexpand">True</property>
+            <property name="margin-start">6</property>
+            <property name="margin-end">6</property>
+            <property name="margin-top">6</property>
+            <property name="margin-bottom">6</property>
+            
+            
+            <child>
+              <object class="GtkBox" id="import_tab_content">
+                <property name="visible">True</property>
+                <property name="orientation">vertical</property>
+                <property name="spacing">12</property>
+                <property name="margin">12</property>
+                
+                
+                <child>
+                  <object class="GtkBox">
+                    <property name="visible">True</property>
+                    <property name="orientation">vertical</property>
+                    <property name="spacing">6</property>
+                    
+                    <child>
+                      <object class="GtkLabel">
+                        <property name="visible">True</property>
+                        <property name="label">Pathway ID</property>
+                        <property name="halign">start</property>
+                        <property name="xalign">0</property>
+                        <attributes>
+                          <attribute name="weight" value="bold" />
+                        </attributes>
+                      </object>
+                    </child>
+                    
+                    <child>
+                      <object class="GtkEntry" id="pathway_id_entry">
+                        <property name="visible">True</property>
+                        <property name="placeholder-text">e.g., hsa00010, eco00020</property>
+                        <property name="tooltip-text">Enter KEGG pathway ID (organism code + pathway number)</property>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                
+                
+                <child>
+                  <object class="GtkBox">
+                    <property name="visible">True</property>
+                    <property name="orientation">vertical</property>
+                    <property name="spacing">6</property>
+                    
+                    <child>
+                      <object class="GtkLabel">
+                        <property name="visible">True</property>
+                        <property name="label">Organism</property>
+                        <property name="halign">start</property>
+                        <property name="xalign">0</property>
+                        <attributes>
+                          <attribute name="weight" value="bold" />
+                        </attributes>
+                      </object>
+                    </child>
+                    
+                    <child>
+                      <object class="GtkComboBoxText" id="organism_combo">
+                        <property name="visible">True</property>
+                        <property name="active">0</property>
+                        <items>
+                          <item>hsa - Homo sapiens (human)</item>
+                          <item>mmu - Mus musculus (mouse)</item>
+                          <item>dme - Drosophila melanogaster</item>
+                          <item>sce - Saccharomyces cerevisiae</item>
+                          <item>eco - Escherichia coli</item>
+                        </items>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                
+                
+                <child>
+                  <object class="GtkExpander" id="options_expander">
+                    <property name="visible">True</property>
+                    <property name="expanded">False</property>
+                    
+                    <child type="label">
+                      <object class="GtkLabel">
+                        <property name="visible">True</property>
+                        <property name="label">Import Options</property>
+                        <attributes>
+                          <attribute name="weight" value="bold" />
+                        </attributes>
+                      </object>
+                    </child>
+                    
+                    <child>
+                      <object class="GtkBox">
+                        <property name="visible">True</property>
+                        <property name="orientation">vertical</property>
+                        <property name="spacing">6</property>
+                        <property name="margin">6</property>
+                        
+                        
+                        <child>
+                          <object class="GtkCheckButton" id="filter_cofactors_check">
+                            <property name="visible">True</property>
+                            <property name="label">Filter common cofactors (ATP, NAD+, etc.)</property>
+                            <property name="active">True</property>
+                            <property name="tooltip-text">Exclude ubiquitous molecules to simplify the network</property>
+                          </object>
+                        </child>
+                        
+                        
+                        <child>
+                          <object class="GtkBox">
+                            <property name="visible">True</property>
+                            <property name="orientation">horizontal</property>
+                            <property name="spacing">6</property>
+                            
+                            <child>
+                              <object class="GtkLabel">
+                                <property name="visible">True</property>
+                                <property name="label">Coordinate scale:</property>
+                              </object>
+                            </child>
+                            
+                            <child>
+                              <object class="GtkSpinButton" id="scale_spin">
+                                <property name="visible">True</property>
+                                <property name="adjustment">pathway_scale_adjustment</property>
+                                <property name="digits">1</property>
+                                <property name="value">2.5</property>
+                              </object>
+                            </child>
+                          </object>
+                        </child>
+                        
+                        
+                        <child>
+                          <object class="GtkCheckButton" id="include_relations_check">
+                            <property name="visible">True</property>
+                            <property name="label">Include regulatory relations (future)</property>
+                            <property name="active">False</property>
+                            <property name="sensitive">False</property>
+                            <property name="tooltip-text">Convert activation/inhibition to test arcs (not yet implemented)</property>
+                          </object>
+                        </child>
+                        
+                        
+                        <child>
+                          <object class="GtkSeparator">
+                            <property name="visible">True</property>
+                            <property name="margin-top">6</property>
+                            <property name="margin-bottom">6</property>
+                          </object>
+                        </child>
+                        
+                        
+                        <child>
+                          <object class="GtkLabel">
+                            <property name="visible">True</property>
+                            <property name="label" translatable="yes">&lt;b&gt;Post-Processing Enhancements:&lt;/b&gt;</property>
+                            <property name="use-markup">True</property>
+                            <property name="halign">start</property>
+                            <property name="margin-bottom">3</property>
+                          </object>
+                        </child>
+                        
+                        
+                        <child>
+                          <object class="GtkCheckButton" id="enhancement_layout_check">
+                            <property name="visible">True</property>
+                            <property name="label">Layout Optimization - Resolve overlapping elements</property>
+                            <property name="active">True</property>
+                            <property name="tooltip-text">Apply force-directed layout to eliminate overlapping places and transitions</property>
+                          </object>
+                        </child>
+                        
+                        
+                        <child>
+                          <object class="GtkCheckButton" id="enhancement_arcs_check">
+                            <property name="visible">True</property>
+                            <property name="label">Arc Routing - Create curved arcs for parallel connections</property>
+                            <property name="active">True</property>
+                            <property name="tooltip-text">Generate Bézier curves for parallel arcs to improve visual clarity</property>
+                          </object>
+                        </child>
+                        
+                        
+                        <child>
+                          <object class="GtkCheckButton" id="enhancement_metadata_check">
+                            <property name="visible">True</property>
+                            <property name="label">Metadata Enhancement - Add compound/reaction names from KEGG</property>
+                            <property name="active">True</property>
+                            <property name="tooltip-text">Extract and apply compound names, reaction info, and colors from KEGG data</property>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                
+                
+                <child>
+                  <object class="GtkFrame">
+                    <property name="visible">True</property>
+                    <property name="label">Preview</property>
+                    <property name="vexpand">True</property>
+                    
+                    <child>
+                      <object class="GtkScrolledWindow">
+                        <property name="visible">True</property>
+                        <property name="min-content-height">100</property>
+                        
+                        <child>
+                          <object class="GtkTextView" id="preview_text">
+                            <property name="visible">True</property>
+                            <property name="editable">False</property>
+                            <property name="wrap-mode">word</property>
+                            <property name="margin">6</property>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                
+                
+                <child>
+                  <object class="GtkLabel" id="import_status_label">
+                    <property name="visible">True</property>
+                    <property name="label" />
+                    <property name="halign">start</property>
+                    <property name="xalign">0</property>
+                    <property name="wrap">True</property>
+                  </object>
+                </child>
+                
+                
+                <child>
+                  <object class="GtkBox">
+                    <property name="visible">True</property>
+                    <property name="orientation">horizontal</property>
+                    <property name="spacing">6</property>
+                    <property name="halign">end</property>
+                    
+                    <child>
+                      <object class="GtkButton" id="fetch_button">
+                        <property name="visible">True</property>
+                        <property name="label">Fetch Pathway</property>
+                        <property name="tooltip-text">Download pathway information from KEGG</property>
+                      </object>
+                    </child>
+                    
+                    <child>
+                      <object class="GtkButton" id="import_button">
+                        <property name="visible">True</property>
+                        <property name="label">Import</property>
+                        <property name="sensitive">False</property>
+                        <property name="tooltip-text">Convert pathway to Petri net and load into canvas</property>
+                        <style>
+                          <class name="suggested-action" />
+                        </style>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                
+                
+                <child>
+                  <object class="GtkFrame">
+                    <property name="visible">True</property>
+                    
+                    <child>
+                      <object class="GtkLabel">
+                        <property name="visible">True</property>
+                        <property name="label">⚠ KEGG data is for academic use only. Commercial use requires a license from Kanehisa Laboratories.</property>
+                        <property name="wrap">True</property>
+                        <property name="margin">6</property>
+                        <property name="xalign">0</property>
+                        <style>
+                          <class name="dim-label" />
+                        </style>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+              </object>
+              <packing>
+                <property name="tab_fill">False</property>
+              </packing>
+            </child>
+            
+            <child type="tab">
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="label">Import</property>
+              </object>
+            </child>
+            
+            
+            <child>
+              <object class="GtkBox" id="browse_tab_content">
+                <property name="visible">True</property>
+                <property name="orientation">vertical</property>
+                <property name="spacing">12</property>
+                <property name="margin">12</property>
+                
+                <child>
+                  <object class="GtkLabel">
+                    <property name="visible">True</property>
+                    <property name="label">Browse KEGG Pathways</property>
+                    <property name="halign">center</property>
+                    <property name="valign">center</property>
+                    <property name="vexpand">True</property>
+                    <style>
+                      <class name="dim-label" />
+                    </style>
+                  </object>
+                </child>
+                
+                <child>
+                  <object class="GtkLabel">
+                    <property name="visible">True</property>
+                    <property name="label">(Future: List of available pathways by category)</property>
+                    <property name="halign">center</property>
+                    <style>
+                      <class name="dim-label" />
+                    </style>
+                  </object>
+                </child>
+              </object>
+            </child>
+            
+            <child type="tab">
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="label">Browse</property>
+              </object>
+            </child>
+            
+            
+            <child>
+              <object class="GtkBox" id="sbml_tab_content">
+                <property name="visible">True</property>
+                <property name="orientation">vertical</property>
+                <property name="spacing">12</property>
+                <property name="margin">12</property>
+                
+                
+                <child>
+                  <object class="GtkBox">
+                    <property name="visible">True</property>
+                    <property name="orientation">vertical</property>
+                    <property name="spacing">6</property>
+                    
+                    <child>
+                      <object class="GtkLabel">
+                        <property name="visible">True</property>
+                        <property name="label">SBML Source</property>
+                        <property name="halign">start</property>
+                        <property name="xalign">0</property>
+                        <attributes>
+                          <attribute name="weight" value="bold" />
+                        </attributes>
+                      </object>
+                    </child>
+                    
+                    
+                    <child>
+                      <object class="GtkBox">
+                        <property name="visible">True</property>
+                        <property name="orientation">horizontal</property>
+                        <property name="spacing">12</property>
+                        
+                        <child>
+                          <object class="GtkRadioButton" id="sbml_local_radio">
+                            <property name="visible">True</property>
+                            <property name="label">Local File</property>
+                            <property name="active">True</property>
+                            <property name="tooltip-text">Browse for local SBML file</property>
+                          </object>
+                        </child>
+                        
+                        <child>
+                          <object class="GtkRadioButton" id="sbml_biomodels_radio">
+                            <property name="visible">True</property>
+                            <property name="label">BioModels Database</property>
+                            <property name="group">sbml_local_radio</property>
+                            <property name="tooltip-text">Fetch model from BioModels repository</property>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                    
+                    
+                    <child>
+                      <object class="GtkBox" id="sbml_local_box">
+                        <property name="visible">True</property>
+                        <property name="orientation">horizontal</property>
+                        <property name="spacing">6</property>
+                        
+                        <child>
+                          <object class="GtkEntry" id="sbml_file_entry">
+                            <property name="visible">True</property>
+                            <property name="editable">True</property>
+                            <property name="placeholder-text">Select SBML file or type path...</property>
+                            <property name="hexpand">True</property>
+                          </object>
+                        </child>
+                        
+                        <child>
+                          <object class="GtkButton" id="sbml_browse_button">
+                            <property name="visible">True</property>
+                            <property name="label">Browse...</property>
+                            <property name="tooltip-text">Select SBML file to import</property>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                    
+                    
+                    <child>
+                      <object class="GtkBox" id="sbml_biomodels_box">
+                        <property name="visible">False</property>
+                        <property name="orientation">horizontal</property>
+                        <property name="spacing">6</property>
+                        
+                        <child>
+                          <object class="GtkEntry" id="sbml_biomodels_entry">
+                            <property name="visible">True</property>
+                            <property name="editable">True</property>
+                            <property name="placeholder-text">Enter BioModels ID (e.g., BIOMD0000000001)...</property>
+                            <property name="hexpand">True</property>
+                          </object>
+                        </child>
+                        
+                        <child>
+                          <object class="GtkButton" id="sbml_fetch_button">
+                            <property name="visible">True</property>
+                            <property name="label">Fetch</property>
+                            <property name="tooltip-text">Download model from BioModels</property>
+                            <property name="sensitive">False</property>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                    
+                    
+                    <child>
+                      <object class="GtkLabel" id="sbml_source_info">
+                        <property name="visible">True</property>
+                        <property name="label">Browse for a local SBML file (.sbml or .xml)</property>
+                        <property name="halign">start</property>
+                        <property name="wrap">True</property>
+                        <style>
+                          <class name="dim-label" />
+                        </style>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                
+                
+                <child>
+                  <object class="GtkExpander" id="sbml_options_expander">
+                    <property name="visible">True</property>
+                    <property name="expanded">True</property>
+                    
+                    <child type="label">
+                      <object class="GtkLabel">
+                        <property name="visible">True</property>
+                        <property name="label">Import Options</property>
+                        <attributes>
+                          <attribute name="weight" value="bold" />
+                        </attributes>
+                      </object>
+                    </child>
+                    
+                    <child>
+                      <object class="GtkBox">
+                        <property name="visible">True</property>
+                        <property name="orientation">vertical</property>
+                        <property name="spacing">6</property>
+                        <property name="margin">6</property>
+                        
+                        
+                        <child>
+                          <object class="GtkLabel">
+                            <property name="visible">True</property>
+                            <property name="label" translatable="yes">&lt;b&gt;Layout Strategy:&lt;/b&gt;</property>
+                            <property name="use-markup">True</property>
+                            <property name="halign">start</property>
+                            <property name="margin-bottom">3</property>
+                          </object>
+                        </child>
+                        
+                        
+                        <child>
+                          <object class="GtkLabel">
+                            <property name="visible">True</property>
+                            <property name="label">Parsed pathways are loaded with arbitrary positions. Use Swiss Palette → Force-Directed Layout to organize nodes after import.</property>
+                            <property name="halign">start</property>
+                            <property name="wrap">True</property>
+                            <property name="margin-bottom">12</property>
+                            <style>
+                              <class name="dim-label" />
+                            </style>
+                          </object>
+                        </child>
+                        
+                        
+                        <child>
+                          <object class="GtkSeparator">
+                            <property name="visible">True</property>
+                            <property name="margin-top">6</property>
+                            <property name="margin-bottom">6</property>
+                          </object>
+                        </child>
+                        
+                        
+                        <child>
+                          <object class="GtkLabel">
+                            <property name="visible">True</property>
+                            <property name="label" translatable="yes">&lt;b&gt;Token Conversion:&lt;/b&gt;</property>
+                            <property name="use-markup">True</property>
+                            <property name="halign">start</property>
+                            <property name="margin-bottom">3</property>
+                          </object>
+                        </child>
+                        
+                        
+                        <child>
+                          <object class="GtkBox">
+                            <property name="visible">True</property>
+                            <property name="orientation">horizontal</property>
+                            <property name="spacing">6</property>
+                            
+                            <child>
+                              <object class="GtkLabel">
+                                <property name="visible">True</property>
+                                <property name="label">Scale factor:</property>
+                                <property name="tooltip-text">Multiplier for concentration → token conversion</property>
+                              </object>
+                            </child>
+                            
+                            <child>
+                              <object class="GtkSpinButton" id="sbml_scale_spin">
+                                <property name="visible">True</property>
+                                <property name="adjustment">pathway_sbml_scale_adjustment</property>
+                                <property name="digits">1</property>
+                                <property name="value">1.0</property>
+                                <property name="tooltip-text">Scale factor: 1 mM = X tokens (0.1-10.0)</property>
+                              </object>
+                            </child>
+                            
+                            <child>
+                              <object class="GtkLabel">
+                                <property name="visible">True</property>
+                                <property name="label">   (1 mM → X tokens)</property>
+                                <style>
+                                  <class name="dim-label" />
+                                </style>
+                              </object>
+                            </child>
+                          </object>
+                        </child>
+                        
+                        
+                        <child>
+                          <object class="GtkLabel" id="sbml_scale_example">
+                            <property name="visible">True</property>
+                            <property name="label">Example: 5 mM glucose → 5 tokens</property>
+                            <property name="halign">start</property>
+                            <property name="margin-start">20</property>
+                            <style>
+                              <class name="dim-label" />
+                            </style>
+                          </object>
+                        </child>
+                        
+                        
+                        <child>
+                          <object class="GtkCheckButton" id="sbml_enrich_check">
+                            <property name="visible">True</property>
+                            <property name="can-focus">True</property>
+                            <property name="receives-default">False</property>
+                            <property name="label">Enrich with external data (Disabled)</property>
+                            <property name="tooltip-text">Feature disabled: Automatic pathway matching between heterogeneous databases (KEGG, BioModels, etc.) is computationally intractable. Different organisms, notations, and scopes make reliable pathway equivalence detection impossible.</property>
+                            <property name="active">False</property>
+                            <property name="sensitive">False</property>
+                            <property name="margin-top">12</property>
+                            <property name="margin-start">12</property>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                
+                
+                <child>
+                  <object class="GtkFrame">
+                    <property name="visible">True</property>
+                    <property name="label">Pathway Information</property>
+                    <property name="vexpand">True</property>
+                    
+                    <child>
+                      <object class="GtkScrolledWindow">
+                        <property name="visible">True</property>
+                        <property name="min-content-height">150</property>
+                        
+                        <child>
+                          <object class="GtkTextView" id="sbml_preview_text">
+                            <property name="visible">True</property>
+                            <property name="editable">False</property>
+                            <property name="wrap-mode">word</property>
+                            <property name="margin">6</property>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                
+                
+                <child>
+                  <object class="GtkLabel" id="sbml_status_label">
+                    <property name="visible">True</property>
+                    <property name="label" />
+                    <property name="halign">start</property>
+                    <property name="xalign">0</property>
+                    <property name="wrap">True</property>
+                  </object>
+                </child>
+                
+                
+                <child>
+                  <object class="GtkBox">
+                    <property name="visible">True</property>
+                    <property name="orientation">horizontal</property>
+                    <property name="spacing">6</property>
+                    <property name="halign">end</property>
+                    
+                    <child>
+                      <object class="GtkButton" id="sbml_parse_button">
+                        <property name="visible">True</property>
+                        <property name="label">Parse and Load</property>
+                        <property name="sensitive">False</property>
+                        <property name="tooltip-text">Parse SBML file and automatically load to canvas (use Swiss Palette to apply force-directed layout)</property>
+                        <style>
+                          <class name="suggested-action" />
+                        </style>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                
+                
+                <child>
+                  <object class="GtkFrame">
+                    <property name="visible">True</property>
+                    
+                    <child>
+                      <object class="GtkLabel">
+                        <property name="visible">True</property>
+                        <property name="label">ℹ Import biochemical pathways from SBML files. Species → places, reactions → transitions, stoichiometry → arc weights. After loading, use Swiss Palette → Force-Directed Layout to organize nodes.</property>
+                        <property name="wrap">True</property>
+                        <property name="margin">6</property>
+                        <property name="xalign">0</property>
+                        <style>
+                          <class name="dim-label" />
+                        </style>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+              </object>
+              <packing>
+                <property name="tab_fill">False</property>
+              </packing>
+            </child>
+            
+            <child type="tab">
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="label">SBML</property>
+              </object>
+            </child>
+            
+            
+            <child>
+              <object class="GtkBox" id="history_tab_content">
+                <property name="visible">True</property>
+                <property name="orientation">vertical</property>
+                <property name="spacing">12</property>
+                <property name="margin">12</property>
+                
+                <child>
+                  <object class="GtkLabel">
+                    <property name="visible">True</property>
+                    <property name="label">Import History</property>
+                    <property name="halign">center</property>
+                    <property name="valign">center</property>
+                    <property name="vexpand">True</property>
+                    <style>
+                      <class name="dim-label" />
+                    </style>
+                  </object>
+                </child>
+                
+                <child>
+                  <object class="GtkLabel">
+                    <property name="visible">True</property>
+                    <property name="label">(Future: Recently imported pathways)</property>
+                    <property name="halign">center</property>
+                    <style>
+                      <class name="dim-label" />
+                    </style>
+                  </object>
+                </child>
+              </object>
+            </child>
+            
+            <child type="tab">
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="label">History</property>
+              </object>
+            </child>
+          </object>
+          <packing>
+            <property name="expand">True</property>
+            <property name="fill">True</property>
+          </packing>
+        </child>
+      </object>
+                          <packing>
+                            <property name="name">pathways</property>
+                          </packing>
+                        </child>
+                        
+                        
+                        <child>
+                          <object class="GtkBox" id="topology_panel_container">
+                            <property name="orientation">vertical</property>
+                            <property name="visible">True</property>
+                            <property name="vexpand">True</property>
+                            <property name="hexpand">False</property>
+                            <property name="width-request">400</property>
+                            
+                          <child>
+      <object class="GtkBox" id="topology_header">
+        <property name="visible">True</property>
+        <property name="can-focus">False</property>
+        <property name="margin-start">6</property>
+        <property name="margin-end">6</property>
+        <property name="margin-top">6</property>
+        <property name="margin-bottom">6</property>
+        <property name="spacing">6</property>
+        
+        
+        <child>
+          <object class="GtkLabel" id="topology_title">
+            <property name="visible">True</property>
+            <property name="can-focus">False</property>
+            <property name="label" translatable="yes">Topology Analysis</property>
+            <property name="xalign">0</property>
+            <property name="hexpand">True</property>
+            <attributes>
+              <attribute name="weight" value="bold" />
+            </attributes>
+          </object>
+          <packing>
+            <property name="expand">True</property>
+            <property name="fill">True</property>
+            <property name="position">0</property>
+          </packing>
+        </child>
+        
+        
+        <child>
+          <object class="GtkToggleButton" id="topology_float_button">
+            <property name="visible">True</property>
+            <property name="can-focus">True</property>
+            <property name="receives-default">True</property>
+            <property name="tooltip-text" translatable="yes">Float panel in separate window</property>
+            <child>
+              <object class="GtkImage">
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="icon-name">view-restore-symbolic</property>
+              </object>
+            </child>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">False</property>
+            <property name="position">1</property>
+          </packing>
+        </child>
+      </object>
+      <packing>
+        <property name="expand">False</property>
+        <property name="fill">True</property>
+        <property name="position">0</property>
+      </packing>
+    </child>
+    
+    
+    <child>
+      <object class="GtkNotebook" id="topology_notebook">
+        <property name="visible">True</property>
+        <property name="can-focus">True</property>
+        <property name="hexpand">True</property>
+        <property name="vexpand">True</property>
+        
+        
+        <child>
+          <object class="GtkScrolledWindow" id="structural_scroll">
+            <property name="visible">True</property>
+            <property name="can-focus">True</property>
+            <property name="hscrollbar-policy">never</property>
+            <property name="vscrollbar-policy">automatic</property>
+            <property name="shadow-type">in</property>
+            <child>
+              <object class="GtkBox" id="structural_box">
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="margin">12</property>
+                <property name="orientation">vertical</property>
+                <property name="spacing">0</property>
+                
+                
+                <child>
+                  <object class="GtkExpander" id="p_invariants_expander">
+                    <property name="visible">True</property>
+                    <property name="can-focus">True</property>
+                    <property name="expanded">True</property>
+                    <child type="label">
+                      <object class="GtkLabel">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="label">P-Invariants</property>
+                        <property name="xalign">0</property>
+                        <attributes>
+                          <attribute name="weight" value="bold" />
+                        </attributes>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkScrolledWindow" id="p_invariants_scrolled">
+                        <property name="visible">True</property>
+                        <property name="can-focus">True</property>
+                        <property name="hexpand">True</property>                        <property name="min-content-height">200</property>
+                        <property name="hscrollbar-policy">automatic</property>
+                        <property name="vscrollbar-policy">automatic</property>
+                        <property name="shadow-type">in</property>
+                        <child>
+                          <object class="GtkViewport">
+                            <property name="visible">True</property>
+                            <child>
+                              <object class="GtkLabel" id="p_invariants_report_label">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="selectable">True</property>
+                                <property name="use-markup">True</property>
+                                <property name="wrap">True</property>
+                                <property name="xalign">0</property>
+                                <property name="yalign">0</property>
+                                <property name="margin-start">12</property>
+                                <property name="margin-end">12</property>
+                                <property name="margin-top">6</property>
+                                <property name="margin-bottom">6</property>
+                                <property name="label">Not yet analyzed.
+
+Collapse and expand again to run analysis.</property>
+                              </object>
+                            </child>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                  </object>
+                <packing>
+                  <property name="expand">False</property>
+                  <property name="fill">True</property>
+                </packing>
+                </child>
+                
+                
+                <child>
+                  <object class="GtkExpander" id="t_invariants_expander">
+                    <property name="visible">True</property>
+                    <property name="can-focus">True</property>
+                    <property name="expanded">False</property>
+                    <child type="label">
+                      <object class="GtkLabel">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="label">T-Invariants</property>
+                        <property name="xalign">0</property>
+                        <attributes>
+                          <attribute name="weight" value="bold" />
+                        </attributes>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkScrolledWindow" id="t_invariants_scrolled">
+                        <property name="visible">True</property>
+                        <property name="can-focus">True</property>
+                        <property name="hexpand">True</property>                        <property name="min-content-height">200</property>
+                        <property name="hscrollbar-policy">automatic</property>
+                        <property name="vscrollbar-policy">automatic</property>
+                        <property name="shadow-type">in</property>
+                        <child>
+                          <object class="GtkViewport">
+                            <property name="visible">True</property>
+                            <child>
+                              <object class="GtkLabel" id="t_invariants_report_label">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="selectable">True</property>
+                                <property name="use-markup">True</property>
+                                <property name="wrap">True</property>
+                                <property name="xalign">0</property>
+                                <property name="yalign">0</property>
+                                <property name="margin-start">12</property>
+                                <property name="margin-end">12</property>
+                                <property name="margin-top">6</property>
+                                <property name="margin-bottom">6</property>
+                                <property name="label" />
+                              </object>
+                            </child>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                  </object>
+                <packing>
+                  <property name="expand">False</property>
+                  <property name="fill">True</property>
+                </packing>
+                </child>
+                
+                
+                <child>
+                  <object class="GtkExpander" id="siphons_expander">
+                    <property name="visible">True</property>
+                    <property name="can-focus">True</property>
+                    <property name="expanded">False</property>
+                    <child type="label">
+                      <object class="GtkLabel">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="label">Siphons</property>
+                        <property name="xalign">0</property>
+                        <attributes>
+                          <attribute name="weight" value="bold" />
+                        </attributes>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkScrolledWindow" id="siphons_scrolled">
+                        <property name="visible">True</property>
+                        <property name="can-focus">True</property>
+                        <property name="hexpand">True</property>                        <property name="min-content-height">200</property>
+                        <property name="hscrollbar-policy">automatic</property>
+                        <property name="vscrollbar-policy">automatic</property>
+                        <property name="shadow-type">in</property>
+                        <child>
+                          <object class="GtkViewport">
+                            <property name="visible">True</property>
+                            <child>
+                              <object class="GtkLabel" id="siphons_report_label">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="selectable">True</property>
+                                <property name="use-markup">True</property>
+                                <property name="wrap">True</property>
+                                <property name="xalign">0</property>
+                                <property name="yalign">0</property>
+                                <property name="margin-start">12</property>
+                                <property name="margin-end">12</property>
+                                <property name="margin-top">6</property>
+                                <property name="margin-bottom">6</property>
+                                <property name="label" />
+                              </object>
+                            </child>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                  </object>
+                <packing>
+                  <property name="expand">False</property>
+                  <property name="fill">True</property>
+                </packing>
+                </child>
+                
+                
+                <child>
+                  <object class="GtkExpander" id="traps_expander">
+                    <property name="visible">True</property>
+                    <property name="can-focus">True</property>
+                    <property name="expanded">False</property>
+                    <child type="label">
+                      <object class="GtkLabel">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="label">Traps</property>
+                        <property name="xalign">0</property>
+                        <attributes>
+                          <attribute name="weight" value="bold" />
+                        </attributes>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkScrolledWindow" id="traps_scrolled">
+                        <property name="visible">True</property>
+                        <property name="can-focus">True</property>
+                        <property name="hexpand">True</property>                        <property name="min-content-height">200</property>
+                        <property name="hscrollbar-policy">automatic</property>
+                        <property name="vscrollbar-policy">automatic</property>
+                        <property name="shadow-type">in</property>
+                        <child>
+                          <object class="GtkViewport">
+                            <property name="visible">True</property>
+                            <child>
+                              <object class="GtkLabel" id="traps_report_label">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="selectable">True</property>
+                                <property name="use-markup">True</property>
+                                <property name="wrap">True</property>
+                                <property name="xalign">0</property>
+                                <property name="yalign">0</property>
+                                <property name="margin-start">12</property>
+                                <property name="margin-end">12</property>
+                                <property name="margin-top">6</property>
+                                <property name="margin-bottom">6</property>
+                                <property name="label" />
+                              </object>
+                            </child>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                  </object>
+                <packing>
+                  <property name="expand">False</property>
+                  <property name="fill">True</property>
+                </packing>
+                </child>              </object>
+            </child>
+          </object>
+        </child>
+        <child type="tab">
+          <object class="GtkLabel" id="structural_tab_label">
+            <property name="visible">True</property>
+            <property name="can-focus">False</property>
+            <property name="label" translatable="yes">Structural</property>
+          </object>
+          <packing>
+            <property name="tab-fill">False</property>
+          </packing>
+        </child>
+        
+        
+        <child>
+          <object class="GtkScrolledWindow" id="graph_network_scroll">
+            <property name="visible">True</property>
+            <property name="can-focus">True</property>
+            <property name="hscrollbar-policy">never</property>
+            <property name="vscrollbar-policy">automatic</property>
+            <property name="shadow-type">in</property>
+            <child>
+              <object class="GtkBox" id="graph_network_box">
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="margin">12</property>
+                <property name="orientation">vertical</property>
+                <property name="spacing">0</property>
+                
+                
+                <child>
+                  <object class="GtkExpander" id="cycles_expander">
+                    <property name="visible">True</property>
+                    <property name="can-focus">True</property>
+                    <property name="expanded">False</property>
+                    <child type="label">
+                      <object class="GtkLabel">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="label">Elementary Cycles</property>
+                        <property name="xalign">0</property>
+                        <attributes>
+                          <attribute name="weight" value="bold" />
+                        </attributes>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkScrolledWindow" id="cycles_scrolled">
+                        <property name="visible">True</property>
+                        <property name="can-focus">True</property>
+                        <property name="hexpand">True</property>                        <property name="min-content-height">200</property>
+                        <property name="hscrollbar-policy">automatic</property>
+                        <property name="vscrollbar-policy">automatic</property>
+                        <property name="shadow-type">in</property>
+                        <child>
+                          <object class="GtkViewport">
+                            <property name="visible">True</property>
+                            <child>
+                              <object class="GtkLabel" id="cycles_report_label">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="selectable">True</property>
+                                <property name="use-markup">True</property>
+                                <property name="wrap">True</property>
+                                <property name="xalign">0</property>
+                                <property name="yalign">0</property>
+                                <property name="margin-start">12</property>
+                                <property name="margin-end">12</property>
+                                <property name="margin-top">6</property>
+                                <property name="margin-bottom">6</property>
+                                <property name="label" />
+                              </object>
+                            </child>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                  </object>
+                <packing>
+                  <property name="expand">False</property>
+                  <property name="fill">True</property>
+                </packing>
+                </child>
+                
+                
+                <child>
+                  <object class="GtkExpander" id="paths_expander">
+                    <property name="visible">True</property>
+                    <property name="can-focus">True</property>
+                    <property name="expanded">False</property>
+                    <child type="label">
+                      <object class="GtkLabel">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="label">Critical Paths</property>
+                        <property name="xalign">0</property>
+                        <attributes>
+                          <attribute name="weight" value="bold" />
+                        </attributes>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkScrolledWindow" id="paths_scrolled">
+                        <property name="visible">True</property>
+                        <property name="can-focus">True</property>
+                        <property name="hexpand">True</property>                        <property name="min-content-height">200</property>
+                        <property name="hscrollbar-policy">automatic</property>
+                        <property name="vscrollbar-policy">automatic</property>
+                        <property name="shadow-type">in</property>
+                        <child>
+                          <object class="GtkViewport">
+                            <property name="visible">True</property>
+                            <child>
+                              <object class="GtkLabel" id="paths_report_label">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="selectable">True</property>
+                                <property name="use-markup">True</property>
+                                <property name="wrap">True</property>
+                                <property name="xalign">0</property>
+                                <property name="yalign">0</property>
+                                <property name="margin-start">12</property>
+                                <property name="margin-end">12</property>
+                                <property name="margin-top">6</property>
+                                <property name="margin-bottom">6</property>
+                                <property name="label" />
+                              </object>
+                            </child>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                  </object>
+                <packing>
+                  <property name="expand">False</property>
+                  <property name="fill">True</property>
+                </packing>
+                </child>
+                
+                
+                <child>
+                  <object class="GtkExpander" id="hubs_expander">
+                    <property name="visible">True</property>
+                    <property name="can-focus">True</property>
+                    <property name="expanded">False</property>
+                    <child type="label">
+                      <object class="GtkLabel">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="label">Network Hubs</property>
+                        <property name="xalign">0</property>
+                        <attributes>
+                          <attribute name="weight" value="bold" />
+                        </attributes>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkScrolledWindow" id="hubs_scrolled">
+                        <property name="visible">True</property>
+                        <property name="can-focus">True</property>
+                        <property name="hexpand">True</property>                        <property name="min-content-height">200</property>
+                        <property name="hscrollbar-policy">automatic</property>
+                        <property name="vscrollbar-policy">automatic</property>
+                        <property name="shadow-type">in</property>
+                        <child>
+                          <object class="GtkViewport">
+                            <property name="visible">True</property>
+                            <child>
+                              <object class="GtkLabel" id="hubs_report_label">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="selectable">True</property>
+                                <property name="use-markup">True</property>
+                                <property name="wrap">True</property>
+                                <property name="xalign">0</property>
+                                <property name="yalign">0</property>
+                                <property name="margin-start">12</property>
+                                <property name="margin-end">12</property>
+                                <property name="margin-top">6</property>
+                                <property name="margin-bottom">6</property>
+                                <property name="label" />
+                              </object>
+                            </child>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                  </object>
+                <packing>
+                  <property name="expand">False</property>
+                  <property name="fill">True</property>
+                </packing>
+                </child>              </object>
+            </child>
+          </object>
+        </child>
+        <child type="tab">
+          <object class="GtkLabel" id="graph_network_tab_label">
+            <property name="visible">True</property>
+            <property name="can-focus">False</property>
+            <property name="label" translatable="yes">Graph &amp; Network</property>
+          </object>
+          <packing>
+            <property name="position">1</property>
+            <property name="tab-fill">False</property>
+          </packing>
+        </child>
+        
+        
+        <child>
+          <object class="GtkScrolledWindow" id="behavioral_scroll">
+            <property name="visible">True</property>
+            <property name="can-focus">True</property>
+            <property name="hscrollbar-policy">never</property>
+            <property name="vscrollbar-policy">automatic</property>
+            <property name="shadow-type">in</property>
+            <child>
+              <object class="GtkBox" id="behavioral_box">
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="margin">12</property>
+                <property name="orientation">vertical</property>
+                <property name="spacing">0</property>
+                
+                
+                <child>
+                  <object class="GtkExpander" id="reachability_expander">
+                    <property name="visible">True</property>
+                    <property name="can-focus">True</property>
+                    <property name="expanded">False</property>
+                    <child type="label">
+                      <object class="GtkLabel">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="label">Reachability Analysis</property>
+                        <property name="xalign">0</property>
+                        <attributes>
+                          <attribute name="weight" value="bold" />
+                        </attributes>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkScrolledWindow" id="reachability_scrolled">
+                        <property name="visible">True</property>
+                        <property name="can-focus">True</property>
+                        <property name="hexpand">True</property>                        <property name="min-content-height">200</property>
+                        <property name="hscrollbar-policy">automatic</property>
+                        <property name="vscrollbar-policy">automatic</property>
+                        <property name="shadow-type">in</property>
+                        <child>
+                          <object class="GtkViewport">
+                            <property name="visible">True</property>
+                            <child>
+                              <object class="GtkLabel" id="reachability_report_label">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="selectable">True</property>
+                                <property name="use-markup">True</property>
+                                <property name="wrap">True</property>
+                                <property name="xalign">0</property>
+                                <property name="yalign">0</property>
+                                <property name="margin-start">12</property>
+                                <property name="margin-end">12</property>
+                                <property name="margin-top">6</property>
+                                <property name="margin-bottom">6</property>
+                                <property name="label" />
+                              </object>
+                            </child>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                  </object>
+                <packing>
+                  <property name="expand">False</property>
+                  <property name="fill">True</property>
+                </packing>
+                </child>
+                
+                
+                <child>
+                  <object class="GtkExpander" id="boundedness_expander">
+                    <property name="visible">True</property>
+                    <property name="can-focus">True</property>
+                    <property name="expanded">False</property>
+                    <child type="label">
+                      <object class="GtkLabel">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="label">Boundedness Analysis</property>
+                        <property name="xalign">0</property>
+                        <attributes>
+                          <attribute name="weight" value="bold" />
+                        </attributes>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkScrolledWindow" id="boundedness_scrolled">
+                        <property name="visible">True</property>
+                        <property name="can-focus">True</property>
+                        <property name="hexpand">True</property>                        <property name="min-content-height">200</property>
+                        <property name="hscrollbar-policy">automatic</property>
+                        <property name="vscrollbar-policy">automatic</property>
+                        <property name="shadow-type">in</property>
+                        <child>
+                          <object class="GtkViewport">
+                            <property name="visible">True</property>
+                            <child>
+                              <object class="GtkLabel" id="boundedness_report_label">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="selectable">True</property>
+                                <property name="use-markup">True</property>
+                                <property name="wrap">True</property>
+                                <property name="xalign">0</property>
+                                <property name="yalign">0</property>
+                                <property name="margin-start">12</property>
+                                <property name="margin-end">12</property>
+                                <property name="margin-top">6</property>
+                                <property name="margin-bottom">6</property>
+                                <property name="label" />
+                              </object>
+                            </child>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                  </object>
+                <packing>
+                  <property name="expand">False</property>
+                  <property name="fill">True</property>
+                </packing>
+                </child>
+                
+                
+                <child>
+                  <object class="GtkExpander" id="liveness_expander">
+                    <property name="visible">True</property>
+                    <property name="can-focus">True</property>
+                    <property name="expanded">False</property>
+                    <child type="label">
+                      <object class="GtkLabel">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="label">Liveness Analysis</property>
+                        <property name="xalign">0</property>
+                        <attributes>
+                          <attribute name="weight" value="bold" />
+                        </attributes>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkScrolledWindow" id="liveness_scrolled">
+                        <property name="visible">True</property>
+                        <property name="can-focus">True</property>
+                        <property name="hexpand">True</property>                        <property name="min-content-height">200</property>
+                        <property name="hscrollbar-policy">automatic</property>
+                        <property name="vscrollbar-policy">automatic</property>
+                        <property name="shadow-type">in</property>
+                        <child>
+                          <object class="GtkViewport">
+                            <property name="visible">True</property>
+                            <child>
+                              <object class="GtkLabel" id="liveness_report_label">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="selectable">True</property>
+                                <property name="use-markup">True</property>
+                                <property name="wrap">True</property>
+                                <property name="xalign">0</property>
+                                <property name="yalign">0</property>
+                                <property name="margin-start">12</property>
+                                <property name="margin-end">12</property>
+                                <property name="margin-top">6</property>
+                                <property name="margin-bottom">6</property>
+                                <property name="label" />
+                              </object>
+                            </child>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                  </object>
+                <packing>
+                  <property name="expand">False</property>
+                  <property name="fill">True</property>
+                </packing>
+                </child>
+                
+                
+                <child>
+                  <object class="GtkExpander" id="deadlocks_expander">
+                    <property name="visible">True</property>
+                    <property name="can-focus">True</property>
+                    <property name="expanded">False</property>
+                    <child type="label">
+                      <object class="GtkLabel">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="label">Deadlock Detection</property>
+                        <property name="xalign">0</property>
+                        <attributes>
+                          <attribute name="weight" value="bold" />
+                        </attributes>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkScrolledWindow" id="deadlocks_scrolled">
+                        <property name="visible">True</property>
+                        <property name="can-focus">True</property>
+                        <property name="hexpand">True</property>                        <property name="min-content-height">200</property>
+                        <property name="hscrollbar-policy">automatic</property>
+                        <property name="vscrollbar-policy">automatic</property>
+                        <property name="shadow-type">in</property>
+                        <child>
+                          <object class="GtkViewport">
+                            <property name="visible">True</property>
+                            <child>
+                              <object class="GtkLabel" id="deadlocks_report_label">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="selectable">True</property>
+                                <property name="use-markup">True</property>
+                                <property name="wrap">True</property>
+                                <property name="xalign">0</property>
+                                <property name="yalign">0</property>
+                                <property name="margin-start">12</property>
+                                <property name="margin-end">12</property>
+                                <property name="margin-top">6</property>
+                                <property name="margin-bottom">6</property>
+                                <property name="label" />
+                              </object>
+                            </child>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                  </object>
+                <packing>
+                  <property name="expand">False</property>
+                  <property name="fill">True</property>
+                </packing>
+                </child>
+                
+                
+                <child>
+                  <object class="GtkExpander" id="fairness_expander">
+                    <property name="visible">True</property>
+                    <property name="can-focus">True</property>
+                    <property name="expanded">False</property>
+                    <child type="label">
+                      <object class="GtkLabel">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="label">Fairness Analysis</property>
+                        <property name="xalign">0</property>
+                        <attributes>
+                          <attribute name="weight" value="bold" />
+                        </attributes>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkScrolledWindow" id="fairness_scrolled">
+                        <property name="visible">True</property>
+                        <property name="can-focus">True</property>
+                        <property name="hexpand">True</property>                        <property name="min-content-height">200</property>
+                        <property name="hscrollbar-policy">automatic</property>
+                        <property name="vscrollbar-policy">automatic</property>
+                        <property name="shadow-type">in</property>
+                        <child>
+                          <object class="GtkViewport">
+                            <property name="visible">True</property>
+                            <child>
+                              <object class="GtkLabel" id="fairness_report_label">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="selectable">True</property>
+                                <property name="use-markup">True</property>
+                                <property name="wrap">True</property>
+                                <property name="xalign">0</property>
+                                <property name="yalign">0</property>
+                                <property name="margin-start">12</property>
+                                <property name="margin-end">12</property>
+                                <property name="margin-top">6</property>
+                                <property name="margin-bottom">6</property>
+                                <property name="label" />
+                              </object>
+                            </child>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                  </object>
+                <packing>
+                  <property name="expand">False</property>
+                  <property name="fill">True</property>
+                </packing>
+                </child>              </object>
+            </child>
+          </object>
+        </child>
+        <child type="tab">
+          <object class="GtkLabel" id="behavioral_tab_label">
+            <property name="visible">True</property>
+            <property name="can-focus">False</property>
+            <property name="label" translatable="yes">Behavioral</property>
+          </object>
+          <packing>
+            <property name="position">2</property>
+            <property name="tab-fill">False</property>
+          </packing>
+        </child>
+        
+      </object>
+      <packing>
+        <property name="expand">True</property>
+        <property name="fill">True</property>
+        <property name="position">1</property>
+      </packing>
+    </child>
+    
+  </object>
+                          <packing>
+                            <property name="name">topology</property>
+                          </packing>
+                        </child>
+                        
+                      </object>
+                    </child>
+                  </object>
+                  <packing>
+                    <property name="resize">False</property>
+                    <property name="shrink">False</property>
+                  </packing>
+                </child>
+                
+                
+                <child>
+                  <object class="GtkBox" id="main_workspace">
+                    <property name="orientation">vertical</property>
+                    <property name="visible">True</property>
+                    <property name="vexpand">True</property>
+                    <property name="hexpand">True</property>
+                    
+                  </object>
+                  <packing>
+                    <property name="resize">True</property>
+                    <property name="shrink">False</property>
+                  </packing>
+                </child>
+                
+              </object>
+              <packing>
+                <property name="expand">True</property>
+                <property name="fill">True</property>
+              </packing>
+            </child>
+            
+            
+            <child>
+              <object class="GtkStatusbar" id="status_bar">
+                <property name="visible">True</property>
+                <property name="hexpand">True</property>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">True</property>
+              </packing>
+            </child>
+            
+          </object>
+          <packing>
+            <property name="expand">True</property>
+            <property name="fill">True</property>
+          </packing>
+        </child>
+        
+      </object>
+    </child>
+
+  </object>
+
+</interface>
