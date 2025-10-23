@@ -270,12 +270,27 @@ class SwissKnifePalette(GObject.GObject):
     def _on_drag_motion(self, widget, event):
         """Handle drag motion event.
         
+        TODO: Canvas transformation awareness
+        ─────────────────────────────────────
+        Mouse coordinates (event.x_root, event.y_root) are in screen space,
+        but when canvas has pan/zoom/rotation applied, the overlay positioning
+        needs to compensate. Currently using raw screen deltas.
+        
+        Options:
+        1. Keep palette in screen space (current) - palette doesn't move with canvas
+        2. Transform to world space - palette would move/scale with canvas (not desired)
+        
+        Current approach (1) is correct, but may need adjustment when:
+        - Canvas rotation is active (drag deltas need rotation transformation)
+        - Multiple monitors with different DPI (rare edge case)
+        
         Args:
             widget: EventBox widget
-            event: Motion event
+            event: Motion event with screen coordinates
         """
         if self.drag_active:
-            # Calculate delta
+            # Calculate delta in screen space
+            # TODO: If rotation is active, these deltas should be rotated
             dx = event.x_root - self.drag_start_x
             dy = event.y_root - self.drag_start_y
             
@@ -297,6 +312,23 @@ class SwissKnifePalette(GObject.GObject):
         
         Emits position-changed signal with delta values for parent to handle.
         The parent (model_canvas_loader) will update the widget margins.
+        
+        TODO: Canvas transformation coordination
+        ────────────────────────────────────────
+        This method emits raw screen-space deltas. The handler in model_canvas_loader
+        must be aware of:
+        
+        1. Overlay coordinate system: GtkOverlay uses widget-relative coordinates
+        2. Canvas transformations: Zoom/pan/rotation affect canvas but not overlay
+        3. Position bounds: Need to clamp to keep palette visible
+        
+        Current implementation: Screen-space deltas → margin updates
+        This is correct for palettes that should stay in screen space (not move
+        with canvas). If we ever want palettes to follow canvas transformations,
+        this signal would need to include canvas_manager reference.
+        
+        Signal: position-changed(dx: float, dy: float)
+        Handler: model_canvas_loader._on_swissknife_position_changed()
         """
         # Emit delta, not cumulative (so parent can add to current position)
         # Get the delta since last update
@@ -308,6 +340,7 @@ class SwissKnifePalette(GObject.GObject):
         self.drag_offset_y = 0
         
         # Emit signal for parent to handle
+        # TODO: Consider passing canvas_manager if transformation awareness needed
         self.emit('position-changed', dx, dy)
     
     def _create_layout_settings_loader(self):

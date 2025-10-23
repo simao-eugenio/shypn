@@ -1020,10 +1020,28 @@ class ModelCanvasLoader:
         
         Updates the widget margins to move it by the delta amounts.
         
+        TODO: Canvas transformation awareness
+        ─────────────────────────────────────
+        The overlay position must be adjusted for canvas transformations:
+        - Pan: When canvas is panned, overlay should stay in place relative to viewport
+        - Zoom: When canvas is zoomed, overlay should maintain screen position
+        - Rotation: If rotation is active, drag deltas need coordinate transformation
+        
+        Current implementation: Direct delta application (no transformation awareness)
+        Required: Query canvas_manager.zoom, pan_x, pan_y and adjust positioning
+        
+        Implementation strategy:
+        1. Get canvas_manager from palette or drawing_area
+        2. Check if transformations are active (zoom != 1.0 or pan != 0.0)
+        3. Adjust dx/dy based on current transformation state
+        4. Consider: Should floating palettes stay in world space or screen space?
+           - Screen space (current): Palette stays at fixed screen position
+           - World space: Palette would move with canvas (probably not desired)
+        
         Args:
             palette: SwissKnifePalette instance
-            dx: Horizontal delta from drag
-            dy: Vertical delta from drag
+            dx: Horizontal delta from drag (screen space)
+            dy: Vertical delta from drag (screen space)
             widget: The palette widget to reposition
         """
         # Get current margins
@@ -1031,6 +1049,7 @@ class ModelCanvasLoader:
         current_top = widget.get_margin_top()
         
         # Apply delta (with reasonable bounds to keep mostly on screen)
+        # TODO: Add canvas transformation compensation here
         new_left = max(-100, min(1000, int(current_left + dx)))
         new_top = max(-50, min(800, int(current_top + dy)))
         
