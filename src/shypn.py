@@ -42,6 +42,7 @@ except Exception as e:
 # TEST MODE: Check which file panel to use
 USE_SIMPLE_TEST_PANEL = os.environ.get('SHYPN_USE_SIMPLE_PANEL', '0') == '1'
 USE_FILE_PANEL_V2 = os.environ.get('SHYPN_USE_FILE_PANEL_V2', '0') == '1'  # Old V2 panel
+# TODO: Rename SHYPN_USE_VSCODE_PANEL to avoid brand name (e.g., SHYPN_USE_EXPLORER_PANEL)
 USE_VSCODE_PANEL = os.environ.get('SHYPN_USE_VSCODE_PANEL', '1') == '1'  # Default to VS Code panel
 
 # Import panel loaders from src/shypn/helpers/

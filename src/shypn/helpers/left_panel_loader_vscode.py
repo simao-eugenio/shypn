@@ -1,6 +1,17 @@
 #!/usr/bin/env python3
 """Left Panel Loader - VS Code Explorer Style.
 
+TODO: RENAME - Avoid using "VS Code" brand name
+      Consider renaming to:
+      - left_panel_loader_explorer.py
+      - left_panel_loader_categorized.py
+      - left_panel_loader_v4.py
+      Also update:
+      - Class name: LeftPanelLoaderVSCode → LeftPanelLoaderExplorer
+      - UI file: left_panel_vscode.ui → left_panel_explorer.ui
+      - All references in src/shypn.py and test files
+      - Environment variable: SHYPN_USE_VSCODE_PANEL → SHYPN_USE_EXPLORER_PANEL
+
 Implements VS Code-style Explorer panel with collapsible categories:
 1. Files - File browser tree (expanded by default)
 2. Project Information - Current project details (collapsed)
