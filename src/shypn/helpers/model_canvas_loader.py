@@ -1005,11 +1005,12 @@ class ModelCanvasLoader:
             widget.set_hexpand(False)
             widget.set_vexpand(False)
             
-            # Lock widget size to its natural (allocated) size to prevent edge adaptation
+            # Lock widget WIDTH to prevent edge adaptation, but allow HEIGHT to expand
+            # for sub-palettes and parameter panels (don't lock height)
             current_width = widget.get_allocated_width()
-            current_height = widget.get_allocated_height()
-            if current_width > 0 and current_height > 0:
-                widget.set_size_request(current_width, current_height)
+            if current_width > 0:
+                # Set minimum width only - height remains flexible (-1 = natural/flexible)
+                widget.set_size_request(current_width, -1)
             
             # Keep current position (margins stay as they are)
         else:
