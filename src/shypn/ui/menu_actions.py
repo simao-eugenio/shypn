@@ -22,6 +22,7 @@ class MenuActions:
 		self.window = window
 		self.persistency = None  # Set later if needed
 		self.model_canvas_loader = None  # Set later if needed
+		self.file_explorer_panel = None  # Set later if needed
 		
 	def set_persistency(self, persistency):
 		"""Set the persistency manager for file operations."""
@@ -31,6 +32,10 @@ class MenuActions:
 		"""Set the canvas loader for view operations."""
 		self.model_canvas_loader = canvas_loader
 	
+	def set_file_explorer_panel(self, file_explorer_panel):
+		"""Set the file explorer panel for file operations."""
+		self.file_explorer_panel = file_explorer_panel
+	
 	# ====================================================================
 	# File Menu Actions
 	# ====================================================================
@@ -38,30 +43,54 @@ class MenuActions:
 	def on_file_new(self, action, param):
 		"""Create a new file/model."""
 		print("[MENU] File → New", file=sys.stderr)
-		# TODO: Implement new file logic
-		# if self.persistency:
-		#     self.persistency.new_file()
+		try:
+			if self.file_explorer_panel:
+				self.file_explorer_panel.new_document()
+			else:
+				print("[MENU] Warning: file_explorer_panel not set", file=sys.stderr)
+		except Exception as e:
+			import traceback
+			traceback.print_exc()
+			self._show_error_dialog("New Document Error", f"Failed to create new document: {e}")
 	
 	def on_file_open(self, action, param):
 		"""Open an existing file."""
 		print("[MENU] File → Open", file=sys.stderr)
-		# TODO: Implement open file dialog
-		# if self.persistency:
-		#     self.persistency.load_file()
+		try:
+			if self.file_explorer_panel:
+				self.file_explorer_panel.open_document()
+			else:
+				print("[MENU] Warning: file_explorer_panel not set", file=sys.stderr)
+		except Exception as e:
+			import traceback
+			traceback.print_exc()
+			self._show_error_dialog("Open Document Error", f"Failed to open document: {e}")
 	
 	def on_file_save(self, action, param):
 		"""Save the current file."""
 		print("[MENU] File → Save", file=sys.stderr)
-		# TODO: Implement save logic
-		# if self.persistency:
-		#     self.persistency.save_file()
+		try:
+			if self.file_explorer_panel:
+				self.file_explorer_panel.save_current_document()
+			else:
+				print("[MENU] Warning: file_explorer_panel not set", file=sys.stderr)
+		except Exception as e:
+			import traceback
+			traceback.print_exc()
+			self._show_error_dialog("Save Document Error", f"Failed to save document: {e}")
 	
 	def on_file_save_as(self, action, param):
 		"""Save the current file with a new name."""
 		print("[MENU] File → Save As", file=sys.stderr)
-		# TODO: Implement save as dialog
-		# if self.persistency:
-		#     self.persistency.save_file_as()
+		try:
+			if self.file_explorer_panel:
+				self.file_explorer_panel.save_current_document_as()
+			else:
+				print("[MENU] Warning: file_explorer_panel not set", file=sys.stderr)
+		except Exception as e:
+			import traceback
+			traceback.print_exc()
+			self._show_error_dialog("Save As Error", f"Failed to save document: {e}")
 	
 	def on_file_quit(self, action, param):
 		"""Quit the application."""
@@ -212,6 +241,28 @@ class MenuActions:
 		# Set keyboard accelerator if provided
 		if accelerator:
 			self.app.set_accels_for_action(f"app.{name}", [accelerator])
+	
+	# ====================================================================
+	# Helper Methods
+	# ====================================================================
+	
+	def _show_error_dialog(self, title, message):
+		"""Show an error dialog to the user.
+		
+		Args:
+			title: Dialog title
+			message: Error message to display
+		"""
+		dialog = Gtk.MessageDialog(
+			transient_for=self.window,
+			modal=True,
+			message_type=Gtk.MessageType.ERROR,
+			buttons=Gtk.ButtonsType.OK,
+			text=title
+		)
+		dialog.format_secondary_text(message)
+		dialog.run()
+		dialog.destroy()
 
 
 __all__ = ['MenuActions']
