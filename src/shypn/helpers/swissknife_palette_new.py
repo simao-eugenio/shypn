@@ -53,6 +53,8 @@ class SwissKnifePalette(GObject.GObject):
         'simulation-step-executed': (GObject.SignalFlags.RUN_FIRST, None, (float,)),
         'simulation-reset-executed': (GObject.SignalFlags.RUN_FIRST, None, ()),
         'simulation-settings-changed': (GObject.SignalFlags.RUN_FIRST, None, ()),
+        # Drag and drop signal
+        'position-changed': (GObject.SignalFlags.RUN_FIRST, None, (float, float)),
     }
     
     def __init__(self, mode='edit', model=None, tool_registry=None):
@@ -73,12 +75,22 @@ class SwissKnifePalette(GObject.GObject):
         self.categories = self.tool_registry.get_categories(mode)
         self.tools = self.tool_registry.get_all_tools()
         
+        # Drag state for floating palette
+        self.drag_active = False
+        self.drag_start_x = 0
+        self.drag_start_y = 0
+        self.drag_offset_x = 0
+        self.drag_offset_y = 0
+        
         # Create modular components
         self.ui = SwissKnifePaletteUI(self.categories, self.tools)
         self.registry = SubPaletteRegistry(self.ui, self.categories, self.tools)
         
         # Build UI first
         self.ui.build()
+        
+        # Wrap main container in EventBox for drag functionality
+        self._wrap_in_draggable_container()
         
         # Create all sub-palettes
         self.registry.create_all_sub_palettes(model)
@@ -126,6 +138,118 @@ class SwissKnifePalette(GObject.GObject):
         """
         from shypn.ui.swissknife_tool_registry import ToolRegistry
         return ToolRegistry()
+    
+    def _wrap_in_draggable_container(self):
+        """Wrap main container in draggable EventBox with drag handle.
+        
+        Creates a visual drag handle at the top of the palette and connects
+        mouse events for drag-and-drop functionality.
+        """
+        # Create drag handle (small grip area)
+        drag_handle = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        drag_handle.set_size_request(-1, 8)
+        drag_handle.get_style_context().add_class('palette-drag-handle')
+        
+        # Create EventBox for mouse events
+        self.drag_event_box = Gtk.EventBox()
+        self.drag_event_box.set_above_child(False)
+        self.drag_event_box.add(drag_handle)
+        
+        # Enable events
+        self.drag_event_box.add_events(
+            Gdk.EventMask.BUTTON_PRESS_MASK |
+            Gdk.EventMask.BUTTON_RELEASE_MASK |
+            Gdk.EventMask.POINTER_MOTION_MASK
+        )
+        
+        # Connect drag events
+        self.drag_event_box.connect('button-press-event', self._on_drag_start)
+        self.drag_event_box.connect('button-release-event', self._on_drag_end)
+        self.drag_event_box.connect('motion-notify-event', self._on_drag_motion)
+        
+        # Change cursor on hover
+        self.drag_event_box.connect('enter-notify-event', 
+            lambda w, e: w.get_window().set_cursor(Gdk.Cursor.new_from_name(w.get_display(), 'grab')))
+        self.drag_event_box.connect('leave-notify-event', 
+            lambda w, e: w.get_window().set_cursor(None) if not self.drag_active else None)
+        
+        # Create wrapper container
+        self.draggable_container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        self.draggable_container.pack_start(self.drag_event_box, False, False, 0)
+        self.draggable_container.pack_start(self.ui.main_container, True, True, 0)
+    
+    def _on_drag_start(self, widget, event):
+        """Handle drag start event.
+        
+        Args:
+            widget: EventBox widget
+            event: Button press event
+        """
+        if event.button == 1:  # Left click only
+            self.drag_active = True
+            self.drag_start_x = event.x_root
+            self.drag_start_y = event.y_root
+            
+            # Change cursor
+            widget.get_window().set_cursor(Gdk.Cursor.new_from_name(widget.get_display(), 'grabbing'))
+            return True
+        return False
+    
+    def _on_drag_end(self, widget, event):
+        """Handle drag end event.
+        
+        Args:
+            widget: EventBox widget
+            event: Button release event
+        """
+        if event.button == 1:
+            self.drag_active = False
+            
+            # Restore cursor
+            widget.get_window().set_cursor(Gdk.Cursor.new_from_name(widget.get_display(), 'grab'))
+            return True
+        return False
+    
+    def _on_drag_motion(self, widget, event):
+        """Handle drag motion event.
+        
+        Args:
+            widget: EventBox widget
+            event: Motion event
+        """
+        if self.drag_active:
+            # Calculate delta
+            dx = event.x_root - self.drag_start_x
+            dy = event.y_root - self.drag_start_y
+            
+            # Update offsets
+            self.drag_offset_x += dx
+            self.drag_offset_y += dy
+            
+            # Update start position for next delta
+            self.drag_start_x = event.x_root
+            self.drag_start_y = event.y_root
+            
+            # Update widget position
+            self._update_position()
+            return True
+        return False
+    
+    def _update_position(self):
+        """Update palette position based on drag offsets.
+        
+        Uses margin properties to reposition the floating palette.
+        """
+        # Get current margins
+        main_widget = self.get_widget()
+        
+        # Calculate new margins (clamped to reasonable bounds)
+        # Note: This works because palette is in an overlay
+        # Negative margins move left/up, positive move right/down
+        
+        # For now, just emit a signal that position changed
+        # The actual repositioning will be handled by the parent overlay
+        self.emit('position-changed', self.drag_offset_x, self.drag_offset_y)
     
     def _create_layout_settings_loader(self):
         """Create layout settings loader for parameter panel.
@@ -262,6 +386,22 @@ class SwissKnifePalette(GObject.GObject):
             border-radius: 6px;
             padding: 4px;
         }
+        
+        /* Drag handle styling */
+        .palette-drag-handle {
+            background: linear-gradient(to bottom, 
+                rgba(100, 110, 120, 0.6),
+                rgba(70, 80, 90, 0.4));
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+            min-height: 8px;
+        }
+        
+        .palette-drag-handle:hover {
+            background: linear-gradient(to bottom, 
+                rgba(120, 130, 140, 0.7),
+                rgba(90, 100, 110, 0.5));
+        }
         """
         
         css_provider = Gtk.CssProvider()
@@ -278,9 +418,9 @@ class SwissKnifePalette(GObject.GObject):
         """Get the main palette widget.
         
         Returns:
-            Gtk.Box: Main container widget
+            Gtk.Box: Draggable container with palette (includes drag handle)
         """
-        return self.ui.main_container
+        return self.draggable_container
     
     def set_mode(self, mode):
         """Set palette mode.
