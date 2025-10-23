@@ -4,8 +4,6 @@
     background-color: rgba(45, 55, 65, 0.95);
     border-radius: 6px;
     padding: 4px;
-    max-width: 350px;
-    min-width: 350px;
 }
 
 .bright-label {
@@ -13,17 +11,24 @@
     color: #ffffff;
 }
 
-/* Force compact width for parameter entries */
+/* Force compact width for parameter entries - prevent any stretching */
 #spacing_entry,
 #iterations_entry {
-    min-width: 45px;
-    max-width: 45px;
+    min-width: 45px !important;
+    max-width: 45px !important;
+    width: 45px !important;
     font-size: 13px;
     font-weight: bold;
 }
 
 #spacing_entry entry,
 #iterations_entry entry {
-    min-width: 45px;
-    max-width: 45px;
+    min-width: 45px !important;
+    max-width: 45px !important;
+    width: 45px !important;
+}
+
+#layout_settings_container {
+    min-width: 280px !important;
+    max-width: 280px !important;
 }
