@@ -358,13 +358,13 @@ class SimulateToolsPaletteLoader(GObject.GObject):
                 btn.set_active(True)
     
     def _hide_settings_panel(self):
-        """Hide the settings panel with animation."""
-        if hasattr(self, 'settings_revealer') and self.settings_revealer:
-            if self.settings_revealer.get_reveal_child():
-                self.settings_revealer.set_reveal_child(False)
-                # Set invisible after animation completes (500ms transition)
-                from gi.repository import GLib
-                GLib.timeout_add(550, lambda: self.settings_revealer.set_visible(False) if self.settings_revealer else False)
+        """Hide the settings panel with animation.
+        
+        DEPRECATED: Settings panel visibility is now managed by ParameterPanelManager (Phase 3).
+        This method is kept for backward compatibility but does nothing.
+        """
+        # Parameter panel manager handles visibility - no-op
+        pass
 
     def _init_simulation_controller(self):
         """Initialize the simulation controller with the model."""

@@ -9,9 +9,9 @@
 
   <object class="GtkRevealer" id="settings_revealer">
     <property name="visible">True</property>
-    <property name="reveal-child">False</property>
-    <property name="transition-type">slide-up</property>
-    <property name="transition-duration">500</property>
+    <property name="reveal-child">True</property>
+    <property name="transition-type">none</property>
+    <property name="transition-duration">0</property>
 
     <child>
       <object class="GtkFrame" id="settings_frame">
