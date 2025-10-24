@@ -4,7 +4,6 @@ This module contains all the action handlers for the main menu bar.
 Keeping menu logic separate from the main loader maintains clean architecture.
 """
 
-import sys
 from gi.repository import Gtk, Gio
 
 
@@ -42,59 +41,38 @@ class MenuActions:
 	
 	def on_file_new(self, action, param):
 		"""Create a new file/model."""
-		print("[MENU] File → New", file=sys.stderr)
 		try:
 			if self.file_explorer_panel:
 				self.file_explorer_panel.new_document()
-			else:
-				print("[MENU] Warning: file_explorer_panel not set", file=sys.stderr)
 		except Exception as e:
-			import traceback
-			traceback.print_exc()
 			self._show_error_dialog("New Document Error", f"Failed to create new document: {e}")
 	
 	def on_file_open(self, action, param):
 		"""Open an existing file."""
-		print("[MENU] File → Open", file=sys.stderr)
 		try:
 			if self.file_explorer_panel:
 				self.file_explorer_panel.open_document()
-			else:
-				print("[MENU] Warning: file_explorer_panel not set", file=sys.stderr)
 		except Exception as e:
-			import traceback
-			traceback.print_exc()
 			self._show_error_dialog("Open Document Error", f"Failed to open document: {e}")
 	
 	def on_file_save(self, action, param):
 		"""Save the current file."""
-		print("[MENU] File → Save", file=sys.stderr)
 		try:
 			if self.file_explorer_panel:
 				self.file_explorer_panel.save_current_document()
-			else:
-				print("[MENU] Warning: file_explorer_panel not set", file=sys.stderr)
 		except Exception as e:
-			import traceback
-			traceback.print_exc()
 			self._show_error_dialog("Save Document Error", f"Failed to save document: {e}")
 	
 	def on_file_save_as(self, action, param):
 		"""Save the current file with a new name."""
-		print("[MENU] File → Save As", file=sys.stderr)
 		try:
 			if self.file_explorer_panel:
 				self.file_explorer_panel.save_current_document_as()
-			else:
-				print("[MENU] Warning: file_explorer_panel not set", file=sys.stderr)
 		except Exception as e:
-			import traceback
-			traceback.print_exc()
 			self._show_error_dialog("Save As Error", f"Failed to save document: {e}")
 	
 	def on_file_quit(self, action, param):
 		"""Quit the application."""
-		print("[MENU] File → Quit", file=sys.stderr)
 		self.app.quit()
 	
 	# ====================================================================
@@ -111,76 +89,80 @@ class MenuActions:
 		print("[MENU] Edit → Redo", file=sys.stderr)
 		# TODO: Implement redo logic
 	
+	def on_edit_undo(self, action, param):
+		"""Undo the last action."""
+		# TODO: Implement undo logic
+		pass
+	
+	def on_edit_redo(self, action, param):
+		"""Redo the last undone action."""
+		# TODO: Implement redo logic
+		pass
+	
 	def on_edit_cut(self, action, param):
-		"""Cut selected content."""
-		print("[MENU] Edit → Cut", file=sys.stderr)
+		"""Cut the selected content."""
 		# TODO: Implement cut logic
+		pass
 	
 	def on_edit_copy(self, action, param):
-		"""Copy selected content."""
-		print("[MENU] Edit → Copy", file=sys.stderr)
+		"""Copy the selected content."""
 		# TODO: Implement copy logic
+		pass
 	
 	def on_edit_paste(self, action, param):
-		"""Paste content from clipboard."""
-		print("[MENU] Edit → Paste", file=sys.stderr)
+		"""Paste the clipboard content."""
 		# TODO: Implement paste logic
+		pass
 	
 	def on_edit_preferences(self, action, param):
 		"""Open preferences dialog."""
-		print("[MENU] Edit → Preferences", file=sys.stderr)
 		# TODO: Implement preferences dialog
-	
-	# ====================================================================
+		pass	# ====================================================================
 	# View Menu Actions
 	# ====================================================================
 	
 	def on_view_zoom_in(self, action, param):
-		"""Zoom in on the canvas."""
-		print("[MENU] View → Zoom In", file=sys.stderr)
-		# TODO: Implement zoom in logic
+		"""Zoom in the view."""
+		# TODO: Implement zoom in
 		# if self.model_canvas_loader:
 		#     self.model_canvas_loader.zoom_in()
+		pass
 	
 	def on_view_zoom_out(self, action, param):
-		"""Zoom out on the canvas."""
-		print("[MENU] View → Zoom Out", file=sys.stderr)
-		# TODO: Implement zoom out logic
+		"""Zoom out the view."""
+		# TODO: Implement zoom out
 		# if self.model_canvas_loader:
 		#     self.model_canvas_loader.zoom_out()
+		pass
 	
 	def on_view_zoom_reset(self, action, param):
 		"""Reset zoom to 100%."""
-		print("[MENU] View → Reset Zoom", file=sys.stderr)
-		# TODO: Implement zoom reset logic
+		# TODO: Implement zoom reset
 		# if self.model_canvas_loader:
-		#     self.model_canvas_loader.zoom_reset()
+		#     self.model_canvas_loader.reset_zoom()
+		pass
 	
 	def on_view_fullscreen(self, action, param):
 		"""Toggle fullscreen mode."""
-		print("[MENU] View → Fullscreen", file=sys.stderr)
 		if self.window.is_maximized():
-			self.window.unfullscreen()
+			self.window.unmaximize()
 		else:
-			self.window.fullscreen()
-	
-	# ====================================================================
+			self.window.maximize()	# ====================================================================
 	# Help Menu Actions
 	# ====================================================================
 	
 	def on_help_contents(self, action, param):
 		"""Show help contents."""
-		print("[MENU] Help → Contents", file=sys.stderr)
 		# TODO: Implement help dialog
+		pass
 	
 	def on_help_shortcuts(self, action, param):
 		"""Show keyboard shortcuts."""
-		print("[MENU] Help → Keyboard Shortcuts", file=sys.stderr)
 		# TODO: Implement shortcuts window
+		pass
 	
 	def on_help_about(self, action, param):
 		"""Show about dialog."""
-		print("[MENU] Help → About", file=sys.stderr)
 		about_dialog = Gtk.AboutDialog()
 		about_dialog.set_transient_for(self.window)
 		about_dialog.set_modal(True)
