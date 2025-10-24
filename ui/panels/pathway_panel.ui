@@ -90,7 +90,7 @@
             <property name="margin-top">6</property>
             <property name="margin-bottom">6</property>
             
-            <!-- TAB 1: Import from KEGG -->
+            <!-- TAB 1: KEGG Import -->
             <child>
               <object class="GtkBox" id="import_tab_content">
                 <property name="visible">True</property>
@@ -98,7 +98,7 @@
                 <property name="spacing">12</property>
                 <property name="margin">12</property>
                 
-                <!-- Pathway ID Input -->
+                <!-- Source Selection -->
                 <child>
                   <object class="GtkBox">
                     <property name="visible">True</property>
@@ -108,7 +108,7 @@
                     <child>
                       <object class="GtkLabel">
                         <property name="visible">True</property>
-                        <property name="label">Pathway ID</property>
+                        <property name="label">KEGG Source</property>
                         <property name="halign">start</property>
                         <property name="xalign">0</property>
                         <attributes>
@@ -117,46 +117,122 @@
                       </object>
                     </child>
                     
+                    <!-- Mode Selection -->
                     <child>
-                      <object class="GtkEntry" id="pathway_id_entry">
+                      <object class="GtkBox">
                         <property name="visible">True</property>
-                        <property name="placeholder-text">e.g., hsa00010, eco00020</property>
-                        <property name="tooltip-text">Enter KEGG pathway ID (organism code + pathway number)</property>
+                        <property name="orientation">horizontal</property>
+                        <property name="spacing">12</property>
+                        
+                        <child>
+                          <object class="GtkRadioButton" id="kegg_database_radio">
+                            <property name="visible">True</property>
+                            <property name="label">KEGG Database</property>
+                            <property name="active">True</property>
+                            <property name="tooltip-text">Fetch pathway from KEGG API by ID</property>
+                          </object>
+                        </child>
+                        
+                        <child>
+                          <object class="GtkRadioButton" id="kegg_local_radio">
+                            <property name="visible">True</property>
+                            <property name="label">Local File</property>
+                            <property name="group">kegg_database_radio</property>
+                            <property name="tooltip-text">Load from saved KEGG file</property>
+                          </object>
+                        </child>
                       </object>
                     </child>
-                  </object>
-                </child>
-                
-                <!-- Organism Selector -->
-                <child>
-                  <object class="GtkBox">
-                    <property name="visible">True</property>
-                    <property name="orientation">vertical</property>
-                    <property name="spacing">6</property>
                     
+                    <!-- KEGG Database Box (default visible) -->
                     <child>
-                      <object class="GtkLabel">
+                      <object class="GtkBox" id="kegg_database_box">
                         <property name="visible">True</property>
-                        <property name="label">Organism</property>
+                        <property name="orientation">vertical</property>
+                        <property name="spacing">6</property>
+                        <property name="margin-top">6</property>
+                        
+                        <!-- Pathway ID -->
+                        <child>
+                          <object class="GtkEntry" id="pathway_id_entry">
+                            <property name="visible">True</property>
+                            <property name="placeholder-text">Enter pathway ID (e.g., hsa00010, eco00020)</property>
+                            <property name="tooltip-text">KEGG pathway ID: organism code + pathway number</property>
+                          </object>
+                        </child>
+                        
+                        <!-- Organism Selector -->
+                        <child>
+                          <object class="GtkBox">
+                            <property name="visible">True</property>
+                            <property name="orientation">horizontal</property>
+                            <property name="spacing">6</property>
+                            <property name="margin-top">6</property>
+                            
+                            <child>
+                              <object class="GtkLabel">
+                                <property name="visible">True</property>
+                                <property name="label">Organism:</property>
+                              </object>
+                            </child>
+                            
+                            <child>
+                              <object class="GtkComboBoxText" id="organism_combo">
+                                <property name="visible">True</property>
+                                <property name="active">0</property>
+                                <property name="hexpand">True</property>
+                                <items>
+                                  <item>hsa - Homo sapiens (human)</item>
+                                  <item>mmu - Mus musculus (mouse)</item>
+                                  <item>dme - Drosophila melanogaster</item>
+                                  <item>sce - Saccharomyces cerevisiae</item>
+                                  <item>eco - Escherichia coli</item>
+                                </items>
+                              </object>
+                            </child>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                    
+                    <!-- Local File Box (initially hidden) -->
+                    <child>
+                      <object class="GtkBox" id="kegg_local_box">
+                        <property name="visible">False</property>
+                        <property name="orientation">horizontal</property>
+                        <property name="spacing">6</property>
+                        <property name="margin-top">6</property>
+                        
+                        <child>
+                          <object class="GtkEntry" id="kegg_file_entry">
+                            <property name="visible">True</property>
+                            <property name="editable">True</property>
+                            <property name="placeholder-text">Select KEGG file or type path...</property>
+                            <property name="hexpand">True</property>
+                          </object>
+                        </child>
+                        
+                        <child>
+                          <object class="GtkButton" id="kegg_browse_button">
+                            <property name="visible">True</property>
+                            <property name="label">Browse...</property>
+                            <property name="tooltip-text">Select KEGG file to import</property>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                    
+                    <!-- Info Label -->
+                    <child>
+                      <object class="GtkLabel" id="kegg_source_info">
+                        <property name="visible">True</property>
+                        <property name="label">Enter pathway ID to fetch from KEGG database</property>
                         <property name="halign">start</property>
-                        <property name="xalign">0</property>
-                        <attributes>
-                          <attribute name="weight" value="bold"/>
-                        </attributes>
-                      </object>
-                    </child>
-                    
-                    <child>
-                      <object class="GtkComboBoxText" id="organism_combo">
-                        <property name="visible">True</property>
-                        <property name="active">0</property>
-                        <items>
-                          <item>hsa - Homo sapiens (human)</item>
-                          <item>mmu - Mus musculus (mouse)</item>
-                          <item>dme - Drosophila melanogaster</item>
-                          <item>sce - Saccharomyces cerevisiae</item>
-                          <item>eco - Escherichia coli</item>
-                        </items>
+                        <property name="wrap">True</property>
+                        <property name="margin-top">3</property>
+                        <style>
+                          <class name="dim-label"/>
+                        </style>
                       </object>
                     </child>
                   </object>
@@ -321,7 +397,7 @@
                   </object>
                 </child>
                 
-                <!-- Action Buttons -->
+                <!-- Action Button -->
                 <child>
                   <object class="GtkBox">
                     <property name="visible">True</property>
@@ -330,19 +406,10 @@
                     <property name="halign">end</property>
                     
                     <child>
-                      <object class="GtkButton" id="fetch_button">
+                      <object class="GtkButton" id="kegg_import_button">
                         <property name="visible">True</property>
-                        <property name="label">Fetch Pathway</property>
-                        <property name="tooltip-text">Download pathway information from KEGG</property>
-                      </object>
-                    </child>
-                    
-                    <child>
-                      <object class="GtkButton" id="import_button">
-                        <property name="visible">True</property>
-                        <property name="label">Import</property>
-                        <property name="sensitive">False</property>
-                        <property name="tooltip-text">Convert pathway to Petri net and load into canvas</property>
+                        <property name="label">Import to Canvas</property>
+                        <property name="tooltip-text">Fetch pathway from external source or load from local file, then convert to Petri net and add to canvas</property>
                         <style>
                           <class name="suggested-action"/>
                         </style>
@@ -379,52 +446,11 @@
             <child type="tab">
               <object class="GtkLabel">
                 <property name="visible">True</property>
-                <property name="label">Import</property>
+                <property name="label">KEGG</property>
               </object>
             </child>
             
-            <!-- TAB 2: Browse Pathways (Future) -->
-            <child>
-              <object class="GtkBox" id="browse_tab_content">
-                <property name="visible">True</property>
-                <property name="orientation">vertical</property>
-                <property name="spacing">12</property>
-                <property name="margin">12</property>
-                
-                <child>
-                  <object class="GtkLabel">
-                    <property name="visible">True</property>
-                    <property name="label">Browse KEGG Pathways</property>
-                    <property name="halign">center</property>
-                    <property name="valign">center</property>
-                    <property name="vexpand">True</property>
-                    <style>
-                      <class name="dim-label"/>
-                    </style>
-                  </object>
-                </child>
-                
-                <child>
-                  <object class="GtkLabel">
-                    <property name="visible">True</property>
-                    <property name="label">(Future: List of available pathways by category)</property>
-                    <property name="halign">center</property>
-                    <style>
-                      <class name="dim-label"/>
-                    </style>
-                  </object>
-                </child>
-              </object>
-            </child>
-            
-            <child type="tab">
-              <object class="GtkLabel">
-                <property name="visible">True</property>
-                <property name="label">Browse</property>
-              </object>
-            </child>
-            
-            <!-- TAB 3: SBML Import -->
+            <!-- TAB 2: SBML Import -->
             <child>
               <object class="GtkBox" id="sbml_tab_content">
                 <property name="visible">True</property>
@@ -719,7 +745,7 @@
                   </object>
                 </child>
                 
-                <!-- Action Buttons -->
+                <!-- Action Button -->
                 <child>
                   <object class="GtkBox">
                     <property name="visible">True</property>
@@ -728,11 +754,10 @@
                     <property name="halign">end</property>
                     
                     <child>
-                      <object class="GtkButton" id="sbml_parse_button">
+                      <object class="GtkButton" id="sbml_import_button">
                         <property name="visible">True</property>
-                        <property name="label">Parse and Load</property>
-                        <property name="sensitive">False</property>
-                        <property name="tooltip-text">Parse SBML file and automatically load to canvas (use Swiss Palette to apply force-directed layout)</property>
+                        <property name="label">Import to Canvas</property>
+                        <property name="tooltip-text">Fetch SBML from external source or load from local file, then parse and add to canvas</property>
                         <style>
                           <class name="suggested-action"/>
                         </style>
@@ -773,35 +798,301 @@
               </object>
             </child>
             
-            <!-- TAB 4: Import History (Future) -->
+            <!-- TAB 3: BRENDA Enrichment -->
             <child>
-              <object class="GtkBox" id="history_tab_content">
+              <object class="GtkBox" id="brenda_tab_content">
                 <property name="visible">True</property>
                 <property name="orientation">vertical</property>
                 <property name="spacing">12</property>
                 <property name="margin">12</property>
                 
+                <!-- Source Selection -->
                 <child>
                   <object class="GtkLabel">
                     <property name="visible">True</property>
-                    <property name="label">Import History</property>
-                    <property name="halign">center</property>
-                    <property name="valign">center</property>
-                    <property name="vexpand">True</property>
-                    <style>
-                      <class name="dim-label"/>
-                    </style>
+                    <property name="label">Source</property>
+                    <property name="halign">start</property>
+                    <property name="xalign">0</property>
+                    <attributes>
+                      <attribute name="weight" value="bold"/>
+                    </attributes>
                   </object>
                 </child>
                 
                 <child>
-                  <object class="GtkLabel">
+                  <object class="GtkBox">
                     <property name="visible">True</property>
-                    <property name="label">(Future: Recently imported pathways)</property>
-                    <property name="halign">center</property>
-                    <style>
-                      <class name="dim-label"/>
-                    </style>
+                    <property name="orientation">horizontal</property>
+                    <property name="spacing">12</property>
+                    
+                    <child>
+                      <object class="GtkRadioButton" id="brenda_external_radio">
+                        <property name="visible">True</property>
+                        <property name="label">External (BRENDA API)</property>
+                        <property name="active">True</property>
+                      </object>
+                    </child>
+                    
+                    <child>
+                      <object class="GtkRadioButton" id="brenda_local_radio">
+                        <property name="visible">True</property>
+                        <property name="label">Local File</property>
+                        <property name="group">brenda_external_radio</property>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                
+                <!-- External Source Input -->
+                <child>
+                  <object class="GtkBox" id="brenda_external_box">
+                    <property name="visible">True</property>
+                    <property name="orientation">vertical</property>
+                    <property name="spacing">6</property>
+                    
+                    <!-- Credentials Status -->
+                    <child>
+                      <object class="GtkBox">
+                        <property name="visible">True</property>
+                        <property name="orientation">horizontal</property>
+                        <property name="spacing">6</property>
+                        
+                        <child>
+                          <object class="GtkLabel" id="brenda_credentials_status">
+                            <property name="visible">True</property>
+                            <property name="label">❌ Credentials not configured</property>
+                            <property name="halign">start</property>
+                          </object>
+                        </child>
+                        
+                        <child>
+                          <object class="GtkButton" id="brenda_configure_button">
+                            <property name="visible">True</property>
+                            <property name="label">Configure...</property>
+                            <property name="tooltip-text">Set up BRENDA credentials in User Profile</property>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                    
+                    <!-- EC Number Input -->
+                    <child>
+                      <object class="GtkLabel">
+                        <property name="visible">True</property>
+                        <property name="label">EC Number</property>
+                        <property name="halign">start</property>
+                        <property name="xalign">0</property>
+                        <attributes>
+                          <attribute name="weight" value="bold"/>
+                        </attributes>
+                      </object>
+                    </child>
+                    
+                    <child>
+                      <object class="GtkEntry" id="ec_number_entry">
+                        <property name="visible">True</property>
+                        <property name="placeholder-text">e.g., 1.1.1.1, 2.3.1.15</property>
+                        <property name="tooltip-text">Enter Enzyme Commission number</property>
+                      </object>
+                    </child>
+                    
+                    <!-- Organism Filter -->
+                    <child>
+                      <object class="GtkLabel">
+                        <property name="visible">True</property>
+                        <property name="label">Organism (optional)</property>
+                        <property name="halign">start</property>
+                        <property name="xalign">0</property>
+                        <attributes>
+                          <attribute name="weight" value="bold"/>
+                        </attributes>
+                      </object>
+                    </child>
+                    
+                    <child>
+                      <object class="GtkComboBoxText" id="brenda_organism_combo">
+                        <property name="visible">True</property>
+                        <items>
+                          <item id="all">All organisms</item>
+                          <item id="human">Homo sapiens</item>
+                          <item id="mouse">Mus musculus</item>
+                          <item id="rat">Rattus norvegicus</item>
+                          <item id="ecoli">Escherichia coli</item>
+                          <item id="yeast">Saccharomyces cerevisiae</item>
+                        </items>
+                      </object>
+                    </child>
+                    
+                    <!-- Help Text -->
+                    <child>
+                      <object class="GtkLabel">
+                        <property name="visible">True</property>
+                        <property name="label">Note: BRENDA registration takes 1-2 business days for approval</property>
+                        <property name="halign">start</property>
+                        <property name="wrap">True</property>
+                        <style>
+                          <class name="dim-label"/>
+                        </style>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                
+                <!-- Local Source Input -->
+                <child>
+                  <object class="GtkBox" id="brenda_local_box">
+                    <property name="visible">False</property>
+                    <property name="orientation">vertical</property>
+                    <property name="spacing">6</property>
+                    
+                    <child>
+                      <object class="GtkLabel">
+                        <property name="visible">True</property>
+                        <property name="label">BRENDA Data File</property>
+                        <property name="halign">start</property>
+                        <property name="xalign">0</property>
+                        <attributes>
+                          <attribute name="weight" value="bold"/>
+                        </attributes>
+                      </object>
+                    </child>
+                    
+                    <child>
+                      <object class="GtkBox">
+                        <property name="visible">True</property>
+                        <property name="orientation">horizontal</property>
+                        <property name="spacing">6</property>
+                        
+                        <child>
+                          <object class="GtkEntry" id="brenda_file_entry">
+                            <property name="visible">True</property>
+                            <property name="editable">False</property>
+                            <property name="placeholder-text">Browse for CSV or JSON file</property>
+                            <property name="hexpand">True</property>
+                          </object>
+                        </child>
+                        
+                        <child>
+                          <object class="GtkButton" id="brenda_browse_button">
+                            <property name="visible">True</property>
+                            <property name="label">Browse...</property>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                    
+                    <child>
+                      <object class="GtkLabel">
+                        <property name="visible">True</property>
+                        <property name="label">Supported formats: CSV, JSON (exported from BRENDA)</property>
+                        <property name="halign">start</property>
+                        <style>
+                          <class name="dim-label"/>
+                        </style>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                
+                <!-- Options Expander -->
+                <child>
+                  <object class="GtkExpander">
+                    <property name="visible">True</property>
+                    <property name="expanded">False</property>
+                    
+                    <child type="label">
+                      <object class="GtkLabel">
+                        <property name="visible">True</property>
+                        <property name="label">Import Options</property>
+                      </object>
+                    </child>
+                    
+                    <child>
+                      <object class="GtkBox">
+                        <property name="visible">True</property>
+                        <property name="orientation">vertical</property>
+                        <property name="spacing">6</property>
+                        <property name="margin">6</property>
+                        
+                        <child>
+                          <object class="GtkCheckButton" id="brenda_km_check">
+                            <property name="visible">True</property>
+                            <property name="label">Include Km values</property>
+                            <property name="active">True</property>
+                          </object>
+                        </child>
+                        
+                        <child>
+                          <object class="GtkCheckButton" id="brenda_kcat_check">
+                            <property name="visible">True</property>
+                            <property name="label">Include kcat values</property>
+                            <property name="active">True</property>
+                          </object>
+                        </child>
+                        
+                        <child>
+                          <object class="GtkCheckButton" id="brenda_ki_check">
+                            <property name="visible">True</property>
+                            <property name="label">Include Ki values</property>
+                            <property name="active">True</property>
+                          </object>
+                        </child>
+                        
+                        <child>
+                          <object class="GtkCheckButton" id="brenda_citations_check">
+                            <property name="visible">True</property>
+                            <property name="label">Include literature citations</property>
+                            <property name="active">True</property>
+                          </object>
+                        </child>
+                        
+                        <child>
+                          <object class="GtkCheckButton" id="brenda_override_check">
+                            <property name="visible">True</property>
+                            <property name="label">Override existing parameters (use with caution for SBML)</property>
+                            <property name="active">False</property>
+                            <property name="tooltip-text">If enabled, BRENDA data will replace existing kinetic parameters. Recommended OFF for curated SBML models, ON for KEGG pathways.</property>
+                          </object>
+                        </child>
+                        
+                        <child>
+                          <object class="GtkCheckButton" id="brenda_update_check">
+                            <property name="visible">True</property>
+                            <property name="label">Add parameters to transitions without data</property>
+                            <property name="active">True</property>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                
+                <!-- Spacer -->
+                <child>
+                  <object class="GtkBox">
+                    <property name="visible">True</property>
+                    <property name="vexpand">True</property>
+                  </object>
+                </child>
+                
+                <!-- Action Button -->
+                <child>
+                  <object class="GtkBox">
+                    <property name="visible">True</property>
+                    <property name="orientation">horizontal</property>
+                    <property name="spacing">6</property>
+                    <property name="halign">end</property>
+                    
+                    <child>
+                      <object class="GtkButton" id="brenda_enrich_button">
+                        <property name="visible">True</property>
+                        <property name="label">Analyze and Enrich Canvas</property>
+                        <property name="tooltip-text">Scan canvas for transitions, query BRENDA for kinetic data, and generate enrichment report for user review</property>
+                        <style>
+                          <class name="suggested-action"/>
+                        </style>
+                      </object>
+                    </child>
                   </object>
                 </child>
               </object>
@@ -810,7 +1101,7 @@
             <child type="tab">
               <object class="GtkLabel">
                 <property name="visible">True</property>
-                <property name="label">History</property>
+                <property name="label">BRENDA</property>
               </object>
             </child>
           </object>

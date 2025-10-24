@@ -410,25 +410,9 @@ def main(argv=None):
 		left_paned = main_builder.get_object('left_paned')
 
 		# ====================================================================
-		# Skeleton Pattern: Add panels to GtkStack BEFORE window shows
-		# Each panel is added to its container in the stack
+		# WAYLAND FIX: Show main window FIRST, then add panels
+		# Following skeleton test pattern: window.show_all() before panel operations
 		# ====================================================================
-		
-		# Add Files panel to stack
-		if left_panel_loader:
-			left_panel_loader.add_to_stack(left_dock_stack, files_panel_container, 'files')
-		
-		# Add Pathways panel to stack
-		if pathway_panel_loader:
-			pathway_panel_loader.add_to_stack(left_dock_stack, pathways_panel_container, 'pathways')
-		
-		# Add Analyses panel to stack
-		if right_panel_loader:
-			right_panel_loader.add_to_stack(left_dock_stack, analyses_panel_container, 'analyses')
-		
-		# Add Topology panel to stack
-		if topology_panel_loader:
-			topology_panel_loader.add_to_stack(left_dock_stack, topology_panel_container, 'topology')
 		
 		# CRITICAL: Hide panel containers BEFORE window.show_all()
 		# This prevents them from being shown when show_all() is called
@@ -448,10 +432,6 @@ def main(argv=None):
 		# Collapse left_paned to 0 width
 		if left_paned:
 			left_paned.set_position(0)
-		
-		# WAYLAND FIX: Process pending events to ensure window destruction completes
-		while Gtk.events_pending():
-			Gtk.main_iteration()
 		
 		# ====================================================================
 		# Create Master Palette (vertical toolbar on far left)
@@ -507,6 +487,28 @@ def main(argv=None):
 		if topology_panel_container:
 			topology_panel_container.set_visible(False)
 			topology_panel_container.set_no_show_all(False)
+		
+		# ====================================================================
+		# NOW add panels to GtkStack AFTER window is shown
+		# Following skeleton test pattern for Wayland safety
+		# WAYLAND FIX: Panels load content directly without creating windows
+		# ====================================================================
+		
+		# Add Files panel to stack
+		if left_panel_loader:
+			left_panel_loader.add_to_stack(left_dock_stack, files_panel_container, 'files')
+		
+		# Add Pathways panel to stack
+		if pathway_panel_loader:
+			pathway_panel_loader.add_to_stack(left_dock_stack, pathways_panel_container, 'pathways')
+		
+		# Add Analyses panel to stack
+		if right_panel_loader:
+			right_panel_loader.add_to_stack(left_dock_stack, analyses_panel_container, 'analyses')
+		
+		# Add Topology panel to stack
+		if topology_panel_loader:
+			topology_panel_loader.add_to_stack(left_dock_stack, topology_panel_container, 'topology')
 
 		# ====================================================================
 		# Set parent windows for dialogs (AFTER window.show_all())

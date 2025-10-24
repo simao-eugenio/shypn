@@ -217,39 +217,71 @@ class TopologyPanelBase(ABC):
     def add_to_stack(self, stack, container, panel_name='topology'):
         """Add panel content to a GtkStack container (Phase 4: new architecture).
         
+        WAYLAND FIX: Try to load content without creating window if possible.
+        
         Args:
             stack: GtkStack widget that will contain all panels
             container: GtkBox container within the stack for this panel
             panel_name: Name identifier for this panel in the stack ('topology')
         """
         
-        if self.window is None:
+        # WAYLAND FIX: Try to load content directly without window
+        if self.window is None and self.content is None:
+            # For simple panels, try loading without full window initialization
+            # This avoids Wayland protocol errors from widget reparenting
+            try:
+                if hasattr(self, 'builder') and self.builder is None:
+                    self.builder = Gtk.Builder()
+                    if hasattr(self, 'ui_path'):
+                        self.builder.add_from_file(str(self.ui_path))
+                        self.content = self.builder.get_object('topology_content')
+                        if self.content:
+                            # Initialize widgets if subclass implements it
+                            if hasattr(self, '_init_widgets'):
+                                try:
+                                    self._init_widgets()
+                                except:
+                                    pass
+                            if hasattr(self, '_connect_signals'):
+                                try:
+                                    self._connect_signals()
+                                except:
+                                    pass
+            except:
+                # Fallback to full load if partial load fails
+                self.load()
+        elif self.window is None:
             self.load()
         
-        # Extract content from window
-        current_parent = self.content.get_parent()
-        if current_parent == self.window:
-            self.window.remove(self.content)
-        elif current_parent and current_parent != container:
-            current_parent.remove(self.content)
-        
         # Add content to stack container
-        if self.content.get_parent() != container:
-            container.add(self.content)
+        if self.content:
+            current_parent = self.content.get_parent()
+            if current_parent:
+                if current_parent == self.window:
+                    self.window.remove(self.content)
+                elif current_parent != container:
+                    current_parent.remove(self.content)
+            
+            if self.content.get_parent() != container:
+                container.add(self.content)
         
-        # Mark as hanged in stack mode (skeleton pattern)
+        # Mark as hanged in stack mode
         self.is_hanged = True
         self.parent_container = container
         self._stack = stack
         self._stack_panel_name = panel_name
         
-        # Hide window (not needed in stack mode)
+        # Hide window if it was created
         if self.window:
             self.window.hide()
         
     
     def show_in_stack(self):
-        """Show this panel in the GtkStack (Phase 4: Master Palette control)."""
+        """Show this panel in the GtkStack (Phase 4: Master Palette control).
+        
+        WAYLAND FIX: Don't use show_all() - it causes Error 71 (Protocol error).
+        Instead, explicitly show widgets that need to be visible.
+        """
         
         if not hasattr(self, '_stack') or not self._stack:
             return
@@ -261,10 +293,10 @@ class TopologyPanelBase(ABC):
         # Set this panel as active child
         self._stack.set_visible_child_name(self._stack_panel_name)
         
-        # Re-enable show_all and make content visible
+        # WAYLAND FIX: Use show() instead of show_all()
         if self.content:
             self.content.set_no_show_all(False)  # Re-enable show_all
-            self.content.show_all()  # Show all child widgets recursively
+            self.content.show()  # Show just the container (not show_all!)
         
         # Make container visible too
         if self.parent_container:

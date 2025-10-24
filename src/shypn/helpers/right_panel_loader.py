@@ -95,18 +95,19 @@ class RightPanelLoader:
         # Panels will be created empty and updated later when data_collector is set
         self._setup_plotting_panels()
         
-        # WAYLAND FIX: Realize window and set event mask for multi-monitor support
-        self.window.realize()
-        if self.window.get_window():
-            try:
-                from gi.repository import Gdk
-                self.window.get_window().set_events(
-                    self.window.get_window().get_events() | 
-                    Gdk.EventMask.STRUCTURE_MASK |
-                    Gdk.EventMask.PROPERTY_CHANGE_MASK
-                )
-            except Exception as e:
-                print(f"[RIGHT_PANEL] Could not set window event mask: {e}", file=sys.stderr)
+        # WAYLAND FIX: Don't realize window early - let GTK do it naturally
+        # Realizing too early can cause protocol errors on Wayland
+        # self.window.realize()
+        # if self.window.get_window():
+        #     try:
+        #         from gi.repository import Gdk
+        #         self.window.get_window().set_events(
+        #             self.window.get_window().get_events() | 
+        #             Gdk.EventMask.STRUCTURE_MASK |
+        #             Gdk.EventMask.PROPERTY_CHANGE_MASK
+        #         )
+        #     except Exception as e:
+        #         print(f"[RIGHT_PANEL] Could not set window event mask: {e}", file=sys.stderr)
         
         # Hide window by default (will be shown when toggled)
         self.window.set_visible(False)
@@ -433,24 +434,40 @@ class RightPanelLoader:
     def add_to_stack(self, stack, container, panel_name='analyses'):
         """Add panel content to a GtkStack container (Phase 4: new architecture).
         
+        WAYLAND FIX: Don't create window in stack mode - load content directly.
+        
         Args:
             stack: GtkStack widget that will contain all panels
             container: GtkBox container within the stack for this panel
             panel_name: Name identifier for this panel in the stack ('analyses')
         """
         
-        if self.window is None:
-            self.load()
+        # WAYLAND FIX: Load content directly without creating window
+        if self.builder is None:
+            # Validate UI file exists
+            if not os.path.exists(self.ui_path):
+                raise FileNotFoundError(f"Right panel UI file not found: {self.ui_path}")
+            
+            # Load the UI
+            self.builder = Gtk.Builder.new_from_file(self.ui_path)
+            
+            # Extract ONLY the content (not the window)
+            self.content = self.builder.get_object('right_panel_content')
+            
+            if self.content is None:
+                raise ValueError("Object 'right_panel_content' not found in right_panel.ui")
+            
+            # Get float button reference
+            self.float_button = self.builder.get_object('float_button')
+            
+            # Setup plotting panels
+            self._setup_plotting_panels()
         
-        # Extract content from window
-        current_parent = self.content.get_parent()
-        if current_parent == self.window:
-            self.window.remove(self.content)
-        elif current_parent and current_parent != container:
-            current_parent.remove(self.content)
-        
-        # Add content to stack container
+        # Add content directly to stack container
         if self.content.get_parent() != container:
+            current_parent = self.content.get_parent()
+            if current_parent:
+                current_parent.remove(self.content)
             container.add(self.content)
         
         # Mark as hanged in stack mode
@@ -458,10 +475,6 @@ class RightPanelLoader:
         self.parent_container = container
         self._stack = stack
         self._stack_panel_name = panel_name
-        
-        # Hide window (not needed in stack mode)
-        if self.window:
-            self.window.hide()
         
     
     def show_in_stack(self):
@@ -477,10 +490,10 @@ class RightPanelLoader:
         # Set this panel as active child
         self._stack.set_visible_child_name(self._stack_panel_name)
         
-        # Re-enable show_all and make content visible
+        # WAYLAND FIX: Use show() instead of show_all()
         if self.content:
             self.content.set_no_show_all(False)  # Re-enable show_all
-            self.content.show_all()  # Show all child widgets recursively
+            self.content.show()  # Show just the container (not show_all!)
         
         # Make container visible too
         if self.parent_container:

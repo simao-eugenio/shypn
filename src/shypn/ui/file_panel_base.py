@@ -190,7 +190,11 @@ class FilePanelBase(ABC):
         print(f"[STACK] FilePanel content added to stack container '{panel_name}'", file=sys.stderr)
     
     def show_in_stack(self):
-        """Show this panel in the GtkStack (Phase 4: Master Palette control)."""
+        """Show this panel in the GtkStack (Phase 4: Master Palette control).
+        
+        WAYLAND FIX: Don't use show_all() - it causes Error 71 (Protocol error).
+        Instead, explicitly show widgets that need to be visible.
+        """
         print(f"[STACK] FilePanel show_in_stack() called", file=sys.stderr)
         
         if not hasattr(self, '_stack') or not self._stack:
@@ -204,10 +208,10 @@ class FilePanelBase(ABC):
         # Set this panel as active child
         self._stack.set_visible_child_name(self._stack_panel_name)
         
-        # Re-enable show_all and make content visible
+        # WAYLAND FIX: Use show() instead of show_all()
         if self.content:
             self.content.set_no_show_all(False)  # Re-enable show_all
-            self.content.show_all()  # Show all child widgets recursively
+            self.content.show()  # Show just the container (not show_all!)
         
         # Make container visible too
         if self.parent_container:

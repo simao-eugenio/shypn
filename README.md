@@ -1,7 +1,9 @@
 ````markdown
-# SHYpn - Stochastic Hybrid Petri Net Editor
+# SHYpn - Systems Biology Pathway Modeling Platform
 
-A GTK-based visual editor for Stochastic Hybrid Petri Nets with advanced modeling capabilities.
+**Hybrid Petri Net Platform for Biological Pathway and Regulatory Network Modeling, Simulation, and Analysis**
+
+A comprehensive GTK-based platform for systems biology pathway modeling with advanced simulation and analysis capabilities.
 
 ## Project Status (October 2025)
 
