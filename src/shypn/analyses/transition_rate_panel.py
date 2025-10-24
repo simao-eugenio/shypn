@@ -126,6 +126,10 @@ class TransitionRatePanel(AnalysisPlotPanel):
         """
         DEBUG_PLOT_DATA = False  # Disable verbose logging
         
+        # Safety check: return empty if no data collector
+        if not self.data_collector:
+            return []
+        
         # Get raw firing event data from collector
         raw_events = self.data_collector.get_transition_data(transition_id)
         

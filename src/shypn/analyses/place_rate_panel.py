@@ -64,6 +64,10 @@ class PlaceRatePanel(AnalysisPlotPanel):
         """
         DEBUG_PLOT_DATA = False  # Disable verbose logging
         
+        # Safety check: return empty if no data collector
+        if not self.data_collector:
+            return []
+        
         # Get raw token count data from collector
         raw_data = self.data_collector.get_place_data(place_id)
         

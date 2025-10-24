@@ -402,6 +402,10 @@ class AnalysisPlotPanel(Gtk.Box):
         Returns:
             bool: True to continue periodic calls
         """
+        # Skip update if no data collector available yet
+        if not self.data_collector:
+            return True
+            
         if not self.selected_objects:
             return True
         data_changed = False

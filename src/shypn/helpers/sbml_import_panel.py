@@ -373,10 +373,12 @@ class SBMLImportPanel:
             import tempfile
             
             # BioModels API endpoint - try multiple formats for compatibility
-            # Format 1: Direct download (current API as of 2025)
-            # Format 2: Legacy format for backwards compatibility
+            # Format 1: Specific file download (returns XML directly)
+            # Format 2: Alternative filename patterns
+            # Format 3: Legacy format for backwards compatibility
+            # NOTE: URL without filename parameter returns COMBINE archive (ZIP), not XML
             urls = [
-                f"https://www.ebi.ac.uk/biomodels/model/download/{biomodels_id}",
+                f"https://www.ebi.ac.uk/biomodels/model/download/{biomodels_id}?filename={biomodels_id}_url.xml",
                 f"https://www.ebi.ac.uk/biomodels/model/download/{biomodels_id}?filename={biomodels_id}.xml",
                 f"https://www.ebi.ac.uk/biomodels-main/download?mid={biomodels_id}",
             ]
@@ -405,9 +407,13 @@ class SBMLImportPanel:
                     # Read content and write to file
                     content = response.read()
                     
-                    # Verify we got XML content
+                    # Verify we got XML content, not a ZIP archive
                     if not content or len(content) < 100:
                         raise ValueError(f"Downloaded content too small: {len(content)} bytes")
+                    
+                    # Check for ZIP/COMBINE archive (BioModels now returns these by default)
+                    if content[:2] == b'PK':  # ZIP magic number
+                        raise ValueError("Downloaded content is a ZIP archive (COMBINE format), not SBML XML. Try a different URL format.")
                     
                     if b'<?xml' not in content[:200] and b'<sbml' not in content[:500]:
                         raise ValueError("Downloaded content does not appear to be SBML/XML")

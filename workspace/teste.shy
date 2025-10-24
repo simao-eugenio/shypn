@@ -1,0 +1,131 @@
+{
+  "version": "2.0",
+  "metadata": {
+    "created": "2025-10-24T00:47:43.691146",
+    "object_counts": {
+      "places": 2,
+      "transitions": 1,
+      "arcs": 2
+    }
+  },
+  "view_state": {
+    "zoom": 1.0,
+    "pan_x": -1000.0,
+    "pan_y": -1000.0,
+    "transformations": {
+      "rotation": {
+        "type": "rotation",
+        "angle_degrees": 0.0,
+        "enabled": true
+      }
+    }
+  },
+  "places": [
+    {
+      "id": "1",
+      "name": "P1",
+      "label": "",
+      "object_type": "place",
+      "x": 1475.0,
+      "y": 1416.0,
+      "radius": 25.0,
+      "marking": 25,
+      "initial_marking": 25,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "2",
+      "name": "P2",
+      "label": "",
+      "object_type": "place",
+      "x": 1627.0,
+      "y": 1429.0,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "id": "1",
+      "name": "T1",
+      "label": "",
+      "object_type": "transition",
+      "x": 1548.0,
+      "y": 1320.0,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0
+    }
+  ],
+  "arcs": [
+    {
+      "id": "1",
+      "name": "A1",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "1",
+      "source_type": "place",
+      "target_id": "1",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "2",
+      "name": "A2",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "1",
+      "source_type": "transition",
+      "target_id": "2",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    }
+  ]
+}

@@ -212,17 +212,17 @@ class ModelCanvasLoader:
                 else:
                     pass
         if self.right_panel_loader and drawing_area:
-            # Get simulate_tools_palette from SwissKnife widget_palette_instances
+            # Get simulate_tools_palette from SwissKnife registry
             # NOTE: SimulateToolsPaletteLoader is embedded inside SwissKnifePalette,
             # not stored directly in overlay_manager
             if drawing_area in self.overlay_managers:
                 overlay_manager = self.overlay_managers[drawing_area]
                 
-                # SwissKnifePalette stores SimulateToolsPaletteLoader in widget_palette_instances
+                # SwissKnifePalette stores SimulateToolsPaletteLoader in registry
                 if hasattr(overlay_manager, 'swissknife_palette'):
                     swissknife = overlay_manager.swissknife_palette
-                    if hasattr(swissknife, 'widget_palette_instances'):
-                        simulate_tools_palette = swissknife.widget_palette_instances.get('simulate')
+                    if hasattr(swissknife, 'registry'):
+                        simulate_tools_palette = swissknife.registry.get_widget_palette_instance('simulate')
                         if simulate_tools_palette and hasattr(simulate_tools_palette, 'data_collector'):
                             data_collector = simulate_tools_palette.data_collector
                             self.right_panel_loader.set_data_collector(data_collector)
@@ -806,6 +806,24 @@ class ModelCanvasLoader:
         
         # DON'T show palettes initially - they should only appear in edit mode
         # palette_manager.show_all()  # Removed - mode change handler will show them
+        
+        # ============================================================
+        # WIRE RIGHT PANEL ANALYSES: Set data_collector on initial load
+        # ============================================================
+        # The data_collector is created by SimulateToolsPaletteLoader
+        # and should be wired immediately after palette creation.
+        # This ensures the Analyses Panel is functional on first model load,
+        # not just after tab switches.
+        
+        if self.right_panel_loader and drawing_area in self.overlay_managers:
+            overlay_manager = self.overlay_managers[drawing_area]
+            if hasattr(overlay_manager, 'swissknife_palette'):
+                swissknife = overlay_manager.swissknife_palette
+                if hasattr(swissknife, 'registry'):
+                    simulate_tools_palette = swissknife.registry.get_widget_palette_instance('simulate')
+                    if simulate_tools_palette and hasattr(simulate_tools_palette, 'data_collector'):
+                        data_collector = simulate_tools_palette.data_collector
+                        self.right_panel_loader.set_data_collector(data_collector)
     
     def _on_palette_tool_selected(self, tools_palette, tool_name, canvas_manager, drawing_area):
         """Handle tool selection from new OOP tools palette.
@@ -2370,6 +2388,30 @@ class ModelCanvasLoader:
             current_page_num = self.notebook.get_current_page()
             current_page = self.notebook.get_nth_page(current_page_num)
             self._on_notebook_page_changed(self.notebook, current_page, current_page_num)
+    
+    def wire_existing_canvases_to_right_panel(self):
+        """Wire data_collector to right_panel for all existing canvases.
+        
+        This is called after both model_canvas_loader and right_panel_loader are initialized.
+        It retroactively wires any canvases that were created before right_panel_loader existed
+        (e.g., the startup default canvas).
+        
+        Simple solution: Just trigger the existing _on_notebook_page_changed() handler
+        for the current page, which already has all the wiring logic.
+        """
+        if not self.right_panel_loader:
+            return
+        
+        # Get the current page and trigger the page changed handler
+        # This will execute all the existing wiring logic
+        current_page_num = self.notebook.get_current_page()
+        current_page = self.notebook.get_nth_page(current_page_num)
+        
+        # Manually call the page changed handler to wire the startup canvas
+        self._on_notebook_page_changed(self.notebook, current_page, current_page_num)
+        
+        sys.stderr.write("[MODEL_CANVAS] wire_existing_canvases_to_right_panel() completed - no valid canvas found\n")
+        sys.stderr.flush()
 
     def set_context_menu_handler(self, handler):
         """Set the context menu handler for adding analysis menu items.

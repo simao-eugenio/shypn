@@ -67,6 +67,9 @@ except ImportError as e:
 	sys.exit(1)
 
 def main(argv=None):
+	sys.stderr.write("[SHYPN MAIN] Starting application\n")
+	sys.stderr.flush()
+	
 	if argv is None:
 		argv = sys.argv
 
@@ -78,6 +81,7 @@ def main(argv=None):
 	app = Gtk.Application(application_id='org.shypn.dockdemo')
 
 	def on_activate(a):
+		
 		# Load workspace settings
 		from shypn.workspace_settings import WorkspaceSettings
 		workspace_settings = WorkspaceSettings()
@@ -367,6 +371,16 @@ def main(argv=None):
 		# Wire right panel loader to canvas loader
 		# This allows tab switching to update the right panel's data collector
 		model_canvas_loader.set_right_panel_loader(right_panel_loader)
+		
+		# IMPORTANT: Wire data_collector for any EXISTING canvases (e.g., startup default canvas)
+		# The startup canvas is created before right_panel_loader exists, so we need to
+		# wire it retroactively here after both components are initialized
+		try:
+			model_canvas_loader.wire_existing_canvases_to_right_panel()
+		except Exception as e:
+			import traceback
+			print(f"[SHYPN ERROR] Exception in wire_existing_canvases_to_right_panel(): {e}", file=sys.stderr)
+			traceback.print_exc()
 		
 		# Wire context menu handler to canvas loader
 		# This allows right-click context menus to include "Add to Analysis" options
