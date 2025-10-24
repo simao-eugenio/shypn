@@ -517,7 +517,6 @@ class LeftPanelLoaderVSCode:
         self.parent_container = container
         self._stack = stack
         self._stack_panel_name = panel_name
-        print(f"[STACK] FilePanel (VS Code) add_to_stack() called for panel '{panel_name}'", file=sys.stderr)
     
     def show_in_stack(self):
         """Show this panel in the GtkStack."""
