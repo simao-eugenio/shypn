@@ -63,18 +63,18 @@ class PathwaysPanelController(BasePanel):
             self.import_notebook = Gtk.Notebook()
             self.import_notebook.set_tab_pos(Gtk.PositionType.TOP)
             
-            # KEGG Import tab
+            # KEGG tab
             kegg_page = self._create_kegg_page()
             self.import_notebook.append_page(
                 kegg_page,
-                Gtk.Label(label="KEGG Import")
+                Gtk.Label(label="KEGG")
             )
             
-            # SBML Import tab
-            sbml_page = self._create_sbml_page()
+            # BRENDA tab
+            brenda_page = self._create_brenda_page()
             self.import_notebook.append_page(
-                sbml_page,
-                Gtk.Label(label="SBML Import")
+                brenda_page,
+                Gtk.Label(label="BRENDA")
             )
             
             content_box.pack_start(self.import_notebook, True, True, 0)
@@ -142,6 +142,40 @@ class PathwaysPanelController(BasePanel):
         placeholder = Gtk.Label(
             label="SBML file import controls will appear here\n\n"
                   "(Phase 4: Wire SBMLImportController)"
+        )
+        placeholder.set_xalign(0)
+        placeholder.get_style_context().add_class("dim-label")
+        box.pack_start(placeholder, True, True, 0)
+        
+        return box
+    
+    def _create_brenda_page(self) -> Gtk.Widget:
+        """Create BRENDA enrichment page.
+        
+        Returns:
+            BRENDA enrichment widget
+        """
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        box.set_margin_start(12)
+        box.set_margin_end(12)
+        box.set_margin_top(12)
+        box.set_margin_bottom(12)
+        
+        # Title
+        title = Gtk.Label(label="BRENDA Data Enrichment")
+        title.set_xalign(0)
+        title.set_markup("<b>BRENDA Data Enrichment</b>")
+        box.pack_start(title, False, False, 0)
+        
+        # Placeholder content
+        placeholder = Gtk.Label(
+            label="BRENDA enzyme database integration will appear here\n\n"
+                  "Features:\n"
+                  "• Automatic kinetic parameters (Km, kcat, Ki)\n"
+                  "• Enzyme names and classifications\n"
+                  "• Literature citations (PubMed)\n"
+                  "• Organism-specific data\n\n"
+                  "(Phase 4: Wire BRENDAConnector)"
         )
         placeholder.set_xalign(0)
         placeholder.get_style_context().add_class("dim-label")

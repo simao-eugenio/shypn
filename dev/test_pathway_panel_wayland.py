@@ -3,6 +3,8 @@
 
 This script loads ONLY the Pathway panel to isolate Wayland Error 71 issues.
 Tests attach/detach/float operations in a minimal environment.
+
+NEW: Tests unified UI with radio buttons (External/Local) and normalized tabs.
 """
 
 import sys
@@ -109,6 +111,27 @@ class TestWindow(Gtk.ApplicationWindow):
         self.cycle_button = Gtk.Button(label="🔄 Attach/Hide Cycle (20x)")
         self.cycle_button.connect('clicked', self.on_cycle_test)
         button_box.pack_start(self.cycle_button, False, False, 0)
+        
+        # Separator
+        button_box.pack_start(Gtk.Separator(), False, False, 10)
+        
+        # NEW: Tab and Radio Button Tests
+        ui_label = Gtk.Label()
+        ui_label.set_markup("<b>UI Interaction Tests:</b>")
+        ui_label.set_xalign(0)
+        button_box.pack_start(ui_label, False, False, 0)
+        
+        self.tab_cycle_button = Gtk.Button(label="📑 Cycle Tabs (KEGG→SBML→BRENDA)")
+        self.tab_cycle_button.connect('clicked', self.on_tab_cycle)
+        button_box.pack_start(self.tab_cycle_button, False, False, 0)
+        
+        self.radio_toggle_button = Gtk.Button(label="🔘 Toggle Radio Buttons")
+        self.radio_toggle_button.connect('clicked', self.on_radio_toggle)
+        button_box.pack_start(self.radio_toggle_button, False, False, 0)
+        
+        self.stress_ui_button = Gtk.Button(label="⚡ Stress UI (tabs+radios)")
+        self.stress_ui_button.connect('clicked', self.on_stress_ui)
+        button_box.pack_start(self.stress_ui_button, False, False, 0)
         
         # Separator
         button_box.pack_start(Gtk.Separator(), False, False, 10)
@@ -248,6 +271,150 @@ class TestWindow(Gtk.ApplicationWindow):
         
         # Schedule cycles with 150ms delay between each operation
         GLib.timeout_add(150, do_cycle)
+    
+    def on_tab_cycle(self, button):
+        """Cycle through tabs to test notebook switching."""
+        print("\n[TEST] ========== TAB CYCLE TEST START ==========")
+        button.set_sensitive(False)
+        self.status_label.set_markup("<i>Status: <b>Cycling through tabs...</b></i>")
+        
+        # Get notebook from pathway panel
+        notebook = self.pathway_panel.builder.get_object('pathway_notebook')
+        if not notebook:
+            print("[TEST] ERROR: Could not find pathway_notebook!")
+            button.set_sensitive(True)
+            return
+        
+        count = [0]
+        max_cycles = 3
+        num_pages = notebook.get_n_pages()
+        
+        def do_tab_switch():
+            if count[0] >= max_cycles * num_pages:
+                button.set_sensitive(True)
+                self.status_label.set_markup(f"<i>Status: Tab cycle complete ({max_cycles} cycles)</i>")
+                print(f"[TEST] ========== TAB CYCLE TEST COMPLETE ==========\n")
+                return False
+            
+            page_index = count[0] % num_pages
+            page = notebook.get_nth_page(page_index)
+            tab_label = notebook.get_tab_label_text(page) if page else "Unknown"
+            
+            print(f"[TEST] Switching to tab {page_index}: {tab_label}")
+            notebook.set_current_page(page_index)
+            count[0] += 1
+            
+            return True
+        
+        # Schedule tab switches with 300ms delay
+        GLib.timeout_add(300, do_tab_switch)
+    
+    def on_radio_toggle(self, button):
+        """Toggle radio buttons between External/Local on all tabs."""
+        print("\n[TEST] ========== RADIO BUTTON TOGGLE TEST ==========")
+        button.set_sensitive(False)
+        self.status_label.set_markup("<i>Status: <b>Toggling radio buttons...</b></i>")
+        
+        # Get radio buttons for all tabs
+        builder = self.pathway_panel.builder
+        radio_pairs = [
+            ('kegg_external_radio', 'kegg_local_radio', 'KEGG'),
+            ('sbml_external_radio', 'sbml_local_radio', 'SBML'),
+            ('brenda_external_radio', 'brenda_local_radio', 'BRENDA')
+        ]
+        
+        count = [0]
+        max_toggles = 10
+        
+        def do_toggle():
+            if count[0] >= max_toggles:
+                button.set_sensitive(True)
+                self.status_label.set_markup(f"<i>Status: Radio toggle complete ({max_toggles} toggles)</i>")
+                print(f"[TEST] ========== RADIO TOGGLE TEST COMPLETE ==========\n")
+                return False
+            
+            count[0] += 1
+            
+            # Toggle all radio buttons
+            for external_id, local_id, tab_name in radio_pairs:
+                external_radio = builder.get_object(external_id)
+                local_radio = builder.get_object(local_id)
+                
+                if external_radio and local_radio:
+                    # Toggle: if external is active, activate local
+                    if external_radio.get_active():
+                        print(f"[TEST] {tab_name}: External → Local")
+                        local_radio.set_active(True)
+                    else:
+                        print(f"[TEST] {tab_name}: Local → External")
+                        external_radio.set_active(True)
+            
+            return True
+        
+        # Schedule toggles with 200ms delay
+        GLib.timeout_add(200, do_toggle)
+    
+    def on_stress_ui(self, button):
+        """Stress test: rapidly cycle tabs AND toggle radios."""
+        print("\n[TEST] ========== UI STRESS TEST START ==========")
+        button.set_sensitive(False)
+        self.status_label.set_markup("<i>Status: <b>Running UI stress test...</b></i>")
+        
+        # Get notebook and radio buttons
+        notebook = self.pathway_panel.builder.get_object('pathway_notebook')
+        builder = self.pathway_panel.builder
+        radio_pairs = [
+            ('kegg_external_radio', 'kegg_local_radio'),
+            ('sbml_external_radio', 'sbml_local_radio'),
+            ('brenda_external_radio', 'brenda_local_radio')
+        ]
+        
+        if not notebook:
+            print("[TEST] ERROR: Could not find pathway_notebook!")
+            button.set_sensitive(True)
+            return
+        
+        count = [0]
+        max_operations = 30
+        num_pages = notebook.get_n_pages()
+        
+        def do_stress_operation():
+            if count[0] >= max_operations:
+                button.set_sensitive(True)
+                self.status_label.set_markup(f"<i>Status: UI stress test complete ({max_operations} ops)</i>")
+                print(f"[TEST] ========== UI STRESS TEST COMPLETE ==========\n")
+                return False
+            
+            count[0] += 1
+            operation = count[0] % 2
+            
+            if operation == 0:
+                # Switch tab
+                page_index = (count[0] // 2) % num_pages
+                page = notebook.get_nth_page(page_index)
+                tab_label = notebook.get_tab_label_text(page) if page else "Unknown"
+                print(f"[TEST] Op {count[0]}: Switch to tab {tab_label}")
+                notebook.set_current_page(page_index)
+            else:
+                # Toggle radios on current tab
+                current_page = notebook.get_current_page()
+                if current_page < len(radio_pairs):
+                    external_id, local_id = radio_pairs[current_page]
+                    external_radio = builder.get_object(external_id)
+                    local_radio = builder.get_object(local_id)
+                    
+                    if external_radio and local_radio:
+                        if external_radio.get_active():
+                            print(f"[TEST] Op {count[0]}: Toggle radio External → Local")
+                            local_radio.set_active(True)
+                        else:
+                            print(f"[TEST] Op {count[0]}: Toggle radio Local → External")
+                            external_radio.set_active(True)
+            
+            return True
+        
+        # Schedule operations with 100ms delay (rapid!)
+        GLib.timeout_add(100, do_stress_operation)
 
 
 class TestApplication(Gtk.Application):
@@ -265,8 +432,15 @@ class TestApplication(Gtk.Application):
 def main():
     """Run the test application."""
     print("=" * 70)
-    print("Pathway Panel Wayland Test")
+    print("Pathway Panel Wayland Test - UNIFIED UI VERSION")
     print("=" * 70)
+    print("Tests:")
+    print("  • Attach/Detach operations")
+    print("  • Float/Hide/Show operations")
+    print("  • Tab switching (KEGG, SBML, BRENDA)")
+    print("  • Radio button toggling (External/Local)")
+    print("  • UI stress tests (combined operations)")
+    print()
     print("Watch for: Gdk-Message: Error 71 (Protocol error)")
     print("=" * 70)
     print()
