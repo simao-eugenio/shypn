@@ -52,13 +52,10 @@ try:
 		pass
 	elif USE_VSCODE_PANEL:
 		from shypn.helpers.left_panel_loader_vscode import create_left_panel
-		print("[INIT] Using VS Code-style File Panel (Explorer)", file=sys.stderr)
 	elif USE_FILE_PANEL_V2:
 		from shypn.helpers.file_panel_v3_loader import create_file_panel_v3 as create_left_panel
-		print("[INIT] Using File Panel V3 (XML UI + OOP)", file=sys.stderr)
 	else:
 		from shypn.helpers.left_panel_loader import create_left_panel
-		print("[INIT] Using original File Panel", file=sys.stderr)
 	from shypn.helpers.right_panel_loader import create_right_panel
 	from shypn.helpers.pathway_panel_loader import create_pathway_panel
 	from shypn.helpers.topology_panel_loader import TopologyPanelLoader
@@ -97,7 +94,6 @@ def main(argv=None):
 				css_provider,
 				Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
 			)
-			print("[CSS] Main window styles loaded", file=sys.stderr)
 		
 		# Load main window
 		main_builder = Gtk.Builder.new_from_file(UI_PATH)
@@ -110,7 +106,6 @@ def main(argv=None):
 		from shypn.ui.menu_actions import MenuActions
 		menu_actions = MenuActions(a, window)
 		menu_actions.register_all_actions()
-		print("[INIT] Menu actions registered", file=sys.stderr)
 		
 		# Restore window geometry
 		geom = workspace_settings.get_window_geometry()
@@ -133,8 +128,8 @@ def main(argv=None):
 					Gdk.EventMask.STRUCTURE_MASK |
 					Gdk.EventMask.PROPERTY_CHANGE_MASK
 				)
-			except Exception as e:
-				print(f"[WAYLAND] Could not set window event mask: {e}", file=sys.stderr)
+			except Exception:
+				pass  # Wayland-specific issue, not critical
 		
 		# Add double-click on header bar to toggle maximize
 		header_bar = main_builder.get_object('header_bar')
@@ -404,40 +399,25 @@ def main(argv=None):
 		# Skeleton Pattern: Add panels to GtkStack BEFORE window shows
 		# Each panel is added to its container in the stack
 		# ====================================================================
-		print("[INIT] Adding panels to GtkStack BEFORE window shows...", file=sys.stderr)
 		
 		# Add Files panel to stack
 		if left_panel_loader:
 			left_panel_loader.add_to_stack(left_dock_stack, files_panel_container, 'files')
-			print("[INIT]   Files panel added to stack", file=sys.stderr)
 		
 		# Add Pathways panel to stack
 		if pathway_panel_loader:
 			pathway_panel_loader.add_to_stack(left_dock_stack, pathways_panel_container, 'pathways')
-			print("[INIT]   Pathways panel added to stack", file=sys.stderr)
 		
 		# Add Analyses panel to stack
 		if right_panel_loader:
 			right_panel_loader.add_to_stack(left_dock_stack, analyses_panel_container, 'analyses')
-			print("[INIT]   Analyses panel added to stack", file=sys.stderr)
 		
 		# Add Topology panel to stack
 		if topology_panel_loader:
 			topology_panel_loader.add_to_stack(left_dock_stack, topology_panel_container, 'topology')
-			print("[INIT]   Topology panel added to stack", file=sys.stderr)
-		
-		# Debug: Verify panel content is in containers
-		print(f"[INIT] Verifying docked content:", file=sys.stderr)
-		print(f"[INIT]   files_panel_container children: {files_panel_container.get_children()}", file=sys.stderr)
-		print(f"[INIT]   analyses_panel_container children: {analyses_panel_container.get_children()}", file=sys.stderr)
-		print(f"[INIT]   pathways_panel_container children: {pathways_panel_container.get_children()}", file=sys.stderr)
-		print(f"[INIT]   topology_panel_container children: {topology_panel_container.get_children()}", file=sys.stderr)
-		
-		print("[INIT] All panels pre-docked successfully (no Error 71!)", file=sys.stderr)
 		
 		# CRITICAL: Hide panel containers BEFORE window.show_all()
 		# This prevents them from being shown when show_all() is called
-		print("[INIT] Hiding panel containers BEFORE show_all()...", file=sys.stderr)
 		if files_panel_container:
 			files_panel_container.set_visible(False)
 			files_panel_container.set_no_show_all(False)
@@ -455,24 +435,17 @@ def main(argv=None):
 		if left_paned:
 			left_paned.set_position(0)
 		
-		print("[INIT] Panel containers hidden", file=sys.stderr)
-		
 		# WAYLAND FIX: Process pending events to ensure window destruction completes
-		print("[INIT] Processing pending GTK events to complete window destruction...", file=sys.stderr)
 		while Gtk.events_pending():
 			Gtk.main_iteration()
-		print("[INIT] Event processing complete", file=sys.stderr)
 		
 		# ====================================================================
 		# Create Master Palette (vertical toolbar on far left)
 		# WAYLAND FIX: Must be created and inserted BEFORE window.show_all()
 		# ====================================================================
-		print("[INIT] Creating MasterPalette...", file=sys.stderr)
 		master_palette = MasterPalette()
-		print("[INIT] MasterPalette created", file=sys.stderr)
 		
 		# Get palette slot and insert palette BEFORE showing main window
-		print("[INIT] Inserting MasterPalette into UI...", file=sys.stderr)
 		master_palette_slot = main_builder.get_object('master_palette_slot')
 		if master_palette_slot:
 			# Clear any existing children (shouldn't be any)
@@ -481,14 +454,12 @@ def main(argv=None):
 			# Add palette widget
 			palette_widget = master_palette.get_widget()
 			master_palette_slot.pack_start(palette_widget, True, True, 0)
-			print("[INIT] Palette widget packed into master_palette_slot", file=sys.stderr)
 		else:
 			print("ERROR: master_palette_slot not found in UI", file=sys.stderr)
 			sys.exit(20)
 		
 		# WAYLAND FIX: Present window AFTER all widgets are added
 		# This ensures everything is in place before window realization
-		print("[INIT] About to show main window with all widgets...", file=sys.stderr)
 		if isinstance(window, Gtk.ApplicationWindow):
 			window.set_application(a)
 			window.show_all()  # Show all widgets including MasterPalette
@@ -496,11 +467,9 @@ def main(argv=None):
 			w = Gtk.ApplicationWindow(application=a)
 			w.add(window)  # GTK3 uses add() instead of set_child()
 			window.show_all()  # Show all widgets including MasterPalette
-		print("[INIT] Main window shown successfully", file=sys.stderr)
 		
 		# CRITICAL: Hide panels AFTER window.show_all()
 		# show_all() reveals everything, so we must explicitly hide panels that start hidden
-		print("[INIT] Hiding panels after show_all()...", file=sys.stderr)
 		
 		# Make sure left_dock_stack and left_paned are visible
 		if left_dock_stack:
@@ -524,12 +493,10 @@ def main(argv=None):
 		if topology_panel_container:
 			topology_panel_container.set_visible(False)
 			topology_panel_container.set_no_show_all(False)
-		print("[INIT] All panels hidden at startup", file=sys.stderr)
 
 		# ====================================================================
 		# Set parent windows for dialogs (AFTER window.show_all())
 		# ====================================================================
-		print("[INIT] Setting parent windows for panels...", file=sys.stderr)
 		if left_panel_loader:
 			left_panel_loader.parent_window = window
 			# Also set for file_explorer and persistency if using File Panel V3
@@ -546,8 +513,6 @@ def main(argv=None):
 		
 		if topology_panel_loader:
 			topology_panel_loader.parent_window = window
-		
-		print("[INIT] Parent windows set for all panels", file=sys.stderr)
 
 		# Define toggle handlers (show/hide panel windows as transient windows)
 		# ====================================================================
@@ -561,7 +526,6 @@ def main(argv=None):
 			EXCLUSIVITY: When activated, deactivates all other panel buttons.
 			Only one panel can be visible at a time in the GtkStack.
 			"""
-			print(f"[HANDLER] on_left_toggle({is_active})", file=sys.stderr)
 			if not left_panel_loader:
 				return
 			
@@ -597,7 +561,6 @@ def main(argv=None):
 			EXCLUSIVITY: When activated, deactivates all other panel buttons.
 			Only one panel can be visible at a time in the GtkStack.
 			"""
-			print(f"[HANDLER] on_right_toggle({is_active})", file=sys.stderr)
 			if not right_panel_loader:
 				return
 			
@@ -633,7 +596,6 @@ def main(argv=None):
 			EXCLUSIVITY: When activated, deactivates all other panel buttons.
 			Only one panel can be visible at a time in the GtkStack.
 			"""
-			print(f"[HANDLER] on_pathway_toggle({is_active})", file=sys.stderr)
 			if not pathway_panel_loader:
 				return
 			
@@ -669,7 +631,6 @@ def main(argv=None):
 			EXCLUSIVITY: When activated, deactivates all other panel buttons.
 			Only one panel can be visible at a time in the GtkStack.
 			"""
-			print(f"[HANDLER] on_topology_toggle({is_active})", file=sys.stderr)
 			if not topology_panel_loader:
 				return
 			
@@ -768,24 +729,19 @@ def main(argv=None):
 		# Wire Master Palette buttons to toggle handlers
 		# ====================================================================
 		# Connect palette buttons directly to toggle handlers
-		print("[INIT] Connecting MasterPalette button handlers...", file=sys.stderr)
 		master_palette.connect('files', on_left_toggle)
 		master_palette.connect('pathways', on_pathway_toggle)
 		master_palette.connect('analyses', on_right_toggle)
 		master_palette.connect('topology', on_topology_toggle)
-		print("[INIT] MasterPalette handlers connected", file=sys.stderr)
 		
 		# Enable topology button if panel loaded successfully
 		if topology_panel_loader:
-			print("[INIT] Enabling topology button...", file=sys.stderr)
 			master_palette.set_sensitive('topology', True)
 			# Update tooltip to remove "Coming Soon"
 			if 'topology' in master_palette.buttons:
 				master_palette.buttons['topology'].widget.set_tooltip_text('Topology Analysis')
-			print("[INIT] Topology button enabled", file=sys.stderr)
 		
 		# Get minimize/maximize buttons
-		print("[INIT] Setting up window control buttons...", file=sys.stderr)
 		minimize_button = main_builder.get_object('minimize_button')
 		maximize_button = main_builder.get_object('maximize_button')
 		maximize_image = main_builder.get_object('maximize_image')
