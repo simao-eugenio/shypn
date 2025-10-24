@@ -81,16 +81,6 @@ class MenuActions:
 	
 	def on_edit_undo(self, action, param):
 		"""Undo the last action."""
-		print("[MENU] Edit → Undo", file=sys.stderr)
-		# TODO: Implement undo logic
-	
-	def on_edit_redo(self, action, param):
-		"""Redo the last undone action."""
-		print("[MENU] Edit → Redo", file=sys.stderr)
-		# TODO: Implement redo logic
-	
-	def on_edit_undo(self, action, param):
-		"""Undo the last action."""
 		# TODO: Implement undo logic
 		pass
 	

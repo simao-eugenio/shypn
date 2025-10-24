@@ -235,7 +235,6 @@ class MasterPalette:
                 Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
             )
             self._css_applied = True
-            print("[CSS] MasterPalette styles applied (squared buttons with hover effects)", file=sys.stderr)
         except Exception as e:
             # CSS load failed, continue without styling
             print(f"Warning: Could not load palette CSS: {e}", file=sys.stderr)

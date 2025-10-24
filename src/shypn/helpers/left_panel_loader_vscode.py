@@ -147,10 +147,9 @@ class LeftPanelLoaderVSCode:
                     Gdk.EventMask.STRUCTURE_MASK |
                     Gdk.EventMask.PROPERTY_CHANGE_MASK
                 )
-            except Exception as e:
-                print(f"[LEFT_PANEL] Could not set window event mask: {e}", file=sys.stderr)
+            except Exception:
+                pass  # Wayland-specific issue, not critical
         
-        print("[LOAD] File Panel (VS Code style) loaded", file=sys.stderr)
         return self.window
     
     def _create_files_category(self, container):
@@ -452,21 +451,18 @@ class LeftPanelLoaderVSCode:
     
     def _on_new_file_clicked(self):
         """Handle New File button click - creates file with inline editing."""
-        print("[FILES] New File clicked - starting inline edit", file=sys.stderr)
         if self.file_explorer:
             # Use existing inline editing infrastructure
             self.file_explorer._start_inline_edit_new_file()
     
     def _on_new_folder_clicked(self):
         """Handle New Folder button click - creates folder with inline editing."""
-        print("[FILES] New Folder clicked - starting inline edit", file=sys.stderr)
         if self.file_explorer:
             # Use existing inline editing infrastructure
             self.file_explorer._start_inline_edit_new_folder()
     
     def _on_refresh_clicked(self):
         """Handle Refresh button click."""
-        print("[FILES] Refresh clicked", file=sys.stderr)
         if self.file_explorer:
             self.file_explorer._on_refresh_clicked(None)
     
@@ -539,8 +535,6 @@ class LeftPanelLoaderVSCode:
         
         if self.parent_container:
             self.parent_container.set_visible(True)
-        
-        print("[STACK] FilePanel (VS Code) now visible in stack", file=sys.stderr)
     
     def hide_in_stack(self):
         """Hide this panel in the GtkStack."""
@@ -550,8 +544,6 @@ class LeftPanelLoaderVSCode:
         
         if self.parent_container:
             self.parent_container.set_visible(False)
-        
-        print("[STACK] FilePanel (VS Code) hidden in stack", file=sys.stderr)
 
 
 def create_left_panel(ui_path=None, base_path=None):

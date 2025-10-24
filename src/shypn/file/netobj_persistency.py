@@ -75,8 +75,6 @@ class NetObjPersistency:
         
         # WAYLAND FIX: Detect if running on Wayland
         self._is_wayland = os.environ.get('WAYLAND_DISPLAY') is not None
-        if self._is_wayland:
-            print("[PERSISTENCY] Wayland detected - using workaround for FileChooser", file=sys.stderr)
         
         # Determine models directory
         if models_directory is None:
