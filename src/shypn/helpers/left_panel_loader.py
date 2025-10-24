@@ -207,29 +207,69 @@ class LeftPanelLoader:
         # Prevent recursive calls when we update the button state programmatically
         if self._updating_button:
             return
+        
+        print(f"[LEFT_PANEL] Float button toggled: active={button.get_active()}, is_hanged={self.is_hanged}")
             
         is_active = button.get_active()
         if is_active:
             # Button is now active -> detach the panel (float)
+            print(f"[LEFT_PANEL] Calling detach()")
             self.detach()
         else:
             # Button is now inactive -> attach the panel back
+            print(f"[LEFT_PANEL] Calling hang_on()")
             if self.parent_container:
                 self.hang_on(self.parent_container)
+    
+    def _on_delete_event(self, window, event):
+        """Handle window close button (X) - hide instead of destroy.
+        
+        Returns:
+            bool: True to prevent default destroy behavior
+        """
+        # Hide the window
+        self.hide()
+        
+        # Update float button to inactive state
+        if self.float_button and self.float_button.get_active():
+            self._updating_button = True
+            self.float_button.set_active(False)
+            self._updating_button = False
+        
+        # Dock back if we have a container
+        if self.parent_container:
+            self.hang_on(self.parent_container)
+        
+        # Return True to prevent window destruction
+        return True
     
     def detach(self):
         """Detach from container and restore as independent window (skeleton pattern)."""
         
+        print(f"[LEFT_PANEL] detach() called: is_hanged={self.is_hanged}, window exists={self.window is not None}")
+        
         if not self.is_hanged:
+            print(f"[LEFT_PANEL] Already detached, returning")
             return
+        
+        # Create window if it doesn't exist (happens when panel was loaded via add_to_stack)
+        if self.window is None:
+            print(f"[LEFT_PANEL] Creating window on-demand")
+            self.window = Gtk.Window()
+            self.window.set_title('Files')
+            self.window.set_default_size(300, 600)
+            # Connect delete-event to prevent destruction
+            self.window.connect('delete-event', self._on_delete_event)
         
         # Remove from container
         if self.parent_container:
+            print(f"[LEFT_PANEL] Removing content from container")
             self.parent_container.remove(self.content)
             # Hide the container after unattaching
             self.parent_container.set_visible(False)
         
         # Return content to independent window
+        print(f"[LEFT_PANEL] Adding content to window")
         self.window.add(self.content)
         
         # Set transient for main window if available
@@ -250,7 +290,9 @@ class LeftPanelLoader:
             self.on_float_callback()
         
         # Show window
+        print(f"[LEFT_PANEL] Showing window")
         self.window.show_all()
+        print(f"[LEFT_PANEL] Detach complete")
         
     
     def float(self, parent_window=None):
@@ -373,6 +415,10 @@ class LeftPanelLoader:
             if not os.path.exists(self.ui_path):
                 raise FileNotFoundError(f"Left panel UI file not found: {self.ui_path}")
             
+            # Initialize flag for preventing recursive toggles
+            if not hasattr(self, '_updating_button'):
+                self._updating_button = False
+            
             # Load the UI
             self.builder = Gtk.Builder.new_from_file(self.ui_path)
             
@@ -385,8 +431,22 @@ class LeftPanelLoader:
             # Initialize controllers (skip window-related stuff)
             self._init_controllers()
             
-            # Get float button reference (won't work in stack mode)
+            # Get float button and connect signal
+            # NOTE: Float button works but will cause Error 71 if window is maximized
             self.float_button = self.builder.get_object('float_button')
+            print(f"[LEFT_PANEL] Float button found: {self.float_button is not None}")
+            if self.float_button:
+                # Connect signal handler
+                handler_id = self.float_button.connect('toggled', self._on_float_toggled)
+                print(f"[LEFT_PANEL] Float button signal connected with handler_id={handler_id}")
+                # Ensure button starts inactive in stack mode
+                if self.float_button.get_active():
+                    self._updating_button = True
+                    self.float_button.set_active(False)
+                    self._updating_button = False
+                print(f"[LEFT_PANEL] Float button initial state: active={self.float_button.get_active()}")
+            else:
+                print(f"[LEFT_PANEL] WARNING: Float button not found in UI file!")
         
         # Add content directly to stack container
         if self.content.get_parent() != container:
@@ -505,15 +565,16 @@ class LeftPanelLoader:
         
 
 
-def create_left_panel(ui_path=None, base_path=None):
+def create_left_panel(ui_path=None, base_path=None, load_window=True):
     """Convenience function to create and load the left panel loader.
     
     Args:
         ui_path: Optional path to left_panel.ui.
         base_path: Optional base path for file explorer (default: models directory).
+        load_window: If True, creates window immediately. If False, defers to add_to_stack().
         
     Returns:
-        LeftPanelLoader: The loaded left panel loader instance.
+        LeftPanelLoader: The left panel loader instance.
         
     Example:
         loader = create_left_panel(base_path="/home/user/projects/models")
@@ -522,5 +583,7 @@ def create_left_panel(ui_path=None, base_path=None):
         loader.attach_to(container)  # Attach to extreme left
     """
     loader = LeftPanelLoader(ui_path, base_path)
-    loader.load()
+    if load_window:
+        loader.load()
     return loader
+

@@ -457,8 +457,16 @@ class RightPanelLoader:
             if self.content is None:
                 raise ValueError("Object 'right_panel_content' not found in right_panel.ui")
             
-            # Get float button reference
+            # Get float button and connect signal
+            # NOTE: Float button works but will cause Error 71 if window is maximized
             self.float_button = self.builder.get_object('float_button')
+            if self.float_button:
+                # Connect signal handler if it exists
+                if hasattr(self, '_on_float_toggled'):
+                    self.float_button.connect('toggled', self._on_float_toggled)
+                # Ensure button starts inactive in stack mode
+                if self.float_button.get_active():
+                    self.float_button.set_active(False)
             
             # Setup plotting panels
             self._setup_plotting_panels()

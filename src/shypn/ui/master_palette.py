@@ -334,6 +334,19 @@ class MasterPalette:
             # Allow handler to run (especially for deactivation)
             button.set_active(active)
 
+    def is_active(self, category: str) -> bool:
+        """Check if a button is currently active.
+        
+        Args:
+            category: Button category name ('files', 'pathways', etc.)
+        
+        Returns:
+            True if button is active, False otherwise
+        """
+        if category not in self.buttons:
+            return False
+        return self.buttons[category].get_active()
+
     def set_sensitive(self, category: str, sensitive: bool):
         """Enable/disable a button (e.g., disable Topology until implemented)."""
         if category not in self.buttons:

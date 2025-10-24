@@ -247,6 +247,8 @@ class TopologyPanelBase(ABC):
                                     self._connect_signals()
                                 except:
                                     pass
+                            # Float button is enabled - will work in non-maximized window
+                            # NOTE: May cause Error 71 if window is maximized
             except:
                 # Fallback to full load if partial load fails
                 self.load()

@@ -42,16 +42,15 @@ except Exception as e:
 # TEST MODE: Check which file panel to use
 USE_SIMPLE_TEST_PANEL = os.environ.get('SHYPN_USE_SIMPLE_PANEL', '0') == '1'
 USE_FILE_PANEL_V2 = os.environ.get('SHYPN_USE_FILE_PANEL_V2', '0') == '1'  # Old V2 panel
-# TODO: Rename SHYPN_USE_VSCODE_PANEL to avoid brand name (e.g., SHYPN_USE_EXPLORER_PANEL)
-USE_VSCODE_PANEL = os.environ.get('SHYPN_USE_VSCODE_PANEL', '1') == '1'  # Default to VS Code panel
+USE_FILE_PANEL = os.environ.get('SHYPN_USE_FILE_PANEL', '1') == '1'  # Default to modern file panel
 
 # Import panel loaders from src/shypn/helpers/
 try:
 	if USE_SIMPLE_TEST_PANEL:
 		# Simple test panel will be defined later (skip import)
 		pass
-	elif USE_VSCODE_PANEL:
-		from shypn.helpers.left_panel_loader_vscode import create_left_panel
+	elif USE_FILE_PANEL:
+		from shypn.helpers.file_panel_loader import create_left_panel
 	elif USE_FILE_PANEL_V2:
 		from shypn.helpers.file_panel_v3_loader import create_file_panel_v3 as create_left_panel
 	else:
@@ -116,12 +115,17 @@ def main(argv=None):
 		window.set_default_size(geom.get('width', 1200), geom.get('height', 800))
 		if geom.get('x') is not None and geom.get('y') is not None:
 			window.move(geom['x'], geom['y'])
-		if geom.get('maximized', False):
-			window.maximize()
 		
-		# WAYLAND FIX: Realize window early to establish window surface
-		# This ensures parent window is available for dialogs/menus during initialization
-		window.realize()
+		# WAYLAND FIX: Do NOT restore maximized state on startup
+		# Maximizing window after panels are loaded causes Error 71 on Wayland
+		# Users can manually maximize using window controls without issues
+		# Store maximize state to apply AFTER panels are loaded
+		# should_maximize = geom.get('maximized', False)
+		
+		# WAYLAND FIX: Do NOT realize() or maximize() before panels are loaded
+		# Early realize() + maximize causes Error 71 on Wayland when panels are added
+		# Window will be automatically realized when show_all() is called later
+		# window.realize()  # COMMENTED OUT - causes Error 71 on maximized windows
 		
 		# WAYLAND FIX: Add event mask for multi-monitor support
 		# This prevents Error 71 when moving mouse between monitors
@@ -136,6 +140,7 @@ def main(argv=None):
 				pass  # Wayland-specific issue, not critical
 		
 		# Add double-click on header bar to toggle maximize
+		# NOTE: May cause Error 71 on Wayland if panels are visible
 		header_bar = main_builder.get_object('header_bar')
 		if header_bar:
 			def on_header_bar_button_press(widget, event):
@@ -209,7 +214,8 @@ def main(argv=None):
 
 		# Load left panel via its loader
 		try:
-			left_panel_loader = create_left_panel()  # Will default to models directory
+			# WAYLAND FIX: Don't load window immediately - let add_to_stack() handle it
+			left_panel_loader = create_left_panel(load_window=False)
 		except Exception as e:
 			print(f'ERROR: Failed to load left panel: {e}', file=sys.stderr)
 			sys.exit(4)
@@ -511,6 +517,19 @@ def main(argv=None):
 			topology_panel_loader.add_to_stack(left_dock_stack, topology_panel_container, 'topology')
 
 		# ====================================================================
+		# WAYLAND FIX: Do NOT auto-maximize on startup
+		# Programmatic maximize after panel loading causes Error 71 on Wayland
+		# Users can manually maximize using window controls
+		# ====================================================================
+		# if should_maximize:
+		# 	from gi.repository import GLib
+		# 	def do_delayed_maximize():
+		# 		window.maximize()
+		# 		return False  # Don't repeat
+		# 	# Defer maximize to give GTK time to settle the widget hierarchy
+		# 	GLib.idle_add(do_delayed_maximize)
+
+		# ====================================================================
 		# Set parent windows for dialogs (AFTER window.show_all())
 		# ====================================================================
 		if left_panel_loader:
@@ -537,144 +556,144 @@ def main(argv=None):
 		# ====================================================================
 		
 		def on_left_toggle(is_active):
-			"""Handle Files panel toggle from Master Palette (Skeleton Pattern).
+			"""Handle Files panel toggle from Master Palette.
 			
-			EXCLUSIVITY: When activated, deactivates all other panel buttons.
-			Only one panel can be visible at a time in the GtkStack.
+			Multiple panels can be active simultaneously (floating).
+			When hanged (in stack), shows in GtkStack and expands paned.
 			"""
 			if not left_panel_loader:
 				return
 			
 			if is_active:
-				# EXCLUSIVITY: Deactivate other buttons
-				master_palette.set_active('pathways', False)
-				master_palette.set_active('analyses', False)
-				master_palette.set_active('topology', False)
-				
-				# Show this panel in stack
+				# Show this panel (in stack if hanged, or floating if detached)
 				left_panel_loader.show_in_stack()
-				# Expand left paned to show stack
-				if left_paned:
+				# Expand left paned to show stack only if panel is hanged
+				if left_panel_loader.is_hanged and left_paned:
 					try:
 						left_paned.set_position(250)
 					except Exception:
 						pass
 			else:
 				left_panel_loader.hide_in_stack()
-				# Hide stack when no panels are visible
-				if left_dock_stack:
-					left_dock_stack.set_visible(False)
-				# Collapse paned when no panel is active
-				if left_paned:
-					try:
-						left_paned.set_position(0)
-					except Exception:
-						pass
+				# Check if any panels are still showing in stack before hiding
+				any_panel_in_stack = (
+					(pathway_panel_loader and pathway_panel_loader.is_hanged and master_palette.is_active('pathways')) or
+					(right_panel_loader and right_panel_loader.is_hanged and master_palette.is_active('analyses')) or
+					(topology_panel_loader and topology_panel_loader.is_hanged and master_palette.is_active('topology'))
+				)
+				if not any_panel_in_stack:
+					if left_dock_stack:
+						left_dock_stack.set_visible(False)
+					if left_paned:
+						try:
+							left_paned.set_position(0)
+						except Exception:
+							pass
 
 		def on_right_toggle(is_active):
-			"""Handle Analyses panel toggle from Master Palette (Skeleton Pattern).
+			"""Handle Analyses panel toggle from Master Palette.
 			
-			EXCLUSIVITY: When activated, deactivates all other panel buttons.
-			Only one panel can be visible at a time in the GtkStack.
+			Multiple panels can be active simultaneously (floating).
+			When hanged (in stack), shows in GtkStack and expands paned.
 			"""
 			if not right_panel_loader:
 				return
 			
 			if is_active:
-				# EXCLUSIVITY: Deactivate other buttons
-				master_palette.set_active('files', False)
-				master_palette.set_active('pathways', False)
-				master_palette.set_active('topology', False)
-				
-				# Show this panel in stack
+				# Show this panel (in stack if hanged, or floating if detached)
 				right_panel_loader.show_in_stack()
-				# Expand left paned to show stack (Analyses now docks LEFT)
-				if left_paned:
+				# Expand left paned to show stack only if panel is hanged
+				if right_panel_loader.is_hanged and left_paned:
 					try:
 						left_paned.set_position(280)
 					except Exception:
 						pass
 			else:
 				right_panel_loader.hide_in_stack()
-				# Hide stack when no panels are visible
-				if left_dock_stack:
-					left_dock_stack.set_visible(False)
-				# Collapse paned when no panel is active
-				if left_paned:
-					try:
-						left_paned.set_position(0)
-					except Exception:
-						pass
+				# Check if any panels are still showing in stack before hiding
+				any_panel_in_stack = (
+					(left_panel_loader and left_panel_loader.is_hanged and master_palette.is_active('files')) or
+					(pathway_panel_loader and pathway_panel_loader.is_hanged and master_palette.is_active('pathways')) or
+					(topology_panel_loader and topology_panel_loader.is_hanged and master_palette.is_active('topology'))
+				)
+				if not any_panel_in_stack:
+					if left_dock_stack:
+						left_dock_stack.set_visible(False)
+					if left_paned:
+						try:
+							left_paned.set_position(0)
+						except Exception:
+							pass
 
 		def on_pathway_toggle(is_active):
-			"""Handle Pathways panel toggle from Master Palette (Skeleton Pattern).
+			"""Handle Pathways panel toggle from Master Palette.
 			
-			EXCLUSIVITY: When activated, deactivates all other panel buttons.
-			Only one panel can be visible at a time in the GtkStack.
+			Multiple panels can be active simultaneously (floating).
+			When hanged (in stack), shows in GtkStack and expands paned.
 			"""
 			if not pathway_panel_loader:
 				return
 			
 			if is_active:
-				# EXCLUSIVITY: Deactivate other buttons
-				master_palette.set_active('files', False)
-				master_palette.set_active('analyses', False)
-				master_palette.set_active('topology', False)
-				
-				# Show this panel in stack
+				# Show this panel (in stack if hanged, or floating if detached)
 				pathway_panel_loader.show_in_stack()
-				# Expand left paned to show stack
-				if left_paned:
+				# Expand left paned to show stack only if panel is hanged
+				if pathway_panel_loader.is_hanged and left_paned:
 					try:
 						left_paned.set_position(270)
 					except Exception:
 						pass
 			else:
 				pathway_panel_loader.hide_in_stack()
-				# Hide stack when no panels are visible
-				if left_dock_stack:
-					left_dock_stack.set_visible(False)
-				# Collapse paned when no panel is active
-				if left_paned:
-					try:
-						left_paned.set_position(0)
-					except Exception:
-						pass
+				# Check if any panels are still showing in stack before hiding
+				any_panel_in_stack = (
+					(left_panel_loader and left_panel_loader.is_hanged and master_palette.is_active('files')) or
+					(right_panel_loader and right_panel_loader.is_hanged and master_palette.is_active('analyses')) or
+					(topology_panel_loader and topology_panel_loader.is_hanged and master_palette.is_active('topology'))
+				)
+				if not any_panel_in_stack:
+					if left_dock_stack:
+						left_dock_stack.set_visible(False)
+					if left_paned:
+						try:
+							left_paned.set_position(0)
+						except Exception:
+							pass
 
 		def on_topology_toggle(is_active):
-			"""Handle Topology panel toggle from Master Palette (Skeleton Pattern).
+			"""Handle Topology panel toggle from Master Palette.
 			
-			EXCLUSIVITY: When activated, deactivates all other panel buttons.
-			Only one panel can be visible at a time in the GtkStack.
+			Multiple panels can be active simultaneously (floating).
+			When hanged (in stack), shows in GtkStack and expands paned.
 			"""
 			if not topology_panel_loader:
 				return
 			
 			if is_active:
-				# EXCLUSIVITY: Deactivate other buttons
-				master_palette.set_active('files', False)
-				master_palette.set_active('pathways', False)
-				master_palette.set_active('analyses', False)
-				
-				# Show this panel in stack
+				# Show this panel (in stack if hanged, or floating if detached)
 				topology_panel_loader.show_in_stack()
-				# Expand left paned to show stack
-				if left_paned:
+				# Expand left paned to show stack only if panel is hanged
+				if topology_panel_loader.is_hanged and left_paned:
 					try:
 						left_paned.set_position(350)
 					except Exception:
 						pass
 			else:
 				topology_panel_loader.hide_in_stack()
-				# Hide stack when no panels are visible
-				if left_dock_stack:
-					left_dock_stack.set_visible(False)
-				# Collapse paned when no panel is active
-				if left_paned:
-					try:
-						left_paned.set_position(0)
-					except Exception:
-						pass
+				# Check if any panels are still showing in stack before hiding
+				any_panel_in_stack = (
+					(left_panel_loader and left_panel_loader.is_hanged and master_palette.is_active('files')) or
+					(pathway_panel_loader and pathway_panel_loader.is_hanged and master_palette.is_active('pathways')) or
+					(right_panel_loader and right_panel_loader.is_hanged and master_palette.is_active('analyses'))
+				)
+				if not any_panel_in_stack:
+					if left_dock_stack:
+						left_dock_stack.set_visible(False)
+					if left_paned:
+						try:
+							left_paned.set_position(0)
+						except Exception:
+							pass
 
 		# Set up callbacks to manage paned position when panels float/attach (detach button)
 		def on_left_float():
@@ -768,6 +787,7 @@ def main(argv=None):
 			window.iconify()
 		
 		# Define maximize/restore handler
+		# NOTE: May cause Error 71 on Wayland if panels are visible
 		def on_maximize_clicked(button):
 			"""Toggle between maximized and normal window state."""
 			if window.is_maximized():
