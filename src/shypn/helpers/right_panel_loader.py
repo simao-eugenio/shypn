@@ -91,9 +91,9 @@ class RightPanelLoader:
         else:
             self.float_button = None
         
-        # Initialize plotting panels if data_collector is available
-        if self.data_collector is not None:
-            self._setup_plotting_panels()
+        # ALWAYS create plotting panels at startup (even without data_collector)
+        # Panels will be created empty and updated later when data_collector is set
+        self._setup_plotting_panels()
         
         # WAYLAND FIX: Realize window and set event mask for multi-monitor support
         self.window.realize()
@@ -114,12 +114,11 @@ class RightPanelLoader:
         return self.window
     
     def _setup_plotting_panels(self):
-        """Set up plotting panels in canvas containers.
+        """Set up the plotting panels for displaying simulation results.
         
-        This method ONLY instantiates panel modules and attaches them to containers.
-        All business logic is in the panel modules themselves.
-        """
-        # Import panel modules
+        Creates panels with None data_collector initially. The data_collector
+        will be set later via set_data_collector() when simulation controller is ready.
+        """        # Import panel modules
         from shypn.analyses import PlaceRatePanel, TransitionRatePanel
         from shypn.analyses.diagnostics_panel import DiagnosticsPanel
         
@@ -133,6 +132,7 @@ class RightPanelLoader:
             # Instantiate and add place rate panel with expand=True to fill vertical space
             self.place_panel = PlaceRatePanel(self.data_collector)
             places_container.pack_start(self.place_panel, True, True, 0)
+            places_container.show_all()  # Ensure panel and container are visible
             
             # Register panel to observe model changes (for automatic cleanup of deleted objects)
             if self.model is not None and hasattr(self.place_panel, 'register_with_model'):
@@ -152,6 +152,7 @@ class RightPanelLoader:
             # Pass place_panel reference for locality plotting support
             self.transition_panel = TransitionRatePanel(self.data_collector, place_panel=self.place_panel)
             transitions_container.pack_start(self.transition_panel, True, True, 0)
+            transitions_container.show_all()  # Ensure panel and container are visible
             
             # Register panel to observe model changes (for automatic cleanup of deleted objects)
             if self.model is not None and hasattr(self.transition_panel, 'register_with_model'):
@@ -238,30 +239,11 @@ class RightPanelLoader:
         """
         self.data_collector = data_collector
         
-        # If panels don't exist yet, create them
-        if self.place_panel is None or self.transition_panel is None:
-            if self.builder is not None:  # UI must be loaded first
-                self._setup_plotting_panels()
-                
-                # Create and wire context menu handler after panels are created
-                if self.place_panel and self.transition_panel and not self.context_menu_handler:
-                    from shypn.analyses import ContextMenuHandler
-                    self.context_menu_handler = ContextMenuHandler(
-                        self.place_panel, 
-                        self.transition_panel, 
-                        self.model,
-                        self.diagnostics_panel  # Pass diagnostics panel
-                    )
-                    
-                    # Notify parent if needed (for wiring to model_canvas_loader)
-                    if hasattr(self, '_on_context_menu_handler_ready'):
-                        self._on_context_menu_handler_ready(self.context_menu_handler)
-        else:
-            # Update existing panels
+        # Update existing panels (they were created at startup with None data_collector)
+        if self.place_panel:
             self.place_panel.data_collector = data_collector
+        if self.transition_panel:
             self.transition_panel.data_collector = data_collector
-        
-        # Update diagnostics panel
         if self.diagnostics_panel:
             self.diagnostics_panel.set_data_collector(data_collector)
     
