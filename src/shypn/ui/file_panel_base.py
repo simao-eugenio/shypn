@@ -163,8 +163,6 @@ class FilePanelBase(ABC):
             container: GtkBox container within the stack for this panel
             panel_name: Name identifier for this panel in the stack ('files')
         """
-        print(f"[STACK] FilePanel add_to_stack() called for panel '{panel_name}'", file=sys.stderr)
-        
         if self.window is None:
             self.load()
         
