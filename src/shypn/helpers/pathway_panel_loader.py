@@ -811,8 +811,17 @@ class PathwayPanelLoader:
             self._setup_brenda_tab()
             self._setup_unified_ui_signals()
             
-            # Get float button (won't work in stack mode, but keep reference)
+            # Get float button and connect signal
+            # NOTE: Float button works but will cause Error 71 if window is maximized
             self.float_button = self.builder.get_object('float_button')
+            if self.float_button:
+                # Connect the signal handler
+                self.float_button.connect('toggled', self._on_float_toggled)
+                # Ensure button starts inactive in stack mode
+                if self.float_button.get_active():
+                    self._updating_button = True
+                    self.float_button.set_active(False)
+                    self._updating_button = False
         
         # Add content directly to stack container (no reparenting needed)
         if self.content.get_parent() != container:

@@ -1,24 +1,13 @@
 #!/usr/bin/env python3
-"""Left Panel Loader - VS Code Explorer Style.
+"""File Panel Loader - Modern Explorer Style.
 
-TODO: RENAME - Avoid using "VS Code" brand name
-      Consider renaming to:
-      - left_panel_loader_explorer.py
-      - left_panel_loader_categorized.py
-      - left_panel_loader_v4.py
-      Also update:
-      - Class name: LeftPanelLoaderVSCode → LeftPanelLoaderExplorer
-      - UI file: left_panel_vscode.ui → left_panel_explorer.ui
-      - All references in src/shypn.py and test files
-      - Environment variable: SHYPN_USE_VSCODE_PANEL → SHYPN_USE_EXPLORER_PANEL
-
-Implements VS Code-style Explorer panel with collapsible categories:
+Implements modern file explorer panel with collapsible categories:
 1. Files - File browser tree (expanded by default)
 2. Project Information - Current project details (collapsed)
 3. Project Actions - Project management buttons (collapsed)
 
 Architecture:
-  LeftPanelLoader: Category management and UI coordination
+  FilePanelLoader: Category management and UI coordination
   └── Delegates to:
       ├── FileExplorerPanel: File browsing logic (Files category)
       ├── ProjectInfoController: Project details display (Project Info category)
@@ -33,7 +22,7 @@ try:
     gi.require_version('Gtk', '3.0')
     from gi.repository import Gtk, GLib
 except Exception as e:
-    print('ERROR: GTK3 not available in left_panel loader:', e, file=sys.stderr)
+    print('ERROR: GTK3 not available in file_panel loader:', e, file=sys.stderr)
     sys.exit(1)
 
 # Import controllers
@@ -42,11 +31,11 @@ from shypn.helpers.project_actions_controller import ProjectActionsController
 from shypn.ui.category_frame import CategoryFrame
 
 
-class LeftPanelLoaderVSCode:
-    """Loader and controller for the File Explorer panel (VS Code style)."""
+class FilePanelLoader:
+    """Loader and controller for the File Explorer panel."""
     
     def __init__(self, ui_path=None, base_path=None):
-        """Initialize the left panel loader.
+        """Initialize the file panel loader.
         
         Args:
             ui_path: Optional path to left_panel_vscode.ui. If None, uses default location.
@@ -77,6 +66,7 @@ class LeftPanelLoaderVSCode:
         self.on_float_callback = None
         self.on_attach_callback = None
         self.on_quit_callback = None
+        self.is_hanged = False  # State flag: True when in stack, False when floating
         
         # Category frames
         self.files_category = None
@@ -476,12 +466,115 @@ class LeftPanelLoaderVSCode:
     # Panel management methods (same as original)
     
     def _on_float_toggled(self, button):
-        """Handle float button toggle."""
-        pass  # Skeleton - implement later
+        """Handle float button toggle - detach/attach panel."""
+        print(f"[FILE_PANEL] Float button toggled: active={button.get_active()}")
+        
+        if button.get_active():
+            # Button is active -> detach (float)
+            self.detach()
+        else:
+            # Button is inactive -> attach
+            if self.parent_container:
+                self.hang_on(self.parent_container)
+    
+    def detach(self):
+        """Detach from container and create floating window."""
+        print(f"[FILE_PANEL] detach() called, is_hanged={self.is_hanged}, window exists={self.window is not None}")
+        
+        if not self.is_hanged:
+            print(f"[FILE_PANEL] Already detached")
+            return
+        
+        if not self.parent_container:
+            print(f"[FILE_PANEL] No parent container, aborting detach")
+            return
+        
+        # Create window if it doesn't exist
+        if self.window is None:
+            print(f"[FILE_PANEL] Creating window on-demand")
+            self.window = Gtk.Window()
+            self.window.set_title('Files')
+            self.window.set_default_size(300, 600)
+            self.window.connect('delete-event', self._on_delete_event)
+        
+        # Remove content from container
+        print(f"[FILE_PANEL] Removing content from container")
+        self.parent_container.remove(self.content)
+        self.parent_container.set_visible(False)
+        
+        # Hide the stack itself when detaching to avoid showing empty container
+        if hasattr(self, '_stack') and self._stack:
+            print(f"[FILE_PANEL] Hiding stack")
+            self._stack.set_visible(False)
+        
+        # Add content to window
+        print(f"[FILE_PANEL] Adding content to window")
+        self.window.add(self.content)
+        
+        # Set transient for main window
+        if self.parent_window:
+            self.window.set_transient_for(self.parent_window)
+        
+        # Update state - panel is now floating
+        self.is_hanged = False
+        
+        # Show window
+        print(f"[FILE_PANEL] Showing window")
+        self.window.show_all()
+        print(f"[FILE_PANEL] Detach complete")
+    
+    def hang_on(self, container):
+        """Attach panel back to container."""
+        print(f"[FILE_PANEL] hang_on() called, is_hanged={self.is_hanged}")
+        
+        if self.is_hanged:
+            print(f"[FILE_PANEL] Already hanged, just showing")
+            if not self.content.get_visible():
+                self.content.show()
+            # Make sure container is visible when re-showing
+            if not container.get_visible():
+                container.set_visible(True)
+            return
+        
+        if not self.window:
+            print(f"[FILE_PANEL] No window exists, aborting hang_on")
+            return
+        
+        # Hide window
+        print(f"[FILE_PANEL] Hiding window")
+        self.window.hide()
+        
+        # Remove content from window
+        print(f"[FILE_PANEL] Removing content from window")
+        self.window.remove(self.content)
+        
+        # Add content back to container
+        print(f"[FILE_PANEL] Adding content to container")
+        container.add(self.content)
+        container.set_visible(True)
+        self.content.show_all()
+        
+        # Show the stack again when re-attaching
+        if hasattr(self, '_stack') and self._stack:
+            print(f"[FILE_PANEL] Showing stack")
+            self._stack.set_visible(True)
+            self._stack.set_visible_child_name(self._stack_panel_name)
+        
+        # Update state - panel is now in stack
+        self.is_hanged = True
+        
+        print(f"[FILE_PANEL] Hang complete")
     
     def _on_delete_event(self, window, event):
-        """Handle window delete event - hide instead of destroy."""
+        """Handle window delete event - hide and re-attach."""
+        print(f"[FILE_PANEL] Window close button clicked")
         window.hide()
+        
+        # Re-attach to container
+        if self.parent_container and self.float_button:
+            # Deactivate float button (will trigger hang_on)
+            self.float_button.set_active(False)
+        
         return True
     
     def set_parent_window(self, window):
@@ -500,14 +593,45 @@ class LeftPanelLoaderVSCode:
             container: GtkBox container within the stack for this panel
             panel_name: Name identifier for this panel in the stack ('files')
         """
-        if not self.content or not container:
+        # WAYLAND FIX: Load content if not already loaded
+        if not self.content:
+            if not os.path.exists(self.ui_path):
+                raise FileNotFoundError(f"Left panel UI file not found: {self.ui_path}")
+            
+            # Load the UI
+            self.builder = Gtk.Builder.new_from_file(self.ui_path)
+            
+            # Extract ONLY the content (not the window)
+            self.content = self.builder.get_object('left_panel_content')
+            
+            if self.content is None:
+                raise ValueError("Object 'left_panel_content' not found in left_panel_vscode.ui")
+            
+            # Get float button and connect signal
+            float_button = self.builder.get_object('float_button')
+            if float_button:
+                float_button.connect('toggled', self._on_float_toggled)
+                self.float_button = float_button
+            else:
+                self.float_button = None
+            
+            # Get categories container
+            categories_container = self.builder.get_object('categories_container')
+            if categories_container:
+                # Create and setup categories
+                self._create_files_category(categories_container)
+                self._create_project_info_category(categories_container)
+                self._create_project_actions_category(categories_container)
+                
+                # Setup exclusive expansion behavior
+                self._setup_category_expansion()
+        
+        if not container:
             return
         
         # Remove from current parent
         parent = self.content.get_parent()
-        if parent == self.window:
-            self.window.remove(self.content)
-        elif parent and parent != container:
+        if parent and parent != container:
             parent.remove(self.content)
         
         # Add content to container
@@ -517,10 +641,17 @@ class LeftPanelLoaderVSCode:
         self.parent_container = container
         self._stack = stack
         self._stack_panel_name = panel_name
+        # Mark as hanged in stack mode
+        self.is_hanged = True
     
     def show_in_stack(self):
         """Show this panel in the GtkStack."""
         if not hasattr(self, '_stack') or not self._stack:
+            return
+        
+        # If panel is floating, don't try to show in stack
+        if not self.is_hanged:
+            print(f"[FILE_PANEL] Panel is floating, skipping show_in_stack")
             return
         
         if not self._stack.get_visible():
@@ -545,22 +676,25 @@ class LeftPanelLoaderVSCode:
             self.parent_container.set_visible(False)
 
 
-def create_left_panel(ui_path=None, base_path=None):
-    """Convenience function to create and load the VS Code-style left panel.
+def create_left_panel(ui_path=None, base_path=None, load_window=False):
+    """Convenience function to create the modern file panel loader.
     
     Args:
         ui_path: Optional path to left_panel_vscode.ui (default: auto-detected).
         base_path: Optional base path for file explorer (default: models directory).
+        load_window: If True, loads the window. If False (default), defers to add_to_stack().
         
     Returns:
-        LeftPanelLoaderVSCode: The loaded left panel loader instance.
+        FilePanelLoader: The file panel loader instance.
         
     Example:
-        loader = create_left_panel(base_path="/home/user/projects/models")
+        loader = create_left_panel(base_path="/home/user/projects/models", load_window=True)
         loader.window.show_all()  # Show as floating
         # or
-        loader.add_to_stack(stack, container)  # Attach to GtkStack
+        loader = create_left_panel()  # Don't load window yet
+        loader.add_to_stack(stack, container)  # Will load content directly to stack
     """
-    loader = LeftPanelLoaderVSCode(ui_path, base_path)
-    loader.load()  # Make sure to load the UI
+    loader = FilePanelLoader(ui_path, base_path)
+    if load_window:
+        loader.load()  # Only load if explicitly requested
     return loader
