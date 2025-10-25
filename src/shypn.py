@@ -375,6 +375,11 @@ def main(argv=None):
 			pathway_panel_loader = None
 			topology_panel_loader = None
 		
+		# Wire pathway panel loader to file panel for project synchronization
+		# This ensures pathway import controllers get updated when project is opened
+		if pathway_panel_loader and left_panel_loader:
+			left_panel_loader.set_pathway_panel_loader(pathway_panel_loader)
+		
 		# Wire right panel loader to canvas loader
 		# This allows tab switching to update the right panel's data collector
 		model_canvas_loader.set_right_panel_loader(right_panel_loader)

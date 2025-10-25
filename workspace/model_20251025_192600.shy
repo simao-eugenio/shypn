@@ -1,0 +1,63 @@
+{
+  "version": "2.0",
+  "metadata": {
+    "created": "2025-10-25T19:26:41.095855",
+    "object_counts": {
+      "places": 2,
+      "transitions": 0,
+      "arcs": 0
+    }
+  },
+  "view_state": {
+    "zoom": 1.0,
+    "pan_x": 0.0,
+    "pan_y": 0.0,
+    "transformations": {
+      "rotation": {
+        "type": "rotation",
+        "angle_degrees": 0.0,
+        "enabled": true
+      }
+    }
+  },
+  "places": [
+    {
+      "id": "1",
+      "name": "P1",
+      "label": "",
+      "object_type": "place",
+      "x": 327.0,
+      "y": 182.0,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "2",
+      "name": "P2",
+      "label": "",
+      "object_type": "place",
+      "x": 82.0,
+      "y": 102.0,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    }
+  ],
+  "transitions": [],
+  "arcs": []
+}
