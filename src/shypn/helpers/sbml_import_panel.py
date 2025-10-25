@@ -160,7 +160,7 @@ class SBMLImportPanel:
         self.sbml_status_label = self.builder.get_object('sbml_status_label')
         
         # Action buttons
-        self.sbml_parse_button = self.builder.get_object('sbml_parse_button')
+        self.sbml_parse_button = self.builder.get_object('sbml_parse_button')  # May be None if using unified import
         self.sbml_import_button = self.builder.get_object('sbml_import_button')
     
     def _connect_signals(self):
@@ -361,7 +361,8 @@ class SBMLImportPanel:
         
         # Disable buttons during fetch
         self.sbml_fetch_button.set_sensitive(False)
-        self.sbml_parse_button.set_sensitive(False)
+        if self.sbml_parse_button:
+            self.sbml_parse_button.set_sensitive(False)
         self._show_status(f"Fetching {biomodels_id} from BioModels...")
         
         # Fetch in REAL background thread (not idle_add which blocks UI)
@@ -722,7 +723,8 @@ class SBMLImportPanel:
             return
         
         # Disable parse button during parsing
-        self.sbml_parse_button.set_sensitive(False)
+        if self.sbml_parse_button:
+            self.sbml_parse_button.set_sensitive(False)
         filepath = self.current_filepath
         filename = os.path.basename(filepath)
         self._show_status(f"🔄 Parsing {filename}...")
@@ -796,7 +798,8 @@ class SBMLImportPanel:
             error_msg = f"❌ Validation failed: {error_count} error(s), {warning_count} warning(s)"
             self._show_status(error_msg, error=True)
             self._show_validation_errors(validation_result)
-            self.sbml_parse_button.set_sensitive(True)
+            if self.sbml_parse_button:
+                self.sbml_parse_button.set_sensitive(True)
             return False
         
         # Show warnings if any
@@ -810,7 +813,8 @@ class SBMLImportPanel:
         self._update_preview()
         
         # Re-enable parse button
-        self.sbml_parse_button.set_sensitive(True)
+        if self.sbml_parse_button:
+            self.sbml_parse_button.set_sensitive(True)
         
         # Load to canvas after parse (NEW: always enabled, not a testing mode)
         if self.model_canvas:
@@ -832,7 +836,8 @@ class SBMLImportPanel:
         """
         self._show_status(f"❌ Parse error: {error_message}", error=True)
         self.parsed_pathway = None
-        self.sbml_parse_button.set_sensitive(True)
+        if self.sbml_parse_button:
+            self.sbml_parse_button.set_sensitive(True)
         return False
     
     def _show_validation_errors(self, validation_result):
