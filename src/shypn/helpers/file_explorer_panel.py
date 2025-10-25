@@ -75,6 +75,8 @@ class FileExplorerPanel:
         self.on_file_open_requested: Optional[Callable[[str], None]] = None
         # WAYLAND FIX: Store parent window reference for dialogs
         self.parent_window: Optional[Gtk.Window] = None
+        # Project reference for saving imported models to project/models/
+        self.project = None
         self._get_widgets()
         self._configure_tree_view()
         self._setup_context_menu()
@@ -1218,6 +1220,15 @@ class FileExplorerPanel:
         # This ensures FileChooser dialogs (Open/Save) use correct parent
         if hasattr(self, 'persistency') and self.persistency:
             self.persistency.parent_window = parent_window
+    
+    def set_project(self, project):
+        """Set the current project for saving imported models to project/models/.
+        
+        Args:
+            project: Project instance or None
+        """
+        self.project = project
+        print(f"[FileExplorer] Project set: {project.name if project else 'None'}")
 
     def set_canvas_loader(self, canvas_loader):
         """Wire file explorer to canvas loader for document operations integration.
@@ -1238,17 +1249,25 @@ class FileExplorerPanel:
         - If manager.is_default_filename() (imported/default): Auto-save to workspace
         - Otherwise: Save directly to manager's filepath
         """
+        print("[FileExplorer] save_current_document called")
         try:
             if not hasattr(self, 'canvas_loader') or self.canvas_loader is None:
+                print("[FileExplorer] No canvas_loader available")
                 return
             
             drawing_area = self.canvas_loader.get_current_document()
             if drawing_area is None:
+                print("[FileExplorer] No current document (drawing_area)")
                 return
             
             manager = self.canvas_loader.get_canvas_manager(drawing_area)
             if manager is None:
+                print("[FileExplorer] No canvas manager")
                 return
+            
+            print(f"[FileExplorer] Manager filepath: {manager.get_filepath() if hasattr(manager, 'get_filepath') else 'N/A'}")
+            print(f"[FileExplorer] Manager has_filepath: {manager.has_filepath() if hasattr(manager, 'has_filepath') else 'N/A'}")
+            print(f"[FileExplorer] Manager is_default_filename: {manager.is_default_filename() if hasattr(manager, 'is_default_filename') else 'N/A'}")
             
             # Convert canvas state to document model
             document = manager.to_document_model()
@@ -1256,10 +1275,24 @@ class FileExplorerPanel:
             # Determine if we need to auto-generate a filepath
             needs_new_filepath = not manager.has_filepath() or manager.is_default_filename()
             
+            print(f"[FileExplorer] needs_new_filepath: {needs_new_filepath}")
+            
             if needs_new_filepath:
                 # Auto-generate filename in workspace directory
                 import os
                 import datetime
+                
+                # Determine save directory: project/models/ if project is open, otherwise workspace
+                if self.project and hasattr(self.project, 'base_path'):
+                    # Save to project/models/ directory
+                    models_dir = os.path.join(self.project.base_path, 'models')
+                    os.makedirs(models_dir, exist_ok=True)
+                    save_directory = models_dir
+                    print(f"[FileExplorer] Saving to project models directory: {save_directory}")
+                else:
+                    # Save to workspace directory
+                    save_directory = self.explorer.current_path
+                    print(f"[FileExplorer] Saving to workspace directory: {save_directory}")
                 
                 # Get base filename from manager or generate timestamp-based name
                 if manager.filename and manager.filename != "default":
@@ -1273,20 +1306,21 @@ class FileExplorerPanel:
                 if not base_name.endswith('.shy'):
                     base_name += '.shy'
                 
-                # Save to workspace directory
-                workspace_path = self.explorer.current_path
-                filepath = os.path.join(workspace_path, base_name)
+                # Save to determined directory (project/models/ or workspace)
+                filepath = os.path.join(save_directory, base_name)
                 
                 # Make sure we don't overwrite existing file
                 counter = 1
                 original_filepath = filepath
                 while os.path.exists(filepath):
                     name_without_ext = base_name[:-4]  # Remove .shy
-                    filepath = os.path.join(workspace_path, f"{name_without_ext}_{counter}.shy")
+                    filepath = os.path.join(save_directory, f"{name_without_ext}_{counter}.shy")
                     counter += 1
                 
                 # Save to generated file
                 document.save_to_file(filepath)
+                
+                print(f"[FileExplorer] ✓ Saved to new file: {filepath}")
                 
                 # Update manager state
                 manager.set_filepath(filepath)
@@ -1302,6 +1336,8 @@ class FileExplorerPanel:
             else:
                 # Direct save to existing file
                 filepath = manager.get_filepath()
+                
+                print(f"[FileExplorer] Saving to existing file: {filepath}")
                 
                 document.save_to_file(filepath)
                 
@@ -1324,24 +1360,40 @@ class FileExplorerPanel:
         
         Always creates a new file with auto-generated name in workspace directory.
         """
+        print("[FileExplorer] save_current_document_as called")
         try:
             if not hasattr(self, 'canvas_loader') or self.canvas_loader is None:
+                print("[FileExplorer] No canvas_loader available")
                 return
             
             drawing_area = self.canvas_loader.get_current_document()
             if drawing_area is None:
+                print("[FileExplorer] No current document (drawing_area)")
                 return
             
             manager = self.canvas_loader.get_canvas_manager(drawing_area)
             if manager is None:
+                print("[FileExplorer] No canvas manager")
                 return
             
             # Convert canvas state to document model
             document = manager.to_document_model()
             
-            # Auto-generate new filename in workspace directory
+            # Auto-generate new filename
             import os
             import datetime
+            
+            # Determine save directory: project/models/ if project is open, otherwise workspace
+            if self.project and hasattr(self.project, 'base_path'):
+                # Save to project/models/ directory
+                models_dir = os.path.join(self.project.base_path, 'models')
+                os.makedirs(models_dir, exist_ok=True)
+                save_directory = models_dir
+                print(f"[FileExplorer] Save As to project models directory: {save_directory}")
+            else:
+                # Save to workspace directory
+                save_directory = self.explorer.current_path
+                print(f"[FileExplorer] Save As to workspace directory: {save_directory}")
             
             # Get base filename from manager or current filename
             if manager.filename and manager.filename != "default":
@@ -1359,9 +1411,8 @@ class FileExplorerPanel:
             if not base_name.endswith('.shy'):
                 base_name += '.shy'
             
-            # Save to workspace directory
-            workspace_path = self.explorer.current_path
-            filepath = os.path.join(workspace_path, base_name)
+            # Save to determined directory (project/models/ or workspace)
+            filepath = os.path.join(save_directory, base_name)
             
             # Make sure we don't overwrite existing file
             counter = 1
@@ -1372,11 +1423,13 @@ class FileExplorerPanel:
                     name_base = name_without_ext
                 else:
                     name_base = name_without_ext.rsplit('_', 1)[0] if '_' in name_without_ext else name_without_ext
-                filepath = os.path.join(workspace_path, f"{name_base}_{counter}.shy")
+                filepath = os.path.join(save_directory, f"{name_base}_{counter}.shy")
                 counter += 1
             
             # Save to generated file
             document.save_to_file(filepath)
+            
+            print(f"[FileExplorer] ✓ Saved as: {filepath}")
             
             # Update manager state
             manager.set_filepath(filepath)

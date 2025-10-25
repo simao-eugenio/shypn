@@ -633,9 +633,15 @@ class SBMLImportPanel:
                 manager.mark_as_imported(pathway_name)
                 
                 # NOW save SBML file and metadata to project (after successful import)
+                print(f"[SBML_IMPORT] Checking project save conditions:")
+                print(f"  - self.project: {self.project}")
+                print(f"  - self.current_filepath: {self.current_filepath}")
+                print(f"  - self.parsed_pathway: {self.parsed_pathway}")
+                
                 if self.project and self.current_filepath and self.parsed_pathway:
                     try:
                         filename = os.path.basename(self.current_filepath)
+                        print(f"[SBML_IMPORT] Saving SBML file to project: {filename}")
                         
                         # Copy SBML file to project/pathways/
                         sbml_content = open(self.current_filepath, 'r', encoding='utf-8').read()
@@ -671,12 +677,15 @@ class SBMLImportPanel:
                         self.project.add_pathway(self.current_pathway_doc)
                         self.project.save()
                         
-                        print(f"[SBML_IMPORT] Saved pathway {filename} to project after successful import")
+                        print(f"[SBML_IMPORT] ✓ Saved pathway {filename} to project after successful import")
+                        print(f"[SBML_IMPORT] ✓ Saved to: {dest_path}")
                         
                     except Exception as e:
-                        print(f"[SBML_IMPORT] Warning: Failed to save pathway metadata after import: {e}")
+                        print(f"[SBML_IMPORT] ✗ Failed to save pathway metadata after import: {e}")
                         import traceback
                         traceback.print_exc()
+                else:
+                    print(f"[SBML_IMPORT] ✗ Skipping project save (conditions not met)")
                 
                 # Trigger redraw
                 drawing_area.queue_draw()

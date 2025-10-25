@@ -394,22 +394,53 @@ class KEGGImportPanel:
     
     def _on_import_complete(self, document_model):
         """Called in main thread after import completes successfully."""
+        print(f"[KEGG_IMPORT] ============================================")
         print(f"[KEGG_IMPORT] _on_import_complete called")
         print(f"[KEGG_IMPORT] document_model: {document_model}")
         print(f"[KEGG_IMPORT] model_canvas: {self.model_canvas}")
+        print(f"[KEGG_IMPORT] model_canvas type: {type(self.model_canvas)}")
         
         try:
+            if not document_model:
+                print(f"[KEGG_IMPORT] ERROR: document_model is None!")
+                self._show_status("❌ Conversion failed - no data", error=True)
+                self.import_button.set_sensitive(True)
+                return False
+            
+            if not self.model_canvas:
+                print(f"[KEGG_IMPORT] ERROR: model_canvas is None!")
+                self._show_status("❌ No canvas available", error=True)
+                self.import_button.set_sensitive(True)
+                return False
+            
             # Load into canvas
             if self.model_canvas:
                 # Create a new tab for this pathway
                 pathway_name = self.current_pathway.title or self.current_pathway.name
                 print(f"[KEGG_IMPORT] Creating tab for: {pathway_name}")
-                page_index, drawing_area = self.model_canvas.add_document(filename=pathway_name)
-                print(f"[KEGG_IMPORT] Tab created: page_index={page_index}, drawing_area={drawing_area}")
+                
+                try:
+                    page_index, drawing_area = self.model_canvas.add_document(filename=pathway_name)
+                    print(f"[KEGG_IMPORT] Tab created: page_index={page_index}, drawing_area={drawing_area}")
+                except Exception as tab_error:
+                    print(f"[KEGG_IMPORT] ERROR creating tab: {tab_error}")
+                    import traceback
+                    traceback.print_exc()
+                    self._show_status(f"❌ Failed to create canvas tab: {tab_error}", error=True)
+                    self.import_button.set_sensitive(True)
+                    return False
                 
                 # Get the canvas manager for this tab
                 manager = self.model_canvas.get_canvas_manager(drawing_area)
                 print(f"[KEGG_IMPORT] Canvas manager: {manager}")
+                print(f"[KEGG_IMPORT] Canvas manager type: {type(manager)}")
+                
+                if not manager:
+                    print(f"[KEGG_IMPORT] ERROR: Failed to get canvas manager!")
+                    self._show_status("❌ Failed to get canvas manager", error=True)
+                    self.import_button.set_sensitive(True)
+                    return False
+                
                 if manager:
                     # Load objects using unified path
                     print(f"[KEGG_IMPORT] Loading objects to canvas...")
@@ -417,12 +448,20 @@ class KEGGImportPanel:
                     print(f"[KEGG_IMPORT]   Transitions: {len(document_model.transitions)}")
                     print(f"[KEGG_IMPORT]   Arcs: {len(document_model.arcs)}")
                     
-                    manager.load_objects(
-                        places=document_model.places,
-                        transitions=document_model.transitions,
-                        arcs=document_model.arcs
-                    )
-                    print(f"[KEGG_IMPORT] Objects loaded!")
+                    try:
+                        manager.load_objects(
+                            places=document_model.places,
+                            transitions=document_model.transitions,
+                            arcs=document_model.arcs
+                        )
+                        print(f"[KEGG_IMPORT] Objects loaded successfully!")
+                    except Exception as load_error:
+                        print(f"[KEGG_IMPORT] ERROR loading objects: {load_error}")
+                        import traceback
+                        traceback.print_exc()
+                        self._show_status(f"❌ Failed to load objects: {load_error}", error=True)
+                        self.import_button.set_sensitive(True)
+                        return False
                     
                     # Set change callback for object state management
                     manager.document_controller.set_change_callback(manager._on_object_changed)
@@ -486,11 +525,16 @@ class KEGGImportPanel:
                 self._show_status("❌ Error: No canvas available for import", error=True)
         
         except Exception as e:
+            print(f"[KEGG_IMPORT] ============================================")
+            print(f"[KEGG_IMPORT] EXCEPTION in _on_import_complete:")
+            print(f"[KEGG_IMPORT] {type(e).__name__}: {str(e)}")
             self._show_status(f"❌ Import error: {str(e)}", error=True)
             import traceback
             traceback.print_exc()
         
         finally:
+            print(f"[KEGG_IMPORT] ============================================")
+            print(f"[KEGG_IMPORT] _on_import_complete finished")
             # Re-enable buttons
             if self.fetch_button:
                 self.fetch_button.set_sensitive(True)

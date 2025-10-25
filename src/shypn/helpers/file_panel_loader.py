@@ -77,6 +77,7 @@ class FilePanelLoader:
         # Sub-controllers
         self.file_explorer = None
         self.project_controller = None
+        self.pathway_panel_loader = None  # For updating pathway panel on project open
         
         # Project reference
         self.project = None
@@ -752,6 +753,14 @@ class FilePanelLoader:
         self.model_canvas = model_canvas
         self._refresh_project_info()
     
+    def set_pathway_panel_loader(self, pathway_panel_loader):
+        """Set the pathway panel loader for project synchronization.
+        
+        Args:
+            pathway_panel_loader: PathwayPanelLoader instance
+        """
+        self.pathway_panel_loader = pathway_panel_loader
+    
     def _refresh_project_info(self):
         """Refresh project information spreadsheet view."""
         if not hasattr(self, 'project_info_store'):
@@ -840,6 +849,19 @@ class FilePanelLoader:
             
             if project:
                 print(f"[FILE_PANEL] Project opened successfully: {project.name}")
+                
+                # Update project info display
+                self.set_project(project)
+                
+                # Update file explorer so it saves to project/models/
+                if self.file_explorer:
+                    self.file_explorer.set_project(project)
+                
+                # Notify pathway panel about project (so import controllers can save to it)
+                if self.pathway_panel_loader:
+                    print(f"[FILE_PANEL] Updating pathway panel with project: {project.name}")
+                    self.pathway_panel_loader.set_project(project)
+                
                 # Trigger project controller callback
                 if self.project_controller:
                     self.project_controller._on_project_opened(project)
