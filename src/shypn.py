@@ -214,8 +214,9 @@ def main(argv=None):
 
 		# Load left panel via its loader
 		try:
-			# WAYLAND FIX: Don't load window immediately - let add_to_stack() handle it
-			left_panel_loader = create_left_panel(load_window=False)
+			# Load the panel immediately so file_explorer is initialized
+			# We need file_explorer available for wiring callbacks before add_to_stack()
+			left_panel_loader = create_left_panel(load_window=True)
 		except Exception as e:
 			print(f'ERROR: Failed to load left panel: {e}', file=sys.stderr)
 			sys.exit(4)
