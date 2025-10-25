@@ -112,11 +112,7 @@ class FilePanelV3Loader(FilePanelBase):
         
         Called by base class after widgets are initialized.
         """
-        # IMPORTANT: Replace the basic TreeView structure with CategoryFrame structure
-        # The XML UI has a simple container, but we need the CategoryFrame design
-        self._build_category_structure()
-        
-        # Create controller
+        # Create controller FIRST before building category structure
         self.controller = FilePanelController(
             base_path=self.base_path,
             tree_view=self.tree_view,
@@ -124,6 +120,10 @@ class FilePanelV3Loader(FilePanelBase):
             path_entry=self.path_entry,
             name_renderer=self.name_renderer,
         )
+        
+        # THEN replace the basic TreeView structure with CategoryFrame structure
+        # The XML UI has a simple container, but we need the CategoryFrame design
+        self._build_category_structure()
         
         # Connect TreeView signals
         if self.tree_view:
@@ -167,10 +167,10 @@ class FilePanelV3Loader(FilePanelBase):
         self.files_category = CategoryFrame(
             title="Files",
             buttons=[
-                ("＋", self.controller.on_new_file if self.controller else lambda: None),
-                ("📁", self.controller.on_new_folder if self.controller else lambda: None),
-                ("↻", self.controller.on_refresh if self.controller else lambda: None),
-                ("─", self.controller.on_collapse_all if self.controller else lambda: None)
+                ("＋", self.controller.on_new_file),
+                ("📁", self.controller.on_new_folder),
+                ("↻", self.controller.on_refresh),
+                ("─", self.controller.on_collapse_all)
             ],
             expanded=True
         )
