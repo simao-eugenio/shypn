@@ -17,6 +17,10 @@ from datetime import datetime
 from typing import Dict, List, Optional, Any
 from pathlib import Path
 
+from .pathway_document import PathwayDocument
+from .enrichment_document import EnrichmentDocument
+from .project_pathway_manager import ProjectPathwayManager
+
 
 class ModelDocument:
     """Represents an individual Petri net model within a project.
@@ -118,8 +122,11 @@ class Project:
         self.modified_date = self.created_date
         self.base_path = base_path
         self.models = {}  # model_id -> ModelDocument
-        self.pathways = []  # List of pathway .shy file paths
-        self.simulations = []  # List of simulation .json file paths
+        
+        # Pathway management (new structured approach)
+        self._pathway_manager = ProjectPathwayManager(self)
+        
+        self.simulations = []  # List of simulation result file paths
         self.tags = []
         self.settings = {
             'auto_backup': True,
@@ -136,9 +143,9 @@ class Project:
         return f"Project(name='{self.name}', id='{self.id[:8]}...', models={len(self.models)})"
     
     def get_project_file_path(self) -> Optional[str]:
-        """Get the path to project.shy file."""
+        """Get the path to .project.shy file (hidden from user)."""
         if self.base_path:
-            return os.path.join(self.base_path, 'project.shy')
+            return os.path.join(self.base_path, '.project.shy')
         return None
     
     def get_models_dir(self) -> Optional[str]:
@@ -147,10 +154,14 @@ class Project:
             return os.path.join(self.base_path, 'models')
         return None
     
-    def get_pathways_dir(self) -> Optional[str]:
-        """Get the pathways directory path."""
+    def get_pathways_dir(self) -> Optional[Path]:
+        """Get the pathways directory path.
+        
+        Returns:
+            Path object for pathways directory, or None if base_path not set
+        """
         if self.base_path:
-            return os.path.join(self.base_path, 'pathways')
+            return Path(self.base_path) / 'pathways'
         return None
     
     def get_simulations_dir(self) -> Optional[str]:
@@ -158,6 +169,94 @@ class Project:
         if self.base_path:
             return os.path.join(self.base_path, 'simulations')
         return None
+    
+    def get_enrichments_dir(self) -> Optional[str]:
+        """Get the enrichments directory path.
+        
+        Returns:
+            Absolute path to enrichments directory, or None if base_path not set
+        """
+        if self.base_path:
+            return os.path.join(self.base_path, 'enrichments')
+        return None
+    
+    # Pathway management properties and methods
+    @property
+    def pathways(self) -> ProjectPathwayManager:
+        """Get the pathway manager for this project.
+        
+        Returns:
+            ProjectPathwayManager instance
+        """
+        return self._pathway_manager
+    
+    def add_pathway(self, pathway_doc: PathwayDocument) -> None:
+        """Add a pathway to the project.
+        
+        Args:
+            pathway_doc: PathwayDocument to add
+        """
+        self._pathway_manager.add_pathway(pathway_doc)
+    
+    def remove_pathway(self, pathway_id: str) -> bool:
+        """Remove a pathway from the project.
+        
+        Args:
+            pathway_id: UUID of pathway to remove
+            
+        Returns:
+            True if removed, False if not found
+        """
+        return self._pathway_manager.remove_pathway(pathway_id)
+    
+    def get_pathway(self, pathway_id: str) -> Optional[PathwayDocument]:
+        """Get a pathway by ID.
+        
+        Args:
+            pathway_id: UUID of pathway
+            
+        Returns:
+            PathwayDocument if found, None otherwise
+        """
+        return self._pathway_manager.get_pathway(pathway_id)
+    
+    def find_pathway_by_model_id(self, model_id: str) -> Optional[PathwayDocument]:
+        """Find pathway that was converted to a specific model.
+        
+        Args:
+            model_id: UUID of ModelDocument
+            
+        Returns:
+            PathwayDocument if found, None otherwise
+        """
+        return self._pathway_manager.find_pathway_by_model_id(model_id)
+    
+    def save_pathway_file(self, filename: str, content: str) -> str:
+        """Save a pathway file to the project's pathways directory.
+        
+        Args:
+            filename: Name of file to save
+            content: File content (text)
+            
+        Returns:
+            Absolute path to saved file
+            
+        Raises:
+            ValueError: If project base_path not set
+        """
+        pathways_dir = self.get_pathways_dir()
+        if not pathways_dir:
+            raise ValueError("Project base_path not set, cannot save pathway file")
+        
+        # Ensure pathways directory exists
+        os.makedirs(pathways_dir, exist_ok=True)
+        
+        # Save file
+        file_path = os.path.join(pathways_dir, filename)
+        with open(file_path, 'w', encoding='utf-8') as f:
+            f.write(content)
+        
+        return file_path
     
     def add_model(self, model: ModelDocument):
         """Add a model to the project."""
@@ -188,7 +287,7 @@ class Project:
         """Convert to dictionary for JSON serialization."""
         return {
             'document_type': 'project',
-            'version': '1.0',
+            'version': '2.0',  # Bumped version for pathway schema change
             'identity': {
                 'id': self.id,
                 'name': self.name,
@@ -201,7 +300,7 @@ class Project:
             },
             'content': {
                 'models': [model.to_dict() for model in self.models.values()],
-                'pathways': self.pathways,
+                'pathways': self._pathway_manager.to_dict(),  # New structured format
                 'simulations': self.simulations
             },
             'metadata': {
@@ -233,7 +332,15 @@ class Project:
             model = ModelDocument.from_dict(model_data)
             project.models[model.id] = model
         
-        project.pathways = content.get('pathways', [])
+        # Load pathways (with migration support)
+        pathways_data = content.get('pathways', [])
+        if isinstance(pathways_data, dict):
+            # New format (v2.0): dict of PathwayDocument objects
+            project._pathway_manager.from_dict(pathways_data)
+        elif isinstance(pathways_data, list):
+            # Old format (v1.0): flat list of file paths - migrate
+            project._pathway_manager.migrate_from_list(pathways_data)
+        
         project.simulations = content.get('simulations', [])
         project.tags = metadata.get('tags', [])
         project.settings = metadata.get('settings', project.settings)
@@ -241,7 +348,7 @@ class Project:
         return project
     
     def save(self):
-        """Save project to project.shy file."""
+        """Save project to .project.shy file (hidden from user)."""
         project_file = self.get_project_file_path()
         if not project_file:
             raise ValueError("Project base_path not set, cannot save")
@@ -255,16 +362,74 @@ class Project:
     
     @classmethod
     def load(cls, project_file: str) -> 'Project':
-        """Load project from project.shy file.
+        """Load project from .project.shy file.
         
         Args:
-            project_file: Path to project.shy file
+            project_file: Path to .project.shy file
             
         Returns:
             Loaded Project instance
         """
         with open(project_file, 'r', encoding='utf-8') as f:
             data = json.load(f)
+        
+        project = cls.from_dict(data)
+        
+        # Sync with file system (discover new files, remove deleted ones)
+        if project.settings.get('auto_sync_on_load', True):
+            project._sync_with_filesystem()
+        
+        return project
+    
+    def _sync_with_filesystem(self):
+        """Sync PathwayDocuments with actual files in pathways directory.
+        
+        Actions:
+            - Remove PathwayDocuments for missing files
+            - Discover new files not tracked
+        """
+        pathways_dir = self.get_pathways_dir()
+        if not pathways_dir or not pathways_dir.exists():
+            return
+        
+        # Find and remove PathwayDocuments for missing files
+        for pathway_id, pathway_doc in list(self._pathway_manager.pathways.items()):
+            if pathway_doc.raw_file:
+                file_path = pathways_dir / pathway_doc.raw_file
+                if not file_path.exists():
+                    # File was deleted externally
+                    self.remove_pathway(pathway_id)
+        
+        # Discover new files (if auto-discovery enabled)
+        if self.settings.get('auto_discover_pathways', True):
+            for file_path in pathways_dir.glob('*.kgml'):
+                self._discover_pathway_file(file_path)
+            
+            for file_path in pathways_dir.glob('*.xml'):
+                if not file_path.name.endswith('.meta.xml'):
+                    self._discover_pathway_file(file_path)
+            
+            for file_path in pathways_dir.glob('*.sbml'):
+                self._discover_pathway_file(file_path)
+    
+    def _discover_pathway_file(self, file_path: Path):
+        """Discover a pathway file if not already tracked.
+        
+        Args:
+            file_path: Path to pathway file
+        """
+        from .project_file_observer import ProjectFileHandler
+        
+        filename = file_path.name
+        
+        # Check if already tracked
+        for pathway in self._pathway_manager.list_pathways():
+            if pathway.raw_file == filename:
+                return  # Already tracked
+        
+        # Use file handler to discover
+        handler = ProjectFileHandler(self)
+        handler._handle_pathway_file_added(file_path)
         return cls.from_dict(data)
     
     def create_directory_structure(self):
@@ -281,34 +446,145 @@ class Project:
 
 
 class ProjectManager:
-    """Global singleton for managing all projects and workspace state.
+    """Global singleton for managing all projects in workspace.
     
-    Manages the project index, recent projects, and current active project.
+    Responsibilities:
+    - Maintain list of open projects
+    - Provide project lookup and creation
+    - Manage project file observers
+    - Handle workspace-level operations
+    
+    Usage:
+        manager = ProjectManager.get_instance()
+        project = manager.load_project("path/to/.project.shy")
+        manager.close_project(project.id)
     """
     
     _instance = None
     
-    def __new__(cls):
-        """Singleton pattern."""
+    def __init__(self):
+        """Initialize project manager (singleton)."""
+        self.projects: Dict[str, Project] = {}
+        self.observers: Dict[str, 'ProjectFileObserver'] = {}
+        self.workspace_path = None
+    
+    @classmethod
+    def get_instance(cls) -> 'ProjectManager':
+        """Get singleton instance.
+        
+        Returns:
+            ProjectManager singleton
+        """
         if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance._initialized = False
+            cls._instance = cls()
         return cls._instance
     
-    def __init__(self):
-        """Initialize the ProjectManager."""
-        if self._initialized:
-            return
+    def set_workspace_path(self, path: str):
+        """Set the workspace root path.
         
-        self._initialized = True
-        self.projects_root = None  # Will be set to workspace/projects/
-        self.current_project = None  # Currently active Project
-        self.project_index = {}  # project_id -> project_info dict
-        self.recent_projects = []  # List of project_ids, most recent first
-        self.max_recent = 10
+        Args:
+            path: Absolute path to workspace directory
+        """
+        self.workspace_path = path
+    
+    def load_project(self, project_file: str) -> Project:
+        """Load a project and start file monitoring.
         
-        # Initialize default paths
-        self._setup_default_paths()
+        Args:
+            project_file: Path to .project.shy file
+            
+        Returns:
+            Loaded Project instance
+        """
+        project = Project.load(project_file)
+        self.projects[project.id] = project
+        
+        # Start file system observer
+        try:
+            from .project_file_observer import ProjectFileObserver
+            observer = ProjectFileObserver(project)
+            observer.start_monitoring()
+            self.observers[project.id] = observer
+        except ImportError:
+            # watchdog not available
+            pass
+        
+        return project
+    
+    def close_project(self, project_id: str) -> bool:
+        """Close a project and stop monitoring.
+        
+        Args:
+            project_id: UUID of project to close
+            
+        Returns:
+            True if closed, False if not found
+        """
+        # Stop observer
+        if project_id in self.observers:
+            self.observers[project_id].stop_monitoring()
+            del self.observers[project_id]
+        
+        # Remove from active projects
+        if project_id in self.projects:
+            del self.projects[project_id]
+            return True
+        
+        return False
+    
+    def get_project(self, project_id: str) -> Optional[Project]:
+        """Get an open project by ID.
+        
+        Args:
+            project_id: UUID of project
+            
+        Returns:
+            Project instance or None
+        """
+        return self.projects.get(project_id)
+    
+    def list_projects(self) -> List[Project]:
+        """Get all open projects.
+        
+        Returns:
+            List of Project instances
+        """
+        return list(self.projects.values())
+    
+    def create_project(self, name: str, base_path: str) -> Project:
+        """Create a new project.
+        
+        Args:
+            name: Project name
+            base_path: Directory for project
+            
+        Returns:
+            New Project instance
+        """
+        project = Project(name=name, base_path=base_path)
+        
+        # Create directory structure
+        os.makedirs(base_path, exist_ok=True)
+        os.makedirs(project.get_models_dir(), exist_ok=True)
+        os.makedirs(project.get_pathways_dir(), exist_ok=True)
+        os.makedirs(project.get_simulations_dir(), exist_ok=True)
+        
+        # Save project file
+        project.save()
+        
+        # Add to managed projects
+        self.projects[project.id] = project
+        
+        # Start observer
+        try:
+            from .project_file_observer import ProjectFileObserver
+            observer = ProjectFileObserver(project)
+            observer.start_monitoring()
+            self.observers[project.id] = observer
+        except ImportError:
+            pass
+        
+        return project
     
     def _setup_default_paths(self):
         """Setup default project paths in workspace directory."""
@@ -450,7 +726,7 @@ class ProjectManager:
             return None
         
         project_info = self.project_index[project_id]
-        project_file = os.path.join(project_info['path'], 'project.shy')
+        project_file = os.path.join(project_info['path'], '.project.shy')
         
         if not os.path.exists(project_file):
             return None
@@ -467,7 +743,7 @@ class ProjectManager:
         """Open a project by file path.
         
         Args:
-            project_file: Path to project.shy file
+            project_file: Path to .project.shy file
             
         Returns:
             Loaded Project instance or None on error

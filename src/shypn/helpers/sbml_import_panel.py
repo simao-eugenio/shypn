@@ -60,7 +60,7 @@ class SBMLImportPanel:
         processed_pathway: Post-processed PathwayData with layout and colors
     """
     
-    def __init__(self, builder: Gtk.Builder, model_canvas=None, workspace_settings=None, parent_window=None):
+    def __init__(self, builder: Gtk.Builder, model_canvas=None, workspace_settings=None, parent_window=None, project=None):
         """Initialize the SBML import panel controller.
         
         Args:
@@ -68,11 +68,13 @@ class SBMLImportPanel:
             model_canvas: Optional ModelCanvasManager for loading pathways
             workspace_settings: Optional WorkspaceSettings for remembering last query
             parent_window: Optional parent window for dialogs (WAYLAND FIX)
+            project: Optional Project instance for metadata tracking
         """
         self.builder = builder
         self.model_canvas = model_canvas
         self.workspace_settings = workspace_settings
         self.parent_window = parent_window  # WAYLAND FIX: Store parent for dialogs
+        self.project = project
         self.logger = logging.getLogger(self.__class__.__name__)
         
         # Initialize backend components
@@ -92,6 +94,7 @@ class SBMLImportPanel:
         self.current_filepath = None
         self.parsed_pathway = None
         self.processed_pathway = None
+        self.current_pathway_doc = None  # PathwayDocument for metadata tracking
         
         # Get widget references
         self._get_widgets()
@@ -101,6 +104,14 @@ class SBMLImportPanel:
         
         # Load last BioModels query from settings
         self._load_last_biomodels_query()
+    
+    def set_project(self, project):
+        """Set or update the current project for metadata tracking.
+        
+        Args:
+            project: Project instance
+        """
+        self.project = project
     
     def _get_widgets(self):
         """Get references to UI widgets from builder."""
@@ -620,6 +631,52 @@ class SBMLImportPanel:
                 # Mark as imported so "Save" triggers "Save As"
                 manager.mark_as_imported(pathway_name)
                 
+                # NOW save SBML file and metadata to project (after successful import)
+                if self.project and self.current_filepath and self.parsed_pathway:
+                    try:
+                        filename = os.path.basename(self.current_filepath)
+                        
+                        # Copy SBML file to project/pathways/
+                        sbml_content = open(self.current_filepath, 'r', encoding='utf-8').read()
+                        dest_path = self.project.save_pathway_file(filename, sbml_content)
+                        
+                        # Create PathwayDocument with metadata
+                        from shypn.data.pathway_document import PathwayDocument
+                        self.current_pathway_doc = PathwayDocument(
+                            source_type="sbml",
+                            source_id=os.path.splitext(filename)[0],
+                            source_organism=self.parsed_pathway.organism or "Unknown",
+                            name=self.parsed_pathway.name or filename,
+                            raw_file=filename,
+                            description=f"SBML model: {self.parsed_pathway.name or filename}"
+                        )
+                        
+                        # Add metadata about pathway content
+                        if self.parsed_pathway:
+                            self.current_pathway_doc.metadata['species_count'] = len(self.parsed_pathway.species)
+                            self.current_pathway_doc.metadata['reactions_count'] = len(self.parsed_pathway.reactions)
+                        
+                        # Get model ID from document_model and link
+                        model_id = document_model.id if hasattr(document_model, 'id') else None
+                        if not model_id:
+                            # Try to get from manager
+                            model_id = manager.document_controller.document.id if hasattr(manager.document_controller.document, 'id') else None
+                        
+                        if model_id:
+                            # Link pathway to model
+                            self.current_pathway_doc.link_to_model(model_id)
+                        
+                        # Register with project
+                        self.project.add_pathway(self.current_pathway_doc)
+                        self.project.save()
+                        
+                        print(f"[SBML_IMPORT] Saved pathway {filename} to project after successful import")
+                        
+                    except Exception as e:
+                        print(f"[SBML_IMPORT] Warning: Failed to save pathway metadata after import: {e}")
+                        import traceback
+                        traceback.print_exc()
+                
                 # Trigger redraw
                 drawing_area.queue_draw()
                 
@@ -703,6 +760,34 @@ class SBMLImportPanel:
             False to stop GLib.idle_add from repeating
         """
         self.parsed_pathway = parsed_pathway
+        
+        # Update PathwayDocument with parsed metadata if available
+        if self.project and self.current_pathway_doc and parsed_pathway:
+            try:
+                pathway_name = parsed_pathway.metadata.get('name', 'Unnamed')
+                pathway_desc = parsed_pathway.metadata.get('description', '')
+                organism = parsed_pathway.metadata.get('organism', 'Unknown')
+                
+                # Update pathway document
+                self.current_pathway_doc.name = pathway_name
+                self.current_pathway_doc.source_organism = organism
+                if pathway_desc:
+                    self.current_pathway_doc.description = pathway_desc
+                
+                # Add metadata about pathway content
+                self.current_pathway_doc.metadata['species_count'] = len(parsed_pathway.species)
+                self.current_pathway_doc.metadata['reactions_count'] = len(parsed_pathway.reactions)
+                self.current_pathway_doc.metadata['compartments'] = list(parsed_pathway.compartments.keys())
+                
+                # Save updated metadata
+                self.project.save()
+                
+                print(f"[SBML_IMPORT] Updated pathway metadata: {pathway_name}")
+                
+            except Exception as e:
+                print(f"[SBML_IMPORT] Warning: Failed to update pathway metadata: {e}")
+                import traceback
+                traceback.print_exc()
         
         # Check for validation errors
         if not validation_result.is_valid:

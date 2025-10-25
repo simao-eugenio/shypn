@@ -173,6 +173,7 @@ class MasterPalette:
         ('pathways', 'network-workgroup-symbolic', 'Pathway Import'),
         ('analyses', 'utilities-system-monitor-symbolic', 'Dynamic Analyses'),
         ('topology', 'applications-science-symbolic', 'Topology Analysis'),
+        ('report', 'document-properties-symbolic', 'Report Generation'),
     ]
 
     def __init__(self, builder: Gtk.Builder = None):

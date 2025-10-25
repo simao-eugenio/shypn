@@ -67,6 +67,9 @@ class ProjectActionsController:
         self.project_settings_button = None
         self.quit_button = None
         
+        # Reference to file panel controller (for project opening mode)
+        self.file_panel_controller = None
+        
         # External callbacks (set by owner)
         self.on_project_created = None  # Callback(project)
         self.on_project_opened = None   # Callback(project)
@@ -88,10 +91,9 @@ class ProjectActionsController:
         if self.open_project_button:
             self.open_project_button.connect('clicked', self._on_open_project_clicked)
         
-        # Project Settings button
-        self.project_settings_button = self.builder.get_object('project_settings_button')
-        if self.project_settings_button:
-            self.project_settings_button.connect('clicked', self._on_project_settings_clicked)
+        # Project Settings button (removed from UI - no longer needed)
+        # Projects can be managed directly in the file tree
+        self.project_settings_button = None
         
         # Quit button
         self.quit_button = self.builder.get_object('quit_button')
@@ -103,14 +105,29 @@ class ProjectActionsController:
     def _on_new_project_clicked(self, button):
         """Handle New Project button click."""
         try:
-            project = self.dialog_manager.show_new_project_dialog()
+            # If we have a file panel controller, use inline creation
+            if self.file_panel_controller:
+                self.file_panel_controller.on_new_project(button)
+            else:
+                # Fallback to dialog (for compatibility)
+                project = self.dialog_manager.show_new_project_dialog()
         except Exception as e:
             import traceback
             traceback.print_exc()
     
     def _on_open_project_clicked(self, button):
         """Handle Open Project button click."""
-        project = self.dialog_manager.show_open_project_dialog()
+        try:
+            # If we have a file panel controller, use the new mode
+            if self.file_panel_controller:
+                self.file_panel_controller.on_open_project(button)
+            else:
+                # Fallback to dialog (for compatibility)
+                project = self.dialog_manager.show_open_project_dialog()
+            # Note: _on_project_opened callback is already called by dialog_manager or file_panel_controller
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
     
     def _on_project_settings_clicked(self, button):
         """Handle Project Settings button click."""
@@ -139,10 +156,6 @@ class ProjectActionsController:
         Args:
             project: The newly created Project instance
         """
-        # Enable project settings button
-        if self.project_settings_button:
-            self.project_settings_button.set_sensitive(True)
-        
         # Notify external callback
         if self.on_project_created:
             self.on_project_created(project)
@@ -153,20 +166,12 @@ class ProjectActionsController:
         Args:
             project: The opened Project instance
         """
-        # Enable project settings button
-        if self.project_settings_button:
-            self.project_settings_button.set_sensitive(True)
-        
         # Notify external callback
         if self.on_project_opened:
             self.on_project_opened(project)
     
     def _on_project_closed(self):
         """Called when a project is closed."""
-        # Disable project settings button
-        if self.project_settings_button:
-            self.project_settings_button.set_sensitive(False)
-        
         # Notify external callback
         if self.on_project_closed:
             self.on_project_closed()
@@ -183,14 +188,25 @@ class ProjectActionsController:
         if self.dialog_manager:
             self.dialog_manager.parent_window = window
     
+    def set_file_panel_controller(self, file_panel_controller):
+        """Set the file panel controller for project opening mode.
+        
+        Args:
+            file_panel_controller: FilePanelController instance
+        """
+        self.file_panel_controller = file_panel_controller
+    
     def update_project_state(self, has_project):
         """Update UI state based on whether a project is open.
         
         Args:
             has_project: True if a project is currently open
+            
+        Note:
+            Currently a no-op since Project Settings button was removed.
+            Projects are now managed directly in the file tree.
         """
-        if self.project_settings_button:
-            self.project_settings_button.set_sensitive(has_project)
+        pass  # No UI to update - button removed
     
     def get_current_project(self):
         """Get the current active project.

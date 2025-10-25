@@ -412,6 +412,7 @@ def main(argv=None):
 		analyses_panel_container = main_builder.get_object('analyses_panel_container')
 		pathways_panel_container = main_builder.get_object('pathways_panel_container')
 		topology_panel_container = main_builder.get_object('topology_panel_container')
+		report_panel_container = main_builder.get_object('report_panel_container')
 
 		# Get paned widget for curtain resize control
 		left_paned = main_builder.get_object('left_paned')
@@ -494,6 +495,9 @@ def main(argv=None):
 		if topology_panel_container:
 			topology_panel_container.set_visible(False)
 			topology_panel_container.set_no_show_all(False)
+		if report_panel_container:
+			report_panel_container.set_visible(False)
+			report_panel_container.set_no_show_all(False)
 		
 		# ====================================================================
 		# NOW add panels to GtkStack AFTER window is shown
@@ -516,6 +520,20 @@ def main(argv=None):
 		# Add Topology panel to stack
 		if topology_panel_loader:
 			topology_panel_loader.add_to_stack(left_dock_stack, topology_panel_container, 'topology')
+		
+		# ====================================================================
+		# Create and Add Report Panel to stack
+		# ====================================================================
+		try:
+			from shypn.ui.panels.report import ReportPanel
+			report_panel = ReportPanel(project=None, model_canvas=model_canvas_loader)
+			report_panel_container.pack_start(report_panel, True, True, 0)
+			report_panel.show_all()
+			print("[SHYPN] Report Panel created and added to stack", file=sys.stderr)
+		except Exception as e:
+			print(f"[SHYPN ERROR] Failed to load Report Panel: {e}", file=sys.stderr)
+			import traceback
+			traceback.print_exc()
 
 		# ====================================================================
 		# WAYLAND FIX: Do NOT auto-maximize on startup
@@ -570,6 +588,7 @@ def main(argv=None):
 				master_palette.set_active('pathways', False)
 				master_palette.set_active('analyses', False)
 				master_palette.set_active('topology', False)
+				master_palette.set_active('report', False)
 				
 				# Show this panel (in stack if hanged, or floating if detached)
 				left_panel_loader.show_in_stack()
@@ -604,6 +623,7 @@ def main(argv=None):
 				master_palette.set_active('files', False)
 				master_palette.set_active('pathways', False)
 				master_palette.set_active('topology', False)
+				master_palette.set_active('report', False)
 				
 				# Show this panel (in stack if hanged, or floating if detached)
 				right_panel_loader.show_in_stack()
@@ -638,6 +658,7 @@ def main(argv=None):
 				master_palette.set_active('files', False)
 				master_palette.set_active('analyses', False)
 				master_palette.set_active('topology', False)
+				master_palette.set_active('report', False)
 				
 				# Show this panel (in stack if hanged, or floating if detached)
 				pathway_panel_loader.show_in_stack()
@@ -672,6 +693,7 @@ def main(argv=None):
 				master_palette.set_active('files', False)
 				master_palette.set_active('pathways', False)
 				master_palette.set_active('analyses', False)
+				master_palette.set_active('report', False)
 				
 				# Show this panel (in stack if hanged, or floating if detached)
 				topology_panel_loader.show_in_stack()
@@ -683,6 +705,48 @@ def main(argv=None):
 						pass
 			else:
 				topology_panel_loader.hide_in_stack()
+				# Hide stack when last panel is hidden
+				if left_dock_stack:
+					left_dock_stack.set_visible(False)
+				if left_paned:
+					try:
+						left_paned.set_position(0)
+					except Exception:
+						pass
+
+		def on_report_toggle(is_active):
+			"""Handle Report panel toggle from Master Palette.
+			
+			EXCLUSIVE MODE: Only one panel active at a time.
+			When button is activated, deactivate others.
+			"""
+			if not report_panel_container:
+				return
+			
+			if is_active:
+				# Deactivate other panels (exclusive mode)
+				master_palette.set_active('files', False)
+				master_palette.set_active('pathways', False)
+				master_palette.set_active('analyses', False)
+				master_palette.set_active('topology', False)
+				
+				# Show report panel in stack
+				if left_dock_stack:
+					left_dock_stack.set_visible_child_name('report')
+					left_dock_stack.set_visible(True)
+				# Expand left paned to show report panel
+				if left_paned:
+					try:
+						left_paned.set_position(320)
+					except Exception:
+						pass
+				# Show report container
+				if report_panel_container:
+					report_panel_container.set_visible(True)
+			else:
+				# Hide report panel
+				if report_panel_container:
+					report_panel_container.set_visible(False)
 				# Hide stack when last panel is hidden
 				if left_dock_stack:
 					left_dock_stack.set_visible(False)
@@ -765,6 +829,7 @@ def main(argv=None):
 		master_palette.connect('pathways', on_pathway_toggle)
 		master_palette.connect('analyses', on_right_toggle)
 		master_palette.connect('topology', on_topology_toggle)
+		master_palette.connect('report', on_report_toggle)
 		
 		# Enable topology button if panel loaded successfully
 		if topology_panel_loader:

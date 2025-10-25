@@ -54,10 +54,12 @@ class PathwayPanelLoader:
         self._updating_button = False  # Flag to prevent recursive toggle events
         self.on_float_callback = None  # Callback to notify when panel floats
         self.on_attach_callback = None  # Callback to notify when panel attaches
+        self.project = None  # Current project for pathway metadata tracking
         
         # Import tab controllers (will be instantiated after loading UI)
         self.kegg_import_controller = None
         self.sbml_import_controller = None
+        self.brenda_enrichment_controller = None
     
     def load(self):
         """Load the panel UI and return the window.
@@ -133,10 +135,11 @@ class PathwayPanelLoader:
         try:
             from shypn.helpers.kegg_import_panel import KEGGImportPanel
             
-            # Instantiate controller with builder and model_canvas
+            # Instantiate controller with builder, model_canvas, and project
             self.kegg_import_controller = KEGGImportPanel(
                 self.builder,
-                self.model_canvas
+                self.model_canvas,
+                self.project
             )
             
         except ImportError as e:
@@ -152,13 +155,14 @@ class PathwayPanelLoader:
         try:
             from shypn.helpers.sbml_import_panel import SBMLImportPanel
             
-            # Instantiate controller with builder and model_canvas
+            # Instantiate controller with builder, model_canvas, workspace_settings, parent_window, and project
             # WAYLAND FIX: Pass None for parent_window initially, will be set when panel attaches
             self.sbml_import_controller = SBMLImportPanel(
                 self.builder,
                 self.model_canvas,
                 self.workspace_settings,
-                parent_window=None
+                parent_window=None,
+                project=self.project
             )
             
         except ImportError as e:
@@ -168,16 +172,20 @@ class PathwayPanelLoader:
     def _setup_brenda_tab(self):
         """Set up the BRENDA tab controllers.
         
-        This method will instantiate the BRENDA connector when implemented.
-        For now, it's a placeholder.
+        Instantiates the BRENDA enrichment controller for project integration.
         """
-        # TODO: Import and instantiate BRENDA connector
-        # try:
-        #     from shypn.data.brenda.brenda_connector import BRENDAConnector
-        #     self.brenda_connector = BRENDAConnector(...)
-        # except ImportError as e:
-        #     print(f"Warning: Could not load BRENDA connector: {e}", file=sys.stderr)
-        pass
+        try:
+            from .brenda_enrichment_controller import BRENDAEnrichmentController
+            
+            self.brenda_enrichment_controller = BRENDAEnrichmentController(
+                model_canvas=self.model_canvas,
+                project=self.project
+            )
+            print("[PATHWAY_PANEL] BRENDA enrichment controller initialized", file=sys.stderr)
+            
+        except ImportError as e:
+            print(f"Warning: Could not load BRENDA enrichment controller: {e}", file=sys.stderr)
+            pass
     
     def _setup_unified_ui_signals(self):
         """Wire up signals for the unified UI pattern (radio buttons, browse buttons).
@@ -452,6 +460,14 @@ class PathwayPanelLoader:
         
         This respects existing data in SBML models while enriching KEGG pathways.
         """
+        if not self.brenda_enrichment_controller:
+            self._show_error("BRENDA enrichment controller not available")
+            return
+        
+        if not self.project:
+            self._show_error("No project is open. Please create or open a project first.")
+            return
+        
         brenda_external_radio = self.builder.get_object('brenda_external_radio')
         
         if brenda_external_radio and brenda_external_radio.get_active():
@@ -482,32 +498,57 @@ class PathwayPanelLoader:
                 if response != Gtk.ResponseType.YES:
                     return  # User cancelled
             
-            # TODO: Implement BRENDA enrichment workflow
+            # Get EC numbers from UI (TODO: implement UI input)
+            # For now, show info that BRENDA API is not yet active
             self._show_info(
-                "BRENDA Canvas Enrichment Workflow:\n\n"
+                "BRENDA Canvas Enrichment (API Mode):\n\n"
+                "Infrastructure is ready, but BRENDA credentials are pending activation.\n\n"
+                "When activated, this will:\n"
                 "1. Scan canvas for transitions (enzymes)\n"
                 "2. Query BRENDA API for kinetic data\n"
                 "3. Generate enrichment report\n"
                 "4. Review and select data to apply\n"
-                "5. Enrich canvas with selected parameters\n\n"
-                "This feature is under development.\n\n"
-                "Override existing: " + ("YES ⚠️" if override_existing else "NO ✓")
+                "5. Enrich canvas with selected parameters\n"
+                "6. Track enrichment metadata in project\n\n"
+                "Override existing: " + ("YES ⚠️" if override_existing else "NO ✓") + "\n\n"
+                "All enrichments will be tracked in .project.shy with:\n"
+                "• Which transitions were enriched\n"
+                "• What parameters were added\n"
+                "• Source citations and confidence"
             )
+            
+            # TODO: When BRENDA credentials are active:
+            # ec_numbers = self._get_ec_numbers_from_ui()
+            # result = self.brenda_enrichment_controller.enrich_canvas_from_api(
+            #     ec_numbers=ec_numbers,
+            #     organism=None,
+            #     override_existing=override_existing
+            # )
+            # self._show_enrichment_result(result)
+            
         else:
             # Local source: load from CSV/JSON file
             brenda_file_entry = self.builder.get_object('brenda_file_entry')
             if brenda_file_entry:
                 file_path = brenda_file_entry.get_text()
                 if file_path and os.path.exists(file_path):
-                    # TODO: Implement local BRENDA file enrichment
-                    self._show_info(
-                        f"Local BRENDA enrichment workflow:\n\n"
-                        f"1. Load data from: {os.path.basename(file_path)}\n"
-                        f"2. Match to canvas transitions\n"
-                        f"3. Generate enrichment report\n"
-                        f"4. Review and apply selected data\n\n"
-                        f"This feature is under development."
+                    # Use controller to enrich from file
+                    result = self.brenda_enrichment_controller.enrich_canvas_from_file(
+                        file_path=file_path,
+                        override_existing=False
                     )
+                    
+                    if result['success']:
+                        self._show_info(
+                            f"BRENDA Enrichment Complete!\n\n"
+                            f"Transitions scanned: {result['transitions_scanned']}\n"
+                            f"Transitions enriched: {result['transitions_enriched']}\n"
+                            f"Enrichment ID: {result['enrichment_id'][:8]}...\n\n"
+                            f"Enrichment metadata saved to project."
+                        )
+                    else:
+                        error = result.get('error', 'Unknown error')
+                        self._show_error(f"Enrichment failed: {error}")
                 else:
                     self._show_error("Please select a valid BRENDA data file (CSV or JSON)")
     
@@ -554,9 +595,30 @@ class PathwayPanelLoader:
         if self.sbml_import_controller:
             self.sbml_import_controller.set_model_canvas(model_canvas)
         
+        if self.brenda_enrichment_controller:
+            self.brenda_enrichment_controller.set_model_canvas(model_canvas)
+        
         # Wire SBML panel to model canvas so Swiss Palette can read layout parameters
         if model_canvas and self.sbml_import_controller:
             model_canvas.sbml_panel = self.sbml_import_controller
+    
+    def set_project(self, project):
+        """Set or update the current project for pathway metadata tracking.
+        
+        Args:
+            project: Project instance
+        """
+        self.project = project
+        
+        # Update import controllers if they exist
+        if self.kegg_import_controller:
+            self.kegg_import_controller.set_project(project)
+        
+        if self.sbml_import_controller and hasattr(self.sbml_import_controller, 'set_project'):
+            self.sbml_import_controller.set_project(project)
+        
+        if self.brenda_enrichment_controller:
+            self.brenda_enrichment_controller.set_project(project)
     
     def get_sbml_controller(self):
         """Get the SBML import controller instance.
