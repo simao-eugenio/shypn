@@ -625,6 +625,10 @@ class FilePanelLoader:
                 
                 # Setup exclusive expansion behavior
                 self._setup_category_expansion()
+                
+                # Initialize controllers (CRITICAL: must happen after categories are created)
+                self._init_file_explorer()
+                self._init_project_controller()
         
         if not container:
             return
