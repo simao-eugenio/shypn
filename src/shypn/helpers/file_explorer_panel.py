@@ -1056,18 +1056,13 @@ class FileExplorerPanel:
     def save_current_document(self):
         """Save the current document using per-document state.
         
-        PHASE 1 REFACTORING: Now uses manager's filepath and is_dirty state
-        instead of global persistency state. This fixes multi-document issues.
-        
-        Behavior:
-        - If manager has no filepath (new/unsaved): Show save dialog
-        - If manager.is_default_filename() (imported/default): Show save dialog
+        Inline save behavior (no dialogs):
+        - If manager has no filepath (new/unsaved): Auto-generate filename in workspace
+        - If manager.is_default_filename() (imported/default): Auto-save to workspace
         - Otherwise: Save directly to manager's filepath
         """
         try:
             if not hasattr(self, 'canvas_loader') or self.canvas_loader is None:
-                return
-            if not hasattr(self, 'persistency') or self.persistency is None:
                 return
             
             drawing_area = self.canvas_loader.get_current_document()
@@ -1081,22 +1076,39 @@ class FileExplorerPanel:
             # Convert canvas state to document model
             document = manager.to_document_model()
             
-            # Determine if we need to show file chooser
-            needs_chooser = not manager.has_filepath() or manager.is_default_filename()
+            # Determine if we need to auto-generate a filepath
+            needs_new_filepath = not manager.has_filepath() or manager.is_default_filename()
             
-            if needs_chooser:
-                # Show save dialog (new document or imported)
+            if needs_new_filepath:
+                # Auto-generate filename in workspace directory
+                import os
+                import datetime
                 
-                # Set suggested filename from manager
+                # Get base filename from manager or generate timestamp-based name
                 if manager.filename and manager.filename != "default":
-                    self.persistency.suggested_filename = manager.filename
+                    base_name = manager.filename
+                else:
+                    # Generate timestamp-based name
+                    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                    base_name = f"model_{timestamp}"
                 
-                # Show file chooser
-                filepath = self.persistency._show_save_dialog()
-                if not filepath:
-                    return  # User cancelled
+                # Ensure .shy extension
+                if not base_name.endswith('.shy'):
+                    base_name += '.shy'
                 
-                # Save to chosen file
+                # Save to workspace directory
+                workspace_path = self.explorer.current_path
+                filepath = os.path.join(workspace_path, base_name)
+                
+                # Make sure we don't overwrite existing file
+                counter = 1
+                original_filepath = filepath
+                while os.path.exists(filepath):
+                    name_without_ext = base_name[:-4]  # Remove .shy
+                    filepath = os.path.join(workspace_path, f"{name_without_ext}_{counter}.shy")
+                    counter += 1
+                
+                # Save to generated file
                 document.save_to_file(filepath)
                 
                 # Update manager state
@@ -1105,7 +1117,6 @@ class FileExplorerPanel:
                 manager.mark_as_saved()  # Clear imported flag
                 
                 # Update UI
-                import os
                 filename = os.path.basename(filepath)
                 self.canvas_loader.update_current_tab_label(filename, is_modified=False)
                 self.set_current_file(filepath)
@@ -1132,15 +1143,12 @@ class FileExplorerPanel:
             traceback.print_exc()
 
     def save_current_document_as(self):
-        """Save the current document with a new name (Save As).
+        """Save the current document with a new auto-generated name (Save As inline).
         
-        PHASE 1 REFACTORING: Now uses manager's filepath and updates it after save.
-        Always shows file chooser regardless of current state.
+        Always creates a new file with auto-generated name in workspace directory.
         """
         try:
             if not hasattr(self, 'canvas_loader') or self.canvas_loader is None:
-                return
-            if not hasattr(self, 'persistency') or self.persistency is None:
                 return
             
             drawing_area = self.canvas_loader.get_current_document()
@@ -1154,16 +1162,43 @@ class FileExplorerPanel:
             # Convert canvas state to document model
             document = manager.to_document_model()
             
-            # Set suggested filename from manager
+            # Auto-generate new filename in workspace directory
+            import os
+            import datetime
+            
+            # Get base filename from manager or current filename
             if manager.filename and manager.filename != "default":
-                self.persistency.suggested_filename = manager.filename
+                base_name = manager.filename
+                # Remove extension if present
+                if base_name.endswith('.shy'):
+                    base_name = base_name[:-4]
+                base_name += "_copy"
+            else:
+                # Generate timestamp-based name
+                timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                base_name = f"model_{timestamp}"
             
-            # Always show file chooser for Save As
-            filepath = self.persistency._show_save_dialog()
-            if not filepath:
-                return  # User cancelled
+            # Ensure .shy extension
+            if not base_name.endswith('.shy'):
+                base_name += '.shy'
             
-            # Save to chosen file
+            # Save to workspace directory
+            workspace_path = self.explorer.current_path
+            filepath = os.path.join(workspace_path, base_name)
+            
+            # Make sure we don't overwrite existing file
+            counter = 1
+            while os.path.exists(filepath):
+                name_without_ext = base_name[:-4]  # Remove .shy
+                # Remove previous counter if exists
+                if name_without_ext.endswith('_copy'):
+                    name_base = name_without_ext
+                else:
+                    name_base = name_without_ext.rsplit('_', 1)[0] if '_' in name_without_ext else name_without_ext
+                filepath = os.path.join(workspace_path, f"{name_base}_{counter}.shy")
+                counter += 1
+            
+            # Save to generated file
             document.save_to_file(filepath)
             
             # Update manager state
@@ -1172,7 +1207,6 @@ class FileExplorerPanel:
             manager.mark_as_saved()  # Clear imported flag
             
             # Update UI - CRITICAL: Update tab label with new filename
-            import os
             filename = os.path.basename(filepath)
             self.canvas_loader.update_current_tab_label(filename, is_modified=False)
             self.set_current_file(filepath)
@@ -1185,19 +1219,41 @@ class FileExplorerPanel:
             traceback.print_exc()
 
     def open_document(self):
-        """Open a document from file using the persistency manager.
+        """Open the currently selected document from the file tree.
         
-        Creates a new tab with the loaded document and sets the manager's filename
-        correctly so is_default_filename() returns False.
+        Opens the file that is currently selected in the tree view.
+        If no file is selected or a directory is selected, does nothing.
+        This provides inline file opening without dialogs.
         """
         try:
             if not hasattr(self, 'canvas_loader') or self.canvas_loader is None:
                 return
-            if not hasattr(self, 'persistency') or self.persistency is None:
+            
+            # Get currently selected item from tree view
+            selection = self.tree_view.get_selection()
+            model, tree_iter = selection.get_selected()
+            
+            if not tree_iter:
+                # No selection - do nothing (no dialog)
                 return
-            document, filepath = self.persistency.load_document()
-            if document and filepath:
-                self._load_document_into_canvas(document, filepath)
+            
+            # Get the selected item's details
+            is_dir = model.get_value(tree_iter, 3)
+            full_path = model.get_value(tree_iter, 2)
+            
+            # Only open files, not directories
+            if is_dir:
+                # Selected item is a directory - do nothing
+                return
+            
+            # Check if it's a .shy file
+            if not full_path.endswith('.shy'):
+                # Not a model file - do nothing
+                return
+            
+            # Open the selected file
+            self._open_file_from_path(full_path)
+            
         except Exception as e:
             import traceback
             traceback.print_exc()

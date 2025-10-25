@@ -5,7 +5,7 @@
 
   <object class="GtkWindow" id="left_panel_window">
     <property name="visible">False</property>
-    <property name="title">File Explorer</property>
+    <property name="title">EXPLORER</property>
     <property name="default-width">300</property>
     <property name="default-height">600</property>
     <property name="resizable">True</property>
@@ -30,7 +30,7 @@
             <child>
               <object class="GtkLabel" id="panel_title">
                 <property name="visible">True</property>
-                <property name="label">Explorer</property>
+                <property name="label">EXPLORER</property>
                 <property name="halign">start</property>
                 <property name="hexpand">True</property>
                 <style>
