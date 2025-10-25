@@ -64,8 +64,8 @@ class FileExplorerPanel:
         self.explorer = FileExplorer(base_path=base_path, root_boundary=root_boundary)
         self.explorer.on_path_changed = self._on_path_changed
         self.explorer.on_error = self._on_error
-        # Default file is now in workspace/examples/
-        self.current_opened_file: Optional[str] = 'workspace/examples/simple.shy'
+        # No default file - will be set when user selects one
+        self.current_opened_file: Optional[str] = None
         self.hierarchical_view = True
         self.selected_item_path: Optional[str] = None
         self.selected_item_name: Optional[str] = None
@@ -153,6 +153,7 @@ class FileExplorerPanel:
         Organized into groups:
             pass
         - File Operations: Open, New File, New Folder
+        - Clipboard: Cut, Copy, Paste
         - File Modifications: Rename, Delete
         - View: Refresh, Properties
         
@@ -165,7 +166,11 @@ class FileExplorerPanel:
         self.context_menu = Gtk.Menu()
         # Attach menu to tree_view for proper Wayland parent window handling
         self.context_menu.attach_to_widget(self.tree_view, None)
-        menu_items = [('Open', self._on_context_open_clicked), ('New File', self._on_context_new_file_clicked), ('New Folder', self._on_context_new_folder_clicked), ('---', None), ('Rename', self._on_rename_clicked), ('Delete', self._on_delete_clicked), ('---', None), ('Refresh', self._on_refresh_clicked), ('Properties', self._on_properties_clicked)]
+        
+        # Store references to menu items that need dynamic enable/disable
+        self.menu_items_refs = {}
+        
+        menu_items = [('Open', self._on_context_open_clicked), ('New File', self._on_context_new_file_clicked), ('New Folder', self._on_context_new_folder_clicked), ('---', None), ('Cut', self._on_cut_clicked), ('Copy', self._on_copy_clicked), ('Paste', self._on_paste_clicked), ('---', None), ('Rename', self._on_rename_clicked), ('Delete', self._on_delete_clicked), ('---', None), ('Refresh', self._on_refresh_clicked), ('Properties', self._on_properties_clicked)]
         for label, callback in menu_items:
             if label == '---':
                 separator = Gtk.SeparatorMenuItem()
@@ -175,7 +180,35 @@ class FileExplorerPanel:
                 if callback:
                     menu_item.connect('activate', callback)
                 self.context_menu.append(menu_item)
+                # Store references for items that need dynamic state
+                if label in ['Cut', 'Copy', 'Paste', 'Rename', 'Delete', 'Open']:
+                    self.menu_items_refs[label] = menu_item
+        
+        # Connect to menu show event to update item states
+        self.context_menu.connect('show', self._on_context_menu_show)
         self.context_menu.show_all()
+    
+    def _on_context_menu_show(self, menu):
+        """Update context menu item states when menu is shown.
+        
+        Args:
+            menu: The Gtk.Menu being shown
+        """
+        # Enable/disable Paste based on clipboard state
+        if 'Paste' in self.menu_items_refs:
+            has_clipboard = bool(self.clipboard_path and self.clipboard_operation)
+            self.menu_items_refs['Paste'].set_sensitive(has_clipboard)
+        
+        # Enable/disable Cut, Copy, Rename, Delete based on selection
+        has_selection = bool(self.selected_item_path)
+        for item_name in ['Cut', 'Copy', 'Rename', 'Delete']:
+            if item_name in self.menu_items_refs:
+                self.menu_items_refs[item_name].set_sensitive(has_selection)
+        
+        # Enable/disable Open based on whether selection is a file
+        if 'Open' in self.menu_items_refs:
+            can_open = has_selection and not self.selected_item_is_dir
+            self.menu_items_refs['Open'].set_sensitive(can_open)
 
     def _connect_signals(self):
         """Connect widget signals to controller methods.
@@ -205,6 +238,10 @@ class FileExplorerPanel:
         self.tree_view.connect('row-activated', self._on_row_activated)
         self.tree_view.connect('button-press-event', self._on_tree_view_button_press)
         self.scrolled_window.connect('button-press-event', self._on_scroll_button_press)
+        
+        # Connect to selection changes to update current file display
+        selection = self.tree_view.get_selection()
+        selection.connect('changed', self._on_tree_selection_changed)
 
     def _get_expanded_paths(self):
         """Get list of currently expanded directory paths in tree view.
@@ -274,6 +311,10 @@ class FileExplorerPanel:
         # Save expanded state before clearing
         expanded_paths = self._get_expanded_paths() if self.hierarchical_view else set()
         
+        # Block selection handler during load to prevent auto-selection
+        selection = self.tree_view.get_selection()
+        selection.handler_block_by_func(self._on_tree_selection_changed)
+        
         self.store.clear()
         if self.hierarchical_view:
             self._load_directory_tree(self.explorer.current_path, None)
@@ -281,11 +322,15 @@ class FileExplorerPanel:
             self._restore_expanded_paths(expanded_paths)
         else:
             self._load_directory_flat(self.explorer.current_path)
-        if self.current_file_label:
-            if self.current_opened_file:
-                self.current_file_label.set_text(self.current_opened_file)
-            else:
-                self.current_file_label.set_text('—')
+        
+        # Clear any auto-selection that GTK might have made
+        selection.unselect_all()
+        
+        # Unblock selection handler
+        selection.handler_unblock_by_func(self._on_tree_selection_changed)
+        
+        # Don't modify the current file entry during refresh
+        # It should only change when user selects a different file
         stats = self.explorer.get_stats()
         status_text = f"{stats['directories']} folders, {stats['files']} files"
         if self.status_label:
@@ -379,19 +424,18 @@ class FileExplorerPanel:
         self.explorer.go_up()
 
     def _on_home_clicked(self, button: Gtk.Button):
-        """Handle home button click (UI event → API call)."""
-        self.explorer.go_home()
+        """Handle home button click - navigate to workspace root and collapse tree."""
+        # Navigate to workspace root (root_boundary)
+        if hasattr(self.explorer, 'root_boundary') and self.explorer.root_boundary:
+            self.explorer.navigate_to(self.explorer.root_boundary)
+            # Collapse all expanded folders when going home
+            self.tree_view.collapse_all()
+        else:
+            self.explorer.go_home()
+            self.tree_view.collapse_all()
 
     def _on_refresh_clicked(self, button: Gtk.Button):
-        """Handle refresh button click.
-        
-        Toggles between hierarchical tree view and flat list view.
-        """
-        self.hierarchical_view = not self.hierarchical_view
-        if self.hierarchical_view:
-            pass
-        else:
-            pass
+        """Handle refresh button click - reload current directory."""
         self._load_current_directory()
 
     def _on_file_new_folder_clicked(self, button: Gtk.Button):
@@ -421,7 +465,7 @@ class FileExplorerPanel:
             self.set_current_file(full_path)
 
     def _on_tree_view_button_press(self, widget, event):
-        """Handle button press on tree view to show context menu.
+        """Handle button press on tree view to show context menu and expand folders.
         
         GTK3 version using button-press-event signal.
         
@@ -432,6 +476,7 @@ class FileExplorerPanel:
         Returns:
             True if event was handled, False otherwise
         """
+        # Handle right-click for context menu
         if event.button == 3 and event.type == Gdk.EventType.BUTTON_PRESS:
             if not self.context_menu:
                 return False
@@ -449,7 +494,64 @@ class FileExplorerPanel:
             # Use popup_at_pointer() instead of deprecated popup() for Wayland compatibility
             self.context_menu.popup_at_pointer(event)
             return True
+        
+        # Handle left-click on folders to expand/collapse
+        if event.button == 1 and event.type == Gdk.EventType.BUTTON_PRESS:
+            result = self.tree_view.get_path_at_pos(int(event.x), int(event.y))
+            if result is not None:
+                path, column, cell_x, cell_y = result
+                iter = self.store.get_iter(path)
+                is_dir = self.store.get_value(iter, 3)
+                full_path = self.store.get_value(iter, 2)
+                
+                # Update selection first (for both files and folders)
+                self.selected_item_path = full_path
+                self.selected_item_name = self.store.get_value(iter, 1)
+                self.selected_item_is_dir = is_dir
+                
+                # Only expand/collapse if clicking on a directory AND not on the expander
+                # Check if click is on the expander arrow (very left side of the row)
+                if is_dir:
+                    # Get the cell area to determine if click was on expander
+                    cell_area = self.tree_view.get_cell_area(path, column)
+                    # Expander is typically in the first ~20 pixels
+                    depth = len(path.get_indices()) - 1  # Tree depth
+                    expander_size = 20
+                    expander_indent = depth * expander_size
+                    click_on_expander = cell_x < (expander_indent + expander_size)
+                    
+                    # Only toggle if NOT clicking on expander (to avoid double-toggle)
+                    if not click_on_expander:
+                        if self.tree_view.row_expanded(path):
+                            self.tree_view.collapse_row(path)
+                        else:
+                            self.tree_view.expand_row(path, False)
+                else:
+                    # For files, update current file display
+                    self.set_current_file(full_path)
+        
         return False
+
+    def _on_tree_selection_changed(self, selection):
+        """Handle tree view selection changes - update current file display.
+        
+        Args:
+            selection: Gtk.TreeSelection object
+        """
+        model, tree_iter = selection.get_selected()
+        if tree_iter is not None:
+            # Get the selected item details
+            full_path = model.get_value(tree_iter, 2)  # Column 2 is the path
+            is_dir = model.get_value(tree_iter, 3)     # Column 3 is is_directory
+            
+            # Update selected_item for context menu
+            self.selected_item_path = full_path
+            self.selected_item_name = model.get_value(tree_iter, 1)
+            self.selected_item_is_dir = is_dir
+            
+            # Update current file display if it's a file (not a directory)
+            if not is_dir:
+                self.set_current_file(full_path)
 
     def _on_scroll_button_press(self, widget, event):
         """Handle button press on scrolled window for outside clicks.
@@ -533,13 +635,17 @@ class FileExplorerPanel:
             pass
 
     def _on_rename_clicked(self, menu_item):
-        """Handle 'Rename' context menu item.
+        """Handle 'Rename' context menu item - inline editing.
         
         Args:
             menu_item: The Gtk.MenuItem that was activated (from 'activate' signal)
         """
+        print(f"DEBUG: _on_rename_clicked called for: {self.selected_item_path}")
         if self.selected_item_path:
-            self._show_rename_dialog()
+            print("DEBUG: Calling _start_inline_edit_rename()")
+            self._start_inline_edit_rename()
+        else:
+            print("DEBUG: No selected_item_path")
 
     def _on_delete_clicked(self, menu_item):
         """Handle 'Delete' context menu item.
@@ -661,6 +767,31 @@ class FileExplorerPanel:
         column = self.tree_view.get_column(0)
         self.tree_view.set_cursor(tree_path, column, True)
 
+    def _start_inline_edit_rename(self):
+        """Start inline editing to rename selected file/folder."""
+        print("DEBUG: _start_inline_edit_rename called - INLINE MODE")  # DEBUG
+        if not self.selected_item_path:
+            return
+        
+        # Find the iter for the selected item
+        iter_to_edit = self._find_iter_for_path(self.selected_item_path)
+        if not iter_to_edit:
+            return
+        
+        # Store original path and name for rename operation
+        self.text_renderer.set_property('editable', True)
+        self.editing_iter = iter_to_edit
+        self.editing_parent_dir = os.path.dirname(self.selected_item_path)
+        self.editing_is_folder = self.selected_item_is_dir
+        self.editing_old_path = self.selected_item_path  # Store for rename
+        self.editing_old_name = os.path.basename(self.selected_item_path)
+        self.is_rename_operation = True  # Flag to distinguish rename from new file/folder
+        
+        # Start editing the cell
+        tree_path = self.store.get_path(iter_to_edit)
+        column = self.tree_view.get_column(0)
+        self.tree_view.set_cursor(tree_path, column, True)
+
     def _find_iter_for_path(self, path):
         """Find TreeIter for given file path.
         
@@ -686,7 +817,7 @@ class FileExplorerPanel:
         return search_tree(self.store, self.store.get_iter_first())
 
     def _on_cell_edited(self, renderer, path, new_text):
-        """Handle cell editing completion - create the file/folder.
+        """Handle cell editing completion - create file/folder or rename.
         
         Args:
             renderer: CellRendererText
@@ -694,11 +825,25 @@ class FileExplorerPanel:
             new_text: New text entered by user
         """
         self.text_renderer.set_property('editable', False)
+        
+        # Check if this is a rename operation
+        is_rename = getattr(self, 'is_rename_operation', False)
+        
         if not new_text or new_text.strip() == '':
-            if hasattr(self, 'editing_iter') and self.editing_iter:
+            if hasattr(self, 'editing_iter') and self.editing_iter and not is_rename:
                 self.store.remove(self.editing_iter)
+            self._cleanup_editing_state()
             return
+        
         new_text = new_text.strip()
+        
+        # For rename, check if name actually changed
+        if is_rename:
+            old_name = getattr(self, 'editing_old_name', '')
+            if new_text == old_name:
+                self._cleanup_editing_state()
+                return
+        
         if not self.editing_is_folder:
             # Ensure .shy extension is present (case-insensitive check)
             if not new_text.lower().endswith('.shy'):
@@ -706,39 +851,71 @@ class FileExplorerPanel:
             elif not new_text.endswith('.shy'):
                 # Handle case where user typed .SHY or .Shy - normalize to .shy
                 new_text = new_text[:-4] + '.shy'
+        
         full_path = os.path.join(self.editing_parent_dir, new_text)
+        
+        # Check if destination already exists (but not if it's the same file during rename)
         if os.path.exists(full_path):
-            if self.explorer.on_error:
-                self.explorer.on_error(f"'{new_text}' already exists")
-            if hasattr(self, 'editing_iter') and self.editing_iter:
-                self.store.remove(self.editing_iter)
-            return
+            if not is_rename or full_path != getattr(self, 'editing_old_path', None):
+                if self.explorer.on_error:
+                    self.explorer.on_error(f"'{new_text}' already exists")
+                if hasattr(self, 'editing_iter') and self.editing_iter and not is_rename:
+                    self.store.remove(self.editing_iter)
+                self._cleanup_editing_state()
+                return
+        
         try:
-            if self.editing_is_folder:
-                os.makedirs(full_path, exist_ok=True)
+            if is_rename:
+                # Rename operation
+                old_path = getattr(self, 'editing_old_path', None)
+                if old_path and old_path != full_path:
+                    os.rename(old_path, full_path)
+                    # Update current file if we renamed it
+                    if self.current_opened_file == old_path:
+                        self.current_opened_file = full_path
             else:
-                from shypn.data.canvas.document_model import DocumentModel
-                doc = DocumentModel()
-                doc.save_to_file(full_path)
+                # Create new file/folder
+                if self.editing_is_folder:
+                    os.makedirs(full_path, exist_ok=True)
+                else:
+                    from shypn.data.canvas.document_model import DocumentModel
+                    doc = DocumentModel()
+                    doc.save_to_file(full_path)
+            
             self._load_current_directory()
         except Exception as e:
             if self.explorer.on_error:
-                self.explorer.on_error(f'Failed to create: {e}')
-            if hasattr(self, 'editing_iter') and self.editing_iter:
+                self.explorer.on_error(f'Failed to {"rename" if is_rename else "create"}: {e}')
+            if hasattr(self, 'editing_iter') and self.editing_iter and not is_rename:
                 self.store.remove(self.editing_iter)
+        
+        self._cleanup_editing_state()
+    
+    def _cleanup_editing_state(self):
+        """Clean up all editing-related state variables."""
         if hasattr(self, 'editing_iter'):
             delattr(self, 'editing_iter')
+        if hasattr(self, 'is_rename_operation'):
+            delattr(self, 'is_rename_operation')
+        if hasattr(self, 'editing_old_path'):
+            delattr(self, 'editing_old_path')
+        if hasattr(self, 'editing_old_name'):
+            delattr(self, 'editing_old_name')
 
     def _on_cell_editing_canceled(self, renderer):
-        """Handle cell editing cancellation - remove temporary row.
+        """Handle cell editing cancellation - remove temporary row or revert changes.
         
         Args:
             renderer: CellRendererText
         """
         self.text_renderer.set_property('editable', False)
-        if hasattr(self, 'editing_iter') and self.editing_iter:
+        
+        # Only remove the iter if it's a new file/folder (not a rename)
+        is_rename = getattr(self, 'is_rename_operation', False)
+        if hasattr(self, 'editing_iter') and self.editing_iter and not is_rename:
             self.store.remove(self.editing_iter)
-            delattr(self, 'editing_iter')
+        
+        self._cleanup_editing_state()
 
     def _on_open_action(self, action, parameter):
         """Handle 'Open' context menu action."""
@@ -815,9 +992,9 @@ class FileExplorerPanel:
             pass
 
     def _on_rename_action(self, action, parameter):
-        """Handle 'Rename' context menu action."""
+        """Handle 'Rename' context menu action - inline editing."""
         if self.selected_item_path:
-            self._show_rename_dialog()
+            self._start_inline_edit_rename()
 
     def _on_delete_action(self, action, parameter):
         """Handle 'Delete' context menu action."""

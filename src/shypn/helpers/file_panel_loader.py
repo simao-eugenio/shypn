@@ -150,9 +150,10 @@ class FilePanelLoader:
             buttons=[
                 ("+ File", self._on_new_file_clicked),
                 ("+ Folder", self._on_new_folder_clicked),
-                ("↻", self._on_refresh_clicked)
+                ("⌂", self._on_collapse_tree_clicked)  # Home/collapse button
             ],
-            expanded=True  # Expanded by default
+            expanded=True,  # Expanded by default
+            on_collapse=self._on_files_category_collapse  # Callback for collapse
         )
         
         # Build content for Files category
@@ -240,9 +241,10 @@ class FilePanelLoader:
         """Initialize file explorer controller."""
         try:
             workspace_boundary = os.path.join(self.repo_root, 'workspace')
+            # Start at workspace root, not subdirectory
             self.file_explorer = FileExplorerPanel(
                 self.builder,
-                base_path=self.base_path,
+                base_path=workspace_boundary,  # Changed from self.base_path to workspace_boundary
                 root_boundary=workspace_boundary
             )
             
@@ -439,6 +441,16 @@ class FilePanelLoader:
     
     # Button handlers for Files category
     
+    def _on_files_category_collapse(self):
+        """Handle FILES category collapse - navigate to workspace root and collapse tree."""
+        if self.file_explorer:
+            # Navigate to workspace root
+            if hasattr(self.file_explorer.explorer, 'root_boundary') and self.file_explorer.explorer.root_boundary:
+                self.file_explorer.explorer.navigate_to(self.file_explorer.explorer.root_boundary)
+            # Collapse all expanded folders
+            self.file_explorer.tree_view.collapse_all()
+            print("[FILES] Category collapsed - navigated to workspace root and collapsed tree", file=sys.stderr)
+    
     def _on_new_file_clicked(self):
         """Handle New File button click - creates file with inline editing."""
         if self.file_explorer:
@@ -451,10 +463,15 @@ class FilePanelLoader:
             # Use existing inline editing infrastructure
             self.file_explorer._start_inline_edit_new_folder()
     
-    def _on_refresh_clicked(self):
-        """Handle Refresh button click."""
+    def _on_collapse_tree_clicked(self):
+        """Handle collapse tree button click - navigate to workspace root and collapse tree."""
         if self.file_explorer:
-            self.file_explorer._on_refresh_clicked(None)
+            # Navigate to workspace root
+            if hasattr(self.file_explorer.explorer, 'root_boundary') and self.file_explorer.explorer.root_boundary:
+                self.file_explorer.explorer.navigate_to(self.file_explorer.explorer.root_boundary)
+            # Collapse all expanded folders
+            self.file_explorer.tree_view.collapse_all()
+            print("[FILES] Tree collapsed - navigated to workspace root", file=sys.stderr)
     
     def _on_quit_requested(self):
         """Handle quit request from project controller."""

@@ -130,15 +130,13 @@
     </child>
     
     <child>
-      <object class="GtkLabel" id="breadcrumb_path_label">
+      <object class="GtkEntry" id="current_file_entry">
         <property name="visible">True</property>
-        <property name="label">workspace/examples</property>
-        <property name="halign">start</property>
-        <property name="ellipsize">middle</property>
-        <property name="single-line-mode">True</property>
-        <style>
-          <class name="dim-label"/>
-        </style>
+        <property name="text"></property>
+        <property name="placeholder-text">No file selected</property>
+        <property name="editable">True</property>
+        <property name="halign">fill</property>
+        <property name="tooltip-text">Currently selected file (editable)</property>
       </object>
       <packing>
         <property name="expand">True</property>

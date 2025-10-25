@@ -47,7 +47,8 @@ class CategoryFrame(Gtk.Frame):
                  title: str,
                  buttons: Optional[List[Tuple[str, Callable]]] = None,
                  expanded: bool = False,
-                 placeholder: bool = False):
+                 placeholder: bool = False,
+                 on_collapse: Optional[Callable] = None):
         """Initialize category frame.
         
         Args:
@@ -55,6 +56,7 @@ class CategoryFrame(Gtk.Frame):
             buttons: Optional list of (label, callback) tuples for inline buttons
             expanded: Initial expand state
             placeholder: If True, shows "TODO" message instead of content
+            on_collapse: Optional callback function to call when collapsing
         """
         super().__init__()
         
@@ -63,6 +65,7 @@ class CategoryFrame(Gtk.Frame):
         self.placeholder = placeholder
         self._buttons = buttons or []
         self._content_widget = None
+        self._on_collapse_callback = on_collapse
         
         # Style
         self.set_shadow_type(Gtk.ShadowType.ETCHED_IN)
@@ -151,6 +154,9 @@ class CategoryFrame(Gtk.Frame):
     def _update_visibility(self):
         """Update content visibility based on expanded state."""
         self._content_box.set_visible(self.expanded)
+        # CRITICAL: Prevent show_all() from overriding collapsed state
+        # When collapsed, mark content box to be skipped by show_all()
+        self._content_box.set_no_show_all(not self.expanded)
     
     def _on_title_clicked(self, widget, event):
         """Handle title bar click to toggle expand/collapse."""
@@ -168,6 +174,11 @@ class CategoryFrame(Gtk.Frame):
         Args:
             expanded: True to expand, False to collapse
         """
+        # Call collapse callback when collapsing (not when expanding)
+        if not expanded and self.expanded and self._on_collapse_callback:
+            print(f"[CATEGORY] Calling collapse callback for {self.title}", file=sys.stderr)
+            self._on_collapse_callback()
+        
         self.expanded = expanded
         self._update_arrow()
         self._update_visibility()
