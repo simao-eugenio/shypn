@@ -558,13 +558,18 @@ def main(argv=None):
 		def on_left_toggle(is_active):
 			"""Handle Files panel toggle from Master Palette.
 			
-			Multiple panels can be active simultaneously (floating).
-			When hanged (in stack), shows in GtkStack and expands paned.
+			EXCLUSIVE MODE: Only one panel active at a time.
+			When button is activated, deactivate others.
 			"""
 			if not left_panel_loader:
 				return
 			
 			if is_active:
+				# Deactivate other panels (exclusive mode)
+				master_palette.set_active('pathways', False)
+				master_palette.set_active('analyses', False)
+				master_palette.set_active('topology', False)
+				
 				# Show this panel (in stack if hanged, or floating if detached)
 				left_panel_loader.show_in_stack()
 				# Expand left paned to show stack only if panel is hanged
@@ -575,31 +580,30 @@ def main(argv=None):
 						pass
 			else:
 				left_panel_loader.hide_in_stack()
-				# Check if any panels are still showing in stack before hiding
-				any_panel_in_stack = (
-					(pathway_panel_loader and pathway_panel_loader.is_hanged and master_palette.is_active('pathways')) or
-					(right_panel_loader and right_panel_loader.is_hanged and master_palette.is_active('analyses')) or
-					(topology_panel_loader and topology_panel_loader.is_hanged and master_palette.is_active('topology'))
-				)
-				if not any_panel_in_stack:
-					if left_dock_stack:
-						left_dock_stack.set_visible(False)
-					if left_paned:
-						try:
-							left_paned.set_position(0)
-						except Exception:
-							pass
+				# Hide stack when last panel is hidden
+				if left_dock_stack:
+					left_dock_stack.set_visible(False)
+				if left_paned:
+					try:
+						left_paned.set_position(0)
+					except Exception:
+						pass
 
 		def on_right_toggle(is_active):
 			"""Handle Analyses panel toggle from Master Palette.
 			
-			Multiple panels can be active simultaneously (floating).
-			When hanged (in stack), shows in GtkStack and expands paned.
+			EXCLUSIVE MODE: Only one panel active at a time.
+			When button is activated, deactivate others.
 			"""
 			if not right_panel_loader:
 				return
 			
 			if is_active:
+				# Deactivate other panels (exclusive mode)
+				master_palette.set_active('files', False)
+				master_palette.set_active('pathways', False)
+				master_palette.set_active('topology', False)
+				
 				# Show this panel (in stack if hanged, or floating if detached)
 				right_panel_loader.show_in_stack()
 				# Expand left paned to show stack only if panel is hanged
@@ -610,31 +614,30 @@ def main(argv=None):
 						pass
 			else:
 				right_panel_loader.hide_in_stack()
-				# Check if any panels are still showing in stack before hiding
-				any_panel_in_stack = (
-					(left_panel_loader and left_panel_loader.is_hanged and master_palette.is_active('files')) or
-					(pathway_panel_loader and pathway_panel_loader.is_hanged and master_palette.is_active('pathways')) or
-					(topology_panel_loader and topology_panel_loader.is_hanged and master_palette.is_active('topology'))
-				)
-				if not any_panel_in_stack:
-					if left_dock_stack:
-						left_dock_stack.set_visible(False)
-					if left_paned:
-						try:
-							left_paned.set_position(0)
-						except Exception:
-							pass
+				# Hide stack when last panel is hidden
+				if left_dock_stack:
+					left_dock_stack.set_visible(False)
+				if left_paned:
+					try:
+						left_paned.set_position(0)
+					except Exception:
+						pass
 
 		def on_pathway_toggle(is_active):
 			"""Handle Pathways panel toggle from Master Palette.
 			
-			Multiple panels can be active simultaneously (floating).
-			When hanged (in stack), shows in GtkStack and expands paned.
+			EXCLUSIVE MODE: Only one panel active at a time.
+			When button is activated, deactivate others.
 			"""
 			if not pathway_panel_loader:
 				return
 			
 			if is_active:
+				# Deactivate other panels (exclusive mode)
+				master_palette.set_active('files', False)
+				master_palette.set_active('analyses', False)
+				master_palette.set_active('topology', False)
+				
 				# Show this panel (in stack if hanged, or floating if detached)
 				pathway_panel_loader.show_in_stack()
 				# Expand left paned to show stack only if panel is hanged
@@ -645,31 +648,30 @@ def main(argv=None):
 						pass
 			else:
 				pathway_panel_loader.hide_in_stack()
-				# Check if any panels are still showing in stack before hiding
-				any_panel_in_stack = (
-					(left_panel_loader and left_panel_loader.is_hanged and master_palette.is_active('files')) or
-					(right_panel_loader and right_panel_loader.is_hanged and master_palette.is_active('analyses')) or
-					(topology_panel_loader and topology_panel_loader.is_hanged and master_palette.is_active('topology'))
-				)
-				if not any_panel_in_stack:
-					if left_dock_stack:
-						left_dock_stack.set_visible(False)
-					if left_paned:
-						try:
-							left_paned.set_position(0)
-						except Exception:
-							pass
+				# Hide stack when last panel is hidden
+				if left_dock_stack:
+					left_dock_stack.set_visible(False)
+				if left_paned:
+					try:
+						left_paned.set_position(0)
+					except Exception:
+						pass
 
 		def on_topology_toggle(is_active):
 			"""Handle Topology panel toggle from Master Palette.
 			
-			Multiple panels can be active simultaneously (floating).
-			When hanged (in stack), shows in GtkStack and expands paned.
+			EXCLUSIVE MODE: Only one panel active at a time.
+			When button is activated, deactivate others.
 			"""
 			if not topology_panel_loader:
 				return
 			
 			if is_active:
+				# Deactivate other panels (exclusive mode)
+				master_palette.set_active('files', False)
+				master_palette.set_active('pathways', False)
+				master_palette.set_active('analyses', False)
+				
 				# Show this panel (in stack if hanged, or floating if detached)
 				topology_panel_loader.show_in_stack()
 				# Expand left paned to show stack only if panel is hanged
@@ -680,20 +682,14 @@ def main(argv=None):
 						pass
 			else:
 				topology_panel_loader.hide_in_stack()
-				# Check if any panels are still showing in stack before hiding
-				any_panel_in_stack = (
-					(left_panel_loader and left_panel_loader.is_hanged and master_palette.is_active('files')) or
-					(pathway_panel_loader and pathway_panel_loader.is_hanged and master_palette.is_active('pathways')) or
-					(right_panel_loader and right_panel_loader.is_hanged and master_palette.is_active('analyses'))
-				)
-				if not any_panel_in_stack:
-					if left_dock_stack:
-						left_dock_stack.set_visible(False)
-					if left_paned:
-						try:
-							left_paned.set_position(0)
-						except Exception:
-							pass
+				# Hide stack when last panel is hidden
+				if left_dock_stack:
+					left_dock_stack.set_visible(False)
+				if left_paned:
+					try:
+						left_paned.set_position(0)
+					except Exception:
+						pass
 
 		# Set up callbacks to manage paned position when panels float/attach (detach button)
 		def on_left_float():
