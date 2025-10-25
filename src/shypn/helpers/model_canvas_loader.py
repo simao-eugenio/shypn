@@ -96,6 +96,9 @@ class ModelCanvasLoader:
         self.context_menu_handler = None
         self._clipboard = []  # Clipboard for cut/copy/paste operations
         
+        # Project reference for structured save paths (pathways/, models/, metadata/)
+        self.project = None
+        
         # Track last pointer position for paste-at-pointer functionality
         self._last_pointer_world_x = 0.0
         self._last_pointer_world_y = 0.0
@@ -2293,6 +2296,20 @@ class ModelCanvasLoader:
                 if original_on_dirty_changed:
                     original_on_dirty_changed(is_dirty)
             persistency.on_dirty_changed = on_dirty_changed_wrapper
+    
+    def set_project(self, project):
+        """Set the current project for structured save paths.
+        
+        When a project is open, all saves go to structured directories:
+        - Petri net models → project/models/
+        - Raw pathway data → project/pathways/
+        - Metadata (BRENDA) → project/metadata/
+        
+        Args:
+            project: Project instance or None
+        """
+        self.project = project
+        print(f"[ModelCanvasLoader] Project set: {project.name if project else 'None'}")
 
     def _on_file_operation_completed(self, filepath, is_save=True):
         """Handle file save/load completion to update tab label.

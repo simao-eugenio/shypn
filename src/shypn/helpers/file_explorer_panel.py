@@ -1332,6 +1332,10 @@ class FileExplorerPanel:
                 import datetime
                 
                 # Determine save directory: project/models/ if project is open, otherwise workspace
+                print(f"[FileExplorer] Project check: self.project={self.project}")
+                if self.project:
+                    print(f"[FileExplorer] Project.base_path={getattr(self.project, 'base_path', 'NO base_path attribute')}")
+                
                 if self.project and hasattr(self.project, 'base_path'):
                     # Save to project/models/ directory
                     models_dir = os.path.join(self.project.base_path, 'models')
@@ -1342,6 +1346,7 @@ class FileExplorerPanel:
                     # Save to workspace directory
                     save_directory = self.explorer.current_path
                     print(f"[FileExplorer] Saving to workspace directory: {save_directory}")
+                    print(f"[FileExplorer] Reason: project={self.project}, has base_path={hasattr(self.project, 'base_path') if self.project else 'N/A'}")
                 
                 # Get base filename from manager or generate timestamp-based name
                 if manager.filename and manager.filename != "default":
@@ -1433,6 +1438,10 @@ class FileExplorerPanel:
             import datetime
             
             # Determine save directory: project/models/ if project is open, otherwise workspace
+            print(f"[FileExplorer] Save As - Project check: self.project={self.project}")
+            if self.project:
+                print(f"[FileExplorer] Save As - Project.base_path={getattr(self.project, 'base_path', 'NO base_path attribute')}")
+            
             if self.project and hasattr(self.project, 'base_path'):
                 # Save to project/models/ directory
                 models_dir = os.path.join(self.project.base_path, 'models')
@@ -1443,6 +1452,7 @@ class FileExplorerPanel:
                 # Save to workspace directory
                 save_directory = self.explorer.current_path
                 print(f"[FileExplorer] Save As to workspace directory: {save_directory}")
+                print(f"[FileExplorer] Reason: project={self.project}, has base_path={hasattr(self.project, 'base_path') if self.project else 'N/A'}")
             
             # Get base filename from manager or current filename
             if manager.filename and manager.filename != "default":
