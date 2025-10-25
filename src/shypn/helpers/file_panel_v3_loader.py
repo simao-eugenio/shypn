@@ -134,6 +134,11 @@ class FilePanelV3Loader(FilePanelBase):
             selection = self.tree_view.get_selection()
             selection.connect('changed', self.controller.on_selection_changed)
         
+        # Connect cell renderer edited signal for inline editing
+        if self.name_renderer:
+            self.name_renderer.connect('edited', self._on_cell_edited)
+            self.name_renderer.connect('editing-canceled', self._on_cell_editing_canceled)
+        
         # Connect path entry
         if self.path_entry:
             self.path_entry.connect('activate', self.controller.on_path_entry_activate)
@@ -294,6 +299,100 @@ class FilePanelV3Loader(FilePanelBase):
         """
         if self.controller:
             self.controller.set_persistency_manager(persistency)
+    
+    def _on_cell_edited(self, renderer, path, new_text):
+        """Handle cell editing completion.
+        
+        Args:
+            renderer: Cell renderer that was edited
+            path: Tree path of the edited cell
+            new_text: New text entered by user
+        """
+        # Disable editing
+        renderer.set_property('editable', False)
+        
+        # Check if we're in project creation mode
+        if self.controller and self.controller.project_creation_mode:
+            self._create_project_from_inline_edit(path, new_text)
+        else:
+            # Handle regular file/folder rename
+            pass  # TODO: Implement if needed
+    
+    def _on_cell_editing_canceled(self, renderer):
+        """Handle cell editing cancellation.
+        
+        Args:
+            renderer: Cell renderer where editing was canceled
+        """
+        # Disable editing
+        renderer.set_property('editable', False)
+        
+        # Remove temporary entry if in project creation mode
+        if self.controller and self.controller.project_creation_mode:
+            if hasattr(self.controller, '_editing_iter'):
+                self.tree_store.remove(self.controller._editing_iter)
+                delattr(self.controller, '_editing_iter')
+            self.controller.project_creation_mode = False
+            self.controller.refresh_tree()
+    
+    def _create_project_from_inline_edit(self, path, project_name):
+        """Create a new project from inline edit.
+        
+        Args:
+            path: Tree path of the edited cell
+            project_name: Name entered by user
+        """
+        print(f"[FILE_PANEL] Creating project: {project_name}")
+        
+        try:
+            # Validate project name
+            if not project_name or project_name.strip() == "":
+                print("[FILE_PANEL] Invalid project name - canceling", file=sys.stderr)
+                self._on_cell_editing_canceled(self.name_renderer)
+                return
+            
+            project_name = project_name.strip()
+            
+            # Remove temporary entry
+            if hasattr(self.controller, '_editing_iter'):
+                self.tree_store.remove(self.controller._editing_iter)
+                delattr(self.controller, '_editing_iter')
+            
+            # Create project using project manager
+            from shypn.data.project_models import get_project_manager
+            project_manager = get_project_manager()
+            
+            # Project path
+            projects_root = Path(self.controller._editing_parent_path)
+            project_path = projects_root / project_name
+            
+            # Create project
+            project = project_manager.create_project(
+                name=project_name,
+                location=str(projects_root),
+                description=f"Project: {project_name}"
+            )
+            
+            if project:
+                print(f"[FILE_PANEL] Project created successfully: {project.name}")
+                
+                # Refresh tree to show new project folder
+                self.controller.refresh_tree()
+                
+                # Trigger callback if set
+                if self.controller.on_project_created:
+                    self.controller.on_project_created(project)
+            else:
+                print(f"[FILE_PANEL] Failed to create project", file=sys.stderr)
+            
+        except Exception as e:
+            print(f"[FILE_PANEL] Error creating project: {e}", file=sys.stderr)
+            import traceback
+            traceback.print_exc()
+        
+        finally:
+            # Exit project creation mode
+            self.controller.project_creation_mode = False
     
     def get_widget(self):
         """Get the main content widget (for backward compatibility).

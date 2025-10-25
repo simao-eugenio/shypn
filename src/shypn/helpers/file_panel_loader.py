@@ -77,6 +77,10 @@ class FilePanelLoader:
         # Sub-controllers
         self.file_explorer = None
         self.project_controller = None
+        
+        # Project reference
+        self.project = None
+        self.model_canvas = None
     
     def load(self):
         """Load the panel UI and create category-based layout.
@@ -179,30 +183,55 @@ class FilePanelLoader:
         self.categories.append(self.files_category)
     
     def _create_project_info_category(self, container):
-        """Create Project Information category.
+        """Create Project Information category with spreadsheet-like view.
         
-        TODO: Create ProjectInfoController to populate this category with live data:
-              - Project name
-              - Project path
-              - Created date
-              - Last modified date
-              - Models count
-              - Project status
-              - Git status (if applicable)
-              Controller should update when project changes or files are added/removed.
+        Displays project summary in a read-only TreeView (2 columns: Property | Value).
+        Auto-populated from project data, no action buttons.
         """
         self.project_info_category = CategoryFrame(
             title="PROJECT INFORMATION",
             expanded=False  # Collapsed by default
         )
         
-        # Get project info content from builder (currently static placeholder)
-        project_info_content = self.builder.get_object('project_info_content')
-        if project_info_content:
-            self.project_info_category.set_content(project_info_content)
+        # Create spreadsheet-like TreeView
+        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         
+        # Create scrolled window
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        scrolled.set_min_content_height(200)
+        
+        # Create TreeView with 2 columns: Property | Value
+        self.project_info_store = Gtk.ListStore(str, str)  # Property, Value
+        self.project_info_treeview = Gtk.TreeView(model=self.project_info_store)
+        self.project_info_treeview.set_headers_visible(True)
+        self.project_info_treeview.set_enable_search(False)
+        self.project_info_treeview.set_grid_lines(Gtk.TreeViewGridLines.HORIZONTAL)
+        
+        # Column 1: Property
+        property_renderer = Gtk.CellRendererText()
+        property_renderer.set_property('weight', 600)  # Bold
+        property_column = Gtk.TreeViewColumn('Property', property_renderer, text=0)
+        property_column.set_sizing(Gtk.TreeViewColumnSizing.AUTOSIZE)
+        property_column.set_min_width(150)
+        self.project_info_treeview.append_column(property_column)
+        
+        # Column 2: Value
+        value_renderer = Gtk.CellRendererText()
+        value_column = Gtk.TreeViewColumn('Value', value_renderer, text=1)
+        value_column.set_sizing(Gtk.TreeViewColumnSizing.AUTOSIZE)
+        value_column.set_expand(True)
+        self.project_info_treeview.append_column(value_column)
+        
+        scrolled.add(self.project_info_treeview)
+        content_box.pack_start(scrolled, True, True, 0)
+        
+        self.project_info_category.set_content(content_box)
         container.pack_start(self.project_info_category, False, False, 0)
         self.categories.append(self.project_info_category)
+        
+        # Populate with initial data
+        self._refresh_project_info()
     
     def _create_project_actions_category(self, container):
         """Create Project Actions category."""
@@ -436,6 +465,15 @@ class FilePanelLoader:
         try:
             self.project_controller = ProjectActionsController(self.builder, parent_window=None)
             self.project_controller.on_quit_requested = self._on_quit_requested
+            
+            # Wire file explorer to project controller for project opening mode
+            if self.file_explorer and hasattr(self.file_explorer, 'controller'):
+                self.project_controller.set_file_panel_controller(self.file_explorer.controller)
+                # Set callback for when project is opened from file panel
+                self.file_explorer.controller.on_project_opened = self._on_project_opened_from_file_panel
+                # Set callback for when project is created from file panel
+                self.file_explorer.controller.on_project_created = self._on_project_created_from_file_panel
+                
         except Exception as e:
             print(f"[LEFT_PANEL] Failed to initialize project controller: {e}", file=sys.stderr)
     
@@ -695,6 +733,141 @@ class FilePanelLoader:
         
         if self.parent_container:
             self.parent_container.set_visible(False)
+    
+    def set_project(self, project):
+        """Set the active project and refresh project information.
+        
+        Args:
+            project: Project instance with metadata
+        """
+        self.project = project
+        self._refresh_project_info()
+    
+    def set_model_canvas(self, model_canvas):
+        """Set the model canvas for extracting model statistics.
+        
+        Args:
+            model_canvas: ModelCanvas instance
+        """
+        self.model_canvas = model_canvas
+        self._refresh_project_info()
+    
+    def _refresh_project_info(self):
+        """Refresh project information spreadsheet view."""
+        if not hasattr(self, 'project_info_store'):
+            return  # Not initialized yet
+        
+        self.project_info_store.clear()
+        
+        if not self.project:
+            # No project loaded
+            self.project_info_store.append(['Status', 'No project loaded'])
+            return
+        
+        # Project basic info
+        self.project_info_store.append(['Project Name', self.project.name or 'Untitled'])
+        self.project_info_store.append(['Path', self.project.base_path or 'N/A'])
+        
+        # Dates
+        if hasattr(self.project, 'created_date') and self.project.created_date:
+            self.project_info_store.append(['Created', str(self.project.created_date)])
+        if hasattr(self.project, 'modified_date') and self.project.modified_date:
+            self.project_info_store.append(['Last Modified', str(self.project.modified_date)])
+        
+        # Add separator row
+        self.project_info_store.append(['', ''])
+        
+        # Content counts
+        models_count = len(self.project.models) if hasattr(self.project, 'models') else 0
+        self.project_info_store.append(['Models', str(models_count)])
+        
+        # Pathways count
+        if hasattr(self.project, 'pathways'):
+            pathways = self.project.pathways.list_pathways()
+            kegg_count = len([p for p in pathways if p.source_type == 'kegg'])
+            sbml_count = len([p for p in pathways if p.source_type == 'sbml'])
+            total_pathways = len(pathways)
+            
+            pathways_str = f"{total_pathways}"
+            if kegg_count > 0 or sbml_count > 0:
+                pathways_str += f" (KEGG: {kegg_count}, SBML: {sbml_count})"
+            
+            self.project_info_store.append(['Pathways', pathways_str])
+            
+            # Enrichments count
+            total_enrichments = sum(len(p.enrichments) for p in pathways)
+            if total_enrichments > 0:
+                # Count by source
+                brenda_count = 0  # TODO: Count actual BRENDA enrichments
+                sabiork_count = 0  # TODO: Count actual SABIO-RK enrichments
+                
+                enrichments_str = f"{total_enrichments}"
+                if brenda_count > 0 or sabiork_count > 0:
+                    enrichments_str += f" (BRENDA: {brenda_count}, SABIO-RK: {sabiork_count})"
+                
+                self.project_info_store.append(['Enrichments', enrichments_str])
+            else:
+                self.project_info_store.append(['Enrichments', '0'])
+        
+        # Model canvas statistics (if available)
+        if self.model_canvas:
+            self.project_info_store.append(['', ''])
+            
+            try:
+                places = len(self.model_canvas.model.places) if hasattr(self.model_canvas, 'model') else 0
+                transitions = len(self.model_canvas.model.transitions) if hasattr(self.model_canvas, 'model') else 0
+                arcs = len(self.model_canvas.model.arcs) if hasattr(self.model_canvas, 'model') else 0
+                
+                self.project_info_store.append(['Places', str(places)])
+                self.project_info_store.append(['Transitions', str(transitions)])
+                self.project_info_store.append(['Arcs', str(arcs)])
+            except Exception as e:
+                print(f"[FILE_PANEL] Could not extract model statistics: {e}")
+    
+    def _on_project_opened_from_file_panel(self, project_path):
+        """Handle project opening from file panel selection.
+        
+        Args:
+            project_path: Path to the .shy project file
+        """
+        print(f"[FILE_PANEL] Project selected for opening: {project_path}")
+        
+        try:
+            # Use project manager to open the project
+            from shypn.data.project_models import get_project_manager
+            project_manager = get_project_manager()
+            project = project_manager.open_project_by_path(project_path)
+            
+            if project:
+                print(f"[FILE_PANEL] Project opened successfully: {project.name}")
+                # Trigger project controller callback
+                if self.project_controller:
+                    self.project_controller._on_project_opened(project)
+            else:
+                print(f"[FILE_PANEL] Failed to open project: {project_path}", file=sys.stderr)
+                
+        except Exception as e:
+            print(f"[FILE_PANEL] Error opening project: {e}", file=sys.stderr)
+            import traceback
+            traceback.print_exc()
+    
+    def _on_project_created_from_file_panel(self, project):
+        """Handle project creation from file panel inline edit.
+        
+        Args:
+            project: The newly created Project instance
+        """
+        print(f"[FILE_PANEL] Project created from file panel: {project.name}")
+        
+        try:
+            # Trigger project controller callback
+            if self.project_controller:
+                self.project_controller._on_project_created(project)
+                
+        except Exception as e:
+            print(f"[FILE_PANEL] Error handling project creation: {e}", file=sys.stderr)
+            import traceback
+            traceback.print_exc()
 
 
 def create_left_panel(ui_path=None, base_path=None, load_window=False):

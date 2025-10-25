@@ -359,19 +359,6 @@
     </child>
     
     <child>
-      <object class="GtkButton" id="project_settings_button">
-        <property name="visible">True</property>
-        <property name="label">Project Settings</property>
-        <property name="tooltip-text">Edit project properties</property>
-        <property name="sensitive">False</property>
-      </object>
-      <packing>
-        <property name="expand">False</property>
-        <property name="fill">True</property>
-      </packing>
-    </child>
-    
-    <child>
       <object class="GtkSeparator">
         <property name="visible">True</property>
         <property name="orientation">horizontal</property>

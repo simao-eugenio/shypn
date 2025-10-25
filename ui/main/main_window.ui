@@ -415,6 +415,20 @@
                       </packing>
                     </child>
                     
+                    <!-- Report Panel Container -->
+                    <child>
+                      <object class="GtkBox" id="report_panel_container">
+                        <property name="orientation">vertical</property>
+                        <property name="visible">True</property>
+                        <property name="vexpand">True</property>
+                        <property name="hexpand">True</property>
+                        <!-- Content loaded from report panel at startup -->
+                      </object>
+                      <packing>
+                        <property name="name">report</property>
+                      </packing>
+                    </child>
+                    
                   </object>
                   <packing>
                     <property name="resize">False</property>

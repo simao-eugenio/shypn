@@ -45,21 +45,25 @@ class KEGGImportPanel:
     Attributes:
         builder: GTK Builder instance (UI references)
         model_canvas: ModelCanvasManager for loading imported pathways
+        project: Current Project instance for pathway metadata tracking
         api_client: KEGGAPIClient for fetching pathways
         parser: KGMLParser for parsing KGML XML
         converter: PathwayConverter for converting to Petri net
         current_pathway: Currently fetched pathway data (KEGGPathway)
+        current_pathway_doc: PathwayDocument for current import
     """
     
-    def __init__(self, builder: Gtk.Builder, model_canvas=None):
+    def __init__(self, builder: Gtk.Builder, model_canvas=None, project=None):
         """Initialize the KEGG import panel controller.
         
         Args:
             builder: GTK Builder with loaded pathway_panel.ui
             model_canvas: Optional ModelCanvasManager for loading pathways
+            project: Optional Project instance for metadata tracking
         """
         self.builder = builder
         self.model_canvas = model_canvas
+        self.project = project
         
         # Initialize backend components
         if KEGGAPIClient and KGMLParser and PathwayConverter:
@@ -75,12 +79,22 @@ class KEGGImportPanel:
         # Current pathway data
         self.current_pathway = None
         self.current_kgml = None
+        self.current_pathway_id = None  # Store pathway ID for later saving
+        self.current_pathway_doc = None  # PathwayDocument for metadata tracking
         
         # Get widget references
         self._get_widgets()
         
         # Connect signals
         self._connect_signals()
+    
+    def set_project(self, project):
+        """Set or update the current project for metadata tracking.
+        
+        Args:
+            project: Project instance
+        """
+        self.project = project
     
     def _get_widgets(self):
         """Get references to UI widgets from builder."""
@@ -178,6 +192,9 @@ class KEGGImportPanel:
         """Called in main thread after fetch completes successfully."""
         self.current_kgml = kgml_data
         self.current_pathway = parsed_pathway
+        
+        # Store pathway_id for later saving (after successful import)
+        self.current_pathway_id = pathway_id
         
         # Update preview
         self._update_preview()
@@ -317,6 +334,50 @@ class KEGGImportPanel:
                     
                     # Mark as imported
                     manager.mark_as_imported(pathway_name)
+                    
+                    # NOW save KGML and metadata to project (after successful import)
+                    if self.project and self.current_kgml and self.current_pathway:
+                        try:
+                            # Save raw KGML file to project/pathways/
+                            filename = f"{self.current_pathway_id}.kgml"
+                            self.project.save_pathway_file(filename, self.current_kgml)
+                            
+                            # Create PathwayDocument with metadata
+                            from shypn.data.pathway_document import PathwayDocument
+                            self.current_pathway_doc = PathwayDocument(
+                                source_type="kegg",
+                                source_id=self.current_pathway_id,
+                                source_organism=self.current_pathway.org,
+                                name=self.current_pathway.title or self.current_pathway.name,
+                                raw_file=filename,
+                                description=f"KEGG pathway: {self.current_pathway.title or self.current_pathway.name}"
+                            )
+                            
+                            # Add metadata about pathway content
+                            self.current_pathway_doc.metadata['entries'] = len(self.current_pathway.entries)
+                            self.current_pathway_doc.metadata['reactions'] = len(self.current_pathway.reactions)
+                            self.current_pathway_doc.metadata['relations'] = len(self.current_pathway.relations)
+                            
+                            # Get model ID from document_model and link
+                            model_id = document_model.id if hasattr(document_model, 'id') else None
+                            if not model_id:
+                                # Try to get from manager
+                                model_id = manager.document_controller.document.id if hasattr(manager.document_controller.document, 'id') else None
+                            
+                            if model_id:
+                                # Link pathway to model
+                                self.current_pathway_doc.link_to_model(model_id)
+                            
+                            # Register with project
+                            self.project.add_pathway(self.current_pathway_doc)
+                            self.project.save()
+                            
+                            print(f"[KEGG_IMPORT] Saved pathway {self.current_pathway_id} to project after successful import")
+                            
+                        except Exception as e:
+                            print(f"[KEGG_IMPORT] Warning: Failed to save pathway metadata after import: {e}")
+                            import traceback
+                            traceback.print_exc()
                     
                     self._show_status(f"✅ Pathway imported: {len(document_model.places)} places, "
                                     f"{len(document_model.transitions)} transitions, "
