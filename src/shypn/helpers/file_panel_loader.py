@@ -368,8 +368,35 @@ class FilePanelLoader:
             print(f"[FILES] Not a project folder: {self.file_explorer.selected_item_path}", file=sys.stderr)
             return
         
-        print(f"[FILES] Opening project: {project_file}")
-        self._on_project_opened_from_file_panel(project_file)
+        # Get project name for confirmation dialog
+        try:
+            from shypn.data.project_models import Project
+            project = Project.load(project_file)
+            project_name = project.name if project and project.name else os.path.basename(self.file_explorer.selected_item_path)
+        except:
+            project_name = os.path.basename(self.file_explorer.selected_item_path)
+        
+        # Show confirmation dialog
+        dialog = Gtk.MessageDialog(
+            transient_for=self.file_explorer.parent_window,
+            flags=0,
+            message_type=Gtk.MessageType.QUESTION,
+            buttons=Gtk.ButtonsType.YES_NO,
+            text=f"Open Project?"
+        )
+        dialog.format_secondary_text(
+            f"Do you want to open the project '{project_name}'?\n\n"
+            f"This will set the project as the active workspace for all operations."
+        )
+        
+        response = dialog.run()
+        dialog.destroy()
+        
+        if response == Gtk.ResponseType.YES:
+            print(f"[FILES] Opening project: {project_file}")
+            self._on_project_opened_from_file_panel(project_file)
+        else:
+            print(f"[FILES] User cancelled project open")
     
     def _on_copy_path_clicked(self, menu_item):
         """Copy absolute path to clipboard."""
@@ -804,6 +831,14 @@ class FilePanelLoader:
         """
         self.pathway_panel_loader = pathway_panel_loader
     
+    def set_model_canvas_loader(self, model_canvas):
+        """Set the model canvas loader for project synchronization.
+        
+        Args:
+            model_canvas: ModelCanvasLoader instance
+        """
+        self.model_canvas = model_canvas
+    
     def _refresh_project_info(self):
         """Refresh project information spreadsheet view."""
         if not hasattr(self, 'project_info_store'):
@@ -899,6 +934,10 @@ class FilePanelLoader:
                 # Update file explorer so it saves to project/models/
                 if self.file_explorer:
                     self.file_explorer.set_project(project)
+                
+                # Update canvas loader so all managers save to correct project paths
+                if self.model_canvas:
+                    self.model_canvas.set_project(project)
                 
                 # Notify pathway panel about project (so import controllers can save to it)
                 if self.pathway_panel_loader:
