@@ -1,0 +1,2399 @@
+{
+  "version": "2.0",
+  "metadata": {
+    "created": "2025-10-25T10:39:45.070610",
+    "object_counts": {
+      "places": 25,
+      "transitions": 24,
+      "arcs": 66
+    }
+  },
+  "view_state": {
+    "zoom": 0.3,
+    "pan_x": 944.8280412362121,
+    "pan_y": 3958.618644740013,
+    "transformations": {
+      "rotation": {
+        "type": "rotation",
+        "angle_degrees": 90.0,
+        "enabled": true
+      }
+    }
+  },
+  "places": [
+    {
+      "id": "1",
+      "name": "P1",
+      "label": "Extracellular glucose",
+      "object_type": "place",
+      "x": -272.62651424618537,
+      "y": 1428.3922583329136,
+      "radius": 25.0,
+      "marking": 7,
+      "initial_marking": 7,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "2",
+      "name": "P2",
+      "label": "Cytosolic glucose",
+      "object_type": "place",
+      "x": -236.4382469751766,
+      "y": 1174.2430115531015,
+      "radius": 25.0,
+      "marking": 1,
+      "initial_marking": 1,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "3",
+      "name": "P3",
+      "label": "ATP",
+      "object_type": "place",
+      "x": -172.62966753365075,
+      "y": 672.4050152518755,
+      "radius": 25.0,
+      "marking": 2,
+      "initial_marking": 2,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "4",
+      "name": "P4",
+      "label": "Glucose-6-Phosphate",
+      "object_type": "place",
+      "x": -372.11930415633617,
+      "y": 856.9270590882936,
+      "radius": 25.0,
+      "marking": 4,
+      "initial_marking": 4,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "5",
+      "name": "P5",
+      "label": "ADP",
+      "object_type": "place",
+      "x": -200.37088674702775,
+      "y": 667.0489268375707,
+      "radius": 25.0,
+      "marking": 2,
+      "initial_marking": 2,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "6",
+      "name": "P6",
+      "label": "Fructose-6-Phosphate",
+      "object_type": "place",
+      "x": -433.91644443157895,
+      "y": 608.885816060965,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "7",
+      "name": "P7",
+      "label": "Fructose 1,6-bisphosphate",
+      "object_type": "place",
+      "x": -218.0265351349985,
+      "y": 250.04585042177365,
+      "radius": 25.0,
+      "marking": 5,
+      "initial_marking": 5,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "8",
+      "name": "P8",
+      "label": "Glyceraldehyde 3-phosphate",
+      "object_type": "place",
+      "x": -29.162443457776163,
+      "y": -74.73453539483666,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "9",
+      "name": "P9",
+      "label": "Dihydroxyacetone phosphate",
+      "object_type": "place",
+      "x": 40.84418153603181,
+      "y": -170.99623830658908,
+      "radius": 25.0,
+      "marking": 3,
+      "initial_marking": 3,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "10",
+      "name": "P10",
+      "label": "NAD",
+      "object_type": "place",
+      "x": 285.536393407431,
+      "y": -91.40964568044524,
+      "radius": 25.0,
+      "marking": 1,
+      "initial_marking": 1,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "11",
+      "name": "P11",
+      "label": "1,3-Bisphosphoglycerate",
+      "object_type": "place",
+      "x": 5.5355125009280925,
+      "y": 250.0975344955533,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "12",
+      "name": "P12",
+      "label": "NADH",
+      "object_type": "place",
+      "x": 272.1065683450452,
+      "y": -123.63707673864093,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "13",
+      "name": "P13",
+      "label": "Phosphoenolpyruvate",
+      "object_type": "place",
+      "x": -9.925671176973907,
+      "y": 526.7445454840896,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "14",
+      "name": "P14",
+      "label": "Pyruvate",
+      "object_type": "place",
+      "x": 233.76628051878475,
+      "y": 454.06101447382946,
+      "radius": 25.0,
+      "marking": 9,
+      "initial_marking": 9,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "15",
+      "name": "P15",
+      "label": "Acetaldehyde",
+      "object_type": "place",
+      "x": 614.3927543699798,
+      "y": 73.10869014821037,
+      "radius": 25.0,
+      "marking": 1,
+      "initial_marking": 1,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "16",
+      "name": "P16",
+      "label": "EtOH",
+      "object_type": "place",
+      "x": 650.033614148977,
+      "y": -90.65972374128671,
+      "radius": 25.0,
+      "marking": 19,
+      "initial_marking": 19,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "17",
+      "name": "P17",
+      "label": "Extracellular ethanol",
+      "object_type": "place",
+      "x": 836.2165326248565,
+      "y": -124.10542870542594,
+      "radius": 25.0,
+      "marking": 16,
+      "initial_marking": 16,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "18",
+      "name": "P18",
+      "label": "Glycerol",
+      "object_type": "place",
+      "x": 450.0914425025713,
+      "y": -471.65895348518234,
+      "radius": 25.0,
+      "marking": 4,
+      "initial_marking": 4,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "19",
+      "name": "P19",
+      "label": "Extracellular glycerol",
+      "object_type": "place",
+      "x": 668.6638009913445,
+      "y": -551.5892006326121,
+      "radius": 25.0,
+      "marking": 2,
+      "initial_marking": 2,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "20",
+      "name": "P20",
+      "label": "Extracellular acetaldehyde",
+      "object_type": "place",
+      "x": 903.303475740042,
+      "y": -130.68899499985037,
+      "radius": 25.0,
+      "marking": 1,
+      "initial_marking": 1,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "21",
+      "name": "P21",
+      "label": "Extracellular cyanide",
+      "object_type": "place",
+      "x": 1278.609060630251,
+      "y": -421.96287434236774,
+      "radius": 25.0,
+      "marking": 5,
+      "initial_marking": 5,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "22",
+      "name": "P22",
+      "label": "AMP",
+      "object_type": "place",
+      "x": -467.94105080423446,
+      "y": 691.5510762665779,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "23",
+      "name": "P23",
+      "label": "P",
+      "object_type": "place",
+      "x": 978.9258500467199,
+      "y": -368.78694748925955,
+      "radius": 25.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "24",
+      "name": "P24",
+      "label": "Mixed flow cyanide",
+      "object_type": "place",
+      "x": 1520.2034891212475,
+      "y": -625.2290948836962,
+      "radius": 25.0,
+      "marking": 6,
+      "initial_marking": 6,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    },
+    {
+      "id": "25",
+      "name": "P25",
+      "label": "Mixed flow glucose",
+      "object_type": "place",
+      "x": -329.78827346061837,
+      "y": 1742.0408163265308,
+      "radius": 25.0,
+      "marking": 24,
+      "initial_marking": 24,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "id": "1",
+      "name": "T1",
+      "label": "Glucose Mixed flow to extracellular medium",
+      "object_type": "transition",
+      "x": -303.75175157828096,
+      "y": 1608.1620835252356,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "stochastic",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0
+    },
+    {
+      "id": "2",
+      "name": "T2",
+      "label": "Glucose uptake",
+      "object_type": "transition",
+      "x": -238.4047439708244,
+      "y": 1210.2233003334532,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0
+    },
+    {
+      "id": "3",
+      "name": "T3",
+      "label": "Hexokinase",
+      "object_type": "transition",
+      "x": -233.82291283485583,
+      "y": 889.9243185309388,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0
+    },
+    {
+      "id": "4",
+      "name": "T4",
+      "label": "Phosphoglucoisomerase",
+      "object_type": "transition",
+      "x": -487.9961431975506,
+      "y": 768.0120579970502,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0
+    },
+    {
+      "id": "5",
+      "name": "T5",
+      "label": "Phosphofructokinase",
+      "object_type": "transition",
+      "x": -271.2199563850156,
+      "y": 509.14034098325766,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0
+    },
+    {
+      "id": "6",
+      "name": "T6",
+      "label": "Aldolase",
+      "object_type": "transition",
+      "x": -107.82233584361725,
+      "y": 14.916285227438806,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0
+    },
+    {
+      "id": "7",
+      "name": "T7",
+      "label": "Triosephosphate isomerase",
+      "object_type": "transition",
+      "x": -67.13564225033795,
+      "y": -200.97767915917876,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0
+    },
+    {
+      "id": "8",
+      "name": "T8",
+      "label": "Glyceraldehyde 3-phosphate dehydrogenase",
+      "object_type": "transition",
+      "x": 122.85574652445875,
+      "y": 11.283648066176056,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0
+    },
+    {
+      "id": "9",
+      "name": "T9",
+      "label": "Phosphoenolpyruvate synthesis",
+      "object_type": "transition",
+      "x": -101.49729094668467,
+      "y": 495.321269682093,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "stochastic",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0,
+      "properties": {
+        "rate_function": "mass_action(P11, P5, 1.0)"
+      }
+    },
+    {
+      "id": "10",
+      "name": "T10",
+      "label": "Pyruvate kinase",
+      "object_type": "transition",
+      "x": -0.9507395990491432,
+      "y": 595.0462423402955,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0
+    },
+    {
+      "id": "11",
+      "name": "T11",
+      "label": "Pyruvate decarboxylase",
+      "object_type": "transition",
+      "x": 439.1544372692772,
+      "y": 280.6742410301425,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0
+    },
+    {
+      "id": "12",
+      "name": "T12",
+      "label": "Alcohol dehydrogenase",
+      "object_type": "transition",
+      "x": 461.21669605864054,
+      "y": -59.466865160935924,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0
+    },
+    {
+      "id": "13",
+      "name": "T13",
+      "label": "Ethanol out",
+      "object_type": "transition",
+      "x": 677.9058360799048,
+      "y": -94.11370626724715,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0
+    },
+    {
+      "id": "14",
+      "name": "T14",
+      "label": "Ethanol flow",
+      "object_type": "transition",
+      "x": 954.8996993388863,
+      "y": -220.7178977513123,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "stochastic",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0
+    },
+    {
+      "id": "15",
+      "name": "T15",
+      "label": "Glycerol synthesis",
+      "object_type": "transition",
+      "x": 262.4667282869817,
+      "y": -267.78009844833633,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0
+    },
+    {
+      "id": "16",
+      "name": "T16",
+      "label": "Glycerol out",
+      "object_type": "transition",
+      "x": 479.01159754932144,
+      "y": -492.5322987662016,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0
+    },
+    {
+      "id": "17",
+      "name": "T17",
+      "label": "Glycerol flow",
+      "object_type": "transition",
+      "x": 848.6623004461552,
+      "y": -507.84379111187536,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "stochastic",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0
+    },
+    {
+      "id": "18",
+      "name": "T18",
+      "label": "Acetaldehyde out",
+      "object_type": "transition",
+      "x": 651.4512313669354,
+      "y": 53.270619637839474,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0
+    },
+    {
+      "id": "19",
+      "name": "T19",
+      "label": "Acetaldehyde flow",
+      "object_type": "transition",
+      "x": 989.5661675567966,
+      "y": -261.30429736570727,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "stochastic",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0
+    },
+    {
+      "id": "20",
+      "name": "T20",
+      "label": "Cyanide-Acetaldehyde flow",
+      "object_type": "transition",
+      "x": 1094.4372317838595,
+      "y": -298.111423394486,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "stochastic",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0,
+      "properties": {
+        "rate_function": "mass_action(P21, P20, 1.0)"
+      }
+    },
+    {
+      "id": "21",
+      "name": "T21",
+      "label": "Cyanide flow",
+      "object_type": "transition",
+      "x": 1416.6182273726738,
+      "y": -537.6804383654397,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "stochastic",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0
+    },
+    {
+      "id": "22",
+      "name": "T22",
+      "label": "Storage",
+      "object_type": "transition",
+      "x": -269.98480746325004,
+      "y": 772.223265817689,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "stochastic",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0,
+      "properties": {
+        "rate_function": "mass_action(P3, P4, 1.0)"
+      }
+    },
+    {
+      "id": "23",
+      "name": "T23",
+      "label": "ATP consumption",
+      "object_type": "transition",
+      "x": -142.53847057972027,
+      "y": 763.0624429518042,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "stochastic",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0
+    },
+    {
+      "id": "24",
+      "name": "T24",
+      "label": "Adenylate kinase",
+      "object_type": "transition",
+      "x": -308.4050233443587,
+      "y": 679.1754793262141,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "stochastic",
+      "priority": 0,
+      "firing_policy": "earliest",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0,
+      "properties": {
+        "rate_function": "mass_action(P3, P22, 1.0)"
+      }
+    }
+  ],
+  "arcs": [
+    {
+      "id": "1",
+      "name": "A1",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "25",
+      "source_type": "place",
+      "target_id": "1",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "2",
+      "name": "A2",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "1",
+      "source_type": "transition",
+      "target_id": "1",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "3",
+      "name": "A3",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "1",
+      "source_type": "place",
+      "target_id": "2",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "4",
+      "name": "A4",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "2",
+      "source_type": "transition",
+      "target_id": "2",
+      "target_type": "place",
+      "weight": 59,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "5",
+      "name": "A5",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "3",
+      "source_type": "place",
+      "target_id": "3",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "6",
+      "name": "A6",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "2",
+      "source_type": "place",
+      "target_id": "3",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "7",
+      "name": "A7",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "3",
+      "source_type": "transition",
+      "target_id": "4",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "8",
+      "name": "A8",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "3",
+      "source_type": "transition",
+      "target_id": "5",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "9",
+      "name": "A9",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "4",
+      "source_type": "place",
+      "target_id": "4",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "10",
+      "name": "A10",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "4",
+      "source_type": "transition",
+      "target_id": "6",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "11",
+      "name": "A11",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "6",
+      "source_type": "place",
+      "target_id": "5",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "12",
+      "name": "A12",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "3",
+      "source_type": "place",
+      "target_id": "5",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "13",
+      "name": "A13",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "5",
+      "source_type": "transition",
+      "target_id": "7",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "14",
+      "name": "A14",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "5",
+      "source_type": "transition",
+      "target_id": "5",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "15",
+      "name": "A15",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "7",
+      "source_type": "place",
+      "target_id": "6",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "16",
+      "name": "A16",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "6",
+      "source_type": "transition",
+      "target_id": "8",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "17",
+      "name": "A17",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "6",
+      "source_type": "transition",
+      "target_id": "9",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "18",
+      "name": "A18",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "9",
+      "source_type": "place",
+      "target_id": "7",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "19",
+      "name": "A19",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "7",
+      "source_type": "transition",
+      "target_id": "8",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "20",
+      "name": "A20",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "8",
+      "source_type": "place",
+      "target_id": "8",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "21",
+      "name": "A21",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "10",
+      "source_type": "place",
+      "target_id": "8",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "22",
+      "name": "A22",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "8",
+      "source_type": "transition",
+      "target_id": "12",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "23",
+      "name": "A23",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "8",
+      "source_type": "transition",
+      "target_id": "11",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "24",
+      "name": "A24",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "11",
+      "source_type": "place",
+      "target_id": "9",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "25",
+      "name": "A25",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "5",
+      "source_type": "place",
+      "target_id": "9",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "26",
+      "name": "A26",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "9",
+      "source_type": "transition",
+      "target_id": "13",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "27",
+      "name": "A27",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "9",
+      "source_type": "transition",
+      "target_id": "3",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "28",
+      "name": "A28",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "5",
+      "source_type": "place",
+      "target_id": "10",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "29",
+      "name": "A29",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "13",
+      "source_type": "place",
+      "target_id": "10",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "30",
+      "name": "A30",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "10",
+      "source_type": "transition",
+      "target_id": "14",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "31",
+      "name": "A31",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "10",
+      "source_type": "transition",
+      "target_id": "3",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "32",
+      "name": "A32",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "14",
+      "source_type": "place",
+      "target_id": "11",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "33",
+      "name": "A33",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "11",
+      "source_type": "transition",
+      "target_id": "15",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "34",
+      "name": "A34",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "12",
+      "source_type": "place",
+      "target_id": "12",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "35",
+      "name": "A35",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "15",
+      "source_type": "place",
+      "target_id": "12",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "36",
+      "name": "A36",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "12",
+      "source_type": "transition",
+      "target_id": "10",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "37",
+      "name": "A37",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "12",
+      "source_type": "transition",
+      "target_id": "16",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "38",
+      "name": "A38",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "16",
+      "source_type": "place",
+      "target_id": "13",
+      "target_type": "transition",
+      "weight": 59,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "39",
+      "name": "A39",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "13",
+      "source_type": "transition",
+      "target_id": "17",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "40",
+      "name": "A40",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "17",
+      "source_type": "place",
+      "target_id": "14",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "41",
+      "name": "A41",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "14",
+      "source_type": "transition",
+      "target_id": "23",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "42",
+      "name": "A42",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "9",
+      "source_type": "place",
+      "target_id": "15",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "43",
+      "name": "A43",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "12",
+      "source_type": "place",
+      "target_id": "15",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "44",
+      "name": "A44",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "15",
+      "source_type": "transition",
+      "target_id": "18",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "45",
+      "name": "A45",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "15",
+      "source_type": "transition",
+      "target_id": "10",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "46",
+      "name": "A46",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "18",
+      "source_type": "place",
+      "target_id": "16",
+      "target_type": "transition",
+      "weight": 59,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "47",
+      "name": "A47",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "16",
+      "source_type": "transition",
+      "target_id": "19",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "48",
+      "name": "A48",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "19",
+      "source_type": "place",
+      "target_id": "17",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "49",
+      "name": "A49",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "17",
+      "source_type": "transition",
+      "target_id": "23",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "50",
+      "name": "A50",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "15",
+      "source_type": "place",
+      "target_id": "18",
+      "target_type": "transition",
+      "weight": 59,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "51",
+      "name": "A51",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "18",
+      "source_type": "transition",
+      "target_id": "20",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "52",
+      "name": "A52",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "20",
+      "source_type": "place",
+      "target_id": "19",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "53",
+      "name": "A53",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "19",
+      "source_type": "transition",
+      "target_id": "23",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "54",
+      "name": "A54",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "21",
+      "source_type": "place",
+      "target_id": "20",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "55",
+      "name": "A55",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "20",
+      "source_type": "place",
+      "target_id": "20",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "56",
+      "name": "A56",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "20",
+      "source_type": "transition",
+      "target_id": "23",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "57",
+      "name": "A57",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "24",
+      "source_type": "place",
+      "target_id": "21",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "58",
+      "name": "A58",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "21",
+      "source_type": "transition",
+      "target_id": "21",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "59",
+      "name": "A59",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "3",
+      "source_type": "place",
+      "target_id": "22",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "60",
+      "name": "A60",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "4",
+      "source_type": "place",
+      "target_id": "22",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "61",
+      "name": "A61",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "22",
+      "source_type": "transition",
+      "target_id": "5",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "62",
+      "name": "A62",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "3",
+      "source_type": "place",
+      "target_id": "23",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "63",
+      "name": "A63",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "23",
+      "source_type": "transition",
+      "target_id": "5",
+      "target_type": "place",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "64",
+      "name": "A64",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "3",
+      "source_type": "place",
+      "target_id": "24",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "65",
+      "name": "A65",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "22",
+      "source_type": "place",
+      "target_id": "24",
+      "target_type": "transition",
+      "weight": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "66",
+      "name": "A66",
+      "label": "",
+      "object_type": "arc",
+      "source_id": "24",
+      "source_type": "transition",
+      "target_id": "5",
+      "target_type": "place",
+      "weight": 2,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    }
+  ]
+}
