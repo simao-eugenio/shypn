@@ -301,6 +301,7 @@ class FilePanelLoader:
         # Build comprehensive VS Code-style context menu
         menu_items = [
             ('Open', self.file_explorer._on_context_open_clicked),
+            ('Open Project', self._on_open_project_clicked),  # NEW: Open project folder
             ('---', None),
             ('Rename', self.file_explorer._on_rename_clicked),
             ('Delete', self.file_explorer._on_delete_clicked),
@@ -316,6 +317,9 @@ class FilePanelLoader:
             ('Properties', self.file_explorer._on_properties_clicked),
         ]
         
+        # Store references for dynamic enable/disable
+        self.file_explorer.menu_items_refs = {}
+        
         for label, callback in menu_items:
             if label == '---':
                 separator = Gtk.SeparatorMenuItem()
@@ -325,8 +329,47 @@ class FilePanelLoader:
                 if callback:
                     menu_item.connect('activate', callback)
                 self.file_explorer.context_menu.append(menu_item)
+                # Store reference for items that need dynamic visibility
+                if label == 'Open Project':
+                    self.file_explorer.menu_items_refs['Open Project'] = menu_item
         
+        # Connect to menu show event to update item visibility
+        self.file_explorer.context_menu.connect('show', self._on_context_menu_show_enhanced)
         self.file_explorer.context_menu.show_all()
+    
+    def _on_context_menu_show_enhanced(self, menu):
+        """Update context menu item visibility when menu is shown.
+        
+        Show "Open Project" only when right-clicking on a project folder.
+        """
+        if not self.file_explorer or 'Open Project' not in self.file_explorer.menu_items_refs:
+            return
+        
+        # Check if selected item is a project folder
+        is_project_folder = False
+        if self.file_explorer.selected_item_path and self.file_explorer.selected_item_is_dir:
+            project_file = os.path.join(self.file_explorer.selected_item_path, '.project.shy')
+            is_project_folder = os.path.exists(project_file)
+        
+        # Show/hide "Open Project" based on selection
+        self.file_explorer.menu_items_refs['Open Project'].set_visible(is_project_folder)
+    
+    def _on_open_project_clicked(self, menu_item):
+        """Open the selected project folder as a SHYpn project."""
+        if not self.file_explorer or not self.file_explorer.selected_item_path:
+            return
+        
+        if not self.file_explorer.selected_item_is_dir:
+            return
+        
+        # Find the .project.shy file in the directory
+        project_file = os.path.join(self.file_explorer.selected_item_path, '.project.shy')
+        if not os.path.exists(project_file):
+            print(f"[FILES] Not a project folder: {self.file_explorer.selected_item_path}", file=sys.stderr)
+            return
+        
+        print(f"[FILES] Opening project: {project_file}")
+        self._on_project_opened_from_file_panel(project_file)
     
     def _on_copy_path_clicked(self, menu_item):
         """Copy absolute path to clipboard."""

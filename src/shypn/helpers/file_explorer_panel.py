@@ -116,7 +116,8 @@ class FileExplorerPanel:
         This is display logic - how data is presented.
         The TreeView widget itself is defined in XML.
         """
-        self.store = Gtk.TreeStore(str, str, str, bool)
+        # TreeStore columns: icon, display_name, full_path, is_directory, is_project, weight, background
+        self.store = Gtk.TreeStore(str, str, str, bool, bool, int, str)
         self.tree_view.set_model(self.store)
         self._apply_tree_view_css()
         name_column = Gtk.TreeViewColumn()
@@ -134,6 +135,9 @@ class FileExplorerPanel:
         text_renderer.connect('editing-canceled', self._on_cell_editing_canceled)
         name_column.pack_start(text_renderer, True)
         name_column.add_attribute(text_renderer, 'text', 1)
+        # Add styling attributes for projects (bold text, darker background)
+        name_column.add_attribute(text_renderer, 'weight', 5)  # Font weight
+        name_column.add_attribute(text_renderer, 'background', 6)  # Background color
         self.text_renderer = text_renderer
         self.tree_view.append_column(name_column)
 
@@ -347,7 +351,49 @@ class FileExplorerPanel:
         """
         entries = self.explorer.get_current_entries()
         for entry in entries:
-            self.store.append(None, [entry['icon_name'], entry['name'], entry['path'], entry['is_directory']])
+            is_project, display_name = self._check_if_project(entry['path'], entry['is_directory'], entry['name'])
+            weight = 700 if is_project else 400  # Bold for projects
+            bg_color = '#e8e8e8' if is_project else None  # Darker background for projects
+            self.store.append(None, [
+                entry['icon_name'], 
+                display_name,  # Use display name (alias)
+                entry['path'], 
+                entry['is_directory'],
+                is_project,
+                weight,
+                bg_color
+            ])
+    
+    def _check_if_project(self, path: str, is_directory: bool, name: str):
+        """Check if a directory is a SHYpn project and get its display name.
+        
+        Args:
+            path: Full path to the item
+            is_directory: Whether the item is a directory
+            name: Original folder/file name
+            
+        Returns:
+            Tuple of (is_project: bool, display_name: str)
+        """
+        if not is_directory:
+            return False, name
+        
+        # Check if directory contains a .project.shy file
+        project_file = os.path.join(path, '.project.shy')
+        if not os.path.exists(project_file):
+            return False, name
+        
+        # Try to read project name from .project.shy file
+        try:
+            from shypn.data.project_models import Project
+            project = Project.load(project_file)
+            if project and project.name:
+                return True, project.name  # Use project's display name
+        except:
+            pass
+        
+        # Fallback: it's a project but couldn't read name, use folder name
+        return True, name
 
     def _load_directory_tree(self, directory: str, parent_iter):
         """Load directory contents recursively in tree mode.
@@ -375,11 +421,14 @@ class FileExplorerPanel:
             files.sort(key=lambda x: x[0].lower())
             for name, path in directories:
                 icon = self.explorer._get_icon_name(name, True)
-                dir_iter = self.store.append(parent_iter, [icon, name, path, True])
+                is_project, display_name = self._check_if_project(path, True, name)
+                weight = 700 if is_project else 400  # Bold for projects
+                bg_color = '#e8e8e8' if is_project else None  # Darker background for projects
+                dir_iter = self.store.append(parent_iter, [icon, display_name, path, True, is_project, weight, bg_color])
                 self._load_directory_tree(path, dir_iter)
             for name, path in files:
                 icon = self.explorer._get_icon_name(name, False)
-                self.store.append(parent_iter, [icon, name, path, False])
+                self.store.append(parent_iter, [icon, name, path, False, False, 400, None])
         except PermissionError:
             if self.explorer.on_error:
                 self.explorer.on_error(f'Permission denied: {directory}')
