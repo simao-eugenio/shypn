@@ -118,7 +118,7 @@ class KEGGImportPanel:
         
         # Action buttons
         self.fetch_button = self.builder.get_object('fetch_button')
-        self.import_button = self.builder.get_object('import_button')
+        self.import_button = self.builder.get_object('kegg_import_button')
     
     def _connect_signals(self):
         """Connect widget signals to handlers."""
@@ -254,7 +254,80 @@ class KEGGImportPanel:
         buffer.set_text(preview_text)
     
     def _on_import_clicked(self, button):
-        """Handle import button click - convert and load into canvas."""
+        """Handle unified import button click.
+        
+        This is the main entry point for KEGG import that does:
+        1. Fetch pathway from KEGG (if not already fetched)
+        2. Convert to Petri net
+        3. Load to canvas
+        
+        All in one smooth flow.
+        """
+        # Check if we already have a fetched pathway
+        if self.current_pathway and self.current_kgml:
+            # Pathway already fetched - go straight to conversion and loading
+            self._do_import_to_canvas()
+        else:
+            # No pathway fetched yet - fetch first, then import
+            pathway_id = self.pathway_id_entry.get_text().strip()
+            if not pathway_id:
+                self._show_status("Please enter a pathway ID", error=True)
+                return
+            
+            # Fetch and then import when complete
+            self._fetch_and_import(pathway_id)
+    
+    def _fetch_and_import(self, pathway_id):
+        """Fetch pathway and then import it automatically."""
+        if not self.api_client:
+            self._show_status("Error: KEGG importer not available", error=True)
+            return
+        
+        # Disable buttons during fetch
+        if self.fetch_button:
+            self.fetch_button.set_sensitive(False)
+        self.import_button.set_sensitive(False)
+        self._show_status(f"🔄 Fetching pathway {pathway_id} from KEGG...")
+        
+        # Fetch in background thread
+        def fetch_thread():
+            try:
+                # Fetch KGML from API
+                kgml_data = self.api_client.fetch_kgml(pathway_id)
+                
+                if not kgml_data:
+                    GLib.idle_add(self._on_fetch_failed, pathway_id)
+                    return
+                
+                # Parse KGML
+                parsed_pathway = self.parser.parse(kgml_data)
+                
+                # Update UI and trigger import
+                GLib.idle_add(self._on_fetch_complete_and_import, pathway_id, kgml_data, parsed_pathway)
+                
+            except Exception as e:
+                GLib.idle_add(self._on_fetch_error, pathway_id, str(e))
+        
+        threading.Thread(target=fetch_thread, daemon=True).start()
+    
+    def _on_fetch_complete_and_import(self, pathway_id, kgml_data, parsed_pathway):
+        """Called after fetch completes - store data and immediately import."""
+        self.current_kgml = kgml_data
+        self.current_pathway = parsed_pathway
+        self.current_pathway_id = pathway_id
+        
+        # Update preview
+        self._update_preview()
+        
+        self._show_status(f"✅ Fetched {pathway_id}, now importing...")
+        
+        # Now import to canvas
+        self._do_import_to_canvas()
+        
+        return False  # Don't repeat
+    
+    def _do_import_to_canvas(self):
+        """Convert and load current pathway into canvas."""
         if not self.current_pathway or not self.converter:
             self._show_status("No pathway loaded", error=True)
             return
@@ -264,7 +337,8 @@ class KEGGImportPanel:
             return
         
         # Disable buttons during import
-        self.fetch_button.set_sensitive(False)
+        if self.fetch_button:
+            self.fetch_button.set_sensitive(False)
         self.import_button.set_sensitive(False)
         self._show_status("🔄 Converting pathway to Petri net...")
         
@@ -394,7 +468,8 @@ class KEGGImportPanel:
         
         finally:
             # Re-enable buttons
-            self.fetch_button.set_sensitive(True)
+            if self.fetch_button:
+                self.fetch_button.set_sensitive(True)
             self.import_button.set_sensitive(True)
         
         return False  # Don't repeat
@@ -402,7 +477,8 @@ class KEGGImportPanel:
     def _on_import_error(self, error_msg):
         """Called in main thread when import encounters an error."""
         self._show_status(f"❌ Import error: {error_msg}", error=True)
-        self.fetch_button.set_sensitive(True)
+        if self.fetch_button:
+            self.fetch_button.set_sensitive(True)
         self.import_button.set_sensitive(True)
         return False  # Don't repeat
     

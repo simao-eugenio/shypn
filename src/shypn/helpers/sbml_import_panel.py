@@ -161,7 +161,7 @@ class SBMLImportPanel:
         
         # Action buttons
         self.sbml_parse_button = self.builder.get_object('sbml_parse_button')
-        # Note: sbml_import_button removed in v2.0 - Parse now auto-loads to canvas
+        self.sbml_import_button = self.builder.get_object('sbml_import_button')
     
     def _connect_signals(self):
         """Connect widget signals to handlers."""
@@ -190,9 +190,9 @@ class SBMLImportPanel:
         if self.sbml_parse_button:
             self.sbml_parse_button.connect('clicked', self._on_parse_clicked)
         
-        # NOTE: Import button removed in v2.0 - Parse now auto-loads to canvas
-        # if self.sbml_import_button:
-        #     self.sbml_import_button.connect('clicked', self._on_import_clicked)
+        # Unified import button (handles both fetch/browse + parse + load to canvas)
+        if self.sbml_import_button:
+            self.sbml_import_button.connect('clicked', self._on_import_clicked)
         
         # Scale changes
         if self.sbml_scale_spin:
@@ -993,3 +993,37 @@ class SBMLImportPanel:
                 params['scale'] = self.sbml_canvas_scale_spin.get_value()
         
         return params
+    
+    def _on_import_clicked(self, button):
+        """Handle unified import button click.
+        
+        This is the main entry point for SBML import that does:
+        1. Browse for file (if not already selected) OR fetch from BioModels
+        2. Parse the SBML file
+        3. Load to canvas
+        
+        All in one smooth flow.
+        """
+        # Check if we already have a file selected or fetched
+        if self.current_filepath and os.path.exists(self.current_filepath):
+            # File already selected - go straight to parse
+            self._on_parse_clicked(button)
+        else:
+            # No file selected yet - need to browse or fetch
+            if self.sbml_local_radio and self.sbml_local_radio.get_active():
+                # Local file mode - trigger browse
+                self._on_browse_clicked(button)
+                # After browse completes, user will need to click import again
+                # (This is expected behavior - browse opens file chooser, user selects, then clicks import)
+            elif self.sbml_biomodels_radio and self.sbml_biomodels_radio.get_active():
+                # BioModels mode - trigger fetch
+                biomodels_id = self.sbml_biomodels_entry.get_text().strip() if self.sbml_biomodels_entry else ""
+                if biomodels_id:
+                    # ID entered - fetch it
+                    self._on_fetch_clicked(button)
+                    # Fetch will auto-parse and load when complete
+                else:
+                    self._show_status("Please enter a BioModels ID", error=True)
+            else:
+                self._show_status("Please select an SBML file or enter a BioModels ID", error=True)
+
