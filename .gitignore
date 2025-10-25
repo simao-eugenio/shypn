@@ -73,6 +73,9 @@ venv.bak/
 .ropeproject
 Token.txt
 
+# BRENDA credentials (never commit passwords!)
+brenda_credentials.txt
+
 # Workspace isolation (user-specific content)
 # workspace/examples/ is tracked (demo files)
 # workspace/projects/ and workspace/cache/ are user-specific

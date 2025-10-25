@@ -112,7 +112,11 @@ class FilePanelV3Loader(FilePanelBase):
         
         Called by base class after widgets are initialized.
         """
-        # Create controller FIRST before building category structure
+        # IMPORTANT: Replace the basic TreeView structure with CategoryFrame structure
+        # The XML UI has a simple container, but we need the CategoryFrame design
+        self._build_category_structure()
+        
+        # Create controller
         self.controller = FilePanelController(
             base_path=self.base_path,
             tree_view=self.tree_view,
@@ -120,10 +124,6 @@ class FilePanelV3Loader(FilePanelBase):
             path_entry=self.path_entry,
             name_renderer=self.name_renderer,
         )
-        
-        # THEN replace the basic TreeView structure with CategoryFrame structure
-        # The XML UI has a simple container, but we need the CategoryFrame design
-        self._build_category_structure()
         
         # Connect TreeView signals
         if self.tree_view:
@@ -167,10 +167,10 @@ class FilePanelV3Loader(FilePanelBase):
         self.files_category = CategoryFrame(
             title="Files",
             buttons=[
-                ("＋", self.controller.on_new_file),
-                ("📁", self.controller.on_new_folder),
-                ("↻", self.controller.on_refresh),
-                ("─", self.controller.on_collapse_all)
+                ("＋", self.controller.on_new_file if self.controller else lambda: None),
+                ("📁", self.controller.on_new_folder if self.controller else lambda: None),
+                ("↻", self.controller.on_refresh if self.controller else lambda: None),
+                ("─", self.controller.on_collapse_all if self.controller else lambda: None)
             ],
             expanded=True
         )
@@ -190,6 +190,9 @@ class FilePanelV3Loader(FilePanelBase):
         
         files_content.pack_start(self.path_entry, False, False, 0)
         files_content.pack_start(self.tree_scroll, True, True, 0)
+        
+        # Make sure all widgets are visible
+        files_content.show_all()
         
         self.files_category.set_content(files_content)
         self.categories_container.pack_start(self.files_category, True, True, 0)
