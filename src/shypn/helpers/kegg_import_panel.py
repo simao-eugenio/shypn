@@ -117,7 +117,8 @@ class KEGGImportPanel:
         self.import_status_label = self.builder.get_object('import_status_label')
         
         # Action buttons
-        self.fetch_button = self.builder.get_object('fetch_button')
+        # Note: fetch_button removed in unified flow - only kegg_import_button exists
+        self.fetch_button = None  # Legacy - no longer in UI
         self.import_button = self.builder.get_object('kegg_import_button')
     
     def _connect_signals(self):
@@ -160,7 +161,8 @@ class KEGGImportPanel:
             return
         
         # Disable buttons during fetch
-        self.fetch_button.set_sensitive(False)
+        if self.fetch_button:
+            self.fetch_button.set_sensitive(False)
         self.import_button.set_sensitive(False)
         self._show_status(f"🔄 Fetching pathway {pathway_id} from KEGG...")
         
@@ -204,13 +206,15 @@ class KEGGImportPanel:
         self._show_status(f"✅ Pathway {pathway_id} loaded successfully")
         
         # Re-enable fetch button
-        self.fetch_button.set_sensitive(True)
+        if self.fetch_button:
+            self.fetch_button.set_sensitive(True)
         return False  # Don't repeat
     
     def _on_fetch_failed(self, pathway_id):
         """Called in main thread when fetch fails."""
         self._show_status(f"❌ Failed to fetch pathway {pathway_id}", error=True)
-        self.fetch_button.set_sensitive(True)
+        if self.fetch_button:
+            self.fetch_button.set_sensitive(True)
         return False  # Don't repeat
     
     def _on_fetch_error(self, pathway_id, error_msg):
@@ -218,7 +222,8 @@ class KEGGImportPanel:
         self._show_status(f"❌ Error: {error_msg}", error=True)
         self.current_pathway = None
         self.current_kgml = None
-        self.fetch_button.set_sensitive(True)
+        if self.fetch_button:
+            self.fetch_button.set_sensitive(True)
         return False  # Don't repeat
     
     def _update_preview(self):
@@ -369,6 +374,12 @@ class KEGGImportPanel:
                     enhancement_options=enhancement_options
                 )
                 
+                # Debug: Check what we got
+                print(f"[KEGG_IMPORT] Conversion complete:")
+                print(f"  - Places: {len(document_model.places) if document_model and hasattr(document_model, 'places') else 'N/A'}")
+                print(f"  - Transitions: {len(document_model.transitions) if document_model and hasattr(document_model, 'transitions') else 'N/A'}")
+                print(f"  - Arcs: {len(document_model.arcs) if document_model and hasattr(document_model, 'arcs') else 'N/A'}")
+                
                 # Update UI in main thread
                 GLib.idle_add(self._on_import_complete, document_model)
                 
@@ -383,22 +394,35 @@ class KEGGImportPanel:
     
     def _on_import_complete(self, document_model):
         """Called in main thread after import completes successfully."""
+        print(f"[KEGG_IMPORT] _on_import_complete called")
+        print(f"[KEGG_IMPORT] document_model: {document_model}")
+        print(f"[KEGG_IMPORT] model_canvas: {self.model_canvas}")
+        
         try:
             # Load into canvas
             if self.model_canvas:
                 # Create a new tab for this pathway
                 pathway_name = self.current_pathway.title or self.current_pathway.name
+                print(f"[KEGG_IMPORT] Creating tab for: {pathway_name}")
                 page_index, drawing_area = self.model_canvas.add_document(filename=pathway_name)
+                print(f"[KEGG_IMPORT] Tab created: page_index={page_index}, drawing_area={drawing_area}")
                 
                 # Get the canvas manager for this tab
                 manager = self.model_canvas.get_canvas_manager(drawing_area)
+                print(f"[KEGG_IMPORT] Canvas manager: {manager}")
                 if manager:
                     # Load objects using unified path
+                    print(f"[KEGG_IMPORT] Loading objects to canvas...")
+                    print(f"[KEGG_IMPORT]   Places: {len(document_model.places)}")
+                    print(f"[KEGG_IMPORT]   Transitions: {len(document_model.transitions)}")
+                    print(f"[KEGG_IMPORT]   Arcs: {len(document_model.arcs)}")
+                    
                     manager.load_objects(
                         places=document_model.places,
                         transitions=document_model.transitions,
                         arcs=document_model.arcs
                     )
+                    print(f"[KEGG_IMPORT] Objects loaded!")
                     
                     # Set change callback for object state management
                     manager.document_controller.set_change_callback(manager._on_object_changed)
