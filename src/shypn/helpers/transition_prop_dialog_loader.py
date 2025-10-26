@@ -392,8 +392,11 @@ class TransitionPropDialogLoader(GObject.GObject):
         Returns:
             Response ID from the dialog
         """
-        # WAYLAND FIX: Explicitly show dialog before run() to prevent protocol errors
-        self.dialog.show()
+        # WAYLAND FIX: Ensure dialog is realized before showing
+        # This creates the underlying Wayland surface before run()
+        if not self.dialog.get_realized():
+            self.dialog.realize()
+        
         return self.dialog.run()
     
     def get_dialog(self):
