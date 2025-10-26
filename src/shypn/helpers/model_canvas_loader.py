@@ -538,6 +538,15 @@ class ModelCanvasLoader:
             print(f"[TS] {time.time():.6f} - [CANVAS] overlay.show_all() complete page_index={page_index} drawing={repr(drawing)}", file=sys.stderr)
         except Exception:
             print(f"[CANVAS] overlay.show_all() complete", file=sys.stderr)
+        
+        # WAYLAND FIX: Realize the widget before setup to ensure proper parent window hierarchy
+        # On Wayland, dialogs require their parent to be realized (have a GdkWindow/GdkSurface)
+        # Default canvas works because it's loaded from UI file and realized when main window shows
+        # File→New/Import canvases are created programmatically and need explicit realization
+        if not overlay.get_realized():
+            overlay.realize()
+            print(f"[CANVAS] Realized overlay for page_index={page_index}", file=sys.stderr)
+        
         self._setup_canvas_manager(drawing, overlay_box, overlay, filename=filename)
         self.notebook.set_current_page(page_index)
         return (page_index, drawing)
