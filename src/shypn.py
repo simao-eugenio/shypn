@@ -333,52 +333,55 @@ def main(argv=None):
 			# Wire topology panel to pathway import events (if both panels loaded)
 			if topology_panel_loader and topology_panel_loader.controller and pathway_panel_loader:
 				# KEGG Import: Wrap import completion callback to notify topology
-				if hasattr(pathway_panel_loader, 'kegg_import_controller') and pathway_panel_loader.kegg_import_controller:
-					kegg_ctrl = pathway_panel_loader.kegg_import_controller
-					original_kegg_complete = kegg_ctrl._on_import_complete
-					
-					def kegg_import_with_topology_notify(document_model):
-						"""Wrapper for KEGG import completion that notifies topology panel."""
-						# Run original completion handler
-						result = original_kegg_complete(document_model)
-						
-						# Notify topology that model was imported (with error handling)
-						try:
-							drawing_area = model_canvas_loader.get_current_document()
-							if drawing_area and topology_panel_loader and topology_panel_loader.controller:
-								topology_panel_loader.controller.on_pathway_imported(drawing_area)
-						except Exception as e:
-							print(f"[KEGG] Warning: Failed to notify topology panel: {e}", file=sys.stderr)
-							import traceback
-							traceback.print_exc()
-						
-						return result
-					
-					kegg_ctrl._on_import_complete = kegg_import_with_topology_notify
+				# DISABLED: Topology notification can trigger expensive calculations
+				pass
+				# if hasattr(pathway_panel_loader, 'kegg_import_controller') and pathway_panel_loader.kegg_import_controller:
+				# 	kegg_ctrl = pathway_panel_loader.kegg_import_controller
+				# 	original_kegg_complete = kegg_ctrl._on_import_complete
+				# 	
+				# 	def kegg_import_with_topology_notify(document_model):
+				# 		"""Wrapper for KEGG import completion that notifies topology panel."""
+				# 		# Run original completion handler
+				# 		result = original_kegg_complete(document_model)
+				# 		
+				# 		# Notify topology that model was imported (with error handling)
+				# 		try:
+				# 			drawing_area = model_canvas_loader.get_current_document()
+				# 			if drawing_area and topology_panel_loader and topology_panel_loader.controller:
+				# 				topology_panel_loader.controller.on_pathway_imported(drawing_area)
+				# 		except Exception as e:
+				# 			print(f"[KEGG] Warning: Failed to notify topology panel: {e}", file=sys.stderr)
+				# 			import traceback
+				# 			traceback.print_exc()
+				# 		
+				# 		return result
+				# 	
+				# 	kegg_ctrl._on_import_complete = kegg_import_with_topology_notify
 				
 				# SBML Import: Wrap load completion callback to notify topology
-				if hasattr(pathway_panel_loader, 'sbml_import_controller') and pathway_panel_loader.sbml_import_controller:
-					sbml_ctrl = pathway_panel_loader.sbml_import_controller
-					original_sbml_complete = sbml_ctrl._on_load_complete
-					
-					def sbml_load_with_topology_notify(document_model, pathway_name):
-						"""Wrapper for SBML load completion that notifies topology panel."""
-						# Run original completion handler
-						result = original_sbml_complete(document_model, pathway_name)
-						
-						# Notify topology that model was imported (with error handling)
-						try:
-							drawing_area = model_canvas_loader.get_current_document()
-							if drawing_area and topology_panel_loader and topology_panel_loader.controller:
-								topology_panel_loader.controller.on_pathway_imported(drawing_area)
-						except Exception as e:
-							print(f"[SBML] Warning: Failed to notify topology panel: {e}", file=sys.stderr)
-							import traceback
-							traceback.print_exc()
-						
-						return result
-					
-					sbml_ctrl._on_load_complete = sbml_load_with_topology_notify
+				# DISABLED: Topology notification can trigger expensive calculations
+				# if hasattr(pathway_panel_loader, 'sbml_import_controller') and pathway_panel_loader.sbml_import_controller:
+				# 	sbml_ctrl = pathway_panel_loader.sbml_import_controller
+				# 	original_sbml_complete = sbml_ctrl._on_load_complete
+				# 	
+				# 	def sbml_load_with_topology_notify(document_model, pathway_name):
+				# 		"""Wrapper for SBML load completion that notifies topology panel."""
+				# 		# Run original completion handler
+				# 		result = original_sbml_complete(document_model, pathway_name)
+				# 		
+				# 		# Notify topology that model was imported (with error handling)
+				# 		try:
+				# 			drawing_area = model_canvas_loader.get_current_document()
+				# 			if drawing_area and topology_panel_loader and topology_panel_loader.controller:
+				# 				topology_panel_loader.controller.on_pathway_imported(drawing_area)
+				# 		except Exception as e:
+				# 			print(f"[SBML] Warning: Failed to notify topology panel: {e}", file=sys.stderr)
+				# 			import traceback
+				# 			traceback.print_exc()
+				# 		
+				# 		return result
+				# 	
+				# 	sbml_ctrl._on_load_complete = sbml_load_with_topology_notify
 				
 		except Exception as e:
 			print(f'WARNING: Failed to load pathway panel: {e}', file=sys.stderr)

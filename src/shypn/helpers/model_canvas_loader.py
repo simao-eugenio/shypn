@@ -24,6 +24,7 @@ try:
     gi.require_version('Gtk', '3.0')
     gi.require_version('Gdk', '3.0')
     from gi.repository import Gtk, Gdk, Gio
+    import time
 except Exception as e:
     print('ERROR: GTK3 not available in model_canvas loader:', e, file=sys.stderr)
     sys.exit(1)
@@ -528,9 +529,15 @@ class ModelCanvasLoader:
         tab_box.show_all()
         
         page_index = self.notebook.append_page(overlay, tab_box)
-        print(f"[CANVAS] Tab appended, calling overlay.show_all()", file=sys.stderr)
+        try:
+            print(f"[TS] {time.time():.6f} - [CANVAS] Tab appended page_index={page_index} drawing={repr(drawing)} filename={filename}", file=sys.stderr)
+        except Exception:
+            print(f"[CANVAS] Tab appended (no timestamp available)", file=sys.stderr)
         overlay.show_all()
-        print(f"[CANVAS] overlay.show_all() complete", file=sys.stderr)
+        try:
+            print(f"[TS] {time.time():.6f} - [CANVAS] overlay.show_all() complete page_index={page_index} drawing={repr(drawing)}", file=sys.stderr)
+        except Exception:
+            print(f"[CANVAS] overlay.show_all() complete", file=sys.stderr)
         self._setup_canvas_manager(drawing, overlay_box, overlay, filename=filename)
         self.notebook.set_current_page(page_index)
         return (page_index, drawing)
@@ -548,6 +555,10 @@ class ModelCanvasLoader:
             filename = 'default'
         manager = ModelCanvasManager(canvas_width=2000, canvas_height=2000, filename=filename)
         self.canvas_managers[drawing_area] = manager
+        try:
+            print(f"[TS] {time.time():.6f} - [MANAGER] Created manager={repr(manager)} for drawing={repr(drawing_area)} filename={filename}", file=sys.stderr)
+        except Exception:
+            print(f"[MANAGER] Created manager for drawing", file=sys.stderr)
         
         # Set redraw callback so manager can trigger widget redraws
         manager.set_redraw_callback(lambda: drawing_area.queue_draw())
@@ -624,6 +635,10 @@ class ModelCanvasLoader:
             
             # Store overlay manager for later access
             self.overlay_managers[drawing_area] = overlay_manager
+            try:
+                print(f"[TS] {time.time():.6f} - [OVERLAY] Registered overlay_manager={repr(overlay_manager)} for drawing={repr(drawing_area)}", file=sys.stderr)
+            except Exception:
+                print(f"[OVERLAY] Registered overlay manager for drawing", file=sys.stderr)
             
             # Connect signals from palettes
             overlay_manager.connect_tool_changed_signal(
@@ -2868,6 +2883,12 @@ class ModelCanvasLoader:
             manager: ModelCanvasManager instance
             drawing_area: GtkDrawingArea widget
         """
+        # Debug: timestamp when opening properties dialog
+        try:
+            print(f"[TS] {time.time():.6f} - _on_object_properties() called for obj id={getattr(obj,'id',None)} name={getattr(obj,'name',None)}", file=sys.stderr)
+        except Exception:
+            pass
+
         # CRITICAL: Clear ALL arc creation state before opening dialog
         # This prevents spurious arc creation when dialog closes
         arc_state = self._arc_state.get(drawing_area)
