@@ -86,8 +86,11 @@ class TransitionPropDialogLoader(GObject.GObject):
                 "Object 'transition_properties_dialog' not found in transition_prop_dialog.ui"
             )
         
-        if self.parent_window:
-            self.dialog.set_transient_for(self.parent_window)
+        # WAYLAND FIX: Always set parent (explicitly None if not available)
+        # This must be done immediately after getting the dialog from builder
+        parent = self.parent_window if self.parent_window else None
+        if parent:
+            self.dialog.set_transient_for(parent)
         
         self.dialog.connect('response', self._on_response)
     
