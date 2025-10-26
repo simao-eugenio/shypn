@@ -546,6 +546,18 @@ class ModelCanvasLoader:
         if not overlay.get_realized():
             overlay.realize()
             print(f"[CANVAS] Realized overlay for page_index={page_index}", file=sys.stderr)
+        else:
+            print(f"[CANVAS] Overlay already realized for page_index={page_index}", file=sys.stderr)
+        
+        # WAYLAND FIX 2: Also ensure the overlay is mapped (visible on screen)
+        # Mapping happens after realize and ensures the widget is actually displayed
+        if not overlay.get_mapped():
+            # Force mapping by showing the widget and processing events
+            print(f"[CANVAS] Overlay not mapped, forcing map for page_index={page_index}", file=sys.stderr)
+            # Already shown with show_all(), but ensure it's processed
+            while Gtk.events_pending():
+                Gtk.main_iteration()
+            print(f"[CANVAS] After event processing: mapped={overlay.get_mapped()}", file=sys.stderr)
         
         self._setup_canvas_manager(drawing, overlay_box, overlay, filename=filename)
         self.notebook.set_current_page(page_index)
@@ -2924,6 +2936,20 @@ class ModelCanvasLoader:
         if not self.parent_window:
             print(f"[DIALOG] ERROR: parent_window is None, cannot open dialog", file=sys.stderr)
             return
+        
+        # DEBUG: Check parent window state for Wayland compatibility
+        print(f"[DIALOG] parent_window type: {type(self.parent_window)}", file=sys.stderr)
+        print(f"[DIALOG] parent_window visible: {self.parent_window.get_visible()}", file=sys.stderr)
+        print(f"[DIALOG] parent_window realized: {self.parent_window.get_realized()}", file=sys.stderr)
+        print(f"[DIALOG] parent_window mapped: {self.parent_window.get_mapped()}", file=sys.stderr)
+        
+        # Also check the drawing area's toplevel
+        toplevel = drawing_area.get_toplevel()
+        print(f"[DIALOG] drawing_area toplevel: {type(toplevel)}", file=sys.stderr)
+        if toplevel and isinstance(toplevel, Gtk.Window):
+            print(f"[DIALOG] toplevel visible: {toplevel.get_visible()}", file=sys.stderr)
+            print(f"[DIALOG] toplevel realized: {toplevel.get_realized()}", file=sys.stderr)
+            print(f"[DIALOG] toplevel mapped: {toplevel.get_mapped()}", file=sys.stderr)
         
         dialog_loader = None
         if isinstance(obj, Place):
