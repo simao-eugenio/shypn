@@ -608,16 +608,25 @@ class PathwayPanelLoader:
         Args:
             project: Project instance
         """
+        print(f"[PATHWAY_PANEL] set_project called with: {project}")
         self.project = project
         
         # Update import controllers if they exist
         if self.kegg_import_controller:
+            print(f"[PATHWAY_PANEL] Updating KEGG controller with project")
             self.kegg_import_controller.set_project(project)
         
         if self.sbml_import_controller and hasattr(self.sbml_import_controller, 'set_project'):
+            print(f"[PATHWAY_PANEL] Updating SBML controller with project")
             self.sbml_import_controller.set_project(project)
+        else:
+            print(f"[PATHWAY_PANEL] SBML controller not available or no set_project method")
+            print(f"[PATHWAY_PANEL]   sbml_import_controller: {self.sbml_import_controller}")
+            if self.sbml_import_controller:
+                print(f"[PATHWAY_PANEL]   has set_project: {hasattr(self.sbml_import_controller, 'set_project')}")
         
         if self.brenda_enrichment_controller:
+            print(f"[PATHWAY_PANEL] Updating BRENDA controller with project")
             self.brenda_enrichment_controller.set_project(project)
     
     def get_sbml_controller(self):

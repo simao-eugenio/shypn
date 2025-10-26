@@ -493,6 +493,9 @@ class FilePanelController:
         # Navigate to workspace/projects folder
         projects_path = self.base_path / 'projects'
         
+        print(f"[FILE_PANEL] Base path: {self.base_path}")
+        print(f"[FILE_PANEL] Projects path: {projects_path}")
+        
         # Create projects folder if it doesn't exist
         if not projects_path.exists():
             try:
@@ -504,6 +507,7 @@ class FilePanelController:
         
         # Navigate to projects folder
         self.current_path = projects_path
+        print(f"[FILE_PANEL] Current path set to: {self.current_path}")
         self.refresh_tree()
         
         # Enter project creation mode

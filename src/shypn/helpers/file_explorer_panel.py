@@ -140,6 +140,158 @@ class FileExplorerPanel:
         name_column.add_attribute(text_renderer, 'background', 6)  # Background color
         self.text_renderer = text_renderer
         self.tree_view.append_column(name_column)
+        
+        # Enable drag and drop for moving files
+        self._setup_drag_and_drop()
+    
+    def _setup_drag_and_drop(self):
+        """Enable drag-and-drop support for moving files/folders within the tree."""
+        # Define the drag-and-drop target (text/uri-list is standard for file paths)
+        targets = [Gtk.TargetEntry.new('text/plain', Gtk.TargetFlags.SAME_WIDGET, 0)]
+        
+        # Enable drag source (allows dragging from tree)
+        self.tree_view.enable_model_drag_source(
+            Gdk.ModifierType.BUTTON1_MASK,  # Left mouse button
+            targets,
+            Gdk.DragAction.MOVE
+        )
+        
+        # Enable drag destination (allows dropping onto tree)
+        self.tree_view.enable_model_drag_dest(
+            targets,
+            Gdk.DragAction.MOVE
+        )
+        
+        # Connect drag-and-drop signals
+        self.tree_view.connect('drag-data-get', self._on_drag_data_get)
+        self.tree_view.connect('drag-data-received', self._on_drag_data_received)
+        self.tree_view.connect('drag-drop', self._on_drag_drop)
+    
+    def _on_drag_data_get(self, widget, drag_context, data, info, time):
+        """Handle drag start - store the source file path."""
+        selection = self.tree_view.get_selection()
+        model, tree_iter = selection.get_selected()
+        
+        if tree_iter:
+            # Get the file path from the selected row
+            source_path = model.get_value(tree_iter, 2)  # Column 2 is full_path
+            # Send the path as drag data
+            data.set_text(source_path, -1)
+            print(f"[DRAG] Started dragging: {source_path}")
+    
+    def _on_drag_drop(self, widget, drag_context, x, y, time):
+        """Handle drag drop event."""
+        # Get the drop position in the tree
+        drop_info = self.tree_view.get_dest_row_at_pos(x, y)
+        
+        if drop_info:
+            path, position = drop_info
+            # Request the drag data
+            target = drag_context.list_targets()[0]
+            widget.drag_get_data(drag_context, target, time)
+            return True
+        
+        return False
+    
+    def _on_drag_data_received(self, widget, drag_context, x, y, data, info, time):
+        """Handle drop completion - move the file to the target location."""
+        import shutil
+        
+        # Get source path from drag data
+        source_path = data.get_text()
+        if not source_path or not os.path.exists(source_path):
+            print(f"[DRAG] Invalid source path: {source_path}")
+            drag_context.finish(False, False, time)
+            return
+        
+        # Get drop target from tree position
+        drop_info = self.tree_view.get_dest_row_at_pos(x, y)
+        if not drop_info:
+            print("[DRAG] No drop target")
+            drag_context.finish(False, False, time)
+            return
+        
+        path, position = drop_info
+        model = self.tree_view.get_model()
+        tree_iter = model.get_iter(path)
+        
+        # Get target path and check if it's a directory
+        target_path = model.get_value(tree_iter, 2)  # Column 2 is full_path
+        is_directory = model.get_value(tree_iter, 3)  # Column 3 is is_directory
+        
+        # Determine the destination directory
+        if is_directory:
+            dest_dir = target_path
+        else:
+            # If dropping on a file, use its parent directory
+            dest_dir = os.path.dirname(target_path)
+        
+        # Build destination path
+        source_name = os.path.basename(source_path)
+        dest_path = os.path.join(dest_dir, source_name)
+        
+        # Prevent moving to itself or to its own subdirectory
+        if source_path == dest_path:
+            print(f"[DRAG] Source and destination are the same")
+            drag_context.finish(False, False, time)
+            return
+        
+        if os.path.isdir(source_path) and dest_dir.startswith(source_path):
+            print(f"[DRAG] Cannot move directory into its own subdirectory")
+            drag_context.finish(False, False, time)
+            return
+        
+        # Check if destination already exists
+        if os.path.exists(dest_path):
+            # Show confirmation dialog
+            dialog = Gtk.MessageDialog(
+                transient_for=self.parent_window,
+                flags=0,
+                message_type=Gtk.MessageType.QUESTION,
+                buttons=Gtk.ButtonsType.YES_NO,
+                text="File Already Exists"
+            )
+            dialog.format_secondary_text(
+                f"A file named '{source_name}' already exists in the destination.\n"
+                f"Do you want to replace it?"
+            )
+            response = dialog.run()
+            dialog.destroy()
+            
+            if response != Gtk.ResponseType.YES:
+                drag_context.finish(False, False, time)
+                return
+        
+        # Perform the move operation
+        try:
+            print(f"[DRAG] Moving '{source_path}' to '{dest_path}'")
+            shutil.move(source_path, dest_path)
+            
+            # Refresh the file tree to show the changes
+            self.refresh()
+            
+            # Mark drag as successful
+            drag_context.finish(True, True, time)
+            print(f"[DRAG] ✓ Successfully moved to: {dest_path}")
+            
+        except Exception as e:
+            print(f"[DRAG] ✗ Failed to move file: {e}")
+            import traceback
+            traceback.print_exc()
+            
+            # Show error dialog
+            dialog = Gtk.MessageDialog(
+                transient_for=self.parent_window,
+                flags=0,
+                message_type=Gtk.MessageType.ERROR,
+                buttons=Gtk.ButtonsType.OK,
+                text="Move Failed"
+            )
+            dialog.format_secondary_text(f"Could not move the file:\n{str(e)}")
+            dialog.run()
+            dialog.destroy()
+            
+            drag_context.finish(False, False, time)
 
     def _apply_tree_view_css(self):
         """Apply CSS styling to improve TreeView appearance."""
@@ -1327,65 +1479,85 @@ class FileExplorerPanel:
             print(f"[FileExplorer] needs_new_filepath: {needs_new_filepath}")
             
             if needs_new_filepath:
-                # Auto-generate filename in workspace directory
-                import os
-                import datetime
+                # Open file chooser dialog for default/imported files
+                print("[FileExplorer] Opening file chooser for default/imported file")
                 
-                # Determine save directory: project/models/ if project is open, otherwise workspace
-                print(f"[FileExplorer] Project check: self.project={self.project}")
-                if self.project:
-                    print(f"[FileExplorer] Project.base_path={getattr(self.project, 'base_path', 'NO base_path attribute')}")
-                
+                # Determine initial directory: project/models/ if project is open, otherwise workspace
                 if self.project and hasattr(self.project, 'base_path'):
-                    # Save to project/models/ directory
-                    models_dir = os.path.join(self.project.base_path, 'models')
-                    os.makedirs(models_dir, exist_ok=True)
-                    save_directory = models_dir
-                    print(f"[FileExplorer] Saving to project models directory: {save_directory}")
+                    initial_dir = os.path.join(self.project.base_path, 'models')
+                    os.makedirs(initial_dir, exist_ok=True)
                 else:
-                    # Save to workspace directory
-                    save_directory = self.explorer.current_path
-                    print(f"[FileExplorer] Saving to workspace directory: {save_directory}")
-                    print(f"[FileExplorer] Reason: project={self.project}, has base_path={hasattr(self.project, 'base_path') if self.project else 'N/A'}")
+                    initial_dir = self.explorer.current_path
                 
-                # Get base filename from manager or generate timestamp-based name
+                # Determine default filename
                 if manager.filename and manager.filename != "default":
-                    base_name = manager.filename
+                    default_filename = manager.filename
+                    if not default_filename.endswith('.shy'):
+                        default_filename += '.shy'
                 else:
-                    # Generate timestamp-based name
-                    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-                    base_name = f"model_{timestamp}"
+                    # Use 'default.shy' as the default filename
+                    default_filename = "default.shy"
                 
-                # Ensure .shy extension
-                if not base_name.endswith('.shy'):
-                    base_name += '.shy'
+                # Create file chooser dialog
+                dialog = Gtk.FileChooserDialog(
+                    title="Save File",
+                    parent=self.parent_window,
+                    action=Gtk.FileChooserAction.SAVE,
+                    buttons=(
+                        Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+                        Gtk.STOCK_SAVE, Gtk.ResponseType.OK
+                    )
+                )
                 
-                # Save to determined directory (project/models/ or workspace)
-                filepath = os.path.join(save_directory, base_name)
+                # Set initial directory and filename
+                dialog.set_current_folder(initial_dir)
+                dialog.set_current_name(default_filename)
                 
-                # Make sure we don't overwrite existing file
-                counter = 1
-                original_filepath = filepath
-                while os.path.exists(filepath):
-                    name_without_ext = base_name[:-4]  # Remove .shy
-                    filepath = os.path.join(save_directory, f"{name_without_ext}_{counter}.shy")
-                    counter += 1
+                # Add file filters
+                filter_shy = Gtk.FileFilter()
+                filter_shy.set_name("SHYpn Files (*.shy)")
+                filter_shy.add_pattern("*.shy")
+                dialog.add_filter(filter_shy)
                 
-                # Save to generated file
-                document.save_to_file(filepath)
+                filter_all = Gtk.FileFilter()
+                filter_all.set_name("All Files")
+                filter_all.add_pattern("*")
+                dialog.add_filter(filter_all)
                 
-                print(f"[FileExplorer] ✓ Saved to new file: {filepath}")
+                # Set overwrite confirmation
+                dialog.set_do_overwrite_confirmation(True)
                 
-                # Update manager state
-                manager.set_filepath(filepath)
-                manager.mark_clean()
-                manager.mark_as_saved()  # Clear imported flag
+                # Run dialog
+                response = dialog.run()
+                filepath = None
                 
-                # Update UI
-                filename = os.path.basename(filepath)
-                self.canvas_loader.update_current_tab_label(filename, is_modified=False)
-                self.set_current_file(filepath)
-                self._load_current_directory()  # Refresh file tree
+                if response == Gtk.ResponseType.OK:
+                    filepath = dialog.get_filename()
+                    
+                    # Ensure .shy extension
+                    if not filepath.endswith('.shy'):
+                        filepath += '.shy'
+                    
+                    # Save to selected file
+                    document.save_to_file(filepath)
+                    
+                    print(f"[FileExplorer] ✓ Saved to: {filepath}")
+                    
+                    # Update manager state
+                    manager.set_filepath(filepath)
+                    manager.mark_clean()
+                    manager.mark_as_saved()  # Clear imported flag
+                    
+                    # Update UI
+                    filename = os.path.basename(filepath)
+                    self.canvas_loader.update_current_tab_label(filename, is_modified=False)
+                    self.set_current_file(filepath)
+                    self._load_current_directory()  # Refresh file tree
+                else:
+                    print("[FileExplorer] Save cancelled by user")
+                
+                # Close dialog
+                dialog.destroy()
                 
             else:
                 # Direct save to existing file
@@ -1410,9 +1582,10 @@ class FileExplorerPanel:
             traceback.print_exc()
 
     def save_current_document_as(self):
-        """Save the current document with a new auto-generated name (Save As inline).
+        """Save the current document with a new name using a file chooser dialog.
         
-        Always creates a new file with auto-generated name in workspace directory.
+        Opens a file chooser dialog with 'default.shy' as the default filename.
+        User can choose location and filename interactively.
         """
         print("[FileExplorer] save_current_document_as called")
         try:
@@ -1433,73 +1606,90 @@ class FileExplorerPanel:
             # Convert canvas state to document model
             document = manager.to_document_model()
             
-            # Auto-generate new filename
-            import os
-            import datetime
-            
-            # Determine save directory: project/models/ if project is open, otherwise workspace
+            # Determine initial directory: project/models/ if project is open, otherwise workspace
             print(f"[FileExplorer] Save As - Project check: self.project={self.project}")
             if self.project:
                 print(f"[FileExplorer] Save As - Project.base_path={getattr(self.project, 'base_path', 'NO base_path attribute')}")
             
             if self.project and hasattr(self.project, 'base_path'):
-                # Save to project/models/ directory
-                models_dir = os.path.join(self.project.base_path, 'models')
-                os.makedirs(models_dir, exist_ok=True)
-                save_directory = models_dir
-                print(f"[FileExplorer] Save As to project models directory: {save_directory}")
+                # Start in project/models/ directory
+                initial_dir = os.path.join(self.project.base_path, 'models')
+                os.makedirs(initial_dir, exist_ok=True)
+                print(f"[FileExplorer] Save As starting in project models: {initial_dir}")
             else:
-                # Save to workspace directory
-                save_directory = self.explorer.current_path
-                print(f"[FileExplorer] Save As to workspace directory: {save_directory}")
-                print(f"[FileExplorer] Reason: project={self.project}, has base_path={hasattr(self.project, 'base_path') if self.project else 'N/A'}")
+                # Start in workspace directory
+                initial_dir = self.explorer.current_path
+                print(f"[FileExplorer] Save As starting in workspace: {initial_dir}")
             
-            # Get base filename from manager or current filename
+            # Determine default filename
             if manager.filename and manager.filename != "default":
-                base_name = manager.filename
-                # Remove extension if present
-                if base_name.endswith('.shy'):
-                    base_name = base_name[:-4]
-                base_name += "_copy"
+                default_filename = manager.filename
+                if not default_filename.endswith('.shy'):
+                    default_filename += '.shy'
             else:
-                # Generate timestamp-based name
-                timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-                base_name = f"model_{timestamp}"
+                # Use 'default.shy' as the default filename
+                default_filename = "default.shy"
             
-            # Ensure .shy extension
-            if not base_name.endswith('.shy'):
-                base_name += '.shy'
+            # Create file chooser dialog
+            dialog = Gtk.FileChooserDialog(
+                title="Save As",
+                parent=self.parent_window,
+                action=Gtk.FileChooserAction.SAVE,
+                buttons=(
+                    Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+                    Gtk.STOCK_SAVE, Gtk.ResponseType.OK
+                )
+            )
             
-            # Save to determined directory (project/models/ or workspace)
-            filepath = os.path.join(save_directory, base_name)
+            # Set initial directory
+            dialog.set_current_folder(initial_dir)
             
-            # Make sure we don't overwrite existing file
-            counter = 1
-            while os.path.exists(filepath):
-                name_without_ext = base_name[:-4]  # Remove .shy
-                # Remove previous counter if exists
-                if name_without_ext.endswith('_copy'):
-                    name_base = name_without_ext
-                else:
-                    name_base = name_without_ext.rsplit('_', 1)[0] if '_' in name_without_ext else name_without_ext
-                filepath = os.path.join(save_directory, f"{name_base}_{counter}.shy")
-                counter += 1
+            # Set default filename
+            dialog.set_current_name(default_filename)
             
-            # Save to generated file
-            document.save_to_file(filepath)
+            # Add file filter for .shy files
+            filter_shy = Gtk.FileFilter()
+            filter_shy.set_name("SHYpn Files (*.shy)")
+            filter_shy.add_pattern("*.shy")
+            dialog.add_filter(filter_shy)
             
-            print(f"[FileExplorer] ✓ Saved as: {filepath}")
+            filter_all = Gtk.FileFilter()
+            filter_all.set_name("All Files")
+            filter_all.add_pattern("*")
+            dialog.add_filter(filter_all)
             
-            # Update manager state
-            manager.set_filepath(filepath)
-            manager.mark_clean()
-            manager.mark_as_saved()  # Clear imported flag
+            # Set overwrite confirmation
+            dialog.set_do_overwrite_confirmation(True)
             
-            # Update UI - CRITICAL: Update tab label with new filename
-            filename = os.path.basename(filepath)
-            self.canvas_loader.update_current_tab_label(filename, is_modified=False)
-            self.set_current_file(filepath)
-            self._load_current_directory()  # Refresh file tree
+            # Run dialog
+            response = dialog.run()
+            filepath = None
+            
+            if response == Gtk.ResponseType.OK:
+                filepath = dialog.get_filename()
+                
+                # Ensure .shy extension
+                if not filepath.endswith('.shy'):
+                    filepath += '.shy'
+                
+                # Save to selected file
+                document.save_to_file(filepath)
+                
+                print(f"[FileExplorer] ✓ Saved as: {filepath}")
+                
+                # Update manager state
+                manager.set_filepath(filepath)
+                manager.mark_clean()
+                manager.mark_as_saved()  # Clear imported flag
+                
+                # Update UI - CRITICAL: Update tab label with new filename
+                filename = os.path.basename(filepath)
+                self.canvas_loader.update_current_tab_label(filename, is_modified=False)
+                self.set_current_file(filepath)
+                self._load_current_directory()  # Refresh file tree
+            
+            # Close dialog
+            dialog.destroy()
             
             
         except Exception as e:
@@ -1508,41 +1698,77 @@ class FileExplorerPanel:
             traceback.print_exc()
 
     def open_document(self):
-        """Open the currently selected document from the file tree.
+        """Open a document via FileChooserDialog.
         
-        Opens the file that is currently selected in the tree view.
-        If no file is selected or a directory is selected, does nothing.
-        This provides inline file opening without dialogs.
+        Shows a file chooser dialog to let the user select a .shy file to open.
+        If invoked via Ctrl+O or File > Open menu, opens a dialog.
         """
         try:
             if not hasattr(self, 'canvas_loader') or self.canvas_loader is None:
                 return
-            
-            # Get currently selected item from tree view
-            selection = self.tree_view.get_selection()
-            model, tree_iter = selection.get_selected()
-            
-            if not tree_iter:
-                # No selection - do nothing (no dialog)
+            if not hasattr(self, 'parent_window') or self.parent_window is None:
+                print("[FILES] ERROR: No parent window set for file chooser dialog")
                 return
             
-            # Get the selected item's details
-            is_dir = model.get_value(tree_iter, 3)
-            full_path = model.get_value(tree_iter, 2)
+            # Create FileChooserDialog for opening files
+            dialog = Gtk.FileChooserDialog(
+                title="Open File",
+                parent=self.parent_window,
+                action=Gtk.FileChooserAction.OPEN
+            )
             
-            # Only open files, not directories
-            if is_dir:
-                # Selected item is a directory - do nothing
-                return
+            dialog.add_buttons(
+                Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+                Gtk.STOCK_OPEN, Gtk.ResponseType.OK
+            )
             
-            # Check if it's a .shy file
-            if not full_path.endswith('.shy'):
-                # Not a model file - do nothing
-                return
+            # Set starting directory
+            if self.current_project:
+                # If project is open, start in project/models/
+                models_dir = os.path.join(self.current_project.base_path, 'models')
+                if os.path.exists(models_dir):
+                    dialog.set_current_folder(models_dir)
+                else:
+                    dialog.set_current_folder(self.current_project.base_path)
+            elif self.current_path and os.path.exists(self.current_path):
+                # Otherwise use current directory in file tree
+                if os.path.isfile(self.current_path):
+                    dialog.set_current_folder(os.path.dirname(self.current_path))
+                else:
+                    dialog.set_current_folder(self.current_path)
+            else:
+                # Default to workspace root
+                workspace_path = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'workspace')
+                workspace_path = os.path.normpath(workspace_path)
+                if os.path.exists(workspace_path):
+                    dialog.set_current_folder(workspace_path)
             
-            # Open the selected file
-            self._open_file_from_path(full_path)
+            # Add file filter for .shy files
+            filter_shy = Gtk.FileFilter()
+            filter_shy.set_name("SHYpn Models (*.shy)")
+            filter_shy.add_pattern("*.shy")
+            dialog.add_filter(filter_shy)
             
+            # Add filter for all files
+            filter_all = Gtk.FileFilter()
+            filter_all.set_name("All Files")
+            filter_all.add_pattern("*")
+            dialog.add_filter(filter_all)
+            
+            # Show dialog and handle response
+            response = dialog.run()
+            
+            if response == Gtk.ResponseType.OK:
+                filepath = dialog.get_filename()
+                dialog.destroy()
+                
+                # Open the selected file
+                if filepath and os.path.exists(filepath):
+                    print(f"[FILES] Opening file from dialog: {filepath}")
+                    self._open_file_from_path(filepath)
+            else:
+                dialog.destroy()
+                
         except Exception as e:
             import traceback
             traceback.print_exc()
