@@ -2948,8 +2948,8 @@ class ModelCanvasLoader:
             print(f"[DIALOG] ERROR: parent_window is None, cannot open dialog", file=sys.stderr)
             return
         
-        # WAYLAND FIX: Ensure the canvas page widget is mapped before opening dialog
-        # On Wayland, dialogs require the widget hierarchy to be fully visible
+        # WAYLAND FIX: Ensure the canvas page widget AND drawing area are mapped before opening dialog
+        # On Wayland, dialogs require the entire widget hierarchy to be fully visible and mapped
         # Get the page widget (overlay) for this drawing area
         page_widget = None
         for i in range(self.notebook.get_n_pages()):
@@ -2959,19 +2959,33 @@ class ModelCanvasLoader:
                 page_widget = page
                 break
         
-        if page_widget and not page_widget.get_mapped():
-            print(f"[DIALOG] Canvas page not mapped yet, deferring dialog...", file=sys.stderr)
-            # Use idle_add to defer dialog opening until widget is mapped
+        # Check if BOTH page widget and drawing area are mapped
+        page_mapped = page_widget.get_mapped() if page_widget else False
+        drawing_mapped = drawing_area.get_mapped()
+        
+        if not (page_mapped and drawing_mapped):
+            print(f"[DIALOG] Widget not ready - page_mapped={page_mapped}, drawing_mapped={drawing_mapped}, deferring dialog...", file=sys.stderr)
+            # Use timeout to defer dialog opening until both widgets are mapped
             from gi.repository import GLib
             
+            retry_count = [0]  # Use list to allow modification in nested function
+            MAX_RETRIES = 20  # 20 retries * 50ms = 1 second max wait
+            
             def open_when_mapped():
-                if page_widget.get_mapped():
-                    print(f"[DIALOG] Canvas now mapped, opening dialog", file=sys.stderr)
-                    # Call this function again now that widget is mapped
+                retry_count[0] += 1
+                page_ready = page_widget.get_mapped() if page_widget else False
+                drawing_ready = drawing_area.get_mapped()
+                
+                if page_ready and drawing_ready:
+                    print(f"[DIALOG] Widgets now mapped (after {retry_count[0]} retries), opening dialog", file=sys.stderr)
+                    # Call this function again now that widgets are mapped
                     self._on_object_properties(obj, manager, drawing_area)
                     return False  # Don't repeat
+                elif retry_count[0] >= MAX_RETRIES:
+                    print(f"[DIALOG] Timeout waiting for widgets to map, aborting dialog", file=sys.stderr)
+                    return False  # Give up
                 else:
-                    print(f"[DIALOG] Still not mapped, retrying...", file=sys.stderr)
+                    print(f"[DIALOG] Still not ready (retry {retry_count[0]}/{MAX_RETRIES}): page={page_ready}, drawing={drawing_ready}", file=sys.stderr)
                     return True  # Keep checking
             
             # Check every 50ms for up to 1 second
