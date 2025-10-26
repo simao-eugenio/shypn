@@ -2950,6 +2950,36 @@ class ModelCanvasLoader:
             print(f"[DIALOG] ERROR: parent_window is None, cannot open dialog", file=sys.stderr)
             return
         
+        # WAYLAND FIX: Ensure the canvas page widget is mapped before opening dialog
+        # On Wayland, dialogs require the widget hierarchy to be fully visible
+        # Get the page widget (overlay) for this drawing area
+        page_widget = None
+        for i in range(self.notebook.get_n_pages()):
+            page = self.notebook.get_nth_page(i)
+            page_drawing = self._get_drawing_area_from_page(page)
+            if page_drawing == drawing_area:
+                page_widget = page
+                break
+        
+        if page_widget and not page_widget.get_mapped():
+            print(f"[DIALOG] Canvas page not mapped yet, deferring dialog...", file=sys.stderr)
+            # Use idle_add to defer dialog opening until widget is mapped
+            from gi.repository import GLib
+            
+            def open_when_mapped():
+                if page_widget.get_mapped():
+                    print(f"[DIALOG] Canvas now mapped, opening dialog", file=sys.stderr)
+                    # Call this function again now that widget is mapped
+                    self._on_object_properties(obj, manager, drawing_area)
+                    return False  # Don't repeat
+                else:
+                    print(f"[DIALOG] Still not mapped, retrying...", file=sys.stderr)
+                    return True  # Keep checking
+            
+            # Check every 50ms for up to 1 second
+            GLib.timeout_add(50, open_when_mapped)
+            return
+        
         # DEBUG: Check parent window state for Wayland compatibility
         print(f"[DIALOG] parent_window type: {type(self.parent_window)}", file=sys.stderr)
         print(f"[DIALOG] parent_window visible: {self.parent_window.get_visible()}", file=sys.stderr)

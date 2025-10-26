@@ -1,0 +1,30 @@
+[SHYPN MAIN] Starting application
+[TS] 1761521071.431457 - [MANAGER] Created manager=<shypn.data.model_canvas_manager.ModelCanvasManager object at 0x7d22754baed0> for drawing=<Gtk.DrawingArea object at 0x7d2275386240 (GtkDrawingArea at 0x2a7e66f0)> filename=default
+[TS] 1761521071.465362 - [OVERLAY] Registered overlay_manager=<shypn.canvas.canvas_overlay_manager.CanvasOverlayManager object at 0x7d22754bae40> for drawing=<Gtk.DrawingArea object at 0x7d2275386240 (GtkDrawingArea at 0x2a7e66f0)>
+[PATHWAY_PANEL] BRENDA enrichment controller initialized
+[MODEL_CANVAS] wire_existing_canvases_to_right_panel() completed - no valid canvas found
+[SHYPN] Report Panel created and added to stack
+[SBML_IMPORT] _on_import_clicked() called
+[SBML_IMPORT] _on_fetch_clicked() called, _fetch_in_progress=False
+[SBML_IMPORT] _on_fetch_clicked() called, _fetch_in_progress=True
+[SBML_IMPORT] Fetch already in progress, ignoring duplicate request
+[SBML_IMPORT] Fetch complete - auto-continuing to parse
+[SBML_IMPORT] _on_parse_complete() called
+[SBML_IMPORT] _on_parse_complete: calling _on_load_clicked()
+[SBML_IMPORT] _on_load_clicked() called
+🔍 CONVERTER INPUT (pathway.positions):
+   BLL: (100.0, 100.0)
+   IL: (110.0, 110.0)
+   AL: (120.0, 120.0)
+[SBML_IMPORT] _on_load_complete: calling add_document(filename=Edelstein1996 - EPSP ACh event)
+[CANVAS] add_document() called, filename=Edelstein1996 - EPSP ACh event
+[TS] 1761521115.638574 - [CANVAS] Tab appended page_index=1 drawing=<Gtk.DrawingArea object at 0x7d2264d4c440 (GtkDrawingArea at 0x2c072790)> filename=Edelstein1996 - EPSP ACh event
+[TS] 1761521115.638730 - [CANVAS] overlay.show_all() complete page_index=1 drawing=<Gtk.DrawingArea object at 0x7d2264d4c440 (GtkDrawingArea at 0x2c072790)>
+[CANVAS] Overlay already realized for page_index=1
+[TS] 1761521115.639510 - [MANAGER] Created manager=<shypn.data.model_canvas_manager.ModelCanvasManager object at 0x7d2264d42d20> for drawing=<Gtk.DrawingArea object at 0x7d2264d4c440 (GtkDrawingArea at 0x2c072790)> filename=Edelstein1996 - EPSP ACh event
+
+(shypn.py:21723): Gtk-CRITICAL **: 20:25:15.665: gtk_widget_set_events: assertion '!_gtk_widget_get_realized (widget)' failed
+[TS] 1761521115.671509 - [OVERLAY] Registered overlay_manager=<shypn.canvas.canvas_overlay_manager.CanvasOverlayManager object at 0x7d22597ae6c0> for drawing=<Gtk.DrawingArea object at 0x7d2264d4c440 (GtkDrawingArea at 0x2c072790)>
+[SBML_IMPORT] _on_load_complete: add_document returned page_index=1
+[CANVAS] ✓ Overlay successfully mapped
+Gdk-Message: 20:25:18.486: Error 71 (Protocol error) dispatching to Wayland display.
