@@ -1867,17 +1867,19 @@ class FileExplorerPanel:
     def new_document(self):
         """Create a new document.
         
-        Checks for unsaved changes and creates a new tab with "default" filename.
+        Creates a new tab with "default" filename. Does NOT check for unsaved
+        changes because File→New should always create a new tab (multi-document
+        interface), not replace the current one.
         """
         try:
             if not hasattr(self, 'canvas_loader') or self.canvas_loader is None:
                 return
             if not hasattr(self, 'persistency') or self.persistency is None:
                 return
-            if not self.persistency.check_unsaved_changes():
-                return
-            if self.persistency.new_document():
-                self.canvas_loader.add_document()
+            # Create new tab directly - no unsaved changes check needed
+            # File→New creates additional tab, doesn't close/replace existing ones
+            # Pass replace_empty_default=False to always create new tab
+            self.canvas_loader.add_document(replace_empty_default=False)
         except Exception as e:
             import traceback
             traceback.print_exc()
