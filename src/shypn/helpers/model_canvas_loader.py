@@ -549,27 +549,27 @@ class ModelCanvasLoader:
         else:
             print(f"[CANVAS] Overlay already realized for page_index={page_index}", file=sys.stderr)
         
-        # WAYLAND FIX 2: Ensure the page is current and force mapping
-        # The widget must be mapped (visible on screen) for dialogs to work on Wayland
-        # This is the critical difference between working canvases and imported ones
+        # WAYLAND FIX 2: Set page current to trigger widget visibility
+        # Setting the page current ensures GTK will map the widget (make it visible)
+        # For Wayland, this is important because dialogs need their parent widget hierarchy
+        # to be fully established before they can attach properly
         self.notebook.set_current_page(page_index)
         
-        # Force GTK to process all pending events to complete the page switch
-        # This ensures the widget is fully mapped before we enable property dialogs
-        max_iterations = 50  # Safety limit
-        iteration = 0
-        while not overlay.get_mapped() and iteration < max_iterations:
-            while Gtk.events_pending():
-                Gtk.main_iteration()
-            iteration += 1
-            # Small delay to allow mapping to complete
-            import time
-            time.sleep(0.001)
+        # Give GTK a moment to process the page switch and map the widget
+        # Using idle_add ensures this happens after the current event processing
+        # but doesn't block user input like a busy-wait loop would
+        from gi.repository import GLib
         
-        if overlay.get_mapped():
-            print(f"[CANVAS] ✓ Overlay mapped after {iteration} iterations", file=sys.stderr)
-        else:
-            print(f"[CANVAS] ⚠ Overlay still not mapped after {max_iterations} iterations", file=sys.stderr)
+        def ensure_mapped():
+            """Verify widget got mapped after page switch."""
+            if overlay.get_mapped():
+                print(f"[CANVAS] ✓ Overlay successfully mapped", file=sys.stderr)
+            else:
+                print(f"[CANVAS] ⚠ Overlay not yet mapped (will map soon)", file=sys.stderr)
+            return False  # Don't repeat
+        
+        # Schedule the check to run once on the next idle cycle
+        GLib.idle_add(ensure_mapped)
         
         self._setup_canvas_manager(drawing, overlay_box, overlay, filename=filename)
         # Note: set_current_page already called above in mapping loop
