@@ -984,10 +984,13 @@ class SBMLImportPanel:
         print(f"[SBML_IMPORT] _on_parse_complete() called, _parsing_in_progress={self._parsing_in_progress}", file=sys.stderr)
         
         # CRITICAL: Prevent duplicate parse completion handling
-        # This can happen if parse thread is called twice or if idle_add queues multiple callbacks
+        # Check and clear the flag atomically to prevent race conditions
         if not self._parsing_in_progress:
             print(f"[SBML_IMPORT] ⚠ Parse not in progress, ignoring duplicate parse completion", file=sys.stderr)
             return False
+        
+        # Clear the flag IMMEDIATELY to block any other queued completions
+        self._parsing_in_progress = False
         
         self.parsed_pathway = parsed_pathway
         
@@ -1052,8 +1055,7 @@ class SBMLImportPanel:
         else:
             self.logger.debug("Canvas not available, skipping auto-load")
         
-        # Clear parsing flag AFTER triggering load (so load can proceed)
-        self._parsing_in_progress = False
+        # NOTE: _parsing_in_progress was already cleared at the top to prevent race conditions
         
         return False
     
