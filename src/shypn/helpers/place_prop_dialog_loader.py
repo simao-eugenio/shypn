@@ -241,6 +241,9 @@ class PlacePropDialogLoader(GObject.GObject):
             Response ID from the dialog.
         """
         # WAYLAND FIX: Explicitly show dialog before run() to prevent protocol errors
+        # Critical for imported canvases where widget hierarchy is established asynchronously
+        # Default canvas works because it's realized when main window shows
+        # Imported canvases are created programmatically and dialogs may open before fully ready
         self.dialog.show()
         return self.dialog.run()
 
