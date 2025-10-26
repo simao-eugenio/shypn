@@ -549,18 +549,12 @@ class ModelCanvasLoader:
         else:
             print(f"[CANVAS] Overlay already realized for page_index={page_index}", file=sys.stderr)
         
-        # WAYLAND FIX 2: Set page current to trigger widget visibility (if not already current)
-        # Setting the page current ensures GTK will map the widget (make it visible)
-        # For Wayland, this is important because dialogs need their parent widget hierarchy
-        # to be fully established before they can attach properly
-        current_page = self.notebook.get_current_page()
-        if current_page != page_index:
-            self.notebook.set_current_page(page_index)
-            print(f"[CANVAS] Set page {page_index} as current", file=sys.stderr)
-        else:
-            print(f"[CANVAS] Page {page_index} already current", file=sys.stderr)
+        # WAYLAND FIX 2: Don't force page switch here - let import code handle it
+        # Forcing set_current_page during add_document() can interrupt user interaction
+        # The page will be switched by the calling code (import handlers) if needed
+        # We just ensure the widget is realized for later dialog creation
         
-        # Give GTK a moment to process the page switch and map the widget
+        # Give GTK a moment to process and map the widget naturally
         # Using idle_add ensures this happens after the current event processing
         # but doesn't block user input like a busy-wait loop would
         from gi.repository import GLib
