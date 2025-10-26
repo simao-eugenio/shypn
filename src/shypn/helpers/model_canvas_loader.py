@@ -549,18 +549,31 @@ class ModelCanvasLoader:
         else:
             print(f"[CANVAS] Overlay already realized for page_index={page_index}", file=sys.stderr)
         
-        # WAYLAND FIX 2: Also ensure the overlay is mapped (visible on screen)
-        # Mapping happens after realize and ensures the widget is actually displayed
-        if not overlay.get_mapped():
-            # Force mapping by showing the widget and processing events
-            print(f"[CANVAS] Overlay not mapped, forcing map for page_index={page_index}", file=sys.stderr)
-            # Already shown with show_all(), but ensure it's processed
+        # WAYLAND FIX 2: Ensure the page is current and force mapping
+        # The widget must be mapped (visible on screen) for dialogs to work on Wayland
+        # This is the critical difference between working canvases and imported ones
+        self.notebook.set_current_page(page_index)
+        
+        # Force GTK to process all pending events to complete the page switch
+        # This ensures the widget is fully mapped before we enable property dialogs
+        max_iterations = 50  # Safety limit
+        iteration = 0
+        while not overlay.get_mapped() and iteration < max_iterations:
             while Gtk.events_pending():
                 Gtk.main_iteration()
-            print(f"[CANVAS] After event processing: mapped={overlay.get_mapped()}", file=sys.stderr)
+            iteration += 1
+            # Small delay to allow mapping to complete
+            import time
+            time.sleep(0.001)
+        
+        if overlay.get_mapped():
+            print(f"[CANVAS] ✓ Overlay mapped after {iteration} iterations", file=sys.stderr)
+        else:
+            print(f"[CANVAS] ⚠ Overlay still not mapped after {max_iterations} iterations", file=sys.stderr)
         
         self._setup_canvas_manager(drawing, overlay_box, overlay, filename=filename)
-        self.notebook.set_current_page(page_index)
+        # Note: set_current_page already called above in mapping loop
+        return (page_index, drawing)
         return (page_index, drawing)
 
     def _setup_canvas_manager(self, drawing_area, overlay_box=None, overlay_widget=None, filename=None):
