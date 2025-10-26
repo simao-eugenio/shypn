@@ -868,12 +868,6 @@ class SBMLImportPanel:
                 # Trigger redraw
                 drawing_area.queue_draw()
                 
-                # Process pending events to avoid Wayland queue overflow
-                # This ensures all import-related GUI updates complete before
-                # user can interact (e.g., open dialogs)
-                while Gtk.events_pending():
-                    Gtk.main_iteration_do(False)
-                
                 self.logger.info(f"Canvas loaded: {len(manager.places)} places, {len(manager.transitions)} transitions")
                 self._show_status(f"✅ Loaded {len(manager.places)} places, {len(manager.transitions)} transitions")
                 
