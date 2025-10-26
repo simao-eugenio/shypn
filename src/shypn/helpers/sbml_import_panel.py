@@ -97,6 +97,7 @@ class SBMLImportPanel:
         self.current_pathway_doc = None  # PathwayDocument for metadata tracking
         self._auto_continuing = False  # Flag to prevent double-triggering from import button
         self._loading_in_progress = False  # Flag to prevent duplicate canvas loading
+        self._parsing_in_progress = False  # Flag to prevent duplicate parse completion handling
         
         # Get widget references
         self._get_widgets()
@@ -929,6 +930,11 @@ class SBMLImportPanel:
             self._show_status("Please select an SBML file", error=True)
             return
         
+        # CRITICAL: Prevent duplicate parses
+        if self._parsing_in_progress:
+            print("[SBML_IMPORT] ⚠ Parse already in progress, ignoring duplicate request", file=sys.stderr)
+            return
+        
         # Validate file exists
         if not os.path.exists(self.current_filepath):
             self._show_status(f"File not found: {self.current_filepath}", error=True)
@@ -937,6 +943,8 @@ class SBMLImportPanel:
         # Disable parse button during parsing
         if self.sbml_parse_button:
             self.sbml_parse_button.set_sensitive(False)
+        
+        self._parsing_in_progress = True
         filepath = self.current_filepath
         filename = os.path.basename(filepath)
         self._show_status(f"🔄 Parsing {filename}...")
@@ -1037,6 +1045,9 @@ class SBMLImportPanel:
         else:
             self.logger.debug("Canvas not available, skipping auto-load")
         
+        # Clear parsing flag AFTER triggering load (so load can proceed)
+        self._parsing_in_progress = False
+        
         return False
     
     def _on_parse_error(self, error_message):
@@ -1052,6 +1063,7 @@ class SBMLImportPanel:
         self.parsed_pathway = None
         if self.sbml_parse_button:
             self.sbml_parse_button.set_sensitive(True)
+        self._parsing_in_progress = False  # Clear parsing flag on error
         return False
     
     def _show_validation_errors(self, validation_result):
