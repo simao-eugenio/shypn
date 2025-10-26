@@ -49,7 +49,8 @@ class TopologyTabLoader(ABC):
         model,
         element_id: str,
         ui_dir: Optional[str] = None,
-        highlighting_manager=None
+        highlighting_manager=None,
+        parent_window=None
     ):
         """Initialize topology tab loader.
         
@@ -58,10 +59,12 @@ class TopologyTabLoader(ABC):
             element_id: ID of the element to analyze
             ui_dir: Directory containing UI files (defaults to /ui)
             highlighting_manager: Optional HighlightingManager for canvas integration
+            parent_window: Parent window for dialogs (for Wayland compatibility)
         """
         self.model = model
         self.element_id = element_id
         self.highlighting_manager = highlighting_manager
+        self.parent_window = parent_window  # Store for dialog creation
         
         # Determine UI directory
         if ui_dir is None:
@@ -181,8 +184,16 @@ class TopologyTabLoader(ABC):
             )
         else:
             # Show info dialog if highlighting not available
+            # WAYLAND FIX: Use stored parent_window instead of get_toplevel()
+            parent = self.parent_window if hasattr(self, 'parent_window') and self.parent_window else None
+            if not parent:
+                # Fallback to get_toplevel() with validation
+                toplevel = button.get_toplevel()
+                if isinstance(toplevel, Gtk.Window):
+                    parent = toplevel
+            
             dialog = Gtk.MessageDialog(
-                transient_for=button.get_toplevel(),
+                transient_for=parent,
                 flags=0,
                 message_type=Gtk.MessageType.INFO,
                 buttons=Gtk.ButtonsType.OK,
@@ -202,9 +213,17 @@ class TopologyTabLoader(ABC):
         Args:
             button: GTK button that was clicked
         """
+        # WAYLAND FIX: Use stored parent_window instead of get_toplevel()
+        parent = self.parent_window if hasattr(self, 'parent_window') and self.parent_window else None
+        if not parent:
+            # Fallback to get_toplevel() with validation
+            toplevel = button.get_toplevel()
+            if isinstance(toplevel, Gtk.Window):
+                parent = toplevel
+        
         dialog = Gtk.FileChooserDialog(
             title="Export Topology Analysis",
-            parent=button.get_toplevel(),
+            parent=parent,
             action=Gtk.FileChooserAction.SAVE
         )
         dialog.add_buttons(
