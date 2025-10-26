@@ -59,8 +59,12 @@ class PlacePropDialogLoader(GObject.GObject):
         self.dialog = self.builder.get_object('place_properties_dialog')
         if self.dialog is None:
             raise ValueError("Object 'place_properties_dialog' not found in place_prop_dialog.ui")
-        if self.parent_window:
-            self.dialog.set_transient_for(self.parent_window)
+        
+        # WAYLAND FIX: Always set parent (explicitly None if not available)
+        parent = self.parent_window if self.parent_window else None
+        if parent:
+            self.dialog.set_transient_for(parent)
+        
         self.dialog.connect('response', self._on_response)
 
     def _setup_color_picker(self):

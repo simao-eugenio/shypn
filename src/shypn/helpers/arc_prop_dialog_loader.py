@@ -62,8 +62,12 @@ class ArcPropDialogLoader(GObject.GObject):
         self.dialog = self.builder.get_object('arc_properties_dialog')
         if self.dialog is None:
             raise ValueError("Object 'arc_properties_dialog' not found in arc_prop_dialog.ui")
-        if self.parent_window:
-            self.dialog.set_transient_for(self.parent_window)
+        
+        # WAYLAND FIX: Always set parent (explicitly None if not available)
+        parent = self.parent_window if self.parent_window else None
+        if parent:
+            self.dialog.set_transient_for(parent)
+        
         ok_button = self.builder.get_object('ok_button')
         cancel_button = self.builder.get_object('cancel_button')
         if ok_button:
