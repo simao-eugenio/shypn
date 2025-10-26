@@ -417,10 +417,11 @@ class TransitionPropDialogLoader(GObject.GObject):
         try:
             from shypn.ui.topology_tab_loader import TransitionTopologyTabLoader
             
-            # Create topology tab loader
+            # Create topology tab loader with parent_window for Wayland compatibility
             self.topology_loader = TransitionTopologyTabLoader(
                 model=self.model,
-                element_id=self.transition_obj.id
+                element_id=self.transition_obj.id,
+                parent_window=self.parent_window  # Pass parent for dialog creation
             )
             
             # NOTE: Do NOT call populate() here - it can hang on large models!
