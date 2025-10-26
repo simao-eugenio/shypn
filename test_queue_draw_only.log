@@ -1,0 +1,154 @@
+[SHYPN MAIN] Starting application
+[PATHWAY_PANEL] BRENDA enrichment controller initialized
+[MODEL_CANVAS] wire_existing_canvases_to_right_panel() completed - no valid canvas found
+[SHYPN] Report Panel created and added to stack
+TypeError: main.<locals>.on_activate.<locals>.kegg_import_with_topology_notify() missing 1 required positional argument: 'pathway_name'
+🔍 CONVERTER INPUT (pathway.positions):
+   BLL: (100.0, 100.0)
+   IL: (110.0, 110.0)
+   AL: (120.0, 120.0)
+[CANVAS] add_document() called, filename=Edelstein1996 - EPSP ACh event
+[CANVAS] Tab appended, calling overlay.show_all()
+[CANVAS] overlay.show_all() complete
+Traceback (most recent call last):
+  File "/home/simao/projetos/shypn/src/shypn/helpers/sbml_import_panel.py", line 971, in _on_parse_complete
+    self.current_pathway_doc.metadata['species_count'] = len(parsed_pathway.species)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'PathwayDocument' object has no attribute 'metadata'
+🔍 CONVERTER INPUT (pathway.positions):
+   BLL: (100.0, 100.0)
+   IL: (110.0, 110.0)
+   AL: (120.0, 120.0)
+[CANVAS] add_document() called, filename=Edelstein1996 - EPSP ACh event
+[CANVAS] Tab appended, calling overlay.show_all()
+[CANVAS] overlay.show_all() complete
+Warning: Failed to load layout settings CSS: gtk-css-provider-error-quark: layout_settings_panel.css:17:19Junk at end of value for color (1)
+[FILE_PANEL] Enhancing context menu...
+[FILE_PANEL] Context menu exists: <Gtk.Menu object at 0x7c5f42785580 (GtkMenu at 0x18614d80)>
+[FILE_PANEL] Cleared existing menu items
+[FILE_PANEL] Added 15 menu items
+[FILE_PANEL] 'Open Project' in refs: True
+[FILE_PANEL] Context menu enhancement complete
+[LEFT_PANEL] FileExplorerPanel doesn't support inline project creation - will use dialogs
+[SHYPN] Wiring file_explorer to canvas and menu: <shypn.helpers.file_explorer_panel.FileExplorerPanel object at 0x7c5f403b3e60>
+[MENU] set_file_explorer_panel called with: <shypn.helpers.file_explorer_panel.FileExplorerPanel object at 0x7c5f403b3e60>
+[MENU] file_explorer_panel set to: <shypn.helpers.file_explorer_panel.FileExplorerPanel object at 0x7c5f403b3e60>
+[SHYPN] File explorer wired successfully
+[FILE_PANEL] Context menu shown
+[FILE_PANEL] Selected path: /home/simao/projetos/shypn/workspace/projects/SBML
+[FILE_PANEL] Is directory: True
+[FILE_PANEL] Project file exists: True
+[FILE_PANEL] Setting 'Open Project' visible: True
+[FILES] Opening existing project: /home/simao/projetos/shypn/workspace/projects/SBML/.project.shy
+[FILE_PANEL] Project selected for opening: /home/simao/projetos/shypn/workspace/projects/SBML/.project.shy
+[FILE_PANEL] Project opened successfully: SBML
+[FILE_PANEL] Propagating project to all components: SBML
+[FILE_PANEL]   → file_explorer
+[FileExplorer] Project set: SBML
+[FILE_PANEL]   → model_canvas
+[ModelCanvasLoader] Project set: SBML
+[FILE_PANEL]   → pathway_panel_loader
+[PATHWAY_PANEL] set_project called with: SBML
+[PATHWAY_PANEL] Updating KEGG controller with project
+[PATHWAY_PANEL] Updating SBML controller with project
+[SBML_IMPORT] set_project called with: SBML
+[SBML_IMPORT]   Project name: SBML
+[SBML_IMPORT]   Project base_path: /home/simao/projetos/shypn/workspace/projects/SBML
+[SBML_IMPORT]   Pathways dir: /home/simao/projetos/shypn/workspace/projects/SBML/pathways
+[PATHWAY_PANEL] Updating BRENDA controller with project
+[FILE_PANEL] Project opened via dialog: SBML
+[FILE_PANEL] Propagating project to all components: SBML
+[FILE_PANEL]   → file_explorer
+[FileExplorer] Project set: SBML
+[FILE_PANEL]   → model_canvas
+[ModelCanvasLoader] Project set: SBML
+[FILE_PANEL]   → pathway_panel_loader
+[PATHWAY_PANEL] set_project called with: SBML
+[PATHWAY_PANEL] Updating KEGG controller with project
+[PATHWAY_PANEL] Updating SBML controller with project
+[SBML_IMPORT] set_project called with: SBML
+[SBML_IMPORT]   Project name: SBML
+[SBML_IMPORT]   Project base_path: /home/simao/projetos/shypn/workspace/projects/SBML
+[SBML_IMPORT]   Pathways dir: /home/simao/projetos/shypn/workspace/projects/SBML/pathways
+[PATHWAY_PANEL] Updating BRENDA controller with project
+[KEGG_IMPORT] Conversion complete:
+  - Places: 26
+  - Transitions: 34
+  - Arcs: 73
+[FILE_PANEL] Context menu shown
+[FILE_PANEL] Selected path: /home/simao/projetos/shypn/workspace/projects/SBML
+[FILE_PANEL] Is directory: True
+[FILE_PANEL] Project file exists: True
+[FILE_PANEL] Setting 'Open Project' visible: True
+[FILES] Opening existing project: /home/simao/projetos/shypn/workspace/projects/SBML/.project.shy
+[FILE_PANEL] Project selected for opening: /home/simao/projetos/shypn/workspace/projects/SBML/.project.shy
+[FILE_PANEL] Project opened successfully: SBML
+[FILE_PANEL] Propagating project to all components: SBML
+[FILE_PANEL]   → file_explorer
+[FileExplorer] Project set: SBML
+[FILE_PANEL]   → model_canvas
+[ModelCanvasLoader] Project set: SBML
+[FILE_PANEL]   → pathway_panel_loader
+[PATHWAY_PANEL] set_project called with: SBML
+[PATHWAY_PANEL] Updating KEGG controller with project
+[PATHWAY_PANEL] Updating SBML controller with project
+[SBML_IMPORT] set_project called with: SBML
+[SBML_IMPORT]   Project name: SBML
+[SBML_IMPORT]   Project base_path: /home/simao/projetos/shypn/workspace/projects/SBML
+[SBML_IMPORT]   Pathways dir: /home/simao/projetos/shypn/workspace/projects/SBML/pathways
+[PATHWAY_PANEL] Updating BRENDA controller with project
+[FILE_PANEL] Project opened via dialog: SBML
+[FILE_PANEL] Propagating project to all components: SBML
+[FILE_PANEL]   → file_explorer
+[FileExplorer] Project set: SBML
+[FILE_PANEL]   → model_canvas
+[ModelCanvasLoader] Project set: SBML
+[FILE_PANEL]   → pathway_panel_loader
+[PATHWAY_PANEL] set_project called with: SBML
+[PATHWAY_PANEL] Updating KEGG controller with project
+[PATHWAY_PANEL] Updating SBML controller with project
+[SBML_IMPORT] set_project called with: SBML
+[SBML_IMPORT]   Project name: SBML
+[SBML_IMPORT]   Project base_path: /home/simao/projetos/shypn/workspace/projects/SBML
+[SBML_IMPORT]   Pathways dir: /home/simao/projetos/shypn/workspace/projects/SBML/pathways
+[PATHWAY_PANEL] Updating BRENDA controller with project
+[SBML_IMPORT] Import button clicked
+[SBML_IMPORT]   current_filepath=None
+[SBML_IMPORT]   _auto_continuing=False
+[SBML_IMPORT]   sbml_local_radio=<Gtk.RadioButton object at 0x7c5f349c0080 (GtkRadioButton at 0x19031c80)>
+[SBML_IMPORT]   sbml_local_radio.active=False
+[SBML_IMPORT]   sbml_biomodels_radio=<Gtk.RadioButton object at 0x7c5f34791380 (GtkRadioButton at 0x19033710)>
+[SBML_IMPORT]   sbml_biomodels_radio.active=True
+[SBML_IMPORT] BioModels mode - triggering fetch
+[SBML_IMPORT] Fetch - checking project: self.project=SBML
+[SBML_IMPORT] Fetch - pathways_dir=/home/simao/projetos/shypn/workspace/projects/SBML/pathways
+[SBML_IMPORT] ✓ Will save BioModels fetch to project: /home/simao/projetos/shypn/workspace/projects/SBML/pathways/BIOMD0000000001.xml
+[SBML_IMPORT] Fetch - checking project: self.project=SBML
+[SBML_IMPORT] Fetch - pathways_dir=/home/simao/projetos/shypn/workspace/projects/SBML/pathways
+[SBML_IMPORT] ✓ Will save BioModels fetch to project: /home/simao/projetos/shypn/workspace/projects/SBML/pathways/BIOMD0000000001.xml
+[SBML_IMPORT] Fetch complete - auto-triggering parse
+Warning: Failed to load layout settings CSS: gtk-css-provider-error-quark: layout_settings_panel.css:17:19Junk at end of value for color (1)
+[SBML_IMPORT] Checking project metadata conditions:
+  - self.project: SBML
+  - self.current_filepath: /home/simao/projetos/shypn/workspace/projects/SBML/pathways/BIOMD0000000001.xml
+  - self.parsed_pathway: PathwayData(species=12, reactions=17)
+[SBML_IMPORT] Creating pathway metadata for: BIOMD0000000001.xml
+[SBML_IMPORT] Current file location: /home/simao/projetos/shypn/workspace/projects/SBML/pathways/BIOMD0000000001.xml
+[SBML_IMPORT] Expected project location: /home/simao/projetos/shypn/workspace/projects/SBML/pathways/BIOMD0000000001.xml
+[SBML_IMPORT] ✓ SBML raw file already in project: /home/simao/projetos/shypn/workspace/projects/SBML/pathways/BIOMD0000000001.xml
+[SBML_IMPORT] ✓ Linked pathway to model: Edelstein1996 - EPSP ACh event
+[SBML_IMPORT] ✓ Saved pathway metadata for BIOMD0000000001.xml to project
+[SBML_IMPORT] ✓ Raw SBML file location: /home/simao/projetos/shypn/workspace/projects/SBML/pathways/BIOMD0000000001.xml
+[SBML_IMPORT] Auto-saving Petri net model to: /home/simao/projetos/shypn/workspace/projects/SBML/models/BIOMD0000000001.shy
+[SBML_IMPORT] ✓ Petri net model auto-saved: /home/simao/projetos/shypn/workspace/projects/SBML/models/BIOMD0000000001.shy
+[SBML_IMPORT] ✓ Model linked to raw SBML: /home/simao/projetos/shypn/workspace/projects/SBML/pathways/BIOMD0000000001.xml
+[SBML_IMPORT] Import workflow complete, reset auto-continue flag
+[SBML_IMPORT] Fetch complete - auto-triggering parse
+[SBML_IMPORT] Warning: Failed to update pathway metadata: 'PathwayDocument' object has no attribute 'metadata'
+Warning: Failed to load layout settings CSS: gtk-css-provider-error-quark: layout_settings_panel.css:17:19Junk at end of value for color (1)
+[SBML_IMPORT] Checking project metadata conditions:
+  - self.project: SBML
+  - self.current_filepath: /home/simao/projetos/shypn/workspace/projects/SBML/pathways/BIOMD0000000001.xml
+  - self.parsed_pathway: PathwayData(species=12, reactions=17)
+[SBML_IMPORT] Creating pathway metadata for: BIOMD0000000001.xml
+Gdk-Message: 16:19:17.163: Error 71 (Protocol error) dispatching to Wayland display.
