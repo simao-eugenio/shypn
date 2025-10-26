@@ -1571,7 +1571,6 @@ class FileExplorerPanel:
                 manager.mark_clean()
                 
                 # Update UI
-                import os
                 filename = os.path.basename(filepath)
                 self.canvas_loader.update_current_tab_label(filename, is_modified=False)
                 
