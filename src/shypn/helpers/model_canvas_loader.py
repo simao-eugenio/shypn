@@ -2962,9 +2962,21 @@ class ModelCanvasLoader:
         # Check if BOTH page widget and drawing area are mapped
         page_mapped = page_widget.get_mapped() if page_widget else False
         drawing_mapped = drawing_area.get_mapped()
+        page_realized = page_widget.get_realized() if page_widget else False
+        drawing_realized = drawing_area.get_realized()
         
-        if not (page_mapped and drawing_mapped):
-            print(f"[DIALOG] Widget not ready - page_mapped={page_mapped}, drawing_mapped={drawing_mapped}, deferring dialog...", file=sys.stderr)
+        # CRITICAL: Also check if this page is the CURRENT page in the notebook
+        # On Wayland, dialogs can only attach to widgets on the visible/current page
+        current_page_num = self.notebook.get_current_page()
+        page_num = -1
+        if page_widget:
+            page_num = self.notebook.page_num(page_widget)
+        is_current_page = (page_num == current_page_num)
+        
+        print(f"[DIALOG] Widget state: page_mapped={page_mapped}, drawing_mapped={drawing_mapped}, page_realized={page_realized}, drawing_realized={drawing_realized}, is_current_page={is_current_page} (page {page_num} vs current {current_page_num})", file=sys.stderr)
+        
+        if not (page_mapped and drawing_mapped and is_current_page):
+            print(f"[DIALOG] Widget not ready - deferring dialog... (mapped: page={page_mapped}/drawing={drawing_mapped}, current_page={is_current_page})", file=sys.stderr)
             # Use timeout to defer dialog opening until both widgets are mapped
             from gi.repository import GLib
             
@@ -2975,17 +2987,18 @@ class ModelCanvasLoader:
                 retry_count[0] += 1
                 page_ready = page_widget.get_mapped() if page_widget else False
                 drawing_ready = drawing_area.get_mapped()
+                is_current = (self.notebook.page_num(page_widget) == self.notebook.get_current_page()) if page_widget else False
                 
-                if page_ready and drawing_ready:
-                    print(f"[DIALOG] Widgets now mapped (after {retry_count[0]} retries), opening dialog", file=sys.stderr)
+                if page_ready and drawing_ready and is_current:
+                    print(f"[DIALOG] Widgets now ready (after {retry_count[0]} retries), opening dialog", file=sys.stderr)
                     # Call this function again now that widgets are mapped
                     self._on_object_properties(obj, manager, drawing_area)
                     return False  # Don't repeat
                 elif retry_count[0] >= MAX_RETRIES:
-                    print(f"[DIALOG] Timeout waiting for widgets to map, aborting dialog", file=sys.stderr)
+                    print(f"[DIALOG] Timeout waiting for widgets to be ready, aborting dialog", file=sys.stderr)
                     return False  # Give up
                 else:
-                    print(f"[DIALOG] Still not ready (retry {retry_count[0]}/{MAX_RETRIES}): page={page_ready}, drawing={drawing_ready}", file=sys.stderr)
+                    print(f"[DIALOG] Still not ready (retry {retry_count[0]}/{MAX_RETRIES}): page={page_ready}, drawing={drawing_ready}, current={is_current}", file=sys.stderr)
                     return True  # Keep checking
             
             # Check every 50ms for up to 1 second
