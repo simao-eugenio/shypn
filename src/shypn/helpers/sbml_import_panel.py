@@ -91,14 +91,15 @@ class SBMLImportPanel:
             print("Warning: SBML import backend not available", file=sys.stderr)
         
         # Current state
+        # Core state
         self.current_filepath = None
         self.parsed_pathway = None
         self.processed_pathway = None
-        self.current_pathway_doc = None  # PathwayDocument for metadata tracking
-        self._auto_continuing = False  # Flag to prevent double-triggering from import button
-        self._loading_in_progress = False  # Flag to prevent duplicate canvas loading
-        self._parsing_in_progress = False  # Flag to prevent duplicate parse completion handling
-        self._parse_completion_count = 0  # Count to detect duplicate completions
+        self.current_pathway_doc = None  # PathwayDocument tracking metadata
+        
+        # Workflow state: track if we're in unified import button flow
+        self._import_button_flow = False
+        self._fetch_in_progress = False
         
         # Get widget references
         self._get_widgets()
@@ -387,19 +388,28 @@ class SBMLImportPanel:
             
             self._show_status(f"Selected: {os.path.basename(filepath)}")
             
-            # AUTO-CONTINUE: Trigger parse automatically after file selection
-            print(f"[SBML_IMPORT] File selected - auto-triggering parse")
-            self._auto_continuing = True  # Set flag to prevent double-trigger
-            GLib.idle_add(lambda: self._on_parse_clicked(button))
+            # Auto-continue to parse if triggered by unified import button
+            # NOTE: We're already in main thread (dialog callback), so call directly
+            if self._import_button_flow:
+                print("[SBML_IMPORT] Browse complete - auto-continuing to parse", file=sys.stderr)
+                self._on_parse_clicked(button)
+
     
     def _on_fetch_clicked(self, button):
         """Handle fetch button click - download model from BioModels."""
+        print(f"[SBML_IMPORT] _on_fetch_clicked() called, _fetch_in_progress={self._fetch_in_progress}", file=sys.stderr)
+        
         if not self.sbml_biomodels_entry:
             return
         
         biomodels_id = self.sbml_biomodels_entry.get_text().strip()
         if not biomodels_id:
             self._show_status("Please enter a BioModels ID", error=True)
+            return
+        
+        # Prevent duplicate fetches
+        if self._fetch_in_progress:
+            print("[SBML_IMPORT] Fetch already in progress, ignoring duplicate request", file=sys.stderr)
             return
         
         # Save query to workspace settings
@@ -410,6 +420,9 @@ class SBMLImportPanel:
         if self.sbml_parse_button:
             self.sbml_parse_button.set_sensitive(False)
         self._show_status(f"Fetching {biomodels_id} from BioModels...")
+        
+        # Set fetch flag
+        self._fetch_in_progress = True
         
         # Fetch in REAL background thread (not idle_add which blocks UI)
         import threading
@@ -539,12 +552,14 @@ class SBMLImportPanel:
                 
                 GLib.idle_add(lambda msg=error_msg: self._show_status(msg, error=True))
                 GLib.idle_add(self.sbml_fetch_button.set_sensitive, True)
+                self._fetch_in_progress = False
                 return
             
             # Verify file was written successfully
             if not os.path.exists(temp_filepath) or os.path.getsize(temp_filepath) == 0:
                 GLib.idle_add(lambda: self._show_status(f"Failed to save {biomodels_id}", error=True))
                 GLib.idle_add(self.sbml_fetch_button.set_sensitive, True)
+                self._fetch_in_progress = False
                 return
             
             # Store filepath
@@ -566,11 +581,14 @@ class SBMLImportPanel:
                 
                 self._show_status(f"✓ Downloaded {biomodels_id} successfully")
                 
-                # AUTO-CONTINUE: Trigger parse automatically after fetch completes
-                print(f"[SBML_IMPORT] Fetch complete - auto-triggering parse")
-                self._auto_continuing = True  # Set flag to prevent double-trigger
-                # Use idle_add to ensure UI is updated first
-                GLib.idle_add(lambda: self._on_parse_clicked(None))
+                # Auto-continue to parse if triggered by unified import button
+                # NOTE: We're already in main thread (queued by idle_add), so call directly
+                if self._import_button_flow:
+                    print("[SBML_IMPORT] Fetch complete - auto-continuing to parse", file=sys.stderr)
+                    self._on_parse_clicked(None)
+                
+                # Clear fetch flag
+                self._fetch_in_progress = False
                 
                 return False  # Don't repeat
             
@@ -581,6 +599,7 @@ class SBMLImportPanel:
                 self._show_status(f"Fetch error: {str(e)}", error=True)
                 if self.sbml_fetch_button:
                     self.sbml_fetch_button.set_sensitive(True)
+                self._fetch_in_progress = False
                 return False
             GLib.idle_add(show_error)
     
@@ -627,7 +646,7 @@ class SBMLImportPanel:
         This is called after successful parse to load the pathway to canvas.
         Operations run in background thread to avoid blocking UI.
         """
-        print(f"[SBML_IMPORT] _on_load_clicked() called, _loading_in_progress={self._loading_in_progress}", file=sys.stderr)
+        print(f"[SBML_IMPORT] _on_load_clicked() called", file=sys.stderr)
         
         if not self.parsed_pathway:
             self.logger.warning("No parsed pathway to load")
@@ -637,14 +656,6 @@ class SBMLImportPanel:
             self.logger.warning("Canvas or converter not available for load")
             return
         
-        # CRITICAL: Prevent duplicate loads (e.g., auto-load after parse + manual button click)
-        if self._loading_in_progress:
-            self.logger.info("Load already in progress, ignoring duplicate request")
-            print("[SBML_IMPORT] ⚠ Load already in progress, ignoring duplicate request", file=sys.stderr)
-            return
-        
-        print(f"[SBML_IMPORT] Setting _loading_in_progress=True and spawning load thread", file=sys.stderr)
-        self._loading_in_progress = True
         self._show_status("🔄 Converting to Petri net...")
         
         # Get parameters from UI (in main thread)
@@ -718,6 +729,18 @@ class SBMLImportPanel:
                 
                 # Mark as imported so "Save" triggers "Save As"
                 manager.mark_as_imported(pathway_name)
+                
+                # CRITICAL: Initialize canvas state to match file load path
+                # This prevents property dialog crashes on imported canvases
+                manager.mark_clean()  # Mark as clean (no unsaved changes yet)
+                print(f"[SBML_IMPORT] Canvas state initialized (marked clean)")
+                
+                # Set filepath if project exists (for proper state initialization)
+                if self.project:
+                    import os
+                    temp_path = os.path.join(self.project.pathways_dir, f"{pathway_name}.shy")
+                    manager.set_filepath(temp_path)
+                    print(f"[SBML_IMPORT] Canvas filepath set: {temp_path}")
                 
                 # Create pathway metadata for project tracking (SBML raw file already saved)
                 print(f"[SBML_IMPORT] Checking project metadata conditions:")
@@ -856,10 +879,16 @@ class SBMLImportPanel:
                             # Save to file
                             save_document.save_to_file(model_filepath)
                             
-                            # Update manager's filename to reflect saved state
+                            # CRITICAL: Update manager's state to reflect saved file
+                            # This must match what happens when opening an existing file
                             if hasattr(manager, 'document_controller'):
-                                manager.document_controller.filename = base_name
+                                # Set the FULL filepath, not just base name
+                                manager.document_controller.filename = model_filepath
                                 manager.document_controller.modified = False
+                                
+                                # Also update the DocumentModel's filepath if it has one
+                                if hasattr(manager.document_controller, 'filepath'):
+                                    manager.document_controller.filepath = model_filepath
                             
                             # Update canvas tab label to show saved filename
                             if hasattr(self.model_canvas, 'update_current_tab_label'):
@@ -886,25 +915,19 @@ class SBMLImportPanel:
                 self.logger.info(f"Canvas loaded: {len(manager.places)} places, {len(manager.transitions)} transitions")
                 self._show_status(f"✅ Loaded {len(manager.places)} places, {len(manager.transitions)} transitions")
                 
-                # Reset auto-continue flag - workflow is complete
-                self._auto_continuing = False
-                self._loading_in_progress = False  # CRITICAL: Clear loading flag on success
-                print(f"[SBML_IMPORT] Import workflow complete, reset auto-continue flag")
+                # Clear import button flow flag - workflow complete
+                self._import_button_flow = False
             else:
                 self.logger.error("Failed to get canvas manager")
                 self._show_status("❌ Error: Failed to get canvas manager", error=True)
-                # Reset flag on error too
-                self._auto_continuing = False
-                self._loading_in_progress = False  # CRITICAL: Clear loading flag on error
+                self._import_button_flow = False
                 
         except Exception as e:
             self.logger.error(f"Load failed: {e}")
             self._show_status(f"❌ Load error: {str(e)}", error=True)
             import traceback
             traceback.print_exc()
-            # Reset flag on exception
-            self._auto_continuing = False
-            self._loading_in_progress = False  # CRITICAL: Clear loading flag on exception
+            self._import_button_flow = False
         
         return False
     
@@ -918,7 +941,6 @@ class SBMLImportPanel:
             False to stop GLib.idle_add from repeating
         """
         self._show_status(f"❌ Load error: {error_message}", error=True)
-        self._loading_in_progress = False  # CRITICAL: Clear loading flag on error
         return False
     
     def _on_parse_clicked(self, button):
@@ -931,11 +953,6 @@ class SBMLImportPanel:
             self._show_status("Please select an SBML file", error=True)
             return
         
-        # CRITICAL: Prevent duplicate parses
-        if self._parsing_in_progress:
-            print("[SBML_IMPORT] ⚠ Parse already in progress, ignoring duplicate request", file=sys.stderr)
-            return
-        
         # Validate file exists
         if not os.path.exists(self.current_filepath):
             self._show_status(f"File not found: {self.current_filepath}", error=True)
@@ -945,8 +962,6 @@ class SBMLImportPanel:
         if self.sbml_parse_button:
             self.sbml_parse_button.set_sensitive(False)
         
-        self._parsing_in_progress = True
-        self._parse_completion_count = 0  # Reset completion counter
         filepath = self.current_filepath
         filename = os.path.basename(filepath)
         self._show_status(f"🔄 Parsing {filename}...")
@@ -983,26 +998,9 @@ class SBMLImportPanel:
         Returns:
             False to stop GLib.idle_add from repeating
         """
-        # Increment completion counter
-        self._parse_completion_count += 1
-        completion_number = self._parse_completion_count
+        print(f"[SBML_IMPORT] _on_parse_complete() called", file=sys.stderr)
         
-        print(f"[SBML_IMPORT] _on_parse_complete() called #{completion_number}, _parsing_in_progress={self._parsing_in_progress}", file=sys.stderr)
-        
-        # CRITICAL: Only process the FIRST completion
-        if completion_number > 1:
-            print(f"[SBML_IMPORT] ⚠ Duplicate parse completion #{completion_number}, ignoring", file=sys.stderr)
-            return False
-        
-        # Also check the flag for safety
-        if not self._parsing_in_progress:
-            print(f"[SBML_IMPORT] ⚠ Parse not in progress, ignoring", file=sys.stderr)
-            return False
-        
-        # Clear the flag IMMEDIATELY
-        self._parsing_in_progress = False
-        
-        # Set parsed_pathway immediately as second guard against duplicates
+        # Store the parsed pathway
         self.parsed_pathway = parsed_pathway
         
         # Update PathwayDocument with parsed metadata if available
@@ -1066,8 +1064,6 @@ class SBMLImportPanel:
         else:
             self.logger.debug("Canvas not available, skipping auto-load")
         
-        # NOTE: _parsing_in_progress was already cleared at the top to prevent race conditions
-        
         return False
     
     def _on_parse_error(self, error_message):
@@ -1083,7 +1079,6 @@ class SBMLImportPanel:
         self.parsed_pathway = None
         if self.sbml_parse_button:
             self.sbml_parse_button.set_sensitive(True)
-        self._parsing_in_progress = False  # Clear parsing flag on error
         return False
     
     def _show_validation_errors(self, validation_result):
@@ -1255,14 +1250,13 @@ class SBMLImportPanel:
         
         All in one smooth flow.
         """
-        print(f"[SBML_IMPORT] Import button clicked")
+        print(f"[SBML_IMPORT] _on_import_clicked() called", file=sys.stderr)
         print(f"[SBML_IMPORT]   current_filepath={self.current_filepath}")
-        print(f"[SBML_IMPORT]   _auto_continuing={self._auto_continuing}")
+        print(f"[SBML_IMPORT]   _import_button_flow={self._import_button_flow}")
+        print(f"[SBML_IMPORT]   _fetch_in_progress={self._fetch_in_progress}")
         
-        # Check if we're in the middle of an auto-continue workflow
-        if self._auto_continuing:
-            print(f"[SBML_IMPORT] Auto-continue in progress, ignoring import button click")
-            return
+        # Set flag to enable auto-continue workflow
+        self._import_button_flow = True
         
         print(f"[SBML_IMPORT]   sbml_local_radio={self.sbml_local_radio}")
         print(f"[SBML_IMPORT]   sbml_local_radio.active={self.sbml_local_radio.get_active() if self.sbml_local_radio else None}")
@@ -1277,21 +1271,21 @@ class SBMLImportPanel:
         else:
             # No file selected yet - need to browse or fetch
             if self.sbml_local_radio and self.sbml_local_radio.get_active():
-                # Local file mode - trigger browse
+                # Local file mode - trigger browse (will auto-continue to parse)
                 print(f"[SBML_IMPORT] Local mode - triggering browse")
                 self._on_browse_clicked(button)
-                # Browse will auto-continue to parse
             elif self.sbml_biomodels_radio and self.sbml_biomodels_radio.get_active():
-                # BioModels mode - trigger fetch
+                # BioModels mode - trigger fetch (will auto-continue to parse)
                 print(f"[SBML_IMPORT] BioModels mode - triggering fetch")
                 biomodels_id = self.sbml_biomodels_entry.get_text().strip() if self.sbml_biomodels_entry else ""
                 if biomodels_id:
                     # ID entered - fetch it
                     self._on_fetch_clicked(button)
-                    # Fetch will auto-continue to parse
                 else:
                     self._show_status("Please enter a BioModels ID", error=True)
+                    self._import_button_flow = False  # Clear flag on error
             else:
                 print(f"[SBML_IMPORT] ERROR: No mode selected!")
                 self._show_status("Please select an SBML file or enter a BioModels ID", error=True)
+                self._import_button_flow = False  # Clear flag on error
 
