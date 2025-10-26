@@ -469,6 +469,10 @@ class KEGGImportPanel:
                     # Fit imported content to page
                     manager.fit_to_page(padding_percent=15, deferred=True, horizontal_offset_percent=30, vertical_offset_percent=10)
                     
+                    # Trigger redraw to display imported objects
+                    print(f"[KEGG_IMPORT] Triggering canvas redraw...")
+                    drawing_area.queue_draw()
+                    
                     # Mark as imported
                     manager.mark_as_imported(pathway_name)
                     
