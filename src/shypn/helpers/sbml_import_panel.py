@@ -981,7 +981,14 @@ class SBMLImportPanel:
         Returns:
             False to stop GLib.idle_add from repeating
         """
-        print(f"[SBML_IMPORT] _on_parse_complete() called", file=sys.stderr)
+        print(f"[SBML_IMPORT] _on_parse_complete() called, _parsing_in_progress={self._parsing_in_progress}", file=sys.stderr)
+        
+        # CRITICAL: Prevent duplicate parse completion handling
+        # This can happen if parse thread is called twice or if idle_add queues multiple callbacks
+        if not self._parsing_in_progress:
+            print(f"[SBML_IMPORT] ⚠ Parse not in progress, ignoring duplicate parse completion", file=sys.stderr)
+            return False
+        
         self.parsed_pathway = parsed_pathway
         
         # Update PathwayDocument with parsed metadata if available
