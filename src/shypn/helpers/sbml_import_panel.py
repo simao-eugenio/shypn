@@ -697,6 +697,10 @@ class SBMLImportPanel:
                 manager.fit_to_page(padding_percent=15, deferred=True, 
                                    horizontal_offset_percent=30, vertical_offset_percent=10)
                 
+                # Trigger redraw to display imported objects
+                print(f"[SBML_IMPORT] Triggering canvas redraw...")
+                drawing_area.queue_draw()
+                
                 # Mark as imported so "Save" triggers "Save As"
                 manager.mark_as_imported(pathway_name)
                 
@@ -863,6 +867,12 @@ class SBMLImportPanel:
                 
                 # Trigger redraw
                 drawing_area.queue_draw()
+                
+                # Process pending events to avoid Wayland queue overflow
+                # This ensures all import-related GUI updates complete before
+                # user can interact (e.g., open dialogs)
+                while Gtk.events_pending():
+                    Gtk.main_iteration_do(False)
                 
                 self.logger.info(f"Canvas loaded: {len(manager.places)} places, {len(manager.transitions)} transitions")
                 self._show_status(f"✅ Loaded {len(manager.places)} places, {len(manager.transitions)} transitions")

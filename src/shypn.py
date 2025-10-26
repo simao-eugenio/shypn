@@ -337,10 +337,10 @@ def main(argv=None):
 					kegg_ctrl = pathway_panel_loader.kegg_import_controller
 					original_kegg_complete = kegg_ctrl._on_import_complete
 					
-					def kegg_import_with_topology_notify(pathway_id, pathway_name):
+					def kegg_import_with_topology_notify(document_model):
 						"""Wrapper for KEGG import completion that notifies topology panel."""
 						# Run original completion handler
-						result = original_kegg_complete(pathway_id, pathway_name)
+						result = original_kegg_complete(document_model)
 						
 						# Notify topology that model was imported
 						drawing_area = model_canvas_loader.get_current_document()
