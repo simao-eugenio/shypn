@@ -5,6 +5,7 @@ Loads and manages the Transition properties dialog UI.
 Follows project pattern: thin loader with business logic in data layer.
 """
 import os
+import sys
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, GObject
@@ -392,11 +393,11 @@ class TransitionPropDialogLoader(GObject.GObject):
         Returns:
             Response ID from the dialog
         """
-        # WAYLAND FIX: Ensure dialog is realized before showing
-        # This creates the underlying Wayland surface before run()
-        if not self.dialog.get_realized():
-            self.dialog.realize()
-        
+        # WAYLAND FIX: Explicitly show dialog before run() to prevent protocol errors
+        # Critical for imported canvases where widget hierarchy is established asynchronously
+        # Default canvas works because it's realized when main window shows
+        # Imported canvases are created programmatically and dialogs may open before fully ready
+        self.dialog.show()
         return self.dialog.run()
     
     def get_dialog(self):
