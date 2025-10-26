@@ -342,10 +342,15 @@ def main(argv=None):
 						# Run original completion handler
 						result = original_kegg_complete(document_model)
 						
-						# Notify topology that model was imported
-						drawing_area = model_canvas_loader.get_current_document()
-						if drawing_area and topology_panel_loader.controller:
-							topology_panel_loader.controller.on_pathway_imported(drawing_area)
+						# Notify topology that model was imported (with error handling)
+						try:
+							drawing_area = model_canvas_loader.get_current_document()
+							if drawing_area and topology_panel_loader and topology_panel_loader.controller:
+								topology_panel_loader.controller.on_pathway_imported(drawing_area)
+						except Exception as e:
+							print(f"[KEGG] Warning: Failed to notify topology panel: {e}", file=sys.stderr)
+							import traceback
+							traceback.print_exc()
 						
 						return result
 					
@@ -361,10 +366,15 @@ def main(argv=None):
 						# Run original completion handler
 						result = original_sbml_complete(document_model, pathway_name)
 						
-						# Notify topology that model was imported
-						drawing_area = model_canvas_loader.get_current_document()
-						if drawing_area and topology_panel_loader.controller:
-							topology_panel_loader.controller.on_pathway_imported(drawing_area)
+						# Notify topology that model was imported (with error handling)
+						try:
+							drawing_area = model_canvas_loader.get_current_document()
+							if drawing_area and topology_panel_loader and topology_panel_loader.controller:
+								topology_panel_loader.controller.on_pathway_imported(drawing_area)
+						except Exception as e:
+							print(f"[SBML] Warning: Failed to notify topology panel: {e}", file=sys.stderr)
+							import traceback
+							traceback.print_exc()
 						
 						return result
 					
