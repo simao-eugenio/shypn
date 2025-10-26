@@ -366,12 +366,32 @@ class FilePanelV3Loader(FilePanelBase):
             projects_root = Path(self.controller._editing_parent_path)
             project_path = projects_root / project_name
             
+            print(f"[FILE_PANEL] Creating project in location:")
+            print(f"[FILE_PANEL]   projects_root: {projects_root}")
+            print(f"[FILE_PANEL]   project_path: {project_path}")
+            print(f"[FILE_PANEL]   _editing_parent_path: {self.controller._editing_parent_path}")
+            
             # Create project
-            project = project_manager.create_project(
-                name=project_name,
-                location=str(projects_root),
-                description=f"Project: {project_name}"
-            )
+            try:
+                project = project_manager.create_project(
+                    name=project_name,
+                    location=str(projects_root),
+                    description=f"Project: {project_name}"
+                )
+            except ValueError as e:
+                # Show error dialog for nested project attempt
+                dialog = Gtk.MessageDialog(
+                    transient_for=None,  # TODO: Get parent window
+                    flags=0,
+                    message_type=Gtk.MessageType.ERROR,
+                    buttons=Gtk.ButtonsType.OK,
+                    text="Cannot Create Project"
+                )
+                dialog.format_secondary_text(str(e))
+                dialog.run()
+                dialog.destroy()
+                print(f"[FILE_PANEL] {e}", file=sys.stderr)
+                return
             
             if project:
                 print(f"[FILE_PANEL] Project created successfully: {project.name}")

@@ -467,6 +467,19 @@ class ProjectManager:
         self.projects: Dict[str, Project] = {}
         self.observers: Dict[str, 'ProjectFileObserver'] = {}
         self.workspace_path = None
+        self.current_project = None
+        
+        # Project tracking attributes
+        self.project_index = {}
+        self.recent_projects = []
+        self.max_recent = 10  # Maximum number of recent projects to track
+        
+        # Initialize default paths for projects
+        self._setup_default_paths()
+        
+        # Load project index and recent projects
+        self.load_index()
+        self.load_recent_projects()
     
     @classmethod
     def get_instance(cls) -> 'ProjectManager':
@@ -560,7 +573,17 @@ class ProjectManager:
             
         Returns:
             New Project instance
+            
+        Raises:
+            ValueError: If trying to create project inside another project
         """
+        # Check if we're trying to create a project inside another project
+        if self._is_inside_project(base_path):
+            raise ValueError(
+                "Cannot create a project inside another project.\n"
+                "Projects should be created at the workspace/projects/ level."
+            )
+        
         project = Project(name=name, base_path=base_path)
         
         # Create directory structure
@@ -585,6 +608,33 @@ class ProjectManager:
             pass
         
         return project
+    
+    def _is_inside_project(self, path: str) -> bool:
+        """Check if a path is inside an existing project.
+        
+        Walks up the directory tree checking for .project.shy files.
+        
+        Args:
+            path: Path to check
+            
+        Returns:
+            True if path is inside a project, False otherwise
+        """
+        # Normalize the path
+        check_path = os.path.abspath(path)
+        
+        # Walk up the directory tree
+        while check_path != os.path.dirname(check_path):  # Stop at root
+            parent = os.path.dirname(check_path)
+            
+            # Check if parent contains a .project.shy file
+            project_file = os.path.join(parent, '.project.shy')
+            if os.path.exists(project_file):
+                return True
+            
+            check_path = parent
+        
+        return False
     
     def _setup_default_paths(self):
         """Setup default project paths in workspace directory."""
