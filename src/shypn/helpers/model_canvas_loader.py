@@ -2928,13 +2928,22 @@ class ModelCanvasLoader:
                 print(f"[DIALOG] has swissknife_palette: {hasattr(overlay_manager, 'swissknife_palette')}", file=sys.stderr)
                 
                 # Get from SwissKnifePalette widget_palette_instances
+                # NOTE: New SwissKnifePalette architecture stores widget palettes in registry
                 if hasattr(overlay_manager, 'swissknife_palette'):
                     swissknife = overlay_manager.swissknife_palette
                     print(f"[DIALOG] swissknife: {swissknife}", file=sys.stderr)
-                    print(f"[DIALOG] has widget_palette_instances: {hasattr(swissknife, 'widget_palette_instances')}", file=sys.stderr)
-                    if hasattr(swissknife, 'widget_palette_instances'):
+                    
+                    # Try new architecture (registry.widget_palette_instances)
+                    if hasattr(swissknife, 'registry') and hasattr(swissknife.registry, 'widget_palette_instances'):
+                        simulate_tools = swissknife.registry.widget_palette_instances.get('simulate')
+                        print(f"[DIALOG] simulate_tools (from registry): {simulate_tools}", file=sys.stderr)
+                        if simulate_tools and hasattr(simulate_tools, 'data_collector'):
+                            data_collector = simulate_tools.data_collector
+                            print(f"[DIALOG] data_collector: {data_collector}", file=sys.stderr)
+                    # Fallback to old architecture (widget_palette_instances directly)
+                    elif hasattr(swissknife, 'widget_palette_instances'):
                         simulate_tools = swissknife.widget_palette_instances.get('simulate')
-                        print(f"[DIALOG] simulate_tools: {simulate_tools}", file=sys.stderr)
+                        print(f"[DIALOG] simulate_tools (direct): {simulate_tools}", file=sys.stderr)
                         if simulate_tools and hasattr(simulate_tools, 'data_collector'):
                             data_collector = simulate_tools.data_collector
                             print(f"[DIALOG] data_collector: {data_collector}", file=sys.stderr)
