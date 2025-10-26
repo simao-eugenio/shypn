@@ -98,6 +98,7 @@ class SBMLImportPanel:
         self._auto_continuing = False  # Flag to prevent double-triggering from import button
         self._loading_in_progress = False  # Flag to prevent duplicate canvas loading
         self._parsing_in_progress = False  # Flag to prevent duplicate parse completion handling
+        self._parse_completion_count = 0  # Count to detect duplicate completions
         
         # Get widget references
         self._get_widgets()
@@ -945,6 +946,7 @@ class SBMLImportPanel:
             self.sbml_parse_button.set_sensitive(False)
         
         self._parsing_in_progress = True
+        self._parse_completion_count = 0  # Reset completion counter
         filepath = self.current_filepath
         filename = os.path.basename(filepath)
         self._show_status(f"🔄 Parsing {filename}...")
@@ -981,17 +983,26 @@ class SBMLImportPanel:
         Returns:
             False to stop GLib.idle_add from repeating
         """
-        print(f"[SBML_IMPORT] _on_parse_complete() called, _parsing_in_progress={self._parsing_in_progress}", file=sys.stderr)
+        # Increment completion counter
+        self._parse_completion_count += 1
+        completion_number = self._parse_completion_count
         
-        # CRITICAL: Prevent duplicate parse completion handling
-        # Check and clear the flag atomically to prevent race conditions
-        if not self._parsing_in_progress:
-            print(f"[SBML_IMPORT] ⚠ Parse not in progress, ignoring duplicate parse completion", file=sys.stderr)
+        print(f"[SBML_IMPORT] _on_parse_complete() called #{completion_number}, _parsing_in_progress={self._parsing_in_progress}", file=sys.stderr)
+        
+        # CRITICAL: Only process the FIRST completion
+        if completion_number > 1:
+            print(f"[SBML_IMPORT] ⚠ Duplicate parse completion #{completion_number}, ignoring", file=sys.stderr)
             return False
         
-        # Clear the flag IMMEDIATELY to block any other queued completions
+        # Also check the flag for safety
+        if not self._parsing_in_progress:
+            print(f"[SBML_IMPORT] ⚠ Parse not in progress, ignoring", file=sys.stderr)
+            return False
+        
+        # Clear the flag IMMEDIATELY
         self._parsing_in_progress = False
         
+        # Set parsed_pathway immediately as second guard against duplicates
         self.parsed_pathway = parsed_pathway
         
         # Update PathwayDocument with parsed metadata if available
