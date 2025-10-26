@@ -738,9 +738,13 @@ class SBMLImportPanel:
                 # Set filepath if project exists (for proper state initialization)
                 if self.project:
                     import os
-                    temp_path = os.path.join(self.project.pathways_dir, f"{pathway_name}.shy")
-                    manager.set_filepath(temp_path)
-                    print(f"[SBML_IMPORT] Canvas filepath set: {temp_path}")
+                    pathways_dir = self.project.get_pathways_dir()
+                    if pathways_dir:
+                        temp_path = os.path.join(pathways_dir, f"{pathway_name}.shy")
+                        manager.set_filepath(temp_path)
+                        print(f"[SBML_IMPORT] Canvas filepath set: {temp_path}")
+                    else:
+                        print(f"[SBML_IMPORT] WARNING: No pathways_dir, filepath not set")
                 
                 # Create pathway metadata for project tracking (SBML raw file already saved)
                 print(f"[SBML_IMPORT] Checking project metadata conditions:")
