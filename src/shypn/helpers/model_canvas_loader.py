@@ -2886,6 +2886,9 @@ class ModelCanvasLoader:
         # Debug: timestamp when opening properties dialog
         try:
             print(f"[TS] {time.time():.6f} - _on_object_properties() called for obj id={getattr(obj,'id',None)} name={getattr(obj,'name',None)}", file=sys.stderr)
+            print(f"[TS] {time.time():.6f} - parent_window={repr(self.parent_window)}", file=sys.stderr)
+            print(f"[TS] {time.time():.6f} - drawing_area={repr(drawing_area)}", file=sys.stderr)
+            print(f"[TS] {time.time():.6f} - manager={repr(manager)}", file=sys.stderr)
         except Exception:
             pass
 
@@ -2907,6 +2910,12 @@ class ModelCanvasLoader:
         from shypn.helpers.place_prop_dialog_loader import create_place_prop_dialog
         from shypn.helpers.transition_prop_dialog_loader import create_transition_prop_dialog
         from shypn.helpers.arc_prop_dialog_loader import create_arc_prop_dialog
+        
+        # CRITICAL: Ensure parent_window is valid for Wayland
+        if not self.parent_window:
+            print(f"[DIALOG] ERROR: parent_window is None, cannot open dialog", file=sys.stderr)
+            return
+        
         dialog_loader = None
         if isinstance(obj, Place):
             dialog_loader = create_place_prop_dialog(obj, parent_window=self.parent_window, persistency_manager=self.persistency, model=manager)
@@ -2915,13 +2924,24 @@ class ModelCanvasLoader:
             if drawing_area in self.overlay_managers:
                 overlay_manager = self.overlay_managers[drawing_area]
                 
+                print(f"[DIALOG] overlay_manager exists: {overlay_manager}", file=sys.stderr)
+                print(f"[DIALOG] has swissknife_palette: {hasattr(overlay_manager, 'swissknife_palette')}", file=sys.stderr)
+                
                 # Get from SwissKnifePalette widget_palette_instances
                 if hasattr(overlay_manager, 'swissknife_palette'):
                     swissknife = overlay_manager.swissknife_palette
+                    print(f"[DIALOG] swissknife: {swissknife}", file=sys.stderr)
+                    print(f"[DIALOG] has widget_palette_instances: {hasattr(swissknife, 'widget_palette_instances')}", file=sys.stderr)
                     if hasattr(swissknife, 'widget_palette_instances'):
                         simulate_tools = swissknife.widget_palette_instances.get('simulate')
+                        print(f"[DIALOG] simulate_tools: {simulate_tools}", file=sys.stderr)
                         if simulate_tools and hasattr(simulate_tools, 'data_collector'):
                             data_collector = simulate_tools.data_collector
+                            print(f"[DIALOG] data_collector: {data_collector}", file=sys.stderr)
+            else:
+                print(f"[DIALOG] WARNING: drawing_area not in overlay_managers!", file=sys.stderr)
+                
+            print(f"[DIALOG] Creating transition dialog with data_collector={data_collector}", file=sys.stderr)
             dialog_loader = create_transition_prop_dialog(obj, parent_window=self.parent_window, persistency_manager=self.persistency, model=manager, data_collector=data_collector)
         elif isinstance(obj, Arc):
             dialog_loader = create_arc_prop_dialog(obj, parent_window=self.parent_window, persistency_manager=self.persistency, model=manager)
@@ -2953,14 +2973,18 @@ class ModelCanvasLoader:
         dialog_loader.connect('properties-changed', on_properties_changed)
         
         try:
+            print(f"[TS] {time.time():.6f} - [DIALOG] Calling dialog_loader.run()...", file=sys.stderr)
             response = dialog_loader.run()
+            print(f"[TS] {time.time():.6f} - [DIALOG] dialog_loader.run() returned response={response}", file=sys.stderr)
             
             if response == Gtk.ResponseType.OK:
                 drawing_area.queue_draw()
         finally:
             # CRITICAL: Always destroy dialog to prevent orphaned widgets
             # Orphaned widgets cause Wayland focus issues and app crashes
+            print(f"[TS] {time.time():.6f} - [DIALOG] Calling dialog_loader.destroy()...", file=sys.stderr)
             dialog_loader.destroy()
+            print(f"[TS] {time.time():.6f} - [DIALOG] dialog_loader.destroy() complete", file=sys.stderr)
         
         # Restore original tool if we switched it
         if original_tool == 'arc':
