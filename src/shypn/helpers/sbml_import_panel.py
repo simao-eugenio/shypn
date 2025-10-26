@@ -625,6 +625,8 @@ class SBMLImportPanel:
         This is called after successful parse to load the pathway to canvas.
         Operations run in background thread to avoid blocking UI.
         """
+        print(f"[SBML_IMPORT] _on_load_clicked() called, _loading_in_progress={self._loading_in_progress}", file=sys.stderr)
+        
         if not self.parsed_pathway:
             self.logger.warning("No parsed pathway to load")
             return
@@ -639,6 +641,7 @@ class SBMLImportPanel:
             print("[SBML_IMPORT] ⚠ Load already in progress, ignoring duplicate request", file=sys.stderr)
             return
         
+        print(f"[SBML_IMPORT] Setting _loading_in_progress=True and spawning load thread", file=sys.stderr)
         self._loading_in_progress = True
         self._show_status("🔄 Converting to Petri net...")
         
@@ -680,7 +683,9 @@ class SBMLImportPanel:
         try:
             # Load to canvas - create new tab
             self._show_status("🔄 Loading to canvas...")
+            print(f"[SBML_IMPORT] _on_load_complete: calling add_document(filename={pathway_name})", file=sys.stderr)
             page_index, drawing_area = self.model_canvas.add_document(filename=pathway_name)
+            print(f"[SBML_IMPORT] _on_load_complete: add_document returned page_index={page_index}", file=sys.stderr)
             
             # Wire sbml_panel to ModelCanvasLoader (if not already wired)
             if not hasattr(self.model_canvas, 'sbml_panel') or self.model_canvas.sbml_panel is None:
@@ -968,6 +973,7 @@ class SBMLImportPanel:
         Returns:
             False to stop GLib.idle_add from repeating
         """
+        print(f"[SBML_IMPORT] _on_parse_complete() called", file=sys.stderr)
         self.parsed_pathway = parsed_pathway
         
         # Update PathwayDocument with parsed metadata if available
@@ -1026,6 +1032,7 @@ class SBMLImportPanel:
         # Load to canvas after parse (NEW: always enabled, not a testing mode)
         if self.model_canvas:
             self.logger.info("Auto-loading to canvas after parse")
+            print(f"[SBML_IMPORT] _on_parse_complete: calling _on_load_clicked()", file=sys.stderr)
             self._on_load_clicked(None)
         else:
             self.logger.debug("Canvas not available, skipping auto-load")
