@@ -476,6 +476,18 @@ class KEGGImportPanel:
                     # Mark as imported
                     manager.mark_as_imported(pathway_name)
                     
+                    # CRITICAL: Initialize canvas state to match file load path
+                    # This prevents property dialog crashes on imported canvases
+                    manager.mark_clean()  # Mark as clean (no unsaved changes yet)
+                    print(f"[KEGG_IMPORT] Canvas state initialized (marked clean)")
+                    
+                    # Set filepath if project exists (for proper state initialization)
+                    if self.project:
+                        import os
+                        temp_path = os.path.join(self.project.pathways_dir, f"{pathway_name}.shy")
+                        manager.set_filepath(temp_path)
+                        print(f"[KEGG_IMPORT] Canvas filepath set: {temp_path}")
+                    
                     # NOW save KGML and metadata to project (after successful import)
                     if self.project and self.current_kgml and self.current_pathway:
                         try:

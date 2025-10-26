@@ -1,0 +1,50 @@
+[SHYPN MAIN] Starting application
+[TS] 1761511942.764505 - [MANAGER] Created manager=<shypn.data.model_canvas_manager.ModelCanvasManager object at 0x7e0e99e77650> for drawing=<Gtk.DrawingArea object at 0x7e0e99ec0b80 (GtkDrawingArea at 0x237840c0)> filename=default
+[TS] 1761511942.767384 - [OVERLAY] Registered overlay_manager=<shypn.canvas.canvas_overlay_manager.CanvasOverlayManager object at 0x7e0e99e75ee0> for drawing=<Gtk.DrawingArea object at 0x7e0e99ec0b80 (GtkDrawingArea at 0x237840c0)>
+[PATHWAY_PANEL] BRENDA enrichment controller initialized
+[MODEL_CANVAS] wire_existing_canvases_to_right_panel() completed - no valid canvas found
+[SHYPN] Report Panel created and added to stack
+[TS] 1761511957.610976 - _on_object_properties() called for obj id=1 name=P1
+[TS] 1761511957.611059 - parent_window=<Gtk.ApplicationWindow object at 0x7e0e99eba0c0 (GtkApplicationWindow at 0x235a6790)>
+[TS] 1761511957.611082 - drawing_area=<Gtk.DrawingArea object at 0x7e0e99ec0b80 (GtkDrawingArea at 0x237840c0)>
+[TS] 1761511957.611090 - manager=<shypn.data.model_canvas_manager.ModelCanvasManager object at 0x7e0e99e77650>
+[TS] 1761511957.641280 - [DIALOG] Calling dialog_loader.run()...
+[TS] 1761511958.901133 - [DIALOG] dialog_loader.run() returned response=-5
+[TS] 1761511958.901181 - [DIALOG] Calling dialog_loader.destroy()...
+[TS] 1761511958.904820 - [DIALOG] dialog_loader.destroy() complete
+[TS] 1761511961.727020 - _on_object_properties() called for obj id=1 name=T1
+[TS] 1761511961.727124 - parent_window=<Gtk.ApplicationWindow object at 0x7e0e99eba0c0 (GtkApplicationWindow at 0x235a6790)>
+[TS] 1761511961.727150 - drawing_area=<Gtk.DrawingArea object at 0x7e0e99ec0b80 (GtkDrawingArea at 0x237840c0)>
+[TS] 1761511961.727158 - manager=<shypn.data.model_canvas_manager.ModelCanvasManager object at 0x7e0e99e77650>
+[DIALOG] overlay_manager exists: <shypn.canvas.canvas_overlay_manager.CanvasOverlayManager object at 0x7e0e99e75ee0>
+[DIALOG] has swissknife_palette: True
+[DIALOG] swissknife: <swissknife_palette_new.SwissKnifePalette object at 0x7e0e99ec3f80 (shypn+helpers+swissknife_palette_new+SwissKnifePalette at 0x237a53e0)>
+[DIALOG] simulate_tools (from registry): <simulate_tools_palette_loader.SimulateToolsPaletteLoader object at 0x7e0e99e87780 (shypn+helpers+simulate_tools_palette_loader+SimulateToolsPaletteLoader at 0x237b1d00)>
+[DIALOG] data_collector: <shypn.analyses.data_collector.SimulationDataCollector object at 0x7e0e9af7bc80>
+[DIALOG] Creating transition dialog with data_collector=<shypn.analyses.data_collector.SimulationDataCollector object at 0x7e0e9af7bc80>
+[TS] 1761511961.750976 - [DIALOG] Calling dialog_loader.run()...
+[TS] 1761511962.731093 - [DIALOG] dialog_loader.run() returned response=-5
+[TS] 1761511962.731145 - [DIALOG] Calling dialog_loader.destroy()...
+[TS] 1761511962.734563 - [DIALOG] dialog_loader.destroy() complete
+[SBML_IMPORT] ⚠ Parse already in progress, ignoring duplicate request
+[SBML_IMPORT] _on_parse_complete() called #1, _parsing_in_progress=True
+[SBML_IMPORT] _on_parse_complete: calling _on_load_clicked()
+[SBML_IMPORT] _on_load_clicked() called, _loading_in_progress=False
+[SBML_IMPORT] Setting _loading_in_progress=True and spawning load thread
+🔍 CONVERTER INPUT (pathway.positions):
+   BLL: (100.0, 100.0)
+   IL: (110.0, 110.0)
+   AL: (120.0, 120.0)
+[SBML_IMPORT] _on_load_complete: calling add_document(filename=Edelstein1996 - EPSP ACh event)
+[CANVAS] add_document() called, filename=Edelstein1996 - EPSP ACh event
+[TS] 1761511980.425768 - [CANVAS] Tab appended page_index=1 drawing=<Gtk.DrawingArea object at 0x7e0e8e3eb4c0 (GtkDrawingArea at 0x25331900)> filename=Edelstein1996 - EPSP ACh event
+[TS] 1761511980.425831 - [CANVAS] overlay.show_all() complete page_index=1 drawing=<Gtk.DrawingArea object at 0x7e0e8e3eb4c0 (GtkDrawingArea at 0x25331900)>
+[TS] 1761511980.425888 - [MANAGER] Created manager=<shypn.data.model_canvas_manager.ModelCanvasManager object at 0x7e0e95e1eea0> for drawing=<Gtk.DrawingArea object at 0x7e0e8e3eb4c0 (GtkDrawingArea at 0x25331900)> filename=Edelstein1996 - EPSP ACh event
+[TS] 1761511980.429958 - [OVERLAY] Registered overlay_manager=<shypn.canvas.canvas_overlay_manager.CanvasOverlayManager object at 0x7e0e9571cf80> for drawing=<Gtk.DrawingArea object at 0x7e0e8e3eb4c0 (GtkDrawingArea at 0x25331900)>
+[SBML_IMPORT] _on_load_complete: add_document returned page_index=1
+[TS] 1761511991.759933 - _on_object_properties() called for obj id=10 name=P10
+[TS] 1761511991.760023 - parent_window=<Gtk.ApplicationWindow object at 0x7e0e99eba0c0 (GtkApplicationWindow at 0x235a6790)>
+[TS] 1761511991.760046 - drawing_area=<Gtk.DrawingArea object at 0x7e0e8e3eb4c0 (GtkDrawingArea at 0x25331900)>
+[TS] 1761511991.760057 - manager=<shypn.data.model_canvas_manager.ModelCanvasManager object at 0x7e0e95e1eea0>
+[TS] 1761511991.767155 - [DIALOG] Calling dialog_loader.run()...
+Gdk-Message: 17:53:11.900: Error 71 (Protocol error) dispatching to Wayland display.

@@ -291,6 +291,8 @@ class ArcPropDialogLoader(GObject.GObject):
         Returns:
             Response ID from the dialog.
         """
+        # WAYLAND FIX: Explicitly show dialog before run() to prevent protocol errors
+        self.dialog.show()
         return self.dialog.run()
 
     def get_dialog(self):
