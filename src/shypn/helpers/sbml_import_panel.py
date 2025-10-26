@@ -96,6 +96,7 @@ class SBMLImportPanel:
         self.processed_pathway = None
         self.current_pathway_doc = None  # PathwayDocument for metadata tracking
         self._auto_continuing = False  # Flag to prevent double-triggering from import button
+        self._loading_in_progress = False  # Flag to prevent duplicate canvas loading
         
         # Get widget references
         self._get_widgets()
@@ -632,6 +633,13 @@ class SBMLImportPanel:
             self.logger.warning("Canvas or converter not available for load")
             return
         
+        # CRITICAL: Prevent duplicate loads (e.g., auto-load after parse + manual button click)
+        if self._loading_in_progress:
+            self.logger.info("Load already in progress, ignoring duplicate request")
+            print("[SBML_IMPORT] ⚠ Load already in progress, ignoring duplicate request", file=sys.stderr)
+            return
+        
+        self._loading_in_progress = True
         self._show_status("🔄 Converting to Petri net...")
         
         # Get parameters from UI (in main thread)
@@ -873,12 +881,14 @@ class SBMLImportPanel:
                 
                 # Reset auto-continue flag - workflow is complete
                 self._auto_continuing = False
+                self._loading_in_progress = False  # CRITICAL: Clear loading flag on success
                 print(f"[SBML_IMPORT] Import workflow complete, reset auto-continue flag")
             else:
                 self.logger.error("Failed to get canvas manager")
                 self._show_status("❌ Error: Failed to get canvas manager", error=True)
                 # Reset flag on error too
                 self._auto_continuing = False
+                self._loading_in_progress = False  # CRITICAL: Clear loading flag on error
                 
         except Exception as e:
             self.logger.error(f"Load failed: {e}")
@@ -887,6 +897,7 @@ class SBMLImportPanel:
             traceback.print_exc()
             # Reset flag on exception
             self._auto_continuing = False
+            self._loading_in_progress = False  # CRITICAL: Clear loading flag on exception
         
         return False
     
@@ -900,6 +911,7 @@ class SBMLImportPanel:
             False to stop GLib.idle_add from repeating
         """
         self._show_status(f"❌ Load error: {error_message}", error=True)
+        self._loading_in_progress = False  # CRITICAL: Clear loading flag on error
         return False
     
     def _on_parse_clicked(self, button):
