@@ -1,0 +1,6 @@
+[SHYPN MAIN] Starting application
+[TS] 1761518621.193085 - [MANAGER] Created manager=<shypn.data.model_canvas_manager.ModelCanvasManager object at 0x7b4c32762990> for drawing=<Gtk.DrawingArea object at 0x7b4c325c2640 (GtkDrawingArea at 0xfb65aa0)> filename=default
+[TS] 1761518621.226772 - [OVERLAY] Registered overlay_manager=<shypn.canvas.canvas_overlay_manager.CanvasOverlayManager object at 0x7b4c32b02db0> for drawing=<Gtk.DrawingArea object at 0x7b4c325c2640 (GtkDrawingArea at 0xfb65aa0)>
+[PATHWAY_PANEL] BRENDA enrichment controller initialized
+[MODEL_CANVAS] wire_existing_canvases_to_right_panel() completed - no valid canvas found
+[SHYPN] Report Panel created and added to stack
