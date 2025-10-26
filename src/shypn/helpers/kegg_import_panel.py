@@ -489,15 +489,15 @@ class KEGGImportPanel:
                                 source_type="kegg",
                                 source_id=self.current_pathway_id,
                                 source_organism=self.current_pathway.org,
-                                name=self.current_pathway.title or self.current_pathway.name,
-                                raw_file=filename,
-                                description=f"KEGG pathway: {self.current_pathway.title or self.current_pathway.name}"
+                                name=self.current_pathway.title or self.current_pathway.name
                             )
                             
-                            # Add metadata about pathway content
-                            self.current_pathway_doc.metadata['entries'] = len(self.current_pathway.entries)
-                            self.current_pathway_doc.metadata['reactions'] = len(self.current_pathway.reactions)
-                            self.current_pathway_doc.metadata['relations'] = len(self.current_pathway.relations)
+                            # Set file paths and notes
+                            self.current_pathway_doc.raw_file = filename
+                            self.current_pathway_doc.notes = f"KEGG pathway: {self.current_pathway.title or self.current_pathway.name}\n"
+                            self.current_pathway_doc.notes += f"Entries: {len(self.current_pathway.entries)}, "
+                            self.current_pathway_doc.notes += f"Reactions: {len(self.current_pathway.reactions)}, "
+                            self.current_pathway_doc.notes += f"Relations: {len(self.current_pathway.relations)}"
                             
                             # Get model ID from document_model and link
                             model_id = document_model.id if hasattr(document_model, 'id') else None
