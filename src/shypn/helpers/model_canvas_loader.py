@@ -495,32 +495,32 @@ class ModelCanvasLoader:
                     
                     return (current_page, drawing_area)
         
-        # Create new tab
+        # Create new tab FROM UI TEMPLATE
+        # This ensures identical widget hierarchy for all canvases (default, File→New, imports)
+        # and eliminates Wayland timing issues by using consistent UI-based instantiation
         self.document_count += 1
         if filename is None:
             if title:
                 filename = title
             else:
                 filename = f"default{(self.document_count if self.document_count > 1 else '')}"
-        overlay = Gtk.Overlay()
-        overlay.set_hexpand(True)
-        overlay.set_vexpand(True)
-        scrolled = Gtk.ScrolledWindow()
-        scrolled.set_hexpand(True)
-        scrolled.set_vexpand(True)
-        scrolled.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-        drawing = Gtk.DrawingArea()
-        drawing.set_hexpand(True)
-        drawing.set_vexpand(True)
-        drawing.set_size_request(2000, 2000)
-        scrolled.add(drawing)
-        overlay.add(scrolled)
-        overlay_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        overlay_box.set_halign(Gtk.Align.END)
-        overlay_box.set_valign(Gtk.Align.END)
-        overlay_box.set_margin_end(10)
-        overlay_box.set_margin_bottom(10)
-        overlay.add_overlay(overlay_box)
+        
+        # Load canvas tab from UI template
+        template_path = os.path.join(os.path.dirname(self.ui_path), 'canvas_tab_template.ui')
+        if not os.path.exists(template_path):
+            raise FileNotFoundError(f"Canvas tab template not found: {template_path}")
+        
+        # Create a new builder instance for this canvas (each canvas gets its own widgets)
+        tab_builder = Gtk.Builder.new_from_file(template_path)
+        overlay = tab_builder.get_object('canvas_overlay_template')
+        scrolled = tab_builder.get_object('canvas_scroll_template')
+        drawing = tab_builder.get_object('canvas_drawing_template')
+        overlay_box = tab_builder.get_object('canvas_overlay_box_template')
+        
+        if not all([overlay, scrolled, drawing, overlay_box]):
+            raise ValueError("Failed to load canvas widgets from template")
+        
+        print(f"[CANVAS] Created canvas from UI template for filename={filename}", file=sys.stderr)
         
         # Create tab label with file icon
         tab_filename = filename if filename else 'default'
