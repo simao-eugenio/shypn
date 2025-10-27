@@ -857,39 +857,10 @@ def main(argv=None):
 			if 'topology' in master_palette.buttons:
 				master_palette.buttons['topology'].widget.set_tooltip_text('Topology Analysis')
 		
-		# Get minimize/maximize buttons
-		minimize_button = main_builder.get_object('minimize_button')
-		maximize_button = main_builder.get_object('maximize_button')
-		maximize_image = main_builder.get_object('maximize_image')
-		
-		# Define minimize handler
-		def on_minimize_clicked(button):
-			"""Minimize (iconify) the window."""
-			window.iconify()
-		
-		# Define maximize/restore handler
-		# NOTE: May cause Error 71 on Wayland if panels are visible
-		def on_maximize_clicked(button):
-			"""Toggle between maximized and normal window state."""
-			if window.is_maximized():
-				window.unmaximize()
-				# Update icon to maximize
-				if maximize_image:
-					maximize_image.set_from_icon_name('window-maximize-symbolic', Gtk.IconSize.BUTTON)
-				button.set_tooltip_text('Maximize window')
-			else:
-				window.maximize()
-				# Update icon to restore
-				if maximize_image:
-					maximize_image.set_from_icon_name('window-restore-symbolic', Gtk.IconSize.BUTTON)
-				button.set_tooltip_text('Restore window')
-		
-		# Connect minimize/maximize buttons
-		if minimize_button is not None:
-			minimize_button.connect('clicked', on_minimize_clicked)
-		
-		if maximize_button is not None:
-			maximize_button.connect('clicked', on_maximize_clicked)
+		# Both maximize and minimize buttons removed for Wayland compatibility
+		# Users can:
+		# - Double-click title bar to maximize/restore
+		# - Use window manager controls to minimize
 		
 		# Save window geometry on close and check for unsaved changes
 		def on_window_delete(window, event):

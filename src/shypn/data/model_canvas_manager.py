@@ -1752,8 +1752,10 @@ class ModelCanvasManager:
         """
         if not self._is_dirty:
             self._is_dirty = True
-            if self.on_dirty_changed:
-                self.on_dirty_changed(True)
+            # Check if callbacks are suppressed during initial setup
+            if not getattr(self, '_suppress_callbacks', False):
+                if self.on_dirty_changed:
+                    self.on_dirty_changed(True)
     
     def mark_clean(self):
         """Mark document as saved (no unsaved changes).
@@ -1763,8 +1765,10 @@ class ModelCanvasManager:
         """
         if self._is_dirty:
             self._is_dirty = False
-            if self.on_dirty_changed:
-                self.on_dirty_changed(False)
+            # Check if callbacks are suppressed during initial setup
+            if not getattr(self, '_suppress_callbacks', False):
+                if self.on_dirty_changed:
+                    self.on_dirty_changed(False)
     
     def is_dirty(self) -> bool:
         """Check if document has unsaved changes.

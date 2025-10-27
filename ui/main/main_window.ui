@@ -16,25 +16,7 @@
         <property name="visible">True</property>
         <property name="title">Shypn</property>
         
-        <!-- Window Control Buttons -->
-        <child>
-          <object class="GtkButton" id="maximize_button">
-            <property name="visible">True</property>
-            <property name="can-focus">False</property>
-            <property name="tooltip-text">Maximize window</property>
-            <child>
-              <object class="GtkImage" id="maximize_image">
-                <property name="visible">True</property>
-                <property name="icon-name">window-maximize-symbolic</property>
-                <property name="icon-size">1</property>
-              </object>
-            </child>
-          </object>
-          <packing>
-            <property name="pack-type">end</property>
-            <property name="position">0</property>
-          </packing>
-        </child>
+        <!-- Window Control Buttons (Maximize button removed - use double-click on title bar instead) -->
         <child>
           <object class="GtkButton" id="minimize_button">
             <property name="visible">True</property>
@@ -50,7 +32,7 @@
           </object>
           <packing>
             <property name="pack-type">end</property>
-            <property name="position">1</property>
+            <property name="position">0</property>
           </packing>
         </child>
       </object>

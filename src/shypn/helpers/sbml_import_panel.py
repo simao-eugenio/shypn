@@ -753,6 +753,11 @@ class SBMLImportPanel:
                 arcs=document_model.arcs
             )
             
+            # ===== STEP 2: MARK CLEAN (like File → Open does) =====
+            # load_objects() marks canvas as dirty, but imported canvases should start clean
+            # This matches the File → Open behavior and prevents Wayland dialog issues
+            manager.mark_clean()
+            
             # Set change callback for object state management
             manager.document_controller.set_change_callback(manager._on_object_changed)
             
