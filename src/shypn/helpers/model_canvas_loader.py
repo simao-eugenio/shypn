@@ -744,6 +744,16 @@ class ModelCanvasLoader:
         self.overlay_managers[drawing_area].simulation_controller = simulation_controller
         
         # ============================================================
+        # Wire data collector to right panel for analysis plotting
+        # ============================================================
+        if self.right_panel_loader and hasattr(swissknife_palette, 'widget_palette_instances'):
+            simulate_tools_palette = swissknife_palette.widget_palette_instances.get('simulate')
+            if simulate_tools_palette and hasattr(simulate_tools_palette, 'data_collector'):
+                data_collector = simulate_tools_palette.data_collector
+                self.right_panel_loader.set_data_collector(data_collector)
+                print(f"[ANALYSES] Wired data_collector for new tab (drawing_area={id(drawing_area)})")
+        
+        # ============================================================
         # OLD PALETTE CODE - Keeping temporarily for reference
         # ============================================================
         # Create and register tools palette
