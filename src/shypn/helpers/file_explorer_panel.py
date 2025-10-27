@@ -1847,9 +1847,8 @@ class FileExplorerPanel:
                 self.persistency.set_filepath(filepath)
                 self.persistency.mark_clean()
             
-            # Update tab label to show the actual filename
-            self.canvas_loader.update_current_tab_label(filename, is_modified=False)
-            self.canvas_loader.update_current_tab_label(filename, is_modified=False)
+            # Note: Tab label is already set correctly by add_document()
+            # No need to call update_current_tab_label() here
             
             drawing_area.queue_draw()
 
