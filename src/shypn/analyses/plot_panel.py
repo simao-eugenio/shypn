@@ -248,20 +248,14 @@ class AnalysisPlotPanel(Gtk.Box):
         old_callback = obj.on_changed if hasattr(obj, 'on_changed') else None
         obj.on_changed = None
         
-        # Set border color
+        # Set border color only - keep fill color black for transitions
         obj.border_color = color_rgb
         
-        # For transitions: make fill color a much lighter shade of border color
-        # This creates better contrast and makes the colored border clearly visible
+        # For transitions: keep fill color black (default)
+        # Only the border gets the plot color for clear visual distinction
         from shypn.netobjs import Transition
         if isinstance(obj, Transition):
-            # Create a very light tint (80% white + 20% color)
-            r, g, b = color_rgb
-            obj.fill_color = (
-                0.8 + r * 0.2,  # Mostly white with a hint of color
-                0.8 + g * 0.2,
-                0.8 + b * 0.2
-            )
+            obj.fill_color = Transition.DEFAULT_COLOR  # Keep black fill
         
         # Restore callback
         obj.on_changed = old_callback
