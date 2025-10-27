@@ -66,9 +66,6 @@ except ImportError as e:
 	sys.exit(1)
 
 def main(argv=None):
-	sys.stderr.write("[SHYPN MAIN] Starting application\n")
-	sys.stderr.flush()
-	
 	if argv is None:
 		argv = sys.argv
 
