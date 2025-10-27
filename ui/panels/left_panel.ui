@@ -91,8 +91,8 @@
             <child>
               <object class="GtkButton" id="file_new_button">
                 <property name="visible">True</property>
-                <property name="label">New</property>
-                <property name="tooltip-text">New File (Ctrl+N)</property>
+                <property name="label">+File</property>
+                <property name="tooltip-text">Create New File Inline</property>
                 <style>
                   <class name="flat"/>
                 </style>
@@ -162,8 +162,8 @@
             <child>
               <object class="GtkButton" id="file_new_folder_button">
                 <property name="visible">True</property>
-                <property name="label">New Folder</property>
-                <property name="tooltip-text">Create New Folder</property>
+                <property name="label">+Folder</property>
+                <property name="tooltip-text">Create New Folder Inline</property>
                 <style>
                   <class name="flat"/>
                 </style>
