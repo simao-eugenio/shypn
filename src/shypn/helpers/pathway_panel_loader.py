@@ -181,7 +181,6 @@ class PathwayPanelLoader:
                 model_canvas=self.model_canvas,
                 project=self.project
             )
-            print("[PATHWAY_PANEL] BRENDA enrichment controller initialized", file=sys.stderr)
             
         except ImportError as e:
             print(f"Warning: Could not load BRENDA enrichment controller: {e}", file=sys.stderr)
@@ -608,25 +607,23 @@ class PathwayPanelLoader:
         Args:
             project: Project instance
         """
-        print(f"[PATHWAY_PANEL] set_project called with: {project}")
         self.project = project
         
         # Update import controllers if they exist
         if self.kegg_import_controller:
-            print(f"[PATHWAY_PANEL] Updating KEGG controller with project")
+            pass
             self.kegg_import_controller.set_project(project)
         
         if self.sbml_import_controller and hasattr(self.sbml_import_controller, 'set_project'):
-            print(f"[PATHWAY_PANEL] Updating SBML controller with project")
+            pass
             self.sbml_import_controller.set_project(project)
         else:
-            print(f"[PATHWAY_PANEL] SBML controller not available or no set_project method")
-            print(f"[PATHWAY_PANEL]   sbml_import_controller: {self.sbml_import_controller}")
+            pass
             if self.sbml_import_controller:
-                print(f"[PATHWAY_PANEL]   has set_project: {hasattr(self.sbml_import_controller, 'set_project')}")
+                pass
         
         if self.brenda_enrichment_controller:
-            print(f"[PATHWAY_PANEL] Updating BRENDA controller with project")
+            pass
             self.brenda_enrichment_controller.set_project(project)
     
     def get_sbml_controller(self):
@@ -683,10 +680,9 @@ class PathwayPanelLoader:
     
     def detach(self):
         """Detach from container and restore as independent window (skeleton pattern)."""
-        print(f"[PATHWAY_PANEL] Detaching from container...")
         
         if not self.is_hanged:
-            print(f"[PATHWAY_PANEL] Already detached")
+            pass
             return
         
         # Remove from container
@@ -722,7 +718,6 @@ class PathwayPanelLoader:
         # Show window - WAYLAND FIX: Don't use show_all()
         self.window.show()
         
-        print(f"[PATHWAY_PANEL] Detached successfully")
     
     def float(self, parent_window=None):
         """Float panel as a separate window (alias for detach for backward compatibility).
@@ -746,10 +741,9 @@ class PathwayPanelLoader:
         Args:
             container: Gtk.Box or other container to embed content into.
         """
-        print(f"[PATHWAY_PANEL] Hanging on container...")
         
         if self.is_hanged:
-            print(f"[PATHWAY_PANEL] Already hanged, just showing")
+            pass
             if not self.content.get_visible():
                 self.content.show()  # WAYLAND FIX: Don't use show_all()
             # Make sure container is visible when re-showing
@@ -789,7 +783,6 @@ class PathwayPanelLoader:
         if self.on_attach_callback:
             self.on_attach_callback()
         
-        print(f"[PATHWAY_PANEL] Hanged successfully")
     
     def attach_to(self, container, parent_window=None):
         """Attach panel to container (alias for hang_on for backward compatibility).
@@ -815,34 +808,28 @@ class PathwayPanelLoader:
     
     def hide(self):
         """Hide the panel (keep hanged but invisible - skeleton pattern)."""
-        print(f"[PATHWAY_PANEL] Hiding panel...")
         
         if self.is_hanged and self.parent_container:
             # Hide content while keeping it hanged
             self.content.set_no_show_all(True)  # Prevent show_all from revealing it
             self.content.hide()
-            print(f"[PATHWAY_PANEL] Hidden (still hanged)")
         else:
             # Hide floating window
             self.window.hide()
-            print(f"[PATHWAY_PANEL] Window hidden")
     
     def show(self):
         """Show the panel (reveal if hanged, show window if floating - skeleton pattern).
         
         WAYLAND FIX: Use show() instead of show_all() to avoid Error 71.
         """
-        print(f"[PATHWAY_PANEL] Showing panel...")
         
         if self.is_hanged and self.parent_container:
             # Re-enable show_all and show content (reveal)
             self.content.set_no_show_all(False)
             self.content.show()  # WAYLAND FIX: Don't use show_all()
-            print(f"[PATHWAY_PANEL] Revealed (hanged)")
         else:
             # Show floating window
             self.window.show()  # WAYLAND FIX: Don't use show_all()
-            print(f"[PATHWAY_PANEL] Window shown")
     
     # ========================================================================
     # PHASE 4: GtkStack Integration Methods

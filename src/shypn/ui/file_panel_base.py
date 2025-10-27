@@ -243,10 +243,9 @@ class FilePanelBase(ABC):
         
         Skeleton pattern: synchronous, simple state flag.
         """
-        print(f"[FILE_PANEL] detach() called", file=sys.stderr)
         
         if not hasattr(self, 'is_hanged') or not self.is_hanged:
-            print(f"[FILE_PANEL] Already detached, nothing to do", file=sys.stderr)
+            pass
             return
         
         # Remove content from container
@@ -273,7 +272,6 @@ class FilePanelBase(ABC):
         # Show floating window
         self.window.show_all()
         
-        print(f"[FILE_PANEL] Panel detached and floating", file=sys.stderr)
     
     def float(self):
         """Alias for detach() - make panel float as separate window."""
@@ -285,10 +283,9 @@ class FilePanelBase(ABC):
         Args:
             container: GtkBox or container to attach to
         """
-        print(f"[FILE_PANEL] hang_on() called", file=sys.stderr)
         
         if hasattr(self, 'is_hanged') and self.is_hanged:
-            print(f"[FILE_PANEL] Already attached, nothing to do", file=sys.stderr)
+            pass
             return
         
         # Hide floating window
@@ -317,7 +314,6 @@ class FilePanelBase(ABC):
             if hasattr(self, '_stack_panel_name'):
                 self._stack.set_visible_child_name(self._stack_panel_name)
         
-        print(f"[FILE_PANEL] Panel attached to container", file=sys.stderr)
     
     def attach_to(self, container):
         """Alias for hang_on() - attach panel to container."""

@@ -2896,7 +2896,7 @@ class ModelCanvasLoader:
         
         # CRITICAL: Ensure parent_window is valid for Wayland
         if not self.parent_window:
-            print(f"[DIALOG] ERROR: parent_window is None, cannot open dialog", file=sys.stderr)
+            pass
             return
         
         # WAYLAND FIX: Ensure the canvas page widget AND drawing area are mapped before opening dialog
@@ -2924,10 +2924,9 @@ class ModelCanvasLoader:
             page_num = self.notebook.page_num(page_widget)
         is_current_page = (page_num == current_page_num)
         
-        print(f"[DIALOG] Widget state: page_mapped={page_mapped}, drawing_mapped={drawing_mapped}, page_realized={page_realized}, drawing_realized={drawing_realized}, is_current_page={is_current_page} (page {page_num} vs current {current_page_num})", file=sys.stderr)
         
         if not (page_mapped and drawing_mapped and is_current_page):
-            print(f"[DIALOG] Widget not ready - deferring dialog... (mapped: page={page_mapped}/drawing={drawing_mapped}, current_page={is_current_page})", file=sys.stderr)
+            pass
             # Use timeout to defer dialog opening until both widgets are mapped
             from gi.repository import GLib
             
@@ -2941,15 +2940,15 @@ class ModelCanvasLoader:
                 is_current = (self.notebook.page_num(page_widget) == self.notebook.get_current_page()) if page_widget else False
                 
                 if page_ready and drawing_ready and is_current:
-                    print(f"[DIALOG] Widgets now ready (after {retry_count[0]} retries), opening dialog", file=sys.stderr)
+                    pass
                     # Call this function again now that widgets are mapped
                     self._on_object_properties(obj, manager, drawing_area)
                     return False  # Don't repeat
                 elif retry_count[0] >= MAX_RETRIES:
-                    print(f"[DIALOG] Timeout waiting for widgets to be ready, aborting dialog", file=sys.stderr)
+                    pass
                     return False  # Give up
                 else:
-                    print(f"[DIALOG] Still not ready (retry {retry_count[0]}/{MAX_RETRIES}): page={page_ready}, drawing={drawing_ready}, current={is_current}", file=sys.stderr)
+                    pass
                     return True  # Keep checking
             
             # Check every 50ms for up to 1 second
@@ -2957,18 +2956,11 @@ class ModelCanvasLoader:
             return
         
         # DEBUG: Check parent window state for Wayland compatibility
-        print(f"[DIALOG] parent_window type: {type(self.parent_window)}", file=sys.stderr)
-        print(f"[DIALOG] parent_window visible: {self.parent_window.get_visible()}", file=sys.stderr)
-        print(f"[DIALOG] parent_window realized: {self.parent_window.get_realized()}", file=sys.stderr)
-        print(f"[DIALOG] parent_window mapped: {self.parent_window.get_mapped()}", file=sys.stderr)
         
         # Also check the drawing area's toplevel
         toplevel = drawing_area.get_toplevel()
-        print(f"[DIALOG] drawing_area toplevel: {type(toplevel)}", file=sys.stderr)
         if toplevel and isinstance(toplevel, Gtk.Window):
-            print(f"[DIALOG] toplevel visible: {toplevel.get_visible()}", file=sys.stderr)
-            print(f"[DIALOG] toplevel realized: {toplevel.get_realized()}", file=sys.stderr)
-            print(f"[DIALOG] toplevel mapped: {toplevel.get_mapped()}", file=sys.stderr)
+            pass
         
         dialog_loader = None
         if isinstance(obj, Place):
@@ -2978,33 +2970,25 @@ class ModelCanvasLoader:
             if drawing_area in self.overlay_managers:
                 overlay_manager = self.overlay_managers[drawing_area]
                 
-                print(f"[DIALOG] overlay_manager exists: {overlay_manager}", file=sys.stderr)
-                print(f"[DIALOG] has swissknife_palette: {hasattr(overlay_manager, 'swissknife_palette')}", file=sys.stderr)
                 
                 # Get from SwissKnifePalette widget_palette_instances
                 # NOTE: New SwissKnifePalette architecture stores widget palettes in registry
                 if hasattr(overlay_manager, 'swissknife_palette'):
                     swissknife = overlay_manager.swissknife_palette
-                    print(f"[DIALOG] swissknife: {swissknife}", file=sys.stderr)
                     
                     # Try new architecture (registry.widget_palette_instances)
                     if hasattr(swissknife, 'registry') and hasattr(swissknife.registry, 'widget_palette_instances'):
                         simulate_tools = swissknife.registry.widget_palette_instances.get('simulate')
-                        print(f"[DIALOG] simulate_tools (from registry): {simulate_tools}", file=sys.stderr)
                         if simulate_tools and hasattr(simulate_tools, 'data_collector'):
                             data_collector = simulate_tools.data_collector
-                            print(f"[DIALOG] data_collector: {data_collector}", file=sys.stderr)
                     # Fallback to old architecture (widget_palette_instances directly)
                     elif hasattr(swissknife, 'widget_palette_instances'):
                         simulate_tools = swissknife.widget_palette_instances.get('simulate')
-                        print(f"[DIALOG] simulate_tools (direct): {simulate_tools}", file=sys.stderr)
                         if simulate_tools and hasattr(simulate_tools, 'data_collector'):
                             data_collector = simulate_tools.data_collector
-                            print(f"[DIALOG] data_collector: {data_collector}", file=sys.stderr)
             else:
-                print(f"[DIALOG] WARNING: drawing_area not in overlay_managers!", file=sys.stderr)
+                pass
                 
-            print(f"[DIALOG] Creating transition dialog with data_collector={data_collector}", file=sys.stderr)
             dialog_loader = create_transition_prop_dialog(obj, parent_window=self.parent_window, persistency_manager=self.persistency, model=manager, data_collector=data_collector)
         elif isinstance(obj, Arc):
             dialog_loader = create_arc_prop_dialog(obj, parent_window=self.parent_window, persistency_manager=self.persistency, model=manager)
@@ -3036,7 +3020,7 @@ class ModelCanvasLoader:
         dialog_loader.connect('properties-changed', on_properties_changed)
         
         try:
-            print(f"[TS] {time.time():.6f} - [DIALOG] Calling dialog_loader.run()...", file=sys.stderr)
+            pass
             response = dialog_loader.run()
             
             if response == Gtk.ResponseType.OK:

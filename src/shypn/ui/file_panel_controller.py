@@ -451,7 +451,6 @@ class FilePanelController:
         Args:
             project_path: Path to .shy project file
         """
-        print(f"[FILE_PANEL] Opening project: {project_path}")
         
         # Exit project opening mode
         self.project_opening_mode = False
@@ -474,7 +473,6 @@ class FilePanelController:
         or .shy file will open that project.
         """
         self.project_opening_mode = True
-        print("[FILE_PANEL] Entered project opening mode - select a project folder or .shy file")
         
         # Update UI to show we're in project opening mode
         if self.path_entry:
@@ -488,26 +486,21 @@ class FilePanelController:
         Navigates to workspace/projects/ and creates an inline editable entry
         where user can type the project name. On completion, creates full project structure.
         """
-        print("[FILE_PANEL] Creating new project inline...")
         
         # Navigate to workspace/projects folder
         projects_path = self.base_path / 'projects'
         
-        print(f"[FILE_PANEL] Base path: {self.base_path}")
-        print(f"[FILE_PANEL] Projects path: {projects_path}")
         
         # Create projects folder if it doesn't exist
         if not projects_path.exists():
             try:
                 projects_path.mkdir(parents=True, exist_ok=True)
-                print(f"[FILE_PANEL] Created projects directory: {projects_path}")
             except Exception as e:
-                print(f"[FILE_PANEL] Error creating projects directory: {e}", file=sys.stderr)
+                pass
                 return
         
         # Navigate to projects folder
         self.current_path = projects_path
-        print(f"[FILE_PANEL] Current path set to: {self.current_path}")
         self.refresh_tree()
         
         # Enter project creation mode
@@ -548,7 +541,6 @@ class FilePanelController:
         column = self.tree_view.get_column(0)
         self.tree_view.set_cursor(tree_path, column, True)
         
-        print("[FILE_PANEL] Inline project creation started - type project name and press Enter")
 
 
 __all__ = ['FilePanelController']

@@ -33,9 +33,7 @@ class MenuActions:
 	
 	def set_file_explorer_panel(self, file_explorer_panel):
 		"""Set the file explorer panel for file operations."""
-		print(f"[MENU] set_file_explorer_panel called with: {file_explorer_panel}")
 		self.file_explorer_panel = file_explorer_panel
-		print(f"[MENU] file_explorer_panel set to: {self.file_explorer_panel}")
 
 	
 	# ====================================================================
@@ -45,14 +43,9 @@ class MenuActions:
 	def on_file_new(self, action, param):
 		"""Create a new file/model."""
 		try:
-			print(f"[MENU] on_file_new called, file_explorer_panel={self.file_explorer_panel}")
 			if self.file_explorer_panel:
-				print(f"[MENU] Calling new_document()")
 				self.file_explorer_panel.new_document()
-			else:
-				print(f"[MENU] ERROR: file_explorer_panel is None!")
 		except Exception as e:
-			print(f"[MENU] Exception in on_file_new: {e}")
 			import traceback
 			traceback.print_exc()
 			self._show_error_dialog("New Document Error", f"Failed to create new document: {e}")
@@ -60,14 +53,9 @@ class MenuActions:
 	def on_file_open(self, action, param):
 		"""Open an existing file."""
 		try:
-			print(f"[MENU] on_file_open called, file_explorer_panel={self.file_explorer_panel}")
 			if self.file_explorer_panel:
-				print(f"[MENU] Calling open_document()")
 				self.file_explorer_panel.open_document()
-			else:
-				print(f"[MENU] ERROR: file_explorer_panel is None!")
 		except Exception as e:
-			print(f"[MENU] Exception in on_file_open: {e}")
 			import traceback
 			traceback.print_exc()
 			self._show_error_dialog("Open Document Error", f"Failed to open document: {e}")
@@ -75,14 +63,9 @@ class MenuActions:
 	def on_file_save(self, action, param):
 		"""Save the current file."""
 		try:
-			print(f"[MENU] on_file_save called, file_explorer_panel={self.file_explorer_panel}")
 			if self.file_explorer_panel:
-				print(f"[MENU] Calling save_current_document()")
 				self.file_explorer_panel.save_current_document()
-			else:
-				print(f"[MENU] ERROR: file_explorer_panel is None!")
 		except Exception as e:
-			print(f"[MENU] Exception in on_file_save: {e}")
 			import traceback
 			traceback.print_exc()
 			self._show_error_dialog("Save Document Error", f"Failed to save document: {e}")
