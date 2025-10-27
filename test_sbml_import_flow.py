@@ -79,10 +79,9 @@ class SBMLImportFlowTest:
             project=None  # Not required for testing canvas pre-creation
         )
         
-        # Layout
+        # Layout - just show canvas for testing, panel UI not needed
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         box.pack_start(self.model_canvas_loader.container, True, True, 0)
-        box.pack_start(self.sbml_panel.panel, False, False, 0)
         
         self.window.add(box)
         self.window.show_all()
@@ -94,16 +93,16 @@ class SBMLImportFlowTest:
     
     def wrap_panel_methods(self):
         """Wrap SBML panel methods to log events."""
-        original_on_load_clicked = self.sbml_panel._on_load_clicked
+        original_on_import_clicked = self.sbml_panel._on_import_clicked
         original_on_parse_complete = self.sbml_panel._on_parse_complete
         original_on_load_complete = self.sbml_panel._on_load_complete
         
-        def wrapped_on_load_clicked(button):
-            self.log_event("BUTTON_CLICK", "Load button clicked")
+        def wrapped_on_import_clicked(button):
+            self.log_event("BUTTON_CLICK", "Import button clicked")
             initial_tab_count = self.model_canvas_loader.notebook.get_n_pages()
             self.log_event("CANVAS_STATE", f"Initial tab count: {initial_tab_count}")
             
-            result = original_on_load_clicked(button)
+            result = original_on_import_clicked(button)
             
             # Check if canvas was pre-created
             post_click_tab_count = self.model_canvas_loader.notebook.get_n_pages()
@@ -175,7 +174,7 @@ class SBMLImportFlowTest:
             return result
         
         # Replace methods
-        self.sbml_panel._on_load_clicked = wrapped_on_load_clicked
+        self.sbml_panel._on_import_clicked = wrapped_on_import_clicked
         self.sbml_panel._on_parse_complete = wrapped_on_parse_complete
         self.sbml_panel._on_load_complete = wrapped_on_load_complete
     
@@ -229,16 +228,16 @@ class SBMLImportFlowTest:
         self.log_event("TEST_FILE", f"Using test file: {test_file}")
         
         # Set the file path in the panel
-        self.sbml_panel.filepath_entry.set_text(test_file)
+        self.sbml_panel.sbml_file_entry.set_text(test_file)
         self.log_event("UI_STATE", f"Set filepath in entry: {test_file}")
         
         # Schedule button click after UI is stable
-        def trigger_load():
-            self.log_event("TRIGGER", "Clicking load button programmatically")
-            self.sbml_panel.load_button.clicked()
+        def trigger_import():
+            self.log_event("TRIGGER", "Clicking import button programmatically")
+            self.sbml_panel.sbml_import_button.clicked()
             return False
         
-        GLib.timeout_add(500, trigger_load)
+        GLib.timeout_add(500, trigger_import)
     
     def finish_test(self):
         """Finish the test and report results."""
