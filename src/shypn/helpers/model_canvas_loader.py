@@ -2105,6 +2105,10 @@ class ModelCanvasLoader:
             menu.append(menu_item)
         if self.context_menu_handler:
             self.context_menu_handler.add_analysis_menu_items(menu, obj)
+        
+        # Store reference to active menu for cleanup before dialogs
+        self._active_context_menu = menu
+        
         # Attach menu to drawing_area for proper Wayland parent window handling
         menu.attach_to_widget(drawing_area, None)
         # Use popup_at_pointer() instead of deprecated popup() for Wayland compatibility
@@ -2840,6 +2844,22 @@ class ModelCanvasLoader:
             manager: ModelCanvasManager instance
             drawing_area: GtkDrawingArea widget
         """
+        # ============================================================================
+        # WAYLAND FIX: Close any open context menu BEFORE opening property dialog
+        # This prevents menu/dialog parent conflicts on Wayland
+        # ============================================================================
+        if hasattr(self, '_active_context_menu') and self._active_context_menu:
+            try:
+                self._active_context_menu.popdown()
+                # Give Wayland time to process menu destruction
+                from gi.repository import GLib
+                # Process pending events to ensure menu is fully closed
+                while GLib.MainContext.default().pending():
+                    GLib.MainContext.default().iteration(False)
+            except:
+                pass
+            self._active_context_menu = None
+        
         # CRITICAL: Clear ALL arc creation state before opening dialog
         # This prevents spurious arc creation when dialog closes
         arc_state = self._arc_state.get(drawing_area)
