@@ -395,6 +395,18 @@ class TransitionPropDialogLoader(GObject.GObject):
         # On Wayland, parent must be realized/mapped before set_transient_for()
         # At run() time, parent is guaranteed to be ready
         if self.parent_window:
+            # CRITICAL WAYLAND FIX: Process pending events before set_transient_for()
+            # This ensures the Wayland compositor has processed all widget state changes
+            import gi
+            gi.require_version('Gdk', '3.0')
+            from gi.repository import Gdk
+            
+            # Flush pending X11/Wayland events
+            display = Gdk.Display.get_default()
+            if display:
+                display.sync()  # Wait for all requests to be processed
+            
+            # Now set transient after compositor is synced
             self.dialog.set_transient_for(self.parent_window)
         
         # WAYLAND FIX: Explicitly show dialog before run() to prevent protocol errors
