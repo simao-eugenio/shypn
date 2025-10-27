@@ -154,10 +154,6 @@ class SimulationController:
         # Register to observe model changes (for arc transformations, deletions, etc.)
         if hasattr(model, 'register_observer'):
             model.register_observer(self._on_model_changed)
-        
-        # Initialize enablement states for time-dependent transitions (timed/stochastic)
-        # This ensures transitions are properly scheduled when controller is first created
-        self._update_enablement_states()
 
     def _on_model_changed(self, event_type: str, obj, old_value=None, new_value=None):
         """Handle model change notifications.
@@ -574,38 +570,12 @@ class SimulationController:
         
         # Handle timed and stochastic transitions with PRIORITY RULE:
         # Timed (deterministic) has PRIORITY over Stochastic (probabilistic)
-        # Stochastic can ONLY fire if NO timed transitions are structurally enabled
-        # (even if timed are waiting in their timing windows)
+        # Stochastic can ONLY fire if NO timed transitions fired
         discrete_fired = False
         
         # Phase 2a: Timed transitions (DETERMINISTIC - PRIORITY)
         timed_transitions = [t for t in self.model.transitions if t.transition_type == 'timed']
         enabled_timed = [t for t in timed_transitions if self._is_transition_enabled(t)]
-        
-        # Check for structurally enabled timed transitions (have tokens, even if waiting)
-        structurally_enabled_timed = []
-        for t in timed_transitions:
-            behavior = self._get_behavior(t)
-            can_fire, reason = behavior.can_fire()
-            # Structurally enabled if: can fire now, OR waiting (too-early, not-enabled-yet)
-            if can_fire or 'too-early' in str(reason) or 'not-enabled-yet' in str(reason):
-                # Verify has tokens (unless source)
-                is_source = getattr(t, 'is_source', False)
-                if is_source:
-                    structurally_enabled_timed.append(t)
-                else:
-                    has_tokens = True
-                    input_arcs = behavior.get_input_arcs()
-                    for arc in input_arcs:
-                        kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
-                        if kind != 'normal':
-                            continue
-                        source_place = self.model_adapter.places.get(arc.source_id)
-                        if source_place is None or source_place.tokens < arc.weight:
-                            has_tokens = False
-                            break
-                    if has_tokens:
-                        structurally_enabled_timed.append(t)
         
         if enabled_timed:
             # Select and fire one timed transition (may have conflicts among timed)
@@ -615,16 +585,15 @@ class SimulationController:
             self._update_enablement_states()  # Update after firing
         
         # Phase 2b: Stochastic transitions (PROBABILISTIC - LOWER PRIORITY)
-        # Only execute if NO timed transitions are structurally enabled (timed has priority)
-        elif not structurally_enabled_timed:  # Changed: check structural enablement, not just firing
+        # Only execute if NO timed transitions fired (timed has priority)
+        elif not discrete_fired:  # Only if no timed fired
             stochastic_transitions = [t for t in self.model.transitions if t.transition_type == 'stochastic']
             enabled_stochastic = [t for t in stochastic_transitions if self._is_transition_enabled(t)]
-            
             if enabled_stochastic:
                 # Select and fire one stochastic transition (may have conflicts among stochastic)
                 transition = self._select_transition(enabled_stochastic)
                 self._fire_transition(transition)
-                discrete_fired = True        
+                discrete_fired = True
         self._notify_step_listeners()
         
         # Check if simulation is complete (duration reached)
