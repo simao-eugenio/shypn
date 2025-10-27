@@ -2849,16 +2849,27 @@ class ModelCanvasLoader:
         # This prevents menu/dialog parent conflicts on Wayland
         # ============================================================================
         if hasattr(self, '_active_context_menu') and self._active_context_menu:
+            print(f"[WAYLAND DEBUG] Closing context menu before dialog...")
             try:
                 self._active_context_menu.popdown()
+                self._active_context_menu.hide()
                 # Give Wayland time to process menu destruction
                 from gi.repository import GLib
-                # Process pending events to ensure menu is fully closed
-                while GLib.MainContext.default().pending():
-                    GLib.MainContext.default().iteration(False)
-            except:
-                pass
+                # Process ALL pending events to ensure menu is fully closed
+                for _ in range(10):  # Process multiple times
+                    while GLib.MainContext.default().pending():
+                        GLib.MainContext.default().iteration(False)
+                print(f"[WAYLAND DEBUG] Context menu closed, processed events")
+            except Exception as e:
+                print(f"[WAYLAND DEBUG] Error closing menu: {e}")
             self._active_context_menu = None
+        else:
+            print(f"[WAYLAND DEBUG] No active context menu to close")
+        
+        # Give Wayland a moment to fully process menu destruction
+        import time
+        time.sleep(0.05)  # 50ms delay
+        print(f"[WAYLAND DEBUG] After menu cleanup delay")
         
         # CRITICAL: Clear ALL arc creation state before opening dialog
         # This prevents spurious arc creation when dialog closes
