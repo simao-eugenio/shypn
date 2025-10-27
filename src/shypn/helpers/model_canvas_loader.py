@@ -528,6 +528,11 @@ class ModelCanvasLoader:
         # Set redraw callback so manager can trigger widget redraws
         manager.set_redraw_callback(lambda: drawing_area.queue_draw())
         
+        # WAYLAND FIX: Set flag to suppress callbacks during initial setup
+        # Prevents premature signal firing before canvas state is fully initialized
+        manager._suppress_callbacks = True
+        print(f"[CANVAS SETUP] Suppressing callbacks during initial setup")
+        
         # PHASE 1: Wire dirty state callback to update tab label with asterisk
         # This enables automatic tab label updates when document is modified
         def on_dirty_changed(is_dirty):
@@ -535,6 +540,11 @@ class ModelCanvasLoader:
             
             Updates the tab label to show/hide asterisk indicator.
             """
+            # Skip callback if we're still setting up the canvas
+            if getattr(manager, '_suppress_callbacks', False):
+                print(f"[CANVAS SETUP] Suppressing on_dirty_changed callback during setup")
+                return
+            
             try:
                 # Find the page widget for this drawing area
                 # Navigation: drawing_area -> GtkScrolledWindow -> GtkOverlay (page widget)
@@ -617,6 +627,10 @@ class ModelCanvasLoader:
             
             # Setup new OOP palette system
             self._setup_edit_palettes(overlay_widget, manager, drawing_area, overlay_manager)
+            
+            # Canvas setup complete - enable callbacks now that state is properly initialized
+            manager._suppress_callbacks = False
+            print(f"[CANVAS SETUP] Callbacks enabled, canvas fully initialized")
 
     def _setup_edit_palettes(self, overlay_widget, canvas_manager, drawing_area, overlay_manager):
         """Setup new OOP palette system with SwissKnifePalette.
@@ -2099,6 +2113,7 @@ class ModelCanvasLoader:
                 menu_item = Gtk.MenuItem(label=label)
 
                 def on_activate(widget, cb):
+                    print(f"[MENU] Menu item '{label}' clicked")
                     cb()
                 menu_item.connect('activate', on_activate, callback)
             menu_item.show()
@@ -2892,8 +2907,9 @@ class ModelCanvasLoader:
         
         # CRITICAL: Ensure parent_window is valid for Wayland
         if not self.parent_window:
-            pass
+            print(f"[DIALOG] ERROR: parent_window is None! Cannot open dialog.")
             return
+        print(f"[DIALOG] parent_window is set: {self.parent_window}")
         
         # WAYLAND FIX: Ensure the canvas page widget AND drawing area are mapped before opening dialog
         # On Wayland, dialogs require the entire widget hierarchy to be fully visible and mapped
@@ -2920,9 +2936,15 @@ class ModelCanvasLoader:
             page_num = self.notebook.page_num(page_widget)
         is_current_page = (page_num == current_page_num)
         
+        print(f"[DIALOG] Canvas state check:")
+        print(f"  page_widget: {page_widget}")
+        print(f"  page_mapped: {page_mapped}, drawing_mapped: {drawing_mapped}")
+        print(f"  page_realized: {page_realized}, drawing_realized: {drawing_realized}")
+        print(f"  page_num: {page_num}, current_page_num: {current_page_num}, is_current: {is_current_page}")
         
         if not (page_mapped and drawing_mapped and is_current_page):
-            pass
+            print(f"[DIALOG] Widget not ready yet - deferring dialog open")
+            print(f"  Reason: page_mapped={page_mapped}, drawing_mapped={drawing_mapped}, is_current={is_current_page}")
             # Use timeout to defer dialog opening until both widgets are mapped
             from gi.repository import GLib
             
@@ -2936,15 +2958,16 @@ class ModelCanvasLoader:
                 is_current = (self.notebook.page_num(page_widget) == self.notebook.get_current_page()) if page_widget else False
                 
                 if page_ready and drawing_ready and is_current:
-                    pass
+                    print(f"[DIALOG] Widgets now ready after {retry_count[0]} retries - opening dialog")
                     # Call this function again now that widgets are mapped
                     self._on_object_properties(obj, manager, drawing_area)
                     return False  # Don't repeat
                 elif retry_count[0] >= MAX_RETRIES:
-                    pass
+                    print(f"[DIALOG] ERROR: Gave up after {MAX_RETRIES} retries")
+                    print(f"  Final state: page_ready={page_ready}, drawing_ready={drawing_ready}, is_current={is_current}")
                     return False  # Give up
                 else:
-                    pass
+                    print(f"[DIALOG] Retry {retry_count[0]}: page={page_ready}, drawing={drawing_ready}, current={is_current}")
                     return True  # Keep checking
             
             # Check every 50ms for up to 1 second
@@ -2952,7 +2975,7 @@ class ModelCanvasLoader:
             return
         
         # DEBUG: Check parent window state for Wayland compatibility
-        
+        print(f"[DIALOG] All checks passed - proceeding to create dialog")
         # Also check the drawing area's toplevel
         toplevel = drawing_area.get_toplevel()
         if toplevel and isinstance(toplevel, Gtk.Window):

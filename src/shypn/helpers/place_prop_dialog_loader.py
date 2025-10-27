@@ -252,13 +252,31 @@ class PlacePropDialogLoader(GObject.GObject):
             if not parent_mapped:
                 print(f"[DIALOG WAYLAND] WARNING: Parent window not mapped! This may cause Error 71")
             
-            # CRITICAL WAYLAND FIX: Process pending events before set_transient_for()
-            # This ensures the Wayland compositor has processed all widget state changes
+            # CRITICAL WAYLAND FIX: Check window state (maximized, fullscreen, etc.)
+            # Error 71 occurs when dialogs are opened while window is in transition
             import gi
             gi.require_version('Gdk', '3.0')
             from gi.repository import Gdk
             
-            # Flush pending X11/Wayland events
+            window = self.parent_window.get_window()
+            if window:
+                state = window.get_state()
+                is_maximized = bool(state & Gdk.WindowState.MAXIMIZED)
+                is_fullscreen = bool(state & Gdk.WindowState.FULLSCREEN)
+                is_tiled = bool(state & Gdk.WindowState.TILED)
+                
+                print(f"[DIALOG WAYLAND] Window state: maximized={is_maximized}, fullscreen={is_fullscreen}, tiled={is_tiled}")
+                
+                # WAYLAND WORKAROUND: If window is maximized/fullscreen/tiled, wait a bit
+                # This gives Wayland compositor time to complete the state transition
+                if is_maximized or is_fullscreen or is_tiled:
+                    print(f"[DIALOG WAYLAND] Window in special state, waiting for stability...")
+                    from gi.repository import GLib
+                    import time
+                    time.sleep(0.1)  # 100ms delay to let compositor settle
+            
+            # CRITICAL WAYLAND FIX: Process pending events before set_transient_for()
+            # This ensures the Wayland compositor has processed all widget state changes
             display = Gdk.Display.get_default()
             if display:
                 display.sync()  # Wait for all requests to be processed

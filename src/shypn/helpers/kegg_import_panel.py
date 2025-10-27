@@ -15,6 +15,7 @@ This follows the MVC pattern:
 """
 import os
 import sys
+import logging
 import threading
 from typing import Optional
 
@@ -65,6 +66,9 @@ class KEGGImportPanel:
         self.model_canvas = model_canvas
         self.project = project
         
+        # Initialize logger
+        self.logger = logging.getLogger(self.__class__.__name__)
+        
         # Initialize backend components
         if KEGGAPIClient and KGMLParser and PathwayConverter:
             self.api_client = KEGGAPIClient()
@@ -81,6 +85,9 @@ class KEGGImportPanel:
         self.current_kgml = None
         self.current_pathway_id = None  # Store pathway ID for later saving
         self.current_pathway_doc = None  # PathwayDocument for metadata tracking
+        
+        # Lazy loading: store canvas info for later model injection
+        self._pending_canvas_info = None
         
         # Get widget references
         self._get_widgets()
@@ -290,10 +297,18 @@ class KEGGImportPanel:
         # Create empty canvas tab IMMEDIATELY
         page_index, drawing_area = self.model_canvas.add_document(filename=pathway_name)
         
+        # Get manager for the created canvas
+        manager = self.model_canvas.get_canvas_manager(drawing_area)
+        if not manager:
+            self.logger.error("Failed to get manager for created canvas")
+            self._show_status("❌ Failed to initialize canvas")
+            return
+        
         # Store canvas info for later model injection
         self._pending_canvas_info = {
             'page_index': page_index,
             'drawing_area': drawing_area,
+            'manager': manager,
             'pathway_name': pathway_name,
             'created_time': time.time()  # Track canvas age for debugging
         }
