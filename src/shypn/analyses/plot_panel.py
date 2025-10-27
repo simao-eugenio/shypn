@@ -265,6 +265,7 @@ class AnalysisPlotPanel(Gtk.Box):
         if self._model_manager:
             self._model_manager.mark_needs_redraw()
 
+
     def remove_object(self, obj: Any):
         """Remove an object from the selected list.
         
