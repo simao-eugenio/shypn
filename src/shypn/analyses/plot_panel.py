@@ -252,6 +252,11 @@ class AnalysisPlotPanel(Gtk.Box):
         
         print(f"[PLOT_PANEL] After: border={obj.border_color}, fill={obj.fill_color}")
         
+        # Trigger object's on_changed callback to notify the canvas
+        if hasattr(obj, 'on_changed') and obj.on_changed:
+            obj.on_changed()
+            print(f"[PLOT_PANEL] Triggered on_changed callback for {obj.name}")
+        
         self.selected_objects.append(obj)
         # Add UI row immediately without full rebuild
         self._add_object_row(obj, len(self.selected_objects) - 1)
