@@ -969,6 +969,10 @@ class FilePanelLoader:
                 # Trigger project controller callback
                 if self.project_controller:
                     self.project_controller._on_project_opened(project)
+                
+                # Silent refresh file tree after project open
+                if self.file_explorer and hasattr(self.file_explorer, '_load_current_directory'):
+                    self.file_explorer._load_current_directory()
             else:
                 pass
                 
@@ -984,6 +988,10 @@ class FilePanelLoader:
             project: The opened Project instance
         """
         self._propagate_project_to_all_components(project)
+        
+        # Silent refresh file tree after project open
+        if self.file_explorer and hasattr(self.file_explorer, '_load_current_directory'):
+            self.file_explorer._load_current_directory()
     
     def _on_project_created_handler(self, project):
         """Handle project created from dialog (not file panel).

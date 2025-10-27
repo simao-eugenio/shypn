@@ -1613,8 +1613,8 @@ class ModelCanvasManager:
         self.pan_y = 0.0
         self._initial_pan_set = False
         
-        # Mark for redraw
-        self.mark_dirty()  # Mark document as having unsaved changes
+        # Mark for redraw but keep clean state (new empty document has no unsaved changes)
+        self.mark_clean()  # New document is clean (no unsaved changes)
         self.mark_needs_redraw()  # Trigger canvas redraw with reset view
         
         # Validate initial state

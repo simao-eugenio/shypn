@@ -408,8 +408,8 @@
                     <child>
                       <object class="GtkButton" id="kegg_import_button">
                         <property name="visible">True</property>
-                        <property name="label">Import to Canvas</property>
-                        <property name="tooltip-text">Fetch pathway from external source or load from local file, then convert to Petri net and add to canvas</property>
+                        <property name="label">Save Model</property>
+                        <property name="tooltip-text">Fetch pathway from KEGG and convert to Petri net model file (.shy). Use File → Open to load the saved model.</property>
                         <style>
                           <class name="suggested-action"/>
                         </style>
@@ -756,8 +756,8 @@
                     <child>
                       <object class="GtkButton" id="sbml_import_button">
                         <property name="visible">True</property>
-                        <property name="label">Import to Canvas</property>
-                        <property name="tooltip-text">Fetch SBML from external source or load from local file, then parse and add to canvas</property>
+                        <property name="label">Save Model</property>
+                        <property name="tooltip-text">Import SBML file and convert to Petri net model file (.shy). Use File → Open to load the saved model.</property>
                         <style>
                           <class name="suggested-action"/>
                         </style>

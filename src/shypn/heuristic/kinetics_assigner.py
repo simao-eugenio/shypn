@@ -144,6 +144,9 @@ class KineticsAssigner:
         
         # Determine type from kinetic law
         if kinetic.rate_type == "mass_action":
+            # Mass action is inherently STOCHASTIC at molecular level (Gillespie algorithm)
+            # For small molecule counts, stochastic simulation is more accurate
+            # Uses exponential distribution: appropriate for Brownian molecular collisions
             transition.transition_type = "stochastic"
             k = kinetic.parameters.get("k", 1.0)
             transition.rate = k
@@ -310,6 +313,9 @@ class KineticsAssigner:
             return result
             
         elif kinetic_law == 'mass_action':
+            # Mass action is STOCHASTIC (Gillespie 1977, J. Phys. Chem. 81:2340-2361)
+            # Molecular collisions follow Brownian motion → exponential distribution
+            # For small copy numbers (typical in BioModels), stochastic is more accurate
             transition.transition_type = "stochastic"
             k = params.get('k', params.get('rate_constant', 1.0))
             transition.rate = k
@@ -378,6 +384,8 @@ class KineticsAssigner:
         
         # Apply to transition
         if kinetic_type in ('mass_action', 'stochastic'):
+            # Mass action is STOCHASTIC (scientific basis: Gillespie algorithm)
+            # Brownian collisions → exponential time distribution (not fixed delay)
             transition.transition_type = "stochastic"
             transition.rate = parameters.get('k', 1.0)
         else:  # michaelis_menten

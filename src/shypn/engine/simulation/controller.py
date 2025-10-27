@@ -567,13 +567,30 @@ class SimulationController:
         # Now check discrete transitions at the NEW time
         # This allows timed transitions to fire when entering their window mid-step
         self._update_enablement_states()
-        discrete_transitions = [t for t in self.model.transitions if t.transition_type in ['timed', 'stochastic']]
-        enabled_discrete = [t for t in discrete_transitions if self._is_transition_enabled(t)]
+        
+        # Handle timed and stochastic transitions separately to avoid interference
+        # Each type gets its own selection, allowing both types to fire in same step
         discrete_fired = False
-        if enabled_discrete:
-            transition = self._select_transition(enabled_discrete)
+        
+        # Phase 2a: Timed transitions
+        timed_transitions = [t for t in self.model.transitions if t.transition_type == 'timed']
+        enabled_timed = [t for t in timed_transitions if self._is_transition_enabled(t)]
+        if enabled_timed:
+            # Select and fire one timed transition (may have conflicts among timed)
+            transition = self._select_transition(enabled_timed)
             self._fire_transition(transition)
             discrete_fired = True
+            self._update_enablement_states()  # Update after firing
+        
+        # Phase 2b: Stochastic transitions (independent of timed)
+        stochastic_transitions = [t for t in self.model.transitions if t.transition_type == 'stochastic']
+        enabled_stochastic = [t for t in stochastic_transitions if self._is_transition_enabled(t)]
+        if enabled_stochastic:
+            # Select and fire one stochastic transition (may have conflicts among stochastic)
+            transition = self._select_transition(enabled_stochastic)
+            self._fire_transition(transition)
+            discrete_fired = True
+        
         self._notify_step_listeners()
         
         # Check if simulation is complete (duration reached)
@@ -582,9 +599,12 @@ class SimulationController:
         
         if immediate_fired_total > 0 or window_crossing_fired > 0 or discrete_fired or continuous_active > 0:
             return True
+        
+        # Check for waiting discrete transitions
+        all_discrete = timed_transitions + stochastic_transitions
         waiting_count = 0
         ready_count = 0
-        for transition in discrete_transitions:
+        for transition in all_discrete:
             behavior = self._get_behavior(transition)
             can_fire, reason = behavior.can_fire()
             if can_fire:
