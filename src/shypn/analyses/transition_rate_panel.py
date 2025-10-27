@@ -123,6 +123,11 @@ class TransitionRatePanel(AnalysisPlotPanel):
         
         print(f"[TRANSITION_RATE_PANEL] After: border={obj.border_color}, fill={obj.fill_color}")
         
+        # Trigger object's on_changed callback to notify the canvas
+        if hasattr(obj, 'on_changed') and obj.on_changed:
+            obj.on_changed()
+            print(f"[TRANSITION_RATE_PANEL] Triggered on_changed callback for {obj.name}")
+        
         self.selected_objects.append(obj)
         
         # Detect and add locality places for this transition
