@@ -17,6 +17,7 @@ This follows the MVC pattern:
 """
 import os
 import sys
+import time
 import logging
 from typing import Optional
 
@@ -615,8 +616,7 @@ class SBMLImportPanel:
     def _on_load_clicked(self, button):
         """Handle load button click - convert and load to canvas.
         
-        NEW FLOW: Pre-create canvas BEFORE parsing/conversion to ensure widget hierarchy
-        is fully established and ready for dialogs. This fixes Wayland timing issues.
+        LAZY LOADING FLOW: Canvas already created in _on_import_clicked(), just inject model.
         
         Operations run in background thread to avoid blocking UI.
         """
@@ -628,49 +628,56 @@ class SBMLImportPanel:
             self.logger.warning("Canvas or converter not available for load")
             return
         
-        # Get pathway name and parameters BEFORE creating canvas
+        # Get pathway name and parameters
         pathway_name = self.parsed_pathway.metadata.get('name', 'Pathway')
         scale_factor = self.sbml_scale_spin.get_value() if self.sbml_scale_spin else 1.0
         parsed_pathway = self.parsed_pathway
         
         # ============================================================================
-        # NEW: PRE-CREATE CANVAS BEFORE PARSING/CONVERSION
-        # This ensures widget hierarchy is fully established and ready for dialogs
+        # CHECK: Is canvas already pre-created by lazy loading?
         # ============================================================================
-        self._show_status(f"📄 Creating canvas for {pathway_name}...")
+        canvas_already_exists = hasattr(self, '_pending_canvas_info') and self._pending_canvas_info
         
-        # Create empty canvas tab with proper state initialization
-        page_index, drawing_area = self.model_canvas.add_document(filename=pathway_name)
-        
-        # Get manager for pre-created canvas
-        manager = self.model_canvas.get_canvas_manager(drawing_area)
-        if not manager:
-            self.logger.error("Failed to get manager for pre-created canvas")
-            self._show_status("❌ Failed to create canvas")
-            return
-        
-        # Initialize canvas state immediately (marks as clean, ready for dialogs)
-        manager.mark_clean()
-        manager.mark_as_imported(pathway_name)
-        
-        # Set filepath if project exists
-        if self.project:
-            import os
-            pathways_dir = self.project.get_pathways_dir()
-            if pathways_dir:
-                temp_path = os.path.join(pathways_dir, f"{pathway_name}.shy")
-                manager.set_filepath(temp_path)
-        
-        # Store pre-created canvas info for load completion
-        self._pending_canvas_info = {
-            'page_index': page_index,
-            'drawing_area': drawing_area,
-            'manager': manager,
-            'pathway_name': pathway_name
-        }
+        if canvas_already_exists:
+            canvas_age = time.time() - self._pending_canvas_info.get('created_time', 0)
+            self.logger.info(f"[LAZY LOAD] Using pre-created canvas (age: {canvas_age:.2f}s)")
+            # Canvas exists, skip creation, go straight to conversion
+        else:
+            # Fallback: No pre-created canvas, create one now (backward compatibility)
+            self.logger.info("[FALLBACK] No pre-created canvas, creating one now")
+            self._show_status(f"📄 Creating canvas for {pathway_name}...")
+            
+            page_index, drawing_area = self.model_canvas.add_document(filename=pathway_name)
+            
+            # Get manager for canvas
+            manager = self.model_canvas.get_canvas_manager(drawing_area)
+            if not manager:
+                self.logger.error("Failed to get manager for canvas")
+                self._show_status("❌ Failed to create canvas")
+                return
+            
+            # Initialize canvas state immediately
+            manager.mark_clean()
+            manager.mark_as_imported(pathway_name)
+            
+            # Set filepath if project exists
+            if self.project:
+                import os
+                pathways_dir = self.project.get_pathways_dir()
+                if pathways_dir:
+                    temp_path = os.path.join(pathways_dir, f"{pathway_name}.shy")
+                    manager.set_filepath(temp_path)
+            
+            # Store canvas info
+            self._pending_canvas_info = {
+                'page_index': page_index,
+                'drawing_area': drawing_area,
+                'manager': manager,
+                'pathway_name': pathway_name
+            }
         
         # ============================================================================
-        # NOW start background parsing/conversion (canvas already exists and ready)
+        # NOW start background conversion (canvas already exists and ready)
         # ============================================================================
         self._show_status("🔄 Converting to Petri net...")
         
@@ -708,7 +715,7 @@ class SBMLImportPanel:
         """
         try:
             # ============================================================================
-            # NEW: Use pre-created canvas (already exists with full state)
+            # LAZY LOADING: Use pre-created canvas, get manager, inject model
             # ============================================================================
             if not hasattr(self, '_pending_canvas_info') or not self._pending_canvas_info:
                 self.logger.error("No pre-created canvas info found!")
@@ -718,9 +725,33 @@ class SBMLImportPanel:
             # Retrieve pre-created canvas information
             page_index = self._pending_canvas_info['page_index']
             drawing_area = self._pending_canvas_info['drawing_area']
-            manager = self._pending_canvas_info['manager']
             
-            # Load to canvas - canvas already exists, just populate with objects
+            # Get manager from canvas (may or may not be stored in _pending_canvas_info)
+            manager = self._pending_canvas_info.get('manager')
+            if not manager:
+                # Not in pending info (lazy loading path), get it now
+                manager = self.model_canvas.get_canvas_manager(drawing_area)
+                if not manager:
+                    self.logger.error("Failed to get manager for pre-created canvas!")
+                    self._show_status("❌ Canvas manager not found")
+                    return False
+                
+                # Initialize canvas state now (wasn't done at creation time)
+                pathway_name = self._pending_canvas_info.get('pathway_name', 'Pathway')
+                manager.mark_clean()
+                manager.mark_as_imported(pathway_name)
+                
+                # Set filepath if project exists
+                if self.project:
+                    import os
+                    pathways_dir = self.project.get_pathways_dir()
+                    if pathways_dir:
+                        temp_path = os.path.join(pathways_dir, f"{pathway_name}.shy")
+                        manager.set_filepath(temp_path)
+            
+            # Load to canvas - inject model into pre-created empty canvas
+            canvas_age = time.time() - self._pending_canvas_info.get('created_time', time.time())
+            self.logger.info(f"[LAZY LOAD] Injecting model into canvas (age: {canvas_age:.2f}s)")
             self._show_status("🔄 Loading objects to canvas...")
             
             # Wire sbml_panel to ModelCanvasLoader (if not already wired)
@@ -1019,7 +1050,8 @@ class SBMLImportPanel:
         if self.sbml_parse_button:
             self.sbml_parse_button.set_sensitive(True)
         
-        # Load to canvas after parse (NEW: always enabled, not a testing mode)
+        # Auto-load to canvas after parse
+        # NOTE: Canvas was already created in _on_import_clicked() for lazy loading
         if self.model_canvas:
             self.logger.info("Auto-loading to canvas after parse")
             self._on_load_clicked(None)
@@ -1205,13 +1237,46 @@ class SBMLImportPanel:
     def _on_import_clicked(self, button):
         """Handle unified import button click.
         
-        This is the main entry point for SBML import that does:
-        1. Browse for file (if not already selected) OR fetch from BioModels
-        2. Parse the SBML file
-        3. Load to canvas
+        LAZY LOADING APPROACH (Wayland fix):
+        1. Create EMPTY canvas IMMEDIATELY (like File → Open)
+        2. Browse/fetch + parse + convert in background
+        3. Inject model into pre-created canvas when ready
         
-        All in one smooth flow.
+        This gives Wayland maximum time to stabilize widget hierarchy before
+        any user interaction (property dialogs, etc.) occurs.
         """
+        # ============================================================================
+        # DRASTIC APPROACH: Create canvas FIRST, before any parsing/conversion
+        # ============================================================================
+        if not self.model_canvas:
+            self._show_status("❌ Canvas not available", error=True)
+            return
+        
+        # Determine pathway name (will be updated after parsing)
+        if self.current_filepath:
+            pathway_name = os.path.splitext(os.path.basename(self.current_filepath))[0]
+        else:
+            pathway_name = "SBML Import"
+        
+        self.logger.info(f"[LAZY LOAD] Creating empty canvas '{pathway_name}' BEFORE import workflow")
+        
+        # Create empty canvas tab IMMEDIATELY
+        page_index, drawing_area = self.model_canvas.add_document(filename=pathway_name)
+        
+        # Store canvas info for later model injection
+        self._pending_canvas_info = {
+            'page_index': page_index,
+            'drawing_area': drawing_area,
+            'pathway_name': pathway_name,
+            'created_time': time.time()  # Track canvas age for debugging
+        }
+        
+        self.logger.info(f"[LAZY LOAD] Canvas created at page_index={page_index}, now starting import workflow")
+        
+        # ============================================================================
+        # NOW proceed with normal import workflow (parse/convert in background)
+        # ============================================================================
+        
         # Set flag to enable auto-continue workflow
         self._import_button_flow = True
         
