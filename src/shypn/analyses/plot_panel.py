@@ -244,13 +244,22 @@ class AnalysisPlotPanel(Gtk.Box):
         
         # Set both border and fill color to match the plot color
         # (same as transition property dialog does)
+        from shypn.netobjs import Transition
+        
         print(f"[PLOT_PANEL] Setting colors for {obj.name}: color_hex={color_hex}, color_rgb={color_rgb}")
-        print(f"[PLOT_PANEL] Before: border={obj.border_color}, fill={obj.fill_color}")
+        if isinstance(obj, Transition):
+            print(f"[PLOT_PANEL] Before: border={obj.border_color}, fill={obj.fill_color}")
+        else:
+            print(f"[PLOT_PANEL] Before: border={obj.border_color}")
         
         obj.border_color = color_rgb
-        obj.fill_color = color_rgb
         
-        print(f"[PLOT_PANEL] After: border={obj.border_color}, fill={obj.fill_color}")
+        # Only set fill_color for Transitions (Places don't have fill_color)
+        if isinstance(obj, Transition):
+            obj.fill_color = color_rgb
+            print(f"[PLOT_PANEL] After: border={obj.border_color}, fill={obj.fill_color}")
+        else:
+            print(f"[PLOT_PANEL] After: border={obj.border_color}")
         
         # Trigger object's on_changed callback to notify the canvas
         if hasattr(obj, 'on_changed') and obj.on_changed:
@@ -282,7 +291,7 @@ class AnalysisPlotPanel(Gtk.Box):
             obj.fill_color = Transition.DEFAULT_COLOR
         elif isinstance(obj, Place):
             obj.border_color = Place.DEFAULT_BORDER_COLOR
-            obj.fill_color = Place.DEFAULT_COLOR
+            # Places don't have fill_color attribute
         
         obj.on_changed = old_callback
         
@@ -422,7 +431,7 @@ class AnalysisPlotPanel(Gtk.Box):
                 obj.fill_color = Transition.DEFAULT_COLOR
             elif isinstance(obj, Place):
                 obj.border_color = Place.DEFAULT_BORDER_COLOR
-                obj.fill_color = Place.DEFAULT_COLOR
+                # Places don't have fill_color attribute
             
             obj.on_changed = old_callback
         
