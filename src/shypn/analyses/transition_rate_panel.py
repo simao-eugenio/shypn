@@ -207,9 +207,6 @@ class TransitionRatePanel(AnalysisPlotPanel):
                 count = i + 1  # Cumulative count (1-indexed)
                 cumulative_series.append((time, count))
             
-            if DEBUG_PLOT_DATA:
-            
-                pass
             return cumulative_series
     
     def _get_ylabel(self) -> str:
