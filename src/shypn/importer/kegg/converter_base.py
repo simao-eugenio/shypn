@@ -48,7 +48,7 @@ class ConversionOptions:
     coordinate_scale: float = 2.5
     include_cofactors: bool = True
     split_reversible: bool = False
-    add_initial_marking: bool = True  # Auto-add tokens for testing/experimentation
+    add_initial_marking: bool = False  # KEGG has no initial concentrations - leave empty by default
     filter_isolated_compounds: bool = True
     enhance_kinetics: bool = True  # Auto-enhance kinetics for better simulation
     center_x: float = 0.0

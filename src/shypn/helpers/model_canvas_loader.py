@@ -222,14 +222,15 @@ class ModelCanvasLoader:
             if drawing_area in self.overlay_managers:
                 overlay_manager = self.overlay_managers[drawing_area]
                 
-                # SwissKnifePalette stores SimulateToolsPaletteLoader in registry
+                # SwissKnifePalette stores SimulateToolsPaletteLoader in widget_palette_instances dict
                 if hasattr(overlay_manager, 'swissknife_palette'):
                     swissknife = overlay_manager.swissknife_palette
-                    if hasattr(swissknife, 'registry'):
-                        simulate_tools_palette = swissknife.registry.get_widget_palette_instance('simulate')
+                    if hasattr(swissknife, 'widget_palette_instances'):
+                        simulate_tools_palette = swissknife.widget_palette_instances.get('simulate')
                         if simulate_tools_palette and hasattr(simulate_tools_palette, 'data_collector'):
                             data_collector = simulate_tools_palette.data_collector
                             self.right_panel_loader.set_data_collector(data_collector)
+                            print(f"[ANALYSES] Wired data_collector on tab switch (drawing_area={id(drawing_area)})")
             if drawing_area in self.canvas_managers:
                 manager = self.canvas_managers[drawing_area]
                 self.right_panel_loader.set_model(manager)
@@ -502,13 +503,13 @@ class ModelCanvasLoader:
         if not overlay.get_realized():
             overlay.realize()
         
-        # WAYLAND FIX 2: Don't force page switch here - let import code handle it
-        # Forcing set_current_page during add_document() can interrupt user interaction
-        # The page will be switched by the calling code (import handlers) if needed
-        # We just ensure the widget is realized for later dialog creation
-        
+        # Setup canvas manager BEFORE switching tabs
+        # This ensures the canvas is fully initialized before receiving focus/events
         self._setup_canvas_manager(drawing, overlay_box, overlay, filename=filename)
-        # Note: set_current_page already called above
+        
+        # Switch to the newly created tab to give it focus (AFTER setup is complete)
+        self.notebook.set_current_page(page_index)
+        
         return (page_index, drawing)
 
     def _setup_canvas_manager(self, drawing_area, overlay_box=None, overlay_widget=None, filename=None):
@@ -812,11 +813,13 @@ class ModelCanvasLoader:
             overlay_manager = self.overlay_managers[drawing_area]
             if hasattr(overlay_manager, 'swissknife_palette'):
                 swissknife = overlay_manager.swissknife_palette
-                if hasattr(swissknife, 'registry'):
-                    simulate_tools_palette = swissknife.registry.get_widget_palette_instance('simulate')
+                # Access widget_palette_instances dict directly (not through registry)
+                if hasattr(swissknife, 'widget_palette_instances'):
+                    simulate_tools_palette = swissknife.widget_palette_instances.get('simulate')
                     if simulate_tools_palette and hasattr(simulate_tools_palette, 'data_collector'):
                         data_collector = simulate_tools_palette.data_collector
                         self.right_panel_loader.set_data_collector(data_collector)
+                        print(f"[ANALYSES] Wired data_collector for new tab (drawing_area={id(drawing_area)})")
     
     def _on_palette_tool_selected(self, tools_palette, tool_name, canvas_manager, drawing_area):
         """Handle tool selection from new OOP tools palette.

@@ -329,7 +329,7 @@ def convert_pathway(pathway: KEGGPathway,
                    coordinate_scale: float = 2.5,
                    include_cofactors: bool = True,
                    split_reversible: bool = False,
-                   add_initial_marking: bool = True,
+                   add_initial_marking: bool = False,
                    filter_isolated_compounds: bool = True) -> DocumentModel:
     """Quick function to convert pathway with common options.
     
@@ -338,7 +338,7 @@ def convert_pathway(pathway: KEGGPathway,
         coordinate_scale: Coordinate scaling factor
         include_cofactors: Include common cofactors
         split_reversible: Split reversible reactions into two transitions
-        add_initial_marking: Add initial tokens to places (default: True for testing)
+        add_initial_marking: Add initial tokens to places (default: False - KEGG has no concentrations)
         filter_isolated_compounds: Remove compounds not involved in any reaction
         
     Returns:
@@ -366,7 +366,7 @@ def convert_pathway_enhanced(pathway: KEGGPathway,
                             coordinate_scale: float = 2.5,
                             include_cofactors: bool = True,
                             split_reversible: bool = False,
-                            add_initial_marking: bool = True,
+                            add_initial_marking: bool = False,
                             filter_isolated_compounds: bool = True,
                             enhancement_options: 'EnhancementOptions' = None,
                             estimate_kinetics: bool = True) -> DocumentModel:
@@ -385,7 +385,7 @@ def convert_pathway_enhanced(pathway: KEGGPathway,
         coordinate_scale: Coordinate scaling factor
         include_cofactors: Include common cofactors
         split_reversible: Split reversible reactions into two transitions
-        add_initial_marking: Add initial tokens to places (default: True for testing)
+        add_initial_marking: Add initial tokens to places (default: False - KEGG has no concentrations)
         filter_isolated_compounds: Remove compounds not involved in any reaction
         enhancement_options: Options for post-processing pipeline.
             If None, standard enhancements are applied.

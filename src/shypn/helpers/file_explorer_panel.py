@@ -1796,13 +1796,34 @@ class FileExplorerPanel:
         filename = os.path.basename(filepath)
         base_name = os.path.splitext(filename)[0]
         
-        # Note: replace_empty_default parameter is deprecated and no longer used
-        # A new tab is always created - users must manually close unwanted default tabs
-        page_index, drawing_area = self.canvas_loader.add_document(
-            filename=base_name,
-            replace_empty_default=True  # Deprecated parameter, has no effect
-        )
-        manager = self.canvas_loader.get_canvas_manager(drawing_area)
+        # Check if current tab is empty/default and can be reused
+        current_page = self.canvas_loader.notebook.get_current_page()
+        can_reuse_tab = False
+        
+        if current_page >= 0:
+            page_widget = self.canvas_loader.notebook.get_nth_page(current_page)
+            drawing_area = self.canvas_loader._get_drawing_area_from_page(page_widget)
+            if drawing_area:
+                manager = self.canvas_loader.get_canvas_manager(drawing_area)
+                # Only reuse tab if it's empty (no objects) and has default name
+                if manager:
+                    is_empty = (len(manager.places) == 0 and 
+                               len(manager.transitions) == 0 and 
+                               len(manager.arcs) == 0)
+                    is_default_name = (manager.filename == 'default' or 
+                                      manager.get_display_name() == 'default')
+                    is_clean = not manager.is_dirty()
+                    can_reuse_tab = is_empty and is_default_name and is_clean
+        
+        # Either reuse current empty tab or create new one
+        if can_reuse_tab:
+            # Reuse the current empty default tab
+            pass  # drawing_area and manager already set from check above
+        else:
+            # Create a new tab for this document
+            page_index, drawing_area = self.canvas_loader.add_document(filename=base_name)
+            manager = self.canvas_loader.get_canvas_manager(drawing_area)
+        
         if manager:
             # ===== UNIFIED OBJECT LOADING =====
             # Use load_objects() for consistent, unified initialization path
@@ -1842,13 +1863,16 @@ class FileExplorerPanel:
             manager.set_filepath(filepath)
             manager.mark_clean()  # Just loaded, no unsaved changes
             
+            # Update manager's filename to match the loaded file
+            manager.filename = base_name
+            
+            # Update tab label with the loaded file's name
+            self.canvas_loader.update_current_tab_label(base_name, is_modified=False)
+            
             # Legacy: Also update global persistency for backward compatibility
             if hasattr(self, 'persistency') and self.persistency:
                 self.persistency.set_filepath(filepath)
                 self.persistency.mark_clean()
-            
-            # Note: Tab label is already set correctly by add_document()
-            # No need to call update_current_tab_label() here
             
             drawing_area.queue_draw()
 

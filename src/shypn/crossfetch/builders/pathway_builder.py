@@ -476,7 +476,10 @@ class PathwayBuilder:
                 if 'law_type' in kinetic_data:
                     law_type = kinetic_data['law_type'].lower()
                     if 'mass_action' in law_type:
-                        transition.transition_type = 'continuous'
+                        # Mass action is STOCHASTIC (scientific basis: Gillespie 1977)
+                        # Molecular collisions are probabilistic (Brownian motion)
+                        # Exponential time distribution, NOT deterministic fixed delay
+                        transition.transition_type = 'stochastic'
                     elif 'michaelis' in law_type or 'enzymatic' in law_type:
                         transition.transition_type = 'continuous'
                     elif 'stochastic' in law_type:

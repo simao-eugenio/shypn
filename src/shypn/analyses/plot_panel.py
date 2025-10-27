@@ -231,6 +231,41 @@ class AnalysisPlotPanel(Gtk.Box):
         """
         if any((o.id == obj.id for o in self.selected_objects)):
             return
+        
+        # Get the color that will be assigned to this object
+        # (before adding it to the selected_objects list)
+        index = len(self.selected_objects)
+        color_hex = self._get_color(index)
+        
+        # Convert hex color to RGB tuple for Cairo rendering
+        # Hex format: '#e74c3c' -> RGB tuple: (0.906, 0.298, 0.235)
+        import matplotlib.colors as mcolors
+        color_rgb = mcolors.hex2color(color_hex)
+        
+        # Set object colors to match the plot color
+        # Temporarily store on_changed callback to prevent marking document dirty
+        # (Adding to analysis is not a document modification)
+        old_callback = obj.on_changed if hasattr(obj, 'on_changed') else None
+        obj.on_changed = None
+        
+        # Set border color
+        obj.border_color = color_rgb
+        
+        # For transitions: make fill color a much lighter shade of border color
+        # This creates better contrast and makes the colored border clearly visible
+        from shypn.netobjs import Transition
+        if isinstance(obj, Transition):
+            # Create a very light tint (80% white + 20% color)
+            r, g, b = color_rgb
+            obj.fill_color = (
+                0.8 + r * 0.2,  # Mostly white with a hint of color
+                0.8 + g * 0.2,
+                0.8 + b * 0.2
+            )
+        
+        # Restore callback
+        obj.on_changed = old_callback
+        
         self.selected_objects.append(obj)
         # Add UI row immediately without full rebuild
         self._add_object_row(obj, len(self.selected_objects) - 1)

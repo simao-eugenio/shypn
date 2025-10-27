@@ -185,12 +185,17 @@ class ContextMenuHandler:
             panel: TransitionRatePanel instance
         """
         
-        # Add transition
+        # Add transition (border color will be set automatically in panel.add_object)
         panel.add_object(transition)
         
         # Add locality places if panel supports it
+        # (these places will also get their border colors set automatically)
         if hasattr(panel, 'add_locality_places'):
             panel.add_locality_places(transition, locality)
+        
+        # Request canvas redraw to show new border colors
+        if self.model:
+            self.model.mark_needs_redraw()
         else:
     
             pass
@@ -204,7 +209,12 @@ class ContextMenuHandler:
         from shypn.netobjs import Place, Transition
         
         # Add object to the appropriate panel
+        # (border color will be set automatically in panel.add_object)
         panel.add_object(obj)
+        
+        # Request canvas redraw to show new border color
+        if self.model:
+            self.model.mark_needs_redraw()
         
         # If it's a transition, also update the diagnostics panel
         if isinstance(obj, Transition) and self.diagnostics_panel:
