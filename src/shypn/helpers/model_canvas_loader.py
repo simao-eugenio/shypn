@@ -2984,11 +2984,52 @@ class ModelCanvasLoader:
                             self.right_panel_loader.transition_panel.needs_update = True
         dialog_loader.connect('properties-changed', on_properties_changed)
         
-        print(f"[DIALOG DEBUG] About to show dialog for {type(obj).__name__}")
-        print(f"[DIALOG DEBUG] parent_window: {self.parent_window}")
-        print(f"[DIALOG DEBUG] parent_window.get_realized(): {self.parent_window.get_realized() if self.parent_window else 'N/A'}")
-        print(f"[DIALOG DEBUG] dialog_loader: {dialog_loader}")
+        # ============================================================================
+        # WAYLAND FIX: Check if parent window is MAPPED (visible), not just realized
+        # ============================================================================
+        if self.parent_window:
+            is_realized = self.parent_window.get_realized()
+            is_mapped = self.parent_window.get_mapped() if hasattr(self.parent_window, 'get_mapped') else False
+            
+            print(f"[DIALOG DEBUG] About to show dialog for {type(obj).__name__}")
+            print(f"[DIALOG DEBUG] parent_window: {self.parent_window}")
+            print(f"[DIALOG DEBUG] parent_window.get_realized(): {is_realized}")
+            print(f"[DIALOG DEBUG] parent_window.get_mapped(): {is_mapped}")
+            print(f"[DIALOG DEBUG] dialog_loader: {dialog_loader}")
+            
+            # WAYLAND: Only proceed if window is MAPPED (visible on screen)
+            if not is_mapped:
+                print(f"[WAYLAND FIX] Parent window not yet mapped, waiting for map-event...")
+                
+                def on_map_event(widget, event):
+                    print(f"[WAYLAND FIX] Window mapped, now safe to show dialog")
+                    # Disconnect signal
+                    self.parent_window.disconnect(map_handler_id)
+                    # Show dialog now
+                    self._show_dialog_safely(dialog_loader, drawing_area, original_tool, manager)
+                    return False
+                
+                # Connect map-event signal
+                map_handler_id = self.parent_window.connect('map-event', on_map_event)
+                print(f"[WAYLAND FIX] Waiting for window to be mapped before showing dialog...")
+                return  # Exit early, dialog will show after map
+        else:
+            print(f"[DIALOG DEBUG] About to show dialog for {type(obj).__name__}")
+            print(f"[DIALOG DEBUG] parent_window: None")
+            print(f"[DIALOG DEBUG] dialog_loader: {dialog_loader}")
         
+        # Window is mapped or no parent window check needed
+        self._show_dialog_safely(dialog_loader, drawing_area, original_tool, manager)
+    
+    def _show_dialog_safely(self, dialog_loader, drawing_area, original_tool, manager):
+        """Show dialog with error handling.
+        
+        Args:
+            dialog_loader: The dialog loader instance
+            drawing_area: The canvas drawing area
+            original_tool: The original tool before dialog (for restoration)
+            manager: The canvas manager
+        """
         try:
             # The dialog_loader already has parent_window set during creation
             # We don't need to set transient_for again - it's already configured
