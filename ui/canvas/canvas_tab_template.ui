@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- GTK3 Canvas Tab Template - Single canvas instance for cloning -->
+<interface>
+  <requires lib="gtk+" version="3.0"/>
+
+  <!-- Template for a single canvas tab (overlay + scrolled window + drawing area) -->
+  <object class="GtkOverlay" id="canvas_overlay_template">
+    <property name="hexpand">True</property>
+    <property name="vexpand">True</property>
+    <property name="visible">True</property>
+    
+    <!-- Main canvas content -->
+    <child>
+      <object class="GtkScrolledWindow" id="canvas_scroll_template">
+        <property name="hexpand">True</property>
+        <property name="vexpand">True</property>
+        <property name="visible">True</property>
+        <property name="hscrollbar-policy">automatic</property>
+        <property name="vscrollbar-policy">automatic</property>
+        
+        <child>
+          <object class="GtkDrawingArea" id="canvas_drawing_template">
+            <property name="hexpand">True</property>
+            <property name="vexpand">True</property>
+            <property name="visible">True</property>
+            <property name="width-request">2000</property>
+            <property name="height-request">2000</property>
+          </object>
+        </child>
+      </object>
+    </child>
+    
+    <!-- Overlay container for zoom control (will be populated programmatically) -->
+    <child type="overlay">
+      <object class="GtkBox" id="canvas_overlay_box_template">
+        <property name="orientation">vertical</property>
+        <property name="halign">end</property>
+        <property name="valign">end</property>
+        <property name="margin-end">10</property>
+        <property name="margin-bottom">10</property>
+        <property name="visible">True</property>
+        <!-- Zoom control will be added here dynamically -->
+      </object>
+    </child>
+    
+  </object>
+</interface>
