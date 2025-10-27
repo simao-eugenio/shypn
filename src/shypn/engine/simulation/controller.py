@@ -568,11 +568,12 @@ class SimulationController:
         # This allows timed transitions to fire when entering their window mid-step
         self._update_enablement_states()
         
-        # Handle timed and stochastic transitions separately to avoid interference
-        # Each type gets its own selection, allowing both types to fire in same step
+        # Handle timed and stochastic transitions with PRIORITY RULE:
+        # Timed (deterministic) has PRIORITY over Stochastic (probabilistic)
+        # Only fire stochastic if NO timed transitions can fire
         discrete_fired = False
         
-        # Phase 2a: Timed transitions
+        # Phase 2a: Timed transitions (DETERMINISTIC - PRIORITY)
         timed_transitions = [t for t in self.model.transitions if t.transition_type == 'timed']
         enabled_timed = [t for t in timed_transitions if self._is_transition_enabled(t)]
         if enabled_timed:
@@ -582,14 +583,16 @@ class SimulationController:
             discrete_fired = True
             self._update_enablement_states()  # Update after firing
         
-        # Phase 2b: Stochastic transitions (independent of timed)
-        stochastic_transitions = [t for t in self.model.transitions if t.transition_type == 'stochastic']
-        enabled_stochastic = [t for t in stochastic_transitions if self._is_transition_enabled(t)]
-        if enabled_stochastic:
-            # Select and fire one stochastic transition (may have conflicts among stochastic)
-            transition = self._select_transition(enabled_stochastic)
-            self._fire_transition(transition)
-            discrete_fired = True
+        # Phase 2b: Stochastic transitions (PROBABILISTIC - LOWER PRIORITY)
+        # Only execute if NO timed transitions fired (timed has priority)
+        elif not discrete_fired:  # Changed: only if no timed fired
+            stochastic_transitions = [t for t in self.model.transitions if t.transition_type == 'stochastic']
+            enabled_stochastic = [t for t in stochastic_transitions if self._is_transition_enabled(t)]
+            if enabled_stochastic:
+                # Select and fire one stochastic transition (may have conflicts among stochastic)
+                transition = self._select_transition(enabled_stochastic)
+                self._fire_transition(transition)
+                discrete_fired = True
         
         self._notify_step_listeners()
         
@@ -601,6 +604,7 @@ class SimulationController:
             return True
         
         # Check for waiting discrete transitions
+        stochastic_transitions = [t for t in self.model.transitions if t.transition_type == 'stochastic']
         all_discrete = timed_transitions + stochastic_transitions
         waiting_count = 0
         ready_count = 0
