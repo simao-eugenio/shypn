@@ -3094,6 +3094,13 @@ class ModelCanvasLoader:
             
             if response == Gtk.ResponseType.OK:
                 drawing_area.queue_draw()
+                
+                # Update simulation controller state after transition type/property changes
+                # This ensures newly created or type-switched stochastic/timed transitions
+                # are properly scheduled when the simulation starts
+                controller = self.get_canvas_controller(drawing_area)
+                if controller:
+                    controller._update_enablement_states()
         except Exception as e:
             print(f"[ERROR] Dialog run failed: {e}")
             import traceback
