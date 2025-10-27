@@ -229,7 +229,11 @@ class AnalysisPlotPanel(Gtk.Box):
         Args:
             obj: Place or Transition object to add
         """
+        print(f"[DEBUG PLOT] add_object called for {self.object_type} {obj.id}")
+        print(f"[DEBUG PLOT] data_collector exists: {self.data_collector is not None}")
+        
         if any((o.id == obj.id for o in self.selected_objects)):
+            print(f"[DEBUG PLOT] Object {obj.id} already in selection, skipping")
             return
         
         # Get the color that will be assigned to this object
@@ -264,6 +268,8 @@ class AnalysisPlotPanel(Gtk.Box):
         # Add UI row immediately without full rebuild
         self._add_object_row(obj, len(self.selected_objects) - 1)
         self.needs_update = True
+        
+        print(f"[DEBUG PLOT] Added object {obj.id}, total selected: {len(self.selected_objects)}")
         
         # Trigger canvas redraw to show color changes
         if self._model_manager is not None:
@@ -474,10 +480,15 @@ class AnalysisPlotPanel(Gtk.Box):
         """
         # Skip update if no data collector available yet
         if not self.data_collector:
+            print(f"[DEBUG PERIODIC] No data collector, skipping update")
             return True
             
         if not self.selected_objects:
+            print(f"[DEBUG PERIODIC] No selected objects, skipping update")
             return True
+        
+        print(f"[DEBUG PERIODIC] Checking for updates, needs_update={self.needs_update}")
+        
         data_changed = False
         for obj in self.selected_objects:
             if self.object_type == 'place':
@@ -488,8 +499,11 @@ class AnalysisPlotPanel(Gtk.Box):
             if current_length != last_length:
                 data_changed = True
                 self.last_data_length[obj.id] = current_length
+                print(f"[DEBUG PERIODIC] Data changed for {obj.id}: {last_length} -> {current_length}")
+        
         if data_changed or self.needs_update:
             # Only update plot, UI list is updated immediately in add_object()
+            print(f"[DEBUG PERIODIC] Triggering plot update (data_changed={data_changed}, needs_update={self.needs_update})")
             self.update_plot()
             self.needs_update = False
         return True
