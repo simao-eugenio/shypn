@@ -410,7 +410,7 @@ class AnalysisPlotPanel(Gtk.Box):
 
     def _on_clear_clicked(self, button):
         """Handle clear button click - clear selection and blank canvas."""
-        # Reset all objects' colors to default before clearing
+        # Reset both border and fill colors for all selected objects
         from shypn.netobjs import Transition, Place
         for obj in self.selected_objects:
             old_callback = obj.on_changed if hasattr(obj, 'on_changed') else None
@@ -421,6 +421,7 @@ class AnalysisPlotPanel(Gtk.Box):
                 obj.fill_color = Transition.DEFAULT_COLOR
             elif isinstance(obj, Place):
                 obj.border_color = Place.DEFAULT_BORDER_COLOR
+                # Places don't have fill_color attribute
             
             obj.on_changed = old_callback
         
@@ -431,7 +432,7 @@ class AnalysisPlotPanel(Gtk.Box):
         self._update_objects_list()
         
         # Trigger canvas redraw to show color resets
-        if self._model_manager is not None:
+        if self._model_manager:
             self._model_manager.mark_needs_redraw()
 
     def _on_grid_toggled(self, button):
@@ -469,10 +470,12 @@ class AnalysisPlotPanel(Gtk.Box):
         """
         # Skip update if no data collector available yet
         if not self.data_collector:
+            print(f"[DEBUG PERIODIC] No data collector, skipping update")
             return True
             
         if not self.selected_objects:
             return True
+        
         data_changed = False
         for obj in self.selected_objects:
             if self.object_type == 'place':
@@ -483,6 +486,7 @@ class AnalysisPlotPanel(Gtk.Box):
             if current_length != last_length:
                 data_changed = True
                 self.last_data_length[obj.id] = current_length
+        
         if data_changed or self.needs_update:
             # Only update plot, UI list is updated immediately in add_object()
             self.update_plot()
