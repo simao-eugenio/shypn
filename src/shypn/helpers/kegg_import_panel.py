@@ -261,20 +261,59 @@ class KEGGImportPanel:
     def _on_import_clicked(self, button):
         """Handle unified import button click.
         
-        This is the main entry point for KEGG import that does:
-        1. Fetch pathway from KEGG (if not already fetched)
-        2. Convert to Petri net
-        3. Load to canvas
+        LAZY LOADING APPROACH (Wayland fix):
+        1. Create EMPTY canvas IMMEDIATELY (like File → Open)
+        2. Fetch/convert in background
+        3. Inject model into pre-created canvas when ready
         
-        All in one smooth flow.
+        This gives Wayland maximum time to stabilize widget hierarchy.
         """
+        # ============================================================================
+        # DRASTIC APPROACH: Create canvas FIRST, before any fetch/conversion
+        # ============================================================================
+        if not self.model_canvas:
+            self._show_status("❌ Canvas not available", error=True)
+            return
+        
+        # Determine pathway name (will be updated after fetch if needed)
+        pathway_id = self.pathway_id_entry.get_text().strip()
+        if self.current_pathway:
+            pathway_name = self.current_pathway.title or self.current_pathway.name
+        elif pathway_id:
+            pathway_name = f"KEGG: {pathway_id}"
+        else:
+            pathway_name = "KEGG Import"
+        
+        import time
+        self.logger.info(f"[LAZY LOAD] Creating empty canvas '{pathway_name}' BEFORE import workflow")
+        
+        # Create empty canvas tab IMMEDIATELY
+        page_index, drawing_area = self.model_canvas.add_document(filename=pathway_name)
+        
+        # Store canvas info for later model injection
+        self._pending_canvas_info = {
+            'page_index': page_index,
+            'drawing_area': drawing_area,
+            'pathway_name': pathway_name,
+            'created_time': time.time()  # Track canvas age for debugging
+        }
+        
+        # Switch to newly created tab to show progress
+        notebook = self.model_canvas.notebook
+        notebook.set_current_page(page_index)
+        
+        self.logger.info(f"[LAZY LOAD] Canvas created at page_index={page_index}, now starting import workflow")
+        
+        # ============================================================================
+        # NOW proceed with normal import workflow (fetch/convert in background)
+        # ============================================================================
+        
         # Check if we already have a fetched pathway
         if self.current_pathway and self.current_kgml:
             # Pathway already fetched - go straight to conversion and loading
             self._do_import_to_canvas()
         else:
             # No pathway fetched yet - fetch first, then import
-            pathway_id = self.pathway_id_entry.get_text().strip()
             if not pathway_id:
                 self._show_status("Please enter a pathway ID", error=True)
                 return
@@ -332,7 +371,10 @@ class KEGGImportPanel:
         return False  # Don't repeat
     
     def _do_import_to_canvas(self):
-        """Convert and load current pathway into canvas."""
+        """Convert and load current pathway into canvas.
+        
+        LAZY LOADING: Canvas already created in _on_import_clicked(), just inject model.
+        """
         if not self.current_pathway or not self.converter:
             self._show_status("No pathway loaded", error=True)
             return
@@ -346,59 +388,71 @@ class KEGGImportPanel:
             self.fetch_button.set_sensitive(False)
         self.import_button.set_sensitive(False)
         
-        # PRE-CREATE CANVAS BEFORE PARSING (ARCHITECTURAL CHANGE)
-        # This ensures the widget hierarchy is fully established before any user interaction
-        # can trigger property dialogs, preventing Wayland Error 71 and dialog crashes
-        pathway_name = self.current_pathway.title or self.current_pathway.name
+        # ============================================================================
+        # CHECK: Is canvas already pre-created by lazy loading?
+        # ============================================================================
+        canvas_already_exists = hasattr(self, '_pending_canvas_info') and self._pending_canvas_info
         
-        try:
-            # Create empty canvas tab from UI template
-            page_index, drawing_area = self.model_canvas.add_document(filename=pathway_name)
+        if canvas_already_exists:
+            import time
+            canvas_age = time.time() - self._pending_canvas_info.get('created_time', 0)
+            self.logger.info(f"[LAZY LOAD] Using pre-created canvas (age: {canvas_age:.2f}s)")
+            pathway_name = self._pending_canvas_info.get('pathway_name', self.current_pathway.title or self.current_pathway.name)
+            # Canvas exists, skip creation, go straight to conversion
+        else:
+            # Fallback: No pre-created canvas, create one now (backward compatibility)
+            self.logger.info("[FALLBACK] No pre-created canvas, creating one now")
+            pathway_name = self.current_pathway.title or self.current_pathway.name
             
-            # Get the canvas manager for state initialization
-            manager = self.model_canvas.get_canvas_manager(drawing_area)
-            if not manager:
-                self._show_status("❌ Failed to initialize canvas", error=True)
+            try:
+                # Create empty canvas tab from UI template
+                page_index, drawing_area = self.model_canvas.add_document(filename=pathway_name)
+                
+                # Get the canvas manager for state initialization
+                manager = self.model_canvas.get_canvas_manager(drawing_area)
+                if not manager:
+                    self._show_status("❌ Failed to initialize canvas", error=True)
+                    if self.fetch_button:
+                        self.fetch_button.set_sensitive(True)
+                    self.import_button.set_sensitive(True)
+                    return
+                
+                # Initialize canvas state IMMEDIATELY
+                manager.mark_clean()
+                manager.mark_as_imported(pathway_name)
+                
+                # Set filepath if project exists
+                if self.project:
+                    import os
+                    pathways_dir = self.project.get_pathways_dir()
+                    if pathways_dir:
+                        temp_path = os.path.join(pathways_dir, f"{pathway_name}.shy")
+                        manager.set_filepath(temp_path)
+                
+                # Switch to the newly created tab
+                notebook = self.model_canvas.notebook
+                notebook.set_current_page(page_index)
+                
+                # Store canvas info
+                self._pending_canvas_info = {
+                    'page_index': page_index,
+                    'drawing_area': drawing_area,
+                    'manager': manager,
+                    'pathway_name': pathway_name
+                }
+                
+            except Exception as tab_error:
+                import traceback
+                traceback.print_exc()
+                self._show_status(f"❌ Failed to create canvas tab: {tab_error}", error=True)
                 if self.fetch_button:
                     self.fetch_button.set_sensitive(True)
                 self.import_button.set_sensitive(True)
                 return
-            
-            # CRITICAL: Initialize canvas state IMMEDIATELY (before background parsing)
-            # This prevents property dialog crashes on imported canvases
-            manager.mark_clean()  # Mark as clean (no unsaved changes yet)
-            manager.mark_as_imported(pathway_name)  # Mark as imported
-            
-            # Set filepath if project exists (for proper state initialization)
-            if self.project:
-                import os
-                pathways_dir = self.project.get_pathways_dir()
-                if pathways_dir:
-                    temp_path = os.path.join(pathways_dir, f"{pathway_name}.shy")
-                    manager.set_filepath(temp_path)
-            
-            # Switch to the newly created tab to show progress
-            notebook = self.model_canvas.notebook
-            notebook.set_current_page(page_index)
-            
-            # Store canvas info for background thread completion handler
-            self._pending_canvas_info = {
-                'page_index': page_index,
-                'drawing_area': drawing_area,
-                'manager': manager,
-                'pathway_name': pathway_name
-            }
-            
-        except Exception as tab_error:
-            import traceback
-            traceback.print_exc()
-            self._show_status(f"❌ Failed to create canvas tab: {tab_error}", error=True)
-            if self.fetch_button:
-                self.fetch_button.set_sensitive(True)
-            self.import_button.set_sensitive(True)
-            return
         
-        self._show_status("🔄 Converting pathway to Petri net...")
+        # ============================================================================
+        # NOW start background conversion (canvas already exists and ready)
+        # ============================================================================
         
         # Import in background thread to avoid blocking UI
         def import_thread():
