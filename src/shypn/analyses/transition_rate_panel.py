@@ -129,23 +129,8 @@ class TransitionRatePanel(AnalysisPlotPanel):
             print(f"[TRANSITION_RATE_PANEL] Triggered on_changed callback for {obj.name}")
         
         self.selected_objects.append(obj)
-        
-        # Detect and add locality places for this transition
-        if self._model_manager:
-            from shypn.diagnostic import LocalityDetector
-            detector = LocalityDetector(self._model_manager)
-            locality = detector.get_locality_for_transition(obj)
-            
-            if locality.is_valid:
-                self.add_locality_places(obj, locality)
-                print(f"[TRANSITION_RATE_PANEL] Added locality for {obj.name}: {locality.place_count} places")
-            else:
-                # Still update UI list even if no locality
-                self._update_objects_list()
-        else:
-            # No model manager, just update UI list
-            self._update_objects_list()
-        
+        # Use full rebuild to show locality places in UI list
+        self._update_objects_list()
         self.needs_update = True
         
         # Trigger canvas redraw to show the new colors
