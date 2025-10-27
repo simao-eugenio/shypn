@@ -208,9 +208,14 @@ class ContextMenuHandler:
         """
         from shypn.netobjs import Place, Transition
         
+        print(f"[CONTEXT_MENU] Adding {obj.name} to plot panel")
+        print(f"[CONTEXT_MENU] Before add: border={obj.border_color}, fill={obj.fill_color}")
+        
         # Add object to the appropriate panel
         # (border color will be set automatically in panel.add_object)
         panel.add_object(obj)
+        
+        print(f"[CONTEXT_MENU] After add: border={obj.border_color}, fill={obj.fill_color}")
         
         # Request canvas redraw to show new border color
         if self.model:
