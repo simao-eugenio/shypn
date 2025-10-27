@@ -210,11 +210,12 @@ class ModelCanvasLoader:
             if drawing_area in self.overlay_managers:
                 overlay_manager = self.overlay_managers[drawing_area]
                 
-                # SwissKnifePalette stores SimulateToolsPaletteLoader in widget_palette_instances dict
+                # SwissKnifePalette stores SimulateToolsPaletteLoader in registry
                 if hasattr(overlay_manager, 'swissknife_palette'):
                     swissknife = overlay_manager.swissknife_palette
-                    if hasattr(swissknife, 'widget_palette_instances'):
-                        simulate_tools_palette = swissknife.widget_palette_instances.get('simulate')
+                    # Access widget_palette_instances via registry (CORRECT way)
+                    if hasattr(swissknife, 'registry'):
+                        simulate_tools_palette = swissknife.registry.get_widget_palette_instance('simulate')
                         if simulate_tools_palette and hasattr(simulate_tools_palette, 'data_collector'):
                             data_collector = simulate_tools_palette.data_collector
                             self.right_panel_loader.set_data_collector(data_collector)

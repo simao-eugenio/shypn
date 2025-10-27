@@ -208,14 +208,9 @@ class ContextMenuHandler:
         """
         from shypn.netobjs import Place, Transition
         
-        print(f"[DEBUG CONTEXT MENU] Add to Analysis clicked for {obj.__class__.__name__} {obj.id}")
-        print(f"[DEBUG CONTEXT MENU] Panel: {panel.__class__.__name__}")
-        
         # Add object to the appropriate panel
         # (border color will be set automatically in panel.add_object)
         panel.add_object(obj)
-        
-        print(f"[DEBUG CONTEXT MENU] Object added to panel")
         
         # Request canvas redraw to show new border color
         if self.model:
