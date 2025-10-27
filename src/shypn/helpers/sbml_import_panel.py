@@ -116,12 +116,6 @@ class SBMLImportPanel:
         Args:
             project: Project instance
         """
-        print(f"[SBML_IMPORT] set_project called with: {project}")
-        if project:
-            print(f"[SBML_IMPORT]   Project name: {project.name}")
-            print(f"[SBML_IMPORT]   Project base_path: {getattr(project, 'base_path', 'NO base_path')}")
-            pathways_dir = project.get_pathways_dir() if hasattr(project, 'get_pathways_dir') else None
-            print(f"[SBML_IMPORT]   Pathways dir: {pathways_dir}")
         self.project = project
     
     def _get_widgets(self):
@@ -296,8 +290,6 @@ class SBMLImportPanel:
     
     def _on_browse_clicked(self, button):
         """Handle browse button click - open file chooser."""
-        print(f"[SBML_IMPORT] Browse clicked, parent_window={self.parent_window}")
-        
         # WAYLAND FIX: Use parent window for dialog
         dialog = Gtk.FileChooserDialog(
             title="Select SBML File",
@@ -321,19 +313,13 @@ class SBMLImportPanel:
         filter_all.add_pattern("*")
         dialog.add_filter(filter_all)
         
-        print("[SBML_IMPORT] Showing file chooser dialog...")
-        
         # WAYLAND FIX: Use async signal-based approach instead of blocking run()
         # This avoids Error 71 (Protocol error) on Wayland
         result_container = [None]  # Mutable container for result
         
         def on_response(dlg, response_id):
-            print(f"[SBML_IMPORT] Dialog response: {response_id}")
             if response_id == Gtk.ResponseType.OK:
                 result_container[0] = dlg.get_filename()
-                print(f"[SBML_IMPORT] User selected: {result_container[0]}")
-            else:
-                print("[SBML_IMPORT] User cancelled")
             dlg.destroy()
             Gtk.main_quit()  # Exit nested main loop
         
@@ -347,7 +333,6 @@ class SBMLImportPanel:
             if self.project:
                 try:
                     filename = os.path.basename(filepath)
-                    print(f"[SBML_IMPORT] Copying selected file to project pathways: {filename}")
                     
                     # Read the SBML content
                     with open(filepath, 'r', encoding='utf-8') as f:
@@ -355,13 +340,11 @@ class SBMLImportPanel:
                     
                     # Save to project/pathways/
                     dest_path = self.project.save_pathway_file(filename, sbml_content)
-                    print(f"[SBML_IMPORT] ✓ Saved raw SBML to: {dest_path}")
                     
                     # Use the project copy as the working file
                     filepath = dest_path
                     
                 except Exception as e:
-                    print(f"[SBML_IMPORT] ✗ Failed to copy SBML to project: {e}")
                     import traceback
                     traceback.print_exc()
                     # Continue with original file if copy fails
@@ -391,14 +374,11 @@ class SBMLImportPanel:
             # Auto-continue to parse if triggered by unified import button
             # NOTE: We're already in main thread (dialog callback), so call directly
             if self._import_button_flow:
-                print("[SBML_IMPORT] Browse complete - auto-continuing to parse", file=sys.stderr)
                 self._on_parse_clicked(button)
 
     
     def _on_fetch_clicked(self, button):
         """Handle fetch button click - download model from BioModels."""
-        print(f"[SBML_IMPORT] _on_fetch_clicked() called, _fetch_in_progress={self._fetch_in_progress}", file=sys.stderr)
-        
         if not self.sbml_biomodels_entry:
             return
         
@@ -409,7 +389,6 @@ class SBMLImportPanel:
         
         # Prevent duplicate fetches
         if self._fetch_in_progress:
-            print("[SBML_IMPORT] Fetch already in progress, ignoring duplicate request", file=sys.stderr)
             return
         
         # Save query to workspace settings
@@ -455,26 +434,20 @@ class SBMLImportPanel:
             ]
             
             # Determine save location based on whether we have a project
-            print(f"[SBML_IMPORT] Fetch - checking project: self.project={self.project}")
             if self.project:
                 # Save directly to project/pathways/
                 pathways_dir = self.project.get_pathways_dir()
-                print(f"[SBML_IMPORT] Fetch - pathways_dir={pathways_dir}")
                 if pathways_dir:
                     os.makedirs(pathways_dir, exist_ok=True)
                     temp_filepath = os.path.join(pathways_dir, f"{biomodels_id}.xml")
-                    print(f"[SBML_IMPORT] ✓ Will save BioModels fetch to project: {temp_filepath}")
                 else:
                     # Fallback to temp if project has no pathways dir
                     temp_dir = tempfile.gettempdir()
                     temp_filepath = os.path.join(temp_dir, f"{biomodels_id}.xml")
-                    print(f"[SBML_IMPORT] ⚠ Warning: No project pathways dir, using temp: {temp_filepath}")
             else:
                 # No project - use temp directory
                 temp_dir = tempfile.gettempdir()
                 temp_filepath = os.path.join(temp_dir, f"{biomodels_id}.xml")
-                print(f"[SBML_IMPORT] ⚠ No project at fetch time, using temp: {temp_filepath}")
-                print(f"[SBML_IMPORT] ℹ File will be copied to project on import if project is opened later")
             
             # Update status (safe from background thread)
             GLib.idle_add(lambda: self._show_status(f"Downloading {biomodels_id}..."))
@@ -584,7 +557,6 @@ class SBMLImportPanel:
                 # Auto-continue to parse if triggered by unified import button
                 # NOTE: We're already in main thread (queued by idle_add), so call directly
                 if self._import_button_flow:
-                    print("[SBML_IMPORT] Fetch complete - auto-continuing to parse", file=sys.stderr)
                     self._on_parse_clicked(None)
                 
                 # Clear fetch flag
@@ -648,8 +620,6 @@ class SBMLImportPanel:
         
         Operations run in background thread to avoid blocking UI.
         """
-        print(f"[SBML_IMPORT] _on_load_clicked() called", file=sys.stderr)
-        
         if not self.parsed_pathway:
             self.logger.warning("No parsed pathway to load")
             return
@@ -667,12 +637,10 @@ class SBMLImportPanel:
         # NEW: PRE-CREATE CANVAS BEFORE PARSING/CONVERSION
         # This ensures widget hierarchy is fully established and ready for dialogs
         # ============================================================================
-        print(f"[SBML_IMPORT] PRE-CREATING canvas tab for: {pathway_name}", file=sys.stderr)
         self._show_status(f"📄 Creating canvas for {pathway_name}...")
         
         # Create empty canvas tab with proper state initialization
         page_index, drawing_area = self.model_canvas.add_document(filename=pathway_name)
-        print(f"[SBML_IMPORT] Canvas pre-created: page_index={page_index}, drawing_area={drawing_area}", file=sys.stderr)
         
         # Get manager for pre-created canvas
         manager = self.model_canvas.get_canvas_manager(drawing_area)
@@ -680,8 +648,6 @@ class SBMLImportPanel:
             self.logger.error("Failed to get manager for pre-created canvas")
             self._show_status("❌ Failed to create canvas")
             return
-        
-        print(f"[SBML_IMPORT] Canvas manager ready: {manager}", file=sys.stderr)
         
         # Initialize canvas state immediately (marks as clean, ready for dialogs)
         manager.mark_clean()
@@ -694,7 +660,6 @@ class SBMLImportPanel:
             if pathways_dir:
                 temp_path = os.path.join(pathways_dir, f"{pathway_name}.shy")
                 manager.set_filepath(temp_path)
-                print(f"[SBML_IMPORT] Canvas filepath set: {temp_path}", file=sys.stderr)
         
         # Store pre-created canvas info for load completion
         self._pending_canvas_info = {
@@ -755,8 +720,6 @@ class SBMLImportPanel:
             drawing_area = self._pending_canvas_info['drawing_area']
             manager = self._pending_canvas_info['manager']
             
-            print(f"[SBML_IMPORT] Using pre-created canvas: page_index={page_index}", file=sys.stderr)
-            
             # Load to canvas - canvas already exists, just populate with objects
             self._show_status("🔄 Loading objects to canvas...")
             
@@ -780,52 +743,30 @@ class SBMLImportPanel:
                                horizontal_offset_percent=30, vertical_offset_percent=10)
             
             # Trigger redraw to display imported objects
-            print(f"[SBML_IMPORT] Triggering canvas redraw...")
             drawing_area.queue_draw()
-            
-            # Canvas state already initialized in _on_load_clicked, but verify
-            print(f"[SBML_IMPORT] Canvas state verified (already initialized)")
-            
-            # Create pathway metadata for project tracking
-            print(f"[SBML_IMPORT] Checking project metadata conditions:")
-            print(f"  - self.project: {self.project}")
-            print(f"  - self.current_filepath: {self.current_filepath}")
-            print(f"  - self.parsed_pathway: {self.parsed_pathway}")
             
             if self.project and self.current_filepath and self.parsed_pathway:
                 try:
                     filename = os.path.basename(self.current_filepath)
-                    print(f"[SBML_IMPORT] Creating pathway metadata for: {filename}")
                     
                     # Check if SBML raw file is already in project/pathways/
                     pathways_dir = self.project.get_pathways_dir()
                     expected_path = os.path.join(pathways_dir, filename) if pathways_dir else None
                     
-                    print(f"[SBML_IMPORT] Current file location: {self.current_filepath}")
-                    print(f"[SBML_IMPORT] Expected project location: {expected_path}")
-                    
                     if expected_path and os.path.exists(expected_path):
-                        print(f"[SBML_IMPORT] ✓ SBML raw file already in project: {expected_path}")
+                        pass  # SBML raw file already in project
                     elif self.current_filepath and os.path.exists(self.current_filepath):
                         # File is not in project yet (e.g., was downloaded to temp before project was set)
                         # Copy it to project/pathways/ now
-                        print(f"[SBML_IMPORT] SBML file not in project location, copying now...")
-                        print(f"[SBML_IMPORT]   From: {self.current_filepath}")
-                        print(f"[SBML_IMPORT]   To:   {expected_path}")
-                        
                         try:
                             sbml_content = open(self.current_filepath, 'r', encoding='utf-8').read()
                             dest_path = self.project.save_pathway_file(filename, sbml_content)
-                            print(f"[SBML_IMPORT] ✓ Successfully copied SBML to project: {dest_path}")
                             
                             # Update current_filepath to point to project location
                             self.current_filepath = dest_path
                         except Exception as copy_error:
-                            print(f"[SBML_IMPORT] ✗ Failed to copy SBML to project: {copy_error}")
                             import traceback
                             traceback.print_exc()
-                    else:
-                        print(f"[SBML_IMPORT] ✗ Warning: SBML file not found at {self.current_filepath}")
                     
                     # Create PathwayDocument with metadata
                     from shypn.data.pathway_document import PathwayDocument
@@ -875,15 +816,10 @@ class SBMLImportPanel:
                     if model_id:
                         # Link pathway to model
                         self.current_pathway_doc.link_to_model(model_id)
-                        print(f"[SBML_IMPORT] ✓ Linked pathway to model: {model_id}")
                     
                     # Register with project
                     self.project.add_pathway(self.current_pathway_doc)
                     self.project.save()
-                    
-                    print(f"[SBML_IMPORT] ✓ Saved pathway metadata for {filename} to project")
-                    if expected_path and os.path.exists(expected_path):
-                        print(f"[SBML_IMPORT] ✓ Raw SBML file location: {expected_path}")
                     
                     # ============================================================
                     # AUTO-SAVE: Save Petri net model to project/models/
@@ -896,12 +832,8 @@ class SBMLImportPanel:
                     models_dir = os.path.join(self.project.base_path, 'models')
                     if not os.path.exists(models_dir):
                         os.makedirs(models_dir, exist_ok=True)
-                        print(f"[SBML_IMPORT] Created models directory: {models_dir}")
                     
                     model_filepath = os.path.join(models_dir, model_filename)
-                    
-                    # Save the Petri net model
-                    print(f"[SBML_IMPORT] Auto-saving Petri net model to: {model_filepath}")
                     
                     try:
                         # Create DocumentModel from current canvas objects
@@ -938,16 +870,11 @@ class SBMLImportPanel:
                         if hasattr(self.model_canvas, 'update_current_tab_label'):
                             self.model_canvas.update_current_tab_label(model_filename, is_modified=False)
                         
-                        print(f"[SBML_IMPORT] ✓ Petri net model auto-saved: {model_filepath}")
-                        print(f"[SBML_IMPORT] ✓ Model linked to raw SBML: {expected_path}")
-                        
                     except Exception as save_error:
-                        print(f"[SBML_IMPORT] ✗ Failed to auto-save Petri net model: {save_error}")
                         import traceback
                         traceback.print_exc()
                     
                 except Exception as e:
-                    print(f"[SBML_IMPORT] ✗ Failed to save pathway metadata after import: {e}")
                     import traceback
                     traceback.print_exc()
             
@@ -1039,8 +966,6 @@ class SBMLImportPanel:
         Returns:
             False to stop GLib.idle_add from repeating
         """
-        print(f"[SBML_IMPORT] _on_parse_complete() called", file=sys.stderr)
-        
         # Store the parsed pathway
         self.parsed_pathway = parsed_pathway
         
@@ -1065,10 +990,7 @@ class SBMLImportPanel:
                 # Save updated metadata
                 self.project.save()
                 
-                print(f"[SBML_IMPORT] Updated pathway metadata: {pathway_name}")
-                
             except Exception as e:
-                print(f"[SBML_IMPORT] Warning: Failed to update pathway metadata: {e}")
                 import traceback
                 traceback.print_exc()
         
@@ -1100,7 +1022,6 @@ class SBMLImportPanel:
         # Load to canvas after parse (NEW: always enabled, not a testing mode)
         if self.model_canvas:
             self.logger.info("Auto-loading to canvas after parse")
-            print(f"[SBML_IMPORT] _on_parse_complete: calling _on_load_clicked()", file=sys.stderr)
             self._on_load_clicked(None)
         else:
             self.logger.debug("Canvas not available, skipping auto-load")
@@ -1291,33 +1212,20 @@ class SBMLImportPanel:
         
         All in one smooth flow.
         """
-        print(f"[SBML_IMPORT] _on_import_clicked() called", file=sys.stderr)
-        print(f"[SBML_IMPORT]   current_filepath={self.current_filepath}")
-        print(f"[SBML_IMPORT]   _import_button_flow={self._import_button_flow}")
-        print(f"[SBML_IMPORT]   _fetch_in_progress={self._fetch_in_progress}")
-        
         # Set flag to enable auto-continue workflow
         self._import_button_flow = True
-        
-        print(f"[SBML_IMPORT]   sbml_local_radio={self.sbml_local_radio}")
-        print(f"[SBML_IMPORT]   sbml_local_radio.active={self.sbml_local_radio.get_active() if self.sbml_local_radio else None}")
-        print(f"[SBML_IMPORT]   sbml_biomodels_radio={self.sbml_biomodels_radio}")
-        print(f"[SBML_IMPORT]   sbml_biomodels_radio.active={self.sbml_biomodels_radio.get_active() if self.sbml_biomodels_radio else None}")
         
         # Check if we already have a file selected or fetched
         if self.current_filepath and os.path.exists(self.current_filepath):
             # File already selected - go straight to parse
-            print(f"[SBML_IMPORT] File already selected, going to parse")
             self._on_parse_clicked(button)
         else:
             # No file selected yet - need to browse or fetch
             if self.sbml_local_radio and self.sbml_local_radio.get_active():
                 # Local file mode - trigger browse (will auto-continue to parse)
-                print(f"[SBML_IMPORT] Local mode - triggering browse")
                 self._on_browse_clicked(button)
             elif self.sbml_biomodels_radio and self.sbml_biomodels_radio.get_active():
                 # BioModels mode - trigger fetch (will auto-continue to parse)
-                print(f"[SBML_IMPORT] BioModels mode - triggering fetch")
                 biomodels_id = self.sbml_biomodels_entry.get_text().strip() if self.sbml_biomodels_entry else ""
                 if biomodels_id:
                     # ID entered - fetch it
@@ -1326,7 +1234,6 @@ class SBMLImportPanel:
                     self._show_status("Please enter a BioModels ID", error=True)
                     self._import_button_flow = False  # Clear flag on error
             else:
-                print(f"[SBML_IMPORT] ERROR: No mode selected!")
                 self._show_status("Please select an SBML file or enter a BioModels ID", error=True)
                 self._import_button_flow = False  # Clear flag on error
 

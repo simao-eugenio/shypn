@@ -472,8 +472,6 @@ class ModelCanvasLoader:
         Returns:
             tuple: (page_index, drawing_area) for the new document.
         """
-        print(f"[CANVAS] add_document() called, filename={filename}", file=sys.stderr)
-        
         if self.notebook is None:
             raise RuntimeError('Canvas not loaded. Call load() first.')
         
@@ -520,8 +518,6 @@ class ModelCanvasLoader:
         if not all([overlay, scrolled, drawing, overlay_box]):
             raise ValueError("Failed to load canvas widgets from template")
         
-        print(f"[CANVAS] Created canvas from UI template for filename={filename}", file=sys.stderr)
-        
         # Create tab label with file icon
         tab_filename = filename if filename else 'default'
         tab_box, tab_label, close_button = self._create_tab_label(tab_filename, False)
@@ -529,15 +525,7 @@ class ModelCanvasLoader:
         tab_box.show_all()
         
         page_index = self.notebook.append_page(overlay, tab_box)
-        try:
-            print(f"[TS] {time.time():.6f} - [CANVAS] Tab appended page_index={page_index} drawing={repr(drawing)} filename={filename}", file=sys.stderr)
-        except Exception:
-            print(f"[CANVAS] Tab appended (no timestamp available)", file=sys.stderr)
         overlay.show_all()
-        try:
-            print(f"[TS] {time.time():.6f} - [CANVAS] overlay.show_all() complete page_index={page_index} drawing={repr(drawing)}", file=sys.stderr)
-        except Exception:
-            print(f"[CANVAS] overlay.show_all() complete", file=sys.stderr)
         
         # WAYLAND FIX: Realize the widget before setup to ensure proper parent window hierarchy
         # On Wayland, dialogs require their parent to be realized (have a GdkWindow/GdkSurface)
@@ -545,30 +533,11 @@ class ModelCanvasLoader:
         # File→New/Import canvases are created programmatically and need explicit realization
         if not overlay.get_realized():
             overlay.realize()
-            print(f"[CANVAS] Realized overlay for page_index={page_index}", file=sys.stderr)
-        else:
-            print(f"[CANVAS] Overlay already realized for page_index={page_index}", file=sys.stderr)
         
         # WAYLAND FIX 2: Don't force page switch here - let import code handle it
         # Forcing set_current_page during add_document() can interrupt user interaction
         # The page will be switched by the calling code (import handlers) if needed
         # We just ensure the widget is realized for later dialog creation
-        
-        # Give GTK a moment to process and map the widget naturally
-        # Using idle_add ensures this happens after the current event processing
-        # but doesn't block user input like a busy-wait loop would
-        from gi.repository import GLib
-        
-        def ensure_mapped():
-            """Verify widget got mapped after page switch."""
-            if overlay.get_mapped():
-                print(f"[CANVAS] ✓ Overlay successfully mapped", file=sys.stderr)
-            else:
-                print(f"[CANVAS] ⚠ Overlay not yet mapped (will map soon)", file=sys.stderr)
-            return False  # Don't repeat
-        
-        # Schedule the check to run once on the next idle cycle
-        GLib.idle_add(ensure_mapped)
         
         self._setup_canvas_manager(drawing, overlay_box, overlay, filename=filename)
         # Note: set_current_page already called above
@@ -587,10 +556,6 @@ class ModelCanvasLoader:
             filename = 'default'
         manager = ModelCanvasManager(canvas_width=2000, canvas_height=2000, filename=filename)
         self.canvas_managers[drawing_area] = manager
-        try:
-            print(f"[TS] {time.time():.6f} - [MANAGER] Created manager={repr(manager)} for drawing={repr(drawing_area)} filename={filename}", file=sys.stderr)
-        except Exception:
-            print(f"[MANAGER] Created manager for drawing", file=sys.stderr)
         
         # Set redraw callback so manager can trigger widget redraws
         manager.set_redraw_callback(lambda: drawing_area.queue_draw())
@@ -667,10 +632,6 @@ class ModelCanvasLoader:
             
             # Store overlay manager for later access
             self.overlay_managers[drawing_area] = overlay_manager
-            try:
-                print(f"[TS] {time.time():.6f} - [OVERLAY] Registered overlay_manager={repr(overlay_manager)} for drawing={repr(drawing_area)}", file=sys.stderr)
-            except Exception:
-                print(f"[OVERLAY] Registered overlay manager for drawing", file=sys.stderr)
             
             # Connect signals from palettes
             overlay_manager.connect_tool_changed_signal(
@@ -2356,7 +2317,6 @@ class ModelCanvasLoader:
             project: Project instance or None
         """
         self.project = project
-        print(f"[ModelCanvasLoader] Project set: {project.name if project else 'None'}")
 
     def _on_file_operation_completed(self, filepath, is_save=True):
         """Handle file save/load completion to update tab label.
@@ -2915,15 +2875,6 @@ class ModelCanvasLoader:
             manager: ModelCanvasManager instance
             drawing_area: GtkDrawingArea widget
         """
-        # Debug: timestamp when opening properties dialog
-        try:
-            print(f"[TS] {time.time():.6f} - _on_object_properties() called for obj id={getattr(obj,'id',None)} name={getattr(obj,'name',None)}", file=sys.stderr)
-            print(f"[TS] {time.time():.6f} - parent_window={repr(self.parent_window)}", file=sys.stderr)
-            print(f"[TS] {time.time():.6f} - drawing_area={repr(drawing_area)}", file=sys.stderr)
-            print(f"[TS] {time.time():.6f} - manager={repr(manager)}", file=sys.stderr)
-        except Exception:
-            pass
-
         # CRITICAL: Clear ALL arc creation state before opening dialog
         # This prevents spurious arc creation when dialog closes
         arc_state = self._arc_state.get(drawing_area)
@@ -3087,16 +3038,13 @@ class ModelCanvasLoader:
         try:
             print(f"[TS] {time.time():.6f} - [DIALOG] Calling dialog_loader.run()...", file=sys.stderr)
             response = dialog_loader.run()
-            print(f"[TS] {time.time():.6f} - [DIALOG] dialog_loader.run() returned response={response}", file=sys.stderr)
             
             if response == Gtk.ResponseType.OK:
                 drawing_area.queue_draw()
         finally:
             # CRITICAL: Always destroy dialog to prevent orphaned widgets
             # Orphaned widgets cause Wayland focus issues and app crashes
-            print(f"[TS] {time.time():.6f} - [DIALOG] Calling dialog_loader.destroy()...", file=sys.stderr)
             dialog_loader.destroy()
-            print(f"[TS] {time.time():.6f} - [DIALOG] dialog_loader.destroy() complete", file=sys.stderr)
         
         # Restore original tool if we switched it
         if original_tool == 'arc':
