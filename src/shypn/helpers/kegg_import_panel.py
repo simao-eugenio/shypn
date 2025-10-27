@@ -417,17 +417,7 @@ class KEGGImportPanel:
                     self.import_button.set_sensitive(True)
                     return
                 
-                # Initialize canvas state IMMEDIATELY
-                manager.mark_clean()
-                manager.mark_as_imported(pathway_name)
-                
-                # Set filepath if project exists
-                if self.project:
-                    import os
-                    pathways_dir = self.project.get_pathways_dir()
-                    if pathways_dir:
-                        temp_path = os.path.join(pathways_dir, f"{pathway_name}.shy")
-                        manager.set_filepath(temp_path)
+                # DON'T mark_clean() here - do it AFTER loading objects
                 
                 # Switch to the newly created tab
                 notebook = self.model_canvas.notebook
@@ -578,9 +568,18 @@ class KEGGImportPanel:
                     self.project.add_pathway(self.current_pathway_doc)
                     self.project.save()
                     
+                    # ===== STEP 2: MARK CLEAN AFTER LOADING (like File → Open) =====
+                    # Canvas has objects loaded and project saved
+                    manager.mark_clean()
+                    
                 except Exception as e:
                     import traceback
                     traceback.print_exc()
+                    # Even if project operations failed, mark canvas as clean
+                    manager.mark_clean()
+            else:
+                # No project - still mark as clean (imported content)
+                manager.mark_clean()
             
             self._show_status(f"✅ Pathway imported: {len(document_model.places)} places, "
                             f"{len(document_model.transitions)} transitions, "

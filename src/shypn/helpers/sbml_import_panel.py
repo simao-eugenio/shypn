@@ -735,19 +735,6 @@ class SBMLImportPanel:
                     self.logger.error("Failed to get manager for pre-created canvas!")
                     self._show_status("❌ Canvas manager not found")
                     return False
-                
-                # Initialize canvas state now (wasn't done at creation time)
-                pathway_name = self._pending_canvas_info.get('pathway_name', 'Pathway')
-                manager.mark_clean()
-                manager.mark_as_imported(pathway_name)
-                
-                # Set filepath if project exists
-                if self.project:
-                    import os
-                    pathways_dir = self.project.get_pathways_dir()
-                    if pathways_dir:
-                        temp_path = os.path.join(pathways_dir, f"{pathway_name}.shy")
-                        manager.set_filepath(temp_path)
             
             # Load to canvas - inject model into pre-created empty canvas
             canvas_age = time.time() - self._pending_canvas_info.get('created_time', time.time())
@@ -759,7 +746,7 @@ class SBMLImportPanel:
                 self.model_canvas.sbml_panel = self
                 self.logger.info("Wired SBML panel to ModelCanvasLoader")
             
-            # Load objects using unified loading path
+            # ===== STEP 1: LOAD OBJECTS FIRST (like File → Open) =====
             manager.load_objects(
                 places=document_model.places,
                 transitions=document_model.transitions,
@@ -897,6 +884,11 @@ class SBMLImportPanel:
                             if hasattr(manager.document_controller, 'filepath'):
                                 manager.document_controller.filepath = model_filepath
                         
+                        # ===== STEP 2: SET FILEPATH AND MARK CLEAN (like File → Open) =====
+                        # This MUST come AFTER objects are loaded AND file is saved
+                        manager.set_filepath(model_filepath)  # Real saved file path
+                        manager.mark_clean()  # Just saved, no unsaved changes
+                        
                         # Update canvas tab label to show saved filename
                         if hasattr(self.model_canvas, 'update_current_tab_label'):
                             self.model_canvas.update_current_tab_label(model_filename, is_modified=False)
@@ -904,10 +896,18 @@ class SBMLImportPanel:
                     except Exception as save_error:
                         import traceback
                         traceback.print_exc()
+                        # Even if save failed, mark canvas as clean (imported, not user-edited)
+                        manager.mark_clean()
                     
                 except Exception as e:
                     import traceback
                     traceback.print_exc()
+                    # Even if project operations failed, mark canvas as clean
+                    manager.mark_clean()
+            else:
+                # No project or filepath - still mark as clean (imported content)
+                self.logger.info("No project/filepath, marking canvas as clean (imported)")
+                manager.mark_clean()
             
             # Clear pending canvas info
             self._pending_canvas_info = None
