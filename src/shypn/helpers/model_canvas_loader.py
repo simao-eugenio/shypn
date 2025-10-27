@@ -2985,11 +2985,20 @@ class ModelCanvasLoader:
         dialog_loader.connect('properties-changed', on_properties_changed)
         
         try:
-            pass
+            # WAYLAND FIX: Ensure parent window is properly set and visible
+            # Check if parent window exists and is realized
+            if self.parent_window and self.parent_window.get_realized():
+                dialog_loader.set_transient_for(self.parent_window)
+                dialog_loader.set_modal(True)
+            
             response = dialog_loader.run()
             
             if response == Gtk.ResponseType.OK:
                 drawing_area.queue_draw()
+        except Exception as e:
+            print(f"[ERROR] Dialog run failed: {e}")
+            import traceback
+            traceback.print_exc()
         finally:
             # CRITICAL: Always destroy dialog to prevent orphaned widgets
             # Orphaned widgets cause Wayland focus issues and app crashes
