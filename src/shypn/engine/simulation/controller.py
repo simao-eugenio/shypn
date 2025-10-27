@@ -154,6 +154,10 @@ class SimulationController:
         # Register to observe model changes (for arc transformations, deletions, etc.)
         if hasattr(model, 'register_observer'):
             model.register_observer(self._on_model_changed)
+        
+        # Initialize enablement states for time-dependent transitions (timed/stochastic)
+        # This ensures transitions are properly scheduled when controller is first created
+        self._update_enablement_states()
 
     def _on_model_changed(self, event_type: str, obj, old_value=None, new_value=None):
         """Handle model change notifications.
@@ -1649,6 +1653,8 @@ class SimulationController:
                 place.tokens = place.initial_marking
             else:
                 place.tokens = 0
+        # Schedule time-dependent transitions (timed/stochastic) after reset
+        self._update_enablement_states()
         self._notify_step_listeners()
 
     def is_running(self) -> bool:
