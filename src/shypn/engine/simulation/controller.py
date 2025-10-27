@@ -603,21 +603,9 @@ class SimulationController:
                     if has_tokens:
                         structurally_enabled_timed.append(t)
         
-        # DEBUG: Show timed transition status
-        if timed_transitions:
-            print(f"\n=== TIME {self.time:.3f} - TIMED TRANSITIONS ({len(timed_transitions)} total) ===")
-            for t in timed_transitions:
-                behavior = self._get_behavior(t)
-                can_fire, reason = behavior.can_fire()
-                struct_enabled = t in structurally_enabled_timed
-                print(f"  T{t.id}: {t.label or 'unnamed'} - can_fire={can_fire}, struct_enabled={struct_enabled}, reason={reason}")
-            print(f"  => {len(enabled_timed)} ready to fire now")
-            print(f"  => {len(structurally_enabled_timed)} structurally enabled (block stochastic)")
-        
         if enabled_timed:
             # Select and fire one timed transition (may have conflicts among timed)
             transition = self._select_transition(enabled_timed)
-            print(f"  FIRING TIMED: T{transition.id} {transition.label or 'unnamed'}")
             self._fire_transition(transition)
             discrete_fired = True
             self._update_enablement_states()  # Update after firing
@@ -628,28 +616,11 @@ class SimulationController:
             stochastic_transitions = [t for t in self.model.transitions if t.transition_type == 'stochastic']
             enabled_stochastic = [t for t in stochastic_transitions if self._is_transition_enabled(t)]
             
-            # DEBUG: Show stochastic transition status
-            if stochastic_transitions:
-                print(f"\n=== TIME {self.time:.3f} - STOCHASTIC TRANSITIONS ({len(stochastic_transitions)} total) ===")
-                print(f"  (Allowed because no timed transitions are structurally enabled)")
-                for t in stochastic_transitions:
-                    behavior = self._get_behavior(t)
-                    can_fire, reason = behavior.can_fire()
-                    print(f"  T{t.id}: {t.label or 'unnamed'} - can_fire={can_fire}, reason={reason}")
-                print(f"  => {len(enabled_stochastic)} stochastic transitions ready to fire")
-            
             if enabled_stochastic:
                 # Select and fire one stochastic transition (may have conflicts among stochastic)
                 transition = self._select_transition(enabled_stochastic)
-                print(f"  FIRING STOCHASTIC: T{transition.id} {transition.label or 'unnamed'}")
                 self._fire_transition(transition)
-                discrete_fired = True
-        else:
-            # DEBUG: Explain why stochastic is blocked
-            if timed_transitions:
-                print(f"\n=== STOCHASTIC BLOCKED: {len(structurally_enabled_timed)} timed transitions structurally enabled ===")
-
-        
+                discrete_fired = True        
         self._notify_step_listeners()
         
         # Check if simulation is complete (duration reached)
