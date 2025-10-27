@@ -285,24 +285,21 @@ class FilePanelLoader:
             self._setup_keyboard_shortcuts()
             
         except Exception as e:
-            print(f"[LEFT_PANEL] Failed to initialize file explorer: {e}", file=sys.stderr)
+            pass
             import traceback
             traceback.print_exc()
     
     def _enhance_context_menu(self):
         """Enhance context menu with VS Code-style operations."""
-        print("[FILE_PANEL] Enhancing context menu...")
         if not self.file_explorer or not self.file_explorer.context_menu:
-            print("[FILE_PANEL] ERROR: file_explorer or context_menu not available")
+            pass
             return
         
-        print(f"[FILE_PANEL] Context menu exists: {self.file_explorer.context_menu}")
         
         # Clear existing menu items
         for child in self.file_explorer.context_menu.get_children():
             self.file_explorer.context_menu.remove(child)
         
-        print("[FILE_PANEL] Cleared existing menu items")
         
         # Build comprehensive VS Code-style context menu
         menu_items = [
@@ -339,39 +336,31 @@ class FilePanelLoader:
                 if label == 'Open Project':
                     self.file_explorer.menu_items_refs['Open Project'] = menu_item
         
-        print(f"[FILE_PANEL] Added {len(menu_items)} menu items")
-        print(f"[FILE_PANEL] 'Open Project' in refs: {'Open Project' in self.file_explorer.menu_items_refs}")
         
         # Connect to menu show event to update item visibility
         self.file_explorer.context_menu.connect('show', self._on_context_menu_show_enhanced)
         self.file_explorer.context_menu.show_all()
         
-        print("[FILE_PANEL] Context menu enhancement complete")
     
     def _on_context_menu_show_enhanced(self, menu):
         """Update context menu item visibility when menu is shown.
         
         Show "Open Project" only when right-clicking on a directory.
         """
-        print(f"[FILE_PANEL] Context menu shown")
         if not self.file_explorer or 'Open Project' not in self.file_explorer.menu_items_refs:
-            print(f"[FILE_PANEL] ERROR: file_explorer={self.file_explorer}, 'Open Project' in refs={'Open Project' in self.file_explorer.menu_items_refs if self.file_explorer else 'N/A'}")
+            pass
             return
         
         # Show "Open Project" for any directory (user can create/open project in any folder)
         is_directory = self.file_explorer.selected_item_is_dir if self.file_explorer.selected_item_path else False
-        print(f"[FILE_PANEL] Selected path: {self.file_explorer.selected_item_path}")
-        print(f"[FILE_PANEL] Is directory: {is_directory}")
         
         # Additional check: see if it has .project.shy (for styling later)
         has_project_file = False
         if is_directory and self.file_explorer.selected_item_path:
             project_file = os.path.join(self.file_explorer.selected_item_path, '.project.shy')
             has_project_file = os.path.exists(project_file)
-            print(f"[FILE_PANEL] Project file exists: {has_project_file}")
         
         # Show "Open Project" for any directory
-        print(f"[FILE_PANEL] Setting 'Open Project' visible: {is_directory}")
         self.file_explorer.menu_items_refs['Open Project'].set_visible(is_directory)
     
     def _on_open_project_clicked(self, menu_item):
@@ -601,12 +590,12 @@ class FilePanelLoader:
             # For now, it will fallback to dialogs (which is expected behavior)
             # TODO: Migrate to FilePanelV3Loader which has inline support
             if self.file_explorer:
-                print("[LEFT_PANEL] FileExplorerPanel doesn't support inline project creation - will use dialogs")
+                pass
                 # Still wire callbacks for when projects are opened/created
                 # These will be called from context menu actions instead
                 
         except Exception as e:
-            print(f"[LEFT_PANEL] Failed to initialize project controller: {e}", file=sys.stderr)
+            pass
     
     # Button handlers for Files category
     
@@ -653,7 +642,6 @@ class FilePanelLoader:
     
     def _on_float_toggled(self, button):
         """Handle float button toggle - detach/attach panel."""
-        print(f"[FILE_PANEL] Float button toggled: active={button.get_active()}")
         
         if button.get_active():
             # Button is active -> detach (float)
@@ -665,36 +653,33 @@ class FilePanelLoader:
     
     def detach(self):
         """Detach from container and create floating window."""
-        print(f"[FILE_PANEL] detach() called, is_hanged={self.is_hanged}, window exists={self.window is not None}")
         
         if not self.is_hanged:
-            print(f"[FILE_PANEL] Already detached")
+            pass
             return
         
         if not self.parent_container:
-            print(f"[FILE_PANEL] No parent container, aborting detach")
+            pass
             return
         
         # Create window if it doesn't exist
         if self.window is None:
-            print(f"[FILE_PANEL] Creating window on-demand")
+            pass
             self.window = Gtk.Window()
             self.window.set_title('Files')
             self.window.set_default_size(300, 600)
             self.window.connect('delete-event', self._on_delete_event)
         
         # Remove content from container
-        print(f"[FILE_PANEL] Removing content from container")
         self.parent_container.remove(self.content)
         self.parent_container.set_visible(False)
         
         # Hide the stack itself when detaching to avoid showing empty container
         if hasattr(self, '_stack') and self._stack:
-            print(f"[FILE_PANEL] Hiding stack")
+            pass
             self._stack.set_visible(False)
         
         # Add content to window
-        print(f"[FILE_PANEL] Adding content to window")
         self.window.add(self.content)
         
         # Set transient for main window
@@ -705,16 +690,13 @@ class FilePanelLoader:
         self.is_hanged = False
         
         # Show window
-        print(f"[FILE_PANEL] Showing window")
         self.window.show_all()
-        print(f"[FILE_PANEL] Detach complete")
     
     def hang_on(self, container):
         """Attach panel back to container."""
-        print(f"[FILE_PANEL] hang_on() called, is_hanged={self.is_hanged}")
         
         if self.is_hanged:
-            print(f"[FILE_PANEL] Already hanged, just showing")
+            pass
             if not self.content.get_visible():
                 self.content.show()
             # Make sure container is visible when re-showing
@@ -723,37 +705,32 @@ class FilePanelLoader:
             return
         
         if not self.window:
-            print(f"[FILE_PANEL] No window exists, aborting hang_on")
+            pass
             return
         
         # Hide window
-        print(f"[FILE_PANEL] Hiding window")
         self.window.hide()
         
         # Remove content from window
-        print(f"[FILE_PANEL] Removing content from window")
         self.window.remove(self.content)
         
         # Add content back to container
-        print(f"[FILE_PANEL] Adding content to container")
         container.add(self.content)
         container.set_visible(True)
         self.content.show_all()
         
         # Show the stack again when re-attaching
         if hasattr(self, '_stack') and self._stack:
-            print(f"[FILE_PANEL] Showing stack")
+            pass
             self._stack.set_visible(True)
             self._stack.set_visible_child_name(self._stack_panel_name)
         
         # Update state - panel is now in stack
         self.is_hanged = True
         
-        print(f"[FILE_PANEL] Hang complete")
     
     def _on_delete_event(self, window, event):
         """Handle window delete event - hide and re-attach."""
-        print(f"[FILE_PANEL] Window close button clicked")
         window.hide()
         
         # Re-attach to container
@@ -841,7 +818,7 @@ class FilePanelLoader:
         
         # If panel is floating, don't try to show in stack
         if not self.is_hanged:
-            print(f"[FILE_PANEL] Panel is floating, skipping show_in_stack")
+            pass
             return
         
         if not self._stack.get_visible():
@@ -969,7 +946,7 @@ class FilePanelLoader:
                 self.project_info_store.append(['Transitions', str(transitions)])
                 self.project_info_store.append(['Arcs', str(arcs)])
             except Exception as e:
-                print(f"[FILE_PANEL] Could not extract model statistics: {e}")
+                pass
     
     def _on_project_opened_from_file_panel(self, project_path):
         """Handle project opening from file panel selection.
@@ -977,7 +954,6 @@ class FilePanelLoader:
         Args:
             project_path: Path to the .shy project file
         """
-        print(f"[FILE_PANEL] Project selected for opening: {project_path}")
         
         try:
             # Use project manager to open the project
@@ -986,17 +962,17 @@ class FilePanelLoader:
             project = project_manager.open_project_by_path(project_path)
             
             if project:
-                print(f"[FILE_PANEL] Project opened successfully: {project.name}")
+                pass
                 self._propagate_project_to_all_components(project)
                 
                 # Trigger project controller callback
                 if self.project_controller:
                     self.project_controller._on_project_opened(project)
             else:
-                print(f"[FILE_PANEL] Failed to open project: {project_path}", file=sys.stderr)
+                pass
                 
         except Exception as e:
-            print(f"[FILE_PANEL] Error opening project: {e}", file=sys.stderr)
+            pass
             import traceback
             traceback.print_exc()
     
@@ -1006,7 +982,6 @@ class FilePanelLoader:
         Args:
             project: The opened Project instance
         """
-        print(f"[FILE_PANEL] Project opened via dialog: {project.name}")
         self._propagate_project_to_all_components(project)
     
     def _on_project_created_handler(self, project):
@@ -1015,7 +990,6 @@ class FilePanelLoader:
         Args:
             project: The newly created Project instance
         """
-        print(f"[FILE_PANEL] Project created via dialog: {project.name}")
         self._propagate_project_to_all_components(project)
     
     def _propagate_project_to_all_components(self, project):
@@ -1024,24 +998,23 @@ class FilePanelLoader:
         Args:
             project: Project instance to propagate
         """
-        print(f"[FILE_PANEL] Propagating project to all components: {project.name}")
         
         # Update project info display
         self.set_project(project)
         
         # Update file explorer so it saves to project/models/
         if self.file_explorer:
-            print(f"[FILE_PANEL]   → file_explorer")
+            pass
             self.file_explorer.set_project(project)
         
         # Update canvas loader so all managers save to correct project paths
         if self.model_canvas:
-            print(f"[FILE_PANEL]   → model_canvas")
+            pass
             self.model_canvas.set_project(project)
         
         # Notify pathway panel about project (so import controllers can save to it)
         if self.pathway_panel_loader:
-            print(f"[FILE_PANEL]   → pathway_panel_loader")
+            pass
             self.pathway_panel_loader.set_project(project)
     
     def _on_project_created_from_file_panel(self, project):
@@ -1050,7 +1023,6 @@ class FilePanelLoader:
         Args:
             project: The newly created Project instance
         """
-        print(f"[FILE_PANEL] Project created from file panel: {project.name}")
         
         try:
             # Trigger project controller callback
@@ -1058,7 +1030,7 @@ class FilePanelLoader:
                 self.project_controller._on_project_created(project)
                 
         except Exception as e:
-            print(f"[FILE_PANEL] Error handling project creation: {e}", file=sys.stderr)
+            pass
             import traceback
             traceback.print_exc()
 

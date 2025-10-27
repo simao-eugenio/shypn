@@ -177,7 +177,6 @@ class FileExplorerPanel:
             source_path = model.get_value(tree_iter, 2)  # Column 2 is full_path
             # Send the path as drag data
             data.set_text(source_path, -1)
-            print(f"[DRAG] Started dragging: {source_path}")
     
     def _on_drag_drop(self, widget, drag_context, x, y, time):
         """Handle drag drop event."""
@@ -200,14 +199,14 @@ class FileExplorerPanel:
         # Get source path from drag data
         source_path = data.get_text()
         if not source_path or not os.path.exists(source_path):
-            print(f"[DRAG] Invalid source path: {source_path}")
+            pass
             drag_context.finish(False, False, time)
             return
         
         # Get drop target from tree position
         drop_info = self.tree_view.get_dest_row_at_pos(x, y)
         if not drop_info:
-            print("[DRAG] No drop target")
+            pass
             drag_context.finish(False, False, time)
             return
         
@@ -232,12 +231,12 @@ class FileExplorerPanel:
         
         # Prevent moving to itself or to its own subdirectory
         if source_path == dest_path:
-            print(f"[DRAG] Source and destination are the same")
+            pass
             drag_context.finish(False, False, time)
             return
         
         if os.path.isdir(source_path) and dest_dir.startswith(source_path):
-            print(f"[DRAG] Cannot move directory into its own subdirectory")
+            pass
             drag_context.finish(False, False, time)
             return
         
@@ -264,7 +263,7 @@ class FileExplorerPanel:
         
         # Perform the move operation
         try:
-            print(f"[DRAG] Moving '{source_path}' to '{dest_path}'")
+            pass
             shutil.move(source_path, dest_path)
             
             # Refresh the file tree to show the changes
@@ -272,10 +271,9 @@ class FileExplorerPanel:
             
             # Mark drag as successful
             drag_context.finish(True, True, time)
-            print(f"[DRAG] ✓ Successfully moved to: {dest_path}")
             
         except Exception as e:
-            print(f"[DRAG] ✗ Failed to move file: {e}")
+            pass
             import traceback
             traceback.print_exc()
             
@@ -843,12 +841,11 @@ class FileExplorerPanel:
         Args:
             menu_item: The Gtk.MenuItem that was activated (from 'activate' signal)
         """
-        print(f"DEBUG: _on_rename_clicked called for: {self.selected_item_path}")
         if self.selected_item_path:
-            print("DEBUG: Calling _start_inline_edit_rename()")
+            pass
             self._start_inline_edit_rename()
         else:
-            print("DEBUG: No selected_item_path")
+            pass
 
     def _on_delete_clicked(self, menu_item):
         """Handle 'Delete' context menu item.
@@ -972,7 +969,6 @@ class FileExplorerPanel:
 
     def _start_inline_edit_rename(self):
         """Start inline editing to rename selected file/folder."""
-        print("DEBUG: _start_inline_edit_rename called - INLINE MODE")  # DEBUG
         if not self.selected_item_path:
             return
         
@@ -1429,7 +1425,6 @@ class FileExplorerPanel:
             project: Project instance or None
         """
         self.project = project
-        print(f"[FileExplorer] Project set: {project.name if project else 'None'}")
 
     def set_canvas_loader(self, canvas_loader):
         """Wire file explorer to canvas loader for document operations integration.
@@ -1450,25 +1445,21 @@ class FileExplorerPanel:
         - If manager.is_default_filename() (imported/default): Auto-save to workspace
         - Otherwise: Save directly to manager's filepath
         """
-        print("[FileExplorer] save_current_document called")
         try:
             if not hasattr(self, 'canvas_loader') or self.canvas_loader is None:
-                print("[FileExplorer] No canvas_loader available")
+                pass
                 return
             
             drawing_area = self.canvas_loader.get_current_document()
             if drawing_area is None:
-                print("[FileExplorer] No current document (drawing_area)")
+                pass
                 return
             
             manager = self.canvas_loader.get_canvas_manager(drawing_area)
             if manager is None:
-                print("[FileExplorer] No canvas manager")
+                pass
                 return
             
-            print(f"[FileExplorer] Manager filepath: {manager.get_filepath() if hasattr(manager, 'get_filepath') else 'N/A'}")
-            print(f"[FileExplorer] Manager has_filepath: {manager.has_filepath() if hasattr(manager, 'has_filepath') else 'N/A'}")
-            print(f"[FileExplorer] Manager is_default_filename: {manager.is_default_filename() if hasattr(manager, 'is_default_filename') else 'N/A'}")
             
             # Convert canvas state to document model
             document = manager.to_document_model()
@@ -1476,11 +1467,9 @@ class FileExplorerPanel:
             # Determine if we need to auto-generate a filepath
             needs_new_filepath = not manager.has_filepath() or manager.is_default_filename()
             
-            print(f"[FileExplorer] needs_new_filepath: {needs_new_filepath}")
             
             if needs_new_filepath:
                 # Open file chooser dialog for default/imported files
-                print("[FileExplorer] Opening file chooser for default/imported file")
                 
                 # Determine initial directory: project/models/ if project is open, otherwise workspace
                 if self.project and hasattr(self.project, 'base_path'):
@@ -1541,7 +1530,6 @@ class FileExplorerPanel:
                     # Save to selected file
                     document.save_to_file(filepath)
                     
-                    print(f"[FileExplorer] ✓ Saved to: {filepath}")
                     
                     # Update manager state
                     manager.set_filepath(filepath)
@@ -1554,7 +1542,7 @@ class FileExplorerPanel:
                     self.set_current_file(filepath)
                     self._load_current_directory()  # Refresh file tree
                 else:
-                    print("[FileExplorer] Save cancelled by user")
+                    pass
                 
                 # Close dialog
                 dialog.destroy()
@@ -1563,7 +1551,6 @@ class FileExplorerPanel:
                 # Direct save to existing file
                 filepath = manager.get_filepath()
                 
-                print(f"[FileExplorer] Saving to existing file: {filepath}")
                 
                 document.save_to_file(filepath)
                 
@@ -1576,7 +1563,7 @@ class FileExplorerPanel:
                 
                 
         except Exception as e:
-            print(f"[FileExplorer] save_current_document ERROR: {e}", file=sys.stderr)
+            pass
             import traceback
             traceback.print_exc()
 
@@ -1586,39 +1573,35 @@ class FileExplorerPanel:
         Opens a file chooser dialog with 'default.shy' as the default filename.
         User can choose location and filename interactively.
         """
-        print("[FileExplorer] save_current_document_as called")
         try:
             if not hasattr(self, 'canvas_loader') or self.canvas_loader is None:
-                print("[FileExplorer] No canvas_loader available")
+                pass
                 return
             
             drawing_area = self.canvas_loader.get_current_document()
             if drawing_area is None:
-                print("[FileExplorer] No current document (drawing_area)")
+                pass
                 return
             
             manager = self.canvas_loader.get_canvas_manager(drawing_area)
             if manager is None:
-                print("[FileExplorer] No canvas manager")
+                pass
                 return
             
             # Convert canvas state to document model
             document = manager.to_document_model()
             
             # Determine initial directory: project/models/ if project is open, otherwise workspace
-            print(f"[FileExplorer] Save As - Project check: self.project={self.project}")
             if self.project:
-                print(f"[FileExplorer] Save As - Project.base_path={getattr(self.project, 'base_path', 'NO base_path attribute')}")
+                pass
             
             if self.project and hasattr(self.project, 'base_path'):
                 # Start in project/models/ directory
                 initial_dir = os.path.join(self.project.base_path, 'models')
                 os.makedirs(initial_dir, exist_ok=True)
-                print(f"[FileExplorer] Save As starting in project models: {initial_dir}")
             else:
                 # Start in workspace directory
                 initial_dir = self.explorer.current_path
-                print(f"[FileExplorer] Save As starting in workspace: {initial_dir}")
             
             # Determine default filename
             if manager.filename and manager.filename != "default":
@@ -1674,7 +1657,6 @@ class FileExplorerPanel:
                 # Save to selected file
                 document.save_to_file(filepath)
                 
-                print(f"[FileExplorer] ✓ Saved as: {filepath}")
                 
                 # Update manager state
                 manager.set_filepath(filepath)
@@ -1692,7 +1674,7 @@ class FileExplorerPanel:
             
             
         except Exception as e:
-            print(f"[FileExplorer] save_current_document_as ERROR: {e}", file=sys.stderr)
+            pass
             import traceback
             traceback.print_exc()
 

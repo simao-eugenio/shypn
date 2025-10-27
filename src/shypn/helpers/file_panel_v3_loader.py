@@ -342,12 +342,11 @@ class FilePanelV3Loader(FilePanelBase):
             path: Tree path of the edited cell
             project_name: Name entered by user
         """
-        print(f"[FILE_PANEL] Creating project: {project_name}")
         
         try:
             # Validate project name
             if not project_name or project_name.strip() == "":
-                print("[FILE_PANEL] Invalid project name - canceling", file=sys.stderr)
+                pass
                 self._on_cell_editing_canceled(self.name_renderer)
                 return
             
@@ -366,10 +365,6 @@ class FilePanelV3Loader(FilePanelBase):
             projects_root = Path(self.controller._editing_parent_path)
             project_path = projects_root / project_name
             
-            print(f"[FILE_PANEL] Creating project in location:")
-            print(f"[FILE_PANEL]   projects_root: {projects_root}")
-            print(f"[FILE_PANEL]   project_path: {project_path}")
-            print(f"[FILE_PANEL]   _editing_parent_path: {self.controller._editing_parent_path}")
             
             # Create project
             try:
@@ -390,11 +385,10 @@ class FilePanelV3Loader(FilePanelBase):
                 dialog.format_secondary_text(str(e))
                 dialog.run()
                 dialog.destroy()
-                print(f"[FILE_PANEL] {e}", file=sys.stderr)
                 return
             
             if project:
-                print(f"[FILE_PANEL] Project created successfully: {project.name}")
+                pass
                 
                 # Refresh tree to show new project folder
                 self.controller.refresh_tree()
@@ -403,10 +397,10 @@ class FilePanelV3Loader(FilePanelBase):
                 if self.controller.on_project_created:
                     self.controller.on_project_created(project)
             else:
-                print(f"[FILE_PANEL] Failed to create project", file=sys.stderr)
+                pass
             
         except Exception as e:
-            print(f"[FILE_PANEL] Error creating project: {e}", file=sys.stderr)
+            pass
             import traceback
             traceback.print_exc()
         

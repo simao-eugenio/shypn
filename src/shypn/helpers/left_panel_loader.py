@@ -208,16 +208,13 @@ class LeftPanelLoader:
         if self._updating_button:
             return
         
-        print(f"[LEFT_PANEL] Float button toggled: active={button.get_active()}, is_hanged={self.is_hanged}")
             
         is_active = button.get_active()
         if is_active:
             # Button is now active -> detach the panel (float)
-            print(f"[LEFT_PANEL] Calling detach()")
             self.detach()
         else:
             # Button is now inactive -> attach the panel back
-            print(f"[LEFT_PANEL] Calling hang_on()")
             if self.parent_container:
                 self.hang_on(self.parent_container)
     
@@ -246,15 +243,14 @@ class LeftPanelLoader:
     def detach(self):
         """Detach from container and restore as independent window (skeleton pattern)."""
         
-        print(f"[LEFT_PANEL] detach() called: is_hanged={self.is_hanged}, window exists={self.window is not None}")
         
         if not self.is_hanged:
-            print(f"[LEFT_PANEL] Already detached, returning")
+            pass
             return
         
         # Create window if it doesn't exist (happens when panel was loaded via add_to_stack)
         if self.window is None:
-            print(f"[LEFT_PANEL] Creating window on-demand")
+            pass
             self.window = Gtk.Window()
             self.window.set_title('Files')
             self.window.set_default_size(300, 600)
@@ -263,13 +259,12 @@ class LeftPanelLoader:
         
         # Remove from container
         if self.parent_container:
-            print(f"[LEFT_PANEL] Removing content from container")
+            pass
             self.parent_container.remove(self.content)
             # Hide the container after unattaching
             self.parent_container.set_visible(False)
         
         # Return content to independent window
-        print(f"[LEFT_PANEL] Adding content to window")
         self.window.add(self.content)
         
         # Set transient for main window if available
@@ -290,9 +285,7 @@ class LeftPanelLoader:
             self.on_float_callback()
         
         # Show window
-        print(f"[LEFT_PANEL] Showing window")
         self.window.show_all()
-        print(f"[LEFT_PANEL] Detach complete")
         
     
     def float(self, parent_window=None):
@@ -434,19 +427,16 @@ class LeftPanelLoader:
             # Get float button and connect signal
             # NOTE: Float button works but will cause Error 71 if window is maximized
             self.float_button = self.builder.get_object('float_button')
-            print(f"[LEFT_PANEL] Float button found: {self.float_button is not None}")
             if self.float_button:
                 # Connect signal handler
                 handler_id = self.float_button.connect('toggled', self._on_float_toggled)
-                print(f"[LEFT_PANEL] Float button signal connected with handler_id={handler_id}")
                 # Ensure button starts inactive in stack mode
                 if self.float_button.get_active():
                     self._updating_button = True
                     self.float_button.set_active(False)
                     self._updating_button = False
-                print(f"[LEFT_PANEL] Float button initial state: active={self.float_button.get_active()}")
             else:
-                print(f"[LEFT_PANEL] WARNING: Float button not found in UI file!")
+                pass
         
         # Add content directly to stack container
         if self.content.get_parent() != container:

@@ -321,9 +321,8 @@ class NetObjPersistency:
         
         # DEBUG: Log parent window for troubleshooting
         import sys
-        print(f"[DIALOG] Creating Save dialog with parent={parent}", file=sys.stderr)
         if parent:
-            print(f"[DIALOG]   Parent visible={parent.get_visible()}, realized={parent.get_realized()}", file=sys.stderr)
+            pass
         
         # Create dialog
         dialog = Gtk.FileChooserDialog(
@@ -486,9 +485,8 @@ class NetObjPersistency:
         
         # DEBUG: Log parent window for troubleshooting
         import sys
-        print(f"[DIALOG] Creating Open dialog with parent={parent}", file=sys.stderr)
         if parent:
-            print(f"[DIALOG]   Parent visible={parent.get_visible()}, realized={parent.get_realized()}", file=sys.stderr)
+            pass
         
         # Create dialog
         dialog = Gtk.FileChooserDialog(
