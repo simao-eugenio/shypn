@@ -2433,9 +2433,6 @@ class ModelCanvasLoader:
         
         # Manually call the page changed handler to wire the startup canvas
         self._on_notebook_page_changed(self.notebook, current_page, current_page_num)
-        
-        sys.stderr.write("[MODEL_CANVAS] wire_existing_canvases_to_right_panel() completed - no valid canvas found\n")
-        sys.stderr.flush()
 
     def set_context_menu_handler(self, handler):
         """Set the context menu handler for adding analysis menu items.
