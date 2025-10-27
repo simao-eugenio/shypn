@@ -115,18 +115,12 @@ class TransitionRatePanel(AnalysisPlotPanel):
         color_rgb = mcolors.hex2color(color_hex)
         
         # Set both border and fill color to match the plot color
-        print(f"[TRANSITION_RATE_PANEL] Setting colors for {obj.name}: color_hex={color_hex}, color_rgb={color_rgb}")
-        print(f"[TRANSITION_RATE_PANEL] Before: border={obj.border_color}, fill={obj.fill_color}")
-        
         obj.border_color = color_rgb
         obj.fill_color = color_rgb
-        
-        print(f"[TRANSITION_RATE_PANEL] After: border={obj.border_color}, fill={obj.fill_color}")
         
         # Trigger object's on_changed callback to notify the canvas
         if hasattr(obj, 'on_changed') and obj.on_changed:
             obj.on_changed()
-            print(f"[TRANSITION_RATE_PANEL] Triggered on_changed callback for {obj.name}")
         
         self.selected_objects.append(obj)
         # Use full rebuild to show locality places in UI list
@@ -415,13 +409,7 @@ class TransitionRatePanel(AnalysisPlotPanel):
             locality: Locality object with input/output places
         """
         if not locality.is_valid:
-            print(f"[TRANSITION_RATE_PANEL] Locality not valid for {transition.name}")
             return
-        
-        print(f"[TRANSITION_RATE_PANEL] Adding locality for {transition.name}:")
-        print(f"  - Input places: {[p.name for p in locality.input_places]}")
-        print(f"  - Output places: {[p.name for p in locality.output_places]}")
-        print(f"  - _place_panel: {self._place_panel}")
         
         # Store locality information
         self._locality_places[transition.id] = {
@@ -434,15 +422,11 @@ class TransitionRatePanel(AnalysisPlotPanel):
         if self._place_panel is not None:
             # Add input places
             for place in locality.input_places:
-                print(f"[TRANSITION_RATE_PANEL] Adding input place: {place.name}")
                 self._place_panel.add_object(place)
             
             # Add output places
             for place in locality.output_places:
-                print(f"[TRANSITION_RATE_PANEL] Adding output place: {place.name}")
                 self._place_panel.add_object(place)
-        else:
-            print(f"[TRANSITION_RATE_PANEL] WARNING: _place_panel is None, cannot add locality places")
         
         # Update the UI list to show locality places under the transition
         self._update_objects_list()

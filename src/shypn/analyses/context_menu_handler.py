@@ -116,12 +116,9 @@ class ContextMenuHandler:
         
         # For transitions with locality support, add submenu
         if isinstance(obj, Transition) and self.locality_detector:
-            print(f"[CONTEXT_MENU] Adding transition with locality submenu for {obj.name}")
             self._add_transition_locality_submenu(menu, obj, panel)
         else:
             # Simple menu item for places or transitions without locality support
-            if isinstance(obj, Transition):
-                print(f"[CONTEXT_MENU] WARNING: No locality_detector, adding simple menu item")
             menu_item = Gtk.MenuItem(label=f"Add to {obj_type_name}")
             
             def on_add_to_analysis(widget):
@@ -185,19 +182,13 @@ class ContextMenuHandler:
             panel: TransitionRatePanel instance
         """
         
-        print(f"[CONTEXT_MENU] Adding transition {transition.name} with locality")
-        print(f"[CONTEXT_MENU] Locality: {locality.place_count} places")
-        
         # Add transition (border color will be set automatically in panel.add_object)
         panel.add_object(transition)
         
         # Add locality places if panel supports it
         # (these places will also get their border colors set automatically)
         if hasattr(panel, 'add_locality_places'):
-            print(f"[CONTEXT_MENU] Calling panel.add_locality_places()")
             panel.add_locality_places(transition, locality)
-        else:
-            print(f"[CONTEXT_MENU] WARNING: Panel doesn't have add_locality_places method")
         
         # Request canvas redraw to show new border colors
         if self.model:
@@ -214,14 +205,9 @@ class ContextMenuHandler:
         """
         from shypn.netobjs import Place, Transition
         
-        print(f"[CONTEXT_MENU] Adding {obj.name} to plot panel")
-        print(f"[CONTEXT_MENU] Before add: border={obj.border_color}, fill={obj.fill_color}")
-        
         # Add object to the appropriate panel
         # (border color will be set automatically in panel.add_object)
         panel.add_object(obj)
-        
-        print(f"[CONTEXT_MENU] After add: border={obj.border_color}, fill={obj.fill_color}")
         
         # Request canvas redraw to show new border color
         if self.model:
