@@ -350,17 +350,14 @@ class KEGGImportPanel:
         # This ensures the widget hierarchy is fully established before any user interaction
         # can trigger property dialogs, preventing Wayland Error 71 and dialog crashes
         pathway_name = self.current_pathway.title or self.current_pathway.name
-        print(f"[KEGG_IMPORT] PRE-CREATING canvas tab for: {pathway_name}")
         
         try:
             # Create empty canvas tab from UI template
             page_index, drawing_area = self.model_canvas.add_document(filename=pathway_name)
-            print(f"[KEGG_IMPORT] Canvas pre-created: page_index={page_index}, drawing_area={drawing_area}")
             
             # Get the canvas manager for state initialization
             manager = self.model_canvas.get_canvas_manager(drawing_area)
             if not manager:
-                print(f"[KEGG_IMPORT] ERROR: Failed to get canvas manager after pre-creation!")
                 self._show_status("❌ Failed to initialize canvas", error=True)
                 if self.fetch_button:
                     self.fetch_button.set_sensitive(True)
@@ -371,7 +368,6 @@ class KEGGImportPanel:
             # This prevents property dialog crashes on imported canvases
             manager.mark_clean()  # Mark as clean (no unsaved changes yet)
             manager.mark_as_imported(pathway_name)  # Mark as imported
-            print(f"[KEGG_IMPORT] Canvas state initialized (clean + imported)")
             
             # Set filepath if project exists (for proper state initialization)
             if self.project:
@@ -380,12 +376,10 @@ class KEGGImportPanel:
                 if pathways_dir:
                     temp_path = os.path.join(pathways_dir, f"{pathway_name}.shy")
                     manager.set_filepath(temp_path)
-                    print(f"[KEGG_IMPORT] Canvas filepath set: {temp_path}")
             
             # Switch to the newly created tab to show progress
             notebook = self.model_canvas.notebook
             notebook.set_current_page(page_index)
-            print(f"[KEGG_IMPORT] Switched to tab {page_index}")
             
             # Store canvas info for background thread completion handler
             self._pending_canvas_info = {
@@ -396,7 +390,6 @@ class KEGGImportPanel:
             }
             
         except Exception as tab_error:
-            print(f"[KEGG_IMPORT] ERROR pre-creating canvas tab: {tab_error}")
             import traceback
             traceback.print_exc()
             self._show_status(f"❌ Failed to create canvas tab: {tab_error}", error=True)
@@ -434,12 +427,6 @@ class KEGGImportPanel:
                     enhancement_options=enhancement_options
                 )
                 
-                # Debug: Check what we got
-                print(f"[KEGG_IMPORT] Conversion complete:")
-                print(f"  - Places: {len(document_model.places) if document_model and hasattr(document_model, 'places') else 'N/A'}")
-                print(f"  - Transitions: {len(document_model.transitions) if document_model and hasattr(document_model, 'transitions') else 'N/A'}")
-                print(f"  - Arcs: {len(document_model.arcs) if document_model and hasattr(document_model, 'arcs') else 'N/A'}")
-                
                 # Update UI in main thread
                 GLib.idle_add(self._on_import_complete, document_model)
                 
@@ -454,13 +441,8 @@ class KEGGImportPanel:
     
     def _on_import_complete(self, document_model):
         """Called in main thread after import completes successfully."""
-        print(f"[KEGG_IMPORT] ============================================")
-        print(f"[KEGG_IMPORT] _on_import_complete called")
-        print(f"[KEGG_IMPORT] document_model: {document_model}")
-        
         try:
             if not document_model:
-                print(f"[KEGG_IMPORT] ERROR: document_model is None!")
                 self._show_status("❌ Conversion failed - no data", error=True)
                 if self.fetch_button:
                     self.fetch_button.set_sensitive(True)
@@ -469,7 +451,6 @@ class KEGGImportPanel:
             
             # USE PRE-CREATED CANVAS (don't create new one)
             if not hasattr(self, '_pending_canvas_info') or not self._pending_canvas_info:
-                print(f"[KEGG_IMPORT] ERROR: No pre-created canvas info!")
                 self._show_status("❌ Canvas initialization error", error=True)
                 if self.fetch_button:
                     self.fetch_button.set_sensitive(True)
@@ -482,26 +463,13 @@ class KEGGImportPanel:
             drawing_area = canvas_info['drawing_area']
             pathway_name = canvas_info['pathway_name']
             
-            print(f"[KEGG_IMPORT] Using pre-created canvas:")
-            print(f"  - pathway_name: {pathway_name}")
-            print(f"  - manager: {manager}")
-            print(f"  - drawing_area: {drawing_area}")
-            
-            # Load objects using unified path
-            print(f"[KEGG_IMPORT] Loading objects to canvas...")
-            print(f"[KEGG_IMPORT]   Places: {len(document_model.places)}")
-            print(f"[KEGG_IMPORT]   Transitions: {len(document_model.transitions)}")
-            print(f"[KEGG_IMPORT]   Arcs: {len(document_model.arcs)}")
-            
             try:
                 manager.load_objects(
                     places=document_model.places,
                     transitions=document_model.transitions,
                     arcs=document_model.arcs
                 )
-                print(f"[KEGG_IMPORT] Objects loaded successfully!")
             except Exception as load_error:
-                print(f"[KEGG_IMPORT] ERROR loading objects: {load_error}")
                 import traceback
                 traceback.print_exc()
                 self._show_status(f"❌ Failed to load objects: {load_error}", error=True)
@@ -517,7 +485,6 @@ class KEGGImportPanel:
             manager.fit_to_page(padding_percent=15, deferred=True, horizontal_offset_percent=30, vertical_offset_percent=10)
             
             # Trigger redraw to display imported objects
-            print(f"[KEGG_IMPORT] Triggering canvas redraw...")
             drawing_area.queue_draw()
             
             # NOW save KGML and metadata to project (after successful import)
@@ -557,10 +524,7 @@ class KEGGImportPanel:
                     self.project.add_pathway(self.current_pathway_doc)
                     self.project.save()
                     
-                    print(f"[KEGG_IMPORT] Saved pathway {self.current_pathway_id} to project after successful import")
-                    
                 except Exception as e:
-                    print(f"[KEGG_IMPORT] Warning: Failed to save pathway metadata after import: {e}")
                     import traceback
                     traceback.print_exc()
             
@@ -577,16 +541,11 @@ class KEGGImportPanel:
             self.import_button.set_sensitive(True)
         
         except Exception as e:
-            print(f"[KEGG_IMPORT] ============================================")
-            print(f"[KEGG_IMPORT] EXCEPTION in _on_import_complete:")
-            print(f"[KEGG_IMPORT] {type(e).__name__}: {str(e)}")
             self._show_status(f"❌ Import error: {str(e)}", error=True)
             import traceback
             traceback.print_exc()
         
         finally:
-            print(f"[KEGG_IMPORT] ============================================")
-            print(f"[KEGG_IMPORT] _on_import_complete finished")
             # Re-enable buttons
             if self.fetch_button:
                 self.fetch_button.set_sensitive(True)

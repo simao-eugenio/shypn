@@ -420,13 +420,9 @@ def main(argv=None):
 		# Wire file explorer panel to canvas loader
 		# This allows keyboard shortcuts (Ctrl+S, Ctrl+Shift+S) to trigger save operations
 		if file_explorer:
-			print(f"[SHYPN] Wiring file_explorer to canvas and menu: {file_explorer}")
 			model_canvas_loader.set_file_explorer_panel(file_explorer)
 			# Wire file explorer panel to menu actions for File menu operations
 			menu_actions.set_file_explorer_panel(file_explorer)
-			print(f"[SHYPN] File explorer wired successfully")
-		else:
-			print(f"[SHYPN] ERROR: file_explorer is None, cannot wire to menu actions!")
 
 		# Get the GtkStack that contains all panel containers
 		left_dock_stack = main_builder.get_object('left_dock_stack')
@@ -556,7 +552,6 @@ def main(argv=None):
 			report_panel = ReportPanel(project=None, model_canvas=model_canvas_loader)
 			report_panel_container.pack_start(report_panel, True, True, 0)
 			report_panel.show_all()
-			print("[SHYPN] Report Panel created and added to stack", file=sys.stderr)
 		except Exception as e:
 			print(f"[SHYPN ERROR] Failed to load Report Panel: {e}", file=sys.stderr)
 			import traceback
