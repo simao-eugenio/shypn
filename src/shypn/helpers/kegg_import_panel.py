@@ -345,6 +345,66 @@ class KEGGImportPanel:
         if self.fetch_button:
             self.fetch_button.set_sensitive(False)
         self.import_button.set_sensitive(False)
+        
+        # PRE-CREATE CANVAS BEFORE PARSING (ARCHITECTURAL CHANGE)
+        # This ensures the widget hierarchy is fully established before any user interaction
+        # can trigger property dialogs, preventing Wayland Error 71 and dialog crashes
+        pathway_name = self.current_pathway.title or self.current_pathway.name
+        print(f"[KEGG_IMPORT] PRE-CREATING canvas tab for: {pathway_name}")
+        
+        try:
+            # Create empty canvas tab from UI template
+            page_index, drawing_area = self.model_canvas.add_document(filename=pathway_name)
+            print(f"[KEGG_IMPORT] Canvas pre-created: page_index={page_index}, drawing_area={drawing_area}")
+            
+            # Get the canvas manager for state initialization
+            manager = self.model_canvas.get_canvas_manager(drawing_area)
+            if not manager:
+                print(f"[KEGG_IMPORT] ERROR: Failed to get canvas manager after pre-creation!")
+                self._show_status("❌ Failed to initialize canvas", error=True)
+                if self.fetch_button:
+                    self.fetch_button.set_sensitive(True)
+                self.import_button.set_sensitive(True)
+                return
+            
+            # CRITICAL: Initialize canvas state IMMEDIATELY (before background parsing)
+            # This prevents property dialog crashes on imported canvases
+            manager.mark_clean()  # Mark as clean (no unsaved changes yet)
+            manager.mark_as_imported(pathway_name)  # Mark as imported
+            print(f"[KEGG_IMPORT] Canvas state initialized (clean + imported)")
+            
+            # Set filepath if project exists (for proper state initialization)
+            if self.project:
+                import os
+                pathways_dir = self.project.get_pathways_dir()
+                if pathways_dir:
+                    temp_path = os.path.join(pathways_dir, f"{pathway_name}.shy")
+                    manager.set_filepath(temp_path)
+                    print(f"[KEGG_IMPORT] Canvas filepath set: {temp_path}")
+            
+            # Switch to the newly created tab to show progress
+            notebook = self.model_canvas.notebook
+            notebook.set_current_page(page_index)
+            print(f"[KEGG_IMPORT] Switched to tab {page_index}")
+            
+            # Store canvas info for background thread completion handler
+            self._pending_canvas_info = {
+                'page_index': page_index,
+                'drawing_area': drawing_area,
+                'manager': manager,
+                'pathway_name': pathway_name
+            }
+            
+        except Exception as tab_error:
+            print(f"[KEGG_IMPORT] ERROR pre-creating canvas tab: {tab_error}")
+            import traceback
+            traceback.print_exc()
+            self._show_status(f"❌ Failed to create canvas tab: {tab_error}", error=True)
+            if self.fetch_button:
+                self.fetch_button.set_sensitive(True)
+            self.import_button.set_sensitive(True)
+            return
+        
         self._show_status("🔄 Converting pathway to Petri net...")
         
         # Import in background thread to avoid blocking UI
@@ -397,152 +457,124 @@ class KEGGImportPanel:
         print(f"[KEGG_IMPORT] ============================================")
         print(f"[KEGG_IMPORT] _on_import_complete called")
         print(f"[KEGG_IMPORT] document_model: {document_model}")
-        print(f"[KEGG_IMPORT] model_canvas: {self.model_canvas}")
-        print(f"[KEGG_IMPORT] model_canvas type: {type(self.model_canvas)}")
         
         try:
             if not document_model:
                 print(f"[KEGG_IMPORT] ERROR: document_model is None!")
                 self._show_status("❌ Conversion failed - no data", error=True)
+                if self.fetch_button:
+                    self.fetch_button.set_sensitive(True)
                 self.import_button.set_sensitive(True)
                 return False
             
-            if not self.model_canvas:
-                print(f"[KEGG_IMPORT] ERROR: model_canvas is None!")
-                self._show_status("❌ No canvas available", error=True)
+            # USE PRE-CREATED CANVAS (don't create new one)
+            if not hasattr(self, '_pending_canvas_info') or not self._pending_canvas_info:
+                print(f"[KEGG_IMPORT] ERROR: No pre-created canvas info!")
+                self._show_status("❌ Canvas initialization error", error=True)
+                if self.fetch_button:
+                    self.fetch_button.set_sensitive(True)
                 self.import_button.set_sensitive(True)
                 return False
             
-            # Load into canvas
-            if self.model_canvas:
-                # Create a new tab for this pathway
-                pathway_name = self.current_pathway.title or self.current_pathway.name
-                print(f"[KEGG_IMPORT] Creating tab for: {pathway_name}")
-                
+            # Extract pre-created canvas components
+            canvas_info = self._pending_canvas_info
+            manager = canvas_info['manager']
+            drawing_area = canvas_info['drawing_area']
+            pathway_name = canvas_info['pathway_name']
+            
+            print(f"[KEGG_IMPORT] Using pre-created canvas:")
+            print(f"  - pathway_name: {pathway_name}")
+            print(f"  - manager: {manager}")
+            print(f"  - drawing_area: {drawing_area}")
+            
+            # Load objects using unified path
+            print(f"[KEGG_IMPORT] Loading objects to canvas...")
+            print(f"[KEGG_IMPORT]   Places: {len(document_model.places)}")
+            print(f"[KEGG_IMPORT]   Transitions: {len(document_model.transitions)}")
+            print(f"[KEGG_IMPORT]   Arcs: {len(document_model.arcs)}")
+            
+            try:
+                manager.load_objects(
+                    places=document_model.places,
+                    transitions=document_model.transitions,
+                    arcs=document_model.arcs
+                )
+                print(f"[KEGG_IMPORT] Objects loaded successfully!")
+            except Exception as load_error:
+                print(f"[KEGG_IMPORT] ERROR loading objects: {load_error}")
+                import traceback
+                traceback.print_exc()
+                self._show_status(f"❌ Failed to load objects: {load_error}", error=True)
+                if self.fetch_button:
+                    self.fetch_button.set_sensitive(True)
+                self.import_button.set_sensitive(True)
+                return False
+            
+            # Set change callback for object state management
+            manager.document_controller.set_change_callback(manager._on_object_changed)
+            
+            # Fit imported content to page
+            manager.fit_to_page(padding_percent=15, deferred=True, horizontal_offset_percent=30, vertical_offset_percent=10)
+            
+            # Trigger redraw to display imported objects
+            print(f"[KEGG_IMPORT] Triggering canvas redraw...")
+            drawing_area.queue_draw()
+            
+            # NOW save KGML and metadata to project (after successful import)
+            if self.project and self.current_kgml and self.current_pathway:
                 try:
-                    page_index, drawing_area = self.model_canvas.add_document(filename=pathway_name)
-                    print(f"[KEGG_IMPORT] Tab created: page_index={page_index}, drawing_area={drawing_area}")
-                except Exception as tab_error:
-                    print(f"[KEGG_IMPORT] ERROR creating tab: {tab_error}")
+                    # Save raw KGML file to project/pathways/
+                    filename = f"{self.current_pathway_id}.kgml"
+                    self.project.save_pathway_file(filename, self.current_kgml)
+                    
+                    # Create PathwayDocument with metadata
+                    from shypn.data.pathway_document import PathwayDocument
+                    self.current_pathway_doc = PathwayDocument(
+                        source_type="kegg",
+                        source_id=self.current_pathway_id,
+                        source_organism=self.current_pathway.org,
+                        name=self.current_pathway.title or self.current_pathway.name
+                    )
+                    
+                    # Set file paths and notes
+                    self.current_pathway_doc.raw_file = filename
+                    self.current_pathway_doc.notes = f"KEGG pathway: {self.current_pathway.title or self.current_pathway.name}\n"
+                    self.current_pathway_doc.notes += f"Entries: {len(self.current_pathway.entries)}, "
+                    self.current_pathway_doc.notes += f"Reactions: {len(self.current_pathway.reactions)}, "
+                    self.current_pathway_doc.notes += f"Relations: {len(self.current_pathway.relations)}"
+                    
+                    # Get model ID from document_model and link
+                    model_id = document_model.id if hasattr(document_model, 'id') else None
+                    if not model_id:
+                        # Try to get from manager
+                        model_id = manager.document_controller.document.id if hasattr(manager.document_controller.document, 'id') else None
+                    
+                    if model_id:
+                        # Link pathway to model
+                        self.current_pathway_doc.link_to_model(model_id)
+                    
+                    # Register with project
+                    self.project.add_pathway(self.current_pathway_doc)
+                    self.project.save()
+                    
+                    print(f"[KEGG_IMPORT] Saved pathway {self.current_pathway_id} to project after successful import")
+                    
+                except Exception as e:
+                    print(f"[KEGG_IMPORT] Warning: Failed to save pathway metadata after import: {e}")
                     import traceback
                     traceback.print_exc()
-                    self._show_status(f"❌ Failed to create canvas tab: {tab_error}", error=True)
-                    self.import_button.set_sensitive(True)
-                    return False
-                
-                # Get the canvas manager for this tab
-                manager = self.model_canvas.get_canvas_manager(drawing_area)
-                print(f"[KEGG_IMPORT] Canvas manager: {manager}")
-                print(f"[KEGG_IMPORT] Canvas manager type: {type(manager)}")
-                
-                if not manager:
-                    print(f"[KEGG_IMPORT] ERROR: Failed to get canvas manager!")
-                    self._show_status("❌ Failed to get canvas manager", error=True)
-                    self.import_button.set_sensitive(True)
-                    return False
-                
-                if manager:
-                    # Load objects using unified path
-                    print(f"[KEGG_IMPORT] Loading objects to canvas...")
-                    print(f"[KEGG_IMPORT]   Places: {len(document_model.places)}")
-                    print(f"[KEGG_IMPORT]   Transitions: {len(document_model.transitions)}")
-                    print(f"[KEGG_IMPORT]   Arcs: {len(document_model.arcs)}")
-                    
-                    try:
-                        manager.load_objects(
-                            places=document_model.places,
-                            transitions=document_model.transitions,
-                            arcs=document_model.arcs
-                        )
-                        print(f"[KEGG_IMPORT] Objects loaded successfully!")
-                    except Exception as load_error:
-                        print(f"[KEGG_IMPORT] ERROR loading objects: {load_error}")
-                        import traceback
-                        traceback.print_exc()
-                        self._show_status(f"❌ Failed to load objects: {load_error}", error=True)
-                        self.import_button.set_sensitive(True)
-                        return False
-                    
-                    # Set change callback for object state management
-                    manager.document_controller.set_change_callback(manager._on_object_changed)
-                    
-                    # Fit imported content to page
-                    manager.fit_to_page(padding_percent=15, deferred=True, horizontal_offset_percent=30, vertical_offset_percent=10)
-                    
-                    # Trigger redraw to display imported objects
-                    print(f"[KEGG_IMPORT] Triggering canvas redraw...")
-                    drawing_area.queue_draw()
-                    
-                    # Mark as imported
-                    manager.mark_as_imported(pathway_name)
-                    
-                    # CRITICAL: Initialize canvas state to match file load path
-                    # This prevents property dialog crashes on imported canvases
-                    manager.mark_clean()  # Mark as clean (no unsaved changes yet)
-                    print(f"[KEGG_IMPORT] Canvas state initialized (marked clean)")
-                    
-                    # Set filepath if project exists (for proper state initialization)
-                    if self.project:
-                        import os
-                        pathways_dir = self.project.get_pathways_dir()
-                        if pathways_dir:
-                            temp_path = os.path.join(pathways_dir, f"{pathway_name}.shy")
-                            manager.set_filepath(temp_path)
-                            print(f"[KEGG_IMPORT] Canvas filepath set: {temp_path}")
-                        else:
-                            print(f"[KEGG_IMPORT] WARNING: No pathways_dir, filepath not set")
-                    
-                    # NOW save KGML and metadata to project (after successful import)
-                    if self.project and self.current_kgml and self.current_pathway:
-                        try:
-                            # Save raw KGML file to project/pathways/
-                            filename = f"{self.current_pathway_id}.kgml"
-                            self.project.save_pathway_file(filename, self.current_kgml)
-                            
-                            # Create PathwayDocument with metadata
-                            from shypn.data.pathway_document import PathwayDocument
-                            self.current_pathway_doc = PathwayDocument(
-                                source_type="kegg",
-                                source_id=self.current_pathway_id,
-                                source_organism=self.current_pathway.org,
-                                name=self.current_pathway.title or self.current_pathway.name
-                            )
-                            
-                            # Set file paths and notes
-                            self.current_pathway_doc.raw_file = filename
-                            self.current_pathway_doc.notes = f"KEGG pathway: {self.current_pathway.title or self.current_pathway.name}\n"
-                            self.current_pathway_doc.notes += f"Entries: {len(self.current_pathway.entries)}, "
-                            self.current_pathway_doc.notes += f"Reactions: {len(self.current_pathway.reactions)}, "
-                            self.current_pathway_doc.notes += f"Relations: {len(self.current_pathway.relations)}"
-                            
-                            # Get model ID from document_model and link
-                            model_id = document_model.id if hasattr(document_model, 'id') else None
-                            if not model_id:
-                                # Try to get from manager
-                                model_id = manager.document_controller.document.id if hasattr(manager.document_controller.document, 'id') else None
-                            
-                            if model_id:
-                                # Link pathway to model
-                                self.current_pathway_doc.link_to_model(model_id)
-                            
-                            # Register with project
-                            self.project.add_pathway(self.current_pathway_doc)
-                            self.project.save()
-                            
-                            print(f"[KEGG_IMPORT] Saved pathway {self.current_pathway_id} to project after successful import")
-                            
-                        except Exception as e:
-                            print(f"[KEGG_IMPORT] Warning: Failed to save pathway metadata after import: {e}")
-                            import traceback
-                            traceback.print_exc()
-                    
-                    self._show_status(f"✅ Pathway imported: {len(document_model.places)} places, "
-                                    f"{len(document_model.transitions)} transitions, "
-                                    f"{len(document_model.arcs)} arcs")
-                else:
-                    self._show_status("❌ Error: Could not get canvas manager", error=True)
-            else:
-                self._show_status("❌ Error: No canvas available for import", error=True)
+            
+            self._show_status(f"✅ Pathway imported: {len(document_model.places)} places, "
+                            f"{len(document_model.transitions)} transitions, "
+                            f"{len(document_model.arcs)} arcs")
+            
+            # Clean up pending canvas info
+            self._pending_canvas_info = None
+            
+            # Re-enable buttons
+            if self.fetch_button:
+                self.fetch_button.set_sensitive(True)
+            self.import_button.set_sensitive(True)
         
         except Exception as e:
             print(f"[KEGG_IMPORT] ============================================")
