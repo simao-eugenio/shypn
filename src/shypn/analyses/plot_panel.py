@@ -244,9 +244,13 @@ class AnalysisPlotPanel(Gtk.Box):
         
         # Set both border and fill color to match the plot color
         # (same as transition property dialog does)
-        # Note: This changes the object state, which may trigger on_changed callback
+        print(f"[PLOT_PANEL] Setting colors for {obj.name}: color_hex={color_hex}, color_rgb={color_rgb}")
+        print(f"[PLOT_PANEL] Before: border={obj.border_color}, fill={obj.fill_color}")
+        
         obj.border_color = color_rgb
         obj.fill_color = color_rgb
+        
+        print(f"[PLOT_PANEL] After: border={obj.border_color}, fill={obj.fill_color}")
         
         self.selected_objects.append(obj)
         # Add UI row immediately without full rebuild
