@@ -372,7 +372,7 @@ class FileExplorerPanel:
         This is the Controller's main job - connecting UI events to business logic.
         """
         if self.new_button:
-            self.new_button.connect('clicked', lambda btn: self.new_document())
+            self.new_button.connect('clicked', lambda btn: self._start_inline_edit_new_file())
         if self.open_button:
             self.open_button.connect('clicked', lambda btn: self.open_document())
         if self.save_button:
@@ -380,7 +380,7 @@ class FileExplorerPanel:
         if self.save_as_button:
             self.save_as_button.connect('clicked', lambda btn: self.save_current_document_as())
         if self.new_folder_button:
-            self.new_folder_button.connect('clicked', self._on_file_new_folder_clicked)
+            self.new_folder_button.connect('clicked', lambda btn: self._start_inline_edit_new_folder())
         if self.back_button:
             self.back_button.connect('clicked', self._on_back_clicked)
         if self.forward_button:
