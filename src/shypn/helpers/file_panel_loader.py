@@ -305,6 +305,8 @@ class FilePanelLoader:
         menu_items = [
             ('Open', self.file_explorer._on_context_open_clicked),
             ('Open Project', self._on_open_project_clicked),  # NEW: Open project folder
+            ('New File', self.file_explorer._on_context_new_file_clicked),
+            ('New Folder', self.file_explorer._on_context_new_folder_clicked),
             ('---', None),
             ('Rename', self.file_explorer._on_rename_clicked),
             ('Delete', self.file_explorer._on_delete_clicked),
@@ -316,7 +318,6 @@ class FilePanelLoader:
             ('Copy Path', self._on_copy_path_clicked),
             ('Copy Relative Path', self._on_copy_relative_path_clicked),
             ('---', None),
-            ('Reveal in File Manager', self._on_reveal_in_file_manager),
             ('Properties', self.file_explorer._on_properties_clicked),
         ]
         

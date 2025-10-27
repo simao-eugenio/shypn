@@ -934,7 +934,8 @@ class FileExplorerPanel:
         icon_name = 'text-x-generic'
         temp_name = 'new_file.shy'
         temp_path = os.path.join(parent_dir, temp_name)
-        new_iter = self.store.append(parent_iter, [icon_name, temp_name, temp_path, False])
+        # TreeStore columns: icon, display_name, full_path, is_directory, is_project, weight, background
+        new_iter = self.store.append(parent_iter, [icon_name, temp_name, temp_path, False, False, 400, None])
         tree_path = self.store.get_path(new_iter)
         if parent_iter:
             self.tree_view.expand_to_path(tree_path)
@@ -956,7 +957,8 @@ class FileExplorerPanel:
         icon_name = 'folder'
         temp_name = 'New Folder'
         temp_path = os.path.join(parent_dir, temp_name)
-        new_iter = self.store.append(parent_iter, [icon_name, temp_name, temp_path, True])
+        # TreeStore columns: icon, display_name, full_path, is_directory, is_project, weight, background
+        new_iter = self.store.append(parent_iter, [icon_name, temp_name, temp_path, True, False, 400, None])
         tree_path = self.store.get_path(new_iter)
         if parent_iter:
             self.tree_view.expand_to_path(tree_path)
@@ -1792,8 +1794,12 @@ class FileExplorerPanel:
         filename = os.path.basename(filepath)
         base_name = os.path.splitext(filename)[0]
         
-        
-        page_index, drawing_area = self.canvas_loader.add_document(filename=base_name)
+        # IMPORTANT: replace_empty_default=True means if there's an empty default tab,
+        # reuse it instead of creating a new one
+        page_index, drawing_area = self.canvas_loader.add_document(
+            filename=base_name,
+            replace_empty_default=True
+        )
         manager = self.canvas_loader.get_canvas_manager(drawing_area)
         if manager:
             # ===== UNIFIED OBJECT LOADING =====

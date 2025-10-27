@@ -420,7 +420,7 @@ class ModelCanvasLoader:
         """Check if current tab is an empty default tab that can be replaced.
         
         Returns:
-            bool: True if current tab is empty default (no objects, default name, not dirty)
+            bool: True if current tab is default (default name, not dirty) - regardless of content
         """
         current_page = self.notebook.get_current_page()
         if current_page < 0:
@@ -435,14 +435,13 @@ class ModelCanvasLoader:
         if not manager:
             return False
         
-        # Check if it's truly empty and default
-        has_objects = (len(manager.places) > 0 or 
-                      len(manager.transitions) > 0 or 
-                      len(manager.arcs) > 0)
+        # Check if it's default name and not dirty
+        # Note: We don't check if it has objects - the default tab can be replaced
+        # even if it has content, as long as it hasn't been saved (not dirty)
         is_default_name = manager.filename in ('default', 'default.shy')
         is_clean = not manager.is_dirty()
         
-        return not has_objects and is_default_name and is_clean
+        return is_default_name and is_clean
 
     def _get_drawing_area_from_page(self, page_widget):
         """Extract drawing area from a notebook page widget.
