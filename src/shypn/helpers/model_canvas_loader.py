@@ -2984,14 +2984,22 @@ class ModelCanvasLoader:
                             self.right_panel_loader.transition_panel.needs_update = True
         dialog_loader.connect('properties-changed', on_properties_changed)
         
+        print(f"[DIALOG DEBUG] About to show dialog for {type(obj).__name__}")
+        print(f"[DIALOG DEBUG] parent_window: {self.parent_window}")
+        print(f"[DIALOG DEBUG] parent_window.get_realized(): {self.parent_window.get_realized() if self.parent_window else 'N/A'}")
+        print(f"[DIALOG DEBUG] dialog_loader: {dialog_loader}")
+        
         try:
             # WAYLAND FIX: Ensure parent window is properly set and visible
             # Check if parent window exists and is realized
             if self.parent_window and self.parent_window.get_realized():
+                print(f"[DIALOG DEBUG] Setting transient_for to parent_window")
                 dialog_loader.set_transient_for(self.parent_window)
                 dialog_loader.set_modal(True)
             
+            print(f"[DIALOG DEBUG] Calling dialog_loader.run()...")
             response = dialog_loader.run()
+            print(f"[DIALOG DEBUG] dialog_loader.run() returned: {response}")
             
             if response == Gtk.ResponseType.OK:
                 drawing_area.queue_draw()
@@ -3000,6 +3008,7 @@ class ModelCanvasLoader:
             import traceback
             traceback.print_exc()
         finally:
+            print(f"[DIALOG DEBUG] Destroying dialog")
             # CRITICAL: Always destroy dialog to prevent orphaned widgets
             # Orphaned widgets cause Wayland focus issues and app crashes
             dialog_loader.destroy()
