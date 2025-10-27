@@ -1431,6 +1431,9 @@ class SimulationController:
     def _select_transition(self, enabled_transitions: List) -> Any:
         """Select one transition from enabled set based on conflict resolution policy.
         
+        Uses per-transition firing_policy attribute to determine selection strategy.
+        Falls back to global conflict_policy if firing_policy not set.
+        
         Args:
             enabled_transitions: List of enabled Transition objects
             
@@ -1439,17 +1442,73 @@ class SimulationController:
         """
         if len(enabled_transitions) == 1:
             return enabled_transitions[0]
-        if self.conflict_policy == ConflictResolutionPolicy.RANDOM:
-            return random.choice(enabled_transitions)
-        elif self.conflict_policy == ConflictResolutionPolicy.PRIORITY:
+        
+        # Use first transition's firing policy (assume homogeneous set)
+        # In hybrid cases, 'priority' policy takes precedence
+        policy = getattr(enabled_transitions[0], 'firing_policy', None)
+        
+        # If no per-transition policy, use global conflict policy
+        if not policy:
+            if self.conflict_policy == ConflictResolutionPolicy.RANDOM:
+                return random.choice(enabled_transitions)
+            elif self.conflict_policy == ConflictResolutionPolicy.PRIORITY:
+                return max(enabled_transitions, key=lambda t: getattr(t, 'priority', 0))
+            elif self.conflict_policy == ConflictResolutionPolicy.TYPE_BASED:
+                return max(enabled_transitions, key=lambda t: TYPE_PRIORITIES.get(t.transition_type, 0))
+            elif self.conflict_policy == ConflictResolutionPolicy.ROUND_ROBIN:
+                selected = enabled_transitions[self._round_robin_index % len(enabled_transitions)]
+                self._round_robin_index += 1
+                return selected
+            else:
+                return random.choice(enabled_transitions)
+        
+        # Per-transition firing policies
+        if policy == 'earliest':
+            # Fire transition that was enabled earliest (smallest enablement time)
+            return min(enabled_transitions, 
+                      key=lambda t: self.transition_states[t.id].last_enabled_time if t.id in self.transition_states else float('inf'))
+        
+        elif policy == 'latest':
+            # Fire transition that was enabled most recently (largest enablement time)
+            return max(enabled_transitions,
+                      key=lambda t: self.transition_states[t.id].last_enabled_time if t.id in self.transition_states else 0)
+        
+        elif policy == 'priority':
+            # Fire highest priority transition
             return max(enabled_transitions, key=lambda t: getattr(t, 'priority', 0))
-        elif self.conflict_policy == ConflictResolutionPolicy.TYPE_BASED:
-            return max(enabled_transitions, key=lambda t: TYPE_PRIORITIES.get(t.transition_type, 0))
-        elif self.conflict_policy == ConflictResolutionPolicy.ROUND_ROBIN:
-            selected = enabled_transitions[self._round_robin_index % len(enabled_transitions)]
-            self._round_robin_index += 1
-            return selected
+        
+        elif policy == 'race':
+            # Mass action kinetics - exponential race condition
+            # Sample exponential delay for each, select minimum
+            import numpy as np
+            min_delay = float('inf')
+            selected = None
+            for t in enabled_transitions:
+                # Use transition rate if available, otherwise default to 1.0
+                rate = float(getattr(t, 'rate', 1.0)) if hasattr(t, 'rate') and t.rate else 1.0
+                if rate > 0:
+                    delay = np.random.exponential(1.0 / rate)
+                    if delay < min_delay:
+                        min_delay = delay
+                        selected = t
+            return selected if selected else random.choice(enabled_transitions)
+        
+        elif policy == 'age':
+            # FIFO - transition enabled longest fires first
+            return min(enabled_transitions,
+                      key=lambda t: self.transition_states[t.id].last_enabled_time if t.id in self.transition_states else float('inf'))
+        
+        elif policy == 'random':
+            # Uniform random selection
+            return random.choice(enabled_transitions)
+        
+        elif policy == 'preemptive-priority':
+            # For now, treat same as priority (full preemption requires interrupt mechanism)
+            # TODO: Implement preemption of running lower-priority transitions
+            return max(enabled_transitions, key=lambda t: getattr(t, 'priority', 0))
+        
         else:
+            # Unknown policy - default to random
             return random.choice(enabled_transitions)
 
     def run(self, time_step: float = None, max_steps: Optional[int] = None) -> bool:
