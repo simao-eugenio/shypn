@@ -1410,12 +1410,12 @@ class SimulationController:
         if policy == 'earliest':
             # Fire transition that was enabled earliest (smallest enablement time)
             return min(enabled_transitions, 
-                      key=lambda t: self.transition_states[t.id].last_enabled_time if t.id in self.transition_states else float('inf'))
+                      key=lambda t: self.transition_states[t.id].enablement_time if t.id in self.transition_states and self.transition_states[t.id].enablement_time is not None else float('inf'))
         
         elif policy == 'latest':
             # Fire transition that was enabled most recently (largest enablement time)
             return max(enabled_transitions,
-                      key=lambda t: self.transition_states[t.id].last_enabled_time if t.id in self.transition_states else 0)
+                      key=lambda t: self.transition_states[t.id].enablement_time if t.id in self.transition_states and self.transition_states[t.id].enablement_time is not None else 0)
         
         elif policy == 'priority':
             # Fire highest priority transition
@@ -1440,7 +1440,7 @@ class SimulationController:
         elif policy == 'age':
             # FIFO - transition enabled longest fires first
             return min(enabled_transitions,
-                      key=lambda t: self.transition_states[t.id].last_enabled_time if t.id in self.transition_states else float('inf'))
+                      key=lambda t: self.transition_states[t.id].enablement_time if t.id in self.transition_states and self.transition_states[t.id].enablement_time is not None else float('inf'))
         
         elif policy == 'random':
             # Uniform random selection
