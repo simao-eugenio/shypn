@@ -2990,12 +2990,8 @@ class ModelCanvasLoader:
         print(f"[DIALOG DEBUG] dialog_loader: {dialog_loader}")
         
         try:
-            # WAYLAND FIX: Ensure parent window is properly set and visible
-            # Check if parent window exists and is realized
-            if self.parent_window and self.parent_window.get_realized():
-                print(f"[DIALOG DEBUG] Setting transient_for to parent_window")
-                dialog_loader.set_transient_for(self.parent_window)
-                dialog_loader.set_modal(True)
+            # The dialog_loader already has parent_window set during creation
+            # We don't need to set transient_for again - it's already configured
             
             print(f"[DIALOG DEBUG] Calling dialog_loader.run()...")
             response = dialog_loader.run()
