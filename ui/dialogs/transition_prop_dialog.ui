@@ -414,10 +414,15 @@
                                 <property name="can-focus">False</property>
                                 <property name="hexpand">True</property>
                                 <property name="active">0</property>
-                                <property name="tooltip-text">When multiple transitions are enabled: 'Earliest' fires the transition enabled first, 'Latest' fires the most recently enabled transition</property>
+                                <property name="tooltip-text">Conflict resolution policy when multiple transitions are enabled simultaneously. Priority: hierarchical control; Race: mass action competition; Age: FIFO scheduling; Random: uniform selection; Preemptive-Priority: allows interruption</property>
                                 <items>
                                   <item translatable="yes">Earliest</item>
                                   <item translatable="yes">Latest</item>
+                                  <item translatable="yes">Priority</item>
+                                  <item translatable="yes">Race</item>
+                                  <item translatable="yes">Age</item>
+                                  <item translatable="yes">Random</item>
+                                  <item translatable="yes">Preemptive-Priority</item>
                                 </items>
                               </object>
                               <packing>

@@ -147,7 +147,15 @@ class TransitionPropDialogLoader(GObject.GObject):
         # Firing policy
         firing_policy_combo = self.builder.get_object('firing_policy_combo')
         if firing_policy_combo and hasattr(self.transition_obj, 'firing_policy'):
-            policy_map = {'earliest': 0, 'latest': 1}
+            policy_map = {
+                'earliest': 0,
+                'latest': 1,
+                'priority': 2,
+                'race': 3,
+                'age': 4,
+                'random': 5,
+                'preemptive-priority': 6
+            }
             policy = self.transition_obj.firing_policy or 'earliest'
             firing_policy_combo.set_active(policy_map.get(policy, 0))
         
@@ -320,7 +328,15 @@ class TransitionPropDialogLoader(GObject.GObject):
             # Firing policy
             firing_policy_combo = self.builder.get_object('firing_policy_combo')
             if firing_policy_combo:
-                policy_list = ['earliest', 'latest']
+                policy_list = [
+                    'earliest',
+                    'latest',
+                    'priority',
+                    'race',
+                    'age',
+                    'random',
+                    'preemptive-priority'
+                ]
                 policy_index = firing_policy_combo.get_active()
                 if policy_index >= 0:
                     self.transition_obj.firing_policy = policy_list[policy_index]
