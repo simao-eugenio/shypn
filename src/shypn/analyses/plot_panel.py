@@ -242,13 +242,8 @@ class AnalysisPlotPanel(Gtk.Box):
         import matplotlib.colors as mcolors
         color_rgb = mcolors.hex2color(color_hex)
         
-        # Set object colors to match the plot color
-        # Temporarily store on_changed callback to prevent marking document dirty
-        # (Adding to analysis is not a document modification)
-        old_callback = obj.on_changed if hasattr(obj, 'on_changed') else None
-        obj.on_changed = None
-        
-        # Set border color
+        # Set border color to match the plot color
+        # Note: This changes the object state, which may trigger on_changed callback
         obj.border_color = color_rgb
         
         # For transitions: keep fill color black for clear visual distinction
@@ -258,9 +253,6 @@ class AnalysisPlotPanel(Gtk.Box):
             # Keep fill_color as black (default) - don't change it
             # This prevents solid colored rectangles and maintains Petri net aesthetic
             pass
-        
-        # Restore callback
-        obj.on_changed = old_callback
         
         self.selected_objects.append(obj)
         # Add UI row immediately without full rebuild
