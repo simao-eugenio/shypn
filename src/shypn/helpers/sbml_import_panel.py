@@ -643,7 +643,9 @@ class SBMLImportPanel:
     def _on_load_clicked(self, button):
         """Handle load button click - convert and load to canvas.
         
-        This is called after successful parse to load the pathway to canvas.
+        NEW FLOW: Pre-create canvas BEFORE parsing/conversion to ensure widget hierarchy
+        is fully established and ready for dialogs. This fixes Wayland timing issues.
+        
         Operations run in background thread to avoid blocking UI.
         """
         print(f"[SBML_IMPORT] _on_load_clicked() called", file=sys.stderr)
@@ -656,12 +658,56 @@ class SBMLImportPanel:
             self.logger.warning("Canvas or converter not available for load")
             return
         
-        self._show_status("🔄 Converting to Petri net...")
-        
-        # Get parameters from UI (in main thread)
-        scale_factor = self.sbml_scale_spin.get_value() if self.sbml_scale_spin else 1.0
+        # Get pathway name and parameters BEFORE creating canvas
         pathway_name = self.parsed_pathway.metadata.get('name', 'Pathway')
+        scale_factor = self.sbml_scale_spin.get_value() if self.sbml_scale_spin else 1.0
         parsed_pathway = self.parsed_pathway
+        
+        # ============================================================================
+        # NEW: PRE-CREATE CANVAS BEFORE PARSING/CONVERSION
+        # This ensures widget hierarchy is fully established and ready for dialogs
+        # ============================================================================
+        print(f"[SBML_IMPORT] PRE-CREATING canvas tab for: {pathway_name}", file=sys.stderr)
+        self._show_status(f"📄 Creating canvas for {pathway_name}...")
+        
+        # Create empty canvas tab with proper state initialization
+        page_index, drawing_area = self.model_canvas.add_document(filename=pathway_name)
+        print(f"[SBML_IMPORT] Canvas pre-created: page_index={page_index}, drawing_area={drawing_area}", file=sys.stderr)
+        
+        # Get manager for pre-created canvas
+        manager = self.model_canvas.get_canvas_manager(drawing_area)
+        if not manager:
+            self.logger.error("Failed to get manager for pre-created canvas")
+            self._show_status("❌ Failed to create canvas")
+            return
+        
+        print(f"[SBML_IMPORT] Canvas manager ready: {manager}", file=sys.stderr)
+        
+        # Initialize canvas state immediately (marks as clean, ready for dialogs)
+        manager.mark_clean()
+        manager.mark_as_imported(pathway_name)
+        
+        # Set filepath if project exists
+        if self.project:
+            import os
+            pathways_dir = self.project.get_pathways_dir()
+            if pathways_dir:
+                temp_path = os.path.join(pathways_dir, f"{pathway_name}.shy")
+                manager.set_filepath(temp_path)
+                print(f"[SBML_IMPORT] Canvas filepath set: {temp_path}", file=sys.stderr)
+        
+        # Store pre-created canvas info for load completion
+        self._pending_canvas_info = {
+            'page_index': page_index,
+            'drawing_area': drawing_area,
+            'manager': manager,
+            'pathway_name': pathway_name
+        }
+        
+        # ============================================================================
+        # NOW start background parsing/conversion (canvas already exists and ready)
+        # ============================================================================
+        self._show_status("🔄 Converting to Petri net...")
         
         # Load in background thread to avoid blocking UI
         def load_thread():
@@ -674,7 +720,7 @@ class SBMLImportPanel:
                 # Convert ProcessedPathwayData to Petri net
                 document_model = self.converter.convert(processed)
                 
-                # Pass results back to main thread
+                # Pass results back to main thread (canvas already exists!)
                 GLib.idle_add(self._on_load_complete, document_model, pathway_name)
                 
             except Exception as e:
@@ -686,6 +732,8 @@ class SBMLImportPanel:
     def _on_load_complete(self, document_model, pathway_name):
         """Handle successful load completion (called in main thread).
         
+        NEW FLOW: Canvas already exists (pre-created), just load objects into it.
+        
         Args:
             document_model: The converted DocumentModel with places/transitions/arcs
             pathway_name: Name for the pathway tab
@@ -694,237 +742,226 @@ class SBMLImportPanel:
             False to stop GLib.idle_add from repeating
         """
         try:
-            # Load to canvas - create new tab
-            self._show_status("🔄 Loading to canvas...")
-            print(f"[SBML_IMPORT] _on_load_complete: calling add_document(filename={pathway_name})", file=sys.stderr)
-            page_index, drawing_area = self.model_canvas.add_document(filename=pathway_name)
-            print(f"[SBML_IMPORT] _on_load_complete: add_document returned page_index={page_index}", file=sys.stderr)
+            # ============================================================================
+            # NEW: Use pre-created canvas (already exists with full state)
+            # ============================================================================
+            if not hasattr(self, '_pending_canvas_info') or not self._pending_canvas_info:
+                self.logger.error("No pre-created canvas info found!")
+                self._show_status("❌ Canvas creation failed")
+                return False
+            
+            # Retrieve pre-created canvas information
+            page_index = self._pending_canvas_info['page_index']
+            drawing_area = self._pending_canvas_info['drawing_area']
+            manager = self._pending_canvas_info['manager']
+            
+            print(f"[SBML_IMPORT] Using pre-created canvas: page_index={page_index}", file=sys.stderr)
+            
+            # Load to canvas - canvas already exists, just populate with objects
+            self._show_status("🔄 Loading objects to canvas...")
             
             # Wire sbml_panel to ModelCanvasLoader (if not already wired)
             if not hasattr(self.model_canvas, 'sbml_panel') or self.model_canvas.sbml_panel is None:
                 self.model_canvas.sbml_panel = self
                 self.logger.info("Wired SBML panel to ModelCanvasLoader")
             
-            # Get canvas manager for this tab
-            manager = self.model_canvas.get_canvas_manager(drawing_area)
+            # Load objects using unified loading path
+            manager.load_objects(
+                places=document_model.places,
+                transitions=document_model.transitions,
+                arcs=document_model.arcs
+            )
             
-            if manager:
-                # Load objects using unified loading path
-                manager.load_objects(
-                    places=document_model.places,
-                    transitions=document_model.transitions,
-                    arcs=document_model.arcs
-                )
-                
-                # Set change callback for object state management
-                manager.document_controller.set_change_callback(manager._on_object_changed)
-                
-                # Fit imported content to page with offsets
-                manager.fit_to_page(padding_percent=15, deferred=True, 
-                                   horizontal_offset_percent=30, vertical_offset_percent=10)
-                
-                # Trigger redraw to display imported objects
-                print(f"[SBML_IMPORT] Triggering canvas redraw...")
-                drawing_area.queue_draw()
-                
-                # Mark as imported so "Save" triggers "Save As"
-                manager.mark_as_imported(pathway_name)
-                
-                # CRITICAL: Initialize canvas state to match file load path
-                # This prevents property dialog crashes on imported canvases
-                manager.mark_clean()  # Mark as clean (no unsaved changes yet)
-                print(f"[SBML_IMPORT] Canvas state initialized (marked clean)")
-                
-                # Set filepath if project exists (for proper state initialization)
-                if self.project:
-                    import os
+            # Set change callback for object state management
+            manager.document_controller.set_change_callback(manager._on_object_changed)
+            
+            # Fit imported content to page with offsets
+            manager.fit_to_page(padding_percent=15, deferred=True, 
+                               horizontal_offset_percent=30, vertical_offset_percent=10)
+            
+            # Trigger redraw to display imported objects
+            print(f"[SBML_IMPORT] Triggering canvas redraw...")
+            drawing_area.queue_draw()
+            
+            # Canvas state already initialized in _on_load_clicked, but verify
+            print(f"[SBML_IMPORT] Canvas state verified (already initialized)")
+            
+            # Create pathway metadata for project tracking
+            print(f"[SBML_IMPORT] Checking project metadata conditions:")
+            print(f"  - self.project: {self.project}")
+            print(f"  - self.current_filepath: {self.current_filepath}")
+            print(f"  - self.parsed_pathway: {self.parsed_pathway}")
+            
+            if self.project and self.current_filepath and self.parsed_pathway:
+                try:
+                    filename = os.path.basename(self.current_filepath)
+                    print(f"[SBML_IMPORT] Creating pathway metadata for: {filename}")
+                    
+                    # Check if SBML raw file is already in project/pathways/
                     pathways_dir = self.project.get_pathways_dir()
-                    if pathways_dir:
-                        temp_path = os.path.join(pathways_dir, f"{pathway_name}.shy")
-                        manager.set_filepath(temp_path)
-                        print(f"[SBML_IMPORT] Canvas filepath set: {temp_path}")
-                    else:
-                        print(f"[SBML_IMPORT] WARNING: No pathways_dir, filepath not set")
-                
-                # Create pathway metadata for project tracking (SBML raw file already saved)
-                print(f"[SBML_IMPORT] Checking project metadata conditions:")
-                print(f"  - self.project: {self.project}")
-                print(f"  - self.current_filepath: {self.current_filepath}")
-                print(f"  - self.parsed_pathway: {self.parsed_pathway}")
-                
-                if self.project and self.current_filepath and self.parsed_pathway:
-                    try:
-                        filename = os.path.basename(self.current_filepath)
-                        print(f"[SBML_IMPORT] Creating pathway metadata for: {filename}")
-                        
-                        # Check if SBML raw file is already in project/pathways/
-                        pathways_dir = self.project.get_pathways_dir()
-                        expected_path = os.path.join(pathways_dir, filename) if pathways_dir else None
-                        
-                        print(f"[SBML_IMPORT] Current file location: {self.current_filepath}")
-                        print(f"[SBML_IMPORT] Expected project location: {expected_path}")
-                        
-                        if expected_path and os.path.exists(expected_path):
-                            print(f"[SBML_IMPORT] ✓ SBML raw file already in project: {expected_path}")
-                        elif self.current_filepath and os.path.exists(self.current_filepath):
-                            # File is not in project yet (e.g., was downloaded to temp before project was set)
-                            # Copy it to project/pathways/ now
-                            print(f"[SBML_IMPORT] SBML file not in project location, copying now...")
-                            print(f"[SBML_IMPORT]   From: {self.current_filepath}")
-                            print(f"[SBML_IMPORT]   To:   {expected_path}")
-                            
-                            try:
-                                sbml_content = open(self.current_filepath, 'r', encoding='utf-8').read()
-                                dest_path = self.project.save_pathway_file(filename, sbml_content)
-                                print(f"[SBML_IMPORT] ✓ Successfully copied SBML to project: {dest_path}")
-                                
-                                # Update current_filepath to point to project location
-                                self.current_filepath = dest_path
-                            except Exception as copy_error:
-                                print(f"[SBML_IMPORT] ✗ Failed to copy SBML to project: {copy_error}")
-                                import traceback
-                                traceback.print_exc()
-                        else:
-                            print(f"[SBML_IMPORT] ✗ Warning: SBML file not found at {self.current_filepath}")
-                        
-                        # Create PathwayDocument with metadata
-                        from shypn.data.pathway_document import PathwayDocument
-                        
-                        # Get organism from metadata or default to Unknown
-                        organism = "Unknown"
-                        if hasattr(self.parsed_pathway, 'organism'):
-                            organism = self.parsed_pathway.organism or "Unknown"
-                        elif hasattr(self.parsed_pathway, 'metadata') and 'organism' in self.parsed_pathway.metadata:
-                            organism = self.parsed_pathway.metadata.get('organism', "Unknown")
-                        
-                        # Get pathway name
-                        pathway_name = filename
-                        if hasattr(self.parsed_pathway, 'name'):
-                            pathway_name = self.parsed_pathway.name or filename
-                        elif hasattr(self.parsed_pathway, 'metadata') and 'name' in self.parsed_pathway.metadata:
-                            pathway_name = self.parsed_pathway.metadata.get('name', filename)
-                        
-                        self.current_pathway_doc = PathwayDocument(
-                            source_type="sbml",
-                            source_id=os.path.splitext(filename)[0],
-                            source_organism=organism,
-                            name=pathway_name
-                        )
-                        
-                        # Set file paths and metadata
-                        self.current_pathway_doc.raw_file = filename
-                        
-                        # Add notes with pathway statistics
-                        notes_parts = [f"SBML model: {pathway_name}"]
-                        if self.parsed_pathway:
-                            species_count = len(self.parsed_pathway.species)
-                            reactions_count = len(self.parsed_pathway.reactions)
-                            notes_parts.append(f"Species: {species_count}, Reactions: {reactions_count}")
-                        self.current_pathway_doc.notes = "\n".join(notes_parts)
-                        
-                        # Get model ID - use filename from document controller
-                        model_id = None
-                        if manager and hasattr(manager, 'document_controller'):
-                            # DocumentController has a 'filename' attribute, not 'document.id'
-                            model_id = manager.document_controller.filename if hasattr(manager.document_controller, 'filename') else None
-                        
-                        if not model_id:
-                            # Fallback to pathway_name if we can't get filename
-                            model_id = pathway_name
-                        
-                        if model_id:
-                            # Link pathway to model
-                            self.current_pathway_doc.link_to_model(model_id)
-                            print(f"[SBML_IMPORT] ✓ Linked pathway to model: {model_id}")
-                        
-                        # Register with project
-                        self.project.add_pathway(self.current_pathway_doc)
-                        self.project.save()
-                        
-                        print(f"[SBML_IMPORT] ✓ Saved pathway metadata for {filename} to project")
-                        if expected_path and os.path.exists(expected_path):
-                            print(f"[SBML_IMPORT] ✓ Raw SBML file location: {expected_path}")
-                        
-                        # ============================================================
-                        # AUTO-SAVE: Save Petri net model to project/models/
-                        # ============================================================
-                        # Generate filename from SBML source (e.g., "BIOMD0000000001.shy")
-                        base_name = os.path.splitext(filename)[0]  # Remove .xml extension
-                        model_filename = f"{base_name}.shy"
-                        
-                        # Build full path to project/models/ directory
-                        models_dir = os.path.join(self.project.base_path, 'models')
-                        if not os.path.exists(models_dir):
-                            os.makedirs(models_dir, exist_ok=True)
-                            print(f"[SBML_IMPORT] Created models directory: {models_dir}")
-                        
-                        model_filepath = os.path.join(models_dir, model_filename)
-                        
-                        # Save the Petri net model
-                        print(f"[SBML_IMPORT] Auto-saving Petri net model to: {model_filepath}")
+                    expected_path = os.path.join(pathways_dir, filename) if pathways_dir else None
+                    
+                    print(f"[SBML_IMPORT] Current file location: {self.current_filepath}")
+                    print(f"[SBML_IMPORT] Expected project location: {expected_path}")
+                    
+                    if expected_path and os.path.exists(expected_path):
+                        print(f"[SBML_IMPORT] ✓ SBML raw file already in project: {expected_path}")
+                    elif self.current_filepath and os.path.exists(self.current_filepath):
+                        # File is not in project yet (e.g., was downloaded to temp before project was set)
+                        # Copy it to project/pathways/ now
+                        print(f"[SBML_IMPORT] SBML file not in project location, copying now...")
+                        print(f"[SBML_IMPORT]   From: {self.current_filepath}")
+                        print(f"[SBML_IMPORT]   To:   {expected_path}")
                         
                         try:
-                            # Create DocumentModel from current canvas objects
-                            from shypn.data.canvas.document_model import DocumentModel
-                            save_document = DocumentModel()
+                            sbml_content = open(self.current_filepath, 'r', encoding='utf-8').read()
+                            dest_path = self.project.save_pathway_file(filename, sbml_content)
+                            print(f"[SBML_IMPORT] ✓ Successfully copied SBML to project: {dest_path}")
                             
-                            # Copy objects from manager to save_document
-                            save_document.places = list(manager.document_controller.places)
-                            save_document.transitions = list(manager.document_controller.transitions)
-                            save_document.arcs = list(manager.document_controller.arcs)
-                            
-                            # Save view state (zoom, pan)
-                            save_document.view_state = {
-                                'zoom': getattr(manager, 'zoom', 1.0),
-                                'pan_x': getattr(manager, 'pan_x', 0.0),
-                                'pan_y': getattr(manager, 'pan_y', 0.0)
-                            }
-                            
-                            # Save to file
-                            save_document.save_to_file(model_filepath)
-                            
-                            # CRITICAL: Update manager's state to reflect saved file
-                            # This must match what happens when opening an existing file
-                            if hasattr(manager, 'document_controller'):
-                                # Set the FULL filepath, not just base name
-                                manager.document_controller.filename = model_filepath
-                                manager.document_controller.modified = False
-                                
-                                # Also update the DocumentModel's filepath if it has one
-                                if hasattr(manager.document_controller, 'filepath'):
-                                    manager.document_controller.filepath = model_filepath
-                            
-                            # Update canvas tab label to show saved filename
-                            if hasattr(self.model_canvas, 'update_current_tab_label'):
-                                self.model_canvas.update_current_tab_label(model_filename, is_modified=False)
-                            
-                            print(f"[SBML_IMPORT] ✓ Petri net model auto-saved: {model_filepath}")
-                            print(f"[SBML_IMPORT] ✓ Model linked to raw SBML: {expected_path}")
-                            
-                        except Exception as save_error:
-                            print(f"[SBML_IMPORT] ✗ Failed to auto-save Petri net model: {save_error}")
+                            # Update current_filepath to point to project location
+                            self.current_filepath = dest_path
+                        except Exception as copy_error:
+                            print(f"[SBML_IMPORT] ✗ Failed to copy SBML to project: {copy_error}")
                             import traceback
                             traceback.print_exc()
+                    else:
+                        print(f"[SBML_IMPORT] ✗ Warning: SBML file not found at {self.current_filepath}")
+                    
+                    # Create PathwayDocument with metadata
+                    from shypn.data.pathway_document import PathwayDocument
+                    
+                    # Get organism from metadata or default to Unknown
+                    organism = "Unknown"
+                    if hasattr(self.parsed_pathway, 'organism'):
+                        organism = self.parsed_pathway.organism or "Unknown"
+                    elif hasattr(self.parsed_pathway, 'metadata') and 'organism' in self.parsed_pathway.metadata:
+                        organism = self.parsed_pathway.metadata.get('organism', "Unknown")
+                    
+                    # Get pathway name
+                    pathway_name = filename
+                    if hasattr(self.parsed_pathway, 'name'):
+                        pathway_name = self.parsed_pathway.name or filename
+                    elif hasattr(self.parsed_pathway, 'metadata') and 'name' in self.parsed_pathway.metadata:
+                        pathway_name = self.parsed_pathway.metadata.get('name', filename)
+                    
+                    self.current_pathway_doc = PathwayDocument(
+                        source_type="sbml",
+                        source_id=os.path.splitext(filename)[0],
+                        source_organism=organism,
+                        name=pathway_name
+                    )
+                    
+                    # Set file paths and metadata
+                    self.current_pathway_doc.raw_file = filename
+                    
+                    # Add notes with pathway statistics
+                    notes_parts = [f"SBML model: {pathway_name}"]
+                    if self.parsed_pathway:
+                        species_count = len(self.parsed_pathway.species)
+                        reactions_count = len(self.parsed_pathway.reactions)
+                        notes_parts.append(f"Species: {species_count}, Reactions: {reactions_count}")
+                    self.current_pathway_doc.notes = "\n".join(notes_parts)
+                    
+                    # Get model ID - use filename from document controller
+                    model_id = None
+                    if manager and hasattr(manager, 'document_controller'):
+                        # DocumentController has a 'filename' attribute, not 'document.id'
+                        model_id = manager.document_controller.filename if hasattr(manager.document_controller, 'filename') else None
+                    
+                    if not model_id:
+                        # Fallback to pathway_name if we can't get filename
+                        model_id = pathway_name
+                    
+                    if model_id:
+                        # Link pathway to model
+                        self.current_pathway_doc.link_to_model(model_id)
+                        print(f"[SBML_IMPORT] ✓ Linked pathway to model: {model_id}")
+                    
+                    # Register with project
+                    self.project.add_pathway(self.current_pathway_doc)
+                    self.project.save()
+                    
+                    print(f"[SBML_IMPORT] ✓ Saved pathway metadata for {filename} to project")
+                    if expected_path and os.path.exists(expected_path):
+                        print(f"[SBML_IMPORT] ✓ Raw SBML file location: {expected_path}")
+                    
+                    # ============================================================
+                    # AUTO-SAVE: Save Petri net model to project/models/
+                    # ============================================================
+                    # Generate filename from SBML source (e.g., "BIOMD0000000001.shy")
+                    base_name = os.path.splitext(filename)[0]  # Remove .xml extension
+                    model_filename = f"{base_name}.shy"
+                    
+                    # Build full path to project/models/ directory
+                    models_dir = os.path.join(self.project.base_path, 'models')
+                    if not os.path.exists(models_dir):
+                        os.makedirs(models_dir, exist_ok=True)
+                        print(f"[SBML_IMPORT] Created models directory: {models_dir}")
+                    
+                    model_filepath = os.path.join(models_dir, model_filename)
+                    
+                    # Save the Petri net model
+                    print(f"[SBML_IMPORT] Auto-saving Petri net model to: {model_filepath}")
+                    
+                    try:
+                        # Create DocumentModel from current canvas objects
+                        from shypn.data.canvas.document_model import DocumentModel
+                        save_document = DocumentModel()
                         
-                    except Exception as e:
-                        print(f"[SBML_IMPORT] ✗ Failed to save pathway metadata after import: {e}")
+                        # Copy objects from manager to save_document
+                        save_document.places = list(manager.document_controller.places)
+                        save_document.transitions = list(manager.document_controller.transitions)
+                        save_document.arcs = list(manager.document_controller.arcs)
+                        
+                        # Save view state (zoom, pan)
+                        save_document.view_state = {
+                            'zoom': getattr(manager, 'zoom', 1.0),
+                            'pan_x': getattr(manager, 'pan_x', 0.0),
+                            'pan_y': getattr(manager, 'pan_y', 0.0)
+                        }
+                        
+                        # Save to file
+                        save_document.save_to_file(model_filepath)
+                        
+                        # CRITICAL: Update manager's state to reflect saved file
+                        # This must match what happens when opening an existing file
+                        if hasattr(manager, 'document_controller'):
+                            # Set the FULL filepath, not just base name
+                            manager.document_controller.filename = model_filepath
+                            manager.document_controller.modified = False
+                            
+                            # Also update the DocumentModel's filepath if it has one
+                            if hasattr(manager.document_controller, 'filepath'):
+                                manager.document_controller.filepath = model_filepath
+                        
+                        # Update canvas tab label to show saved filename
+                        if hasattr(self.model_canvas, 'update_current_tab_label'):
+                            self.model_canvas.update_current_tab_label(model_filename, is_modified=False)
+                        
+                        print(f"[SBML_IMPORT] ✓ Petri net model auto-saved: {model_filepath}")
+                        print(f"[SBML_IMPORT] ✓ Model linked to raw SBML: {expected_path}")
+                        
+                    except Exception as save_error:
+                        print(f"[SBML_IMPORT] ✗ Failed to auto-save Petri net model: {save_error}")
                         import traceback
                         traceback.print_exc()
-                else:
-                    print(f"[SBML_IMPORT] ✗ Skipping project save (conditions not met)")
-                
-                # Trigger redraw
-                drawing_area.queue_draw()
-                
-                self.logger.info(f"Canvas loaded: {len(manager.places)} places, {len(manager.transitions)} transitions")
-                self._show_status(f"✅ Loaded {len(manager.places)} places, {len(manager.transitions)} transitions")
-                
-                # Clear import button flow flag - workflow complete
-                self._import_button_flow = False
-            else:
-                self.logger.error("Failed to get canvas manager")
-                self._show_status("❌ Error: Failed to get canvas manager", error=True)
-                self._import_button_flow = False
+                    
+                except Exception as e:
+                    print(f"[SBML_IMPORT] ✗ Failed to save pathway metadata after import: {e}")
+                    import traceback
+                    traceback.print_exc()
+            
+            # Clear pending canvas info
+            self._pending_canvas_info = None
+            
+            # Trigger redraw
+            drawing_area.queue_draw()
+            
+            self.logger.info(f"Canvas loaded: {len(manager.places)} places, {len(manager.transitions)} transitions")
+            self._show_status(f"✅ Loaded {len(manager.places)} places, {len(manager.transitions)} transitions")
+            
+            # Clear import button flow flag - workflow complete
+            self._import_button_flow = False
                 
         except Exception as e:
             self.logger.error(f"Load failed: {e}")
