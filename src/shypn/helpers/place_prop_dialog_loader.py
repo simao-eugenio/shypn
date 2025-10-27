@@ -243,6 +243,15 @@ class PlacePropDialogLoader(GObject.GObject):
         # On Wayland, parent must be realized/mapped before set_transient_for()
         # At run() time, parent is guaranteed to be ready
         if self.parent_window:
+            # CRITICAL WAYLAND CHECK: Ensure parent is MAPPED before setting transient
+            parent_mapped = self.parent_window.get_mapped()
+            parent_realized = self.parent_window.get_realized()
+            
+            print(f"[DIALOG WAYLAND] Parent window mapped: {parent_mapped}, realized: {parent_realized}")
+            
+            if not parent_mapped:
+                print(f"[DIALOG WAYLAND] WARNING: Parent window not mapped! This may cause Error 71")
+            
             # CRITICAL WAYLAND FIX: Process pending events before set_transient_for()
             # This ensures the Wayland compositor has processed all widget state changes
             import gi
@@ -253,15 +262,18 @@ class PlacePropDialogLoader(GObject.GObject):
             display = Gdk.Display.get_default()
             if display:
                 display.sync()  # Wait for all requests to be processed
+                print(f"[DIALOG WAYLAND] Display sync completed")
             
             # Now set transient after compositor is synced
             self.dialog.set_transient_for(self.parent_window)
+            print(f"[DIALOG WAYLAND] set_transient_for completed")
         
         # WAYLAND FIX: Explicitly show dialog before run() to prevent protocol errors
         # Critical for imported canvases where widget hierarchy is established asynchronously
         # Default canvas works because it's realized when main window shows
         # Imported canvases are created programmatically and dialogs may open before fully ready
         self.dialog.show()
+        print(f"[DIALOG WAYLAND] dialog.show() completed, calling run()")
         return self.dialog.run()
 
     def get_dialog(self):
