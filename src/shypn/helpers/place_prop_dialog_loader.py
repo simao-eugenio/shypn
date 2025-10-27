@@ -60,10 +60,9 @@ class PlacePropDialogLoader(GObject.GObject):
         if self.dialog is None:
             raise ValueError("Object 'place_properties_dialog' not found in place_prop_dialog.ui")
         
-        # WAYLAND FIX: Always set parent (explicitly None if not available)
-        parent = self.parent_window if self.parent_window else None
-        if parent:
-            self.dialog.set_transient_for(parent)
+        # WAYLAND FIX: Do NOT set transient_for here!
+        # On Wayland, parent must be realized/mapped before set_transient_for()
+        # We'll set it in run() when parent is guaranteed to be ready
         
         self.dialog.connect('response', self._on_response)
 
@@ -240,6 +239,12 @@ class PlacePropDialogLoader(GObject.GObject):
         Returns:
             Response ID from the dialog.
         """
+        # WAYLAND FIX: Set transient_for HERE, not in __init__!
+        # On Wayland, parent must be realized/mapped before set_transient_for()
+        # At run() time, parent is guaranteed to be ready
+        if self.parent_window:
+            self.dialog.set_transient_for(self.parent_window)
+        
         # WAYLAND FIX: Explicitly show dialog before run() to prevent protocol errors
         # Critical for imported canvases where widget hierarchy is established asynchronously
         # Default canvas works because it's realized when main window shows
