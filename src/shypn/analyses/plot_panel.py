@@ -246,25 +246,15 @@ class AnalysisPlotPanel(Gtk.Box):
         # (same as transition property dialog does)
         from shypn.netobjs import Transition
         
-        print(f"[PLOT_PANEL] Setting colors for {obj.name}: color_hex={color_hex}, color_rgb={color_rgb}")
-        if isinstance(obj, Transition):
-            print(f"[PLOT_PANEL] Before: border={obj.border_color}, fill={obj.fill_color}")
-        else:
-            print(f"[PLOT_PANEL] Before: border={obj.border_color}")
-        
         obj.border_color = color_rgb
         
         # Only set fill_color for Transitions (Places don't have fill_color)
         if isinstance(obj, Transition):
             obj.fill_color = color_rgb
-            print(f"[PLOT_PANEL] After: border={obj.border_color}, fill={obj.fill_color}")
-        else:
-            print(f"[PLOT_PANEL] After: border={obj.border_color}")
         
         # Trigger object's on_changed callback to notify the canvas
         if hasattr(obj, 'on_changed') and obj.on_changed:
             obj.on_changed()
-            print(f"[PLOT_PANEL] Triggered on_changed callback for {obj.name}")
         
         self.selected_objects.append(obj)
         # Add UI row immediately without full rebuild
