@@ -266,6 +266,10 @@ class AnalysisPlotPanel(Gtk.Box):
         # Add UI row immediately without full rebuild
         self._add_object_row(obj, len(self.selected_objects) - 1)
         self.needs_update = True
+        
+        # Trigger canvas redraw to show the new border color
+        if self._model_manager:
+            self._model_manager.mark_needs_redraw()
 
     def remove_object(self, obj: Any):
         """Remove an object from the selected list.
@@ -273,10 +277,26 @@ class AnalysisPlotPanel(Gtk.Box):
         Args:
             obj: Place or Transition object to remove
         """
+        # Reset border color to default before removing
+        old_callback = obj.on_changed if hasattr(obj, 'on_changed') else None
+        obj.on_changed = None
+        
+        from shypn.netobjs import Transition, Place
+        if isinstance(obj, Transition):
+            obj.border_color = Transition.DEFAULT_BORDER_COLOR
+        elif isinstance(obj, Place):
+            obj.border_color = Place.DEFAULT_BORDER_COLOR
+        
+        obj.on_changed = old_callback
+        
         self.selected_objects = [o for o in self.selected_objects if o.id != obj.id]
         # Full rebuild needed since colors/indices change
         self._update_objects_list()
         self.needs_update = True
+        
+        # Trigger canvas redraw to show the color reset
+        if self._model_manager:
+            self._model_manager.mark_needs_redraw()
 
     def _add_object_row(self, obj: Any, index: int):
         """Add a single object row to the UI list (optimized for incremental adds).
@@ -394,11 +414,28 @@ class AnalysisPlotPanel(Gtk.Box):
 
     def _on_clear_clicked(self, button):
         """Handle clear button click - clear selection and blank canvas."""
+        # Reset border colors for all selected objects
+        from shypn.netobjs import Transition, Place
+        for obj in self.selected_objects:
+            old_callback = obj.on_changed if hasattr(obj, 'on_changed') else None
+            obj.on_changed = None
+            
+            if isinstance(obj, Transition):
+                obj.border_color = Transition.DEFAULT_BORDER_COLOR
+            elif isinstance(obj, Place):
+                obj.border_color = Place.DEFAULT_BORDER_COLOR
+            
+            obj.on_changed = old_callback
+        
         self.selected_objects.clear()
         self.last_data_length.clear()
         self._plot_lines.clear()
         self._show_empty_state()
         self._update_objects_list()
+        
+        # Trigger canvas redraw to show color resets
+        if self._model_manager:
+            self._model_manager.mark_needs_redraw()
 
     def _on_grid_toggled(self, button):
         """Handle grid toggle button.
