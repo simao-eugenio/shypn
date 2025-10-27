@@ -381,6 +381,12 @@ class KEGGImportPanel:
             notebook = self.model_canvas.notebook
             notebook.set_current_page(page_index)
             
+            # WAYLAND FIX: Force GTK to process pending events to ensure canvas is fully mapped
+            # On Wayland, widgets must be mapped (visible) before dialogs can attach
+            # Simply realizing isn't enough - need to process events to complete mapping
+            while Gtk.events_pending():
+                Gtk.main_iteration()
+            
             # Store canvas info for background thread completion handler
             self._pending_canvas_info = {
                 'page_index': page_index,
