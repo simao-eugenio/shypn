@@ -105,10 +105,31 @@ class TransitionRatePanel(AnalysisPlotPanel):
         """
         if any((o.id == obj.id for o in self.selected_objects)):
             return
+        
+        # Get the color that will be assigned to this object
+        index = len(self.selected_objects)
+        color_hex = self._get_color(index)
+        
+        # Convert hex color to RGB tuple for Cairo rendering
+        import matplotlib.colors as mcolors
+        color_rgb = mcolors.hex2color(color_hex)
+        
+        # Set both border and fill color to match the plot color
+        obj.border_color = color_rgb
+        obj.fill_color = color_rgb
+        
+        # Trigger object's on_changed callback to notify the canvas
+        if hasattr(obj, 'on_changed') and obj.on_changed:
+            obj.on_changed()
+        
         self.selected_objects.append(obj)
         # Use full rebuild to show locality places in UI list
         self._update_objects_list()
         self.needs_update = True
+        
+        # Trigger canvas redraw to show the new colors
+        if self._model_manager:
+            self._model_manager.mark_needs_redraw()
     
     def _get_rate_data(self, transition_id: Any) -> List[Tuple[float, float]]:
         """Get behavior-specific data for a transition.
