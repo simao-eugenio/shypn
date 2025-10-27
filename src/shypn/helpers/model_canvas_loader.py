@@ -179,7 +179,49 @@ class ModelCanvasLoader:
                 tab_box.show_all()
                 self.notebook.set_tab_label(page, tab_box)
         self.notebook.connect('switch-page', self._on_notebook_page_changed)
+        
+        # Wire data collector for the initial default tab
+        # The switch-page signal doesn't fire for the initially displayed page,
+        # so we need to manually wire the data collector for tab 0
+        if self.notebook.get_n_pages() > 0:
+            initial_page = self.notebook.get_nth_page(0)
+            self._wire_data_collector_for_page(initial_page)
+        
         return self.container
+
+    def _wire_data_collector_for_page(self, page):
+        """Wire the data collector to the right panel for a given page.
+        
+        Extracts the drawing_area from the page and wires its data collector.
+        
+        Args:
+            page: Notebook page widget (Gtk.Overlay or Gtk.ScrolledWindow)
+        """
+        drawing_area = None
+        if isinstance(page, Gtk.Overlay):
+            scrolled = page.get_child()
+            if isinstance(scrolled, Gtk.ScrolledWindow):
+                drawing_area = scrolled.get_child()
+                if hasattr(drawing_area, 'get_child'):
+                    drawing_area = drawing_area.get_child()
+        
+        if self.right_panel_loader and drawing_area:
+            # Get simulate_tools_palette from SwissKnife registry
+            if drawing_area in self.overlay_managers:
+                overlay_manager = self.overlay_managers[drawing_area]
+                
+                # SwissKnifePalette stores SimulateToolsPaletteLoader in registry
+                if hasattr(overlay_manager, 'swissknife_palette'):
+                    swissknife = overlay_manager.swissknife_palette
+                    # Access widget_palette_instances via registry (CORRECT way)
+                    if hasattr(swissknife, 'registry'):
+                        simulate_tools_palette = swissknife.registry.get_widget_palette_instance('simulate')
+                        if simulate_tools_palette and hasattr(simulate_tools_palette, 'data_collector'):
+                            data_collector = simulate_tools_palette.data_collector
+                            self.right_panel_loader.set_data_collector(data_collector)
+                            print(f"[ANALYSES] Wired data_collector (drawing_area={id(drawing_area)})")
+                            return True
+        return False
 
     def _on_notebook_page_changed(self, notebook, page, page_num):
         """Handle notebook page switch.
@@ -215,22 +257,11 @@ class ModelCanvasLoader:
                     self.persistency.set_filepath(None)
                 else:
                     pass
+        
+        # Wire data collector for the switched-to page
+        self._wire_data_collector_for_page(page)
+        
         if self.right_panel_loader and drawing_area:
-            # Get simulate_tools_palette from SwissKnife registry
-            # NOTE: SimulateToolsPaletteLoader is embedded inside SwissKnifePalette,
-            # not stored directly in overlay_manager
-            if drawing_area in self.overlay_managers:
-                overlay_manager = self.overlay_managers[drawing_area]
-                
-                # SwissKnifePalette stores SimulateToolsPaletteLoader in widget_palette_instances dict
-                if hasattr(overlay_manager, 'swissknife_palette'):
-                    swissknife = overlay_manager.swissknife_palette
-                    if hasattr(swissknife, 'widget_palette_instances'):
-                        simulate_tools_palette = swissknife.widget_palette_instances.get('simulate')
-                        if simulate_tools_palette and hasattr(simulate_tools_palette, 'data_collector'):
-                            data_collector = simulate_tools_palette.data_collector
-                            self.right_panel_loader.set_data_collector(data_collector)
-                            print(f"[ANALYSES] Wired data_collector on tab switch (drawing_area={id(drawing_area)})")
             if drawing_area in self.canvas_managers:
                 manager = self.canvas_managers[drawing_area]
                 self.right_panel_loader.set_model(manager)
