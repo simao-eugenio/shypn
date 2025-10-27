@@ -419,29 +419,13 @@ class ModelCanvasLoader:
     def is_current_tab_empty_default(self):
         """Check if current tab is an empty default tab that can be replaced.
         
+        DEPRECATED: This feature has been disabled. Users must manually close default tabs.
+        
         Returns:
-            bool: True if current tab is default (default name, not dirty) - regardless of content
+            bool: Always returns False (auto-replacement disabled)
         """
-        current_page = self.notebook.get_current_page()
-        if current_page < 0:
-            return False
-        
-        page_widget = self.notebook.get_nth_page(current_page)
-        drawing_area = self._get_drawing_area_from_page(page_widget)
-        if not drawing_area:
-            return False
-        
-        manager = self.canvas_managers.get(drawing_area)
-        if not manager:
-            return False
-        
-        # Check if it's default name and not dirty
-        # Note: We don't check if it has objects - the default tab can be replaced
-        # even if it has content, as long as it hasn't been saved (not dirty)
-        is_default_name = manager.filename in ('default', 'default.shy')
-        is_clean = not manager.is_dirty()
-        
-        return is_default_name and is_clean
+        # Auto-replacement disabled - users manually close default tab if unwanted
+        return False
 
     def _get_drawing_area_from_page(self, page_widget):
         """Extract drawing area from a notebook page widget.
@@ -466,7 +450,7 @@ class ModelCanvasLoader:
         Args:
             title: Optional title for the new document tab (deprecated, use filename).
             filename: Base filename without extension (default: "default").
-            replace_empty_default: If True, replace current tab if it's empty default (default: True).
+            replace_empty_default: DEPRECATED - No longer used. Always creates new tab.
             
         Returns:
             tuple: (page_index, drawing_area) for the new document.
@@ -474,23 +458,8 @@ class ModelCanvasLoader:
         if self.notebook is None:
             raise RuntimeError('Canvas not loaded. Call load() first.')
         
-        # Check if we should replace the current empty default tab
-        if replace_empty_default and self.is_current_tab_empty_default():
-            current_page = self.notebook.get_current_page()
-            page_widget = self.notebook.get_nth_page(current_page)
-            drawing_area = self._get_drawing_area_from_page(page_widget)
-            
-            if drawing_area:
-                # Get the manager and update its filename
-                manager = self.canvas_managers.get(drawing_area)
-                if manager:
-                    # Update manager's filename
-                    manager.filename = filename if filename else 'default'
-                    
-                    # Update tab label with new filename
-                    self.update_current_tab_label(filename if filename else 'default', is_modified=False)
-                    
-                    return (current_page, drawing_area)
+        # Auto-replacement feature has been disabled
+        # Users must manually close the default tab if they don't want it
         
         # Create new tab FROM UI TEMPLATE
         # This ensures identical widget hierarchy for all canvases (default, File→New, imports)

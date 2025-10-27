@@ -1796,11 +1796,11 @@ class FileExplorerPanel:
         filename = os.path.basename(filepath)
         base_name = os.path.splitext(filename)[0]
         
-        # IMPORTANT: replace_empty_default=True means if there's an empty default tab,
-        # reuse it instead of creating a new one
+        # Note: replace_empty_default parameter is deprecated and no longer used
+        # A new tab is always created - users must manually close unwanted default tabs
         page_index, drawing_area = self.canvas_loader.add_document(
             filename=base_name,
-            replace_empty_default=True
+            replace_empty_default=True  # Deprecated parameter, has no effect
         )
         manager = self.canvas_loader.get_canvas_manager(drawing_area)
         if manager:
