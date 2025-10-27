@@ -242,17 +242,11 @@ class AnalysisPlotPanel(Gtk.Box):
         import matplotlib.colors as mcolors
         color_rgb = mcolors.hex2color(color_hex)
         
-        # Set border color to match the plot color
+        # Set both border and fill color to match the plot color
+        # (same as transition property dialog does)
         # Note: This changes the object state, which may trigger on_changed callback
         obj.border_color = color_rgb
-        
-        # For transitions: keep fill color black for clear visual distinction
-        # Only border gets the plot color (red, blue, green, etc.)
-        from shypn.netobjs import Transition
-        if isinstance(obj, Transition):
-            # Keep fill_color as black (default) - don't change it
-            # This prevents solid colored rectangles and maintains Petri net aesthetic
-            pass
+        obj.fill_color = color_rgb
         
         self.selected_objects.append(obj)
         # Add UI row immediately without full rebuild
@@ -269,15 +263,17 @@ class AnalysisPlotPanel(Gtk.Box):
         Args:
             obj: Place or Transition object to remove
         """
-        # Reset border color to default before removing
+        # Reset both border and fill color to default before removing
         old_callback = obj.on_changed if hasattr(obj, 'on_changed') else None
         obj.on_changed = None
         
         from shypn.netobjs import Transition, Place
         if isinstance(obj, Transition):
             obj.border_color = Transition.DEFAULT_BORDER_COLOR
+            obj.fill_color = Transition.DEFAULT_COLOR
         elif isinstance(obj, Place):
             obj.border_color = Place.DEFAULT_BORDER_COLOR
+            obj.fill_color = Place.DEFAULT_COLOR
         
         obj.on_changed = old_callback
         
@@ -406,7 +402,7 @@ class AnalysisPlotPanel(Gtk.Box):
 
     def _on_clear_clicked(self, button):
         """Handle clear button click - clear selection and blank canvas."""
-        # Reset border colors for all selected objects
+        # Reset both border and fill colors for all selected objects
         from shypn.netobjs import Transition, Place
         for obj in self.selected_objects:
             old_callback = obj.on_changed if hasattr(obj, 'on_changed') else None
@@ -414,8 +410,10 @@ class AnalysisPlotPanel(Gtk.Box):
             
             if isinstance(obj, Transition):
                 obj.border_color = Transition.DEFAULT_BORDER_COLOR
+                obj.fill_color = Transition.DEFAULT_COLOR
             elif isinstance(obj, Place):
                 obj.border_color = Place.DEFAULT_BORDER_COLOR
+                obj.fill_color = Place.DEFAULT_COLOR
             
             obj.on_changed = old_callback
         
