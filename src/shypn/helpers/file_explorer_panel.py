@@ -1704,25 +1704,27 @@ class FileExplorerPanel:
             )
             
             # Set starting directory
-            if self.current_project:
+            if self.project:
                 # If project is open, start in project/models/
-                models_dir = os.path.join(self.current_project.base_path, 'models')
+                models_dir = os.path.join(self.project.base_path, 'models')
                 if os.path.exists(models_dir):
                     dialog.set_current_folder(models_dir)
                 else:
-                    dialog.set_current_folder(self.current_project.base_path)
-            elif self.current_path and os.path.exists(self.current_path):
-                # Otherwise use current directory in file tree
-                if os.path.isfile(self.current_path):
-                    dialog.set_current_folder(os.path.dirname(self.current_path))
-                else:
-                    dialog.set_current_folder(self.current_path)
+                    dialog.set_current_folder(self.project.base_path)
             else:
-                # Default to workspace root
-                workspace_path = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'workspace')
-                workspace_path = os.path.normpath(workspace_path)
-                if os.path.exists(workspace_path):
-                    dialog.set_current_folder(workspace_path)
+                # Otherwise use current directory in file tree
+                current_path = self.get_current_path()
+                if current_path and os.path.exists(current_path):
+                    if os.path.isfile(current_path):
+                        dialog.set_current_folder(os.path.dirname(current_path))
+                    else:
+                        dialog.set_current_folder(current_path)
+                else:
+                    # Default to workspace root
+                    workspace_path = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'workspace')
+                    workspace_path = os.path.normpath(workspace_path)
+                    if os.path.exists(workspace_path):
+                        dialog.set_current_folder(workspace_path)
             
             # Add file filter for .shy files
             filter_shy = Gtk.FileFilter()
