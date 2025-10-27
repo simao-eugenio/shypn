@@ -124,18 +124,19 @@ class TransitionRatePanel(AnalysisPlotPanel):
         Returns:
             List of (time, value) tuples where value depends on transition type
         """
-        DEBUG_PLOT_DATA = False  # Disable verbose logging
+        DEBUG_PLOT_DATA = True  # Enable verbose logging to debug
         
         # Safety check: return empty if no data collector
         if not self.data_collector:
+            print(f"[DEBUG] No data collector available for transition {transition_id}")
             return []
         
         # Get raw firing event data from collector
         raw_events = self.data_collector.get_transition_data(transition_id)
+        print(f"[DEBUG] Transition {transition_id}: got {len(raw_events)} raw events")
         
         if not raw_events:
-            if DEBUG_PLOT_DATA:
-                pass
+            print(f"[DEBUG] Transition {transition_id}: NO EVENTS - returning empty")
             return []
         
         # Determine transition type by checking if details contain 'rate' field
@@ -146,32 +147,29 @@ class TransitionRatePanel(AnalysisPlotPanel):
             if isinstance(details, dict) and 'rate' in details:
                 has_rate_data = True
         
+        print(f"[DEBUG] Transition {transition_id}: has_rate_data={has_rate_data}")
+        
         if has_rate_data:
             # CONTINUOUS TRANSITION: Plot rate function value over time
-            if DEBUG_PLOT_DATA:
-            
-                pass
+            print(f"[DEBUG] Transition {transition_id}: Processing as CONTINUOUS")
             rate_series = []
             for time, event_type, details in raw_events:
                 if event_type == 'fired' and details and isinstance(details, dict):
                     rate = details.get('rate', 0.0)
                     rate_series.append((time, rate))
             
-            if DEBUG_PLOT_DATA and rate_series:
-            
-                pass
+            print(f"[DEBUG] Transition {transition_id}: Extracted {len(rate_series)} rate points")
             return rate_series
         else:
             # DISCRETE TRANSITION: Plot cumulative firing count
-            if DEBUG_PLOT_DATA:
-            
-                pass
+            print(f"[DEBUG] Transition {transition_id}: Processing as DISCRETE")
             firing_times = [t for t, event_type, _ in raw_events 
                            if event_type == 'fired']
             
+            print(f"[DEBUG] Transition {transition_id}: Found {len(firing_times)} firings")
+            
             if len(firing_times) < 1:
-                if DEBUG_PLOT_DATA:
-                    pass
+                print(f"[DEBUG] Transition {transition_id}: NO FIRINGS - returning empty")
                 return []
             
             # Convert to cumulative count series
@@ -186,9 +184,7 @@ class TransitionRatePanel(AnalysisPlotPanel):
                 count = i + 1  # Cumulative count (1-indexed)
                 cumulative_series.append((time, count))
             
-            if DEBUG_PLOT_DATA:
-            
-                pass
+            print(f"[DEBUG] Transition {transition_id}: Created {len(cumulative_series)} cumulative points")
             return cumulative_series
     
     def _get_ylabel(self) -> str:

@@ -500,6 +500,8 @@ class AnalysisPlotPanel(Gtk.Box):
         Uses matplotlib's set_data() for fast updates instead of axes.clear() + replot.
         Only does full redraw when object list changes.
         """
+        print(f"[DEBUG PLOT] update_plot called, selected_objects: {len(self.selected_objects)}")
+        
         if not self.selected_objects:
             self._show_empty_state()
             return
@@ -508,14 +510,19 @@ class AnalysisPlotPanel(Gtk.Box):
         current_ids = [obj.id for obj in self.selected_objects]
         cached_ids = list(self._plot_lines.keys())
         
+        print(f"[DEBUG PLOT] current_ids: {current_ids}, cached_ids: {cached_ids}")
+        
         if current_ids != cached_ids:
             # Full redraw needed - object list changed
+            print(f"[DEBUG PLOT] Full redraw needed")
             self._full_redraw()
             return
         
         # Fast update - just update existing line data
+        print(f"[DEBUG PLOT] Fast update mode")
         for i, obj in enumerate(self.selected_objects):
             rate_data = self._get_rate_data(obj.id)
+            print(f"[DEBUG PLOT] Object {obj.id}: got {len(rate_data) if rate_data else 0} data points")
             if rate_data and obj.id in self._plot_lines:
                 times = [t for t, r in rate_data]
                 rates = [r for t, r in rate_data]
@@ -532,6 +539,7 @@ class AnalysisPlotPanel(Gtk.Box):
     
     def _full_redraw(self):
         """Perform a full plot redraw when object list changes."""
+        print(f"[DEBUG PLOT] _full_redraw: Starting full redraw for {len(self.selected_objects)} objects")
         self.axes.clear()
         self._plot_lines.clear()
         
