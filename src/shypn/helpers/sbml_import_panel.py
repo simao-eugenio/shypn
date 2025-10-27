@@ -661,9 +661,11 @@ class SBMLImportPanel:
                 temp_path = os.path.join(pathways_dir, f"{pathway_name}.shy")
                 manager.set_filepath(temp_path)
         
-        # WAYLAND FIX: Force GTK to process pending events to ensure canvas is fully mapped
+        # WAYLAND FIX: Give GTK time to fully map the canvas widget
         # On Wayland, widgets must be mapped (visible) before dialogs can attach
-        # Simply realizing isn't enough - need to process events to complete mapping
+        # Use GLib.timeout to defer continuation until widget is stable
+        import time
+        time.sleep(0.1)  # 100ms delay to ensure widget mapping completes
         while Gtk.events_pending():
             Gtk.main_iteration()
         
