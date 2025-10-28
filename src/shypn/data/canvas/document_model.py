@@ -428,25 +428,49 @@ class DocumentModel:
         
         # Restore places first (they have no dependencies)
         places_dict = {}
+        max_place_id = 0
         for place_data in data.get("places", []):
             place = Place.from_dict(place_data)
             document.places.append(place)
             places_dict[place.id] = place  # Use string ID as dict key
-            # Note: No longer updating _next_place_id since IDs are strings
+            # Track maximum ID to update counter (IDs are stored as strings but generated as ints)
+            try:
+                place_id_int = int(place.id)
+                max_place_id = max(max_place_id, place_id_int)
+            except (ValueError, TypeError):
+                pass  # Skip non-numeric IDs (shouldn't happen in normal files)
         
         # Restore transitions second (they have no dependencies)
         transitions_dict = {}
+        max_transition_id = 0
         for transition_data in data.get("transitions", []):
             transition = Transition.from_dict(transition_data)
             document.transitions.append(transition)
             transitions_dict[transition.id] = transition  # Use string ID as dict key
-            # Note: No longer updating _next_transition_id since IDs are strings
+            # Track maximum ID to update counter (IDs are stored as strings but generated as ints)
+            try:
+                transition_id_int = int(transition.id)
+                max_transition_id = max(max_transition_id, transition_id_int)
+            except (ValueError, TypeError):
+                pass  # Skip non-numeric IDs (shouldn't happen in normal files)
         
         # Restore arcs last (they depend on places and transitions)
+        max_arc_id = 0
         for arc_data in data.get("arcs", []):
             arc = Arc.from_dict(arc_data, places=places_dict, transitions=transitions_dict)
             document.arcs.append(arc)
-            # Note: No longer updating _next_arc_id since IDs are strings
+            # Track maximum ID to update counter (IDs are stored as strings but generated as ints)
+            try:
+                arc_id_int = int(arc.id)
+                max_arc_id = max(max_arc_id, arc_id_int)
+            except (ValueError, TypeError):
+                pass  # Skip non-numeric IDs (shouldn't happen in normal files)
+        
+        # Update ID counters to prevent duplicates when creating new objects
+        # Set to max_id + 1 so next created object gets a unique ID
+        document._next_place_id = max_place_id + 1
+        document._next_transition_id = max_transition_id + 1
+        document._next_arc_id = max_arc_id + 1
         
         # Restore view state if present
         if "view_state" in data:
