@@ -150,10 +150,12 @@ class StochasticBehavior(TransitionBehavior):
             result = eval(self.rate_function_expr, {"__builtins__": {}}, context)
             rate = float(result)
             
-            # Ensure positive rate
+            # Ensure positive rate (required for exponential distribution)
             if rate <= 0:
                 self.logger.warning(
-                    f"Formula evaluated to non-positive rate {rate}, using fallback {self.rate}"
+                    f"Stochastic transition '{self.transition.name}' formula evaluated to "
+                    f"non-positive rate {rate:.3f}. This may indicate a reversible reaction "
+                    f"that should be modeled as continuous, not stochastic. Using fallback rate {self.rate}."
                 )
                 return self.rate
             
