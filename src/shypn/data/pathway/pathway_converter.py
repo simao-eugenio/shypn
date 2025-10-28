@@ -259,12 +259,19 @@ class ReactionConverter(BaseConverter):
         elif kinetic.rate_type == "mass_action":
             self._setup_mass_action(transition, reaction, kinetic)
         
-        # OTHER: Continuous with simple rate
+        # UNKNOWN/OTHER: Continuous transition, mark for enrichment
         else:
             transition.transition_type = "continuous"
             transition.rate = 1.0
+            
+            # Mark for enrichment since kinetic type is unknown
+            if not hasattr(transition, 'properties'):
+                transition.properties = {}
+            transition.properties['needs_enrichment'] = True
+            transition.properties['enrichment_reason'] = f"Unknown kinetic type: {kinetic.rate_type}"
+            
             self.logger.debug(
-                f"  Unknown kinetic type '{kinetic.rate_type}', defaulting to continuous"
+                f"  Unknown kinetic type '{kinetic.rate_type}', set as continuous and marked for enrichment"
             )
     
     def _setup_michaelis_menten(self, transition: Transition, reaction: Reaction, 
