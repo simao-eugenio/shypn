@@ -119,9 +119,6 @@ class ContextMenuHandler:
             self._add_transition_locality_submenu(menu, obj, panel)
         else:
             # Simple menu item for places or transitions without locality support
-            if isinstance(obj, Transition):
-            
-                pass
             menu_item = Gtk.MenuItem(label=f"Add to {obj_type_name}")
             
             def on_add_to_analysis(widget):

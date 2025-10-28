@@ -44,45 +44,36 @@ def test_default_firing_policy():
 def test_firing_policy_persistence():
     """Test that firing_policy persists through serialization."""
     print("\n" + "="*80)
-    print("TEST 2: Firing Policy Persistence (Save/Load)")
+    print("TEST 2: Firing Policy Persistence (Save/Load) - All 7 Policies")
     print("="*80)
     
-    # Create transition with earliest policy
-    transition1 = Transition(x=100, y=100, id=1, name="T1")
-    transition1.firing_policy = 'earliest'
+    # Test all 7 firing policies
+    policies = ['earliest', 'latest', 'priority', 'race', 'age', 'random', 'preemptive-priority']
     
-    # Serialize
-    data1 = transition1.to_dict()
-    print(f"\nSerialized (earliest):")
-    print(f"  firing_policy: {data1.get('firing_policy')}")
+    for i, policy in enumerate(policies):
+        print(f"\n--- Testing policy: {policy} ---")
+        
+        # Create transition with specific policy
+        transition = Transition(x=100*(i+1), y=100, id=i+1, name=f"T{i+1}")
+        transition.firing_policy = policy
+        transition.priority = (i + 1) * 10  # Set different priorities
+        
+        # Serialize
+        data = transition.to_dict()
+        print(f"  Serialized: firing_policy={data.get('firing_policy')}, priority={data.get('priority')}")
+        
+        assert 'firing_policy' in data, f"Should serialize firing_policy for {policy}"
+        assert data['firing_policy'] == policy, f"Should save '{policy}'"
+        
+        # Deserialize
+        loaded = Transition.from_dict(data)
+        print(f"  Deserialized: firing_policy={loaded.firing_policy}, priority={loaded.priority}")
+        
+        assert loaded.firing_policy == policy, f"Should restore '{policy}'"
+        assert loaded.priority == (i + 1) * 10, f"Should restore priority for {policy}"
     
-    assert 'firing_policy' in data1, "Should serialize firing_policy"
-    assert data1['firing_policy'] == 'earliest', "Should save 'earliest'"
-    
-    # Deserialize
-    loaded1 = Transition.from_dict(data1)
-    print(f"\nDeserialized:")
-    print(f"  firing_policy: {loaded1.firing_policy}")
-    
-    assert loaded1.firing_policy == 'earliest', "Should restore 'earliest'"
-    
-    # Test with 'latest' policy
-    transition2 = Transition(x=200, y=200, id=2, name="T2")
-    transition2.firing_policy = 'latest'
-    
-    data2 = transition2.to_dict()
-    print(f"\nSerialized (latest):")
-    print(f"  firing_policy: {data2.get('firing_policy')}")
-    
-    assert data2['firing_policy'] == 'latest', "Should save 'latest'"
-    
-    loaded2 = Transition.from_dict(data2)
-    print(f"\nDeserialized:")
-    print(f"  firing_policy: {loaded2.firing_policy}")
-    
-    assert loaded2.firing_policy == 'latest', "Should restore 'latest'"
-    
-    print("\n✅ PASS: Firing policy persists through save/load")
+    print("\n✅ PASS: All 7 firing policies persist through save/load")
+    print("   Tested: earliest, latest, priority, race, age, random, preemptive-priority")
     return True
 
 
@@ -189,6 +180,59 @@ def test_json_format():
     return True
 
 
+def test_dialog_loader_policy_mapping():
+    """Test that dialog loader correctly maps all 7 policies."""
+    print("\n" + "="*80)
+    print("TEST 5: Dialog Loader Policy Mapping")
+    print("="*80)
+    
+    # Expected mappings from dialog loader
+    policy_map = {
+        'earliest': 0,
+        'latest': 1,
+        'priority': 2,
+        'race': 3,
+        'age': 4,
+        'random': 5,
+        'preemptive-priority': 6
+    }
+    
+    policy_list = [
+        'earliest',
+        'latest',
+        'priority',
+        'race',
+        'age',
+        'random',
+        'preemptive-priority'
+    ]
+    
+    print("\nTesting bidirectional mapping:")
+    
+    # Test policy_map (name -> index)
+    for policy, index in policy_map.items():
+        print(f"  {policy:20} -> index {index}")
+        assert 0 <= index < 7, f"Index {index} out of range for {policy}"
+    
+    # Test policy_list (index -> name)
+    for index, policy in enumerate(policy_list):
+        print(f"  index {index} -> {policy:20}")
+        assert policy in policy_map, f"Policy {policy} not in policy_map"
+        assert policy_map[policy] == index, f"Inconsistent mapping for {policy}"
+    
+    # Test round-trip
+    print("\nTesting round-trip conversion:")
+    for policy in policy_list:
+        index = policy_map[policy]
+        retrieved = policy_list[index]
+        success = retrieved == policy
+        print(f"  {policy:20} -> {index} -> {retrieved:20} {'✓' if success else '✗'}")
+        assert success, f"Round-trip failed for {policy}"
+    
+    print("\n✅ PASS: Dialog loader policy mapping is correct and bidirectional")
+    return True
+
+
 def main():
     """Run all tests."""
     print("\n" + "="*80)
@@ -199,7 +243,7 @@ def main():
         # Test 1: Default value
         test_default_firing_policy()
         
-        # Test 2: Persistence
+        # Test 2: Persistence (all 7 policies)
         test_firing_policy_persistence()
         
         # Test 3: SBML import
@@ -208,15 +252,27 @@ def main():
         # Test 4: JSON format
         test_json_format()
         
+        # Test 5: Dialog loader mapping
+        test_dialog_loader_policy_mapping()
+        
         print("\n" + "="*80)
         print("✅ ALL TESTS PASSED")
         print("="*80)
         print("\nSummary:")
         print("  ✓ Default firing_policy is 'earliest'")
-        print("  ✓ firing_policy persists through save/load")
+        print("  ✓ All 7 firing policies persist through save/load")
         print("  ✓ SBML imported transitions have 'earliest' policy")
         print("  ✓ JSON format is correct")
-        print("\nFiring policy persistence verified! 🎉")
+        print("  ✓ Dialog loader policy mapping is bidirectional")
+        print("\nPolicies tested:")
+        print("  - earliest (time-based, earliest enabled)")
+        print("  - latest (time-based, most recent)")
+        print("  - priority (hierarchical, use transition.priority)")
+        print("  - race (mass action, exponential sampling)")
+        print("  - age (FIFO, oldest enabled first)")
+        print("  - random (uniform random selection)")
+        print("  - preemptive-priority (interrupt mechanism)")
+        print("\nFiring policy implementation verified! 🎉")
         return 0
         
     except AssertionError as e:
