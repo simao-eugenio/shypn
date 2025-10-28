@@ -168,10 +168,24 @@ class TransitionPropDialogLoader(GObject.GObject):
         if is_sink_check and hasattr(self.transition_obj, 'is_sink'):
             is_sink_check.set_active(self.transition_obj.is_sink)
         
-        # Rate (simple entry)
+        # Rate (simple entry) - also check for rate_function formulas (SBML)
         rate_entry = self.builder.get_object('rate_entry')
-        if rate_entry and hasattr(self.transition_obj, 'rate'):
-            rate_value = self.transition_obj.rate
+        if rate_entry:
+            rate_value = None
+            
+            # Priority 1: Check properties['rate_function_display'] (SBML biological names for UI)
+            if hasattr(self.transition_obj, 'properties') and 'rate_function_display' in self.transition_obj.properties:
+                rate_value = self.transition_obj.properties['rate_function_display']
+            
+            # Priority 2: Check transition.properties['rate_function'] (SBML formulas stored here)
+            elif hasattr(self.transition_obj, 'properties') and 'rate_function' in self.transition_obj.properties:
+                rate_value = self.transition_obj.properties['rate_function']
+            
+            # Priority 3: Fall back to simple rate value
+            elif hasattr(self.transition_obj, 'rate') and self.transition_obj.rate is not None:
+                rate_value = self.transition_obj.rate
+            
+            # Set the text if we found something
             if rate_value is not None:
                 rate_entry.set_text(str(rate_value))
         
