@@ -225,7 +225,10 @@ class ReactionExtractor(BaseExtractor):
         # Extract kinetic law
         kinetic_law = None
         if sbml_reaction.isSetKineticLaw():
-            kinetic_law = self._extract_kinetic_law(sbml_reaction.getKineticLaw())
+            kinetic_law = self._extract_kinetic_law(
+                sbml_reaction.getKineticLaw(),
+                sbml_reaction=sbml_reaction
+            )
         
         return Reaction(
             id=reaction_id,
@@ -236,12 +239,13 @@ class ReactionExtractor(BaseExtractor):
             reversible=reversible
         )
     
-    def _extract_kinetic_law(self, sbml_kinetic_law) -> Optional[KineticLaw]:
+    def _extract_kinetic_law(self, sbml_kinetic_law, sbml_reaction=None) -> Optional[KineticLaw]:
         """
         Extract kinetic law from SBML.
         
         Args:
             sbml_kinetic_law: libsbml KineticLaw object
+            sbml_reaction: libsbml Reaction object (for metadata)
             
         Returns:
             KineticLaw object or None
@@ -264,11 +268,25 @@ class ReactionExtractor(BaseExtractor):
         # Try to detect kinetic law type
         rate_type = self._detect_rate_type(formula)
         
-        return KineticLaw(
+        # Store SBML-specific metadata for later metadata creation
+        # This will be used by the converter to create SBMLKineticMetadata
+        sbml_metadata = {}
+        if sbml_reaction:
+            sbml_metadata['sbml_reaction_id'] = sbml_reaction.getId()
+            sbml_metadata['sbml_level'] = self.model.getLevel()
+            sbml_metadata['sbml_version'] = self.model.getVersion()
+            sbml_metadata['sbml_model_id'] = self.model.getId()
+        
+        kinetic_law = KineticLaw(
             formula=formula,
             rate_type=rate_type,
             parameters=parameters
         )
+        
+        # Attach SBML metadata to kinetic law for converter to use
+        kinetic_law.sbml_metadata = sbml_metadata
+        
+        return kinetic_law
     
     def _detect_rate_type(self, formula: str) -> str:
         """
