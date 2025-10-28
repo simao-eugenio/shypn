@@ -334,6 +334,27 @@ class CompartmentExtractor(BaseExtractor):
             self.logger.debug(f"  - {comp_id}: {comp_name}")
         
         return compartments
+    
+    def extract_sizes(self) -> Dict[str, float]:
+        """
+        Extract compartment sizes from SBML model.
+        
+        Returns:
+            Dict mapping compartment IDs to sizes (volumes)
+        """
+        compartment_sizes = {}
+        
+        num_compartments = self.model.getNumCompartments()
+        
+        for i in range(num_compartments):
+            sbml_compartment = self.model.getCompartment(i)
+            comp_id = sbml_compartment.getId()
+            # Get size (volume), default to 1.0 if not set
+            comp_size = sbml_compartment.getSize() if sbml_compartment.isSetSize() else 1.0
+            compartment_sizes[comp_id] = comp_size
+            self.logger.debug(f"  - {comp_id} size: {comp_size}")
+        
+        return compartment_sizes
 
 
 class ParameterExtractor(BaseExtractor):
@@ -462,6 +483,12 @@ class SBMLParser:
         reactions = reaction_extractor.extract()
         compartments = compartment_extractor.extract()
         parameters = parameter_extractor.extract()
+        
+        # Extract compartment sizes and merge into parameters
+        # This makes compartment sizes available in kinetic formulas
+        compartment_sizes = compartment_extractor.extract_sizes()
+        parameters.update(compartment_sizes)
+        self.logger.debug(f"Merged {len(compartment_sizes)} compartment sizes into parameters")
         
         # Create metadata
         metadata = {
