@@ -45,7 +45,8 @@ class SBMLKineticsIntegrationService:
         transitions: List,  # List of Transition objects
         pathway_data: PathwayData,
         transition_reaction_map: Optional[Dict] = None,
-        source_file: Optional[str] = None
+        source_file: Optional[str] = None,
+        document: Optional = None  # DocumentModel for place access
     ) -> Dict[str, bool]:
         """
         Integrate SBML kinetic laws into transitions.
@@ -59,6 +60,7 @@ class SBMLKineticsIntegrationService:
             transition_reaction_map: Optional dict mapping transition object → reaction object
                                     If None, uses transition.name to match reaction.id
             source_file: SBML source filename (for metadata tracking)
+            document: Optional DocumentModel for accessing places (needed for species mapping)
         
         Returns:
             Dict mapping transition.name → success (True/False)
@@ -66,6 +68,12 @@ class SBMLKineticsIntegrationService:
         if not transitions:
             self.logger.warning("No transitions to integrate")
             return {}
+        
+        # Build species-to-place name mapping if document provided
+        self.species_to_place_map = {}
+        if document:
+            self.species_to_place_map = self._build_species_to_place_map(document)
+            self.logger.info(f"Built species mapping for {len(self.species_to_place_map)} species")
         
         self.logger.info(f"Integrating SBML kinetics for {len(transitions)} transitions")
         
@@ -178,6 +186,65 @@ class SBMLKineticsIntegrationService:
         
         return transition_reaction_map
     
+    def _build_species_to_place_map(self, document) -> Dict[str, str]:
+        """
+        Build mapping from SBML species IDs to Petri net place names.
+        
+        Uses place.metadata['species_id'] to map biological names to P1, P2, P3...
+        
+        Args:
+            document: DocumentModel with places
+        
+        Returns:
+            Dict mapping species_id (e.g., "ADP") → place_name (e.g., "P5")
+        """
+        species_map = {}
+        
+        for place in document.places:
+            # Check if place has species_id in metadata
+            if hasattr(place, 'metadata') and 'species_id' in place.metadata:
+                species_id = place.metadata['species_id']
+                place_name = place.name  # e.g., "P1", "P2", "P3"
+                species_map[species_id] = place_name
+                
+                self.logger.debug(f"Mapped species '{species_id}' → place '{place_name}'")
+        
+        return species_map
+    
+    def _translate_formula_to_petri_net(self, formula: str) -> str:
+        """
+        Translate SBML formula from biological names to Petri net place names.
+        
+        Example:
+            Input:  "cytosol * V10m * ADP * PEP / ((K10PEP + PEP) * (K10ADP + ADP))"
+            Output: "cytosol * V10m * P5 * P8 / ((K10PEP + P8) * (K10ADP + P5))"
+        
+        Args:
+            formula: SBML formula with species names
+        
+        Returns:
+            Translated formula with place names (P1, P2, P3...)
+        """
+        if not formula or not self.species_to_place_map:
+            return formula
+        
+        translated = formula
+        
+        # Sort species by length (descending) to avoid partial replacements
+        # Example: Replace "ATP" before "AT" to avoid "ATP" → "P3P"
+        sorted_species = sorted(self.species_to_place_map.keys(), key=len, reverse=True)
+        
+        for species_id in sorted_species:
+            place_name = self.species_to_place_map[species_id]
+            
+            # Use word boundary replacement to avoid partial matches
+            # Replace "ADP" but not "ADPK" or "mADP"
+            import re
+            pattern = r'\b' + re.escape(species_id) + r'\b'
+            translated = re.sub(pattern, place_name, translated)
+        
+        return translated
+    
     def _should_preserve_existing(self, transition) -> bool:
         """
         Check if existing kinetics should be preserved.
@@ -245,15 +312,24 @@ class SBMLKineticsIntegrationService:
             transition.kinetic_metadata = metadata
             
             # Set rate_function from SBML formula for evaluation during simulation
-            # The formula can use place names and will be evaluated with Python/numpy
+            # Store BOTH biological (display) and computational (Petri net) versions
             if kinetic_law.formula:
-                # Store the SBML formula as rate_function for continuous transitions
-                # This will be evaluated during simulation to compute the reaction rate
-                transition.properties['rate_function'] = kinetic_law.formula
+                # Store original formula with biological names (for UI display)
+                transition.properties['rate_function_display'] = kinetic_law.formula
+                
+                # Translate formula to Petri net notation (for simulation)
+                translated_formula = self._translate_formula_to_petri_net(kinetic_law.formula)
+                transition.properties['rate_function'] = translated_formula
+                
+                # Store species mapping for reference
+                if self.species_to_place_map:
+                    transition.properties['species_map'] = self.species_to_place_map.copy()
                 
                 self.logger.debug(
-                    f"Set rate_function for {transition.name}: {kinetic_law.formula[:80]}..."
+                    f"Set rate formulas for {transition.name}:"
                 )
+                self.logger.debug(f"  Display: {kinetic_law.formula[:60]}...")
+                self.logger.debug(f"  Computational: {translated_formula[:60]}...")
             
             # Also update transition.rate if parameters available
             if kinetic_law.parameters:
