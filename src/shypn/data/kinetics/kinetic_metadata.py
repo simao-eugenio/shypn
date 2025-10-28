@@ -55,6 +55,11 @@ class KineticMetadata:
     - UI confidence indicators
     - Audit trail
     
+    Design Note:
+    - Does NOT store transition ID or reference (to avoid circular dependencies)
+    - Metadata is attached to Transition object as an attribute
+    - Transition owns its metadata, not the other way around
+    
     Attributes:
         source: Data source type
         confidence: Confidence level
