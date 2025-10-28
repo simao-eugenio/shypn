@@ -669,7 +669,8 @@ class PathwayConverter:
             transitions,
             pathway_data_wrapper,
             transition_reaction_map=transition_reaction_map,
-            source_file=source_file
+            source_file=source_file,
+            document=document  # Pass document for species mapping
         )
         
         # Log results

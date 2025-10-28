@@ -189,16 +189,20 @@ class TransitionPropDialogLoader(GObject.GObject):
             buffer = rate_textview.get_buffer()
             rate_func = None
             
-            # Priority 1: Check transition.properties['rate_function'] (SBML formulas stored here)
-            if hasattr(self.transition_obj, 'properties') and 'rate_function' in self.transition_obj.properties:
+            # Priority 1: Check properties['rate_function_display'] (SBML biological names for UI)
+            if hasattr(self.transition_obj, 'properties') and 'rate_function_display' in self.transition_obj.properties:
+                rate_func = self.transition_obj.properties['rate_function_display']
+            
+            # Priority 2: Check transition.properties['rate_function'] (SBML formulas stored here)
+            elif hasattr(self.transition_obj, 'properties') and 'rate_function' in self.transition_obj.properties:
                 rate_func = self.transition_obj.properties['rate_function']
             
-            # Priority 2: Check kinetic_metadata.formula (backup for SBML)
+            # Priority 3: Check kinetic_metadata.formula (backup for SBML)
             elif hasattr(self.transition_obj, 'kinetic_metadata') and self.transition_obj.kinetic_metadata:
                 if hasattr(self.transition_obj.kinetic_metadata, 'formula'):
                     rate_func = self.transition_obj.kinetic_metadata.formula
             
-            # Priority 3: Fall back to simple rate value
+            # Priority 4: Fall back to simple rate value
             elif hasattr(self.transition_obj, 'rate') and self.transition_obj.rate is not None:
                 rate_func = str(self.transition_obj.rate)
             
@@ -373,17 +377,27 @@ class TransitionPropDialogLoader(GObject.GObject):
                 rate_text = buffer.get_text(start, end, True).strip()
                 
                 if rate_text:
-                    # Save to properties['rate_function'] for complex expressions/formulas
+                    # Save to properties for complex expressions/formulas
                     if not hasattr(self.transition_obj, 'properties'):
                         self.transition_obj.properties = {}
+                    
+                    # If user edited a formula, it's now considered manual input
+                    # Store as both display and computational versions
+                    self.transition_obj.properties['rate_function_display'] = rate_text
                     self.transition_obj.properties['rate_function'] = rate_text
+                    
+                    # Note: For manual edits, user must use P1, P2, P3 notation for simulation
+                    # or keep biological names if they want display-only
                     
                     # Also try to set rate (for simple numeric values)
                     self.transition_obj.set_rate(rate_text)
                 else:
                     # Clear rate_function if empty
-                    if hasattr(self.transition_obj, 'properties') and 'rate_function' in self.transition_obj.properties:
-                        del self.transition_obj.properties['rate_function']
+                    if hasattr(self.transition_obj, 'properties'):
+                        if 'rate_function' in self.transition_obj.properties:
+                            del self.transition_obj.properties['rate_function']
+                        if 'rate_function_display' in self.transition_obj.properties:
+                            del self.transition_obj.properties['rate_function_display']
                     self.transition_obj.set_rate(None)
             
             # Guard - let object handle it
