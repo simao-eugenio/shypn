@@ -26,19 +26,33 @@ A comprehensive GTK-based platform for systems biology pathway modeling with adv
 - ✅ **Clean repository structure** (test files organized, shell scripts archived)
 
 **Recent Updates** (October 2025):
+- ✅ **Canvas Health fixing series** - Complete feature parity across all canvas creation flows (5 branches merged)
+  - Color matching (transitions: border+fill, places: border) across Default/File New/File Open/KEGG/SBML
+  - Locality detection and automatic addition
+  - Data collector wiring for plot panels
+  - Pan/Zoom NavigationToolbar integration
+  - Wayland compatibility fixes
+- ✅ **SBML workflow enhancements** - Production-ready biological modeling
+  - 7 firing policies (random, earliest, latest, priority, race, age, preemptive-priority)
+  - Fixed duplicate ID bugs (DocumentModel.from_dict + ID parsing "10" vs "P10")
+  - Fixed stochastic transition scheduling
+  - Can load SBML models and add source/sink transitions without conflicts
+  - Scientific corrections (mass action → stochastic terminology)
+- ✅ **Repository cleanup** - Professional project organization (Oct 27, 2025)
+  - Removed 29 test log files from root
+  - Moved 10 test files to tests/ directory
+  - All test artifacts consolidated
 - ✅ **Master Palette system** - Unified panel control with exclusive button logic
 - ✅ **Panel architecture refactoring** - All 5 panels use skeleton pattern (synchronous float/attach)
 - ✅ **File Panel V3** - Normalized XML UI + OOP architecture (Base → Loader → Controller)
 - ✅ **CategoryFrame structure** - Programmatic collapsible categories with exclusive expansion
 - ✅ **Float/attach functionality** - All panels support detach to floating window
-- ✅ **Repository organization** - Test files moved to tests/, shell scripts archived to archive/sh/
-- ✅ **Project organization** - Moved files to proper directories (doc/, tests/, scripts/)
 - ✅ **Analysis panel performance optimization** - 95% faster updates (156ms → 7ms)
 - ✅ **Locality integration fix** - Complete P-T-P pattern plotting in analyses
 - ✅ **Canvas management** - Proper reset/clear with immediate visual feedback
 - ✅ **UI improvements** - Hierarchical display of locality objects with color-coded indicators
 - ✅ **Comprehensive testing** - 34/34 property dialog and analysis tests passing (100%)
-- ✅ **Documentation** - 19 new comprehensive documentation files
+- ✅ **Documentation** - 24+ new comprehensive documentation files
 - ✅ **Complete repository cleanup** - Legacy code removed, deprecated files archived
 - ✅ **Debug print removal** - 107 debug prints removed from 26 files
 - ✅ **Syntax error fixes** - 27 empty code blocks fixed in 15 files
@@ -102,12 +116,15 @@ shypn/
 │       ├── pathway/       # Pathway enhancement pipeline
 │       ├── ui/            # UI component classes
 │       └── utils/         # Utility functions
-├── tests/          # Complete test suite (120+ test files)
+├── tests/          # Complete test suite (130+ test files)
 │   ├── prop_dialogs/      # Property dialog integration tests (34 tests)
-│   ├── test_*.py          # All test files (moved from root Oct 2025)
+│   ├── test_*.py          # Unit and integration tests (organized Oct 27, 2025)
+│   ├── test_*.sh          # Shell test scripts (organized Oct 27, 2025)
 │   ├── test_arc_model_integration.py
 │   ├── test_place_model_integration.py
 │   ├── test_transition_model_integration.py
+│   ├── test_duplicate_id_fix.py  # Duplicate ID bug verification
+│   ├── test_firing_policy_persistence.py  # Firing policy tests
 │   └── ...
 ├── ui/
 │   ├── canvas/     # Document canvas interfaces (.ui files)
@@ -128,13 +145,15 @@ shypn/
   - `ui/`: UI component classes (FilePanelBase, CategoryFrame, dialogs, controllers)
 - `ui/`: GTK UI definition files (Glade XML format) - All files actively used
   - `panels/`: Panel UI definitions including file_panel_v3.ui
-- `tests/`: Complete test suite (120+ files, 34 property dialog tests)
-  - All test files consolidated here (moved from root Oct 2025)
+- `tests/`: Complete test suite (130+ files, all tests passing)
+  - All test files consolidated here (organized Oct 27, 2025)
   - `prop_dialogs/`: Integration tests for Place, Arc, and Transition dialogs (100% passing)
+  - Duplicate ID bug tests, firing policy tests, SBML import tests
 - `scripts/`: Utility scripts (6 files) - KEGG inspection, topology comparison, headless testing
 - `workspace/`: User workspace with examples and projects
-- `doc/`: Comprehensive technical documentation (430+ files)
-  - Recent additions: Panel architecture, File Panel V3, Master Palette system
+- `doc/`: Comprehensive technical documentation (440+ files)
+  - Recent additions: Canvas Health series, Firing Policies, Duplicate ID fixes, SBML flow analysis
+  - Panel architecture, File Panel V3, Master Palette system
 - `archive/`: Archived and deprecated code (not for active use)
   - `deprecated/`: 6 unused Python files
   - `sh/`: Historical test shell scripts (4 files, moved Oct 2025)
@@ -230,12 +249,19 @@ Please read [CONTRIBUTING.md](doc/CONTRIBUTING.md) for details on our code of co
 
 ## Documentation
 
-All project documentation is located in the [`doc/`](doc/) directory (430+ files):
+All project documentation is located in the [`doc/`](doc/) directory (440+ files):
 
 ### Core Documentation
 - **[COORDINATE_SYSTEM.md](doc/COORDINATE_SYSTEM.md)** - Coordinate system conventions (Cartesian vs Graphics)
 - **[CONTRIBUTING.md](doc/CONTRIBUTING.md)** - Contribution guidelines and code standards
 - **[CHANGELOG.md](doc/CHANGELOG.md)** - Version history and changes
+
+### Canvas Health Series (October 2025)
+- **[FIRING_POLICIES.md](doc/FIRING_POLICIES.md)** - 7 firing policies implementation
+- **[FIX_STOCHASTIC_SCHEDULING_INITIALIZATION.md](doc/FIX_STOCHASTIC_SCHEDULING_INITIALIZATION.md)** - Stochastic transition scheduling fixes
+- **[DUPLICATE_ID_BUG_FIX.md](doc/DUPLICATE_ID_BUG_FIX.md)** - Duplicate ID bug analysis and fix
+- **[SBML_COMPLETE_FLOW_ANALYSIS.md](doc/SBML_COMPLETE_FLOW_ANALYSIS.md)** - Complete SBML import pipeline documentation
+- **[DUPLICATE_ID_BUG_ALL_FLOWS_ANALYSIS.md](doc/DUPLICATE_ID_BUG_ALL_FLOWS_ANALYSIS.md)** - Cross-flow duplicate ID analysis
 
 ### Recent Features (December 2024)
 - **[ANALYSES_PANEL_PERFORMANCE_COMPLETE.md](doc/ANALYSES_PANEL_PERFORMANCE_COMPLETE.md)** - Performance optimization (95% improvement)
