@@ -28,6 +28,12 @@ from shypn.netobjs.transition import Transition
 from shypn.netobjs.arc import Arc
 from shypn.heuristic import EstimatorFactory
 
+# Import SBML kinetics integration service
+try:
+    from shypn.services.sbml_kinetics_service import SBMLKineticsIntegrationService
+except ImportError:
+    SBMLKineticsIntegrationService = None
+
 
 class BaseConverter:
     """
@@ -591,6 +597,16 @@ class PathwayConverter:
         )
         arcs = arc_converter.convert()
         
+        # ==============================================================================
+        # INTEGRATE SBML KINETICS: Create SBMLKineticMetadata for transitions
+        # ==============================================================================
+        if SBMLKineticsIntegrationService is not None:
+            self._integrate_sbml_kinetics(
+                document,
+                pathway,
+                reaction_to_transition
+            )
+        
         # Log summary
         place_count, transition_count, arc_count = document.get_object_count()
         self.logger.info(
@@ -599,6 +615,75 @@ class PathwayConverter:
         )
         
         return document
+    
+    def _integrate_sbml_kinetics(
+        self,
+        document: DocumentModel,
+        pathway: ProcessedPathwayData,
+        reaction_to_transition: Dict[str, Transition]
+    ) -> None:
+        """
+        Integrate SBML kinetic metadata into transitions.
+        
+        Creates SBMLKineticMetadata for transitions with kinetic laws from SBML.
+        Uses object references (not IDs) to map reactions to transitions.
+        
+        Args:
+            document: DocumentModel with transitions
+            pathway: ProcessedPathwayData with reactions and kinetic laws
+            reaction_to_transition: Mapping from reaction.id to Transition object
+        """
+        # Build transition→reaction map (using object references)
+        transition_reaction_map = {}
+        for reaction_id, transition in reaction_to_transition.items():
+            # Find corresponding reaction object
+            reaction = next(
+                (r for r in pathway.reactions if r.id == reaction_id),
+                None
+            )
+            if reaction is not None:
+                # Store object reference (not ID)
+                transition_reaction_map[transition] = reaction
+        
+        # Get source file from pathway metadata
+        source_file = pathway.metadata.get('source_file', 'unknown.sbml')
+        
+        # Create service and integrate kinetics
+        service = SBMLKineticsIntegrationService()
+        
+        # Get all transitions from document
+        transitions = [obj for obj in document.objects if isinstance(obj, Transition)]
+        
+        # Create a simple PathwayData wrapper (service expects this)
+        from .pathway_data import PathwayData
+        pathway_data_wrapper = PathwayData(
+            species=pathway.species,
+            reactions=pathway.reactions,
+            compartments=pathway.compartments,
+            parameters=pathway.parameters,
+            metadata=pathway.metadata
+        )
+        
+        # Integrate kinetics using object references
+        results = service.integrate_kinetics(
+            transitions,
+            pathway_data_wrapper,
+            transition_reaction_map=transition_reaction_map,
+            source_file=source_file
+        )
+        
+        # Log results
+        integrated = sum(1 for success in results.values() if success)
+        self.logger.info(
+            f"SBML kinetics integration: {integrated}/{len(results)} transitions enriched"
+        )
+        
+        # Get summary statistics
+        summary = service.get_integration_summary(transitions)
+        self.logger.info(
+            f"Kinetics summary: {summary['sbml_kinetics']} SBML, "
+            f"{summary['without_kinetics']} without kinetics"
+        )
 
 
 # Example usage
