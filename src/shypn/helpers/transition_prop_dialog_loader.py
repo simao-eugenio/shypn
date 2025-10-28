@@ -139,24 +139,20 @@ class TransitionPropDialogLoader(GObject.GObject):
             transition_type = self.transition_obj.transition_type or 'continuous'
             type_combo.set_active(type_map.get(transition_type, 3))
         
-        # Priority
-        priority_spin = self.builder.get_object('priority_spin')
-        if priority_spin and hasattr(self.transition_obj, 'priority'):
-            priority_spin.set_value(float(self.transition_obj.priority))
-        
-        # Firing policy
+        # Firing policy (replaces priority spinner)
         firing_policy_combo = self.builder.get_object('firing_policy_combo')
         if firing_policy_combo and hasattr(self.transition_obj, 'firing_policy'):
+            # Map policy names to combobox indices (order: Random, Earliest, Latest, Priority, Race, Age, Preemptive-Priority)
             policy_map = {
-                'earliest': 0,
-                'latest': 1,
-                'priority': 2,
-                'race': 3,
-                'age': 4,
-                'random': 5,
+                'random': 0,
+                'earliest': 1,
+                'latest': 2,
+                'priority': 3,
+                'race': 4,
+                'age': 5,
                 'preemptive-priority': 6
             }
-            policy = self.transition_obj.firing_policy or 'earliest'
+            policy = self.transition_obj.firing_policy or 'random'
             firing_policy_combo.set_active(policy_map.get(policy, 0))
         
         # Source/Sink checkboxes
@@ -168,10 +164,24 @@ class TransitionPropDialogLoader(GObject.GObject):
         if is_sink_check and hasattr(self.transition_obj, 'is_sink'):
             is_sink_check.set_active(self.transition_obj.is_sink)
         
-        # Rate (simple entry)
+        # Rate (simple entry) - also check for rate_function formulas (SBML)
         rate_entry = self.builder.get_object('rate_entry')
-        if rate_entry and hasattr(self.transition_obj, 'rate'):
-            rate_value = self.transition_obj.rate
+        if rate_entry:
+            rate_value = None
+            
+            # Priority 1: Check properties['rate_function_display'] (SBML biological names for UI)
+            if hasattr(self.transition_obj, 'properties') and 'rate_function_display' in self.transition_obj.properties:
+                rate_value = self.transition_obj.properties['rate_function_display']
+            
+            # Priority 2: Check transition.properties['rate_function'] (SBML formulas stored here)
+            elif hasattr(self.transition_obj, 'properties') and 'rate_function' in self.transition_obj.properties:
+                rate_value = self.transition_obj.properties['rate_function']
+            
+            # Priority 3: Fall back to simple rate value
+            elif hasattr(self.transition_obj, 'rate') and self.transition_obj.rate is not None:
+                rate_value = self.transition_obj.rate
+            
+            # Set the text if we found something
             if rate_value is not None:
                 rate_entry.set_text(str(rate_value))
         
@@ -183,13 +193,32 @@ class TransitionPropDialogLoader(GObject.GObject):
             if guard_value is not None:
                 buffer.set_text(str(guard_value))
         
-        # Rate function (TextView)
+        # Rate function (TextView) - check multiple sources
         rate_textview = self.builder.get_object('rate_textview')
-        if rate_textview and hasattr(self.transition_obj, 'rate'):
+        if rate_textview:
             buffer = rate_textview.get_buffer()
-            rate_value = self.transition_obj.rate
-            if rate_value is not None:
-                buffer.set_text(str(rate_value))
+            rate_func = None
+            
+            # Priority 1: Check properties['rate_function_display'] (SBML biological names for UI)
+            if hasattr(self.transition_obj, 'properties') and 'rate_function_display' in self.transition_obj.properties:
+                rate_func = self.transition_obj.properties['rate_function_display']
+            
+            # Priority 2: Check transition.properties['rate_function'] (SBML formulas stored here)
+            elif hasattr(self.transition_obj, 'properties') and 'rate_function' in self.transition_obj.properties:
+                rate_func = self.transition_obj.properties['rate_function']
+            
+            # Priority 3: Check kinetic_metadata.formula (backup for SBML)
+            elif hasattr(self.transition_obj, 'kinetic_metadata') and self.transition_obj.kinetic_metadata:
+                if hasattr(self.transition_obj.kinetic_metadata, 'formula'):
+                    rate_func = self.transition_obj.kinetic_metadata.formula
+            
+            # Priority 4: Fall back to simple rate value
+            elif hasattr(self.transition_obj, 'rate') and self.transition_obj.rate is not None:
+                rate_func = str(self.transition_obj.rate)
+            
+            # Set the text if we found something
+            if rate_func is not None:
+                buffer.set_text(str(rate_func))
         
         # Line Width
         width_entry = self.builder.get_object('prop_transition_width_entry')
@@ -320,21 +349,17 @@ class TransitionPropDialogLoader(GObject.GObject):
                 type_list = ['immediate', 'timed', 'stochastic', 'continuous']
                 self.transition_obj.transition_type = type_list[type_combo.get_active()]
             
-            # Priority
-            priority_spin = self.builder.get_object('priority_spin')
-            if priority_spin:
-                self.transition_obj.priority = int(priority_spin.get_value())
-            
-            # Firing policy
+            # Firing policy (replaces priority spinner)
             firing_policy_combo = self.builder.get_object('firing_policy_combo')
             if firing_policy_combo:
+                # Policy list order matches combobox: Random, Earliest, Latest, Priority, Race, Age, Preemptive-Priority
                 policy_list = [
+                    'random',
                     'earliest',
                     'latest',
                     'priority',
                     'race',
                     'age',
-                    'random',
                     'preemptive-priority'
                 ]
                 policy_index = firing_policy_combo.get_active()
@@ -350,15 +375,36 @@ class TransitionPropDialogLoader(GObject.GObject):
             if is_sink_check:
                 self.transition_obj.is_sink = is_sink_check.get_active()
             
-            # Rate - let object validate
+            # Rate function - save to both rate and properties['rate_function']
             rate_textview = self.builder.get_object('rate_textview')
             if rate_textview:
                 buffer = rate_textview.get_buffer()
                 start, end = buffer.get_bounds()
                 rate_text = buffer.get_text(start, end, True).strip()
                 
-                # Use object's validation method
-                self.transition_obj.set_rate(rate_text if rate_text else None)
+                if rate_text:
+                    # Save to properties for complex expressions/formulas
+                    if not hasattr(self.transition_obj, 'properties'):
+                        self.transition_obj.properties = {}
+                    
+                    # If user edited a formula, it's now considered manual input
+                    # Store as both display and computational versions
+                    self.transition_obj.properties['rate_function_display'] = rate_text
+                    self.transition_obj.properties['rate_function'] = rate_text
+                    
+                    # Note: For manual edits, user must use P1, P2, P3 notation for simulation
+                    # or keep biological names if they want display-only
+                    
+                    # Also try to set rate (for simple numeric values)
+                    self.transition_obj.set_rate(rate_text)
+                else:
+                    # Clear rate_function if empty
+                    if hasattr(self.transition_obj, 'properties'):
+                        if 'rate_function' in self.transition_obj.properties:
+                            del self.transition_obj.properties['rate_function']
+                        if 'rate_function_display' in self.transition_obj.properties:
+                            del self.transition_obj.properties['rate_function_display']
+                    self.transition_obj.set_rate(None)
             
             # Guard - let object handle it
             guard_textview = self.builder.get_object('guard_textview')

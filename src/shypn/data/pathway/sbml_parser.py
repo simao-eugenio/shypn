@@ -225,7 +225,10 @@ class ReactionExtractor(BaseExtractor):
         # Extract kinetic law
         kinetic_law = None
         if sbml_reaction.isSetKineticLaw():
-            kinetic_law = self._extract_kinetic_law(sbml_reaction.getKineticLaw())
+            kinetic_law = self._extract_kinetic_law(
+                sbml_reaction.getKineticLaw(),
+                sbml_reaction=sbml_reaction
+            )
         
         return Reaction(
             id=reaction_id,
@@ -236,12 +239,13 @@ class ReactionExtractor(BaseExtractor):
             reversible=reversible
         )
     
-    def _extract_kinetic_law(self, sbml_kinetic_law) -> Optional[KineticLaw]:
+    def _extract_kinetic_law(self, sbml_kinetic_law, sbml_reaction=None) -> Optional[KineticLaw]:
         """
         Extract kinetic law from SBML.
         
         Args:
             sbml_kinetic_law: libsbml KineticLaw object
+            sbml_reaction: libsbml Reaction object (for metadata)
             
         Returns:
             KineticLaw object or None
@@ -264,11 +268,25 @@ class ReactionExtractor(BaseExtractor):
         # Try to detect kinetic law type
         rate_type = self._detect_rate_type(formula)
         
-        return KineticLaw(
+        # Store SBML-specific metadata for later metadata creation
+        # This will be used by the converter to create SBMLKineticMetadata
+        sbml_metadata = {}
+        if sbml_reaction:
+            sbml_metadata['sbml_reaction_id'] = sbml_reaction.getId()
+            sbml_metadata['sbml_level'] = self.model.getLevel()
+            sbml_metadata['sbml_version'] = self.model.getVersion()
+            sbml_metadata['sbml_model_id'] = self.model.getId()
+        
+        kinetic_law = KineticLaw(
             formula=formula,
             rate_type=rate_type,
             parameters=parameters
         )
+        
+        # Attach SBML metadata to kinetic law for converter to use
+        kinetic_law.sbml_metadata = sbml_metadata
+        
+        return kinetic_law
     
     def _detect_rate_type(self, formula: str) -> str:
         """
@@ -316,6 +334,27 @@ class CompartmentExtractor(BaseExtractor):
             self.logger.debug(f"  - {comp_id}: {comp_name}")
         
         return compartments
+    
+    def extract_sizes(self) -> Dict[str, float]:
+        """
+        Extract compartment sizes from SBML model.
+        
+        Returns:
+            Dict mapping compartment IDs to sizes (volumes)
+        """
+        compartment_sizes = {}
+        
+        num_compartments = self.model.getNumCompartments()
+        
+        for i in range(num_compartments):
+            sbml_compartment = self.model.getCompartment(i)
+            comp_id = sbml_compartment.getId()
+            # Get size (volume), default to 1.0 if not set
+            comp_size = sbml_compartment.getSize() if sbml_compartment.isSetSize() else 1.0
+            compartment_sizes[comp_id] = comp_size
+            self.logger.debug(f"  - {comp_id} size: {comp_size}")
+        
+        return compartment_sizes
 
 
 class ParameterExtractor(BaseExtractor):
@@ -444,6 +483,12 @@ class SBMLParser:
         reactions = reaction_extractor.extract()
         compartments = compartment_extractor.extract()
         parameters = parameter_extractor.extract()
+        
+        # Extract compartment sizes and merge into parameters
+        # This makes compartment sizes available in kinetic formulas
+        compartment_sizes = compartment_extractor.extract_sizes()
+        parameters.update(compartment_sizes)
+        self.logger.debug(f"Merged {len(compartment_sizes)} compartment sizes into parameters")
         
         # Create metadata
         metadata = {

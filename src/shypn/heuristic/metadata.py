@@ -2,11 +2,31 @@
 Kinetics Metadata
 
 Tracks the source and confidence of kinetic assignments for transitions.
-This metadata is stored in transition.metadata dict.
+This metadata is stored in transition.metadata dict (legacy) or 
+transition.kinetic_metadata (new structured metadata).
+
+COMPATIBILITY LAYER:
+This module bridges the old metadata system (dict-based) with the new
+structured KineticMetadata classes. It checks both systems and prefers
+the new structured metadata when available.
 """
 
 from typing import Optional, Dict, Any
 from .assignment_result import ConfidenceLevel, AssignmentSource
+
+# Import new kinetic metadata classes
+try:
+    from shypn.data.kinetics import (
+        KineticMetadata as NewKineticMetadata,
+        KineticSource,
+        ConfidenceLevel as NewConfidenceLevel
+    )
+    NEW_METADATA_AVAILABLE = True
+except ImportError:
+    NEW_METADATA_AVAILABLE = False
+    NewKineticMetadata = None
+    KineticSource = None
+    NewConfidenceLevel = None
 
 
 class KineticsMetadata:
@@ -87,14 +107,25 @@ class KineticsMetadata:
         """
         Check if transition should be enhanced with kinetics.
         
+        PRIORITY: Checks new structured metadata first, falls back to legacy.
+        
         Never enhance if:
-        - Source is 'explicit' (from curated model)
-        - Source is 'user' (user configured)
-        - Confidence is 'high' and source is 'database'
+        - New metadata: SBML or Manual source (definitive/high confidence)
+        - New metadata: Locked flag set
+        - Legacy: Source is 'explicit' (from curated model)
+        - Legacy: Source is 'user' (user configured)
+        - Legacy: Confidence is 'high' and source is 'database'
         
         Returns:
             True if safe to enhance, False otherwise
         """
+        # PRIORITY 1: Check new structured metadata (if available)
+        if NEW_METADATA_AVAILABLE:
+            if hasattr(transition, 'kinetic_metadata') and transition.kinetic_metadata:
+                # Use new metadata preservation logic
+                return not NewKineticMetadata.should_preserve(transition.kinetic_metadata)
+        
+        # FALLBACK: Check legacy metadata
         source = cls.get_source(transition)
         confidence = cls.get_confidence(transition)
         

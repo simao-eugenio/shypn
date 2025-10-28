@@ -139,6 +139,12 @@ class ContinuousBehavior(TransitionBehavior):
                 # Add all catalog functions to context
                 context.update(FUNCTION_CATALOG)
                 
+                # Add SBML parameters from kinetic_metadata (if available)
+                if hasattr(self.transition, 'kinetic_metadata') and self.transition.kinetic_metadata:
+                    if hasattr(self.transition.kinetic_metadata, 'parameters'):
+                        # Add all kinetic parameters (kf_0, kr_0, Vmax, Km, etc.)
+                        context.update(self.transition.kinetic_metadata.parameters)
+                
                 # Add place tokens as P1, P2, ... (or P88, P105 if ID already has P)
                 for place_id, place in places.items():
                     # Handle both numeric IDs (1, 2, 3) and string IDs ("P88", "P105")
