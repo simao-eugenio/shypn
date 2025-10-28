@@ -69,6 +69,9 @@ class SBMLKineticsIntegrationService:
             self.logger.warning("No transitions to integrate")
             return {}
         
+        # Store pathway_data for access to global parameters and compartments
+        self.pathway_data = pathway_data
+        
         # Build species-to-place name mapping if document provided
         self.species_to_place_map = {}
         if document:
@@ -296,12 +299,23 @@ class SBMLKineticsIntegrationService:
             # Extract SBML metadata from kinetic law (if available)
             sbml_metadata = getattr(kinetic_law, 'sbml_metadata', {})
             
-            # Create SBMLKineticMetadata
+            # Merge parameters: global parameters (includes compartment sizes) + local kinetic law parameters
+            all_parameters = {}
+            
+            # 1. Add global parameters from SBML model (includes compartment sizes)
+            if hasattr(self, 'pathway_data') and self.pathway_data.parameters:
+                all_parameters.update(self.pathway_data.parameters)
+                self.logger.debug(f"  Added {len(self.pathway_data.parameters)} global parameters (incl. compartments)")
+            
+            # 2. Add local kinetic law parameters (these override globals if duplicate)
+            all_parameters.update(kinetic_law.parameters)
+            
+            # Create SBMLKineticMetadata with all parameters
             metadata = SBMLKineticMetadata(
                 source_file=source_file,
                 rate_type=kinetic_law.rate_type,
                 formula=kinetic_law.formula,
-                parameters=kinetic_law.parameters.copy(),
+                parameters=all_parameters,
                 sbml_level=sbml_metadata.get('sbml_level'),
                 sbml_version=sbml_metadata.get('sbml_version'),
                 sbml_reaction_id=sbml_metadata.get('sbml_reaction_id'),
