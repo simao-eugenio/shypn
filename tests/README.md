@@ -3,7 +3,7 @@
 ```markdown
 # SHYpn Test Suite
 
-This directory contains all test scripts and test modules for the SHYpn project. **110+ test files** covering various aspects of the application.
+This directory contains all test scripts and test modules for the SHYpn project. **130+ test files** covering various aspects of the application.
 
 ## Test Status (October 2025)
 
@@ -12,9 +12,17 @@ This directory contains all test scripts and test modules for the SHYpn project.
 - Arc dialogs: 13/13 passing  
 - Transition dialogs: 12/12 passing
 
+**Firing Policy Tests**: ✅ All 7 policies tested and passing
+- Random, Earliest, Latest, Priority, Race, Age, Preemptive-Priority
+
+**SBML Import Tests**: ✅ All passing
+- Duplicate ID bug fixes validated
+- Stochastic transition scheduling verified
+- Source/sink transition compatibility confirmed
+
 **Overall Coverage**: High coverage across all major components
 
-**Repository Organization**: All test files consolidated into this directory (October 2025)
+**Repository Organization**: All test files consolidated into this directory (October 27, 2025)
 
 ## Organization
 
@@ -32,14 +40,27 @@ Tests are organized by functionality:
 
 ### October 2025 Updates
 
-#### Test Consolidation
+#### Test Consolidation (October 27, 2025)
 All test files consolidated from repository root into this directory:
-- ✅ **13 test Python files** moved from root (October 22, 2025)
+- ✅ **10 additional test files** moved from root (test scripts and shell scripts)
+- ✅ **29 test log files** removed from root
 - ✅ Files organized into logical categories
 - ✅ All tests maintain 100% functionality
 - ✅ Clean repository structure achieved
 
-**Files moved**:
+**Recently moved files** (October 27, 2025):
+- `test_duplicate_canvas.sh` - Duplicate canvas testing
+- `test_duplicate_id_fix.py` - Duplicate ID bug verification tests
+- `test_import_property_dialogs.sh` - Property dialog import tests
+- `test_panel_creation.sh` - Panel creation testing
+- `test_sbml_biomodels_headless.py` - Headless SBML BioModels tests
+- `test_sbml_flow.sh` - SBML import flow testing
+- `test_sbml_import_flow.py` - SBML import flow Python tests
+- `test_sbml_stochastic_source.py` - SBML stochastic source tests
+- `test_stochastic_source.py` - Stochastic source transition tests
+- `test_transition_dialog_stochastic.py` - Stochastic transition dialog tests
+
+**Previously moved files** (October 22, 2025):
 - `test_dialog_speed.py` - Dialog performance testing
 - `test_dialogs.py` - Dialog functionality tests
 - `test_exclusive_master_palette.py` - Master Palette exclusive button logic
@@ -101,6 +122,20 @@ All test files consolidated from repository root into this directory:
 - `test_source_sink.py` - Source/sink place types
 - `test_timed_source.py` - Timed source places
 - `test_timed_sink.py` - Timed sink places
+- `test_stochastic_source.py` - Stochastic source transitions (moved Oct 27, 2025)
+
+#### SBML Import Tests
+- `test_sbml_biomodels_headless.py` - Headless SBML BioModels tests (moved Oct 27, 2025)
+- `test_sbml_import_flow.py` - SBML import flow tests (moved Oct 27, 2025)
+- `test_sbml_stochastic_source.py` - SBML stochastic source tests (moved Oct 27, 2025)
+- `test_sbml_flow.sh` - SBML flow shell tests (moved Oct 27, 2025)
+
+#### Firing Policy Tests
+- `test_firing_policy_persistence.py` - Firing policy persistence and all 7 policies
+
+#### Duplicate ID Tests
+- `test_duplicate_id_fix.py` - Duplicate ID bug verification (moved Oct 27, 2025)
+- `test_duplicate_canvas.sh` - Duplicate canvas testing (moved Oct 27, 2025)
 
 #### Transformation Handler Tests
 - `test_transformation_handlers.py` - Arc transformation handlers
