@@ -652,7 +652,7 @@ class PathwayConverter:
         service = SBMLKineticsIntegrationService()
         
         # Get all transitions from document
-        transitions = [obj for obj in document.objects if isinstance(obj, Transition)]
+        transitions = document.transitions  # Use transitions list, not objects
         
         # Create a simple PathwayData wrapper (service expects this)
         from .pathway_data import PathwayData
