@@ -70,6 +70,17 @@ class StochasticBehavior(TransitionBehavior):
         self.has_rate_function = 'rate_function' in props
         self.rate_function_expr = props.get('rate_function') if self.has_rate_function else None
         
+        # Warn if stochastic transition has complex formula (likely should be continuous)
+        if self.has_rate_function and self.rate_function_expr:
+            # Check for patterns indicating reversible reactions (forward - reverse)
+            formula_lower = str(self.rate_function_expr).lower()
+            if ' - ' in self.rate_function_expr or 'k_r' in formula_lower or 'kr_' in formula_lower:
+                self.logger.warning(
+                    f"Stochastic transition '{transition.name}' has formula with subtraction, "
+                    f"which may produce negative rates. Consider converting to continuous transition. "
+                    f"Formula: {self.rate_function_expr[:80]}..."
+                )
+        
         # Support both properties dict AND transition.rate attribute (for UI compatibility)
         if 'rate' in props:
             # Explicit rate in properties
