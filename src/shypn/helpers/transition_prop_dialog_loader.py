@@ -139,24 +139,20 @@ class TransitionPropDialogLoader(GObject.GObject):
             transition_type = self.transition_obj.transition_type or 'continuous'
             type_combo.set_active(type_map.get(transition_type, 3))
         
-        # Priority
-        priority_spin = self.builder.get_object('priority_spin')
-        if priority_spin and hasattr(self.transition_obj, 'priority'):
-            priority_spin.set_value(float(self.transition_obj.priority))
-        
-        # Firing policy
+        # Firing policy (replaces priority spinner)
         firing_policy_combo = self.builder.get_object('firing_policy_combo')
         if firing_policy_combo and hasattr(self.transition_obj, 'firing_policy'):
+            # Map policy names to combobox indices (order: Random, Earliest, Latest, Priority, Race, Age, Preemptive-Priority)
             policy_map = {
-                'earliest': 0,
-                'latest': 1,
-                'priority': 2,
-                'race': 3,
-                'age': 4,
-                'random': 5,
+                'random': 0,
+                'earliest': 1,
+                'latest': 2,
+                'priority': 3,
+                'race': 4,
+                'age': 5,
                 'preemptive-priority': 6
             }
-            policy = self.transition_obj.firing_policy or 'earliest'
+            policy = self.transition_obj.firing_policy or 'random'
             firing_policy_combo.set_active(policy_map.get(policy, 0))
         
         # Source/Sink checkboxes
@@ -353,21 +349,17 @@ class TransitionPropDialogLoader(GObject.GObject):
                 type_list = ['immediate', 'timed', 'stochastic', 'continuous']
                 self.transition_obj.transition_type = type_list[type_combo.get_active()]
             
-            # Priority
-            priority_spin = self.builder.get_object('priority_spin')
-            if priority_spin:
-                self.transition_obj.priority = int(priority_spin.get_value())
-            
-            # Firing policy
+            # Firing policy (replaces priority spinner)
             firing_policy_combo = self.builder.get_object('firing_policy_combo')
             if firing_policy_combo:
+                # Policy list order matches combobox: Random, Earliest, Latest, Priority, Race, Age, Preemptive-Priority
                 policy_list = [
+                    'random',
                     'earliest',
                     'latest',
                     'priority',
                     'race',
                     'age',
-                    'random',
                     'preemptive-priority'
                 ]
                 policy_index = firing_policy_combo.get_active()

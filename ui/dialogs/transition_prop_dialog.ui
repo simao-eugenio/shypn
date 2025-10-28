@@ -343,51 +343,7 @@
                         <property name="margin-left">15</property>
                         <property name="margin-right">15</property>
                         
-                        <!-- Priority Field -->
-                        <child>
-                          <object class="GtkBox" id="priority_box">
-                            <property name="visible">True</property>
-                            <property name="can-focus">False</property>
-                            <property name="spacing">10</property>
-                            <child>
-                              <object class="GtkLabel" id="priority_label">
-                                <property name="visible">True</property>
-                                <property name="can-focus">False</property>
-                                <property name="label" translatable="yes">Priority:</property>
-                                <property name="width-chars">12</property>
-                                <property name="xalign">1</property>
-                                <property name="tooltip-text">Priority for conflict resolution (higher = higher priority)</property>
-                              </object>
-                              <packing>
-                                <property name="expand">False</property>
-                                <property name="fill">True</property>
-                                <property name="position">0</property>
-                              </packing>
-                            </child>
-                            <child>
-                              <object class="GtkSpinButton" id="priority_spin">
-                                <property name="visible">True</property>
-                                <property name="can-focus">True</property>
-                                <property name="hexpand">True</property>
-                                <property name="adjustment">priority_adjustment</property>
-                                <property name="digits">0</property>
-                                <property name="tooltip-text">Priority for conflict resolution when multiple transitions are enabled (0-100, default=0)</property>
-                              </object>
-                              <packing>
-                                <property name="expand">True</property>
-                                <property name="fill">True</property>
-                                <property name="position">1</property>
-                              </packing>
-                            </child>
-                          </object>
-                          <packing>
-                            <property name="expand">False</property>
-                            <property name="fill">True</property>
-                            <property name="position">0</property>
-                          </packing>
-                        </child>
-                        
-                        <!-- Firing Policy Field -->
+                        <!-- Firing Policy Field (replaces Priority spinner) -->
                         <child>
                           <object class="GtkBox" id="firing_policy_box">
                             <property name="visible">True</property>
@@ -397,10 +353,10 @@
                               <object class="GtkLabel" id="firing_policy_label">
                                 <property name="visible">True</property>
                                 <property name="can-focus">False</property>
-                                <property name="label" translatable="yes">Firing Policy:</property>
+                                <property name="label" translatable="yes">Policy:</property>
                                 <property name="width-chars">12</property>
                                 <property name="xalign">1</property>
-                                <property name="tooltip-text">Policy for conflict resolution timing</property>
+                                <property name="tooltip-text">Firing policy for conflict resolution when multiple transitions are enabled</property>
                               </object>
                               <packing>
                                 <property name="expand">False</property>
@@ -413,15 +369,15 @@
                                 <property name="visible">True</property>
                                 <property name="can-focus">False</property>
                                 <property name="hexpand">True</property>
-                                <property name="active">0</property>
-                                <property name="tooltip-text">Conflict resolution policy when multiple transitions are enabled simultaneously. Priority: hierarchical control; Race: mass action competition; Age: FIFO scheduling; Random: uniform selection; Preemptive-Priority: allows interruption</property>
+                                <property name="active">5</property>
+                                <property name="tooltip-text">Conflict resolution policy when multiple transitions are enabled simultaneously. Random: uniform selection; Earliest: first enabled fires; Latest: last enabled fires; Priority: uses priority value; Race: mass action competition; Age: FIFO scheduling; Preemptive-Priority: allows interruption</property>
                                 <items>
+                                  <item translatable="yes">Random</item>
                                   <item translatable="yes">Earliest</item>
                                   <item translatable="yes">Latest</item>
                                   <item translatable="yes">Priority</item>
                                   <item translatable="yes">Race</item>
                                   <item translatable="yes">Age</item>
-                                  <item translatable="yes">Random</item>
                                   <item translatable="yes">Preemptive-Priority</item>
                                 </items>
                               </object>
@@ -435,7 +391,7 @@
                           <packing>
                             <property name="expand">False</property>
                             <property name="fill">True</property>
-                            <property name="position">1</property>
+                            <property name="position">0</property>
                           </packing>
                         </child>
                         
@@ -487,7 +443,7 @@
                           <object class="GtkLabel" id="type_parameters_help">
                             <property name="visible">True</property>
                             <property name="can-focus">False</property>
-                            <property name="label">• Priority: Used for conflict resolution (PRIORITY policy)
+                            <property name="label">• Policy: Firing policy for conflict resolution (Random, Earliest, Latest, Priority, Race, Age, Preemptive-Priority)
 • Rate: Basic numeric value or expression
 • For complex rate functions, use the Behavior tab</property>
                             <property name="use-markup">True</property>
