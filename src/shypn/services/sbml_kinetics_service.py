@@ -208,6 +208,14 @@ class SBMLKineticsIntegrationService:
         """
         Integrate kinetic law into transition with metadata.
         
+        Sets:
+        - transition.kinetic_metadata: SBMLKineticMetadata object with formula and parameters
+        - transition.properties['rate_function']: SBML formula for evaluation during simulation
+        - transition.rate: Fallback numeric rate (Vmax for MM, k for mass action)
+        
+        The rate_function is the SBML formula that can be evaluated with Python/numpy
+        during simulation, using place names (concentrations) as variables.
+        
         Args:
             transition: Transition object (passed by reference)
             reaction: Reaction object (passed by reference)
@@ -235,6 +243,17 @@ class SBMLKineticsIntegrationService:
             
             # Attach metadata to transition (object reference, no ID storage)
             transition.kinetic_metadata = metadata
+            
+            # Set rate_function from SBML formula for evaluation during simulation
+            # The formula can use place names and will be evaluated with Python/numpy
+            if kinetic_law.formula:
+                # Store the SBML formula as rate_function for continuous transitions
+                # This will be evaluated during simulation to compute the reaction rate
+                transition.properties['rate_function'] = kinetic_law.formula
+                
+                self.logger.debug(
+                    f"Set rate_function for {transition.name}: {kinetic_law.formula[:80]}..."
+                )
             
             # Also update transition.rate if parameters available
             if kinetic_law.parameters:
