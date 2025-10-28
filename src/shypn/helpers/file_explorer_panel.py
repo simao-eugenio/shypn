@@ -1840,23 +1840,34 @@ class FileExplorerPanel:
             manager.document_controller.set_change_callback(manager._on_object_changed)
             
             # Restore view state (zoom, pan, and rotation) if available
-            # NOTE: We still fit_to_page afterwards to ensure objects are visible
+            has_view_state = False
             if hasattr(document, 'view_state') and document.view_state:
-                manager.zoom = document.view_state.get('zoom', 1.0)
-                manager.pan_x = document.view_state.get('pan_x', 0.0)
-                manager.pan_y = document.view_state.get('pan_y', 0.0)
-                manager._initial_pan_set = True  # Mark as set to prevent auto-centering
+                # Check if view state has meaningful values (not just default zeros)
+                zoom = document.view_state.get('zoom', 1.0)
+                pan_x = document.view_state.get('pan_x', 0.0)
+                pan_y = document.view_state.get('pan_y', 0.0)
                 
-                # Restore transformations (rotation) if available
-                if 'transformations' in document.view_state:
-                    manager.transformation_manager.from_dict(document.view_state['transformations'])
+                # Consider view state valid if pan values are non-zero
+                # (zoom=1.0, pan_x=0, pan_y=0 is the default/new file state)
+                has_view_state = (pan_x != 0.0 or pan_y != 0.0 or zoom != 1.0)
+                
+                if has_view_state:
+                    manager.zoom = zoom
+                    manager.pan_x = pan_x
+                    manager.pan_y = pan_y
+                    manager._initial_pan_set = True  # Mark as set to prevent auto-centering
+                    
+                    # Restore transformations (rotation) if available
+                    if 'transformations' in document.view_state:
+                        manager.transformation_manager.from_dict(document.view_state['transformations'])
             
-            # ALWAYS fit loaded content to page to ensure visibility
-            # This centers objects in viewport regardless of saved view state
-            # Use deferred=True to wait for viewport dimensions on first draw
-            # Use 30% horizontal offset to shift right (accounting for right panel)
-            # Use +10% vertical offset to shift UP in Cartesian space (increase Y)
-            manager.fit_to_page(padding_percent=15, deferred=True, horizontal_offset_percent=30, vertical_offset_percent=10)
+            # Only fit to page if no saved view state exists
+            # This preserves user's saved view position and zoom level
+            if not has_view_state:
+                # Use deferred=True to wait for viewport dimensions on first draw
+                # Use 30% horizontal offset to shift right (accounting for right panel)
+                # Use +10% vertical offset to shift UP in Cartesian space (increase Y)
+                manager.fit_to_page(padding_percent=15, deferred=True, horizontal_offset_percent=30, vertical_offset_percent=10)
             
             # PHASE 1: Set per-document file state
             # Initialize manager's filepath and mark as clean (just loaded)

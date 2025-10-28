@@ -17,6 +17,7 @@ Extracted from: legacy/shypnpy/core/petri.py:1562-1690
 from typing import Dict, Tuple, List, Any, Optional
 import random
 import math
+import logging
 from .transition_behavior import TransitionBehavior
 
 
@@ -59,8 +60,26 @@ class StochasticBehavior(TransitionBehavior):
         """
         super().__init__(transition, model)
         
+        # Logger for warnings
+        self.logger = logging.getLogger(self.__class__.__name__)
+        
         # Extract stochastic parameters
         props = getattr(transition, 'properties', {})
+        
+        # Check if has rate_function (SBML formulas)
+        self.has_rate_function = 'rate_function' in props
+        self.rate_function_expr = props.get('rate_function') if self.has_rate_function else None
+        
+        # Warn if stochastic transition has complex formula (likely should be continuous)
+        if self.has_rate_function and self.rate_function_expr:
+            # Check for patterns indicating reversible reactions (forward - reverse)
+            formula_lower = str(self.rate_function_expr).lower()
+            if ' - ' in self.rate_function_expr or 'k_r' in formula_lower or 'kr_' in formula_lower:
+                self.logger.warning(
+                    f"Stochastic transition '{transition.name}' has formula with subtraction, "
+                    f"which may produce negative rates. Consider converting to continuous transition. "
+                    f"Formula: {self.rate_function_expr[:80]}..."
+                )
         
         # Support both properties dict AND transition.rate attribute (for UI compatibility)
         if 'rate' in props:
@@ -90,21 +109,119 @@ class StochasticBehavior(TransitionBehavior):
         self._scheduled_fire_time = None
         self._sampled_burst = None
     
+    def _evaluate_rate_at_enablement(self, time: float) -> float:
+        """Evaluate rate (λ) at enablement time.
+        
+        For SBML stochastic reactions with formulas, evaluate the formula
+        at the moment of enablement to get the rate parameter.
+        
+        Args:
+            time: Current simulation time
+            
+        Returns:
+            Evaluated rate (λ) for exponential distribution
+        """
+        if not self.has_rate_function:
+            # No formula - use constant rate
+            return self.rate
+        
+        try:
+            # Build evaluation context (similar to continuous_behavior.py)
+            from .function_catalog import FUNCTION_CATALOG
+            import numpy as np
+            
+            context = {
+                'time': time,
+                't': time,
+                'min': min,
+                'max': max,
+                'abs': abs,
+                'math': math,
+                'np': np,
+                'numpy': np,
+            }
+            
+            # Add function catalog
+            context.update(FUNCTION_CATALOG)
+            
+            # Add SBML parameters from kinetic_metadata (if available)
+            if hasattr(self.transition, 'kinetic_metadata') and self.transition.kinetic_metadata:
+                if hasattr(self.transition.kinetic_metadata, 'parameters'):
+                    context.update(self.transition.kinetic_metadata.parameters)
+            
+            # Add place tokens
+            places_dict = self._get_places_dict()
+            for place_id, tokens in places_dict.items():
+                if isinstance(place_id, str) and place_id.startswith('P'):
+                    context[place_id] = tokens
+                else:
+                    context[f'P{place_id}'] = tokens
+            
+            # Evaluate formula
+            result = eval(self.rate_function_expr, {"__builtins__": {}}, context)
+            rate = float(result)
+            
+            # Ensure positive rate (required for exponential distribution)
+            if rate <= 0:
+                self.logger.warning(
+                    f"Stochastic transition '{self.transition.name}' formula evaluated to "
+                    f"non-positive rate {rate:.3f}. This may indicate a reversible reaction "
+                    f"that should be modeled as continuous, not stochastic. Using fallback rate {self.rate}."
+                )
+                return self.rate
+            
+            return rate
+            
+        except Exception as e:
+            self.logger.warning(
+                f"Failed to evaluate rate_function: {e}, using fallback {self.rate}"
+            )
+            return self.rate
+    
+    def _get_places_dict(self) -> Dict:
+        """Get current place tokens as dict for formula evaluation."""
+        places_dict = {}
+        
+        # Get all input places
+        for arc in self.get_input_arcs():
+            if hasattr(arc, 'source'):
+                place = arc.source
+                if hasattr(place, 'tokens') and hasattr(place, 'name'):
+                    # Extract numeric ID from name (e.g., "P5" → 5)
+                    place_id = place.name
+                    places_dict[place_id] = place.tokens
+        
+        # Get all output places (for access to all network state)
+        for arc in self.get_output_arcs():
+            if hasattr(arc, 'target'):
+                place = arc.target
+                if hasattr(place, 'tokens') and hasattr(place, 'name'):
+                    place_id = place.name
+                    places_dict[place_id] = place.tokens
+        
+        return places_dict
+    
     def set_enablement_time(self, time: float):
         """Set enablement time and sample firing delay.
         
         When a stochastic transition becomes enabled, we immediately
         sample the firing delay from Exp(rate) distribution.
         
+        If transition has rate_function (SBML formula), evaluate it
+        at enablement time to get the rate parameter λ.
+        
         Args:
             time: Current simulation time when enablement occurred
         """
         self._enablement_time = time
         
+        # Get rate (λ) - either from formula evaluation or constant
+        lambda_rate = self._evaluate_rate_at_enablement(time)
+        
         # Sample firing delay from exponential distribution
         # T ~ Exp(λ) => T = -ln(U) / λ, where U ~ Uniform(0,1)
         u = random.random()
-        delay = -math.log(u) / self.rate if u > 0 else 0.0
+        delay = -math.log(u) / lambda_rate if u > 0 and lambda_rate > 0 else 0.0
         
         self._scheduled_fire_time = time + delay
         

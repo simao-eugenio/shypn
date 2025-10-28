@@ -5,6 +5,15 @@ Transitions represent events or actions that transform the net state.
 Rendered as a filled black rectangle.
 """
 from shypn.netobjs.petri_net_object import PetriNetObject
+from typing import Optional
+
+# Import kinetic metadata classes
+try:
+    from shypn.data.kinetics import KineticMetadata, create_metadata_from_dict
+except ImportError:
+    # Fallback for when kinetics module not available
+    KineticMetadata = None
+    create_metadata_from_dict = None
 
 
 class Transition(PetriNetObject):
@@ -63,6 +72,9 @@ class Transition(PetriNetObject):
         # Source/Sink markers
         self.is_source = False  # Source transition (generates tokens without input)
         self.is_sink = False    # Sink transition (consumes tokens without output)
+        
+        # Kinetic metadata (optional, added by importers or enrichment)
+        self.kinetic_metadata: Optional[KineticMetadata] = None
     
     def render(self, cr, transform=None, zoom=1.0):
         """Render the transition using Cairo.
@@ -315,8 +327,10 @@ class Transition(PetriNetObject):
         Returns field visibility based on transition semantics:
         - Immediate: No rate (fires instantly), has firing policy
         - Timed: Has delay time, has firing policy
-        - Stochastic: Has rate λ, no firing policy
-        - Continuous: Has rate function, no firing policy
+        - Stochastic: Has rate λ, has firing policy
+        - Continuous: Has rate function, has firing policy
+        
+        All transition types support firing policies at the simulation engine level.
         
         Returns:
             dict: Field name -> bool (True if should be shown/editable)
@@ -325,22 +339,22 @@ class Transition(PetriNetObject):
             'immediate': {
                 'rate': False,           # No rate needed
                 'rate_function': False,  # No rate function
-                'firing_policy': True    # Earliest/Latest
+                'firing_policy': True    # All 7 policies available
             },
             'timed': {
                 'rate': True,            # Delay time
                 'rate_function': True,   # Can use expressions
-                'firing_policy': True    # Earliest/Latest
+                'firing_policy': True    # All 7 policies available
             },
             'stochastic': {
                 'rate': True,            # Rate λ
                 'rate_function': True,   # Can use expressions
-                'firing_policy': False   # N/A for stochastic
+                'firing_policy': True    # All 7 policies available
             },
             'continuous': {
                 'rate': True,            # Rate value/function
                 'rate_function': True,   # Rate expressions
-                'firing_policy': False   # N/A for continuous
+                'firing_policy': True    # All 7 policies available
             }
         }
         
@@ -484,9 +498,13 @@ class Transition(PetriNetObject):
         if hasattr(self, 'properties') and self.properties:
             data["properties"] = self.properties
         
-        # Serialize metadata (EC numbers, enzyme info, kinetics data)
+        # Serialize legacy metadata (EC numbers, enzyme info) - deprecated
         if hasattr(self, 'metadata') and self.metadata:
             data["metadata"] = self.metadata
+        
+        # Serialize kinetic metadata (new structured metadata)
+        if self.kinetic_metadata is not None:
+            data["kinetic_metadata"] = self.kinetic_metadata.to_dict()
         
         return data
     
@@ -632,8 +650,12 @@ class Transition(PetriNetObject):
         if "is_sink" in data:
             transition.is_sink = data["is_sink"]
         
-        # Restore metadata (EC numbers, enzyme info, kinetics data)
+        # Restore legacy metadata (EC numbers, enzyme info) - deprecated
         if "metadata" in data:
             transition.metadata = data["metadata"]
+        
+        # Restore kinetic metadata (new structured metadata)
+        if "kinetic_metadata" in data and create_metadata_from_dict is not None:
+            transition.kinetic_metadata = create_metadata_from_dict(data["kinetic_metadata"])
         
         return transition
