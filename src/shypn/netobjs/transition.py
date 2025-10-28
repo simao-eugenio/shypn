@@ -327,8 +327,10 @@ class Transition(PetriNetObject):
         Returns field visibility based on transition semantics:
         - Immediate: No rate (fires instantly), has firing policy
         - Timed: Has delay time, has firing policy
-        - Stochastic: Has rate λ, no firing policy
-        - Continuous: Has rate function, no firing policy
+        - Stochastic: Has rate λ, has firing policy
+        - Continuous: Has rate function, has firing policy
+        
+        All transition types support firing policies at the simulation engine level.
         
         Returns:
             dict: Field name -> bool (True if should be shown/editable)
@@ -337,22 +339,22 @@ class Transition(PetriNetObject):
             'immediate': {
                 'rate': False,           # No rate needed
                 'rate_function': False,  # No rate function
-                'firing_policy': True    # Earliest/Latest
+                'firing_policy': True    # All 7 policies available
             },
             'timed': {
                 'rate': True,            # Delay time
                 'rate_function': True,   # Can use expressions
-                'firing_policy': True    # Earliest/Latest
+                'firing_policy': True    # All 7 policies available
             },
             'stochastic': {
                 'rate': True,            # Rate λ
                 'rate_function': True,   # Can use expressions
-                'firing_policy': False   # N/A for stochastic
+                'firing_policy': True    # All 7 policies available
             },
             'continuous': {
                 'rate': True,            # Rate value/function
                 'rate_function': True,   # Rate expressions
-                'firing_policy': False   # N/A for continuous
+                'firing_policy': True    # All 7 policies available
             }
         }
         
