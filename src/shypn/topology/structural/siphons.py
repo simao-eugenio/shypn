@@ -92,6 +92,48 @@ class SiphonAnalyzer(TopologyAnalyzer):
                 metadata={'analysis_time': self._end_timer(start_time)}
             )
         
+        # ========================================================================
+        # SIZE GUARD: Check model size to prevent exponential computation freeze
+        # ========================================================================
+        n_places = len(self.model.places)
+        
+        # Siphon analysis has O(2^n) complexity - exponential in number of places
+        # Checking all subsets becomes impractical beyond ~20 places
+        MAX_PLACES_SAFE = 20  # Conservative limit for interactive use
+        
+        if n_places > MAX_PLACES_SAFE:
+            estimated_combinations = sum(
+                1 for r in range(min_size, min(max_size or n_places, n_places) + 1)
+                for _ in range(1)  # Just count ranges
+            )
+            
+            return AnalysisResult(
+                success=False,
+                errors=[
+                    f"⛔ Model too large for siphon analysis",
+                    f"   Places: {n_places} (maximum: {MAX_PLACES_SAFE})",
+                    f"   Estimated operations: > 10^{int(n_places * 0.3)} (exponential)",
+                    "",
+                    "⚠️  This analysis would take hours or days to complete",
+                    "    and could freeze your system."
+                ],
+                warnings=[
+                    "Options to analyze this model:",
+                    "• Extract a smaller subnetwork for analysis",
+                    "• Use batch analysis mode (overnight processing)",
+                    "• Increase max_size limit if you only need small siphons",
+                    f"  Current max_size: {max_size or n_places}"
+                ],
+                metadata={
+                    'analysis_time': self._end_timer(start_time),
+                    'blocked': True,
+                    'block_reason': 'model_too_large',
+                    'max_places_limit': MAX_PLACES_SAFE,
+                    'actual_places': n_places,
+                    'complexity': 'O(2^n) - Exponential'
+                }
+            )
+        
         # Handle empty model
         if not self.model.places or not self.model.transitions:
             return AnalysisResult(

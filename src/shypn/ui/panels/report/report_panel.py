@@ -36,6 +36,7 @@ class ReportPanel(Gtk.Box):
         
         self.project = project
         self.model_canvas = model_canvas
+        self.topology_panel = None  # Will be set via set_topology_panel()
         
         # Category controllers
         self.categories = []
@@ -83,6 +84,9 @@ class ReportPanel(Gtk.Box):
         
         # Setup exclusive expansion
         self._setup_exclusive_expansion()
+        
+        # Show all widgets (this ensures categories are visible even if collapsed)
+        self.show_all()
     
     def _create_categories(self, container):
         """Create all report categories aligned with panels.
@@ -96,7 +100,9 @@ class ReportPanel(Gtk.Box):
             model_canvas=self.model_canvas
         )
         self.categories.append(models)
-        container.pack_start(models.get_widget(), False, False, 0)
+        widget = models.get_widget()
+        widget.show_all()
+        container.pack_start(widget, False, False, 0)
         
         # DYNAMIC ANALYSES (from Pathway Operations Panel - enrichments)
         dynamic = DynamicAnalysesCategory(
@@ -104,7 +110,9 @@ class ReportPanel(Gtk.Box):
             model_canvas=self.model_canvas
         )
         self.categories.append(dynamic)
-        container.pack_start(dynamic.get_widget(), False, False, 0)
+        widget = dynamic.get_widget()
+        widget.show_all()
+        container.pack_start(widget, False, False, 0)
         
         # TOPOLOGY ANALYSES (from Analyses Panel)
         topology = TopologyAnalysesCategory(
@@ -112,7 +120,9 @@ class ReportPanel(Gtk.Box):
             model_canvas=self.model_canvas
         )
         self.categories.append(topology)
-        container.pack_start(topology.get_widget(), False, False, 0)
+        widget = topology.get_widget()
+        widget.show_all()
+        container.pack_start(widget, False, False, 0)
         
         # PROVENANCE & LINEAGE (from all panels)
         provenance = ProvenanceCategory(
@@ -120,7 +130,9 @@ class ReportPanel(Gtk.Box):
             model_canvas=self.model_canvas
         )
         self.categories.append(provenance)
-        container.pack_start(provenance.get_widget(), False, False, 0)
+        widget = provenance.get_widget()
+        widget.show_all()
+        container.pack_start(widget, False, False, 0)
     
     def _create_export_buttons(self):
         """Create export buttons bar.
@@ -199,6 +211,32 @@ class ReportPanel(Gtk.Box):
         self.model_canvas = model_canvas
         for category in self.categories:
             category.set_model_canvas(model_canvas)
+    
+    def set_topology_panel(self, topology_panel):
+        """Set topology panel reference for fetching analysis data.
+        
+        Args:
+            topology_panel: TopologyPanel instance
+        """
+        self.topology_panel = topology_panel
+        
+        # Update topology analyses category with the panel reference
+        for category in self.categories:
+            if isinstance(category, TopologyAnalysesCategory):
+                category.set_topology_panel(topology_panel)
+                break
+        
+        # Set callback so topology panel can notify us when analyses update
+        if hasattr(topology_panel, 'set_report_refresh_callback'):
+            topology_panel.set_report_refresh_callback(self._on_topology_updated)
+    
+    def _on_topology_updated(self):
+        """Called by topology panel when analyses are updated."""
+        # Refresh the topology analyses category
+        for category in self.categories:
+            if isinstance(category, TopologyAnalysesCategory):
+                category.refresh()
+                break
     
     def refresh_all(self):
         """Refresh all categories."""

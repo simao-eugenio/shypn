@@ -94,6 +94,47 @@ class ReachabilityAnalyzer(TopologyAnalyzer):
                 metadata={'analysis_time': self._end_timer(start_time)}
             )
         
+        # ========================================================================
+        # SIZE GUARD: Estimate state space to prevent state explosion freeze
+        # ========================================================================
+        n_places = len(self.model.places)
+        n_transitions = len(self.model.transitions)
+        
+        # Estimate state space size (rough heuristic)
+        # Real state space can be much larger for complex nets
+        avg_tokens_per_place = sum(p.tokens for p in self.model.places) / n_places if n_places > 0 else 0
+        estimated_states = int((avg_tokens_per_place + 1) ** n_places)
+        
+        # Warn if estimated state space is very large
+        if estimated_states > 100000 or n_places > 30:
+            return AnalysisResult(
+                success=False,
+                errors=[
+                    f"⛔ Model likely has huge state space",
+                    f"   Places: {n_places}, Transitions: {n_transitions}",
+                    f"   Estimated states: {estimated_states:,} (may be conservative)",
+                    "",
+                    "⚠️  This analysis could take 30-60+ seconds or freeze",
+                    "    the system due to state explosion."
+                ],
+                warnings=[
+                    "Options to analyze this model:",
+                    "• Use a smaller subnetwork",
+                    "• Reduce initial tokens to limit state space",
+                    "• Use batch analysis mode with timeout",
+                    f"• Lower max_states limit (current: {max_states})"
+                ],
+                metadata={
+                    'analysis_time': self._end_timer(start_time),
+                    'blocked': True,
+                    'block_reason': 'state_explosion_risk',
+                    'estimated_states': estimated_states,
+                    'actual_places': n_places,
+                    'actual_transitions': n_transitions,
+                    'complexity': 'O(k^n) - State Explosion'
+                }
+            )
+        
         # Handle empty model
         if not self.model.places or not self.model.transitions:
             return AnalysisResult(
