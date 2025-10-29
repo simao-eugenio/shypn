@@ -271,7 +271,8 @@ def main(argv=None):
 			topology_panel_loader = TopologyPanelLoader(model=None)
 			# Wire model_canvas_loader so topology can access current model
 			if hasattr(topology_panel_loader, 'controller') and topology_panel_loader.controller:
-				topology_panel_loader.controller.model_canvas_loader = model_canvas_loader
+				# Use the proper method to set model_canvas_loader
+				topology_panel_loader.set_model_canvas_loader(model_canvas_loader)
 				
 				# ===================================================================
 				# WIRE TOPOLOGY PANEL TO MODEL LIFECYCLE EVENTS
@@ -547,6 +548,12 @@ def main(argv=None):
 		try:
 			from shypn.ui.panels.report import ReportPanel
 			report_panel = ReportPanel(project=None, model_canvas=model_canvas_loader)
+			
+			# Wire topology panel to report panel for analysis summary
+			# The loader has a .panel attribute which is the actual TopologyPanel
+			if topology_panel_loader and hasattr(topology_panel_loader, 'panel'):
+				report_panel.set_topology_panel(topology_panel_loader.panel)
+			
 			report_panel_container.pack_start(report_panel, True, True, 0)
 			report_panel.show_all()
 		except Exception as e:
@@ -719,7 +726,7 @@ def main(argv=None):
 				# Expand left paned to show stack only if panel is hanged
 				if topology_panel_loader.is_hanged and left_paned:
 					try:
-						left_paned.set_position(350)
+						left_paned.set_position(320)  # Match Report panel width
 					except Exception:
 						pass
 			else:
