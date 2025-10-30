@@ -135,17 +135,16 @@ class TransitionRatePanel(AnalysisPlotPanel):
         """Get behavior-specific data for a transition.
         
         The data plotted depends on transition type:
-        - Continuous enzymatic (Hill, M-M): (concentration, rate) - substrate concentration vs reaction rate
-        - Continuous time-based: (time, rate) - time vs rate value
+        - Continuous: (time, rate) - time vs rate value
         - Discrete (immediate/timed/stochastic): (time, cumulative_count)
         
         Args:
             transition_id: ID of the transition
             
         Returns:
-            List of (x, y) tuples where x is time or concentration depending on function type
+            List of (time, rate) tuples
         """
-        DEBUG_PLOT_DATA = False  # Disable verbose logging
+        DEBUG_PLOT_DATA = False  # Disable debug output
         
         # Safety check: return empty if no data collector
         if not self.data_collector:
@@ -168,84 +167,13 @@ class TransitionRatePanel(AnalysisPlotPanel):
                 has_rate_data = True
         
         if has_rate_data:
-            # CONTINUOUS TRANSITION: Check if enzymatic function (needs concentration on X-axis)
-            # Get the transition object to check its rate function
-            transition_obj = None
-            for obj in self.selected_objects:
-                if obj.id == transition_id:
-                    transition_obj = obj
-                    break
-            
-            # Detect if this is an enzymatic function
-            is_enzymatic = False
-            input_place_id = None
-            if transition_obj:
-                rate_func = None
-                if hasattr(transition_obj, 'properties') and transition_obj.properties:
-                    rate_func = transition_obj.properties.get('rate_function') or transition_obj.properties.get('rate_function_display')
-                if not rate_func:
-                    rate_func = str(getattr(transition_obj, 'rate', ''))
-                
-                if rate_func and rate_func != 'None':
-                    func_type, params = self._detect_rate_function_type(rate_func)
-                    is_enzymatic = func_type in ['hill_equation', 'michaelis_menten']
-                    
-                    # Get the input place (substrate) for concentration lookup
-                    # Since transition doesn't have model reference, extract place name from rate function
-                    if is_enzymatic:
-                        # Extract place name from rate function (e.g., "P1" from "hill_equation(P1, ...)")
-                        import re
-                        place_match = re.search(r'\(([A-Za-z_]\w*)', rate_func)
-                        if place_match:
-                            place_name = place_match.group(1)
-                            
-                            # Try to find this place in the data_collector's tracked places
-                            # The place ID might be the place name or an object ID
-                            # We'll try to match by looking at all tracked places
-                            for tracked_place_id in self.data_collector.place_data.keys():
-                                # Use the first place with data as substrate concentration source
-                                # TODO: Better matching - for now use first available
-                                input_place_id = tracked_place_id
-                                break
-            
+            # CONTINUOUS TRANSITION: Always use time on X-axis
             rate_series = []
+            for time, event_type, details in raw_events:
+                if event_type == 'fired' and details and isinstance(details, dict):
+                    rate = details.get('rate', 0.0)
+                    rate_series.append((time, rate))
             
-            # For enzymatic functions, we need to match times with place concentrations
-            if is_enzymatic and input_place_id:
-                # Get place token history
-                place_history = self.data_collector.get_place_data(input_place_id)
-                
-                # Create a time -> concentration lookup
-                time_to_concentration = {}
-                for place_time, tokens in place_history:
-                    time_to_concentration[place_time] = tokens
-                
-                # Match transition rates with substrate concentrations at those times
-                for time, event_type, details in raw_events:
-                    if event_type == 'fired' and details and isinstance(details, dict):
-                        rate = details.get('rate', 0.0)
-                        
-                        # Find the closest concentration measurement
-                        concentration = time_to_concentration.get(time)
-                        if concentration is None and place_history:
-                            # Interpolate or use closest time point
-                            closest_time = min(time_to_concentration.keys(), 
-                                             key=lambda t: abs(t - time))
-                            concentration = time_to_concentration[closest_time]
-                        
-                        if concentration is not None:
-                            rate_series.append((concentration, rate))
-            else:
-                if DEBUG_PLOT_DATA:
-                    pass
-                # For time-based functions, use time as X-axis
-                for time, event_type, details in raw_events:
-                    if event_type == 'fired' and details and isinstance(details, dict):
-                        rate = details.get('rate', 0.0)
-                        rate_series.append((time, rate))
-            
-            if DEBUG_PLOT_DATA and rate_series:
-                pass
             return rate_series
         else:
             # DISCRETE TRANSITION: Plot cumulative firing count
@@ -300,28 +228,12 @@ class TransitionRatePanel(AnalysisPlotPanel):
                 details = raw_events[0][2]
                 if isinstance(details, dict) and 'rate' in details:
                     has_continuous = True
-                    # Detect function type for label
-                    if func_type is None:  # Use first object's function type
-                        rate_func = None
-                        if hasattr(obj, 'properties') and obj.properties:
-                            rate_func = obj.properties.get('rate_function') or obj.properties.get('rate_function_display')
-                        if not rate_func:
-                            rate_func = str(getattr(obj, 'rate', ''))
-                        if rate_func and rate_func != 'None':
-                            func_type, _ = self._detect_rate_function_type(rate_func)
                 else:
                     has_discrete = True
         
         if has_continuous and not has_discrete:
-            # Return function-specific label
-            if func_type == 'hill_equation':
-                return 'Fraction Bound'
-            elif func_type == 'michaelis_menten':
-                return 'Reaction Rate (v)'
-            elif func_type == 'sigmoid':
-                return 'Fraction Bound'
-            else:
-                return 'Rate (tokens/s)'
+            # Simple, consistent label for all rate functions
+            return 'Rate'
         elif has_discrete and not has_continuous:
             return 'Cumulative Firings'
         else:
@@ -370,31 +282,14 @@ class TransitionRatePanel(AnalysisPlotPanel):
         return 'Transition Behavior Evolution'
     
     def _format_plot(self):
-        """Format the plot with labels, grid, legend, and smart Y-axis and X-axis scaling.
+        """Format the plot with labels, grid, legend, and smart Y-axis scaling.
         
         Overrides parent to add:
-        - Concentration-based X-axis for enzymatic functions
         - Source/sink-aware Y-axis scaling
-        - Rate function type-aware X-axis scaling (Hill, Michaelis-Menten, Sigmoid, etc.)
-        - Annotations for key parameters (Kd, Km, center points)
+        - Rate function type-aware X-axis scaling and annotations
         """
-        # Call parent formatting first
+        # Call parent formatting first (sets X-axis to "Time (s)" and Y-axis labels)
         super()._format_plot()
-        
-        # Update X-axis label for enzymatic functions (Hill, Michaelis-Menten)
-        if self.selected_objects:
-            for obj in self.selected_objects:
-                rate_func = None
-                if hasattr(obj, 'properties') and obj.properties:
-                    rate_func = obj.properties.get('rate_function') or obj.properties.get('rate_function_display')
-                if not rate_func:
-                    rate_func = str(getattr(obj, 'rate', ''))
-                
-                if rate_func and rate_func != 'None':
-                    func_type, _ = self._detect_rate_function_type(rate_func)
-                    if func_type in ['hill_equation', 'michaelis_menten']:
-                        self.axes.set_xlabel('Concentration', fontsize=11)
-                        break  # Only need to set once
         
         # Apply smart Y-axis scaling if not auto-scale
         if not self.auto_scale and self.selected_objects:
