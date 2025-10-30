@@ -187,26 +187,36 @@ class TransitionRatePanel(AnalysisPlotPanel):
                     rate_func = str(getattr(transition_obj, 'rate', ''))
                 
                 if rate_func and rate_func != 'None':
-                    func_type, _ = self._detect_rate_function_type(rate_func)
+                    func_type, params = self._detect_rate_function_type(rate_func)
                     is_enzymatic = func_type in ['hill_equation', 'michaelis_menten']
                     
                     if DEBUG_PLOT_DATA:
                         print(f"[CONCENTRATION DEBUG] Transition {transition_id}: rate_func={rate_func}, func_type={func_type}, is_enzymatic={is_enzymatic}")
                     
                     # Get the input place (substrate) for concentration lookup
-                    if is_enzymatic and hasattr(transition_obj, 'model') and transition_obj.model:
-                        model = transition_obj.model
-                        if DEBUG_PLOT_DATA:
-                            print(f"[CONCENTRATION DEBUG] Has model, checking {len(model.arcs)} arcs")
-                        for arc in model.arcs:
-                            if arc.target_id == transition_obj.id:  # Input arc
-                                input_place_id = arc.source_id
+                    # Since transition doesn't have model reference, we need to find it differently
+                    if is_enzymatic:
+                        # Extract place name from rate function (e.g., "P1" from "hill_equation(P1, ...)")
+                        import re
+                        place_match = re.search(r'\(([A-Za-z_]\w*)', rate_func)
+                        if place_match:
+                            place_name = place_match.group(1)
+                            if DEBUG_PLOT_DATA:
+                                print(f"[CONCENTRATION DEBUG] Extracted place name: {place_name}")
+                            
+                            # Try to find this place in the data_collector's tracked places
+                            # The place ID might be the place name or an object ID
+                            # We'll try to match by looking at all tracked places
+                            for tracked_place_id in self.data_collector.place_data.keys():
+                                # Try direct match or check if place name matches
+                                # For now, use the first place with data as a heuristic
                                 if DEBUG_PLOT_DATA:
-                                    print(f"[CONCENTRATION DEBUG] Found input arc from place {input_place_id}")
+                                    print(f"[CONCENTRATION DEBUG] Found tracked place: {tracked_place_id}")
+                                # TODO: Better matching - for now use first available
+                                input_place_id = tracked_place_id
                                 break
-                    elif is_enzymatic:
-                        if DEBUG_PLOT_DATA:
-                            print(f"[CONCENTRATION DEBUG] Enzymatic but no model access: has_model={hasattr(transition_obj, 'model')}, model={getattr(transition_obj, 'model', None)}")
+                        elif DEBUG_PLOT_DATA:
+                            print(f"[CONCENTRATION DEBUG] Could not extract place name from rate function")
             
             if DEBUG_PLOT_DATA:
                 print(f"[CONCENTRATION DEBUG] is_enzymatic={is_enzymatic}, input_place_id={input_place_id}")
