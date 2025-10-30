@@ -570,7 +570,7 @@ class SimulationController:
         
         # Handle timed and stochastic transitions with PRIORITY RULE:
         # Timed (deterministic) has PRIORITY over Stochastic (probabilistic)
-        # Stochastic can ONLY fire if NO timed transitions fired
+        # Only fire stochastic if NO timed transitions can fire
         discrete_fired = False
         
         # Phase 2a: Timed transitions (DETERMINISTIC - PRIORITY)
@@ -586,7 +586,7 @@ class SimulationController:
         
         # Phase 2b: Stochastic transitions (PROBABILISTIC - LOWER PRIORITY)
         # Only execute if NO timed transitions fired (timed has priority)
-        elif not discrete_fired:  # Only if no timed fired
+        elif not discrete_fired:  # Changed: only if no timed fired
             stochastic_transitions = [t for t in self.model.transitions if t.transition_type == 'stochastic']
             enabled_stochastic = [t for t in stochastic_transitions if self._is_transition_enabled(t)]
             if enabled_stochastic:
@@ -594,6 +594,7 @@ class SimulationController:
                 transition = self._select_transition(enabled_stochastic)
                 self._fire_transition(transition)
                 discrete_fired = True
+        
         self._notify_step_listeners()
         
         # Check if simulation is complete (duration reached)
