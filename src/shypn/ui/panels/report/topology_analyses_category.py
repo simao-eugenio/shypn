@@ -3,6 +3,7 @@
 
 Displays network structure and connectivity analysis results.
 """
+import sys
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk
@@ -23,11 +24,15 @@ class TopologyAnalysesCategory(BaseReportCategory):
     
     def __init__(self, project=None, model_canvas=None):
         """Initialize topology analyses category."""
+        # Set topology_panel BEFORE calling super().__init__
+        # because super() calls _build_content() which calls refresh()
+        self.topology_panel = None
+        
         super().__init__(
             title="TOPOLOGY ANALYSES",
             project=project,
             model_canvas=model_canvas,
-            expanded=False
+            expanded=True  # Expand by default so users see content
         )
     
     def _build_content(self):
@@ -200,8 +205,167 @@ class TopologyAnalysesCategory(BaseReportCategory):
         
         return box
     
+    def set_topology_panel(self, topology_panel):
+        """Set topology panel reference for fetching analysis data.
+        
+        Args:
+            topology_panel: TopologyPanel instance
+        """
+        self.topology_panel = topology_panel
+        # Refresh to show new data
+        self.refresh()
+    
     def refresh(self):
-        """Refresh topology analyses data."""
+        """Refresh topology analyses data from Topology Panel."""
+        # If topology panel is available, fetch real summary data
+        if self.topology_panel:
+            try:
+                summary = self.topology_panel.generate_summary_for_report_panel()
+                self._update_with_summary(summary)
+                return
+            except Exception as e:
+                print(f"Warning: Could not fetch topology summary: {e}", file=sys.__stderr__)
+                # Fall through to placeholder display
+        
+        # Otherwise show placeholder (topology panel not yet connected)
+        self._show_placeholder_summary()
+    
+    def _update_with_summary(self, summary):
+        """Update UI with real topology summary data.
+        
+        Args:
+            summary: Dict from TopologyPanel.generate_summary_for_report_panel()
+        """
+        # Update OVERALL SUMMARY at the top
+        status = summary.get('status', 'unknown')
+        summary_lines = summary.get('summary_lines', [])
+        statistics = summary.get('statistics', {})
+        warnings = summary.get('warnings', [])
+        
+        # Build summary text with status indicator
+        status_emoji = {
+            'complete': '✓',
+            'partial': '⚠️',
+            'error': '❌',
+            'not_analyzed': 'ℹ️'
+        }.get(status, '○')
+        
+        summary_text = [f"<b>{status_emoji} Topology Analyses Status:</b>\n"]
+        
+        # Add summary lines
+        for line in summary_lines:
+            summary_text.append(f"  {line}")
+        
+        # Add warnings if any
+        if warnings:
+            summary_text.append("\n<b>Warnings:</b>")
+            for warning in warnings:
+                summary_text.append(f"  {warning}")
+        
+        self.overall_summary_label.set_markup("\n".join(summary_text))
+        
+        # Update individual sub-sections with detailed data
+        self._update_structural_section(statistics)
+        self._update_graph_section(statistics)
+        self._update_behavioral_section(statistics)
+    
+    def _update_structural_section(self, statistics):
+        """Update structural analysis section with real data."""
+        p_inv_count = statistics.get('p_invariants', 0)
+        t_inv_count = statistics.get('t_invariants', 0)
+        p_inv_coverage = statistics.get('p_invariant_coverage', 0)
+        t_inv_coverage = statistics.get('t_invariant_coverage', 0)
+        
+        if p_inv_count > 0 or t_inv_count > 0:
+            summary_text = f"Structural Analysis: ✓ Completed\n"
+            summary_text += f"  • {p_inv_count} P-invariants ({p_inv_coverage:.0%} coverage)\n"
+            summary_text += f"  • {t_inv_count} T-invariants ({t_inv_coverage:.0%} coverage)"
+            self.topology_summary_label.set_text(summary_text)
+            
+            # Detailed metrics
+            details = f"P-Invariants: {p_inv_count}\n"
+            details += f"Coverage: {p_inv_coverage:.1%}\n\n"
+            details += f"T-Invariants: {t_inv_count}\n"
+            details += f"Coverage: {t_inv_coverage:.1%}"
+            self.topology_buffer.set_text(details)
+        else:
+            self.topology_summary_label.set_text("Structural Analysis: Not computed")
+            self.topology_buffer.set_text("No structural invariants computed yet")
+    
+    def _update_graph_section(self, statistics):
+        """Update graph/network analysis section with real data."""
+        cycles = statistics.get('cycles', 0)
+        hubs = statistics.get('hubs', 0)
+        paths = statistics.get('paths', 0)
+        
+        if cycles > 0 or hubs > 0:
+            summary_text = f"Graph Analysis: ✓ Completed\n"
+            summary_text += f"  • {cycles} cycles detected\n"
+            summary_text += f"  • {hubs} hub nodes\n"
+            summary_text += f"  • {paths} critical paths"
+            self.locality_summary_label.set_text(summary_text)
+            
+            # Detailed metrics
+            details = f"Cycles: {cycles}\n"
+            details += f"Hub nodes: {hubs}\n"
+            details += f"Critical paths: {paths}"
+            self.locality_buffer.set_text(details)
+        else:
+            self.locality_summary_label.set_text("Graph Analysis: Not computed")
+            self.locality_buffer.set_text("No graph analysis performed yet")
+    
+    def _update_behavioral_section(self, statistics):
+        """Update behavioral analysis section with real data."""
+        is_live = statistics.get('is_live')
+        is_bounded = statistics.get('is_bounded')
+        is_deadlock_free = statistics.get('is_deadlock_free')
+        
+        if is_live is not None or is_bounded is not None:
+            summary_text = "Behavioral Analysis: ✓ Completed\n"
+            
+            properties = []
+            if is_live is True:
+                properties.append("✓ Live")
+            elif is_live is False:
+                properties.append("✗ Not live")
+            
+            if is_bounded is True:
+                properties.append("✓ Bounded")
+            elif is_bounded is False:
+                properties.append("✗ Unbounded")
+            
+            if is_deadlock_free is True:
+                properties.append("✓ Deadlock-free")
+            elif is_deadlock_free is False:
+                properties.append("✗ Has deadlocks")
+            
+            if properties:
+                summary_text += "  • " + ", ".join(properties)
+            
+            self.sourcesink_summary_label.set_text(summary_text)
+            self.invariants_summary_label.set_text(summary_text)
+            
+            # Detailed metrics
+            details = ""
+            if is_live is not None:
+                details += f"Liveness: {'Yes' if is_live else 'No'}\n"
+            if is_bounded is not None:
+                details += f"Boundedness: {'Yes' if is_bounded else 'No'}\n"
+            if is_deadlock_free is not None:
+                details += f"Deadlock-free: {'Yes' if is_deadlock_free else 'No'}"
+            
+            self.sourcesink_buffer.set_text(details)
+            self.invariants_buffer.set_text(details)
+        else:
+            self.sourcesink_summary_label.set_text("Behavioral Analysis: Not computed")
+            self.invariants_summary_label.set_text("Behavioral Analysis: Not computed")
+            self.sourcesink_buffer.set_text("No behavioral analysis performed yet")
+            self.invariants_buffer.set_text("No behavioral analysis performed yet")
+    
+    def _show_placeholder_summary(self):
+        """Show placeholder text when topology panel not connected."""
+    def _show_placeholder_summary(self):
+        """Show placeholder text when topology panel not connected."""
         # TODO: Integrate with actual analysis results from Analyses Panel
         # For now, show placeholder summaries
         
