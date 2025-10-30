@@ -1,219 +1,161 @@
-"""Minimal Topology Panel Loader - Expander Design (NO BUTTONS).
+"""Minimal Topology Panel Loader - Normalized Architecture.
 
-Ultra-clean architecture:
-- Inherits Wayland-safe operations from base
-- Delegates business logic to controller
-- Just loads UI and wires expander signals
+Ultra-minimal loader that instantiates the normalized TopologyPanel class.
+All business logic is in the topology panel package.
+
+This is a compatibility wrapper to work with existing shypn.py infrastructure.
+Eventually can be reduced further or eliminated.
 
 Author: Simão Eugénio
-Date: 2025-10-20
+Date: 2025-10-29
 """
-
-import sys
 
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk, Gdk
+from gi.repository import Gtk
 
-from shypn.ui.topology_panel_base import TopologyPanelBase
-from shypn.ui.topology_panel_controller import TopologyPanelController
+from shypn.ui.panels.topology import TopologyPanel
 
 
-class TopologyPanelLoader(TopologyPanelBase):
-    """Minimal loader for Topology Panel (Expander Design).
+class TopologyPanelLoader:
+    """Minimal loader for normalized Topology Panel.
     
-    Responsibilities (MINIMAL):
-    - Load UI
-    - Get widget references (expanders + labels)
-    - Connect expander signals to controller
-    - Delegate all logic to controller
+    Responsibilities:
+    - Instantiate TopologyPanel class
+    - Provide compatibility with existing shypn.py infrastructure
+    - Wire model_canvas_loader reference
     
-    NOT responsible for:
-    - Analysis logic (handled by controller)
-    - Business logic (handled by analyzers)
-    - Results caching (handled by controller)
-    - Highlighting (handled by Switch Palette)
+    All panel logic is in the TopologyPanel class and its categories.
     """
     
     def __init__(self, model):
         """Initialize topology panel loader.
         
         Args:
-            model: The ShypnModel instance
+            model: The ShypnModel instance (can be None)
         """
-        # Store model
         self.model = model
+        self.model_canvas_loader = None  # Set externally
         
-        # Controller (created after UI loads)
-        self.controller = None
-        
-        # Widget references (12 analyzers, 3 widgets each)
-        self.expanders = {}       # GtkExpander widgets
-        self.report_labels = {}   # GtkLabel widgets (for reports)
-        self.scrolled_windows = {} # GtkScrolledWindow widgets (for dynamic vexpand)
-        
-        # Initialize base
-        super().__init__()
-        
-        # Load UI
-        self.load()
-    
-    def _init_widgets(self):
-        """Get widget references for all 12 analyzers.
-        
-        Called by base class after UI loads.
-        """
-        # Analyzer names
-        analyzers = [
-            # Structural (4)
-            'p_invariants',
-            't_invariants',
-            'siphons',
-            'traps',
-            # Graph (3)
-            'cycles',
-            'paths',
-            'hubs',
-            # Behavioral (5)
-            'reachability',
-            'boundedness',
-            'liveness',
-            'deadlocks',
-            'fairness',
-        ]
-        
-        # Get references for each analyzer
-        for analyzer in analyzers:
-            # GtkExpander widget
-            expander = self.builder.get_object(f'{analyzer}_expander')
-            if expander:
-                self.expanders[analyzer] = expander
-            else:
-                print(f"⚠ Warning: Could not find expander for {analyzer}", file=sys.stderr)
-            
-            # GtkScrolledWindow widget (for dynamic vexpand control)
-            scrolled = self.builder.get_object(f'{analyzer}_scrolled')
-            if scrolled:
-                self.scrolled_windows[analyzer] = scrolled
-            else:
-                print(f"⚠ Warning: Could not find scrolled window for {analyzer}", file=sys.stderr)
-            
-            # Report label (inside expander)
-            report_label = self.builder.get_object(f'{analyzer}_report_label')
-            if report_label:
-                self.report_labels[analyzer] = report_label
-            else:
-                print(f"⚠ Warning: Could not find report label for {analyzer}", file=sys.stderr)
-    
-    def _connect_signals(self):
-        """Connect expander signals to controller methods.
-        
-        Called by base class after widgets are initialized.
-        """
-        # Create controller with expanders, scrolled windows, and labels
-        self.controller = TopologyPanelController(
+        # Create the topology panel
+        self.panel = TopologyPanel(
             model=self.model,
-            expanders=self.expanders,
-            scrolled_windows=self.scrolled_windows,
-            report_labels=self.report_labels,
+            model_canvas=None  # Will be set via set_model_canvas_loader
         )
         
-        # Connect expander 'notify::expanded' signals
-        # When user clicks expander arrow, this fires
-        for analyzer, expander in self.expanders.items():
-            expander.connect('notify::expanded', self.controller.on_expander_toggled, analyzer)
+        # Compatibility: old code checks for controller attribute
+        # Controller is the loader itself (has on_tab_switched, on_file_opened, etc.)
+        self.controller = self
         
-        # Connect float button if present
-        float_button = self.builder.get_object('topology_float_button')
-        if float_button:
-            float_button.connect('toggled', self._on_float_toggled)
-            self.float_button = float_button
-            self._updating_button = False  # Flag to prevent recursive toggle events
-        else:
-            self.float_button = None
-        
-        # Apply CSS styling for vertical tabs appearance
-        self._apply_css_styling()
+        # Expose the panel widget for adding to containers
+        self.widget = self.panel
     
-    def _on_float_toggled(self, button):
-        """Internal callback when float toggle button is clicked."""
-        # Prevent recursive calls when we update the button state programmatically
-        if self._updating_button:
-            return
-            
-        is_active = button.get_active()
-        if is_active:
-            # Button is now active → detach the panel (float)
-            self.detach()
-        else:
-            # Button is now inactive → attach the panel back
-            if hasattr(self, 'parent_container') and self.parent_container:
-                self.hang_on(self.parent_container)
-    
-    def _apply_css_styling(self):
-        """Apply CSS styling to give expanders a vertical tabs appearance."""
-        css = b"""
-        /* Topology Panel - Vertical Tabs Styling */
+    def set_model_canvas_loader(self, model_canvas_loader):
+        """Set model canvas loader for accessing current model.
         
-        /* Add BOLD VISIBLE borders to all expanders */
-        #p_invariants_expander,
-        #t_invariants_expander,
-        #siphons_expander,
-        #traps_expander,
-        #cycles_expander,
-        #paths_expander,
-        #hubs_expander,
-        #reachability_expander,
-        #boundedness_expander,
-        #liveness_expander,
-        #deadlocks_expander,
-        #fairness_expander {
-            border: 2px solid #4a5568;
-            border-radius: 6px;
-            margin: 4px;
-            padding: 8px;
-            background-color: #f7fafc;
-        }
-        
-        /* Highlight expanded expander - BOLD and CLEAR */
-        #p_invariants_expander:checked,
-        #t_invariants_expander:checked,
-        #siphons_expander:checked,
-        #traps_expander:checked,
-        #cycles_expander:checked,
-        #paths_expander:checked,
-        #hubs_expander:checked,
-        #reachability_expander:checked,
-        #boundedness_expander:checked,
-        #liveness_expander:checked,
-        #deadlocks_expander:checked,
-        #fairness_expander:checked {
-            background-color: #e6f7ff;
-            border-color: #1890ff;
-            border-width: 3px;
-            box-shadow: 0 0 0 1px #69c0ff;
-        }
+        Args:
+            model_canvas_loader: ModelCanvasLoader instance
         """
+        self.model_canvas_loader = model_canvas_loader
         
-        try:
-            css_provider = Gtk.CssProvider()
-            css_provider.load_from_data(css)
-            
-            # Apply globally to the screen (not just individual widgets)
-            screen = Gdk.Screen.get_default()
-            if screen:
-                Gtk.StyleContext.add_provider_for_screen(
-                    screen,
-                    css_provider,
-                    Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
-                )
-            else:
-                # Fallback: apply to individual expanders if no screen
-                for expander in self.expanders.values():
-                    context = expander.get_style_context()
-                    context.add_provider(css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
-        except Exception as e:
-            print(f"Warning: Could not apply topology panel CSS styling: {e}", file=sys.stderr)
+        # Pass to panel
+        self.panel.set_model_canvas(model_canvas_loader)
+    
+    def on_tab_switched(self, drawing_area):
+        """Handle tab switch event.
+        
+        Args:
+            drawing_area: The newly active drawing area
+        """
+        # Refresh all categories to update for new tab
+        self.panel.refresh()
+        
+        # Auto-run SAFE analyzers only (P-Invariants, T-Invariants, etc.)
+        # Dangerous analyzers (Siphons, Traps, Reachability) require manual expansion
+        if drawing_area and self.model_canvas_loader:
+            manager = self.model_canvas_loader.get_canvas_manager(drawing_area)
+            if manager and not (hasattr(manager, 'is_empty') and manager.is_empty()):
+                self.panel.auto_run_all_analyzers()
+    
+    def on_file_opened(self, drawing_area):
+        """Handle file open event.
+        
+        Args:
+            drawing_area: The drawing area with newly opened file
+        """
+        # Refresh all categories
+        self.panel.refresh()
+        
+        # Auto-run SAFE analyzers only (P-Invariants, T-Invariants, etc.)
+        # Dangerous analyzers (Siphons, Traps, Reachability) require manual expansion
+        if drawing_area and self.model_canvas_loader:
+            manager = self.model_canvas_loader.get_canvas_manager(drawing_area)
+            if manager and not (hasattr(manager, 'is_empty') and manager.is_empty()):
+                self.panel.auto_run_all_analyzers()
+    
+    def on_pathway_imported(self, drawing_area):
+        """Handle pathway import event.
+        
+        Args:
+            drawing_area: The drawing area with imported pathway
+        """
+        # Refresh all categories
+        self.panel.refresh()
+    
+    def refresh(self):
+        """Refresh the panel."""
+        self.panel.refresh()
+    
+    def add_to_stack(self, stack, container, panel_name='topology'):
+        """Add panel content to a GtkStack container.
+        
+        Args:
+            stack: GtkStack widget that will contain all panels
+            container: GtkBox container within the stack for this panel
+            panel_name: Name identifier for this panel in the stack ('topology')
+        """
+        # Add panel widget directly to container
+        if self.widget.get_parent() != container:
+            current_parent = self.widget.get_parent()
+            if current_parent:
+                current_parent.remove(self.widget)
+            container.pack_start(self.widget, True, True, 0)
+        
+        # Show all widgets
+        self.widget.show_all()
+        
+        # Store references for compatibility
+        self.is_hanged = True
+        self.parent_container = container
+        self._stack = stack
+        self._stack_panel_name = panel_name
+    
+    def show_in_stack(self):
+        """Show this panel in the GtkStack (Master Palette control)."""
+        if not hasattr(self, '_stack') or not self._stack:
+            return
+        
+        # Make stack visible
+        if not self._stack.get_visible():
+            self._stack.set_visible(True)
+        
+        # Set this panel as active child
+        self._stack.set_visible_child_name(self._stack_panel_name)
+        
+        # Show the container
+        if self.parent_container:
+            self.parent_container.set_visible(True)
+        
+        # Show the widget and all children
+        if self.widget:
+            self.widget.set_no_show_all(False)
+            self.widget.show_all()  # Ensure all children are shown
+    
+    def hide_in_stack(self):
+        """Hide this panel in the GtkStack (Master Palette control)."""
+        # Just hide container - don't use no_show_all as it breaks other panels
+        if self.parent_container:
+            self.parent_container.set_visible(False)
 
 
 __all__ = ['TopologyPanelLoader']
