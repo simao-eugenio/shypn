@@ -253,12 +253,12 @@ class TransitionRatePanel(AnalysisPlotPanel):
         return 'Transition Behavior Evolution'
     
     def _format_plot(self):
-        """Format the plot with labels, grid, legend, and smart Y-axis scaling.
+        """Format the plot with labels, grid, legend, and smart Y-axis and X-axis scaling.
         
-        Overrides parent to add source/sink-aware Y-axis scaling:
-        - Source transitions: Generous upper margin for unbounded growth
-        - Sink transitions: Lower bound at 0 for bounded decrease
-        - Mixed/normal: Balanced margins
+        Overrides parent to add:
+        - Source/sink-aware Y-axis scaling
+        - Rate function type-aware X-axis scaling (Hill, Michaelis-Menten, Sigmoid, etc.)
+        - Annotations for key parameters (Kd, Km, center points)
         """
         # Call parent formatting first
         super()._format_plot()
@@ -266,6 +266,9 @@ class TransitionRatePanel(AnalysisPlotPanel):
         # Apply smart Y-axis scaling if not auto-scale
         if not self.auto_scale and self.selected_objects:
             self._apply_smart_ylim_scaling()
+        
+        # Apply rate function-aware X-axis scaling and annotations
+        self._apply_rate_function_adjustments()
     
     def _apply_smart_ylim_scaling(self):
         """Apply smart Y-axis limits based on transition types.
@@ -318,6 +321,239 @@ class TransitionRatePanel(AnalysisPlotPanel):
             new_lower = ylim[0] - y_range * 0.1
             new_upper = ylim[1] + y_range * 0.1
             self.axes.set_ylim(new_lower, new_upper)
+    
+    def _apply_rate_function_adjustments(self):
+        """Apply intelligent X-axis scaling and annotations based on rate function type.
+        
+        Detects rate function types (Hill, Michaelis-Menten, Sigmoid, etc.) from
+        transition properties and adjusts plot accordingly:
+        - Hill equation: X-axis 0 to 4×Kd, show Kd marker
+        - Michaelis-Menten: X-axis 0 to 4×Km, show Km marker
+        - Sigmoid: X-axis 0 to 2×center, show inflection point
+        - Exponential: Extended X-axis for full curve visualization
+        """
+        import re
+        
+        # Only apply to continuous transitions with rate functions
+        for obj in self.selected_objects:
+            if getattr(obj, 'transition_type', '') != 'continuous':
+                continue
+            
+            # Get rate function from properties
+            rate_func = None
+            if hasattr(obj, 'properties') and obj.properties:
+                rate_func = obj.properties.get('rate_function') or obj.properties.get('rate_function_display')
+            
+            if not rate_func:
+                # Try the rate attribute as fallback
+                rate_func = str(getattr(obj, 'rate', ''))
+            
+            if not rate_func or rate_func == 'None':
+                continue
+            
+            # Detect function type and extract parameters
+            func_type, params = self._detect_rate_function_type(rate_func)
+            
+            if func_type == 'hill_equation':
+                self._adjust_for_hill_equation(params, obj)
+            elif func_type == 'michaelis_menten':
+                self._adjust_for_michaelis_menten(params, obj)
+            elif func_type == 'sigmoid':
+                self._adjust_for_sigmoid(params, obj)
+            elif func_type == 'exponential':
+                self._adjust_for_exponential(params, obj)
+    
+    def _detect_rate_function_type(self, rate_func_str):
+        """Detect the type of rate function and extract parameters.
+        
+        Args:
+            rate_func_str: Rate function string from transition properties
+            
+        Returns:
+            tuple: (function_type, parameters_dict)
+                function_type: 'hill_equation', 'michaelis_menten', 'sigmoid', 'exponential', or 'unknown'
+                parameters_dict: Extracted parameters like {'vmax': 10, 'kd': 5, 'n': 2}
+        """
+        import re
+        
+        rate_func_str = str(rate_func_str).strip()
+        
+        # Hill equation: hill_equation(P1, vmax=10, kd=5, n=2)
+        if 'hill_equation' in rate_func_str:
+            params = {}
+            # Extract vmax
+            vmax_match = re.search(r'vmax\s*=\s*([\d.]+)', rate_func_str)
+            if vmax_match:
+                params['vmax'] = float(vmax_match.group(1))
+            # Extract kd
+            kd_match = re.search(r'kd\s*=\s*([\d.]+)', rate_func_str)
+            if kd_match:
+                params['kd'] = float(kd_match.group(1))
+            # Extract n (Hill coefficient)
+            n_match = re.search(r'n\s*=\s*([\d.]+)', rate_func_str)
+            if n_match:
+                params['n'] = float(n_match.group(1))
+            
+            return ('hill_equation', params)
+        
+        # Michaelis-Menten: michaelis_menten(P1, vmax=10, km=5)
+        elif 'michaelis_menten' in rate_func_str:
+            params = {}
+            # Extract vmax
+            vmax_match = re.search(r'vmax\s*=\s*([\d.]+)', rate_func_str)
+            if vmax_match:
+                params['vmax'] = float(vmax_match.group(1))
+            # Extract km
+            km_match = re.search(r'km\s*=\s*([\d.]+)', rate_func_str)
+            if km_match:
+                params['km'] = float(km_match.group(1))
+            
+            return ('michaelis_menten', params)
+        
+        # Sigmoid: sigmoid(t, 10, 0.5)
+        elif 'sigmoid' in rate_func_str:
+            params = {}
+            # Extract center and steepness from sigmoid(t, center, steepness)
+            sig_match = re.search(r'sigmoid\s*\([^,]+,\s*([\d.]+)\s*,\s*([\d.]+)\)', rate_func_str)
+            if sig_match:
+                params['center'] = float(sig_match.group(1))
+                params['steepness'] = float(sig_match.group(2))
+            
+            return ('sigmoid', params)
+        
+        # Exponential: math.exp(0.1 * t) or exp(...)
+        elif 'exp(' in rate_func_str or 'math.exp' in rate_func_str:
+            params = {}
+            # Try to extract the rate coefficient
+            exp_match = re.search(r'exp\s*\(\s*([-+]?[\d.]+)\s*\*', rate_func_str)
+            if exp_match:
+                params['rate'] = float(exp_match.group(1))
+                params['decay'] = params['rate'] < 0
+            
+            return ('exponential', params)
+        
+        return ('unknown', {})
+    
+    def _adjust_for_hill_equation(self, params, transition_obj):
+        """Adjust plot for Hill equation: X-axis 0 to 4×Kd, show Kd marker.
+        
+        Args:
+            params: Dict with 'vmax', 'kd', 'n' parameters
+            transition_obj: Transition object
+        """
+        if 'kd' not in params:
+            return
+        
+        kd = params['kd']
+        vmax = params.get('vmax', 10.0)
+        
+        # Set X-axis range: 0 to 4×Kd (shows full sigmoid curve)
+        xlim = self.axes.get_xlim()
+        suggested_xmax = 4.0 * kd
+        
+        # Only adjust if current range is much larger (don't shrink if user zoomed in)
+        if xlim[1] > suggested_xmax * 1.5 or xlim[1] < suggested_xmax * 0.5:
+            self.axes.set_xlim(0, suggested_xmax)
+        
+        # Add vertical line at Kd (half-maximal response point)
+        self.axes.axvline(x=kd, color='gray', linestyle='--', linewidth=1, alpha=0.5, zorder=1)
+        
+        # Add annotation
+        y_pos = vmax / 2.0  # Half-maximal point
+        self.axes.annotate(f'Kd = {kd}', 
+                          xy=(kd, y_pos), 
+                          xytext=(kd + kd * 0.2, y_pos),
+                          fontsize=9, 
+                          color='gray',
+                          arrowprops=dict(arrowstyle='->', color='gray', lw=0.5))
+    
+    def _adjust_for_michaelis_menten(self, params, transition_obj):
+        """Adjust plot for Michaelis-Menten: X-axis 0 to 4×Km, show Km marker.
+        
+        Args:
+            params: Dict with 'vmax', 'km' parameters
+            transition_obj: Transition object
+        """
+        if 'km' not in params:
+            return
+        
+        km = params['km']
+        vmax = params.get('vmax', 10.0)
+        
+        # Set X-axis range: 0 to 4×Km (shows saturation)
+        xlim = self.axes.get_xlim()
+        suggested_xmax = 4.0 * km
+        
+        if xlim[1] > suggested_xmax * 1.5 or xlim[1] < suggested_xmax * 0.5:
+            self.axes.set_xlim(0, suggested_xmax)
+        
+        # Add vertical line at Km (V = Vmax/2 point)
+        self.axes.axvline(x=km, color='orange', linestyle='--', linewidth=1, alpha=0.5, zorder=1)
+        
+        # Add annotation
+        y_pos = vmax / 2.0
+        self.axes.annotate(f'Km = {km}', 
+                          xy=(km, y_pos), 
+                          xytext=(km + km * 0.2, y_pos),
+                          fontsize=9, 
+                          color='orange',
+                          arrowprops=dict(arrowstyle='->', color='orange', lw=0.5))
+    
+    def _adjust_for_sigmoid(self, params, transition_obj):
+        """Adjust plot for Sigmoid: X-axis 0 to 2×center, show inflection point.
+        
+        Args:
+            params: Dict with 'center', 'steepness' parameters
+            transition_obj: Transition object
+        """
+        if 'center' not in params:
+            return
+        
+        center = params['center']
+        
+        # Set X-axis range: 0 to 2×center (shows full S-curve)
+        xlim = self.axes.get_xlim()
+        suggested_xmax = 2.0 * center
+        
+        if xlim[1] > suggested_xmax * 1.5 or xlim[1] < suggested_xmax * 0.5:
+            self.axes.set_xlim(0, suggested_xmax)
+        
+        # Add vertical line at center (inflection point)
+        self.axes.axvline(x=center, color='purple', linestyle='--', linewidth=1, alpha=0.5, zorder=1)
+        
+        # Add annotation
+        ylim = self.axes.get_ylim()
+        y_pos = (ylim[0] + ylim[1]) / 2.0
+        self.axes.annotate(f'Center = {center}', 
+                          xy=(center, y_pos), 
+                          xytext=(center + center * 0.1, y_pos),
+                          fontsize=9, 
+                          color='purple',
+                          arrowprops=dict(arrowstyle='->', color='purple', lw=0.5))
+    
+    def _adjust_for_exponential(self, params, transition_obj):
+        """Adjust plot for Exponential: Extended X-axis for full curve.
+        
+        Args:
+            params: Dict with 'rate', 'decay' parameters
+            transition_obj: Transition object
+        """
+        # For exponential, extend X-axis to show full behavior
+        # Growth: show enough range to see exponential rise
+        # Decay: show enough range to see decay to near-zero
+        
+        xlim = self.axes.get_xlim()
+        
+        if 'rate' in params:
+            rate = abs(params['rate'])
+            # Time constant: τ = 1/rate
+            if rate > 0:
+                time_constant = 1.0 / rate
+                # Show 5 time constants (99% of change)
+                suggested_xmax = 5.0 * time_constant
+                
+                if xlim[1] > suggested_xmax * 1.5 or xlim[1] < suggested_xmax * 0.5:
+                    self.axes.set_xlim(0, suggested_xmax)
     
     def wire_search_ui(self, entry, search_btn, result_label, model):
         """Wire search UI controls to transition search functionality.
