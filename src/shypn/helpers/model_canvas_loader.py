@@ -1378,7 +1378,16 @@ class ModelCanvasLoader:
                     click_state['pending_timeout'] = None
                     click_state['pending_click_data'] = None
                 if clicked_obj.selected and (not is_double_click):
-                    # Already selected - start drag immediately
+                    # Ctrl+Click on selected object → Deselect (remove from multi-selection)
+                    if is_ctrl:
+                        manager.selection_manager.deselect(clicked_obj)
+                        widget.queue_draw()
+                        # Record for double-click detection
+                        click_state['last_click_time'] = current_time
+                        click_state['last_click_obj'] = clicked_obj
+                        return True
+                    
+                    # Already selected (no Ctrl) - start drag immediately
                     manager.selection_manager.start_drag(clicked_obj, event.x, event.y, manager)
                     state['active'] = True
                     state['button'] = event.button
