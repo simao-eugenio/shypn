@@ -145,7 +145,7 @@ class TransitionRatePanel(AnalysisPlotPanel):
         Returns:
             List of (x, y) tuples where x is time or concentration depending on function type
         """
-        DEBUG_PLOT_DATA = True  # ENABLE for debugging concentration issue
+        DEBUG_PLOT_DATA = False  # Disable verbose logging
         
         # Safety check: return empty if no data collector
         if not self.data_collector:
@@ -190,36 +190,23 @@ class TransitionRatePanel(AnalysisPlotPanel):
                     func_type, params = self._detect_rate_function_type(rate_func)
                     is_enzymatic = func_type in ['hill_equation', 'michaelis_menten']
                     
-                    if DEBUG_PLOT_DATA:
-                        print(f"[CONCENTRATION DEBUG] Transition {transition_id}: rate_func={rate_func}, func_type={func_type}, is_enzymatic={is_enzymatic}")
-                    
                     # Get the input place (substrate) for concentration lookup
-                    # Since transition doesn't have model reference, we need to find it differently
+                    # Since transition doesn't have model reference, extract place name from rate function
                     if is_enzymatic:
                         # Extract place name from rate function (e.g., "P1" from "hill_equation(P1, ...)")
                         import re
                         place_match = re.search(r'\(([A-Za-z_]\w*)', rate_func)
                         if place_match:
                             place_name = place_match.group(1)
-                            if DEBUG_PLOT_DATA:
-                                print(f"[CONCENTRATION DEBUG] Extracted place name: {place_name}")
                             
                             # Try to find this place in the data_collector's tracked places
                             # The place ID might be the place name or an object ID
                             # We'll try to match by looking at all tracked places
                             for tracked_place_id in self.data_collector.place_data.keys():
-                                # Try direct match or check if place name matches
-                                # For now, use the first place with data as a heuristic
-                                if DEBUG_PLOT_DATA:
-                                    print(f"[CONCENTRATION DEBUG] Found tracked place: {tracked_place_id}")
+                                # Use the first place with data as substrate concentration source
                                 # TODO: Better matching - for now use first available
                                 input_place_id = tracked_place_id
                                 break
-                        elif DEBUG_PLOT_DATA:
-                            print(f"[CONCENTRATION DEBUG] Could not extract place name from rate function")
-            
-            if DEBUG_PLOT_DATA:
-                print(f"[CONCENTRATION DEBUG] is_enzymatic={is_enzymatic}, input_place_id={input_place_id}")
             
             rate_series = []
             
@@ -227,11 +214,6 @@ class TransitionRatePanel(AnalysisPlotPanel):
             if is_enzymatic and input_place_id:
                 # Get place token history
                 place_history = self.data_collector.get_place_data(input_place_id)
-                
-                if DEBUG_PLOT_DATA:
-                    print(f"[CONCENTRATION DEBUG] Place history has {len(place_history)} points")
-                    if place_history:
-                        print(f"[CONCENTRATION DEBUG] First place point: {place_history[0]}, Last: {place_history[-1]}")
                 
                 # Create a time -> concentration lookup
                 time_to_concentration = {}
@@ -253,14 +235,9 @@ class TransitionRatePanel(AnalysisPlotPanel):
                         
                         if concentration is not None:
                             rate_series.append((concentration, rate))
-                
-                if DEBUG_PLOT_DATA:
-                    print(f"[CONCENTRATION DEBUG] Created {len(rate_series)} (concentration, rate) points")
-                    if rate_series:
-                        print(f"[CONCENTRATION DEBUG] First: {rate_series[0]}, Last: {rate_series[-1]}")
             else:
                 if DEBUG_PLOT_DATA:
-                    print(f"[CONCENTRATION DEBUG] Using TIME for X-axis (not enzymatic or no input place)")
+                    pass
                 # For time-based functions, use time as X-axis
                 for time, event_type, details in raw_events:
                     if event_type == 'fired' and details and isinstance(details, dict):
