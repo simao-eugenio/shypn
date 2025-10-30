@@ -143,6 +143,14 @@ class SBMLKineticsIntegrationService:
             f"{integrated_count} integrated, {skipped_count} skipped"
         )
         
+        # Validate and fix transition types based on formulas (detect reversible reactions)
+        validation_stats = self.validate_and_fix_transition_types(transitions)
+        if validation_stats['converted'] > 0:
+            self.logger.info(
+                f"Auto-fixed {validation_stats['converted']} stochastic transitions "
+                f"with reversible formulas → converted to continuous"
+            )
+        
         return results
     
     def _build_transition_reaction_map(
@@ -370,6 +378,90 @@ class SBMLKineticsIntegrationService:
                 f"Failed to integrate kinetics for {transition.name}: {e}"
             )
             return False
+    
+    def validate_and_fix_transition_types(self, transitions: List) -> Dict[str, int]:
+        """
+        Validate transition types based on rate_function formulas.
+        
+        Stochastic transitions CANNOT handle negative rates (reversible reactions).
+        This method detects stochastic transitions with formulas containing subtraction
+        and converts them to continuous type.
+        
+        Detection patterns:
+        - Subtraction operators: ' - '
+        - Reverse rate constants: 'k_r', 'kr_', 'k_rev'
+        - Reversible mass action: 'k_f * A - k_r * B'
+        
+        Args:
+            transitions: List of Transition objects to validate
+        
+        Returns:
+            Dict with conversion statistics:
+                - total: Total transitions checked
+                - converted: Number converted from stochastic to continuous
+                - already_continuous: Number already continuous with formulas
+                - stochastic_safe: Stochastic without problematic formulas
+        """
+        stats = {
+            'total': len(transitions),
+            'converted': 0,
+            'already_continuous': 0,
+            'stochastic_safe': 0
+        }
+        
+        for transition in transitions:
+            # Check if has rate_function
+            if not hasattr(transition, 'properties') or 'rate_function' not in transition.properties:
+                continue
+            
+            formula = transition.properties.get('rate_function', '')
+            if not formula or not isinstance(formula, str):
+                continue
+            
+            # Get transition type
+            t_type = getattr(transition, 'transition_type', 'continuous')
+            
+            if t_type == 'continuous':
+                stats['already_continuous'] += 1
+                continue
+            
+            # Check if stochastic transition has problematic formula
+            if t_type == 'stochastic':
+                # Detect reversible reaction patterns
+                has_subtraction = ' - ' in formula
+                has_reverse_rate = any(pattern in formula.lower() for pattern in ['k_r', 'kr_', 'k_rev', 'krev'])
+                
+                if has_subtraction or has_reverse_rate:
+                    # Convert to continuous
+                    transition.transition_type = 'continuous'
+                    
+                    # Mark conversion for tracking
+                    if not hasattr(transition, 'properties'):
+                        transition.properties = {}
+                    transition.properties['needs_enrichment'] = True
+                    transition.properties['enrichment_reason'] = 'Converted from stochastic (reversible formula detected)'
+                    
+                    stats['converted'] += 1
+                    
+                    self.logger.warning(
+                        f"Converted {transition.name} from stochastic to continuous: "
+                        f"Formula contains reversible reaction pattern (can produce negative rates)"
+                    )
+                else:
+                    stats['stochastic_safe'] += 1
+        
+        # Log summary
+        if stats['converted'] > 0:
+            self.logger.info(
+                f"Transition type validation: Converted {stats['converted']}/{stats['total']} "
+                f"stochastic transitions to continuous (reversible formulas detected)"
+            )
+        else:
+            self.logger.debug(
+                f"Transition type validation: All {stats['total']} transitions have appropriate types"
+            )
+        
+        return stats
     
     def get_integration_summary(self, transitions: List) -> Dict[str, int]:
         """
