@@ -23,6 +23,10 @@ class DynamicAnalysesCategory(BaseReportCategory):
     
     def __init__(self, project=None, model_canvas=None):
         """Initialize dynamic analyses category."""
+        # Set dynamic_analyses_panel BEFORE calling super().__init__
+        # because parent may call refresh() which needs this reference
+        self.dynamic_analyses_panel = None
+        
         super().__init__(
             title="DYNAMIC ANALYSES",
             project=project,
@@ -132,6 +136,30 @@ class DynamicAnalysesCategory(BaseReportCategory):
     
     def refresh(self):
         """Refresh dynamic analyses data with summary + detailed info."""
+        # First check if we have dynamic analyses panel connection
+        if self.dynamic_analyses_panel:
+            try:
+                summary = self.dynamic_analyses_panel.generate_summary_for_report_panel()
+                self.summary_label.set_text(summary.get('formatted_text', 'No data'))
+                
+                # For now, keep the old enrichments display in detailed sections
+                # TODO: Integrate with dynamic analyses panel data
+                if not self.project or not hasattr(self.project, 'pathways'):
+                    self.enrichments_buffer.set_text("No project loaded")
+                    self.citations_buffer.set_text("No project loaded")
+                    return
+                
+                pathways = self.project.pathways.list_pathways()
+                enrichments_text = self._build_enrichments_detail(pathways)
+                self.enrichments_buffer.set_text(enrichments_text)
+                
+                citations_text = self._build_citations_detail(pathways)
+                self.citations_buffer.set_text(citations_text)
+                return
+            except Exception as e:
+                print(f"Warning: Could not get summary from dynamic analyses panel: {e}")
+        
+        # Fallback to old behavior if no panel connection
         if not self.project or not hasattr(self.project, 'pathways'):
             self.summary_label.set_text("No project loaded")
             self.enrichments_buffer.set_text("No project loaded")
@@ -235,3 +263,11 @@ class DynamicAnalysesCategory(BaseReportCategory):
             text.append("")
         
         return "\n".join(text)
+    
+    def set_dynamic_analyses_panel(self, panel):
+        """Set reference to Dynamic Analyses Panel for data integration.
+        
+        Args:
+            panel: DynamicAnalysesPanel instance
+        """
+        self.dynamic_analyses_panel = panel

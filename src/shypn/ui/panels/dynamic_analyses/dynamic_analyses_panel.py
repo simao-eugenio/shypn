@@ -268,3 +268,19 @@ class DynamicAnalysesPanel(Gtk.Box):
             'statistics': statistics,
             'formatted_text': formatted_text
         }
+    
+    def set_report_refresh_callback(self, callback):
+        """Set callback to notify report panel of updates.
+        
+        Args:
+            callback: Function to call when dynamic analyses are updated
+        """
+        self._report_refresh_callback = callback
+    
+    def notify_report_panel(self):
+        """Notify report panel that dynamic analyses have been updated."""
+        if self._report_refresh_callback:
+            try:
+                self._report_refresh_callback()
+            except Exception as e:
+                print(f"Warning: Could not refresh report panel: {e}")
