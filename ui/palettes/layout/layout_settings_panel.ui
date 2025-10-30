@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Layout Settings Panel - Compact parameter panel for layout algorithms -->
+<!-- Layout Settings Panel - Parameter panel for layout algorithms -->
 <interface>
   <requires lib="gtk+" version="3.0"/>
 
@@ -14,103 +14,253 @@
     <property name="halign">center</property>
 
     <child>
-      <!-- Main Settings Container - Compact single line -->
-      <object class="GtkBox" id="layout_settings_container">
+      <!-- Main Settings Container - Grid layout for organized parameters -->
+      <object class="GtkGrid" id="layout_settings_container">
         <property name="visible">True</property>
-        <property name="orientation">horizontal</property>
-        <property name="spacing">8</property>
-        <property name="margin">8</property>
+        <property name="row-spacing">6</property>
+        <property name="column-spacing">8</property>
+        <property name="margin-top">8</property>
+        <property name="margin-bottom">8</property>
+        <property name="margin-start">12</property>
+        <property name="margin-end">12</property>
         <property name="halign">center</property>
         <property name="hexpand">False</property>
         <property name="vexpand">False</property>
-        <property name="homogeneous">False</property>
-        <property name="width-request">280</property>
         <style>
           <class name="layout-settings-panel"/>
         </style>
 
-        <!-- Spacing Parameter -->
+        <!-- HIERARCHICAL SECTION HEADER (Row 0) -->
         <child>
           <object class="GtkLabel">
             <property name="visible">True</property>
-            <property name="label">Spacing:</property>
-            <property name="hexpand">False</property>
+            <property name="label">Hierarchical:</property>
+            <property name="halign">start</property>
+            <property name="margin-top">4</property>
+            <style>
+              <class name="section-header"/>
+            </style>
+          </object>
+          <packing>
+            <property name="left-attach">0</property>
+            <property name="top-attach">0</property>
+            <property name="width">4</property>
+          </packing>
+        </child>
+
+        <!-- Layer Spacing (Row 1) -->
+        <child>
+          <object class="GtkLabel">
+            <property name="visible">True</property>
+            <property name="label">Layer:</property>
+            <property name="halign">end</property>
             <style>
               <class name="bright-label"/>
             </style>
           </object>
           <packing>
-            <property name="expand">False</property>
-            <property name="fill">False</property>
+            <property name="left-attach">0</property>
+            <property name="top-attach">1</property>
           </packing>
         </child>
 
         <child>
-          <object class="GtkEntry" id="spacing_entry">
+          <object class="GtkEntry" id="layer_spacing_entry">
+            <property name="visible">True</property>
+            <property name="text">150</property>
+            <property name="width-chars">3</property>
+            <property name="max-width-chars">3</property>
+            <property name="max-length">3</property>
+            <property name="input-purpose">number</property>
+            <property name="tooltip-text">Vertical spacing between layers (px)</property>
+            <property name="halign">center</property>
+            <property name="xalign">0.5</property>
+            <property name="hexpand">False</property>
+            <property name="width-request">45</property>
+          </object>
+          <packing>
+            <property name="left-attach">1</property>
+            <property name="top-attach">1</property>
+          </packing>
+        </child>
+
+        <!-- Node Spacing (Row 1, right side) -->
+        <child>
+          <object class="GtkLabel">
+            <property name="visible">True</property>
+            <property name="label">Node:</property>
+            <property name="halign">end</property>
+            <property name="margin-start">12</property>
+            <style>
+              <class name="bright-label"/>
+            </style>
+          </object>
+          <packing>
+            <property name="left-attach">2</property>
+            <property name="top-attach">1</property>
+          </packing>
+        </child>
+
+        <child>
+          <object class="GtkEntry" id="node_spacing_entry">
             <property name="visible">True</property>
             <property name="text">100</property>
             <property name="width-chars">3</property>
             <property name="max-width-chars">3</property>
             <property name="max-length">3</property>
             <property name="input-purpose">number</property>
-            <property name="tooltip-text">Node spacing (px)</property>
+            <property name="tooltip-text">Horizontal spacing between nodes (px)</property>
             <property name="halign">center</property>
             <property name="xalign">0.5</property>
             <property name="hexpand">False</property>
             <property name="width-request">45</property>
           </object>
           <packing>
-            <property name="expand">False</property>
-            <property name="fill">False</property>
+            <property name="left-attach">3</property>
+            <property name="top-attach">1</property>
           </packing>
         </child>
 
-        <!-- Separator -->
+        <!-- Separator (Row 2) -->
         <child>
           <object class="GtkSeparator">
             <property name="visible">True</property>
-            <property name="orientation">vertical</property>
-            <property name="hexpand">False</property>
+            <property name="orientation">horizontal</property>
+            <property name="margin-top">6</property>
+            <property name="margin-bottom">6</property>
           </object>
           <packing>
-            <property name="expand">False</property>
-            <property name="fill">False</property>
+            <property name="left-attach">0</property>
+            <property name="top-attach">2</property>
+            <property name="width">4</property>
           </packing>
         </child>
 
-        <!-- Iterations Parameter -->
+        <!-- FORCE-DIRECTED SECTION HEADER (Row 3) -->
         <child>
           <object class="GtkLabel">
             <property name="visible">True</property>
-            <property name="label">Iterations:</property>
-            <property name="hexpand">False</property>
+            <property name="label">Force-Directed:</property>
+            <property name="halign">start</property>
+            <property name="margin-top">4</property>
+            <style>
+              <class name="section-header"/>
+            </style>
+          </object>
+          <packing>
+            <property name="left-attach">0</property>
+            <property name="top-attach">3</property>
+            <property name="width">4</property>
+          </packing>
+        </child>
+
+        <!-- Iterations (Row 4) -->
+        <child>
+          <object class="GtkLabel">
+            <property name="visible">True</property>
+            <property name="label">Iter:</property>
+            <property name="halign">end</property>
             <style>
               <class name="bright-label"/>
             </style>
           </object>
           <packing>
-            <property name="expand">False</property>
-            <property name="fill">False</property>
+            <property name="left-attach">0</property>
+            <property name="top-attach">4</property>
           </packing>
         </child>
 
         <child>
           <object class="GtkEntry" id="iterations_entry">
             <property name="visible">True</property>
-            <property name="text">50</property>
+            <property name="text">500</property>
             <property name="width-chars">3</property>
             <property name="max-width-chars">3</property>
             <property name="max-length">3</property>
             <property name="input-purpose">number</property>
-            <property name="tooltip-text">Force-directed iterations</property>
+            <property name="tooltip-text">Physics simulation iterations (50-1000)</property>
             <property name="halign">center</property>
             <property name="xalign">0.5</property>
             <property name="hexpand">False</property>
             <property name="width-request">45</property>
           </object>
           <packing>
-            <property name="expand">False</property>
-            <property name="fill">False</property>
+            <property name="left-attach">1</property>
+            <property name="top-attach">4</property>
+          </packing>
+        </child>
+
+        <!-- K Multiplier (Row 4, right side) -->
+        <child>
+          <object class="GtkLabel">
+            <property name="visible">True</property>
+            <property name="label">K:</property>
+            <property name="halign">end</property>
+            <property name="margin-start">12</property>
+            <style>
+              <class name="bright-label"/>
+            </style>
+          </object>
+          <packing>
+            <property name="left-attach">2</property>
+            <property name="top-attach">4</property>
+          </packing>
+        </child>
+
+        <child>
+          <object class="GtkEntry" id="k_multiplier_entry">
+            <property name="visible">True</property>
+            <property name="text">1.5</property>
+            <property name="width-chars">3</property>
+            <property name="max-width-chars">3</property>
+            <property name="max-length">3</property>
+            <property name="input-purpose">number</property>
+            <property name="tooltip-text">Spacing multiplier (0.5=compact, 3.0=spacious)</property>
+            <property name="halign">center</property>
+            <property name="xalign">0.5</property>
+            <property name="hexpand">False</property>
+            <property name="width-request">45</property>
+          </object>
+          <packing>
+            <property name="left-attach">3</property>
+            <property name="top-attach">4</property>
+          </packing>
+        </child>
+
+        <!-- Scale (Row 5) -->
+        <child>
+          <object class="GtkLabel">
+            <property name="visible">True</property>
+            <property name="label">Scale:</property>
+            <property name="halign">end</property>
+            <style>
+              <class name="bright-label"/>
+            </style>
+          </object>
+          <packing>
+            <property name="left-attach">0</property>
+            <property name="top-attach">5</property>
+          </packing>
+        </child>
+
+        <child>
+          <object class="GtkEntry" id="scale_entry">
+            <property name="visible">True</property>
+            <property name="text">2000</property>
+            <property name="width-chars">4</property>
+            <property name="max-width-chars">4</property>
+            <property name="max-length">4</property>
+            <property name="input-purpose">number</property>
+            <property name="tooltip-text">Canvas scale (500-5000 px)</property>
+            <property name="halign">center</property>
+            <property name="xalign">0.5</property>
+            <property name="hexpand">False</property>
+            <property name="width-request">50</property>
+          </object>
+          <packing>
+            <property name="left-attach">1</property>
+            <property name="top-attach">5</property>
+            <property name="width">3</property>
           </packing>
         </child>
 
@@ -119,20 +269,44 @@
   </object>
 
   <!-- Adjustments -->
-  <object class="GtkAdjustment" id="spacing_adjustment">
-    <property name="lower">20</property>
+  <object class="GtkAdjustment" id="layer_spacing_adjustment">
+    <property name="lower">50</property>
     <property name="upper">500</property>
+    <property name="step-increment">10</property>
+    <property name="page-increment">50</property>
+    <property name="value">150</property>
+  </object>
+
+  <object class="GtkAdjustment" id="node_spacing_adjustment">
+    <property name="lower">50</property>
+    <property name="upper">300</property>
     <property name="step-increment">10</property>
     <property name="page-increment">50</property>
     <property name="value">100</property>
   </object>
 
   <object class="GtkAdjustment" id="iterations_adjustment">
-    <property name="lower">10</property>
-    <property name="upper">200</property>
-    <property name="step-increment">5</property>
-    <property name="page-increment">10</property>
-    <property name="value">50</property>
+    <property name="lower">50</property>
+    <property name="upper">1000</property>
+    <property name="step-increment">50</property>
+    <property name="page-increment">100</property>
+    <property name="value">500</property>
+  </object>
+
+  <object class="GtkAdjustment" id="k_multiplier_adjustment">
+    <property name="lower">0.5</property>
+    <property name="upper">3.0</property>
+    <property name="step-increment">0.1</property>
+    <property name="page-increment">0.5</property>
+    <property name="value">1.5</property>
+  </object>
+
+  <object class="GtkAdjustment" id="scale_adjustment">
+    <property name="lower">500</property>
+    <property name="upper">5000</property>
+    <property name="step-increment">100</property>
+    <property name="page-increment">500</property>
+    <property name="value">2000</property>
   </object>
 
 </interface>
