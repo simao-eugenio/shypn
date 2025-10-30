@@ -145,7 +145,7 @@ class TransitionRatePanel(AnalysisPlotPanel):
         Returns:
             List of (x, y) tuples where x is time or concentration depending on function type
         """
-        DEBUG_PLOT_DATA = False  # Disable verbose logging
+        DEBUG_PLOT_DATA = True  # ENABLE for debugging concentration issue
         
         # Safety check: return empty if no data collector
         if not self.data_collector:
@@ -190,16 +190,26 @@ class TransitionRatePanel(AnalysisPlotPanel):
                     func_type, _ = self._detect_rate_function_type(rate_func)
                     is_enzymatic = func_type in ['hill_equation', 'michaelis_menten']
                     
+                    if DEBUG_PLOT_DATA:
+                        print(f"[CONCENTRATION DEBUG] Transition {transition_id}: rate_func={rate_func}, func_type={func_type}, is_enzymatic={is_enzymatic}")
+                    
                     # Get the input place (substrate) for concentration lookup
                     if is_enzymatic and hasattr(transition_obj, 'model') and transition_obj.model:
                         model = transition_obj.model
+                        if DEBUG_PLOT_DATA:
+                            print(f"[CONCENTRATION DEBUG] Has model, checking {len(model.arcs)} arcs")
                         for arc in model.arcs:
                             if arc.target_id == transition_obj.id:  # Input arc
                                 input_place_id = arc.source_id
+                                if DEBUG_PLOT_DATA:
+                                    print(f"[CONCENTRATION DEBUG] Found input arc from place {input_place_id}")
                                 break
+                    elif is_enzymatic:
+                        if DEBUG_PLOT_DATA:
+                            print(f"[CONCENTRATION DEBUG] Enzymatic but no model access: has_model={hasattr(transition_obj, 'model')}, model={getattr(transition_obj, 'model', None)}")
             
             if DEBUG_PLOT_DATA:
-                pass
+                print(f"[CONCENTRATION DEBUG] is_enzymatic={is_enzymatic}, input_place_id={input_place_id}")
             
             rate_series = []
             
@@ -207,6 +217,11 @@ class TransitionRatePanel(AnalysisPlotPanel):
             if is_enzymatic and input_place_id:
                 # Get place token history
                 place_history = self.data_collector.get_place_data(input_place_id)
+                
+                if DEBUG_PLOT_DATA:
+                    print(f"[CONCENTRATION DEBUG] Place history has {len(place_history)} points")
+                    if place_history:
+                        print(f"[CONCENTRATION DEBUG] First place point: {place_history[0]}, Last: {place_history[-1]}")
                 
                 # Create a time -> concentration lookup
                 time_to_concentration = {}
@@ -228,7 +243,14 @@ class TransitionRatePanel(AnalysisPlotPanel):
                         
                         if concentration is not None:
                             rate_series.append((concentration, rate))
+                
+                if DEBUG_PLOT_DATA:
+                    print(f"[CONCENTRATION DEBUG] Created {len(rate_series)} (concentration, rate) points")
+                    if rate_series:
+                        print(f"[CONCENTRATION DEBUG] First: {rate_series[0]}, Last: {rate_series[-1]}")
             else:
+                if DEBUG_PLOT_DATA:
+                    print(f"[CONCENTRATION DEBUG] Using TIME for X-axis (not enzymatic or no input place)")
                 # For time-based functions, use time as X-axis
                 for time, event_type, details in raw_events:
                     if event_type == 'fired' and details and isinstance(details, dict):
