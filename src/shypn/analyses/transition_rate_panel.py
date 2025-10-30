@@ -135,15 +135,15 @@ class TransitionRatePanel(AnalysisPlotPanel):
         """Get behavior-specific data for a transition.
         
         The data plotted depends on transition type:
-            pass
-        - Continuous: Rate function value over time (shows sigmoid, exponential curves, etc.)
-        - Discrete (immediate/timed/stochastic): Cumulative firing count
+        - Continuous enzymatic (Hill, M-M): (concentration, rate) - substrate concentration vs reaction rate
+        - Continuous time-based: (time, rate) - time vs rate value
+        - Discrete (immediate/timed/stochastic): (time, cumulative_count)
         
         Args:
             transition_id: ID of the transition
             
         Returns:
-            List of (time, value) tuples where value depends on transition type
+            List of (x, y) tuples where x is time or concentration depending on function type
         """
         DEBUG_PLOT_DATA = False  # Disable verbose logging
         
@@ -168,14 +168,72 @@ class TransitionRatePanel(AnalysisPlotPanel):
                 has_rate_data = True
         
         if has_rate_data:
-            # CONTINUOUS TRANSITION: Plot rate function value over time
+            # CONTINUOUS TRANSITION: Check if enzymatic function (needs concentration on X-axis)
+            # Get the transition object to check its rate function
+            transition_obj = None
+            for obj in self.selected_objects:
+                if obj.id == transition_id:
+                    transition_obj = obj
+                    break
+            
+            # Detect if this is an enzymatic function
+            is_enzymatic = False
+            input_place_id = None
+            if transition_obj:
+                rate_func = None
+                if hasattr(transition_obj, 'properties') and transition_obj.properties:
+                    rate_func = transition_obj.properties.get('rate_function') or transition_obj.properties.get('rate_function_display')
+                if not rate_func:
+                    rate_func = str(getattr(transition_obj, 'rate', ''))
+                
+                if rate_func and rate_func != 'None':
+                    func_type, _ = self._detect_rate_function_type(rate_func)
+                    is_enzymatic = func_type in ['hill_equation', 'michaelis_menten']
+                    
+                    # Get the input place (substrate) for concentration lookup
+                    if is_enzymatic and hasattr(transition_obj, 'model') and transition_obj.model:
+                        model = transition_obj.model
+                        for arc in model.arcs:
+                            if arc.target_id == transition_obj.id:  # Input arc
+                                input_place_id = arc.source_id
+                                break
+            
             if DEBUG_PLOT_DATA:
                 pass
+            
             rate_series = []
-            for time, event_type, details in raw_events:
-                if event_type == 'fired' and details and isinstance(details, dict):
-                    rate = details.get('rate', 0.0)
-                    rate_series.append((time, rate))
+            
+            # For enzymatic functions, we need to match times with place concentrations
+            if is_enzymatic and input_place_id:
+                # Get place token history
+                place_history = self.data_collector.get_place_data(input_place_id)
+                
+                # Create a time -> concentration lookup
+                time_to_concentration = {}
+                for place_time, tokens in place_history:
+                    time_to_concentration[place_time] = tokens
+                
+                # Match transition rates with substrate concentrations at those times
+                for time, event_type, details in raw_events:
+                    if event_type == 'fired' and details and isinstance(details, dict):
+                        rate = details.get('rate', 0.0)
+                        
+                        # Find the closest concentration measurement
+                        concentration = time_to_concentration.get(time)
+                        if concentration is None and place_history:
+                            # Interpolate or use closest time point
+                            closest_time = min(time_to_concentration.keys(), 
+                                             key=lambda t: abs(t - time))
+                            concentration = time_to_concentration[closest_time]
+                        
+                        if concentration is not None:
+                            rate_series.append((concentration, rate))
+            else:
+                # For time-based functions, use time as X-axis
+                for time, event_type, details in raw_events:
+                    if event_type == 'fired' and details and isinstance(details, dict):
+                        rate = details.get('rate', 0.0)
+                        rate_series.append((time, rate))
             
             if DEBUG_PLOT_DATA and rate_series:
                 pass
