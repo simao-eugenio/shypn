@@ -876,10 +876,14 @@ class TransitionRatePanel(AnalysisPlotPanel):
         self.axes.set_yticks([])
         self.canvas.draw()
     
-    def update_plot(self):
+    def update_plot(self, force_full_redraw=False):
         """Update the plot with current data including locality places.
         
         Overrides parent method to add locality place plotting.
+        
+        Args:
+            force_full_redraw: If True, force a full redraw even if object list hasn't changed.
+                              Used when properties change to re-apply adjustments.
         """
         DEBUG_UPDATE_PLOT = False  # Disable verbose logging
         
