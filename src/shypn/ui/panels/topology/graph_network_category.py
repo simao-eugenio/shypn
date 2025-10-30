@@ -37,7 +37,7 @@ class GraphNetworkCategory(BaseTopologyCategory):
             expanded: Whether category starts expanded
         """
         super().__init__(
-            title="Graph & Network Analysis",
+            title="GRAPH & NETWORK ANALYSIS",
             model_canvas=model_canvas,
             expanded=expanded
         )
