@@ -88,9 +88,9 @@ class AnalysesPanelController(BasePanel):
         self.topological_expander.set_expanded(False)
         
         # Label
-        label = Gtk.Label(label="Topologic Analyses")
+        label = Gtk.Label(label="TOPOLOGICAL ANALYSES")
         label.set_xalign(0)
-        label.set_markup("<b>Topologic Analyses</b>")
+        label.set_markup("<b>TOPOLOGICAL ANALYSES</b>")
         self.topological_expander.set_label_widget(label)
         
         # Content
@@ -113,9 +113,9 @@ class AnalysesPanelController(BasePanel):
         expander.set_expanded(True)
         
         # Label
-        label = Gtk.Label(label="Dynamic Analyses")
+        label = Gtk.Label(label="DYNAMIC ANALYSES")
         label.set_xalign(0)
-        label.set_markup("<b>Dynamic Analyses</b>")
+        label.set_markup("<b>DYNAMIC ANALYSES</b>")
         expander.set_label_widget(label)
         
         # Notebook with plot tabs

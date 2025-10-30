@@ -554,6 +554,10 @@ def main(argv=None):
 			if topology_panel_loader and hasattr(topology_panel_loader, 'panel'):
 				report_panel.set_topology_panel(topology_panel_loader.panel)
 			
+			# Wire dynamic analyses panel to report panel for real-time data
+			if right_panel_loader and hasattr(right_panel_loader, 'dynamic_analyses_panel'):
+				report_panel.set_dynamic_analyses_panel(right_panel_loader.dynamic_analyses_panel)
+			
 			report_panel_container.pack_start(report_panel, True, True, 0)
 			report_panel.show_all()
 		except Exception as e:

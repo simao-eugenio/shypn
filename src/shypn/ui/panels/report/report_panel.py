@@ -37,6 +37,7 @@ class ReportPanel(Gtk.Box):
         self.project = project
         self.model_canvas = model_canvas
         self.topology_panel = None  # Will be set via set_topology_panel()
+        self.dynamic_analyses_panel = None  # Will be set via set_dynamic_analyses_panel()
         
         # Category controllers
         self.categories = []
@@ -235,6 +236,32 @@ class ReportPanel(Gtk.Box):
         # Refresh the topology analyses category
         for category in self.categories:
             if isinstance(category, TopologyAnalysesCategory):
+                category.refresh()
+                break
+    
+    def set_dynamic_analyses_panel(self, dynamic_analyses_panel):
+        """Set dynamic analyses panel reference for fetching real-time data.
+        
+        Args:
+            dynamic_analyses_panel: DynamicAnalysesPanel instance
+        """
+        self.dynamic_analyses_panel = dynamic_analyses_panel
+        
+        # Update dynamic analyses category with the panel reference
+        for category in self.categories:
+            if isinstance(category, DynamicAnalysesCategory):
+                category.set_dynamic_analyses_panel(dynamic_analyses_panel)
+                break
+        
+        # Set callback so dynamic analyses panel can notify us when data updates
+        if hasattr(dynamic_analyses_panel, 'set_report_refresh_callback'):
+            dynamic_analyses_panel.set_report_refresh_callback(self._on_dynamic_analyses_updated)
+    
+    def _on_dynamic_analyses_updated(self):
+        """Called by dynamic analyses panel when monitoring data is updated."""
+        # Refresh the dynamic analyses category
+        for category in self.categories:
+            if isinstance(category, DynamicAnalysesCategory):
                 category.refresh()
                 break
     
