@@ -3078,12 +3078,7 @@ class ModelCanvasLoader:
                 if hasattr(self.right_panel_loader, 'transition_panel') and self.right_panel_loader.transition_panel:
                     if isinstance(obj, Transition):
                         if obj in self.right_panel_loader.transition_panel.selected_objects:
-                            print(f"[PROPERTY CHANGE] Transition {obj.name} (ID:{obj.id}) properties changed - setting needs_update=True")
-                            print(f"[PROPERTY CHANGE] New rate_function: {obj.properties.get('rate_function', 'None')}")
                             self.right_panel_loader.transition_panel.needs_update = True
-                        else:
-                            print(f"[PROPERTY CHANGE] Transition {obj.name} (ID:{obj.id}) changed but NOT in selected_objects")
-                            print(f"[PROPERTY CHANGE] Selected transitions: {[o.name for o in self.right_panel_loader.transition_panel.selected_objects]}")
         dialog_loader.connect('properties-changed', on_properties_changed)
         
         # Show dialog
