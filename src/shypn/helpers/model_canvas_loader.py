@@ -3070,6 +3070,9 @@ class ModelCanvasLoader:
                 if simulate_tools and simulate_tools.simulation:
                     if obj.id in simulate_tools.simulation.behavior_cache:
                         del simulate_tools.simulation.behavior_cache[obj.id]
+                    # Clear historical data so plot shows new rate function immediately
+                    if simulate_tools.simulation.data_collector:
+                        simulate_tools.simulation.data_collector.clear_transition(obj.id)
             if isinstance(obj, (Place, Transition)) and self.right_panel_loader:
                 if hasattr(self.right_panel_loader, 'place_panel') and self.right_panel_loader.place_panel:
                     if isinstance(obj, Place):
