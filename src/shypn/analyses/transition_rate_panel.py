@@ -145,7 +145,7 @@ class TransitionRatePanel(AnalysisPlotPanel):
         Returns:
             List of (time, value) tuples where value depends on transition type
         """
-        DEBUG_PLOT_DATA = False  # Disable verbose logging
+        DEBUG_PLOT_DATA = True  # TEMPORARILY ENABLE for debugging
         
         # Safety check: return empty if no data collector
         if not self.data_collector:
@@ -156,7 +156,7 @@ class TransitionRatePanel(AnalysisPlotPanel):
         
         if not raw_events:
             if DEBUG_PLOT_DATA:
-                pass
+                print(f"[RATE DATA DEBUG] No raw events for transition {transition_id}")
             return []
         
         # Determine transition type by checking if details contain 'rate' field
@@ -166,12 +166,16 @@ class TransitionRatePanel(AnalysisPlotPanel):
             details = raw_events[0][2]
             if isinstance(details, dict) and 'rate' in details:
                 has_rate_data = True
+                if DEBUG_PLOT_DATA:
+                    print(f"[RATE DATA DEBUG] Transition {transition_id}: HAS rate data, first rate={details.get('rate')}")
+        else:
+            if DEBUG_PLOT_DATA:
+                print(f"[RATE DATA DEBUG] Transition {transition_id}: NO rate data in details")
         
         if has_rate_data:
             # CONTINUOUS TRANSITION: Plot rate function value over time
             if DEBUG_PLOT_DATA:
-            
-                pass
+                print(f"[RATE DATA DEBUG] Processing {len(raw_events)} events as CONTINUOUS")
             rate_series = []
             for time, event_type, details in raw_events:
                 if event_type == 'fired' and details and isinstance(details, dict):
@@ -179,14 +183,12 @@ class TransitionRatePanel(AnalysisPlotPanel):
                     rate_series.append((time, rate))
             
             if DEBUG_PLOT_DATA and rate_series:
-            
-                pass
+                print(f"[RATE DATA DEBUG] Extracted {len(rate_series)} rate points, first={(rate_series[0] if rate_series else 'none')}, last={(rate_series[-1] if rate_series else 'none')}")
             return rate_series
         else:
             # DISCRETE TRANSITION: Plot cumulative firing count
             if DEBUG_PLOT_DATA:
-            
-                pass
+                print(f"[RATE DATA DEBUG] Processing {len(raw_events)} events as DISCRETE")
             firing_times = [t for t, event_type, _ in raw_events 
                            if event_type == 'fired']
             
