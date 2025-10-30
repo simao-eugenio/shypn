@@ -23,9 +23,10 @@ class DynamicAnalysesCategory(BaseReportCategory):
     
     def __init__(self, project=None, model_canvas=None):
         """Initialize dynamic analyses category."""
-        # Set dynamic_analyses_panel BEFORE calling super().__init__
-        # because parent may call refresh() which needs this reference
+        # Set panel references BEFORE calling super().__init__
+        # because parent may call refresh() which needs these references
         self.dynamic_analyses_panel = None
+        self.pathway_operations_panel = None
         
         super().__init__(
             title="DYNAMIC ANALYSES",
@@ -271,3 +272,16 @@ class DynamicAnalysesCategory(BaseReportCategory):
             panel: DynamicAnalysesPanel instance
         """
         self.dynamic_analyses_panel = panel
+    
+    def set_pathway_operations_panel(self, panel):
+        """Set reference to Pathway Operations Panel for pathway data.
+        
+        This allows the report to display information about imported pathways
+        (KEGG, SBML, BioModels) including their enrichments and metadata.
+        
+        Args:
+            panel: PathwayOperationsPanel instance
+        """
+        self.pathway_operations_panel = panel
+        # Refresh to show any existing pathway data
+        self.refresh()

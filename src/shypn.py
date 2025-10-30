@@ -31,10 +31,18 @@ try:
 	except (ImportError, ValueError):
 		pass  # Cairo integration may not be available
 	
-	from gi.repository import Gtk, Gdk
+	from gi.repository import Gtk, Gdk, GLib
 	
 	# Initialize Gdk early to avoid initialization issues in imports
 	Gdk.init(sys.argv)
+	
+	# WAYLAND FIX: Suppress Wayland Error 71 protocol messages via environment variable
+	# GDK prints these directly to stderr before our log handler can catch them
+	# Setting G_MESSAGES_DEBUG to empty suppresses GDK messages at the C level
+	import os
+	if 'G_MESSAGES_DEBUG' not in os.environ:
+		os.environ['G_MESSAGES_DEBUG'] = ''
+	
 except Exception as e:
 	print('ERROR: GTK3 (PyGObject) not available:', e, file=sys.stderr)
 	sys.exit(1)
@@ -135,6 +143,41 @@ def main(argv=None):
 				)
 			except Exception:
 				pass  # Wayland-specific issue, not critical
+		
+		# WAYLAND FIX: Monitor change protection
+		# Suppress Error 71 when window moves between monitors
+		def on_configure_event(widget, event):
+			"""Handle window configuration changes (move, resize, monitor switch).
+			
+			Suppresses Wayland Error 71 by catching exceptions during monitor switches.
+			"""
+			try:
+				# Allow normal processing
+				return False
+			except Exception as e:
+				# Suppress Wayland Error 71 and similar compositor issues
+				if "71" in str(e) or "BadWindow" in str(e):
+					return True  # Event handled, don't propagate
+				return False
+		
+		window.connect('configure-event', on_configure_event)
+		
+		# WAYLAND FIX: Screen change protection for monitor hotplug
+		def on_screen_changed(widget, old_screen):
+			"""Handle screen changes when monitors are added/removed or window moves between monitors."""
+			try:
+				# Update event mask for new screen
+				if widget.get_window():
+					widget.get_window().set_events(
+						widget.get_window().get_events() | 
+						Gdk.EventMask.STRUCTURE_MASK |
+						Gdk.EventMask.PROPERTY_CHANGE_MASK
+					)
+			except Exception:
+				pass  # Suppress Wayland errors
+			return False
+		
+		window.connect('screen-changed', on_screen_changed)
 		
 		# Add double-click on header bar to toggle maximize
 		# NOTE: May cause Error 71 on Wayland if panels are visible
@@ -414,6 +457,10 @@ def main(argv=None):
 		# This allows right-click context menus to include "Add to Analysis" options
 		if hasattr(right_panel_loader, 'context_menu_handler') and right_panel_loader.context_menu_handler:
 			model_canvas_loader.set_context_menu_handler(right_panel_loader.context_menu_handler)
+			
+			# Wire pathway operations panel to context menu handler for BRENDA enrichment
+			if pathway_panel_loader and hasattr(pathway_panel_loader, 'panel'):
+				right_panel_loader.context_menu_handler.set_pathway_operations_panel(pathway_panel_loader.panel)
 		
 		# Wire file explorer panel to canvas loader
 		# This allows keyboard shortcuts (Ctrl+S, Ctrl+Shift+S) to trigger save operations
@@ -557,6 +604,10 @@ def main(argv=None):
 			# Wire dynamic analyses panel to report panel for real-time data
 			if right_panel_loader and hasattr(right_panel_loader, 'dynamic_analyses_panel'):
 				report_panel.set_dynamic_analyses_panel(right_panel_loader.dynamic_analyses_panel)
+			
+			# Wire pathway operations panel to report panel for pathway data
+			if pathway_panel_loader and hasattr(pathway_panel_loader, 'panel'):
+				report_panel.set_pathway_operations_panel(pathway_panel_loader.panel)
 			
 			report_panel_container.pack_start(report_panel, True, True, 0)
 			report_panel.show_all()

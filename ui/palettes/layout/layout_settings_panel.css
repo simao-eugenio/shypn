@@ -6,53 +6,121 @@
     padding: 4px;
 }
 
-/* Bright white labels for all text - force bright white in all states */
+/* Section headers (algorithm names) - force bright blue, no transitions */
+.section-header,
+.section-header:backdrop,
+.section-header:disabled,
+.section-header:hover,
+.section-header:active {
+    font-weight: bold;
+    color: #3498db;
+    font-size: 13px;
+    opacity: 1.0;
+    transition: none;
+    animation: none;
+}
+
+/* Bright white labels for all text - force bright white in ALL states, no transitions */
 .layout-settings-panel label,
 .layout-settings-panel label:backdrop,
 .layout-settings-panel label:disabled,
+.layout-settings-panel label:hover,
+.layout-settings-panel label:active,
+.layout-settings-panel label:focus,
 .bright-label,
 .bright-label:backdrop,
-.bright-label:disabled {
+.bright-label:disabled,
+.bright-label:hover,
+.bright-label:active,
+.bright-label:focus {
     font-weight: 500;
-    color: #ffffff !important;
+    color: #ffffff;
     font-size: 13px;
-    opacity: 1.0 !important;
+    opacity: 1.0;
+    transition: none;
+    animation: none;
 }
 
-/* Force compact width for parameter entries - prevent any stretching */
-#spacing_entry,
-#iterations_entry {
-    min-width: 45px !important;
-    max-width: 45px !important;
-    width: 45px !important;
+/* Force compact width for parameter entries - GTK3 compatible */
+#layer_spacing_entry,
+#node_spacing_entry,
+#iterations_entry,
+#k_multiplier_entry,
+#scale_entry {
     font-size: 13px;
     font-weight: bold;
-    color: #ffffff !important;
+    color: #ffffff;
     background-color: #2c3e50;
     border: 1px solid #34495e;
-    opacity: 1.0 !important;
+    opacity: 1.0;
+    transition: none;
+    animation: none;
 }
 
-/* GTK3 Entry text styling - force white text in all states */
-#spacing_entry entry,
+/* GTK3 Entry text styling - force white text in ALL states, no transitions or animations */
+#layer_spacing_entry,
+#node_spacing_entry,
+#iterations_entry,
+#k_multiplier_entry,
+#scale_entry,
+#layer_spacing_entry entry,
+#node_spacing_entry entry,
 #iterations_entry entry,
-entry#spacing_entry,
+#k_multiplier_entry entry,
+#scale_entry entry,
+entry#layer_spacing_entry,
+entry#node_spacing_entry,
 entry#iterations_entry,
-#spacing_entry:backdrop,
+entry#k_multiplier_entry,
+entry#scale_entry,
+#layer_spacing_entry:backdrop,
+#node_spacing_entry:backdrop,
 #iterations_entry:backdrop,
-#spacing_entry:disabled,
-#iterations_entry:disabled {
-    min-width: 45px !important;
-    max-width: 45px !important;
-    width: 45px !important;
-    color: #ffffff !important;
+#k_multiplier_entry:backdrop,
+#scale_entry:backdrop,
+#layer_spacing_entry:disabled,
+#node_spacing_entry:disabled,
+#iterations_entry:disabled,
+#k_multiplier_entry:disabled,
+#scale_entry:disabled,
+#layer_spacing_entry:focus,
+#node_spacing_entry:focus,
+#iterations_entry:focus,
+#k_multiplier_entry:focus,
+#scale_entry:focus,
+#layer_spacing_entry:hover,
+#node_spacing_entry:hover,
+#iterations_entry:hover,
+#k_multiplier_entry:hover,
+#scale_entry:hover,
+#layer_spacing_entry:active,
+#node_spacing_entry:active,
+#iterations_entry:active,
+#k_multiplier_entry:active,
+#scale_entry:active {
+    color: #ffffff;
     caret-color: #ffffff;
-    opacity: 1.0 !important;
+    opacity: 1.0;
+    transition: none;
+    animation: none;
+    -gtk-secondary-caret-color: #ffffff;
 }
 
-/* Container - prevent expansion */
+/* Force focus state to also be bright white with no fade */
+#layer_spacing_entry:focus,
+#node_spacing_entry:focus,
+#iterations_entry:focus,
+#k_multiplier_entry:focus,
+#scale_entry:focus {
+    background-color: #34495e;
+    border-color: #3498db;
+    color: #ffffff;
+    transition: none;
+}
+
+/* Container - no transitions */
 #layout_settings_container {
-    min-width: 280px !important;
-    max-width: 280px !important;
-    opacity: 1.0 !important;
+    opacity: 1.0;
+    transition: none;
+    animation: none;
 }

@@ -38,6 +38,7 @@ class ReportPanel(Gtk.Box):
         self.model_canvas = model_canvas
         self.topology_panel = None  # Will be set via set_topology_panel()
         self.dynamic_analyses_panel = None  # Will be set via set_dynamic_analyses_panel()
+        self.pathway_operations_panel = None  # Will be set via set_pathway_operations_panel()
         
         # Category controllers
         self.categories = []
@@ -260,6 +261,33 @@ class ReportPanel(Gtk.Box):
     def _on_dynamic_analyses_updated(self):
         """Called by dynamic analyses panel when monitoring data is updated."""
         # Refresh the dynamic analyses category
+        for category in self.categories:
+            if isinstance(category, DynamicAnalysesCategory):
+                category.refresh()
+                break
+    
+    def set_pathway_operations_panel(self, pathway_operations_panel):
+        """Set pathway operations panel reference for fetching pathway data.
+        
+        Args:
+            pathway_operations_panel: PathwayOperationsPanel instance
+        """
+        self.pathway_operations_panel = pathway_operations_panel
+        
+        # Update dynamic analyses category with the panel reference
+        # (it displays pathway enrichments and KEGG/SBML import data)
+        for category in self.categories:
+            if isinstance(category, DynamicAnalysesCategory):
+                category.set_pathway_operations_panel(pathway_operations_panel)
+                break
+        
+        # Set callback so pathway operations panel can notify us when pathways are imported
+        if hasattr(pathway_operations_panel, 'set_report_refresh_callback'):
+            pathway_operations_panel.set_report_refresh_callback(self._on_pathway_imported)
+    
+    def _on_pathway_imported(self):
+        """Called by pathway operations panel when new pathway is imported."""
+        # Refresh the dynamic analyses category (shows pathway enrichments)
         for category in self.categories:
             if isinstance(category, DynamicAnalysesCategory):
                 category.refresh()

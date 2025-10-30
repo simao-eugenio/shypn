@@ -29,7 +29,7 @@ class ContextMenuHandler:
         handler.add_analysis_menu_items(menu, obj)
     """
     
-    def __init__(self, place_panel=None, transition_panel=None, model=None, diagnostics_panel=None):
+    def __init__(self, place_panel=None, transition_panel=None, model=None, diagnostics_panel=None, pathway_operations_panel=None):
         """Initialize the context menu handler.
         
         Args:
@@ -37,10 +37,12 @@ class ContextMenuHandler:
             transition_panel: TransitionRatePanel instance (optional, can be set later)
             model: ModelCanvasManager instance for locality detection (optional)
             diagnostics_panel: DiagnosticsPanel instance (optional, can be set later)
+            pathway_operations_panel: PathwayOperationsPanel instance for BRENDA enrichment (optional)
         """
         self.place_panel = place_panel
         self.transition_panel = transition_panel
         self.diagnostics_panel = diagnostics_panel
+        self.pathway_operations_panel = pathway_operations_panel
         self.model = model
         self.locality_detector = None
         
@@ -60,6 +62,14 @@ class ContextMenuHandler:
         """
         self.place_panel = place_panel
         self.transition_panel = transition_panel
+    
+    def set_pathway_operations_panel(self, pathway_operations_panel):
+        """Set or update the pathway operations panel for BRENDA enrichment.
+        
+        Args:
+            pathway_operations_panel: PathwayOperationsPanel instance
+        """
+        self.pathway_operations_panel = pathway_operations_panel
     
     def set_model(self, model):
         """Set or update the model for locality detection.
@@ -128,6 +138,10 @@ class ContextMenuHandler:
             menu_item.connect("activate", on_add_to_analysis)
             menu_item.show()
             menu.append(menu_item)
+        
+        # Add BRENDA enrichment option for transitions
+        if isinstance(obj, Transition) and self.pathway_operations_panel:
+            self._add_brenda_enrichment_menu(menu, obj)
             
     
     def _add_transition_locality_submenu(self, menu, transition, panel):
@@ -196,6 +210,91 @@ class ContextMenuHandler:
         else:
     
             pass
+    
+    def _add_brenda_enrichment_menu(self, menu, transition):
+        """Add BRENDA enrichment menu item for transitions.
+        
+        Extracts enzyme/reaction information from the transition metadata
+        and pre-fills the BRENDA query in the Pathway Operations panel.
+        
+        Args:
+            menu: Gtk.Menu instance to add menu item to
+            transition: Transition object
+        """
+        menu_item = Gtk.MenuItem(label="Enrich with BRENDA")
+        menu_item.connect("activate", lambda w: self._on_enrich_with_brenda(transition))
+        menu_item.show()
+        menu.append(menu_item)
+    
+    def _on_enrich_with_brenda(self, transition):
+        """Handle BRENDA enrichment request.
+        
+        Extracts transition data and pre-fills BRENDA query fields:
+        - EC number from metadata
+        - Reaction name from label or metadata
+        - Enzyme name from metadata
+        
+        Args:
+            transition: Transition object to enrich
+        """
+        # Extract data from transition
+        ec_number = ""
+        reaction_name = ""
+        enzyme_name = ""
+        
+        # Check metadata for enzyme/reaction information
+        if hasattr(transition, 'metadata') and transition.metadata:
+            metadata = transition.metadata
+            
+            # Try to get EC number
+            if 'ec_number' in metadata:
+                ec_number = metadata['ec_number']
+            elif 'ec_numbers' in metadata and metadata['ec_numbers']:
+                # Take first EC number if list
+                ec_list = metadata['ec_numbers']
+                if isinstance(ec_list, list) and ec_list:
+                    ec_number = ec_list[0]
+                elif isinstance(ec_list, str):
+                    ec_number = ec_list
+            
+            # Try to get enzyme name
+            if 'enzyme_name' in metadata:
+                enzyme_name = metadata['enzyme_name']
+            elif 'enzyme' in metadata:
+                enzyme_name = metadata['enzyme']
+            
+            # Try to get reaction name
+            if 'reaction' in metadata:
+                reaction_name = metadata['reaction']
+            elif 'reaction_id' in metadata:
+                reaction_name = metadata['reaction_id']
+        
+        # Use label as reaction name if not found in metadata
+        if not reaction_name and transition.label:
+            reaction_name = transition.label
+        
+        # Use name as fallback
+        if not reaction_name:
+            reaction_name = transition.name
+        
+        # Access BRENDA category in pathway operations panel
+        if hasattr(self.pathway_operations_panel, 'brenda_category'):
+            brenda_category = self.pathway_operations_panel.brenda_category
+            
+            # Pre-fill the query fields
+            if hasattr(brenda_category, 'set_query_from_transition'):
+                brenda_category.set_query_from_transition(
+                    ec_number=ec_number,
+                    reaction_name=reaction_name,
+                    enzyme_name=enzyme_name,
+                    transition_id=transition.id
+                )
+            
+            # Switch to Pathway Operations panel and expand BRENDA category
+            # This makes the pre-filled query visible to the user
+            if hasattr(self.pathway_operations_panel, 'switch_to_category'):
+                self.pathway_operations_panel.switch_to_category('BRENDA')
+    
     def _on_add_to_analysis_clicked(self, obj, panel):
         """Handle "Add to Analysis" menu item click.
         
