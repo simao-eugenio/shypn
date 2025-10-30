@@ -927,8 +927,12 @@ class TransitionRatePanel(AnalysisPlotPanel):
                 break
         
         # If no data yet, show waiting message with locality info
+        # BUT still apply rate function adjustments for proper axis scaling
         if not has_any_data:
             self._show_waiting_state()
+            # Apply rate function adjustments even without data
+            # This ensures axis scaling is correct when data starts appearing
+            self._apply_rate_function_adjustments()
             return
         
         # Plot rate for each selected transition
