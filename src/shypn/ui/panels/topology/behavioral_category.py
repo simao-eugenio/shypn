@@ -43,7 +43,7 @@ class BehavioralCategory(BaseTopologyCategory):
             expanded: Whether category starts expanded
         """
         super().__init__(
-            title="Behavioral Analysis",
+            title="BEHAVIORAL ANALYSIS",
             model_canvas=model_canvas,
             expanded=expanded
         )

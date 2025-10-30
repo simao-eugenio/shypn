@@ -108,22 +108,45 @@ class DiagnosticsPanel:
             if parent:
                 parent.remove(placeholder_label)
         
-        # Create TextView for diagnostics
-        self.textview = Gtk.TextView()
-        self.textview.set_editable(False)
-        self.textview.set_cursor_visible(False)
-        self.textview.set_wrap_mode(Gtk.WrapMode.WORD)
-        self.textview.set_left_margin(10)
-        self.textview.set_right_margin(10)
-        self.textview.set_top_margin(10)
-        self.textview.set_bottom_margin(10)
+        # Find the existing TextView in the container (created by category)
+        # Look for a ScrolledWindow that contains a TextView
+        self.textview = None
+        for child in container.get_children():
+            if isinstance(child, Gtk.ScrolledWindow):
+                # Check if it has a TextView child
+                scrolled_child = child.get_child()
+                if isinstance(scrolled_child, Gtk.TextView):
+                    self.textview = scrolled_child
+                    break
         
-        # Monospace font for better alignment
-        font_desc = Pango.FontDescription("Monospace 10")
-        self.textview.override_font(font_desc)
+        # If no TextView found, create one (fallback)
+        if not self.textview:
+            self.textview = Gtk.TextView()
+            self.textview.set_editable(False)
+            self.textview.set_cursor_visible(False)
+            self.textview.set_wrap_mode(Gtk.WrapMode.WORD)
+            self.textview.set_left_margin(10)
+            self.textview.set_right_margin(10)
+            self.textview.set_top_margin(0)
+            self.textview.set_bottom_margin(10)
+            
+            # Monospace font for better alignment
+            font_desc = Pango.FontDescription("Monospace 10")
+            self.textview.override_font(font_desc)
+            
+            # Add to container
+            self.container.pack_start(self.textview, True, True, 0)
+        else:
+            # Use existing TextView but update its properties
+            self.textview.set_left_margin(10)
+            self.textview.set_right_margin(10)
+            self.textview.set_top_margin(0)
+            self.textview.set_bottom_margin(10)
+            
+            # Update font
+            font_desc = Pango.FontDescription("Monospace 10")
+            self.textview.override_font(font_desc)
         
-        # Add to container
-        self.container.pack_start(self.textview, True, True, 0)
         self.container.show_all()
         
         # Show initial message and enable auto-tracking
