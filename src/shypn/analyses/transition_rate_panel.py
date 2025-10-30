@@ -334,15 +334,9 @@ class TransitionRatePanel(AnalysisPlotPanel):
         """
         import re
         
-        print(f"[APPLY_ADJUSTMENTS] Called for {len(self.selected_objects)} transitions")
-        
         # Only apply to continuous transitions with rate functions
         for obj in self.selected_objects:
-            print(f"[APPLY_ADJUSTMENTS] Checking transition: {obj.name} (ID:{obj.id})")
-            print(f"[APPLY_ADJUSTMENTS]   transition_type: {getattr(obj, 'transition_type', 'N/A')}")
-            
             if getattr(obj, 'transition_type', '') != 'continuous':
-                print(f"[APPLY_ADJUSTMENTS]   Skipping - not continuous")
                 continue
             
             # Get rate function from properties
@@ -350,21 +344,15 @@ class TransitionRatePanel(AnalysisPlotPanel):
             if hasattr(obj, 'properties') and obj.properties:
                 rate_func = obj.properties.get('rate_function') or obj.properties.get('rate_function_display')
             
-            print(f"[APPLY_ADJUSTMENTS]   rate_function from properties: {rate_func}")
-            
             if not rate_func:
                 # Try the rate attribute as fallback
                 rate_func = str(getattr(obj, 'rate', ''))
-                print(f"[APPLY_ADJUSTMENTS]   rate_function from rate attribute: {rate_func}")
             
             if not rate_func or rate_func == 'None':
-                print(f"[APPLY_ADJUSTMENTS]   Skipping - no rate function")
                 continue
             
             # Detect function type and extract parameters
             func_type, params = self._detect_rate_function_type(rate_func)
-            
-            print(f"[APPLY_ADJUSTMENTS]   Detected type: {func_type}, params: {params}")
             
             if func_type == 'hill_equation':
                 self._adjust_for_hill_equation(params, obj)
@@ -898,9 +886,6 @@ class TransitionRatePanel(AnalysisPlotPanel):
                               Used when properties change to re-apply adjustments.
         """
         DEBUG_UPDATE_PLOT = False  # Disable verbose logging
-        
-        print(f"[TRANSITION_RATE_PANEL] update_plot called with force_full_redraw={force_full_redraw}")
-        print(f"[TRANSITION_RATE_PANEL] selected_objects: {[obj.name for obj in self.selected_objects]}")
         
         if DEBUG_UPDATE_PLOT:
         

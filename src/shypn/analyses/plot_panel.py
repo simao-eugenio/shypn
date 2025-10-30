@@ -491,8 +491,6 @@ class AnalysisPlotPanel(Gtk.Box):
         if data_changed or self.needs_update:
             # Only update plot, UI list is updated immediately in add_object()
             # Force full redraw when needs_update (properties changed) to re-apply adjustments
-            print(f"[UPDATE] data_changed={data_changed}, needs_update={self.needs_update}")
-            print(f"[UPDATE] Calling update_plot(force_full_redraw={self.needs_update})")
             self.update_plot(force_full_redraw=self.needs_update)
             self.needs_update = False
         return True
@@ -507,8 +505,6 @@ class AnalysisPlotPanel(Gtk.Box):
             force_full_redraw: If True, force a full redraw even if object list hasn't changed.
                               Used when properties change to re-apply adjustments.
         """
-        print(f"[UPDATE_PLOT] force_full_redraw={force_full_redraw}, selected_objects={len(self.selected_objects)}")
-        
         if not self.selected_objects:
             self._show_empty_state()
             return
@@ -517,11 +513,8 @@ class AnalysisPlotPanel(Gtk.Box):
         current_ids = [obj.id for obj in self.selected_objects]
         cached_ids = list(self._plot_lines.keys())
         
-        print(f"[UPDATE_PLOT] current_ids={current_ids}, cached_ids={cached_ids}")
-        
         if current_ids != cached_ids or force_full_redraw:
             # Full redraw needed - object list changed or properties changed
-            print(f"[UPDATE_PLOT] Triggering _full_redraw() - ids_changed={current_ids != cached_ids}, force={force_full_redraw}")
             self._full_redraw()
             return
         
