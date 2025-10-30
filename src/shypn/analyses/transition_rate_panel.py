@@ -145,7 +145,7 @@ class TransitionRatePanel(AnalysisPlotPanel):
         Returns:
             List of (time, value) tuples where value depends on transition type
         """
-        DEBUG_PLOT_DATA = True  # TEMPORARILY ENABLE for debugging
+        DEBUG_PLOT_DATA = False  # Disable verbose logging
         
         # Safety check: return empty if no data collector
         if not self.data_collector:
@@ -156,7 +156,7 @@ class TransitionRatePanel(AnalysisPlotPanel):
         
         if not raw_events:
             if DEBUG_PLOT_DATA:
-                print(f"[RATE DATA DEBUG] No raw events for transition {transition_id}")
+                pass
             return []
         
         # Determine transition type by checking if details contain 'rate' field
@@ -166,16 +166,11 @@ class TransitionRatePanel(AnalysisPlotPanel):
             details = raw_events[0][2]
             if isinstance(details, dict) and 'rate' in details:
                 has_rate_data = True
-                if DEBUG_PLOT_DATA:
-                    print(f"[RATE DATA DEBUG] Transition {transition_id}: HAS rate data, first rate={details.get('rate')}")
-        else:
-            if DEBUG_PLOT_DATA:
-                print(f"[RATE DATA DEBUG] Transition {transition_id}: NO rate data in details")
         
         if has_rate_data:
             # CONTINUOUS TRANSITION: Plot rate function value over time
             if DEBUG_PLOT_DATA:
-                print(f"[RATE DATA DEBUG] Processing {len(raw_events)} events as CONTINUOUS")
+                pass
             rate_series = []
             for time, event_type, details in raw_events:
                 if event_type == 'fired' and details and isinstance(details, dict):
@@ -183,12 +178,12 @@ class TransitionRatePanel(AnalysisPlotPanel):
                     rate_series.append((time, rate))
             
             if DEBUG_PLOT_DATA and rate_series:
-                print(f"[RATE DATA DEBUG] Extracted {len(rate_series)} rate points, first={(rate_series[0] if rate_series else 'none')}, last={(rate_series[-1] if rate_series else 'none')}")
+                pass
             return rate_series
         else:
             # DISCRETE TRANSITION: Plot cumulative firing count
             if DEBUG_PLOT_DATA:
-                print(f"[RATE DATA DEBUG] Processing {len(raw_events)} events as DISCRETE")
+                pass
             firing_times = [t for t, event_type, _ in raw_events 
                            if event_type == 'fired']
             
@@ -214,11 +209,12 @@ class TransitionRatePanel(AnalysisPlotPanel):
     def _get_ylabel(self) -> str:
         """Get Y-axis label for transition plot.
         
-        The label depends on transition types being plotted:
-            pass
-        - If only continuous: "Rate (flow/s)"
-        - If only discrete: "Cumulative Firings"
-        - If mixed: "Value" (generic)
+        The label depends on rate function type:
+        - Hill equation: "Fraction Bound"
+        - Michaelis-Menten: "Reaction Rate (v)"
+        - Sigmoid: "Fraction Bound"
+        - Continuous (other): "Rate (tokens/s)"
+        - Discrete: "Cumulative Firings"
         
         Returns:
             str: Y-axis label
@@ -226,9 +222,10 @@ class TransitionRatePanel(AnalysisPlotPanel):
         if not self.selected_objects:
             return 'Value'
         
-        # Check if we have any continuous transitions
+        # Check if we have any continuous transitions with specific rate functions
         has_continuous = False
         has_discrete = False
+        func_type = None
         
         for obj in self.selected_objects:
             raw_events = self.data_collector.get_transition_data(obj.id)
@@ -236,11 +233,28 @@ class TransitionRatePanel(AnalysisPlotPanel):
                 details = raw_events[0][2]
                 if isinstance(details, dict) and 'rate' in details:
                     has_continuous = True
+                    # Detect function type for label
+                    if func_type is None:  # Use first object's function type
+                        rate_func = None
+                        if hasattr(obj, 'properties') and obj.properties:
+                            rate_func = obj.properties.get('rate_function') or obj.properties.get('rate_function_display')
+                        if not rate_func:
+                            rate_func = str(getattr(obj, 'rate', ''))
+                        if rate_func and rate_func != 'None':
+                            func_type, _ = self._detect_rate_function_type(rate_func)
                 else:
                     has_discrete = True
         
         if has_continuous and not has_discrete:
-            return 'Rate (tokens/s)'
+            # Return function-specific label
+            if func_type == 'hill_equation':
+                return 'Fraction Bound'
+            elif func_type == 'michaelis_menten':
+                return 'Reaction Rate (v)'
+            elif func_type == 'sigmoid':
+                return 'Fraction Bound'
+            else:
+                return 'Rate (tokens/s)'
         elif has_discrete and not has_continuous:
             return 'Cumulative Firings'
         else:
@@ -249,21 +263,71 @@ class TransitionRatePanel(AnalysisPlotPanel):
     def _get_title(self) -> str:
         """Get plot title for transition plot.
         
+        Shows function name and parameters if applicable.
+        
         Returns:
-            str: Plot title
+            str: Plot title with function name and parameters
         """
+        if not self.selected_objects:
+            return 'Transition Behavior Evolution'
+        
+        # If single selection with specific rate function, show function details
+        if len(self.selected_objects) == 1:
+            obj = list(self.selected_objects)[0]
+            rate_func = None
+            if hasattr(obj, 'properties') and obj.properties:
+                rate_func = obj.properties.get('rate_function') or obj.properties.get('rate_function_display')
+            if not rate_func:
+                rate_func = str(getattr(obj, 'rate', ''))
+            
+            if rate_func and rate_func != 'None':
+                func_type, params = self._detect_rate_function_type(rate_func)
+                
+                if func_type == 'hill_equation':
+                    vmax = params.get('vmax', '?')
+                    kd = params.get('kd', '?')
+                    n = params.get('n', '?')
+                    return f'Hill Equation (vmax={vmax}, Kd={kd}, n={n})'
+                elif func_type == 'michaelis_menten':
+                    vmax = params.get('vmax', '?')
+                    km = params.get('km', '?')
+                    return f'Michaelis-Menten (vmax={vmax}, Km={km})'
+                elif func_type == 'sigmoid':
+                    center = params.get('center', '?')
+                    steepness = params.get('steepness', '?')
+                    return f'Sigmoid (center={center}, k={steepness})'
+                elif func_type == 'exponential':
+                    rate = params.get('rate', '?')
+                    return f'Exponential (rate={rate})'
+        
         return 'Transition Behavior Evolution'
     
     def _format_plot(self):
         """Format the plot with labels, grid, legend, and smart Y-axis and X-axis scaling.
         
         Overrides parent to add:
+        - Concentration-based X-axis for enzymatic functions
         - Source/sink-aware Y-axis scaling
         - Rate function type-aware X-axis scaling (Hill, Michaelis-Menten, Sigmoid, etc.)
         - Annotations for key parameters (Kd, Km, center points)
         """
         # Call parent formatting first
         super()._format_plot()
+        
+        # Update X-axis label for enzymatic functions (Hill, Michaelis-Menten)
+        if self.selected_objects:
+            for obj in self.selected_objects:
+                rate_func = None
+                if hasattr(obj, 'properties') and obj.properties:
+                    rate_func = obj.properties.get('rate_function') or obj.properties.get('rate_function_display')
+                if not rate_func:
+                    rate_func = str(getattr(obj, 'rate', ''))
+                
+                if rate_func and rate_func != 'None':
+                    func_type, _ = self._detect_rate_function_type(rate_func)
+                    if func_type in ['hill_equation', 'michaelis_menten']:
+                        self.axes.set_xlabel('Concentration', fontsize=11)
+                        break  # Only need to set once
         
         # Apply smart Y-axis scaling if not auto-scale
         if not self.auto_scale and self.selected_objects:
