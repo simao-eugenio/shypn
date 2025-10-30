@@ -40,7 +40,7 @@ class StructuralCategory(BaseTopologyCategory):
             expanded: Whether category starts expanded
         """
         super().__init__(
-            title="Structural Analysis",
+            title="STRUCTURAL ANALYSIS",
             model_canvas=model_canvas,
             expanded=expanded
         )
