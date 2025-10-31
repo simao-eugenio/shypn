@@ -259,19 +259,40 @@ class ReactionConverter(BaseConverter):
         elif kinetic.rate_type == "mass_action":
             self._setup_mass_action(transition, reaction, kinetic)
         
-        # UNKNOWN/OTHER: Continuous transition, mark for enrichment
+        # UNKNOWN/OTHER WITH FORMULA: Continuous transition with SBML formula
+        # This handles complex SBML rate laws like reversible mass action:
+        # e.g., comp1 * (kf_0 * B - kr_0 * BL)
+        elif kinetic.formula:
+            transition.transition_type = "continuous"
+            transition.rate = 1.0  # Fallback rate
+            
+            # Store the SBML formula (will be processed by SBML kinetics service)
+            if not hasattr(transition, 'properties'):
+                transition.properties = {}
+            
+            # The SBML kinetics service will translate this formula
+            # and handle parameter substitution
+            transition.properties['sbml_formula'] = kinetic.formula
+            transition.properties['needs_enrichment'] = True
+            transition.properties['enrichment_reason'] = f"SBML formula (type: {kinetic.rate_type})"
+            
+            self.logger.debug(
+                f"  SBML formula: Set as continuous with formula '{kinetic.formula[:50]}...'"
+            )
+        
+        # NO FORMULA: Continuous transition, mark for enrichment
         else:
             transition.transition_type = "continuous"
             transition.rate = 1.0
             
-            # Mark for enrichment since kinetic type is unknown
+            # Mark for enrichment since no kinetic information
             if not hasattr(transition, 'properties'):
                 transition.properties = {}
             transition.properties['needs_enrichment'] = True
-            transition.properties['enrichment_reason'] = f"Unknown kinetic type: {kinetic.rate_type}"
+            transition.properties['enrichment_reason'] = f"No kinetic formula"
             
             self.logger.debug(
-                f"  Unknown kinetic type '{kinetic.rate_type}', set as continuous and marked for enrichment"
+                f"  No kinetic formula, set as continuous and marked for enrichment"
             )
     
     def _setup_michaelis_menten(self, transition: Transition, reaction: Reaction, 
