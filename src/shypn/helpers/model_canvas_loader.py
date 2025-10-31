@@ -3064,15 +3064,27 @@ class ModelCanvasLoader:
             if isinstance(obj, Arc):
                 pass
             drawing_area.queue_draw()
-            if isinstance(obj, Transition) and drawing_area in self.overlay_managers:
-                overlay_manager = self.overlay_managers[drawing_area]
-                simulate_tools = overlay_manager.get_palette('simulate_tools')
-                if simulate_tools and simulate_tools.simulation:
-                    if obj.id in simulate_tools.simulation.behavior_cache:
-                        del simulate_tools.simulation.behavior_cache[obj.id]
+            
+            # MANAGER SYNCHRONIZATION FIX: Use canvas-centric controller access
+            # This works reliably across ALL canvas creation paths (Default Canvas,
+            # File New, File Open, KEGG Import, SBML Import) because controllers are
+            # keyed by drawing_area in self.simulation_controllers dict.
+            # Previous code used overlay_manager.get_palette('simulate_tools') which
+            # was unreliable due to palette structure variations across paths.
+            if isinstance(obj, Transition):
+                controller = self.get_canvas_controller(drawing_area)
+                if controller:
+                    # Clear behavior cache when transition type/properties change
+                    # This forces behavior algorithm recompilation on next simulation step
+                    if obj.id in controller.behavior_cache:
+                        del controller.behavior_cache[obj.id]
+                        print(f"[SYNC] Cleared behavior cache for transition {obj.id} after property change")
+                    
                     # Clear historical data so plot shows new rate function immediately
-                    if simulate_tools.simulation.data_collector:
-                        simulate_tools.simulation.data_collector.clear_transition(obj.id)
+                    if hasattr(controller, 'data_collector') and controller.data_collector:
+                        controller.data_collector.clear_transition(obj.id)
+                        print(f"[SYNC] Cleared data collector for transition {obj.id}")
+            
             if isinstance(obj, (Place, Transition)) and self.right_panel_loader:
                 if hasattr(self.right_panel_loader, 'place_panel') and self.right_panel_loader.place_panel:
                     if isinstance(obj, Place):
