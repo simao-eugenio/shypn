@@ -143,7 +143,18 @@ class ContinuousBehavior(TransitionBehavior):
                 if hasattr(self.transition, 'kinetic_metadata') and self.transition.kinetic_metadata:
                     if hasattr(self.transition.kinetic_metadata, 'parameters'):
                         # Add all kinetic parameters (kf_0, kr_0, Vmax, Km, etc.)
-                        context.update(self.transition.kinetic_metadata.parameters)
+                        params = self.transition.kinetic_metadata.parameters.copy()
+                        
+                        # IMPORTANT: Normalize compartment volumes for token-based simulation
+                        # In SBML, compartment sizes (comp1, comp2, etc.) are in liters
+                        # but for discrete token simulations, we use normalized volumes
+                        # Set all comp* parameters to 1.0 to avoid scaling issues
+                        for key in list(params.keys()):
+                            if key.startswith('comp') and key[4:].isdigit():
+                                # This is a compartment parameter (comp1, comp2, etc.)
+                                params[key] = 1.0  # Normalize for token-based simulation
+                        
+                        context.update(params)
                 
                 # Add place tokens as P1, P2, ... (or P88, P105 if ID already has P)
                 for place_id, place in places.items():
