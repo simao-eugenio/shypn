@@ -100,9 +100,9 @@ class TopologySummaryGenerator:
         
         # Graph summary
         graph_parts = []
-        if graph['cycles_count'] is not None:
+        if graph['cycles_count'] is not None and graph['cycles_count'] > 0:
             graph_parts.append(f"{graph['cycles_count']} cycles")
-        if graph['hubs_count'] and graph['hubs_count'] > 0:
+        if graph['hubs_count'] is not None and graph['hubs_count'] > 0:
             graph_parts.append(f"{graph['hubs_count']} hubs")
         
         if graph_parts:
