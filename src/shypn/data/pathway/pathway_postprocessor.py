@@ -131,6 +131,15 @@ class UnitNormalizer(BaseProcessor):
             # Convert to tokens (round to nearest integer)
             tokens = max(0, round(concentration * self.scale_factor))
             
+            # IMPORTANT: If concentration is non-zero but tokens round to 0,
+            # set to 1 token minimum (prevents losing non-zero initial conditions)
+            if concentration > 0 and tokens == 0:
+                tokens = 1
+                self.logger.debug(
+                    f"Species '{species.id}' has very small concentration "
+                    f"({concentration:.2e}), setting to 1 token minimum"
+                )
+            
             # Update species with token count
             updated_species = replace(species, initial_tokens=tokens)
             
@@ -140,8 +149,12 @@ class UnitNormalizer(BaseProcessor):
                     processed_data.species[i] = updated_species
                     break
         
+        # Count how many species have non-zero tokens
+        non_zero_count = sum(1 for s in processed_data.species if s.initial_tokens > 0)
+        
         self.logger.info(
-            f"Normalized concentrations to tokens (scale={self.scale_factor})"
+            f"Normalized concentrations to tokens (scale={self.scale_factor}): "
+            f"{non_zero_count}/{len(processed_data.species)} species have initial tokens"
         )
 
 
