@@ -145,23 +145,16 @@ class ContinuousBehavior(TransitionBehavior):
                         # Add all kinetic parameters (kf_0, kr_0, Vmax, Km, etc.)
                         params = self.transition.kinetic_metadata.parameters.copy()
                         
-                        # IMPORTANT: Normalize compartment volumes for token-based simulation
-                        # In SBML, compartment sizes (comp1, comp2, etc.) are in liters
-                        # but for discrete token simulations, we use normalized volumes
-                        # Set all comp* parameters to 1.0 to avoid scaling issues
-                        comp_normalized = False
-                        for key in list(params.keys()):
-                            if key.startswith('comp') and len(key) > 4 and key[4:].isdigit():
-                                # This is a compartment parameter (comp1, comp2, etc.)
-                                old_val = params[key]
-                                params[key] = 1.0  # Normalize for token-based simulation
-                                if not comp_normalized:
-                                    print(f"[COMP NORMALIZE] {self.transition.name}: {key} {old_val:.2e} → 1.0")
-                                    comp_normalized = True
-                        
-                        context.update(params)
+                # Normalize compartment volumes for token-based simulation
+                # In SBML, compartment sizes (comp1, comp2, etc.) are in liters
+                # but for discrete token simulations, we use normalized volumes
+                # Set all comp* parameters to 1.0 to avoid scaling issues
+                for key in list(params.keys()):
+                    if key.startswith('comp') and len(key) > 4 and key[4:].isdigit():
+                        # This is a compartment parameter (comp1, comp2, etc.)
+                        params[key] = 1.0  # Normalize for token-based simulation
                 
-                # Add place tokens as P1, P2, ... (or P88, P105 if ID already has P)
+                context.update(params)                # Add place tokens as P1, P2, ... (or P88, P105 if ID already has P)
                 # IMPORTANT: Also add by place.name for SBML formulas that use names
                 for place_id, place in places.items():
                     # Add by ID (for numeric IDs like 1, 2, 3)
@@ -179,14 +172,6 @@ class ContinuousBehavior(TransitionBehavior):
                 
                 # Evaluate expression safely
                 result = eval(expr, {"__builtins__": {}}, context)
-                
-                # DEBUG: Log first evaluation for each transition
-                if not hasattr(self, '_first_eval_logged'):
-                    self._first_eval_logged = True
-                    place_tokens = {k: v for k, v in context.items() if k.startswith('P')}
-                    print(f"[RATE EVAL] {self.transition.name}: expr='{expr[:50]}...' → {result:.6f}")
-                    print(f"  Places: {list(place_tokens.items())[:3]}")
-                
                 return float(result)
             except Exception as e:
                 # Log error for debugging
@@ -296,12 +281,37 @@ class ContinuousBehavior(TransitionBehavior):
             
             current_time = self._get_current_time()
             
-            # Gather place objects for rate evaluation
+            # Gather ALL place objects for rate evaluation
+            # CRITICAL: Rate formulas may reference places not in this transition's arcs
+            # For example, T1 formula "comp1 * (kf_0 * P6 - kr_0 * P5)" needs P5 and P6
+            # even if T1 only has arcs to P1 and P2
             places_dict = {}
-            for arc in input_arcs + output_arcs:
-                place = self._get_place(arc.source_id if hasattr(arc, 'source_id') else arc.target_id)
-                if place:
+            
+            # Get all places from the model
+            if hasattr(self.model, 'places'):
+                # model.places might be a list of place objects OR a dict
+                if isinstance(self.model.places, dict):
+                    # It's a dict of {place_id: place_object}
+                    places_dict = self.model.places.copy()
+                elif isinstance(self.model.places, list):
+                    # It's a list of place objects
+                    for place in self.model.places:
+                        if hasattr(place, 'id'):
+                            places_dict[place.id] = place
+                        else:
+                            # place is a string ID - need to get actual object
+                            place_obj = self._get_place(place)
+                            if place_obj:
+                                places_dict[place_obj.id] = place_obj
+            elif hasattr(self.model, 'get_all_places'):
+                for place in self.model.get_all_places():
                     places_dict[place.id] = place
+            else:
+                # Fallback: gather from arcs (may be incomplete!)
+                for arc in input_arcs + output_arcs:
+                    place = self._get_place(arc.source_id if hasattr(arc, 'source_id') else arc.target_id)
+                    if place:
+                        places_dict[place.id] = place
             
             # Evaluate rate function
             rate = self.rate_function(places_dict, current_time)
