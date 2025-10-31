@@ -550,14 +550,29 @@ class BaseTopologyCategory:
             columns = list(result[0].keys())
             rows = [[str(row.get(col, '')) for col in columns] for row in result]
         elif isinstance(result, dict):
-            # Dict of lists: keys are columns
+            # Dict of lists/scalars: keys are columns
             columns = list(result.keys())
+            
+            # Determine number of rows: find max length of list values (scalars count as 1)
+            num_rows = 0
+            for value in result.values():
+                if isinstance(value, (list, tuple)):
+                    num_rows = max(num_rows, len(value))
+                else:
+                    num_rows = max(num_rows, 1)  # Scalar = 1 row
+            
             # Transpose: each index becomes a row
-            num_rows = len(list(result.values())[0]) if result else 0
             rows = []
             for i in range(num_rows):
-                row = [str(result[col][i]) if i < len(result[col]) else '' 
-                       for col in columns]
+                row = []
+                for col in columns:
+                    col_value = result[col]
+                    if isinstance(col_value, (list, tuple)):
+                        # List/tuple: get element at index i if exists
+                        row.append(str(col_value[i]) if i < len(col_value) else '')
+                    else:
+                        # Scalar: show on first row only
+                        row.append(str(col_value) if i == 0 else '')
                 rows.append(row)
         else:
             columns = ['Value']
