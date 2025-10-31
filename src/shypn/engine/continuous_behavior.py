@@ -149,28 +149,48 @@ class ContinuousBehavior(TransitionBehavior):
                         # In SBML, compartment sizes (comp1, comp2, etc.) are in liters
                         # but for discrete token simulations, we use normalized volumes
                         # Set all comp* parameters to 1.0 to avoid scaling issues
+                        comp_normalized = False
                         for key in list(params.keys()):
-                            if key.startswith('comp') and key[4:].isdigit():
+                            if key.startswith('comp') and len(key) > 4 and key[4:].isdigit():
                                 # This is a compartment parameter (comp1, comp2, etc.)
+                                old_val = params[key]
                                 params[key] = 1.0  # Normalize for token-based simulation
+                                if not comp_normalized:
+                                    print(f"[COMP NORMALIZE] {self.transition.name}: {key} {old_val:.2e} → 1.0")
+                                    comp_normalized = True
                         
                         context.update(params)
                 
                 # Add place tokens as P1, P2, ... (or P88, P105 if ID already has P)
+                # IMPORTANT: Also add by place.name for SBML formulas that use names
                 for place_id, place in places.items():
-                    # Handle both numeric IDs (1, 2, 3) and string IDs ("P88", "P105")
+                    # Add by ID (for numeric IDs like 1, 2, 3)
                     if isinstance(place_id, str) and place_id.startswith('P'):
                         # ID already has P prefix (e.g., "P105")
                         context[place_id] = place.tokens
                     else:
                         # Numeric ID needs P prefix (e.g., 1 → P1)
                         context[f'P{place_id}'] = place.tokens
+                    
+                    # ALSO add by place name (for SBML formulas)
+                    # Place name might be "P1", "P5", etc. from SBML conversion
+                    if hasattr(place, 'name') and place.name:
+                        context[place.name] = place.tokens
                 
                 # Evaluate expression safely
                 result = eval(expr, {"__builtins__": {}}, context)
+                
+                # DEBUG: Log first evaluation for each transition
+                if not hasattr(self, '_first_eval_logged'):
+                    self._first_eval_logged = True
+                    place_tokens = {k: v for k, v in context.items() if k.startswith('P')}
+                    print(f"[RATE EVAL] {self.transition.name}: expr='{expr[:50]}...' → {result:.6f}")
+                    print(f"  Places: {list(place_tokens.items())[:3]}")
+                
                 return float(result)
             except Exception as e:
                 # Log error for debugging
+                print(f"[RATE ERROR] {self.transition.name}: {e}")
                 return 0.0  # Safe fallback
         
         return evaluate_rate
