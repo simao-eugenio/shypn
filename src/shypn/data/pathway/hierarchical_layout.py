@@ -67,7 +67,7 @@ class HierarchicalLayoutProcessor:
         """
         self.logger.info("Calculating hierarchical layout...")
         
-        # Step 1: Build dependency graph
+        # Step 1: Build dependency graph (excludes isolated enzyme places)
         graph, in_degree = self._build_dependency_graph()
         
         # Step 2: Assign layers using topological sort (Kahn's algorithm)
@@ -80,7 +80,20 @@ class HierarchicalLayoutProcessor:
         reaction_positions = self._position_reactions(positions)
         positions.update(reaction_positions)
         
-        # Step 5: Validate and normalize coordinates (ensure all positive)
+        # Step 5: Position isolated enzyme places (catalysts with only test arcs)
+        # These were excluded from the dependency graph to prevent layout flattening
+        positioned_species = set(positions.keys())
+        all_species_ids = {species.id for species in self.pathway.species}
+        unpositioned_species = all_species_ids - positioned_species
+        
+        if unpositioned_species:
+            enzyme_positions = self._position_enzyme_places(unpositioned_species, positions)
+            positions.update(enzyme_positions)
+            self.logger.info(
+                f"Positioned {len(enzyme_positions)} enzyme places (catalysts with test arcs only)"
+            )
+        
+        # Step 6: Validate and normalize coordinates (ensure all positive)
         positions = self._normalize_coordinates(positions)
         
         self.logger.info(f"Hierarchical layout complete: {len(layers)} layers, {len(positions)} positioned")
@@ -134,6 +147,10 @@ class HierarchicalLayoutProcessor:
         
         Graph structure: species_A → species_B means A is consumed to produce B
         
+        IMPORTANT: Only includes species connected via normal arcs (reactants/products).
+        Excludes species connected ONLY via test arcs (catalysts/enzymes).
+        This prevents isolated enzyme places from flattening the hierarchical layout.
+        
         Returns:
             (graph, in_degree) where:
                 graph: {species_id: [dependent_species_ids]}
@@ -142,14 +159,17 @@ class HierarchicalLayoutProcessor:
         graph = defaultdict(list)
         in_degree = defaultdict(int)
         
-        # Initialize all species with zero in-degree
-        for species in self.pathway.species:
-            in_degree[species.id] = 0
+        # Build edges from reactions (only reactants and products)
+        # This automatically excludes modifiers/catalysts connected only via test arcs
+        connected_species = set()
         
-        # Build edges from reactions
         for reaction in self.pathway.reactions:
             reactants = [species_id for species_id, _ in reaction.reactants]
             products = [species_id for species_id, _ in reaction.products]
+            
+            # Track species that are actually connected via normal arcs
+            connected_species.update(reactants)
+            connected_species.update(products)
             
             # Each reactant → each product (dependency)
             for reactant_id in reactants:
@@ -157,6 +177,22 @@ class HierarchicalLayoutProcessor:
                     if reactant_id != product_id:  # Avoid self-loops
                         graph[reactant_id].append(product_id)
                         in_degree[product_id] += 1
+        
+        # Initialize in-degree ONLY for connected species
+        # This excludes isolated enzyme places (connected only via test arcs)
+        for species_id in connected_species:
+            if species_id not in in_degree:
+                in_degree[species_id] = 0
+        
+        # Log excluded species (likely catalysts with only test arcs)
+        all_species_ids = {species.id for species in self.pathway.species}
+        excluded_species = all_species_ids - connected_species
+        if excluded_species:
+            self.logger.info(
+                f"Excluded {len(excluded_species)} species from hierarchical layout "
+                f"(likely catalysts with only test arcs): {sorted(list(excluded_species))[:10]}"
+                + ("..." if len(excluded_species) > 10 else "")
+            )
         
         return dict(graph), dict(in_degree)
     
@@ -346,6 +382,97 @@ class HierarchicalLayoutProcessor:
                 reaction_positions[reaction.id] = (400.0, 300.0)
         
         return reaction_positions
+    
+    def _position_enzyme_places(self, enzyme_species_ids: Set[str], 
+                                existing_positions: Dict[str, Tuple[float, float]]) -> Dict[str, Tuple[float, float]]:
+        """Position enzyme places (catalysts with only test arcs).
+        
+        These are species excluded from the hierarchical layout because they only
+        connect via test arcs. Position them near the reactions they catalyze.
+        
+        Strategy:
+        1. Check if enzyme has original KGML/SBML coordinates - use those if available
+        2. Otherwise, position enzyme "above" (offset in Y) the reaction it catalyzes
+        3. If enzyme catalyzes multiple reactions, position near the first one
+        4. If no reaction found, position in upper-right corner
+        
+        Args:
+            enzyme_species_ids: Set of enzyme species IDs to position
+            existing_positions: Already positioned species and reactions
+            
+        Returns:
+            Dictionary {enzyme_id: (x, y)}
+        """
+        enzyme_positions = {}
+        enzyme_offset_y = -80.0  # Position enzymes 80px above reactions
+        enzyme_offset_x = 40.0   # Slight horizontal offset to avoid overlap
+        
+        # Build mapping: enzyme_id -> reactions it catalyzes
+        # We need to find which reactions use these enzymes as modifiers/catalysts
+        enzyme_to_reactions = defaultdict(list)
+        
+        for reaction in self.pathway.reactions:
+            # Check if reaction has modifiers (catalysts)
+            # Note: In PathwayData, modifiers are stored in reaction.modifiers
+            if hasattr(reaction, 'modifiers'):
+                for modifier_id in reaction.modifiers:
+                    if modifier_id in enzyme_species_ids:
+                        enzyme_to_reactions[modifier_id].append(reaction.id)
+        
+        # Position each enzyme
+        for enzyme_id in enzyme_species_ids:
+            # Get the species object to check for original coordinates
+            enzyme_species = next((s for s in self.pathway.species if s.id == enzyme_id), None)
+            
+            if enzyme_species:
+                # Check metadata for coordinates (used by KEGG/SBML importers)
+                x_coord = enzyme_species.metadata.get('x')
+                y_coord = enzyme_species.metadata.get('y')
+                
+                if x_coord is not None and y_coord is not None:
+                    # Use original KGML/SBML coordinates if available
+                    enzyme_positions[enzyme_id] = (float(x_coord), float(y_coord))
+                    self.logger.debug(
+                        f"Enzyme {enzyme_id}: using original coords ({x_coord}, {y_coord})"
+                    )
+                    continue
+            
+            # If no original coordinates, position near catalyzed reaction
+            catalyzed_reactions = enzyme_to_reactions.get(enzyme_id, [])
+            
+            if catalyzed_reactions:
+                # Position near first catalyzed reaction
+                reaction_id = catalyzed_reactions[0]
+                
+                if reaction_id in existing_positions:
+                    rx, ry = existing_positions[reaction_id]
+                    enzyme_x = rx + enzyme_offset_x
+                    enzyme_y = ry + enzyme_offset_y
+                    enzyme_positions[enzyme_id] = (enzyme_x, enzyme_y)
+                    self.logger.debug(
+                        f"Enzyme {enzyme_id}: positioned above reaction {reaction_id} "
+                        f"at ({enzyme_x:.1f}, {enzyme_y:.1f})"
+                    )
+                else:
+                    # Reaction not positioned yet (shouldn't happen, but fallback)
+                    enzyme_positions[enzyme_id] = (600.0, 50.0)
+                    self.logger.warning(
+                        f"Enzyme {enzyme_id}: reaction {reaction_id} not positioned, "
+                        f"using fallback position"
+                    )
+            else:
+                # No catalyzed reaction found - position in upper area
+                # Spread enzymes horizontally to avoid overlap
+                num_positioned = len(enzyme_positions)
+                enzyme_x = 600.0 + (num_positioned % 5) * 120.0
+                enzyme_y = 50.0 + (num_positioned // 5) * 80.0
+                enzyme_positions[enzyme_id] = (enzyme_x, enzyme_y)
+                self.logger.debug(
+                    f"Enzyme {enzyme_id}: no catalyzed reaction found, "
+                    f"using upper-area position ({enzyme_x:.1f}, {enzyme_y:.1f})"
+                )
+        
+        return enzyme_positions
 
 
 class BiochemicalLayoutProcessor:

@@ -239,6 +239,17 @@ class KEGGCategory(BasePathwayCategory):
         )
         box.pack_start(self.filter_cofactors_check, False, False, 0)
         
+        # Show catalysts checkbox (Biological Petri Net mode)
+        self.show_catalysts_check = Gtk.CheckButton(label="Show catalysts (Biological Petri Net)")
+        self.show_catalysts_check.set_active(False)
+        self.show_catalysts_check.set_tooltip_text(
+            "Create enzyme/catalyst places with test arcs (dashed lines).\n"
+            "Enables Biological Petri Net analysis but increases visual complexity.\n\n"
+            "When disabled: Clean layout matching KEGG visualization (default)\n"
+            "When enabled: Explicit enzyme places with non-consuming test arcs"
+        )
+        box.pack_start(self.show_catalysts_check, False, False, 0)
+        
         return box
     
     def _build_preview(self):
@@ -457,6 +468,7 @@ class KEGGCategory(BasePathwayCategory):
                 
                 # 3. Convert to Petri net
                 filter_cofactors = self.filter_cofactors_check.get_active()
+                show_catalysts = self.show_catalysts_check.get_active()
                 coordinate_scale = 2.5  # Optimal default scale for KEGG coordinates
                 
                 enhancement_options = EnhancementOptions(
@@ -465,12 +477,13 @@ class KEGGCategory(BasePathwayCategory):
                     enable_metadata_enhancement=True
                 )
                 
-                self.logger.info(f"Converting pathway (cofactors={filter_cofactors})")
+                self.logger.info(f"Converting pathway (cofactors={filter_cofactors}, catalysts={show_catalysts})")
                 document_model = convert_pathway_enhanced(
                     parsed_pathway,
                     coordinate_scale=coordinate_scale,
                     include_cofactors=filter_cofactors,
                     filter_isolated_compounds=True,
+                    create_enzyme_places=show_catalysts,  # ← NEW: Pass catalyst option
                     enhancement_options=enhancement_options
                 )
                 
@@ -517,6 +530,7 @@ class KEGGCategory(BasePathwayCategory):
                 
                 # 3. Convert to Petri net
                 filter_cofactors = self.filter_cofactors_check.get_active()
+                show_catalysts = self.show_catalysts_check.get_active()
                 coordinate_scale = 2.5  # Optimal default scale for KEGG coordinates
                 
                 enhancement_options = EnhancementOptions(
@@ -525,12 +539,13 @@ class KEGGCategory(BasePathwayCategory):
                     enable_metadata_enhancement=True
                 )
                 
-                self.logger.info(f"Converting pathway (cofactors={filter_cofactors})")
+                self.logger.info(f"Converting pathway (cofactors={filter_cofactors}, catalysts={show_catalysts})")
                 document_model = convert_pathway_enhanced(
                     parsed_pathway,
                     coordinate_scale=coordinate_scale,
                     include_cofactors=filter_cofactors,
                     filter_isolated_compounds=True,  # Remove isolated places/compounds
+                    create_enzyme_places=show_catalysts,  # ← NEW: Pass catalyst option
                     enhancement_options=enhancement_options
                 )
                 
@@ -583,20 +598,147 @@ class KEGGCategory(BasePathwayCategory):
             # Save files to project (so they're available later)
             saved_filepath = self._save_to_project(pathway_id, kgml_data, parsed_pathway, document_model, coordinate_scale)
             
-            # Show success message - guide user to File → Open
-            # This follows the proven workflow from v1.0-file-open-kegg-health
-            # Direct canvas loading bypasses proper initialization (data_collector, plot panels, etc.)
+            # Auto-load model into canvas if available
+            # Note: self.model_canvas might be a loader, not a manager
+            canvas_loader = None
+            canvas_manager = None
+            
+            if self.model_canvas:
+                if hasattr(self.model_canvas, 'get_current_model'):
+                    # It's a loader - save reference and get current manager
+                    canvas_loader = self.model_canvas
+                    canvas_manager = canvas_loader.get_current_model()
+                    self.logger.info(f"Auto-load: Detected canvas loader, current manager={canvas_manager is not None}")
+                else:
+                    # It's already a manager
+                    canvas_manager = self.model_canvas
+                    self.logger.info("Auto-load: Direct canvas manager provided")
+            
+            self.logger.info(f"Auto-load check: model_canvas={self.model_canvas is not None}, "
+                           f"canvas_loader={canvas_loader is not None}, "
+                           f"canvas_manager={canvas_manager is not None}, "
+                           f"document_model={document_model is not None}, "
+                           f"saved_filepath={saved_filepath is not None}")
+            
+            # For auto-load, we need the canvas_loader to create a new tab
+            # (like File → Open does)
+            if canvas_loader and document_model and saved_filepath:
+                try:
+                    self.logger.info("✓ Auto-loading imported model into new canvas tab...")
+                    
+                    import os
+                    filename = os.path.basename(saved_filepath)
+                    base_name = os.path.splitext(filename)[0]
+                    
+                    # Check if current tab can be reused (empty + default name)
+                    can_reuse_tab = False
+                    current_page = canvas_loader.notebook.get_current_page()
+                    
+                    if current_page >= 0:
+                        page_widget = canvas_loader.notebook.get_nth_page(current_page)
+                        drawing_area = canvas_loader._get_drawing_area_from_page(page_widget)
+                        if drawing_area:
+                            manager = canvas_loader.get_canvas_manager(drawing_area)
+                            if manager:
+                                is_empty = (len(manager.places) == 0 and 
+                                           len(manager.transitions) == 0 and 
+                                           len(manager.arcs) == 0)
+                                is_default_name = (manager.filename == 'default' or 
+                                                  manager.get_display_name() == 'default')
+                                is_clean = not manager.is_dirty()
+                                can_reuse_tab = is_empty and is_default_name and is_clean
+                                self.logger.info(f"Current tab check: empty={is_empty}, default={is_default_name}, clean={is_clean}, reuse={can_reuse_tab}")
+                    
+                    # Either reuse current empty tab or create new one
+                    if can_reuse_tab:
+                        # Reuse the current empty default tab
+                        self.logger.info("Reusing current empty tab")
+                        canvas_manager = manager  # Already set from check above
+                    else:
+                        # Create a new tab for this document (like File → Open does)
+                        self.logger.info(f"Creating new tab for: {base_name}")
+                        page_index, drawing_area = canvas_loader.add_document(filename=base_name)
+                        canvas_manager = canvas_loader.get_canvas_manager(drawing_area)
+                    
+                    if not canvas_manager:
+                        raise ValueError("Failed to get canvas manager after tab creation")
+                    
+                    # No need to clear - we either created new tab or verified current tab is empty
+                    
+                    # ===== UNIFIED OBJECT LOADING =====
+                    # Use load_objects() for consistent initialization (same as File → Open)
+                    canvas_manager.load_objects(
+                        places=document_model.places,
+                        transitions=document_model.transitions,
+                        arcs=document_model.arcs
+                    )
+                    
+                    # CRITICAL: Set change callback for proper state management
+                    # (This is what File → Open does)
+                    canvas_manager.document_controller.set_change_callback(
+                        canvas_manager._on_object_changed
+                    )
+                    
+                    # Set filepath and mark as clean (just imported/saved)
+                    canvas_manager.set_filepath(saved_filepath)
+                    canvas_manager.mark_clean()
+                    
+                    # Mark as imported (Canvas Health standard)
+                    canvas_manager.mark_as_imported(base_name)
+                    
+                    # Fit to page to show entire model (with padding)
+                    canvas_manager.fit_to_page(
+                        padding_percent=15,
+                        deferred=True,
+                        horizontal_offset_percent=30,
+                        vertical_offset_percent=10
+                    )
+                    
+                    # Force redraw
+                    if hasattr(canvas_manager, 'drawing_area'):
+                        canvas_manager.drawing_area.queue_draw()
+                    
+                    self.logger.info(
+                        f"Model auto-loaded: {len(document_model.places)} places, "
+                        f"{len(document_model.transitions)} transitions, "
+                        f"{len(document_model.arcs)} arcs (including test arcs)"
+                    )
+                    
+                except Exception as e:
+                    self.logger.error(f"Failed to auto-load model into canvas: {e}")
+                    import traceback
+                    traceback.print_exc()
+            else:
+                # Auto-load didn't happen - explain why
+                if not canvas_loader:
+                    self.logger.warning("Auto-load skipped: No canvas loader available (model_canvas might be a manager, not loader)")
+                elif not document_model:
+                    self.logger.warning("Auto-load skipped: No document_model")
+                elif not saved_filepath:
+                    self.logger.warning("Auto-load skipped: No saved_filepath")
+            
+            # Show success message
+            auto_load_success = (canvas_loader is not None and document_model is not None and saved_filepath is not None)
+            
             if saved_filepath:
-                self._show_status(
-                    f"✅ Model saved to {saved_filepath}\n"
-                    f"Use File → Open to load the model\n"
-                    f"💡 Use View → Fit to Page (Ctrl+0) to see the entire model"
-                )
+                if auto_load_success:
+                    # Auto-load happened
+                    self._show_status(
+                        f"✅ Model imported and loaded!\n"
+                        f"Saved to: {saved_filepath}\n"
+                        f"💡 Use mouse wheel to zoom, drag to pan"
+                    )
+                else:
+                    # Auto-load didn't happen
+                    self._show_status(
+                        f"✅ Model saved to {saved_filepath}\n"
+                        f"Use File → Open to load the model\n"
+                        f"💡 Use View → Fit to Page (Ctrl+0) to see the entire model"
+                    )
             else:
                 self._show_status(
                     "✅ Import complete\n"
-                    "Use File → Open to load the model\n"
-                    "💡 Use View → Fit to Page (Ctrl+0) to see the entire model"
+                    "Use File → Open to load the model"
                 )
             
             # Refresh file tree to show new files

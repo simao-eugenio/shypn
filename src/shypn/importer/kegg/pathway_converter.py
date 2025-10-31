@@ -1,16 +1,134 @@
 """Main pathway converter implementation."""
 
 import logging
-from typing import Dict, Optional, Callable
+from typing import Dict, Optional, Callable, List
 from shypn.data.canvas.document_model import DocumentModel
 from shypn.netobjs import Place, Transition
+from shypn.netobjs.test_arc import TestArc
 from .converter_base import ConversionStrategy, ConversionOptions
-from .models import KEGGPathway
+from .models import KEGGPathway, KEGGEntry
 from shypn.heuristic import KineticsAssigner
 from shypn.data.kegg_ec_fetcher import fetch_ec_numbers_parallel
 
 # Set up logging
 logger = logging.getLogger(__name__)
+
+
+class KEGGEnzymeConverter:
+    """Converts KEGG enzyme entries to test arcs (Biological Petri Net).
+    
+    In KEGG pathways, enzyme entries (type="gene", "enzyme", "ortholog") have a
+    'reaction' attribute linking them to the reactions they catalyze. This converter
+    implements the Σ component of Biological Petri Nets:
+    
+    Σ: T → 2^P (maps transitions to their regulatory/catalyst places)
+    
+    For each enzyme entry with a reaction attribute:
+    - enzyme_entry.type in ("gene", "enzyme", "ortholog")
+    - enzyme_entry.reaction = "rn:R00710" (KEGG reaction ID)
+    - Create test arc: enzyme_place → reaction_transition
+    
+    Test arcs are non-consuming (catalysts enable reactions without depletion).
+    """
+    
+    def __init__(self, pathway: KEGGPathway, document: DocumentModel,
+                 entry_to_place: Dict[str, Place],
+                 reaction_name_to_transition: Dict[str, Transition]):
+        """Initialize KEGG enzyme converter.
+        
+        Args:
+            pathway: KEGG pathway with entries and reactions
+            document: Target document model
+            entry_to_place: Mapping from entry ID to Place object
+            reaction_name_to_transition: Mapping from reaction name (e.g., "rn:R00710") to Transition
+        """
+        self.pathway = pathway
+        self.document = document
+        self.entry_to_place = entry_to_place
+        self.reaction_name_to_transition = reaction_name_to_transition
+        self.logger = logging.getLogger(__name__)
+    
+    def convert(self) -> List[TestArc]:
+        """Convert enzyme entries to test arcs.
+        
+        Returns:
+            List of TestArc objects created
+        """
+        test_arcs = []
+        enzyme_count = 0
+        skipped_no_place = 0
+        skipped_no_transition = 0
+        
+        # Scan all entries for enzymes
+        for entry_id, entry in self.pathway.entries.items():
+            # Check if this is an enzyme entry with a reaction
+            if not entry.is_gene():
+                continue
+            
+            if not entry.reaction:
+                continue
+            
+            enzyme_count += 1
+            
+            # Get the place for this enzyme entry
+            enzyme_place = self.entry_to_place.get(entry_id)
+            if not enzyme_place:
+                skipped_no_place += 1
+                self.logger.debug(
+                    f"Skipping enzyme entry {entry_id} ({entry.name}): "
+                    f"no place created (filtered out)"
+                )
+                continue
+            
+            # Get the transition for the reaction this enzyme catalyzes
+            # entry.reaction is typically "rn:R00710" format
+            reaction_transition = self.reaction_name_to_transition.get(entry.reaction)
+            if not reaction_transition:
+                skipped_no_transition += 1
+                self.logger.debug(
+                    f"Skipping enzyme entry {entry_id} ({entry.name}): "
+                    f"reaction {entry.reaction} not found in transitions"
+                )
+                continue
+            
+            # Create test arc: enzyme_place → reaction_transition
+            arc_id = f"A{self.document._next_arc_id}"
+            self.document._next_arc_id += 1
+            
+            test_arc = TestArc(
+                source=enzyme_place,
+                target=reaction_transition,
+                id=arc_id,
+                name=f"TA{arc_id[1:]}",  # TA1, TA2, etc.
+                weight=1
+            )
+            
+            # Add metadata
+            test_arc.metadata = {
+                'source': 'kegg_enzyme',
+                'kegg_entry_id': entry_id,
+                'kegg_entry_name': entry.name,
+                'kegg_entry_type': entry.type,
+                'kegg_reaction': entry.reaction,
+                'catalyst_type': 'enzyme'
+            }
+            
+            self.document.arcs.append(test_arc)
+            test_arcs.append(test_arc)
+            
+            self.logger.debug(
+                f"Created test arc: {enzyme_place.label} → {reaction_transition.label} "
+                f"(enzyme {entry.name} catalyzes {entry.reaction})"
+            )
+        
+        # Log summary
+        self.logger.info(
+            f"KEGG enzyme conversion: {len(test_arcs)} test arcs created from "
+            f"{enzyme_count} enzyme entries "
+            f"(skipped: {skipped_no_place} no place, {skipped_no_transition} no transition)"
+        )
+        
+        return test_arcs
 
 
 class StandardConversionStrategy(ConversionStrategy):
@@ -41,8 +159,8 @@ class StandardConversionStrategy(ConversionStrategy):
         """
         document = DocumentModel()
         
-        # Phase 1: Create places from compounds
-        # Strategy: Only create places for compounds used in reactions
+        # Phase 1: Create places from compounds AND enzyme entries
+        # Strategy: Only create places for compounds used in reactions + enzyme entries with reactions
         place_map: Dict[str, Place] = {}
         
         if options.filter_isolated_compounds:
@@ -62,6 +180,43 @@ class StandardConversionStrategy(ConversionStrategy):
                         place = self.compound_mapper.create_place(entry, options)
                         document.places.append(place)
                         place_map[entry.id] = place
+            
+            # NEW: Optionally create places for enzyme entries (gene, enzyme, ortholog types)
+            # These represent catalysts in Biological Petri Nets
+            # Set options.create_enzyme_places = True to enable biological analysis
+            # Set False (default) to maintain clean KEGG layout
+            if options.create_enzyme_places:
+                for entry_id, entry in pathway.entries.items():
+                    if entry.is_gene() and entry.reaction:
+                        # This is an enzyme entry that catalyzes a reaction
+                        # Create a place for it (even though it's not a compound)
+                        x = entry.graphics.x * options.coordinate_scale + options.center_x
+                        y = entry.graphics.y * options.coordinate_scale + options.center_y
+                        
+                        # Get enzyme name from graphics
+                        label = entry.graphics.name if entry.graphics and entry.graphics.name else entry.name
+                        label = label.replace('\n', ' ').strip()
+                        
+                        place_id = f"P{entry.id}"
+                        place_name = f"P{entry.id}"
+                        
+                        # Create enzyme place
+                        place = Place(x, y, place_id, place_name, label=label)
+                        place.tokens = 1  # Enzymes typically have 1 token (present/active)
+                        place.initial_marking = 1
+                        
+                        # Mark as enzyme in metadata
+                        if not hasattr(place, 'metadata'):
+                            place.metadata = {}
+                        place.metadata['kegg_id'] = entry.name
+                        place.metadata['kegg_entry_id'] = entry.id
+                        place.metadata['kegg_type'] = entry.type
+                        place.metadata['source'] = 'KEGG'
+                        place.metadata['is_enzyme'] = True
+                        place.metadata['catalyzes_reaction'] = entry.reaction
+                        
+                        document.places.append(place)
+                        place_map[entry.id] = place
         else:
             # Create places for all compounds (old behavior when filtering disabled)
             compounds = pathway.get_compounds()
@@ -70,6 +225,35 @@ class StandardConversionStrategy(ConversionStrategy):
                     place = self.compound_mapper.create_place(entry, options)
                     document.places.append(place)
                     place_map[entry.id] = place
+            
+            # Optionally create places for all enzyme entries
+            if options.create_enzyme_places:
+                for entry_id, entry in pathway.entries.items():
+                    if entry.is_gene() and entry.reaction:
+                        x = entry.graphics.x * options.coordinate_scale + options.center_x
+                        y = entry.graphics.y * options.coordinate_scale + options.center_y
+                        
+                        label = entry.graphics.name if entry.graphics and entry.graphics.name else entry.name
+                        label = label.replace('\n', ' ').strip()
+                        
+                        place_id = f"P{entry.id}"
+                        place_name = f"P{entry.id}"
+                        
+                        place = Place(x, y, place_id, place_name, label=label)
+                        place.tokens = 1
+                        place.initial_marking = 1
+                        
+                        if not hasattr(place, 'metadata'):
+                            place.metadata = {}
+                        place.metadata['kegg_id'] = entry.name
+                        place.metadata['kegg_entry_id'] = entry.id
+                        place.metadata['kegg_type'] = entry.type
+                        place.metadata['source'] = 'KEGG'
+                        place.metadata['is_enzyme'] = True
+                        place.metadata['catalyzes_reaction'] = entry.reaction
+                        
+                        document.places.append(place)
+                        place_map[entry.id] = place
         
         
         # Phase 1.5: Pre-fetch EC numbers in parallel (if metadata enhancement enabled)
@@ -94,6 +278,7 @@ class StandardConversionStrategy(ConversionStrategy):
         
         # Phase 2: Create transitions and arcs from reactions
         reaction_transition_map = {}  # Track reactions for kinetics enhancement
+        reaction_name_to_transition = {}  # Map reaction names to transitions for enzyme conversion
         
         for reaction in pathway.reactions:
             # Create transition(s)
@@ -103,11 +288,41 @@ class StandardConversionStrategy(ConversionStrategy):
                 document.transitions.append(transition)
                 reaction_transition_map[transition] = reaction
                 
+                # Map reaction name (e.g., "rn:R00710") to transition for enzyme linking
+                # This allows enzyme entries with reaction="rn:R00710" to find their transition
+                reaction_name_to_transition[reaction.name] = transition
+                
                 # Create arcs for this transition
                 arcs = self.arc_builder.create_arcs(
                     reaction, transition, place_map, pathway, options
                 )
                 document.arcs.extend(arcs)
+        
+        # Phase 2.5: Convert enzyme entries to test arcs (Biological Petri Net)
+        # ONLY if create_enzyme_places option is enabled
+        # KEGG enzyme entries (type="gene"/"enzyme"/"ortholog") with reaction attribute
+        # become test arcs connecting enzyme places to reaction transitions
+        if options.create_enzyme_places:
+            enzyme_converter = KEGGEnzymeConverter(
+                pathway=pathway,
+                document=document,
+                entry_to_place=place_map,
+                reaction_name_to_transition=reaction_name_to_transition
+            )
+            test_arcs = enzyme_converter.convert()
+            
+            # Mark document as Biological Petri Net if test arcs were created
+            if test_arcs:
+                if not hasattr(document, 'metadata') or document.metadata is None:
+                    document.metadata = {}
+                document.metadata['source'] = 'kegg'
+                document.metadata['has_test_arcs'] = True
+                document.metadata['model_type'] = 'Biological Petri Net'
+                document.metadata['test_arc_count'] = len(test_arcs)
+                logger.info(
+                    f"Created Biological Petri Net with {len(test_arcs)} test arcs "
+                    f"(enzymes/catalysts)"
+                )
         
         # Phase 3: Enhance transitions with kinetic properties
         if options.enhance_kinetics:
@@ -330,7 +545,8 @@ def convert_pathway(pathway: KEGGPathway,
                    include_cofactors: bool = True,
                    split_reversible: bool = False,
                    add_initial_marking: bool = False,
-                   filter_isolated_compounds: bool = True) -> DocumentModel:
+                   filter_isolated_compounds: bool = True,
+                   create_enzyme_places: bool = False) -> DocumentModel:
     """Quick function to convert pathway with common options.
     
     Args:
@@ -340,6 +556,9 @@ def convert_pathway(pathway: KEGGPathway,
         split_reversible: Split reversible reactions into two transitions
         add_initial_marking: Add initial tokens to places (default: False - KEGG has no concentrations)
         filter_isolated_compounds: Remove compounds not involved in any reaction
+        create_enzyme_places: Create explicit places for enzymes and test arcs (default: False)
+            When False: Clean KEGG layout, classical PN (recommended for visualization)
+            When True: Biological PN with enzyme places and test arcs (recommended for analysis)
         
     Returns:
         DocumentModel
@@ -348,14 +567,20 @@ def convert_pathway(pathway: KEGGPathway,
         >>> from shypn.importer.kegg import fetch_pathway, parse_kgml, convert_pathway
         >>> kgml = fetch_pathway("hsa00010")
         >>> pathway = parse_kgml(kgml)
+        >>> 
+        >>> # Clean layout (default - recommended)
         >>> document = convert_pathway(pathway, coordinate_scale=3.0, include_cofactors=False)
+        >>> 
+        >>> # Biological analysis (with enzyme places)
+        >>> document = convert_pathway(pathway, create_enzyme_places=True)
     """
     options = ConversionOptions(
         coordinate_scale=coordinate_scale,
         include_cofactors=include_cofactors,
         split_reversible=split_reversible,
         add_initial_marking=add_initial_marking,
-        filter_isolated_compounds=filter_isolated_compounds
+        filter_isolated_compounds=filter_isolated_compounds,
+        create_enzyme_places=create_enzyme_places
     )
     
     converter = PathwayConverter()
@@ -368,6 +593,7 @@ def convert_pathway_enhanced(pathway: KEGGPathway,
                             split_reversible: bool = False,
                             add_initial_marking: bool = False,
                             filter_isolated_compounds: bool = True,
+                            create_enzyme_places: bool = False,
                             enhancement_options: 'EnhancementOptions' = None,
                             estimate_kinetics: bool = True) -> DocumentModel:
     """Convert pathway with optional post-processing enhancements.
@@ -387,6 +613,9 @@ def convert_pathway_enhanced(pathway: KEGGPathway,
         split_reversible: Split reversible reactions into two transitions
         add_initial_marking: Add initial tokens to places (default: False - KEGG has no concentrations)
         filter_isolated_compounds: Remove compounds not involved in any reaction
+        create_enzyme_places: Create explicit places for enzymes and test arcs (default: False)
+            When False: Clean KEGG layout, classical PN (recommended for visualization)
+            When True: Biological PN with enzyme places and test arcs (recommended for analysis)
         enhancement_options: Options for post-processing pipeline.
             If None, standard enhancements are applied.
             Set enable_enhancements=False to skip all enhancements.
@@ -422,7 +651,8 @@ def convert_pathway_enhanced(pathway: KEGGPathway,
         include_cofactors=include_cofactors,
         split_reversible=split_reversible,
         add_initial_marking=add_initial_marking,
-        filter_isolated_compounds=filter_isolated_compounds
+        filter_isolated_compounds=filter_isolated_compounds,
+        create_enzyme_places=create_enzyme_places
     )
     
     # Apply kinetic parameter estimation if requested
