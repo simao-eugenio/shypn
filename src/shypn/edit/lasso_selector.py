@@ -66,11 +66,18 @@ class LassoSelector:
         if self.points[0] != self.points[-1]:
             self.points.append(self.points[0])
         
-        # Find objects inside polygon
+        # Find objects inside polygon (only places and transitions, not arcs)
         selected = []
-        for obj in self.canvas_manager.get_all_objects():
-            if self._is_point_in_polygon(obj.x, obj.y, self.points):
-                selected.append(obj)
+        
+        # Check places
+        for place in self.canvas_manager.places:
+            if self._is_point_in_polygon(place.x, place.y, self.points):
+                selected.append(place)
+        
+        # Check transitions
+        for transition in self.canvas_manager.transitions:
+            if self._is_point_in_polygon(transition.x, transition.y, self.points):
+                selected.append(transition)
         
         # Update selection
         if not multi:
