@@ -175,17 +175,26 @@ class Arc(PetriNetObject):
         src_world_x, src_world_y = self.source.x, self.source.y
         tgt_world_x, tgt_world_y = self.target.x, self.target.y
         
+        # Check if this is a loop arc (source == target)
+        is_loop = (self.source == self.target)
+        
         # Calculate direction in world space
         dx_world = tgt_world_x - src_world_x
         dy_world = tgt_world_y - src_world_y
         length_world = math.sqrt(dx_world * dx_world + dy_world * dy_world)
         
-        if length_world < 1:
-            return  # Too short to draw
-        
-        # Normalize direction
-        dx_world /= length_world
-        dy_world /= length_world
+        # For loop arcs, use a default direction (pointing right)
+        if is_loop or length_world < 1:
+            if is_loop:
+                dx_world = 1.0  # Point right
+                dy_world = 0.0
+                length_world = 1.0
+            else:
+                return  # Too short to draw (non-loop)
+        else:
+            # Normalize direction
+            dx_world /= length_world
+            dy_world /= length_world
         
         # Get boundary points using straight-line direction from actual centers
         start_world_x, start_world_y = self._get_boundary_point(
@@ -202,9 +211,10 @@ class Arc(PetriNetObject):
                 has_parallels = True
                 parallel_offset = self._manager.calculate_arc_offset(self, parallels)
         
-        # Force curved rendering for parallel arcs (never render parallel arcs as straight)
+        # Force curved rendering for parallel arcs and loop arcs
         # Parallel arcs MUST be curved to avoid visual overlap
-        render_as_curved = self.is_curved or has_parallels
+        # Loop arcs MUST be curved to be visible
+        render_as_curved = self.is_curved or has_parallels or is_loop
         
         display_start_x = start_world_x
         display_start_y = start_world_y
@@ -224,14 +234,16 @@ class Arc(PetriNetObject):
                 mid_x += perp_x * parallel_offset
                 mid_y += perp_y * parallel_offset
             
-            # For parallel arcs that aren't explicitly curved, use default perpendicular offset
+            # For parallel arcs that aren't explicitly curved, ensure proper control point
             if has_parallels and not self.is_curved:
-                # Auto-curve with perpendicular offset (20% of arc length)
+                # Use parallel offset as the primary curve direction
+                # This ensures consistent curvature matching the parallel offset
                 perp_x = -dy_world
                 perp_y = dx_world
-                auto_offset = length_world * 0.2  # Default curve amount
-                control_x = mid_x + perp_x * auto_offset
-                control_y = mid_y + perp_y * auto_offset
+                # Control point perpendicular to arc at the parallel-offset midpoint
+                # No additional offset needed - the parallel offset IS the curve
+                control_x = mid_x
+                control_y = mid_y
             else:
                 # Use explicit control offsets
                 control_x = mid_x + self.control_offset_x

@@ -593,6 +593,11 @@ class ModelCanvasManager:
             arc._manager = self  # Set manager reference for parallel detection
             self._notify_observers('created', arc)
         
+        # Auto-convert loop arcs and parallel arcs to curved
+        # This ensures loaded models have proper curved rendering for loops and parallels
+        for arc in arcs:
+            self._auto_convert_parallel_arcs_to_curved(arc)
+        
         
         # Update ID counters to avoid collisions
         # Handle both numeric IDs (int) and string IDs ("123", "P123", "T45", "A12")
@@ -690,43 +695,142 @@ class ModelCanvasManager:
         return parallels
     
     def _auto_convert_parallel_arcs_to_curved(self, new_arc):
-        """Automatically convert parallel arcs to curved arcs.
+        """Automatically convert parallel arcs and loop arcs to curved arcs.
         
         When a new arc creates a parallel situation (same source/target or opposite),
-        convert all involved arcs to curved arcs for better visualization.
+        or when it's a loop arc (source == target), convert all involved arcs to
+        curved arcs for better visualization.
         
-        Parallel arcs MUST always be curved - never straight. This prevents
-        visual overlap and maintains clear distinction between different flows.
+        Parallel arcs MUST always be curved - never straight. Loops MUST be curved.
+        This prevents visual overlap and maintains clear distinction between different flows.
+        
+        For opposite direction arcs (A→B and B→A), BOTH are converted to curved
+        simultaneously with perpendicular offsets on opposite sides.
         
         Args:
-            new_arc: The newly added arc that may create parallels
+            new_arc: The newly added arc that may create parallels or be a loop
         """
         from shypn.netobjs import CurvedArc, CurvedInhibitorArc, InhibitorArc
         from shypn.utils.arc_transform import make_curved
+        import math
+        
+        # Check if this is a loop arc (source == target)
+        is_loop = (new_arc.source == new_arc.target)
         
         parallels = self.detect_parallel_arcs(new_arc)
         
-        if parallels:
-            # Convert the new arc if it's straight
-            if isinstance(new_arc, Arc) and not isinstance(new_arc, (CurvedArc, CurvedInhibitorArc)):
-                curved_arc = make_curved(new_arc)
-                index = self.arcs.index(new_arc)
-                self.arcs[index] = curved_arc
-                curved_arc._manager = self
-                curved_arc.on_changed = self._on_object_changed
-                # Update the reference in the arcs list to return the new curved arc
-                new_arc = curved_arc
+        # Convert loop arcs or parallel arcs
+        if is_loop or parallels:
             
-            # Convert all parallel arcs if they're straight
-            for i, parallel in enumerate(parallels):
-                if isinstance(parallel, (Arc, InhibitorArc)) and not isinstance(parallel, (CurvedArc, CurvedInhibitorArc)):
-                    curved_arc = make_curved(parallel)
-                    index = self.arcs.index(parallel)
-                    self.arcs[index] = curved_arc
-                    curved_arc._manager = self
-                    curved_arc.on_changed = self._on_object_changed
-                    # Update parallels list with new reference
-                    parallels[i] = curved_arc
+            # For loop arcs, just convert and apply offset
+            if is_loop:
+                if isinstance(new_arc, Arc) and not isinstance(new_arc, (CurvedArc, CurvedInhibitorArc)):
+                    curved_arc = make_curved(new_arc)
+                    curved_arc.control_offset_x = 60.0
+                    curved_arc.control_offset_y = -60.0
+                    
+                    try:
+                        index = self.arcs.index(new_arc)
+                        self.arcs[index] = curved_arc
+                        curved_arc._manager = self
+                        curved_arc.on_changed = self._on_object_changed
+                    except ValueError:
+                        pass  # Already replaced
+                
+                self.mark_dirty()
+                return
+            
+            # For parallel arcs, check if we have an opposite-direction pair
+            opposite_arc = None
+            for parallel in parallels:
+                if parallel.source == new_arc.target and parallel.target == new_arc.source:
+                    opposite_arc = parallel
+                    break
+            
+            # If we have an opposite-direction pair, convert BOTH with perpendicular offsets
+            if opposite_arc is not None:
+                # Calculate perpendicular direction from new_arc direction
+                dx = new_arc.target.x - new_arc.source.x
+                dy = new_arc.target.y - new_arc.source.y
+                length = math.sqrt(dx*dx + dy*dy)
+                
+                if length > 1:
+                    # Normalize
+                    dx /= length
+                    dy /= length
+                    
+                    # Perpendicular vector (90° rotation)
+                    perp_x = -dy
+                    perp_y = dx
+                    
+                    # Offset distance
+                    offset_distance = 50.0
+                    
+                    # Convert and offset new_arc
+                    if isinstance(new_arc, Arc) and not isinstance(new_arc, (CurvedArc, CurvedInhibitorArc)):
+                        curved_new = make_curved(new_arc)
+                        
+                        # Determine offset direction based on ID
+                        if new_arc.id < opposite_arc.id:
+                            curved_new.control_offset_x = perp_x * offset_distance
+                            curved_new.control_offset_y = perp_y * offset_distance
+                        else:
+                            curved_new.control_offset_x = -perp_x * offset_distance
+                            curved_new.control_offset_y = -perp_y * offset_distance
+                        
+                        try:
+                            index = self.arcs.index(new_arc)
+                            self.arcs[index] = curved_new
+                            curved_new._manager = self
+                            curved_new.on_changed = self._on_object_changed
+                        except ValueError:
+                            pass
+                    
+                    # Convert and offset opposite_arc
+                    if isinstance(opposite_arc, (Arc, InhibitorArc)) and not isinstance(opposite_arc, (CurvedArc, CurvedInhibitorArc)):
+                        curved_opposite = make_curved(opposite_arc)
+                        
+                        # Mirror offset
+                        if new_arc.id < opposite_arc.id:
+                            curved_opposite.control_offset_x = -perp_x * offset_distance
+                            curved_opposite.control_offset_y = -perp_y * offset_distance
+                        else:
+                            curved_opposite.control_offset_x = perp_x * offset_distance
+                            curved_opposite.control_offset_y = perp_y * offset_distance
+                        
+                        try:
+                            index = self.arcs.index(opposite_arc)
+                            self.arcs[index] = curved_opposite
+                            curved_opposite._manager = self
+                            curved_opposite.on_changed = self._on_object_changed
+                        except ValueError:
+                            pass
+            
+            else:
+                # No opposite pair, just convert parallels without special offsets
+                # (This handles same-direction parallels)
+                for parallel in parallels:
+                    if isinstance(parallel, (Arc, InhibitorArc)) and not isinstance(parallel, (CurvedArc, CurvedInhibitorArc)):
+                        curved_arc = make_curved(parallel)
+                        
+                        try:
+                            index = self.arcs.index(parallel)
+                            self.arcs[index] = curved_arc
+                            curved_arc._manager = self
+                            curved_arc.on_changed = self._on_object_changed
+                        except ValueError:
+                            pass
+                
+                # Convert new_arc too if it's not curved
+                if isinstance(new_arc, Arc) and not isinstance(new_arc, (CurvedArc, CurvedInhibitorArc)):
+                    curved_new = make_curved(new_arc)
+                    try:
+                        index = self.arcs.index(new_arc)
+                        self.arcs[index] = curved_new
+                        curved_new._manager = self
+                        curved_new.on_changed = self._on_object_changed
+                    except ValueError:
+                        pass
             
             # Mark dirty to trigger redraw
             self.mark_dirty()
