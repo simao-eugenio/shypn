@@ -628,6 +628,7 @@ class Arc(PetriNetObject):
         data = super().to_dict()  # Get base properties (id, name, label)
         data.update({
             "object_type": "arc",  # Renamed from "type" to avoid confusion
+            "arc_type": "normal",  # CRITICAL: Mark as normal arc (subclasses override)
             "source_id": self.source.id,
             "source_type": "place" if isinstance(self.source, Place) else "transition",
             "target_id": self.target.id,

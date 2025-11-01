@@ -423,10 +423,10 @@ class InhibitorArc(Arc):
         """Serialize inhibitor arc to dictionary for persistence.
         
         Returns:
-            dict: Dictionary containing all arc properties with type 'inhibitor_arc'
+            dict: Dictionary containing all arc properties with arc_type='inhibitor'
         """
         data = super().to_dict()
-        data["object_type"] = "inhibitor_arc"  # Override object_type to distinguish from Arc
+        data["arc_type"] = "inhibitor"  # Override arc_type to distinguish from normal Arc
         return data
     
     def __repr__(self):
