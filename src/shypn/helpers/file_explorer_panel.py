@@ -1818,7 +1818,9 @@ class FileExplorerPanel:
         # Either reuse current empty tab or create new one
         if can_reuse_tab:
             # Reuse the current empty default tab
-            pass  # drawing_area and manager already set from check above
+            # CRITICAL: Reset manager state before loading to avoid stale state bugs
+            # This ensures callbacks are enabled and all flags are reset
+            self.canvas_loader._reset_manager_for_load(manager, base_name)
         else:
             # Create a new tab for this document
             page_index, drawing_area = self.canvas_loader.add_document(filename=base_name)

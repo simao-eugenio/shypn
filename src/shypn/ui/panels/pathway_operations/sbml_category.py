@@ -539,6 +539,8 @@ class SBMLCategory(BasePathwayCategory):
                 if current_manager and current_manager.is_empty():
                     canvas_manager = current_manager
                     self.logger.info("Reusing empty tab for SBML import")
+                    # CRITICAL: Reset manager state before loading
+                    canvas_loader._reset_manager_for_load(canvas_manager, base_name)
                 else:
                     # Create new tab
                     self.logger.info("Creating new tab for SBML import")

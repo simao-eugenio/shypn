@@ -663,6 +663,70 @@ class ModelCanvasLoader:
             # Canvas setup complete - enable callbacks now that state is properly initialized
             manager._suppress_callbacks = False
             print(f"[CANVAS SETUP] Callbacks enabled, canvas fully initialized")
+        else:
+            # CRITICAL FIX: Even without overlay_box, MUST enable callbacks
+            # Otherwise canvas becomes non-interactive
+            manager._suppress_callbacks = False
+            print(f"[CANVAS SETUP] Callbacks enabled (no overlay), canvas initialized")
+
+    def _reset_manager_for_load(self, manager, filename):
+        """Reset manager state before loading objects from file.
+        
+        This prepares an existing manager to receive a loaded document,
+        resetting all state flags and counters to clean slate.
+        
+        MUST be called BEFORE load_objects() when reusing a tab for File→Open or Import.
+        
+        This is the CANONICAL state reset for document loading, ensuring:
+        - All state flags are reset
+        - Callbacks are enabled
+        - Objects are cleared
+        - ID counters are reset
+        
+        Args:
+            manager: ModelCanvasManager instance to reset
+            filename: Base filename (without extension) for the document
+        """
+        from datetime import datetime
+        
+        # Reset document metadata
+        manager.filename = filename
+        manager.modified = False
+        manager.created_at = datetime.now()
+        manager.modified_at = None
+        
+        # Reset view state (will be overridden by saved view_state if exists)
+        manager.zoom = 1.0
+        manager.pan_x = 0.0
+        manager.pan_y = 0.0
+        manager._initial_pan_set = False
+        
+        # CRITICAL: Ensure callbacks are enabled
+        # This is the most common cause of "frozen canvas" bugs
+        manager._suppress_callbacks = False
+        
+        # Clear any existing objects
+        # (Should be empty when reusing default tab, but be paranoid)
+        manager.places.clear()
+        manager.transitions.clear()
+        manager.arcs.clear()
+        
+        # Reset ID counters to avoid collisions
+        manager.document_controller._next_place_id = 1
+        manager.document_controller._next_transition_id = 1
+        manager.document_controller._next_arc_id = 1
+        
+        # Mark as clean (document will be loaded)
+        manager.mark_clean()
+        
+        # Clear selection
+        if hasattr(manager, 'selection_manager'):
+            manager.selection_manager.clear_selection()
+        
+        # Reset tool state
+        manager.clear_active_tool()
+        
+        print(f"[RESET] Manager reset for document load: {filename}")
 
     def _setup_edit_palettes(self, overlay_widget, canvas_manager, drawing_area, overlay_manager):
         """Setup new OOP palette system with SwissKnifePalette.
