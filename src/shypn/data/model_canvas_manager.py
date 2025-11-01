@@ -644,6 +644,15 @@ class ModelCanvasManager:
             if arc_ids:
                 self.document_controller._next_arc_id = max(arc_ids) + 1
         
+        # CRITICAL: Reset all places to their initial marking
+        # When loading (File Open, KEGG import, SBML import, etc), we want to start
+        # with the initial state, not the simulation state that may be in the data.
+        # This is especially important for test arcs (catalysts) which must have
+        # tokens=initial_marking to function correctly.
+        for place in places:
+            if hasattr(place, 'initial_marking'):
+                place.tokens = place.initial_marking
+        
         # Mark document as dirty (unsaved changes) and trigger redraw
         self.mark_dirty()  # Document dirty tracking for save state
         self.mark_needs_redraw()  # Canvas redraw for rendering
