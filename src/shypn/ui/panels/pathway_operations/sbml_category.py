@@ -522,7 +522,8 @@ class SBMLCategory(BasePathwayCategory):
             # Load the saved model into canvas automatically (same as KEGG import)
             try:
                 from shypn.helpers.model_canvas_loader import ModelCanvasLoader
-                canvas_loader = self.app_window.canvas_loader
+                # Use self.model_canvas which is set by the parent panel
+                canvas_loader = self.model_canvas
                 
                 # Get base name for tab
                 base_name = os.path.splitext(os.path.basename(saved_filepath))[0]

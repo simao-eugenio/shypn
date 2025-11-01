@@ -116,7 +116,9 @@ class LayoutEngine:
         for i, place in enumerate(doc.places):
             # Check if this place is an enzyme/catalyst place
             # Enzyme places have metadata['is_enzyme'] = True
-            is_enzyme = place.metadata.get('is_enzyme', False)
+            # Use getattr() to safely access metadata attribute
+            metadata = getattr(place, 'metadata', {})
+            is_enzyme = metadata.get('is_enzyme', False) if metadata else False
             
             # Set is_catalyst attribute on place object for layout algorithm
             # The hierarchical layout base.py checks this with getattr(node, 'is_catalyst', False)
