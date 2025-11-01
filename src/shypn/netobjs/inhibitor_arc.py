@@ -433,6 +433,17 @@ class InhibitorArc(Arc):
         cr.new_path()
         cr.restore()
     
+    def consumes_tokens(self) -> bool:
+        """Check if this arc consumes tokens on firing.
+        
+        Inhibitor arcs are read-only regulatory checks (like test arcs).
+        They check the enabling condition but do NOT consume tokens.
+        
+        Returns:
+            bool: False - inhibitor arcs never consume (regulatory check only)
+        """
+        return False
+    
     def to_dict(self) -> dict:
         """Serialize inhibitor arc to dictionary for persistence.
         
