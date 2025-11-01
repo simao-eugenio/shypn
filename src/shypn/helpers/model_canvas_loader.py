@@ -724,7 +724,7 @@ class ModelCanvasLoader:
             manager.selection_manager.clear_selection()
         
         # Reset tool state
-        manager.clear_active_tool()
+        manager.clear_tool()
         
         # Trigger redraw to show canvas is ready for new content
         manager.mark_needs_redraw()
