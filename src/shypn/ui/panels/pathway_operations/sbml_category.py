@@ -518,12 +518,82 @@ class SBMLCategory(BasePathwayCategory):
                 import traceback
                 traceback.print_exc()
             
-            # Show success message
-            self._show_status(
-                f"✅ Model saved to {saved_filepath}\n"
-                f"Use File → Open to load the model\n"
-                f"💡 Use View → Fit to Page (Ctrl+0) to see the entire model"
-            )
+            # ===== AUTO-LOAD MODEL TO CANVAS =====
+            # Load the saved model into canvas automatically (same as KEGG import)
+            try:
+                from shypn.helpers.model_canvas_loader import ModelCanvasLoader
+                canvas_loader = self.app_window.canvas_loader
+                
+                # Get base name for tab
+                base_name = os.path.splitext(os.path.basename(saved_filepath))[0]
+                
+                # Check if current tab is empty and can be reused
+                current_drawing_area = canvas_loader.get_current_drawing_area()
+                current_manager = None
+                if current_drawing_area:
+                    current_manager = canvas_loader.get_canvas_manager(current_drawing_area)
+                
+                canvas_manager = None
+                
+                # If current tab is empty, reuse it
+                if current_manager and current_manager.is_empty():
+                    canvas_manager = current_manager
+                    self.logger.info("Reusing empty tab for SBML import")
+                else:
+                    # Create new tab
+                    self.logger.info("Creating new tab for SBML import")
+                    page_index, drawing_area = canvas_loader.add_document(filename=base_name)
+                    canvas_manager = canvas_loader.get_canvas_manager(drawing_area)
+                
+                if not canvas_manager:
+                    raise ValueError("Failed to get canvas manager after tab creation")
+                
+                # Load objects using UNIFIED path (same as KEGG and File→Open)
+                canvas_manager.load_objects(
+                    places=document_model.places,
+                    transitions=document_model.transitions,
+                    arcs=document_model.arcs
+                )
+                
+                # Set change callback for proper state management
+                canvas_manager.document_controller.set_change_callback(
+                    canvas_manager._on_object_changed
+                )
+                
+                # Set filepath and mark as clean (just imported/saved)
+                canvas_manager.set_filepath(saved_filepath)
+                canvas_manager.mark_clean()
+                
+                # Mark as imported
+                canvas_manager.mark_as_imported(base_name)
+                
+                # Fit to page to show entire model (with padding)
+                canvas_manager.fit_to_page(
+                    padding_percent=15,
+                    deferred=True,
+                    horizontal_offset_percent=30,
+                    vertical_offset_percent=10
+                )
+                
+                # Force redraw
+                if hasattr(canvas_manager, 'drawing_area'):
+                    canvas_manager.drawing_area.queue_draw()
+                
+                self._show_status(
+                    f"✅ Model loaded to canvas: {base_name}\n"
+                    f"💡 Use View → Fit to Page (Ctrl+0) to adjust view if needed"
+                )
+                
+            except Exception as load_error:
+                self.logger.error(f"Failed to auto-load model to canvas: {load_error}")
+                import traceback
+                traceback.print_exc()
+                # Show fallback message
+                self._show_status(
+                    f"✅ Model saved to {saved_filepath}\n"
+                    f"⚠️ Auto-load failed, use File → Open to load manually\n"
+                    f"💡 Use View → Fit to Page (Ctrl+0) to see the entire model"
+                )
             
             # Re-enable button
             self.import_button.set_sensitive(True)
