@@ -520,16 +520,19 @@ class SBMLCategory(BasePathwayCategory):
             
             # ===== AUTO-LOAD MODEL TO CANVAS =====
             # Load the saved model into canvas automatically (same as KEGG import)
+            self.logger.info("=== Starting SBML canvas auto-load ===")
             try:
                 from shypn.helpers.model_canvas_loader import ModelCanvasLoader
                 # Use self.model_canvas which is set by the parent panel
                 canvas_loader = self.model_canvas
+                self.logger.info(f"Canvas loader: {canvas_loader}")
                 
                 if not canvas_loader:
                     raise ValueError("Model canvas not available - please open the application with GUI")
                 
                 # Get base name for tab
                 base_name = os.path.splitext(os.path.basename(saved_filepath))[0]
+                self.logger.info(f"Loading model: {base_name}")
                 
                 # Check if current tab is empty and can be reused
                 current_drawing_area = canvas_loader.get_current_drawing_area()
@@ -584,12 +587,14 @@ class SBMLCategory(BasePathwayCategory):
                 # Force redraw to display loaded objects
                 canvas_manager.mark_needs_redraw()
                 
+                self.logger.info("=== SBML canvas auto-load COMPLETED ===")
                 self._show_status(
                     f"✅ Model loaded to canvas: {base_name}\n"
                     f"💡 Use View → Fit to Page (Ctrl+0) to adjust view if needed"
                 )
                 
             except Exception as load_error:
+                self.logger.error(f"=== SBML canvas auto-load FAILED ===")
                 self.logger.error(f"Failed to auto-load model to canvas: {load_error}")
                 import traceback
                 traceback.print_exc()
