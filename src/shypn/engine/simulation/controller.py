@@ -75,9 +75,18 @@ class ModelAdapter:
 
     @property
     def arcs(self):
-        """Get arcs as dictionary keyed by ID."""
+        """Get arcs as dictionary keyed by ID.
+        
+        WARNING: Arc IDs may not be unique in models (especially imported ones).
+        Using ID as dict key can cause arcs to be lost. Behaviors should iterate
+        over arcs directly, not use this dict for lookup.
+        
+        Returns a dict for API compatibility, but keyed by object id() to ensure uniqueness.
+        """
         if self._arcs_dict is None:
-            self._arcs_dict = {a.id: a for a in self.canvas_manager.arcs}
+            # Use Python object ID as key to avoid duplicate arc ID issues
+            # This ensures all arcs are accessible even if they have duplicate IDs
+            self._arcs_dict = {id(a): a for a in self.canvas_manager.arcs}
         return self._arcs_dict
 
     @property
@@ -218,6 +227,11 @@ class SimulationController:
         CRITICAL: Validates cache against current transition_type to handle
         dynamic type changes during simulation. If type changes, invalidates
         and recreates the behavior instance.
+        
+        Cache invalidation strategy:
+        - Type mismatch: Invalidates and recreates behavior (handles type changes)
+        - reset(): Clears entire cache (prevents stale state across model reloads)
+        - _on_model_changed: Removes specific transition behaviors (handles deletions)
         
         Args:
             transition: Transition object with transition_type property
@@ -1601,7 +1615,8 @@ class SimulationController:
         """Reset the simulation to initial marking.
         
         This stops any running simulation and resets all places to their
-        initial marking values.
+        initial marking values. Also clears the behavior cache to prevent
+        stale state from persisting across model reloads.
         """
         if self._running:
             self.stop()
@@ -1613,9 +1628,15 @@ class SimulationController:
         if self.data_collector is not None:
             self.data_collector.clear()
         self.transition_states.clear()
+        
+        # Clear behavior cache to prevent stale state across model reloads
+        # This fixes the issue where cached behaviors from a previous model
+        # (with same transition IDs) persist and cause transitions not to fire
         for behavior in self.behavior_cache.values():
             if hasattr(behavior, 'clear_enablement'):
                 behavior.clear_enablement()
+        self.behavior_cache.clear()
+        
         for place in self.model.places:
             if hasattr(place, 'initial_marking'):
                 place.tokens = place.initial_marking
