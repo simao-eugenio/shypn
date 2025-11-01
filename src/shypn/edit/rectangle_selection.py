@@ -149,14 +149,15 @@ class RectangleSelection:
         
         selected_count = 0
         
-        # Check all objects
-        for obj in manager.get_all_objects():
-            # Check if object center is within bounds
-            obj_x = obj.x
-            obj_y = obj.y
-            
-            if min_x <= obj_x <= max_x and min_y <= obj_y <= max_y:
-                manager.selection_manager.select(obj, multi=True, manager=manager)
+        # Check places and transitions (not arcs - they don't have x,y center)
+        for place in manager.places:
+            if min_x <= place.x <= max_x and min_y <= place.y <= max_y:
+                manager.selection_manager.select(place, multi=True, manager=manager)
+                selected_count += 1
+        
+        for transition in manager.transitions:
+            if min_x <= transition.x <= max_x and min_y <= transition.y <= max_y:
+                manager.selection_manager.select(transition, multi=True, manager=manager)
                 selected_count += 1
         
         return selected_count
