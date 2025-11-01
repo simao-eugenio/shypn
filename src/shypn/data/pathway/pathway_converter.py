@@ -780,6 +780,12 @@ class PathwayConverter:
             )
         
         # ==============================================================================
+        # VALIDATION: Detect modeling issues
+        # ==============================================================================
+        self._validate_catalyst_only_transitions(document, arcs, test_arcs)
+        self._validate_mixed_role_species(pathway, species_to_place)
+        
+        # ==============================================================================
         # INTEGRATE SBML KINETICS: Create SBMLKineticMetadata for transitions
         # ==============================================================================
         if SBMLKineticsIntegrationService is not None:
@@ -871,6 +877,195 @@ class PathwayConverter:
             f"Kinetics summary: {summary['sbml_kinetics']} SBML, "
             f"{summary['without_kinetics']} without kinetics"
         )
+    
+    def _validate_catalyst_only_transitions(
+        self,
+        document: DocumentModel,
+        normal_arcs: List[Arc],
+        test_arcs: List[TestArc]
+    ) -> None:
+        """
+        Detect transitions with only test arcs (catalysts) but no normal input arcs.
+        
+        This indicates a modeling error: transitions need substrates to fire.
+        
+        Args:
+            document: DocumentModel with transitions
+            normal_arcs: List of normal arcs
+            test_arcs: List of test arcs
+        """
+        if not test_arcs:
+            return  # No test arcs, nothing to validate
+        
+        for transition in document.transitions:
+            # Count normal input arcs (reactants)
+            normal_inputs = [
+                arc for arc in normal_arcs
+                if arc.target == transition and not isinstance(arc, TestArc)
+            ]
+            
+            # Count test arcs (catalysts)
+            test_inputs = [
+                arc for arc in test_arcs
+                if arc.target == transition
+            ]
+            
+            # Count output arcs (products)
+            outputs = [
+                arc for arc in normal_arcs
+                if arc.source == transition
+            ]
+            
+            # PROBLEM PATTERN: test arcs but no normal inputs
+            if test_inputs and not normal_inputs and outputs:
+                self.logger.warning(
+                    f"\n{'='*70}\n"
+                    f"⚠️  MODELING ERROR: Transition '{transition.name}'\n"
+                    f"{'='*70}\n"
+                    f"Structure:\n"
+                    f"  - Catalyst arcs (test): {len(test_inputs)}\n"
+                    f"  - Reactant arcs (normal input): {len(normal_inputs)} ← MISSING!\n"
+                    f"  - Product arcs (output): {len(outputs)}\n"
+                    f"\n"
+                    f"Problem:\n"
+                    f"  This transition has catalysts but NO SUBSTRATES.\n"
+                    f"  It CANNOT FIRE because test arcs are non-consuming.\n"
+                    f"  Simulation will be blocked at this transition!\n"
+                    f"\n"
+                    f"Catalysts involved:\n"
+                )
+                for arc in test_inputs:
+                    catalyst_name = arc.source.name if hasattr(arc.source, 'name') else 'Unknown'
+                    self.logger.warning(f"  - {catalyst_name}")
+                
+                self.logger.warning(
+                    f"\n"
+                    f"Possible fixes:\n"
+                    f"  1. Add missing reactant species to SBML <listOfReactants>\n"
+                    f"  2. Mark transition as SOURCE if it represents external input\n"
+                    f"  3. Check if catalyst should be a reactant instead of modifier\n"
+                    f"{'='*70}\n"
+                )
+    
+    def _validate_mixed_role_species(
+        self,
+        pathway: ProcessedPathwayData,
+        species_to_place: Dict[str, Place]
+    ) -> None:
+        """
+        Detect species that act as BOTH substrates AND catalysts across reactions.
+        
+        This can cause catalyst depletion: consuming species as substrate
+        prevents it from catalyzing other reactions.
+        
+        Args:
+            pathway: Processed pathway data
+            species_to_place: Mapping from species ID to Place
+        """
+        # Track species roles across all reactions
+        species_roles = {}  # species_id -> {reactions by role}
+        
+        for reaction in pathway.reactions:
+            # Track reactants
+            for species_id, _ in reaction.reactants:
+                if species_id not in species_roles:
+                    species_roles[species_id] = {
+                        'reactant_reactions': [],
+                        'product_reactions': [],
+                        'modifier_reactions': []
+                    }
+                species_roles[species_id]['reactant_reactions'].append(reaction.id)
+            
+            # Track products
+            for species_id, _ in reaction.products:
+                if species_id not in species_roles:
+                    species_roles[species_id] = {
+                        'reactant_reactions': [],
+                        'product_reactions': [],
+                        'modifier_reactions': []
+                    }
+                species_roles[species_id]['product_reactions'].append(reaction.id)
+            
+            # Track modifiers
+            for species_id in reaction.modifiers:
+                if species_id not in species_roles:
+                    species_roles[species_id] = {
+                        'reactant_reactions': [],
+                        'product_reactions': [],
+                        'modifier_reactions': []
+                    }
+                species_roles[species_id]['modifier_reactions'].append(reaction.id)
+        
+        # Identify species with mixed roles
+        mixed_role_species = []
+        for species_id, roles in species_roles.items():
+            has_modifier = len(roles['modifier_reactions']) > 0
+            has_substrate = len(roles['reactant_reactions']) > 0 or len(roles['product_reactions']) > 0
+            
+            if has_modifier and has_substrate:
+                mixed_role_species.append((species_id, roles))
+        
+        # Log warnings for mixed-role species
+        if mixed_role_species:
+            self.logger.warning(
+                f"\n{'='*70}\n"
+                f"⚠️  CATALYST DEPLETION WARNING\n"
+                f"{'='*70}\n"
+                f"Found {len(mixed_role_species)} species with MIXED ROLES:\n"
+            )
+            
+            for species_id, roles in mixed_role_species[:5]:  # Show first 5
+                place = species_to_place.get(species_id)
+                species_name = place.name if place else species_id
+                
+                self.logger.warning(
+                    f"\n"
+                    f"Species: {species_name} (ID: {species_id})\n"
+                    f"  Roles:\n"
+                )
+                
+                if roles['modifier_reactions']:
+                    self.logger.warning(
+                        f"    - CATALYST in {len(roles['modifier_reactions'])} reactions: "
+                        f"{', '.join(roles['modifier_reactions'][:3])}"
+                        f"{'...' if len(roles['modifier_reactions']) > 3 else ''}"
+                    )
+                
+                if roles['reactant_reactions']:
+                    self.logger.warning(
+                        f"    - REACTANT in {len(roles['reactant_reactions'])} reactions: "
+                        f"{', '.join(roles['reactant_reactions'][:3])}"
+                        f"{'...' if len(roles['reactant_reactions']) > 3 else ''}"
+                    )
+                
+                if roles['product_reactions']:
+                    self.logger.warning(
+                        f"    - PRODUCT in {len(roles['product_reactions'])} reactions: "
+                        f"{', '.join(roles['product_reactions'][:3])}"
+                        f"{'...' if len(roles['product_reactions']) > 3 else ''}"
+                    )
+                
+                self.logger.warning(
+                    f"  \n"
+                    f"  ⚠️  Issue: Consuming as substrate depletes catalyst pool!\n"
+                )
+            
+            if len(mixed_role_species) > 5:
+                self.logger.warning(
+                    f"\n... and {len(mixed_role_species) - 5} more species\n"
+                )
+            
+            self.logger.warning(
+                f"\n"
+                f"This may represent:\n"
+                f"  1. ✅ Correct model: Resource competition for limited cofactor\n"
+                f"     (e.g., ATP used as both substrate and allosteric regulator)\n"
+                f"  2. ❌ Modeling error: Should be separate species/compartments\n"
+                f"     (e.g., AMP-free vs AMP-enzyme-bound)\n"
+                f"\n"
+                f"Review SBML model to verify intended semantics.\n"
+                f"{'='*70}\n"
+            )
 
 
 # Example usage
