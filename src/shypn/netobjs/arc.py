@@ -657,6 +657,7 @@ class Arc(PetriNetObject):
             "target_id": self.target.id,
             "target_type": "place" if isinstance(self.target, Place) else "transition",
             "weight": self.weight,
+            "threshold": self.threshold,  # Save threshold (can be None, value, dict, or expression)
             "color": list(self.color),
             "width": self.width,
             "control_points": self.control_points
@@ -756,6 +757,8 @@ class Arc(PetriNetObject):
             arc.width = data["width"]
         if "control_points" in data:
             arc.control_points = data["control_points"]
+        if "threshold" in data:
+            arc.threshold = data["threshold"]
         
         return arc
     
