@@ -54,14 +54,38 @@ class HierarchicalLayout(LayoutAlgorithm):
         if graph.number_of_nodes() == 0:
             return {}
         
+        # Filter out completely isolated nodes (no arcs at all)
+        # These are likely manual annotations or artifacts
+        connected_graph = graph.copy()
+        isolated_nodes = [
+            n for n in connected_graph.nodes() 
+            if connected_graph.degree(n) == 0
+        ]
+        if isolated_nodes:
+            connected_graph.remove_nodes_from(isolated_nodes)
+            print(f"🔍 Hierarchical layout: Filtered {len(isolated_nodes)} isolated nodes (no arcs)")
+        
+        # Also filter catalyst places (only test arcs, not part of main hierarchy)
+        catalyst_nodes = [
+            n for n in connected_graph.nodes()
+            if getattr(n, 'is_catalyst', False)
+        ]
+        if catalyst_nodes:
+            connected_graph.remove_nodes_from(catalyst_nodes)
+            print(f"🔍 Hierarchical layout: Filtered {len(catalyst_nodes)} catalyst nodes (test arcs only)")
+        
+        if connected_graph.number_of_nodes() == 0:
+            print("⚠️ Hierarchical layout: No connected nodes after filtering")
+            return {}
+        
         # Phase 1: Layer Assignment
-        layers = self._assign_layers(graph)
+        layers = self._assign_layers(connected_graph)
         
         # Group nodes by layer
         layer_groups = self._group_by_layer(layers)
         
         # Phase 2: Crossing Reduction (barycentric heuristic)
-        layer_groups = self._reduce_crossings(graph, layer_groups)
+        layer_groups = self._reduce_crossings(connected_graph, layer_groups)
         
         # Phase 3: Coordinate Assignment
         positions = self._assign_coordinates(
