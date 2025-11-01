@@ -518,8 +518,13 @@ class ArcConverter(BaseConverter):
                 self.logger.warning(f"Transition not found for reaction '{reaction.id}'")
                 continue
             
-            # Create input arcs (reactants → transition)
+            # Aggregate stoichiometries for reactants (in case same species appears multiple times)
+            reactant_weights = {}
             for species_id, stoichiometry in reaction.reactants:
+                reactant_weights[species_id] = reactant_weights.get(species_id, 0) + stoichiometry
+            
+            # Create input arcs (reactants → transition)
+            for species_id, total_stoichiometry in reactant_weights.items():
                 place = self.species_to_place.get(species_id)
                 if not place:
                     self.logger.warning(
@@ -529,7 +534,7 @@ class ArcConverter(BaseConverter):
                     continue
                 
                 # Create arc from place to transition
-                weight = max(1, round(stoichiometry))  # Convert to integer
+                weight = max(1, round(total_stoichiometry))  # Convert to integer
                 arc = self.document.create_arc(
                     source=place,
                     target=transition,
@@ -542,8 +547,13 @@ class ArcConverter(BaseConverter):
                         f"Created input arc: {place.name} → {transition.name} (weight: {weight})"
                     )
             
-            # Create output arcs (transition → products)
+            # Aggregate stoichiometries for products (in case same species appears multiple times)
+            product_weights = {}
             for species_id, stoichiometry in reaction.products:
+                product_weights[species_id] = product_weights.get(species_id, 0) + stoichiometry
+            
+            # Create output arcs (transition → products)
+            for species_id, total_stoichiometry in product_weights.items():
                 place = self.species_to_place.get(species_id)
                 if not place:
                     self.logger.warning(
@@ -553,7 +563,7 @@ class ArcConverter(BaseConverter):
                     continue
                 
                 # Create arc from transition to place
-                weight = max(1, round(stoichiometry))  # Convert to integer
+                weight = max(1, round(total_stoichiometry))  # Convert to integer
                 arc = self.document.create_arc(
                     source=transition,
                     target=place,
