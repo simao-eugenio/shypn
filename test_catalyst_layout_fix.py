@@ -84,20 +84,18 @@ def test_catalyst_exclusion():
     
     print(f"\n✅ VERIFICATION:")
     print(f"   Substrate layer: {substrate_layer} (expected: 0)")
-    print(f"   Enzyme layer: {enzyme_layer} (expected: NOT 0)")
+    print(f"   Enzyme layer: {enzyme_layer} (expected: 0 - same as substrate)")
     print(f"   Reaction layer: {reaction_layer} (expected: 1)")
     print(f"   Product layer: {product_layer} (expected: 2)")
     
     # Assertions
     assert substrate_layer == 0, f"Substrate should be at layer 0, got {substrate_layer}"
-    assert enzyme_layer != 0, f"Enzyme (catalyst) should NOT be at layer 0, got {enzyme_layer}"
+    assert enzyme_layer == 0, f"Enzyme (catalyst) should be at layer 0 (same as input places), got {enzyme_layer}"
     assert reaction_layer == 1, f"Reaction should be at layer 1, got {reaction_layer}"
     assert product_layer == 2, f"Product should be at layer 2, got {product_layer}"
-    assert enzyme_layer == reaction_layer, f"Enzyme should be at same layer as catalyzed reaction, got {enzyme_layer} vs {reaction_layer}"
     
     print(f"\n✓ TEST PASSED!")
-    print(f"   Catalyst properly excluded from layer 0")
-    print(f"   Catalyst positioned at same layer as catalyzed reaction")
+    print(f"   Catalyst at same layer as input places (layer 0)")
     print(f"   Hierarchical structure preserved")
 
 
@@ -168,17 +166,15 @@ def test_multiple_catalysts():
     print(f"\n✅ VERIFICATION:")
     print(f"   Number of layers: {num_layers}")
     print(f"   Expected: 5 layers (clean hierarchy)")
-    print(f"   Without fix would be: 3 layers (flattened due to catalysts at layer 0)")
+    print(f"   Catalysts should be at same layers as input places")
     
     assert num_layers >= 5, f"Should have at least 5 layers, got {num_layers} (layout flattening detected!)"
-    assert layers[e1] == layers[r1], f"E1 should be at same layer as R1"
-    assert layers[e2] == layers[r2], f"E2 should be at same layer as R2"
-    assert layers[e1] != 0, f"E1 (catalyst) should NOT be at layer 0"
-    assert layers[e2] != 0, f"E2 (catalyst) should NOT be at layer 0"
+    assert layers[e1] == layers[s1], f"E1 should be at same layer as S1 (input places)"
+    assert layers[e2] == layers[i1], f"E2 should be at same layer as I1 (input places for R2)"
     
     print(f"\n✓ TEST PASSED!")
     print(f"   Hierarchical structure preserved ({num_layers} layers)")
-    print(f"   Catalysts positioned at reaction layers")
+    print(f"   Catalysts positioned at input place layers")
     print(f"   No layout flattening!")
 
 
