@@ -182,10 +182,73 @@ def test_multiple_catalysts():
     print(f"   No layout flattening!")
 
 
+def test_isolated_node_filtering():
+    """Test that completely isolated nodes are filtered out."""
+    
+    print("\n" + "=" * 80)
+    print("TEST: Isolated Node Filtering")
+    print("=" * 80)
+    
+    # Create pathway with isolated annotation nodes
+    # S1 → R1 → P1
+    # (E1 isolated, E2 isolated - no arcs at all)
+    
+    s1 = Place(id="P1", name="S1", x=0, y=0)
+    p1 = Place(id="P2", name="P1", x=0, y=0)
+    
+    # Isolated places (manual annotations, no arcs)
+    e1 = Place(id="P3", name="E1_isolated", x=0, y=0)
+    e2 = Place(id="P4", name="E2_isolated", x=0, y=0)
+    
+    r1 = Transition(id="T1", name="R1", x=0, y=0)
+    
+    # Build graph
+    graph = nx.DiGraph()
+    
+    for node in [s1, p1, e1, e2, r1]:
+        node_type = 'transition' if hasattr(node, 'transition_type') else 'place'
+        graph.add_node(node, type=node_type)
+    
+    # Only pathway arcs: S1 → R1 → P1
+    # E1 and E2 have NO arcs at all
+    graph.add_edge(s1, r1, weight=1)
+    graph.add_edge(r1, p1, weight=1)
+    
+    print(f"\n📊 Graph Structure:")
+    print(f"   Total nodes: {graph.number_of_nodes()}")
+    print(f"   S1: degree={graph.degree(s1)}")
+    print(f"   P1: degree={graph.degree(p1)}")
+    print(f"   E1 (isolated): degree={graph.degree(e1)} ← Should be filtered")
+    print(f"   E2 (isolated): degree={graph.degree(e2)} ← Should be filtered")
+    print(f"   R1: degree={graph.degree(r1)}")
+    
+    # Apply hierarchical layout
+    from shypn.edit.graph_layout.hierarchical import HierarchicalLayout
+    algo = HierarchicalLayout()
+    positions = algo.compute(graph)
+    
+    print(f"\n🔍 Layout Results:")
+    print(f"   Positioned nodes: {len(positions)}")
+    print(f"   Expected: 3 (S1, R1, P1)")
+    print(f"   Isolated nodes filtered: {graph.number_of_nodes() - len(positions)}")
+    
+    # Verify isolated nodes NOT in layout
+    assert s1 in positions, "S1 should be positioned"
+    assert r1 in positions, "R1 should be positioned"
+    assert p1 in positions, "P1 should be positioned"
+    assert e1 not in positions, "E1 (isolated) should NOT be positioned"
+    assert e2 not in positions, "E2 (isolated) should NOT be positioned"
+    
+    print(f"\n✓ TEST PASSED!")
+    print(f"   Only connected nodes positioned")
+    print(f"   Isolated annotation nodes filtered out")
+
+
 if __name__ == "__main__":
     try:
         test_catalyst_exclusion()
         test_multiple_catalysts()
+        test_isolated_node_filtering()
         
         print("\n" + "=" * 80)
         print("ALL TESTS PASSED! ✅")
@@ -194,6 +257,7 @@ if __name__ == "__main__":
         print("  ✓ Catalyst places excluded from layer 0")
         print("  ✓ Catalysts positioned at same layer as catalyzed reactions")
         print("  ✓ Hierarchical layout preserved (no flattening)")
+        print("  ✓ Isolated nodes (no arcs) filtered out")
         print("\nUser can now enable 'Show catalysts' in KEGG imports without layout flattening!")
         
     except AssertionError as e:
