@@ -34,9 +34,6 @@ class TInvariantAnalyzer(TopologyAnalyzer):
         
         if result.success:
             for inv in result.get('t_invariants', []):
-                print(f"T-Invariant: {inv['transitions']} with weights {inv['weights']}")
-                print(f"  Firing sequence: {inv['firing_sequence']}")
-                print(f"  Type: {inv['type']}")
     """
     
     def analyze(

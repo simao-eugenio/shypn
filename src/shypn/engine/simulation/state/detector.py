@@ -227,9 +227,9 @@ class SimulationStateDetector:
         for observer in self._observers:
             try:
                 observer.on_state_changed(old_state, new_state)
-            except Exception as e:
+            except Exception:
                 # Don't let observer errors break state updates
-                print(f"[StateDetector] Observer error: {e}")
+                pass
     
     # ========== String Representation ==========
     

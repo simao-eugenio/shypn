@@ -71,7 +71,6 @@ class HierarchicalLayout(LayoutAlgorithm):
         # treated as "source" nodes (layer 0) when they have no incoming arcs
         
         if connected_graph.number_of_nodes() == 0:
-            print("⚠️ Hierarchical layout: No connected nodes after filtering")
             return {}
         
         # Phase 1: Layer Assignment

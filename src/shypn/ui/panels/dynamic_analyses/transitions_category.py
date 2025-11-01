@@ -68,12 +68,6 @@ class TransitionsCategory(BaseDynamicCategory):
             place_panel=self._place_panel
         )
         
-        # Debug: Check if place panel is set
-        if self._place_panel:
-            print(f"[TransitionsCategory] Place panel connected: {type(self._place_panel)}")
-        else:
-            print("[TransitionsCategory] WARNING: Place panel is None!")
-        
         # Wire search UI to panel
         if self.model:
             self.panel.wire_search_ui(

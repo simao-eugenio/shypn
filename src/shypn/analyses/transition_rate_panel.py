@@ -673,13 +673,8 @@ class TransitionRatePanel(AnalysisPlotPanel):
             locality: Locality object with input/output places
         """
         if not locality.is_valid:
-            print(f"[TransitionRatePanel] Locality for {transition.name} is not valid")
             return
         
-        print(f"[TransitionRatePanel] Adding locality for {transition.name}")
-        print(f"  Input places: {[p.name for p in locality.input_places]}")
-        print(f"  Output places: {[p.name for p in locality.output_places]}")
-        print(f"  Place panel: {self._place_panel}")
         
         # Store locality information
         self._locality_places[transition.id] = {
@@ -690,18 +685,13 @@ class TransitionRatePanel(AnalysisPlotPanel):
         
         # Actually add the locality places to the PlaceRatePanel for plotting
         if self._place_panel is not None:
-            print(f"[TransitionRatePanel] Adding {locality.place_count} places to place panel")
             # Add input places
             for place in locality.input_places:
                 self._place_panel.add_object(place)
-                print(f"  Added input place: {place.name}")
             
             # Add output places
             for place in locality.output_places:
                 self._place_panel.add_object(place)
-                print(f"  Added output place: {place.name}")
-        else:
-            print("[TransitionRatePanel] WARNING: Place panel is None, cannot add locality places!")
         
         # Update the UI list to show locality places under the transition
         self._update_objects_list()

@@ -471,7 +471,6 @@ class AnalysisPlotPanel(Gtk.Box):
         """
         # Skip update if no data collector available yet
         if not self.data_collector:
-            print(f"[DEBUG PERIODIC] No data collector, skipping update")
             return True
             
         if not self.selected_objects:

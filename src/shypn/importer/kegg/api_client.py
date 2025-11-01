@@ -53,13 +53,10 @@ class KEGGAPIClient:
             with urllib.request.urlopen(url, timeout=self.timeout) as response:
                 return response.read().decode('utf-8')
         except HTTPError as e:
-            print(f"[KEGGAPIClient] HTTP Error {e.code}: {e.reason} for {url}", file=sys.stderr)
             return None
         except URLError as e:
-            print(f"[KEGGAPIClient] URL Error: {e.reason} for {url}", file=sys.stderr)
             return None
         except Exception as e:
-            print(f"[KEGGAPIClient] Unexpected error: {e} for {url}", file=sys.stderr)
             return None
     
     def fetch_kgml(self, pathway_id: str) -> Optional[str]:

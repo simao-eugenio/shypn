@@ -210,7 +210,6 @@ class BasePalette(GObject.GObject, ABC, metaclass=GObjectABCMeta):
             self.revealer.set_reveal_child(True)
             self._is_visible = True
             
-            # Debug: Check allocation
             allocation = self.revealer.get_allocation()
             
             self.emit('palette-shown')

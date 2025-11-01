@@ -34,11 +34,9 @@ class TopologyResultAggregator:
         
         # Access place properties
         atp_properties = element_data['places']['P1']
-        print(f"ATP is in {len(atp_properties['p_invariants'])} invariants")
         
         # Access transition properties
         hexokinase = element_data['transitions']['T1']
-        print(f"Hexokinase is a hub: {hexokinase['is_hub']}")
     """
     
     def aggregate(self, all_results: Dict[str, Any]) -> Dict[str, Dict]:

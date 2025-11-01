@@ -142,7 +142,6 @@ class SettingsTransactionBuilder:
                       .execute())
         
         if transaction.is_committed:
-            print("Success!")
     """
     
     def __init__(self, buffered_settings: BufferedSimulationSettings):

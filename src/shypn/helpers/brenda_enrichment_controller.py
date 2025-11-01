@@ -92,7 +92,6 @@ class BRENDAEnrichmentController:
             }
         """
         if not self.model_canvas:
-            print("[BRENDA_CONTROLLER] Warning: No model canvas set")
             return []
         
         transitions = []
@@ -101,7 +100,6 @@ class BRENDAEnrichmentController:
         # This depends on the canvas architecture
         # For now, return empty list (will be implemented when wiring to UI)
         
-        print(f"[BRENDA_CONTROLLER] Scanned canvas, found {len(transitions)} transitions")
         return transitions
     
     # ========================================================================
@@ -133,8 +131,6 @@ class BRENDAEnrichmentController:
         # TODO: Implement BRENDA SOAP API integration
         # Requires zeep library and BRENDA credentials
         
-        print(f"[BRENDA_CONTROLLER] BRENDA API not yet implemented (credentials pending)")
-        print(f"[BRENDA_CONTROLLER] Would query: EC {ec_number}, organism: {organism or 'Any'}")
         
         return None
     
@@ -156,24 +152,19 @@ class BRENDAEnrichmentController:
             Dict with parsed BRENDA data or None on error
         """
         if not os.path.exists(file_path):
-            print(f"[BRENDA_CONTROLLER] Error: File not found: {file_path}")
             return None
         
         try:
             if file_path.endswith('.json'):
                 with open(file_path, 'r') as f:
                     data = json.load(f)
-                print(f"[BRENDA_CONTROLLER] Loaded JSON file: {os.path.basename(file_path)}")
                 return data
             elif file_path.endswith('.csv'):
                 # TODO: Implement CSV parsing
-                print(f"[BRENDA_CONTROLLER] CSV parsing not yet implemented")
                 return None
             else:
-                print(f"[BRENDA_CONTROLLER] Error: Unsupported file format")
                 return None
         except Exception as e:
-            print(f"[BRENDA_CONTROLLER] Error loading file: {e}")
             return None
     
     # ========================================================================
@@ -197,7 +188,6 @@ class BRENDAEnrichmentController:
         if query_params:
             self.current_enrichment.source_query = query_params
         
-        print(f"[BRENDA_CONTROLLER] Started enrichment session: {self.current_enrichment.id}")
     
     def apply_enrichment_to_transition(self, transition_id: str, parameters: Dict[str, Any]):
         """Apply BRENDA enrichment data to a specific transition.
@@ -207,7 +197,6 @@ class BRENDAEnrichmentController:
             parameters: Dict of parameters to add (km, kcat, ki, etc.)
         """
         if not self.current_enrichment:
-            print("[BRENDA_CONTROLLER] Warning: No enrichment session started")
             return
         
         # Track transition enrichment
@@ -220,7 +209,6 @@ class BRENDAEnrichmentController:
         # TODO: Actually apply to canvas transition
         # This depends on canvas/model architecture
         
-        print(f"[BRENDA_CONTROLLER] Enriched transition {transition_id} with {len(parameters)} parameters")
     
     def add_citations(self, citations: List[str]):
         """Add citations to current enrichment.
@@ -263,11 +251,9 @@ class BRENDAEnrichmentController:
             True if successful, False otherwise
         """
         if not self.project:
-            print("[BRENDA_CONTROLLER] Warning: No project set, cannot save enrichment")
             return False
         
         if not self.current_enrichment:
-            print("[BRENDA_CONTROLLER] Warning: No enrichment to save")
             return False
         
         try:
@@ -288,7 +274,6 @@ class BRENDAEnrichmentController:
                     
                     # Update enrichment document
                     self.current_enrichment.data_file = filename
-                    print(f"[BRENDA_CONTROLLER] Saved enrichment data: {filename}")
             
             # 2. Find current pathway (if model is linked to pathway)
             current_pathway = self._find_current_pathway()
@@ -297,7 +282,6 @@ class BRENDAEnrichmentController:
             if current_pathway:
                 # Link enrichment to pathway
                 current_pathway.enrichments.append(self.current_enrichment.id)
-                print(f"[BRENDA_CONTROLLER] Linked enrichment to pathway: {current_pathway.name}")
             
             # 4. Add enrichment to project's enrichments collection
             # (This would need a new method on Project class)
@@ -305,12 +289,10 @@ class BRENDAEnrichmentController:
             
             # 5. Save project
             self.project.save()
-            print(f"[BRENDA_CONTROLLER] Saved project with enrichment metadata")
             
             return True
             
         except Exception as e:
-            print(f"[BRENDA_CONTROLLER] Error saving enrichment: {e}")
             import traceback
             traceback.print_exc()
             return False
