@@ -207,6 +207,12 @@ class StandardConversionStrategy(ConversionStrategy):
                         place.tokens = 1  # Enzymes typically have 1 token (present/active)
                         place.initial_marking = 1
                         
+                        # CRITICAL: Mark as catalyst for layout algorithm exclusion
+                        # Catalysts are NOT input places - they're "decorations" that indicate
+                        # presence/absence of enzymes. Layout algorithms should exclude them
+                        # from dependency graphs to prevent treating them as network inputs.
+                        place.is_catalyst = True  # Direct attribute for fast checking
+                        
                         # Mark as enzyme in metadata
                         if not hasattr(place, 'metadata'):
                             place.metadata = {}
@@ -215,6 +221,7 @@ class StandardConversionStrategy(ConversionStrategy):
                         place.metadata['kegg_type'] = entry.type
                         place.metadata['source'] = 'KEGG'
                         place.metadata['is_enzyme'] = True
+                        place.metadata['is_catalyst'] = True  # Redundant but explicit
                         place.metadata['catalyzes_reaction'] = entry.reaction
                         
                         document.places.append(place)
@@ -245,6 +252,9 @@ class StandardConversionStrategy(ConversionStrategy):
                         place.tokens = 1
                         place.initial_marking = 1
                         
+                        # CRITICAL: Mark as catalyst for layout algorithm exclusion
+                        place.is_catalyst = True  # Direct attribute for fast checking
+                        
                         if not hasattr(place, 'metadata'):
                             place.metadata = {}
                         place.metadata['kegg_id'] = entry.name
@@ -252,6 +262,7 @@ class StandardConversionStrategy(ConversionStrategy):
                         place.metadata['kegg_type'] = entry.type
                         place.metadata['source'] = 'KEGG'
                         place.metadata['is_enzyme'] = True
+                        place.metadata['is_catalyst'] = True  # Redundant but explicit
                         place.metadata['catalyzes_reaction'] = entry.reaction
                         
                         document.places.append(place)

@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 """Topology Panel - Main panel class.
 
-Assembles 3 topology analysis categories:
+Assembles 4 topology analysis categories:
 1. Structural Analysis (P-Invariants, T-Invariants, Siphons, Traps)
 2. Graph & Network Analysis (Cycles, Paths, Hubs)
 3. Behavioral Analysis (Reachability, Boundedness, Liveness, Deadlocks, Fairness)
+4. Biological Analysis (Dependency & Coupling, Regulatory Structure) - For Bio-PNs
 
 Uses CategoryFrame expanders with exclusive expansion between categories.
 
 Author: Simão Eugénio
 Date: 2025-10-29
+Updated: October 31, 2025 - Added Biological Analysis category
 """
 import gi
 gi.require_version('Gtk', '3.0')
@@ -18,16 +20,18 @@ from gi.repository import Gtk
 from shypn.ui.panels.topology.structural_category import StructuralCategory
 from shypn.ui.panels.topology.graph_network_category import GraphNetworkCategory
 from shypn.ui.panels.topology.behavioral_category import BehavioralCategory
+from shypn.ui.panels.topology.biological_category import BiologicalCategory
 
 
 class TopologyPanel(Gtk.Box):
-    """Topology analysis panel with 3 categories.
+    """Topology analysis panel with 4 categories.
     
     Architecture:
     - Each category is a CategoryFrame expander
     - Categories can expand/collapse independently
     - Each category contains Analysis Summary + individual analyzer expanders
     - Analyzers run on expansion (with caching)
+    - Biological category appears for SBML models and models with test arcs
     """
     
     def __init__(self, model=None, model_canvas=None):
@@ -76,7 +80,7 @@ class TopologyPanel(Gtk.Box):
         self.categories_box.set_margin_top(5)
         self.categories_box.set_margin_bottom(5)
         
-        # Create 3 categories
+        # Create 4 categories
         self.structural_category = StructuralCategory(
             model_canvas=model_canvas,
             expanded=False
@@ -92,11 +96,17 @@ class TopologyPanel(Gtk.Box):
             expanded=False
         )
         
+        self.biological_category = BiologicalCategory(
+            model_canvas=model_canvas,
+            expanded=False
+        )
+        
         # Store categories in list for easy iteration
         self.categories = [
             self.structural_category,
             self.graph_network_category,
             self.behavioral_category,
+            self.biological_category,
         ]
         
         # Report panel callback (will be set by report panel)

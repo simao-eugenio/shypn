@@ -295,7 +295,7 @@
                                 <items>
                                   <item id="normal" translatable="yes">Normal</item>
                                   <item id="inhibitor" translatable="yes">Inhibitor</item>
-                                  <item id="reset" translatable="yes">Reset</item>
+                                  <item id="test" translatable="yes">Test (Catalyst)</item>
                                 </items>
                               </object>
                               <packing>

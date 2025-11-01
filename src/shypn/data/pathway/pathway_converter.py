@@ -26,6 +26,7 @@ from shypn.data.canvas.document_model import DocumentModel
 from shypn.netobjs.place import Place
 from shypn.netobjs.transition import Transition
 from shypn.netobjs.arc import Arc
+from shypn.netobjs.test_arc import TestArc
 from shypn.heuristic import EstimatorFactory
 
 # Import SBML kinetics integration service
@@ -569,6 +570,105 @@ class ArcConverter(BaseConverter):
         return arcs
 
 
+class ModifierConverter(BaseConverter):
+    """
+    Converts modifiers (catalysts/enzymes) to test arcs.
+    
+    In SBML, modifiers are species that participate in reactions without being
+    consumed or produced. They represent:
+    - Enzymes that catalyze reactions
+    - Allosteric regulators
+    - Inhibitors
+    
+    In Biological Petri Nets, these are modeled as test arcs (read arcs):
+    - Non-consuming arcs from catalyst place to transition
+    - Enable reaction without token consumption
+    - Visual: dashed line with hollow diamond
+    
+    This implements the Σ component from the Biological PN formalization:
+    Σ(t) = {p | arc(p,t) is test arc}
+    """
+    
+    def __init__(self, pathway: ProcessedPathwayData, document: DocumentModel,
+                 species_to_place: Dict[str, Place],
+                 reaction_to_transition: Dict[str, Transition]):
+        """
+        Initialize modifier converter.
+        
+        Args:
+            pathway: The processed pathway data
+            document: The DocumentModel to populate
+            species_to_place: Mapping from species ID to Place
+            reaction_to_transition: Mapping from reaction ID to Transition
+        """
+        super().__init__(pathway, document)
+        self.species_to_place = species_to_place
+        self.reaction_to_transition = reaction_to_transition
+    
+    def convert(self) -> List[TestArc]:
+        """
+        Convert all modifiers to test arcs.
+        
+        Returns:
+            List of created TestArc objects
+        """
+        test_arcs = []
+        
+        for reaction in self.pathway.reactions:
+            transition = self.reaction_to_transition.get(reaction.id)
+            if not transition:
+                self.logger.warning(f"Transition not found for reaction '{reaction.id}'")
+                continue
+            
+            # Create test arcs for modifiers (catalysts/enzymes)
+            for modifier_species_id in reaction.modifiers:
+                place = self.species_to_place.get(modifier_species_id)
+                if not place:
+                    self.logger.warning(
+                        f"Place not found for modifier species '{modifier_species_id}' "
+                        f"in reaction '{reaction.id}'"
+                    )
+                    continue
+                
+                # Create test arc from catalyst place to transition
+                # Test arcs are non-consuming: check tokens but don't consume
+                arc_id = f"A{self.document._next_arc_id}"
+                self.document._next_arc_id += 1
+                
+                test_arc = TestArc(
+                    source=place,
+                    target=transition,
+                    id=arc_id,
+                    name=f"TA{arc_id[1:]}",  # TA1, TA2, etc.
+                    weight=1  # Catalysts typically require 1 token to enable
+                )
+                
+                # Add to document
+                self.document.arcs.append(test_arc)
+                test_arcs.append(test_arc)
+                
+                self.logger.info(
+                    f"Created test arc (catalyst): {place.name} --[catalyst]--> {transition.name}"
+                )
+                self.logger.debug(
+                    f"  This is a NON-CONSUMING arc (test arc/read arc)"
+                )
+        
+        if test_arcs:
+            self.logger.info(
+                f"Created {len(test_arcs)} test arcs for catalysts/enzymes"
+            )
+            self.logger.info(
+                "These test arcs implement the Σ component of Biological Petri Nets"
+            )
+        else:
+            self.logger.info(
+                "No modifiers found in SBML - no test arcs created"
+            )
+        
+        return test_arcs
+
+
 class PathwayConverter:
     """
     Main pathway converter coordinator.
@@ -626,6 +726,28 @@ class PathwayConverter:
         arcs = arc_converter.convert()
         
         # ==============================================================================
+        # BIOLOGICAL PETRI NET: Convert modifiers to test arcs (catalysts/enzymes)
+        # ==============================================================================
+        # Modifiers in SBML become test arcs in Biological Petri Nets
+        # Test arcs are non-consuming: they check tokens but don't consume
+        # This implements the Σ component: Σ(t) = {p | arc(p,t) is test arc}
+        modifier_converter = ModifierConverter(
+            pathway, document,
+            species_to_place, reaction_to_transition
+        )
+        test_arcs = modifier_converter.convert()
+        
+        # Update metadata to indicate this is a Biological PN if test arcs exist
+        if test_arcs:
+            document.metadata["source"] = "sbml"  # Mark as SBML (biological model)
+            document.metadata["has_test_arcs"] = True
+            document.metadata["test_arcs_count"] = len(test_arcs)
+            document.metadata["model_type"] = "Biological Petri Net"
+            self.logger.info(
+                "✓ Model identified as BIOLOGICAL PETRI NET (has test arcs/catalysts)"
+            )
+        
+        # ==============================================================================
         # INTEGRATE SBML KINETICS: Create SBMLKineticMetadata for transitions
         # ==============================================================================
         if SBMLKineticsIntegrationService is not None:
@@ -641,6 +763,10 @@ class PathwayConverter:
             f"Conversion complete: {place_count} places, "
             f"{transition_count} transitions, {arc_count} arcs"
         )
+        if test_arcs:
+            self.logger.info(
+                f"  Including {len(test_arcs)} test arcs (catalysts/enzymes)"
+            )
         
         return document
     

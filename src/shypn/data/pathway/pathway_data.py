@@ -86,18 +86,20 @@ class Reaction:
         name: Human-readable name (e.g., "Hexokinase")
         reactants: List of (species_id, stoichiometry) tuples for inputs
         products: List of (species_id, stoichiometry) tuples for outputs
+        modifiers: List of species_ids that act as catalysts/modulators
         kinetic_law: Rate law (optional)
         reversible: Whether reaction can go both directions
-        enzyme: Enzyme catalyst name (optional)
+        enzyme: Enzyme catalyst name (optional, legacy)
         metadata: Additional properties
     """
     id: str
     name: Optional[str] = None
     reactants: List[Tuple[str, float]] = field(default_factory=list)  # [(species_id, stoich), ...]
     products: List[Tuple[str, float]] = field(default_factory=list)   # [(species_id, stoich), ...]
+    modifiers: List[str] = field(default_factory=list)  # [species_id, ...] - catalysts/enzymes
     kinetic_law: Optional[KineticLaw] = None
     reversible: bool = False
-    enzyme: Optional[str] = None
+    enzyme: Optional[str] = None  # Legacy field for enzyme name
     
     # Additional properties
     metadata: Dict[str, Any] = field(default_factory=dict)

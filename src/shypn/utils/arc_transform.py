@@ -3,12 +3,13 @@
 
 This module provides utilities for transforming arcs between different types:
 - Straight ↔ Curved
-- Normal ↔ Inhibitor
+- Normal ↔ Inhibitor ↔ Test
 
 Transformations preserve all arc properties (weight, color, width, etc.)
 and maintain the arc's identity (ID, name) in the model.
 """
 from shypn.netobjs import Arc, InhibitorArc, CurvedArc, CurvedInhibitorArc
+from shypn.netobjs.test_arc import TestArc
 
 
 def transform_arc(arc, make_curved=None, make_inhibitor=None):
@@ -213,8 +214,20 @@ def is_inhibitor(arc):
     return isinstance(arc, (InhibitorArc, CurvedInhibitorArc))
 
 
+def is_test(arc):
+    """Check if arc is a test arc (read arc).
+    
+    Args:
+        arc: Arc instance to check
+        
+    Returns:
+        bool: True if arc is test arc (TestArc)
+    """
+    return isinstance(arc, TestArc)
+
+
 def is_normal(arc):
-    """Check if arc is a normal arc (not inhibitor).
+    """Check if arc is a normal arc (not inhibitor or test).
     
     Args:
         arc: Arc instance to check
@@ -222,7 +235,63 @@ def is_normal(arc):
     Returns:
         bool: True if arc is normal (Arc or CurvedArc)
     """
-    return not isinstance(arc, (InhibitorArc, CurvedInhibitorArc))
+    return not isinstance(arc, (InhibitorArc, CurvedInhibitorArc, TestArc))
+
+
+def convert_to_test(arc):
+    """Convert normal arc to test arc (read arc).
+    
+    Args:
+        arc: Arc instance to convert
+        
+    Returns:
+        TestArc: Test version of the arc
+        
+    Raises:
+        ValueError: If arc direction is invalid (test arcs must be Place → Transition)
+    """
+    from shypn.netobjs.place import Place
+    from shypn.netobjs.transition import Transition
+    
+    # Validate direction (Place → Transition only)
+    if isinstance(arc.source, Transition) and isinstance(arc.target, Place):
+        raise ValueError(
+            "Cannot convert to test arc: Transition → Place is forbidden. "
+            "Test arcs must connect Place → Transition only."
+        )
+    
+    # If already test arc, return it
+    if isinstance(arc, TestArc):
+        return arc
+    
+    # Create new test arc
+    new_arc = TestArc(
+        source=arc.source,
+        target=arc.target,
+        id=arc.id,
+        name=arc.name,
+        weight=arc.weight
+    )
+    
+    # Copy all properties
+    new_arc.color = arc.color
+    new_arc.width = arc.width
+    new_arc.threshold = arc.threshold
+    new_arc.control_points = arc.control_points
+    
+    # Copy optional properties if they exist
+    if hasattr(arc, 'label'):
+        new_arc.label = arc.label
+    if hasattr(arc, 'description'):
+        new_arc.description = arc.description
+    
+    # Copy internal references
+    if hasattr(arc, '_manager'):
+        new_arc._manager = arc._manager
+    if hasattr(arc, 'on_changed'):
+        new_arc.on_changed = arc.on_changed
+    
+    return new_arc
 
 
 def get_arc_type_name(arc):
@@ -232,9 +301,11 @@ def get_arc_type_name(arc):
         arc: Arc instance
         
     Returns:
-        str: Arc type name ("Arc", "Inhibitor Arc", "Curved Arc", "Curved Inhibitor Arc")
+        str: Arc type name ("Arc", "Inhibitor Arc", "Test Arc", "Curved Arc", "Curved Inhibitor Arc")
     """
-    if isinstance(arc, CurvedInhibitorArc):
+    if isinstance(arc, TestArc):
+        return "Test Arc"
+    elif isinstance(arc, CurvedInhibitorArc):
         return "Curved Inhibitor Arc"
     elif isinstance(arc, CurvedArc):
         return "Curved Arc"

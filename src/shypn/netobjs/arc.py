@@ -78,9 +78,12 @@ class Arc(PetriNetObject):
             str: Arc type - "normal", "inhibitor", "test"
         """
         from shypn.netobjs.inhibitor_arc import InhibitorArc
+        from shypn.netobjs.test_arc import TestArc
+        
+        if isinstance(self, TestArc):
+            return "test"
         if isinstance(self, InhibitorArc):
             return "inhibitor"
-        # Future: add "test" arc support
         return "normal"
     
     def set_arc_type(self, arc_type: str):
