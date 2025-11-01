@@ -13,28 +13,42 @@ from .arc import Arc
 
 class InhibitorArc(Arc):
     """
-    Represents an inhibitor arc in a Petri net (Living Systems / Cooperation Semantics).
+    Represents an inhibitor arc in a Petri net (Classical/Biological Semantics).
     
-    **SHYPN Semantics** (Living Systems):
-    An inhibitor arc allows a transition to fire ONLY when the source place has
-    SURPLUS tokens (tokens >= weight). This implements a cooperation principle:
-    - Place can share resources only when it has enough to spare
-    - Prevents starvation by maintaining minimum reserve levels
-    - Consumes tokens on firing (like normal arcs)
+    **SHYPN Semantics** (Classical Inhibitor = Biological Negative Feedback):
+    An inhibitor arc PREVENTS a transition from firing when the source place has
+    TOO MANY tokens (tokens >= weight). This implements negative feedback:
+    - Transition active when product is LOW (product < threshold)
+    - Transition inhibited when product is HIGH (product >= threshold)
+    - Does NOT consume tokens (read-only check, like test arcs)
     
-    **Enabling Condition**: source.tokens >= weight (must have surplus)
-    **Token Transfer**: YES - consumes from source place (cooperation)
-    **Protection**: Transition disabled when source.tokens < weight (prevents starvation)
+    **Enabling Condition**: source.tokens < weight (must be BELOW threshold)
+    **Token Transfer**: NO - does not consume (regulatory check only)
+    **Biological Role**: End-product inhibition, homeostasis, negative feedback
     
     **Visual Rendering**:
     - White-filled circle with colored ring at target end
-    - Radius scales with marker size (6-12px range)
+    - Radius scales with marker size (8.0px)
     - Arc line stops before marker for clean appearance
     
-    **Classical Semantics** (for reference, NOT used in SHYPN):
-    In classical Petri net theory, inhibitor arcs enable when place is BELOW threshold
-    and don't consume tokens. SHYPN uses the opposite: enable when ABOVE threshold
-    and DO consume tokens. This reflects organic systems vs. manufacturing systems.
+    **Biological Examples:**
+    1. ATP inhibiting glycolysis (energy homeostasis)
+    2. Amino acid inhibiting its synthesis pathway
+    3. Hormone feedback on its production
+    4. Product accumulation stopping enzyme
+    
+    **Example:**
+    ```
+    Substrate --[normal]--> Enzyme --[normal]--> Product
+                              ↑
+                              | [inhibitor, w=10]
+                           Product
+    
+    Behavior:
+    - Product < 10: Enzyme ACTIVE (produces more product)
+    - Product >= 10: Enzyme INHIBITED (stops production)
+    - Classic negative feedback loop
+    ```
     
     Inherits all properties from Arc but overrides the arrowhead rendering
     to display a circle marker.
