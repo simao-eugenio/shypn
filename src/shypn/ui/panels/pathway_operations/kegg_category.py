@@ -654,6 +654,8 @@ class KEGGCategory(BasePathwayCategory):
                         # Reuse the current empty default tab
                         self.logger.info("Reusing current empty tab")
                         canvas_manager = manager  # Already set from check above
+                        # CRITICAL: Reset manager state before loading
+                        canvas_loader._reset_manager_for_load(canvas_manager, base_name)
                     else:
                         # Create a new tab for this document (like File → Open does)
                         self.logger.info(f"Creating new tab for: {base_name}")
@@ -662,8 +664,6 @@ class KEGGCategory(BasePathwayCategory):
                     
                     if not canvas_manager:
                         raise ValueError("Failed to get canvas manager after tab creation")
-                    
-                    # No need to clear - we either created new tab or verified current tab is empty
                     
                     # ===== UNIFIED OBJECT LOADING =====
                     # Use load_objects() for consistent initialization (same as File → Open)
