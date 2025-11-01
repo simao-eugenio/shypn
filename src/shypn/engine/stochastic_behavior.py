@@ -291,15 +291,17 @@ class StochasticBehavior(TransitionBehavior):
             burst = self._sampled_burst if self._sampled_burst else self.max_burst
             
             for arc in input_arcs:
-                kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
-                if kind != 'normal':
-                    continue
-                
                 source_place = self._get_place(arc.source_id)
                 if source_place is None:
                     return False, f"missing-source-place-{arc.source_id}"
                 
-                required = arc.weight * burst
+                # Test arcs only check presence (weight), not burst requirements
+                # They don't consume tokens, so burst doesn't apply
+                if hasattr(arc, 'consumes_tokens') and not arc.consumes_tokens():
+                    required = arc.weight  # Just check presence for catalysts
+                else:
+                    required = arc.weight * burst  # Normal/inhibitor need burst tokens
+                
                 if source_place.tokens < required:
                     return False, f"insufficient-tokens-for-burst-P{arc.source_id}"
         
@@ -364,10 +366,6 @@ class StochasticBehavior(TransitionBehavior):
             # Phase 1: Consume tokens with burst multiplier (skip if source transition)
             if not is_source:
                 for arc in input_arcs:
-                    kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
-                    if kind != 'normal':
-                        continue
-                    
                     # Skip test arcs - they check enablement but don't consume tokens
                     if hasattr(arc, 'consumes_tokens') and not arc.consumes_tokens():
                         continue

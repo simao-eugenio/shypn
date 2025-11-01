@@ -140,6 +140,7 @@ class ContinuousBehavior(TransitionBehavior):
                 context.update(FUNCTION_CATALOG)
                 
                 # Add SBML parameters from kinetic_metadata (if available)
+                params = {}  # Initialize params dict
                 if hasattr(self.transition, 'kinetic_metadata') and self.transition.kinetic_metadata:
                     if hasattr(self.transition.kinetic_metadata, 'parameters'):
                         # Add all kinetic parameters (kf_0, kr_0, Vmax, Km, etc.)
@@ -214,10 +215,8 @@ class ContinuousBehavior(TransitionBehavior):
         
         # Check each input place for positive tokens
         for arc in input_arcs:
-            kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
-            if kind != 'normal':
-                continue
-            
+            # Check ALL input arcs (normal, test, inhibitor) for token presence
+            # All arc types require tokens > 0 for continuous enablement
             source_place = self._get_place(arc.source_id)
             if source_place is None:
                 return False, f"missing-source-place-{arc.source_id}"
@@ -347,10 +346,6 @@ class ContinuousBehavior(TransitionBehavior):
             actual_flow = intended_flow
             if not is_source:
                 for arc in input_arcs:
-                    kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
-                    if kind != 'normal':
-                        continue
-                    
                     # Skip test arcs - they check enablement but don't consume tokens
                     if hasattr(arc, 'consumes_tokens') and not arc.consumes_tokens():
                         continue
@@ -366,10 +361,6 @@ class ContinuousBehavior(TransitionBehavior):
             # Phase 2: Consume tokens continuously from input places (skip if source)
             if not is_source and actual_flow > 0:
                 for arc in input_arcs:
-                    kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
-                    if kind != 'normal':
-                        continue
-                    
                     # Skip test arcs - they check enablement but don't consume tokens
                     if hasattr(arc, 'consumes_tokens') and not arc.consumes_tokens():
                         continue

@@ -157,17 +157,21 @@ class LayoutAlgorithm(ABC):
                         # the INPUT PLACES of this transition, NOT at the transition layer
                         for pred in graph.predecessors(successor):
                             if getattr(pred, 'is_catalyst', False) and pred not in processed:
-                                # Find the layer of input places (not catalysts) to this transition
+                                # Find the layer of ACTUAL INPUT PLACES (not catalysts, not transitions)
+                                # Only consider places that have been processed and are not catalysts
                                 input_place_layers = [
                                     layers.get(p, 0) 
                                     for p in graph.predecessors(successor)
-                                    if not getattr(p, 'is_catalyst', False) and p in layers
+                                    if (not getattr(p, 'is_catalyst', False) and 
+                                        p in layers and
+                                        hasattr(p, 'tokens'))  # Places have tokens attribute, transitions don't
                                 ]
                                 if input_place_layers:
                                     # Place catalyst at same layer as input places
                                     layers[pred] = max(input_place_layers)
                                 else:
-                                    # No input places found, use transition layer - 1
+                                    # No input places found yet, use transition layer - 1
+                                    # This is a fallback - normally input places are processed first
                                     layers[pred] = max(0, successor_layer - 1)
                                 processed.add(pred)
                                 # Don't add to next_layer - catalysts don't propagate

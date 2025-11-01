@@ -161,6 +161,10 @@ class DependencyAndCouplingAnalyzer(TopologyAnalyzer):
     def _build_place_usage_maps(self) -> Tuple[Dict, Dict, Dict]:
         """Build maps of which places each transition uses as input/output/regulatory.
         
+        IMPORTANT: Excludes catalyst places (is_catalyst=True) from all maps.
+        Catalysts are "decorations" showing enzyme presence - they should NOT
+        participate in locality analysis or dependency/coupling classification.
+        
         Returns:
             Tuple of (input_places, output_places, regulatory_places)
             Each is a dict mapping transition_id → set of place_ids
@@ -173,6 +177,11 @@ class DependencyAndCouplingAnalyzer(TopologyAnalyzer):
         arcs = self.model.arcs.values() if hasattr(self.model.arcs, 'values') else self.model.arcs
         
         for arc in arcs:
+            # CRITICAL: Skip arcs involving catalysts
+            # Catalysts should NOT be part of locality membership
+            if getattr(arc.source, 'is_catalyst', False) or getattr(arc.target, 'is_catalyst', False):
+                continue
+            
             # Determine arc direction and type
             source_id = arc.source.id if hasattr(arc.source, 'id') else arc.source_id
             target_id = arc.target.id if hasattr(arc.target, 'id') else arc.target_id

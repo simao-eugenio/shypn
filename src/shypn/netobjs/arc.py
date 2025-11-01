@@ -650,17 +650,33 @@ class Arc(PetriNetObject):
         The places/transitions dicts are keyed by integer IDs, so for legacy
         string names, we need to find objects by name instead.
         
+        IMPORTANT: Checks arc_type to create TestArc or InhibitorArc instances
+        instead of regular Arc instances when appropriate.
+        
         Args:
             data: Dictionary containing arc properties
             places: Dictionary mapping place IDs to Place instances
             transitions: Dictionary mapping transition IDs to Transition instances
             
         Returns:
-            Arc: New arc instance with restored properties
+            Arc: New arc instance with restored properties (may be TestArc or InhibitorArc subclass)
             
         Raises:
             ValueError: If source or target objects not found
         """
+        # Check arc type to determine which class to instantiate
+        arc_type = data.get('arc_type', 'normal')
+        
+        # Import subclasses if needed
+        if arc_type == 'test':
+            from shypn.netobjs.test_arc import TestArc
+            arc_class = TestArc
+        elif arc_type == 'inhibitor':
+            from shypn.netobjs.inhibitor_arc import InhibitorArc
+            arc_class = InhibitorArc
+        else:
+            arc_class = cls  # Use the class this method was called on (Arc)
+        
         # Resolve source and target references (handle both int IDs and string names)
         raw_source_id = data["source_id"]
         raw_target_id = data["target_id"]
@@ -700,8 +716,8 @@ class Arc(PetriNetObject):
         arc_id = str(data.get("id"))  # Always store as string
         arc_name = str(data.get("name", f"A{arc_id}"))
         
-        # Create arc
-        arc = cls(
+        # Create arc using the appropriate class (Arc, TestArc, or InhibitorArc)
+        arc = arc_class(
             source=source,
             target=target,
             id=arc_id,  # String ID

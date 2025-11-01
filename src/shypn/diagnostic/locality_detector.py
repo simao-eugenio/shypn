@@ -191,6 +191,11 @@ class LocalityDetector:
         3. Extract places from arcs (avoiding duplicates)
         4. Build Locality object
         
+        IMPORTANT: Excludes catalyst places (is_catalyst=True) from locality.
+        Catalysts are connected via test arcs (non-consuming) and should NOT
+        be considered part of the locality membership. They're "decorations"
+        showing enzyme presence, not participants in token flow.
+        
         Args:
             transition: Transition object to analyze
             
@@ -213,6 +218,16 @@ class LocalityDetector:
         # Scan all arcs in model
         # Model uses lists, not dictionaries
         for arc in self.model.arcs:
+            # CRITICAL: Skip test arcs (catalysts)
+            # Test arcs don't define locality membership (non-consuming semantics)
+            if hasattr(arc, 'consumes_tokens') and not arc.consumes_tokens():
+                continue
+            
+            # CRITICAL: Skip arcs involving catalyst places
+            # Catalysts are "decorations" and not part of locality
+            if getattr(arc.source, 'is_catalyst', False) or getattr(arc.target, 'is_catalyst', False):
+                continue
+            
             # Input arc: place → transition
             if arc.target == transition:
                 locality.input_arcs.append(arc)

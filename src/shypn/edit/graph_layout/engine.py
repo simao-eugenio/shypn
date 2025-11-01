@@ -331,6 +331,9 @@ class LayoutEngine:
             else:
                 pass  # Node not found or invalid
         
+        # NOTE: Isolated nodes (not in positions dict) are left at their original positions
+        # This allows users to easily identify and manually delete them if needed
+        
         return nodes_moved
     
     def get_available_algorithms(self) -> Dict[str, str]:
