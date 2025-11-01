@@ -75,9 +75,18 @@ class ModelAdapter:
 
     @property
     def arcs(self):
-        """Get arcs as dictionary keyed by ID."""
+        """Get arcs as dictionary keyed by ID.
+        
+        WARNING: Arc IDs may not be unique in models (especially imported ones).
+        Using ID as dict key can cause arcs to be lost. Behaviors should iterate
+        over arcs directly, not use this dict for lookup.
+        
+        Returns a dict for API compatibility, but keyed by object id() to ensure uniqueness.
+        """
         if self._arcs_dict is None:
-            self._arcs_dict = {a.id: a for a in self.canvas_manager.arcs}
+            # Use Python object ID as key to avoid duplicate arc ID issues
+            # This ensures all arcs are accessible even if they have duplicate IDs
+            self._arcs_dict = {id(a): a for a in self.canvas_manager.arcs}
         return self._arcs_dict
 
     @property
