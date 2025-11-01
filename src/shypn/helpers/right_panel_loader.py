@@ -138,7 +138,6 @@ class RightPanelLoader:
         
         # If handler was not created yet (shouldn't happen but safety check)
         if not self.context_menu_handler:
-            print("[WARNING] Context menu handler not created during panel setup, creating now...", file=sys.stderr)
             from shypn.analyses import ContextMenuHandler
             self.context_menu_handler = ContextMenuHandler(
                 place_panel=self.place_panel,

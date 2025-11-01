@@ -938,7 +938,6 @@ class SBMLCategory(BasePathwayCategory):
                 
                 lines = []
                 
-                # Debug: Log what we received
                 self.logger.debug(f"Preview pathway type: {type(pathway)}")
                 self.logger.debug(f"Preview pathway dir: {dir(pathway)[:10]}...")  # First 10 attributes
                 

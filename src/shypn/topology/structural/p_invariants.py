@@ -34,9 +34,6 @@ class PInvariantAnalyzer(TopologyAnalyzer):
         
         if result.success:
             for inv in result.get('p_invariants', []):
-                print(f"P-Invariant: {inv['places']} with weights {inv['weights']}")
-                print(f"  Sum: {inv['sum_expression']}")
-                print(f"  Conserved value: {inv['conserved_value']}")
     """
     
     def analyze(
@@ -397,7 +394,6 @@ class PInvariantAnalyzer(TopologyAnalyzer):
         Example:
             # Find invariants containing place with ID 5
             place_invs = analyzer.find_invariants_containing_place(5)
-            print(f"Place 5 is in {len(place_invs)} invariant(s)")
         """
         result = self.analyze(max_invariants=max_invariants)
         

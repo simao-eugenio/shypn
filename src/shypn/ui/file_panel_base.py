@@ -79,7 +79,6 @@ class FilePanelBase(ABC):
                 raise RuntimeError("Required widgets not found in UI file")
             
             # Panel content stays in its own window - no reparenting
-            print(f"[LOAD] File Panel loaded (content stays in panel window)", file=sys.stderr)
             
             # Connect window delete event
             self.window.connect('delete-event', self._on_window_delete)
@@ -95,7 +94,6 @@ class FilePanelBase(ABC):
             
             # Mark as loaded
             self.is_loaded = True
-            print(f"[LOAD] File Panel load() complete, is_loaded=True", file=sys.stderr)
             
         except Exception as e:
             print(f"Error loading file panel UI: {e}", file=sys.stderr)
@@ -187,7 +185,6 @@ class FilePanelBase(ABC):
         if self.window:
             self.window.hide()
         
-        print(f"[STACK] FilePanel content added to stack container '{panel_name}'", file=sys.stderr)
     
     def show_in_stack(self):
         """Show this panel in the GtkStack (Phase 4: Master Palette control).
@@ -195,10 +192,8 @@ class FilePanelBase(ABC):
         WAYLAND FIX: Don't use show_all() - it causes Error 71 (Protocol error).
         Instead, explicitly show widgets that need to be visible.
         """
-        print(f"[STACK] FilePanel show_in_stack() called", file=sys.stderr)
         
         if not hasattr(self, '_stack') or not self._stack:
-            print(f"[STACK] WARNING: FilePanel not added to stack yet", file=sys.stderr)
             return
         
         # Make stack visible
@@ -217,11 +212,9 @@ class FilePanelBase(ABC):
         if self.parent_container:
             self.parent_container.set_visible(True)
         
-        print(f"[STACK] FilePanel now visible in stack", file=sys.stderr)
     
     def hide_in_stack(self):
         """Hide this panel in the GtkStack (Phase 4: Master Palette control)."""
-        print(f"[STACK] FilePanel hide_in_stack() called", file=sys.stderr)
         
         # Hide the content using no_show_all to prevent show_all from revealing it
         if self.content:
@@ -232,7 +225,6 @@ class FilePanelBase(ABC):
         if self.parent_container:
             self.parent_container.set_visible(False)
         
-        print(f"[STACK] FilePanel hidden in stack (content remains for fast re-show)", file=sys.stderr)
     
     # ========================================================================
     # Float/Detach Support (Skeleton Pattern)

@@ -1749,7 +1749,6 @@ class FileExplorerPanel:
                 
                 # Open the selected file
                 if filepath and os.path.exists(filepath):
-                    print(f"[FILES] Opening file from dialog: {filepath}")
                     self._open_file_from_path(filepath)
             else:
                 dialog.destroy()

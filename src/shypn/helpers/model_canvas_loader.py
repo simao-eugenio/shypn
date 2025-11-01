@@ -219,7 +219,6 @@ class ModelCanvasLoader:
                         if simulate_tools_palette and hasattr(simulate_tools_palette, 'data_collector'):
                             data_collector = simulate_tools_palette.data_collector
                             self.right_panel_loader.set_data_collector(data_collector)
-                            print(f"[ANALYSES] Wired data_collector (drawing_area={id(drawing_area)})")
                             return True
         return False
 
@@ -563,7 +562,6 @@ class ModelCanvasLoader:
         # WAYLAND FIX: Set flag to suppress callbacks during initial setup
         # Prevents premature signal firing before canvas state is fully initialized
         manager._suppress_callbacks = True
-        print(f"[CANVAS SETUP] Suppressing callbacks during initial setup")
         
         # PHASE 1: Wire dirty state callback to update tab label with asterisk
         # This enables automatic tab label updates when document is modified
@@ -574,7 +572,6 @@ class ModelCanvasLoader:
             """
             # Skip callback if we're still setting up the canvas
             if getattr(manager, '_suppress_callbacks', False):
-                print(f"[CANVAS SETUP] Suppressing on_dirty_changed callback during setup")
                 return
             
             try:
@@ -662,12 +659,10 @@ class ModelCanvasLoader:
             
             # Canvas setup complete - enable callbacks now that state is properly initialized
             manager._suppress_callbacks = False
-            print(f"[CANVAS SETUP] Callbacks enabled, canvas fully initialized")
         else:
             # CRITICAL FIX: Even without overlay_box, MUST enable callbacks
             # Otherwise canvas becomes non-interactive
             manager._suppress_callbacks = False
-            print(f"[CANVAS SETUP] Callbacks enabled (no overlay), canvas initialized")
 
     def _reset_manager_for_load(self, manager, filename):
         """Reset manager state before loading objects from file.
@@ -729,7 +724,6 @@ class ModelCanvasLoader:
         # Trigger redraw to show canvas is ready for new content
         manager.mark_needs_redraw()
         
-        print(f"[RESET] Manager reset for document load: {filename}")
 
     def _setup_edit_palettes(self, overlay_widget, canvas_manager, drawing_area, overlay_manager):
         """Setup new OOP palette system with SwissKnifePalette.
@@ -917,7 +911,6 @@ class ModelCanvasLoader:
                     if simulate_tools_palette and hasattr(simulate_tools_palette, 'data_collector'):
                         data_collector = simulate_tools_palette.data_collector
                         self.right_panel_loader.set_data_collector(data_collector)
-                        print(f"[ANALYSES] Wired data_collector for new tab (drawing_area={id(drawing_area)})")
     
     def _on_palette_tool_selected(self, tools_palette, tool_name, canvas_manager, drawing_area):
         """Handle tool selection from new OOP tools palette.
@@ -2257,7 +2250,6 @@ class ModelCanvasLoader:
                 menu_item = Gtk.MenuItem(label=label)
 
                 def on_activate(widget, cb):
-                    print(f"[MENU] Menu item '{label}' clicked")
                     cb()
                 menu_item.connect('activate', on_activate, callback)
             menu_item.show()
@@ -3008,7 +3000,6 @@ class ModelCanvasLoader:
         # This prevents menu/dialog parent conflicts on Wayland
         # ============================================================================
         if hasattr(self, '_active_context_menu') and self._active_context_menu:
-            print(f"[WAYLAND DEBUG] Closing context menu before dialog...")
             try:
                 self._active_context_menu.popdown()
                 self._active_context_menu.hide()
@@ -3018,17 +3009,13 @@ class ModelCanvasLoader:
                 for _ in range(10):  # Process multiple times
                     while GLib.MainContext.default().pending():
                         GLib.MainContext.default().iteration(False)
-                print(f"[WAYLAND DEBUG] Context menu closed, processed events")
-            except Exception as e:
-                print(f"[WAYLAND DEBUG] Error closing menu: {e}")
+            except Exception:
+                pass
             self._active_context_menu = None
-        else:
-            print(f"[WAYLAND DEBUG] No active context menu to close")
         
         # Give Wayland a moment to fully process menu destruction
         import time
         time.sleep(0.05)  # 50ms delay
-        print(f"[WAYLAND DEBUG] After menu cleanup delay")
         
         # CRITICAL: Clear ALL arc creation state before opening dialog
         # This prevents spurious arc creation when dialog closes
@@ -3053,7 +3040,6 @@ class ModelCanvasLoader:
         if not self.parent_window:
             print(f"[DIALOG] ERROR: parent_window is None! Cannot open dialog.")
             return
-        print(f"[DIALOG] parent_window is set: {self.parent_window}")
         
         # WAYLAND FIX: Ensure the canvas page widget AND drawing area are mapped before opening dialog
         # On Wayland, dialogs require the entire widget hierarchy to be fully visible and mapped
@@ -3080,14 +3066,12 @@ class ModelCanvasLoader:
             page_num = self.notebook.page_num(page_widget)
         is_current_page = (page_num == current_page_num)
         
-        print(f"[DIALOG] Canvas state check:")
         print(f"  page_widget: {page_widget}")
         print(f"  page_mapped: {page_mapped}, drawing_mapped: {drawing_mapped}")
         print(f"  page_realized: {page_realized}, drawing_realized: {drawing_realized}")
         print(f"  page_num: {page_num}, current_page_num: {current_page_num}, is_current: {is_current_page}")
         
         if not (page_mapped and drawing_mapped and is_current_page):
-            print(f"[DIALOG] Widget not ready yet - deferring dialog open")
             print(f"  Reason: page_mapped={page_mapped}, drawing_mapped={drawing_mapped}, is_current={is_current_page}")
             # Use timeout to defer dialog opening until both widgets are mapped
             from gi.repository import GLib
@@ -3102,7 +3086,6 @@ class ModelCanvasLoader:
                 is_current = (self.notebook.page_num(page_widget) == self.notebook.get_current_page()) if page_widget else False
                 
                 if page_ready and drawing_ready and is_current:
-                    print(f"[DIALOG] Widgets now ready after {retry_count[0]} retries - opening dialog")
                     # Call this function again now that widgets are mapped
                     self._on_object_properties(obj, manager, drawing_area)
                     return False  # Don't repeat
@@ -3111,16 +3094,13 @@ class ModelCanvasLoader:
                     print(f"  Final state: page_ready={page_ready}, drawing_ready={drawing_ready}, is_current={is_current}")
                     return False  # Give up
                 else:
-                    print(f"[DIALOG] Retry {retry_count[0]}: page={page_ready}, drawing={drawing_ready}, current={is_current}")
                     return True  # Keep checking
             
             # Check every 50ms for up to 1 second
             GLib.timeout_add(50, open_when_mapped)
             return
         
-        # DEBUG: Check parent window state for Wayland compatibility
-        print(f"[DIALOG] All checks passed - proceeding to create dialog")
-        # Also check the drawing area's toplevel
+        # Check the drawing area's toplevel for Wayland compatibility
         toplevel = drawing_area.get_toplevel()
         if toplevel and isinstance(toplevel, Gtk.Window):
             pass
@@ -3179,12 +3159,10 @@ class ModelCanvasLoader:
                     # This forces behavior algorithm recompilation on next simulation step
                     if obj.id in controller.behavior_cache:
                         del controller.behavior_cache[obj.id]
-                        print(f"[SYNC] Cleared behavior cache for transition {obj.id} after property change")
                     
                     # Clear historical data so plot shows new rate function immediately
                     if hasattr(controller, 'data_collector') and controller.data_collector:
                         controller.data_collector.clear_transition(obj.id)
-                        print(f"[SYNC] Cleared data collector for transition {obj.id}")
             
             if isinstance(obj, (Place, Transition)) and self.right_panel_loader:
                 if hasattr(self.right_panel_loader, 'place_panel') and self.right_panel_loader.place_panel:
@@ -3213,9 +3191,7 @@ class ModelCanvasLoader:
             # The dialog_loader already has parent_window set during creation
             # We don't need to set transient_for again - it's already configured
             
-            print(f"[DIALOG DEBUG] Calling dialog_loader.run()...")
             response = dialog_loader.run()
-            print(f"[DIALOG DEBUG] dialog_loader.run() returned: {response}")
             
             if response == Gtk.ResponseType.OK:
                 drawing_area.queue_draw()
@@ -3231,7 +3207,6 @@ class ModelCanvasLoader:
             import traceback
             traceback.print_exc()
         finally:
-            print(f"[DIALOG DEBUG] Destroying dialog")
             # CRITICAL: Always destroy dialog to prevent orphaned widgets
             # Orphaned widgets cause Wayland focus issues and app crashes
             dialog_loader.destroy()

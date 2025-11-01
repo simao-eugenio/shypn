@@ -405,14 +405,12 @@ class ArcPropDialogLoader(GObject.GObject):
                         "Click 'Analyze' button to run analysis.</i>"
                     )
         
-        except ImportError as e:
+        except ImportError:
             # Topology module not available - silently skip
-            print(f"Topology tab not available: {e}")
-        except Exception as e:
+            pass
+        except Exception:
             # Any other error - log but don't crash the dialog
-            print(f"Error setting up topology tab: {type(e).__name__}: {e}")
-            import traceback
-            traceback.print_exc()
+            pass
     
     def destroy(self):
         """Destroy dialog and clean up all widget references.

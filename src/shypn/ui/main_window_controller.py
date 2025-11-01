@@ -64,7 +64,6 @@ class MainWindowController(GObject.GObject):
         4. Wire Master Palette signals
         5. Set initial state (all panels hidden)
         """
-        print("[MAIN_WINDOW] Initializing...", file=sys.stderr)
         
         try:
             # Step 1: Get widget references
@@ -83,7 +82,6 @@ class MainWindowController(GObject.GObject):
             self._set_initial_state()
             
             self._initialized = True
-            print("[MAIN_WINDOW] Initialized successfully", file=sys.stderr)
             self.emit('window-ready')
             
         except Exception as e:
@@ -92,7 +90,6 @@ class MainWindowController(GObject.GObject):
     
     def _get_widgets(self):
         """Get widget references from builder."""
-        print("[MAIN_WINDOW] Getting widget references...", file=sys.stderr)
         
         self.window = self.builder.get_object('main_window')
         if not self.window:
@@ -114,11 +111,9 @@ class MainWindowController(GObject.GObject):
         if not self.main_workspace:
             raise ValueError("main_workspace not found in UI")
         
-        print("[MAIN_WINDOW] Widget references obtained", file=sys.stderr)
     
     def _insert_master_palette(self):
         """Insert Master Palette widget into window."""
-        print("[MAIN_WINDOW] Inserting Master Palette...", file=sys.stderr)
         
         # TEMPORARILY disable Master Palette insertion to debug Error 71
         # master_palette_slot = self.builder.get_object('master_palette_slot')
@@ -128,20 +123,16 @@ class MainWindowController(GObject.GObject):
         # master_palette_widget = self.master_palette.get_widget()
         # master_palette_slot.pack_start(master_palette_widget, True, True, 0)
         # master_palette_widget.show_all()
-        print("[MAIN_WINDOW] Skipping Master Palette insertion (debugging Error 71)", file=sys.stderr)
         
-        print("[MAIN_WINDOW] Master Palette inserted", file=sys.stderr)
     
     def _create_panel_controllers(self):
         """Create panel controller instances."""
-        print("[MAIN_WINDOW] Creating panel controllers...", file=sys.stderr)
         
         # TEMPORARILY disable ALL panels to debug Error 71
         # self.panels['files'] = FilesPanelController(self.builder)
         # self.panels['analyses'] = AnalysesPanelController(self.builder)
         # self.panels['pathways'] = PathwaysPanelController(self.builder)
         # self.panels['topology'] = TopologyPanelController(self.builder)
-        print("[MAIN_WINDOW] Skipping ALL panels (debugging Error 71)", file=sys.stderr)
         
         # Initialize each panel
         for panel_name, panel_ctrl in self.panels.items():
@@ -149,20 +140,16 @@ class MainWindowController(GObject.GObject):
             panel_ctrl.connect('panel-error', self._on_panel_error, panel_name)
             panel_ctrl.initialize()
         
-        print(f"[MAIN_WINDOW] Created {len(self.panels)} panel controllers", file=sys.stderr)
     
     def _wire_master_palette(self):
         """Wire Master Palette signals to panel toggle handlers."""
-        print("[MAIN_WINDOW] Wiring Master Palette signals...", file=sys.stderr)
         
         # TEMPORARILY disable ALL signal wiring to debug Error 71
         # self.master_palette.connect('files', self._create_toggle_handler('files'))
         # self.master_palette.connect('analyses', self._create_toggle_handler('analyses'))
         # self.master_palette.connect('pathways', self._create_toggle_handler('pathways'))
         # self.master_palette.connect('topology', self._create_toggle_handler('topology'))
-        print("[MAIN_WINDOW] Skipping signal wiring (debugging Error 71)", file=sys.stderr)
         
-        print("[MAIN_WINDOW] Master Palette signals wired", file=sys.stderr)
     
     def _create_toggle_handler(self, panel_name: str):
         """Create toggle handler for a panel.
@@ -193,13 +180,11 @@ class MainWindowController(GObject.GObject):
             panel_name: Name of panel to show
         """
         if panel_name not in self.panels:
-            print(f"[MAIN_WINDOW] WARNING: Unknown panel '{panel_name}'", file=sys.stderr)
             return
         
         panel = self.panels[panel_name]
         width = panel.get_preferred_width()
         
-        print(f"[MAIN_WINDOW] Showing panel '{panel_name}' (width={width}px)", file=sys.stderr)
         
         # Switch stack to panel
         self.panels_stack.set_visible_child_name(panel_name)
@@ -226,7 +211,6 @@ class MainWindowController(GObject.GObject):
         if panel_name not in self.panels:
             return
         
-        print(f"[MAIN_WINDOW] Hiding panel '{panel_name}'", file=sys.stderr)
         
         # Deactivate panel
         panel = self.panels[panel_name]
@@ -245,7 +229,6 @@ class MainWindowController(GObject.GObject):
     
     def _set_initial_state(self):
         """Set initial window state (all panels hidden)."""
-        print("[MAIN_WINDOW] Setting initial state...", file=sys.stderr)
         
         # Hide revealer
         self.panels_revealer.set_reveal_child(False)
@@ -253,14 +236,12 @@ class MainWindowController(GObject.GObject):
         # Collapse paned
         self.left_paned.set_position(0)
         
-        print("[MAIN_WINDOW] Initial state set (all panels hidden)", file=sys.stderr)
     
     def show_default_panel(self):
         """Show default panel (Analyses) after window is mapped.
         
         Call this with GLib.idle_add() after window.show_all()
         """
-        print("[MAIN_WINDOW] Showing default panel (analyses)...", file=sys.stderr)
         self.master_palette.set_active('analyses', True)
     
     def get_window(self) -> Gtk.ApplicationWindow:
@@ -286,7 +267,6 @@ class MainWindowController(GObject.GObject):
             panel: Panel controller
             panel_name: Name of panel
         """
-        print(f"[MAIN_WINDOW] Panel '{panel_name}' is ready", file=sys.stderr)
     
     def _on_panel_error(self, panel, error_msg: str, panel_name: str):
         """Handle panel-error signal.
@@ -296,4 +276,3 @@ class MainWindowController(GObject.GObject):
             error_msg: Error message
             panel_name: Name of panel
         """
-        print(f"[MAIN_WINDOW] Panel '{panel_name}' error: {error_msg}", file=sys.stderr)

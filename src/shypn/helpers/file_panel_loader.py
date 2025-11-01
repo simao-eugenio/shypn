@@ -407,10 +407,7 @@ class FilePanelLoader:
             dialog.destroy()
             
             if response == Gtk.ResponseType.YES:
-                print(f"[FILES] Opening existing project: {project_file}")
                 self._on_project_opened_from_file_panel(project_file)
-            else:
-                print(f"[FILES] User cancelled project open")
         else:
             # Create new project in this folder
             dialog = Gtk.MessageDialog(
@@ -434,14 +431,10 @@ class FilePanelLoader:
                     # Create new project
                     project = Project(name=folder_name, base_path=project_dir)
                     project.save()
-                    print(f"[FILES] Created new project: {project_file}")
                     self._on_project_opened_from_file_panel(project_file)
                 except Exception as e:
-                    print(f"[FILES] Error creating project: {e}", file=sys.stderr)
                     import traceback
                     traceback.print_exc()
-            else:
-                print(f"[FILES] User cancelled project creation")
     
     def _on_copy_path_clicked(self, menu_item):
         """Copy absolute path to clipboard."""
@@ -451,7 +444,6 @@ class FilePanelLoader:
         from gi.repository import Gdk
         clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
         clipboard.set_text(self.file_explorer.selected_item_path, -1)
-        print(f"[FILES] Copied path: {self.file_explorer.selected_item_path}", file=sys.stderr)
     
     def _on_copy_relative_path_clicked(self, menu_item):
         """Copy workspace-relative path to clipboard."""
@@ -467,7 +459,6 @@ class FilePanelLoader:
             rel_path = os.path.relpath(abs_path, workspace_path)
             clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
             clipboard.set_text(rel_path, -1)
-            print(f"[FILES] Copied relative path: {rel_path}", file=sys.stderr)
         except ValueError:
             # File is outside workspace, copy absolute path
             clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
@@ -487,9 +478,8 @@ class FilePanelLoader:
             # Use xdg-open to open the parent directory
             parent_dir = os.path.dirname(path) if os.path.isfile(path) else path
             subprocess.Popen(['xdg-open', parent_dir])
-            print(f"[FILES] Revealed in file manager: {parent_dir}", file=sys.stderr)
-        except Exception as e:
-            print(f"[FILES] Failed to reveal in file manager: {e}", file=sys.stderr)
+        except Exception:
+            pass
     
     def _setup_keyboard_shortcuts(self):
         """Setup keyboard shortcuts for file operations (F2=Rename, Del=Delete, etc.)."""
@@ -608,7 +598,6 @@ class FilePanelLoader:
                 self.file_explorer.explorer.navigate_to(self.file_explorer.explorer.root_boundary)
             # Collapse all expanded folders
             self.file_explorer.tree_view.collapse_all()
-            print("[FILES] Category collapsed - navigated to workspace root and collapsed tree", file=sys.stderr)
     
     def _on_new_file_clicked(self):
         """Handle New File button click - creates file with inline editing."""
@@ -630,7 +619,6 @@ class FilePanelLoader:
                 self.file_explorer.explorer.navigate_to(self.file_explorer.explorer.root_boundary)
             # Collapse all expanded folders
             self.file_explorer.tree_view.collapse_all()
-            print("[FILES] Tree collapsed - navigated to workspace root", file=sys.stderr)
     
     def _on_quit_requested(self):
         """Handle quit request from project controller."""

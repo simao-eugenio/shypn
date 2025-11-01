@@ -78,7 +78,6 @@ class LayoutSettingsLoader(GObject.GObject):
     def _load_ui(self):
         """Load the layout settings panel UI from file."""
         if not os.path.exists(self.ui_path):
-            print(f'Warning: Layout settings UI file not found: {self.ui_path}')
             return
         
         try:
@@ -94,7 +93,6 @@ class LayoutSettingsLoader(GObject.GObject):
             self.scale_entry = builder.get_object('scale_entry')
             
             if not self.settings_revealer:
-                print('Warning: layout_settings_revealer not found in UI file')
                 return
             
             # Connect signals - auto-emit on value change (no apply button needed)
@@ -137,7 +135,6 @@ class LayoutSettingsLoader(GObject.GObject):
             
         except Exception as e:
             import traceback
-            print(f'Error loading layout settings UI: {e}')
             traceback.print_exc()
             self.settings_revealer = None
     
@@ -156,8 +153,8 @@ class LayoutSettingsLoader(GObject.GObject):
                 screen, css_provider,
                 Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
             )
-        except Exception as e:
-            print(f'Warning: Failed to load layout settings CSS: {e}')
+        except Exception:
+            pass
     
     def _on_layer_spacing_changed(self, entry):
         """Handle layer spacing entry change - auto-emit signal."""

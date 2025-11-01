@@ -170,7 +170,6 @@ class ImmediateBehavior(TransitionBehavior):
                     source_place.set_tokens(source_place.tokens - arc.weight)
                     consumed_map[source_place.id] = float(arc.weight)
                     
-                    # Debug validation
                     assert source_place.tokens == old_tokens - arc.weight, \
                         f"Token consumption error: expected {old_tokens - arc.weight}, got {source_place.tokens}"
             
@@ -188,7 +187,6 @@ class ImmediateBehavior(TransitionBehavior):
                     target_place.set_tokens(target_place.tokens + arc.weight)
                     produced_map[target_place.id] = float(arc.weight)
                     
-                    # Debug validation
                     assert target_place.tokens == old_tokens + arc.weight, \
                         f"Token production error: expected {old_tokens + arc.weight}, got {target_place.tokens}"
             

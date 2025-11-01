@@ -117,7 +117,6 @@ class HierarchicalLayoutProcessor:
         max_x = max(x for x, y in positions.values())
         max_y = max(y for x, y in positions.values())
         
-        # DEBUG: Always log coordinate ranges
         self.logger.warning(f"🔍 HIERARCHICAL LAYOUT COORDINATES BEFORE NORMALIZATION:")
         self.logger.warning(f"   X range: {min_x:.1f} to {max_x:.1f} (width: {max_x - min_x:.1f}px)")
         self.logger.warning(f"   Y range: {min_y:.1f} to {max_y:.1f} (height: {max_y - min_y:.1f}px)")

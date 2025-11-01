@@ -319,7 +319,6 @@ class NetObjPersistency:
         # Ensure parent window is set
         parent = self.parent_window if self.parent_window else None
         
-        # DEBUG: Log parent window for troubleshooting
         import sys
         if parent:
             pass
@@ -483,7 +482,6 @@ class NetObjPersistency:
         # Ensure parent window is set
         parent = self.parent_window if self.parent_window else None
         
-        # DEBUG: Log parent window for troubleshooting
         import sys
         if parent:
             pass

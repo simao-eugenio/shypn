@@ -176,7 +176,6 @@ class CategoryFrame(Gtk.Frame):
         """
         # Call collapse callback when collapsing (not when expanding)
         if not expanded and self.expanded and self._on_collapse_callback:
-            print(f"[CATEGORY] Calling collapse callback for {self.title}", file=sys.stderr)
             self._on_collapse_callback()
         
         self.expanded = expanded

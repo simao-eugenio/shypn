@@ -41,9 +41,7 @@ class BufferedSimulationSettings:
         
         # Commit atomically (validated, all-or-nothing)
         if buffered.commit():
-            print("Changes applied successfully")
         else:
-            print("Validation failed, changes rolled back")
     
     Thread Safety:
         All public methods are thread-safe. The commit operation
@@ -163,7 +161,6 @@ class BufferedSimulationSettings:
                 
             except (ValueError, ValidationError) as e:
                 # Validation failed - rollback
-                print(f"[BufferedSettings] Commit failed: {e}")
                 return False
     
     def rollback(self):
@@ -240,7 +237,7 @@ class BufferedSimulationSettings:
                 
                 # Warning for very small step counts
                 if step_count < 10:
-                    print(f"[BufferedSettings] Warning: Only {step_count} steps planned")
+                    pass  # Could log warning if needed
     
     def _track_changes(self):
         """Track what properties have changed for notification."""
@@ -318,16 +315,16 @@ class BufferedSimulationSettings:
         for listener in self._listeners:
             try:
                 listener.on_changes_committed(self._pending_changes.copy())
-            except Exception as e:
-                print(f"[BufferedSettings] Listener error on commit: {e}")
+            except Exception:
+                pass
     
     def _notify_rollback(self):
         """Notify listeners that changes were rolled back."""
         for listener in self._listeners:
             try:
                 listener.on_changes_rolled_back(self._pending_changes.copy())
-            except Exception as e:
-                print(f"[BufferedSettings] Listener error on rollback: {e}")
+            except Exception:
+                pass
     
     # ========== String Representation ==========
     
