@@ -726,6 +726,9 @@ class ModelCanvasLoader:
         # Reset tool state
         manager.clear_active_tool()
         
+        # Trigger redraw to show canvas is ready for new content
+        manager.mark_needs_redraw()
+        
         print(f"[RESET] Manager reset for document load: {filename}")
 
     def _setup_edit_palettes(self, overlay_widget, canvas_manager, drawing_area, overlay_manager):

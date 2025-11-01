@@ -577,9 +577,8 @@ class SBMLCategory(BasePathwayCategory):
                     vertical_offset_percent=10
                 )
                 
-                # Force redraw
-                if hasattr(canvas_manager, 'drawing_area'):
-                    canvas_manager.drawing_area.queue_draw()
+                # Force redraw to display loaded objects
+                canvas_manager.mark_needs_redraw()
                 
                 self._show_status(
                     f"✅ Model loaded to canvas: {base_name}\n"
