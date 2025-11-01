@@ -620,8 +620,26 @@ class ModifierConverter(BaseConverter):
                 self.logger.warning(f"Transition not found for reaction '{reaction.id}'")
                 continue
             
+            # Build set of species that are reactants or products for this reaction
+            # These already have normal arcs (consuming/producing)
+            reactant_product_species = set()
+            for species_id, _ in reaction.reactants:
+                reactant_product_species.add(species_id)
+            for species_id, _ in reaction.products:
+                reactant_product_species.add(species_id)
+            
             # Create test arcs for modifiers (catalysts/enzymes)
             for modifier_species_id in reaction.modifiers:
+                # CRITICAL FIX: Species cannot have BOTH normal arc AND test arc to same transition
+                # If species is already a reactant or product, it has a normal arc - skip test arc
+                if modifier_species_id in reactant_product_species:
+                    self.logger.warning(
+                        f"Species '{modifier_species_id}' is BOTH a reactant/product AND modifier "
+                        f"in reaction '{reaction.id}'. Keeping normal arc, skipping test arc. "
+                        f"A place can only have ONE arc type (normal OR test) to a transition."
+                    )
+                    continue
+                
                 place = self.species_to_place.get(modifier_species_id)
                 if not place:
                     self.logger.warning(
@@ -629,6 +647,10 @@ class ModifierConverter(BaseConverter):
                         f"in reaction '{reaction.id}'"
                     )
                     continue
+                
+                # Mark this place as an enzyme/catalyst place
+                # This helps the layout engine identify it
+                place.metadata['is_enzyme'] = True
                 
                 # Create test arc from catalyst place to transition
                 # Test arcs are non-consuming: check tokens but don't consume
