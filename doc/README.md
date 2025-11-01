@@ -132,6 +132,7 @@ Documentation is actively maintained and updated with each major feature or fix.
 
 ## Related Directories
 
-- `tests/`: Test files referenced in documentation
+- `tests/`: Test files referenced in documentation (organized November 2025)
+- `scripts/`: Utility and diagnostic scripts (organized November 2025)
 - `src/shypn/`: Source code documented here
 - `ui/`: UI files and dialog specifications

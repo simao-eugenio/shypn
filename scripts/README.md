@@ -15,6 +15,42 @@ Adds source transitions to Petri net models for testing purposes.
 python3 scripts/add_source_transitions.py [model_file.shy]
 ```
 
+### analyze_biomd61_parameters.py
+Analyzes parameters in the BIOMD61 model.
+- Inspects parameter values and distributions
+- Validates parameter assignments
+- Reports parameter statistics
+- Useful for SBML model analysis
+
+**Usage**:
+```bash
+python3 scripts/analyze_biomd61_parameters.py
+```
+
+### check_arc_types.py
+Checks and validates arc types in Petri net models.
+- Identifies normal, inhibitor, and test arcs
+- Validates arc configurations
+- Reports arc type distribution
+- Useful for model verification
+
+**Usage**:
+```bash
+python3 scripts/check_arc_types.py [model_file.shy]
+```
+
+### check_stochastic_sources.py
+Checks stochastic source configurations in models.
+- Identifies stochastic transitions with source behavior
+- Validates source/sink configurations
+- Reports stochastic source statistics
+- Useful for simulation setup validation
+
+**Usage**:
+```bash
+python3 scripts/check_stochastic_sources.py [model_file.shy]
+```
+
 ### compare_topology.py
 Compares topology between different Petri net models or versions.
 - Analyzes structural differences
@@ -25,6 +61,66 @@ Compares topology between different Petri net models or versions.
 **Usage**:
 ```bash
 python3 scripts/compare_topology.py model1.shy model2.shy
+```
+
+### diagnose_firing_issue.py
+Diagnoses issues with transition firing in models.
+- Analyzes why transitions are not firing
+- Checks enablement conditions
+- Reports missing tokens or inhibitor conflicts
+- Useful for debugging simulation problems
+
+**Usage**:
+```bash
+python3 scripts/diagnose_firing_issue.py [model_file.shy]
+```
+
+### diagnose_runtime_arcs.py
+Diagnoses arc-related issues during runtime.
+- Analyzes arc connections and weights
+- Validates arc endpoints
+- Reports arc rendering issues
+- Useful for debugging visual artifacts
+
+**Usage**:
+```bash
+python3 scripts/diagnose_runtime_arcs.py [model_file.shy]
+```
+
+### diagnose_transition_firing.py
+Comprehensive transition firing diagnostics.
+- Detailed analysis of firing conditions
+- Token availability checks
+- Rate function validation
+- Enablement state tracking
+
+**Usage**:
+```bash
+python3 scripts/diagnose_transition_firing.py [model_file.shy]
+```
+
+### diagnosis_sigmoid_issue.py
+Diagnoses issues with sigmoid rate functions.
+- Analyzes sigmoid function parameters
+- Validates curve shapes
+- Reports parameter sensitivity
+- Useful for continuous transition debugging
+
+**Usage**:
+```bash
+python3 scripts/diagnosis_sigmoid_issue.py [model_file.shy]
+```
+
+### fix_stochastic_to_continuous.py
+Converts stochastic transitions to continuous transitions.
+- Batch conversion utility
+- Preserves rate function structure
+- Updates transition types
+- Useful for model transformation
+
+**Usage**:
+```bash
+python3 scripts/fix_stochastic_to_continuous.py [model_file.shy]
 ```
 
 ### inspect_kegg_ec_numbers.py
@@ -79,6 +175,18 @@ python3 scripts/run_headless_tests.py
 python3 scripts/run_headless_tests.py --suite property_dialogs
 ```
 
+### verify_biomd61_fix.py
+Verifies fixes applied to the BIOMD61 model.
+- Validates model integrity after fixes
+- Checks transition types
+- Verifies parameter values
+- Confirms simulation readiness
+
+**Usage**:
+```bash
+python3 scripts/verify_biomd61_fix.py
+```
+
 ## Development Tools
 
 These scripts are designed for:
@@ -90,7 +198,7 @@ These scripts are designed for:
 
 ## Related Directories
 
-- `tests/`: Complete test suite (110+ test files)
+- `tests/`: Complete test suite (130+ test files, organized November 2025)
 - `archive/`: Legacy analysis scripts (deprecated)
 - `src/shypn/dev/`: Development utilities integrated into the application
 - `src/shypn/diagnostic/`: Diagnostic tools for runtime debugging
@@ -102,14 +210,23 @@ These scripts are designed for:
 - Scripts use the same Python environment as the main application
 - For KEGG-related scripts, ensure KEGG data is available in `data/` directory
 
-## Migration from Root
+## Migration from Root (November 2025)
 
-These scripts were moved from the repository root to `scripts/` in December 2024 as part of project organization improvements. They maintain 100% functionality with the same command-line interfaces.
+These scripts were moved from the repository root to `scripts/` in November 2025 as part of project organization improvements. They maintain 100% functionality with the same command-line interfaces.
 
-Previous locations:
+**Previously in root, now in scripts/**:
 - `add_source_transitions.py` → `scripts/add_source_transitions.py`
+- `analyze_biomd61_parameters.py` → `scripts/analyze_biomd61_parameters.py`
+- `check_arc_types.py` → `scripts/check_arc_types.py`
+- `check_stochastic_sources.py` → `scripts/check_stochastic_sources.py`
 - `compare_topology.py` → `scripts/compare_topology.py`
+- `diagnose_firing_issue.py` → `scripts/diagnose_firing_issue.py`
+- `diagnose_runtime_arcs.py` → `scripts/diagnose_runtime_arcs.py`
+- `diagnose_transition_firing.py` → `scripts/diagnose_transition_firing.py`
+- `diagnosis_sigmoid_issue.py` → `scripts/diagnosis_sigmoid_issue.py`
+- `fix_stochastic_to_continuous.py` → `scripts/fix_stochastic_to_continuous.py`
 - `inspect_kegg_ec_numbers.py` → `scripts/inspect_kegg_ec_numbers.py`
 - `inspect_kegg_reactions.py` → `scripts/inspect_kegg_reactions.py`
 - `inspect_transition_types.py` → `scripts/inspect_transition_types.py`
 - `run_headless_tests.py` → `scripts/run_headless_tests.py`
+- `verify_biomd61_fix.py` → `scripts/verify_biomd61_fix.py`

@@ -132,7 +132,10 @@ Method `to_table_format()` creates UI-ready tables:
 **5. Test Script**
 
 File created:
-- `test_aggregator.py` - Validates aggregator functionality
+### Validation
+
+Testing strategy:
+- `tests/test_aggregator.py` - Validates aggregator functionality
 - ✅ Test passed successfully
 
 ---
@@ -215,7 +218,7 @@ python3 src/shypn.py examples/glycolysis.xml
 ### Test 3: Aggregator
 ```bash
 # Run test script
-python3 test_aggregator.py
+python3 tests/test_aggregator.py
 # Should show element-centric properties and tables
 ```
 

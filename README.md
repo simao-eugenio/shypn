@@ -92,13 +92,22 @@ shypn/
 │   ├── project/    # Project management documentation
 │   └── validation/ # Validation and testing documentation
 ├── models/         # User Petri net model files (.shy format - primary extension)
-├── scripts/        # Utility scripts, demos (non-test)
+├── scripts/        # Utility scripts, demos, diagnostic tools (non-test)
 │   ├── add_source_transitions.py
+│   ├── analyze_biomd61_parameters.py
+│   ├── check_arc_types.py
+│   ├── check_stochastic_sources.py
 │   ├── compare_topology.py
+│   ├── diagnose_firing_issue.py
+│   ├── diagnose_runtime_arcs.py
+│   ├── diagnose_transition_firing.py
+│   ├── diagnosis_sigmoid_issue.py
+│   ├── fix_stochastic_to_continuous.py
 │   ├── inspect_kegg_ec_numbers.py
 │   ├── inspect_kegg_reactions.py
 │   ├── inspect_transition_types.py
-│   └── run_headless_tests.py
+│   ├── run_headless_tests.py
+│   └── verify_biomd61_fix.py
 ├── src/
 │   └── shypn/
 │       ├── analyses/      # Analysis tools and real-time plotting (optimized)

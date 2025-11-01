@@ -116,7 +116,7 @@ def integrate_kinetics(self, transitions, pathway_data, ...):
 **Before Enhancement (Manual Fix Required):**
 - Import creates 10 stochastic transitions with formulas
 - Terminal shows negative rate warnings during simulation
-- Required running `fix_stochastic_to_continuous.py` script
+- Required running `scripts/fix_stochastic_to_continuous.py` script
 - Manual intervention needed
 
 **After Enhancement (Automatic Fix):**
@@ -330,8 +330,8 @@ assert ' - ' not in formula  # ✅ No subtraction
 - `SBML_TRANSITION_TYPE_VALIDATION.md` (this file)
 
 ### Scripts (No Longer Needed for Import)
-- `fix_stochastic_to_continuous.py` (kept for manual fixes)
-- `verify_biomd61_fix.py` (validation utility)
+- `scripts/fix_stochastic_to_continuous.py` (kept for manual fixes)
+- `scripts/verify_biomd61_fix.py` (validation utility)
 
 ## Migration Guide
 
@@ -343,10 +343,10 @@ assert ' - ' not in formula  # ✅ No subtraction
 python3 import_sbml.py model.xml
 
 # 2. Run fix script
-python3 fix_stochastic_to_continuous.py model.shy
+python3 scripts/fix_stochastic_to_continuous.py model.shy
 
 # 3. Verify
-python3 verify_biomd61_fix.py model.shy
+python3 scripts/verify_biomd61_fix.py model.shy
 ```
 
 **After (Automatic Fix):**

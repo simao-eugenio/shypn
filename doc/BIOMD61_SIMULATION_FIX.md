@@ -50,10 +50,12 @@ When a stochastic transition evaluates to a negative rate:
 
 ## Solution Applied
 
-Used the existing `fix_stochastic_to_continuous.py` script:
+### Manual Fix Applied
+
+Used the existing `scripts/fix_stochastic_to_continuous.py` script:
 
 ```bash
-python3 fix_stochastic_to_continuous.py workspace/projects/SBML/models/BIOMD0000000061.shy
+python3 scripts/fix_stochastic_to_continuous.py workspace/projects/SBML/models/BIOMD0000000061.shy
 ```
 
 ### What the Fix Does
@@ -143,7 +145,7 @@ else:
 
 ## Related Files
 
-- **Fix Script**: `fix_stochastic_to_continuous.py`
+- **Fix Script**: `scripts/fix_stochastic_to_continuous.py`
 - **Model**: `workspace/projects/SBML/models/BIOMD0000000061.shy`
 - **Engine**: `src/shypn/engine/stochastic_behavior.py` (has warning for this issue)
 - **Engine**: `src/shypn/engine/continuous_behavior.py` (handles negative rates)
