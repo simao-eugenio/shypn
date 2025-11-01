@@ -175,17 +175,26 @@ class Arc(PetriNetObject):
         src_world_x, src_world_y = self.source.x, self.source.y
         tgt_world_x, tgt_world_y = self.target.x, self.target.y
         
+        # Check if this is a loop arc (source == target)
+        is_loop = (self.source == self.target)
+        
         # Calculate direction in world space
         dx_world = tgt_world_x - src_world_x
         dy_world = tgt_world_y - src_world_y
         length_world = math.sqrt(dx_world * dx_world + dy_world * dy_world)
         
-        if length_world < 1:
-            return  # Too short to draw
-        
-        # Normalize direction
-        dx_world /= length_world
-        dy_world /= length_world
+        # For loop arcs, use a default direction (pointing right)
+        if is_loop or length_world < 1:
+            if is_loop:
+                dx_world = 1.0  # Point right
+                dy_world = 0.0
+                length_world = 1.0
+            else:
+                return  # Too short to draw (non-loop)
+        else:
+            # Normalize direction
+            dx_world /= length_world
+            dy_world /= length_world
         
         # Get boundary points using straight-line direction from actual centers
         start_world_x, start_world_y = self._get_boundary_point(
@@ -193,26 +202,28 @@ class Arc(PetriNetObject):
         end_world_x, end_world_y = self._get_boundary_point(
             self.target, tgt_world_x, tgt_world_y, -dx_world, -dy_world)
         
-        # Check for parallel arcs - offset will be applied to control point only
+        # Check for parallel arcs and calculate offset
         parallel_offset = 0.0
+        has_parallels = False
         if hasattr(self, '_manager') and self._manager:
             parallels = self._manager.detect_parallel_arcs(self)
             if parallels:
+                has_parallels = True
                 parallel_offset = self._manager.calculate_arc_offset(self, parallels)
         
-        # Endpoints stay at boundaries (not offset)
-        display_start_x = start_world_x
-        display_start_y = start_world_y
-        display_end_x = end_world_x
-        display_end_y = end_world_y
+        # Force curved rendering for parallel arcs and loop arcs
+        # Parallel arcs MUST be curved to avoid visual overlap
+        # Loop arcs MUST be curved to be visible
+        render_as_curved = self.is_curved or has_parallels or is_loop
+        
         display_start_x = start_world_x
         display_start_y = start_world_y
         display_end_x = end_world_x
         display_end_y = end_world_y
         
-        # Calculate control point for curved arcs
+        # Calculate control point for curved arcs (including forced-curved parallel arcs)
         # Control point uses offset from the midpoint between boundary points
-        if self.is_curved:
+        if render_as_curved:
             mid_x = (start_world_x + end_world_x) / 2
             mid_y = (start_world_y + end_world_y) / 2
             
@@ -223,13 +234,25 @@ class Arc(PetriNetObject):
                 mid_x += perp_x * parallel_offset
                 mid_y += perp_y * parallel_offset
             
-            control_x = mid_x + self.control_offset_x
-            control_y = mid_y + self.control_offset_y
+            # For parallel arcs that aren't explicitly curved, ensure proper control point
+            if has_parallels and not self.is_curved:
+                # Use parallel offset as the primary curve direction
+                # This ensures consistent curvature matching the parallel offset
+                perp_x = -dy_world
+                perp_y = dx_world
+                # Control point perpendicular to arc at the parallel-offset midpoint
+                # No additional offset needed - the parallel offset IS the curve
+                control_x = mid_x
+                control_y = mid_y
+            else:
+                # Use explicit control offsets
+                control_x = mid_x + self.control_offset_x
+                control_y = mid_y + self.control_offset_y
         
         # Add glow effect for colored arcs (CSS-like styling)
         if self.color != self.DEFAULT_COLOR:
             # Draw outer glow (subtle shadow effect)
-            if self.is_curved:
+            if render_as_curved:
                 cr.move_to(display_start_x, display_start_y)
                 cr.curve_to(control_x, control_y, control_x, control_y, display_end_x, display_end_y)
             else:
@@ -241,7 +264,7 @@ class Arc(PetriNetObject):
             cr.stroke()
         
         # Draw line in world coordinates (straight or curved)
-        if self.is_curved:
+        if render_as_curved:
             cr.move_to(display_start_x, display_start_y)
             cr.curve_to(control_x, control_y, control_x, control_y, display_end_x, display_end_y)
         else:
@@ -252,7 +275,7 @@ class Arc(PetriNetObject):
         cr.stroke()
         
         # Calculate direction at end point for arrowhead
-        if self.is_curved:
+        if render_as_curved:
             # For curved arc, calculate tangent at end point
             # Using simple approximation: direction from control point to end
             arrow_dx = display_end_x - control_x
@@ -634,6 +657,7 @@ class Arc(PetriNetObject):
             "target_id": self.target.id,
             "target_type": "place" if isinstance(self.target, Place) else "transition",
             "weight": self.weight,
+            "threshold": self.threshold,  # Save threshold (can be None, value, dict, or expression)
             "color": list(self.color),
             "width": self.width,
             "control_points": self.control_points
@@ -733,6 +757,8 @@ class Arc(PetriNetObject):
             arc.width = data["width"]
         if "control_points" in data:
             arc.control_points = data["control_points"]
+        if "threshold" in data:
+            arc.threshold = data["threshold"]
         
         return arc
     

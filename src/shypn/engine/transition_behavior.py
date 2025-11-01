@@ -137,18 +137,27 @@ class TransitionBehavior(ABC):
     def _check_enablement_manual(self) -> bool:
         """Manual enablement check (fallback if model doesn't provide method).
         
-        SHYPN uses "living systems" cooperation semantics:
-        - ALL input arcs (normal and inhibitor) check: tokens >= weight
-        - Normal arc meaning: "I need weight tokens to function" (necessity)
-        - Inhibitor arc meaning: "I need weight tokens surplus to share" (cooperation)
+        SHYPN uses CLASSICAL (biological) inhibitor semantics:
+        - Normal arcs: tokens >= weight (standard enablement)
+        - Inhibitor arcs: tokens < weight (INVERTED - negative feedback)
         
-        Both prevent firing when tokens < weight, but for different reasons:
-        - Normal: insufficient resources
-        - Inhibitor: insufficient surplus (starvation prevention)
+        Biological Semantics:
+        - Normal arc: "I need weight tokens to function" (substrate requirement)
+        - Inhibitor arc: "Inhibit reaction when product >= weight" (negative feedback)
+        
+        Example with weight=10:
+        - Normal arc: enabled at 10+ tokens (direct requirement)
+        - Inhibitor arc: DISABLED at 10+ tokens (product inhibition)
+        
+        This models end-product inhibition, the most common biological regulation:
+        - Enzyme active when product LOW (product < threshold)
+        - Enzyme inhibited when product HIGH (product >= threshold)
         
         Returns:
             bool: True if enabled, False otherwise
         """
+        from shypn.netobjs.inhibitor_arc import InhibitorArc
+        
         input_arcs = self.get_input_arcs()
         
         for arc in input_arcs:
@@ -157,10 +166,18 @@ class TransitionBehavior(ABC):
             if source_place is None:
                 return False
             
-            # Living systems semantics: ALL arcs check for sufficient tokens
-            # The semantic meaning differs (need vs. surplus) but check is same
-            if source_place.tokens < arc.weight:
-                return False
+            # Check based on arc type
+            if isinstance(arc, InhibitorArc):
+                # Inhibitor: INVERTED check (tokens < weight)
+                # Transition DISABLED when place has too many tokens (negative feedback)
+                # Transition ENABLED when place has few tokens (allows production)
+                if source_place.tokens >= arc.weight:
+                    return False  # INHIBITED by excess product
+            else:
+                # Normal: Standard check (tokens >= weight)
+                # Transition enabled when enough substrate available
+                if source_place.tokens < arc.weight:
+                    return False
         
         return True
     

@@ -100,6 +100,11 @@ class ContinuousBehavior(TransitionBehavior):
         self.integration_method = 'rk4'  # Runge-Kutta 4th order
         self.min_step = 0.0001  # Minimum step size
         self.max_step = 0.1     # Maximum step size
+        
+        # Minimum token threshold for enablement (prevents premature stopping)
+        # Default 0.0 means transitions stop only at exactly 0 tokens
+        # Setting to small value (e.g., 1e-6) prevents numerical precision issues
+        self.min_token_threshold = float(props.get('min_token_threshold', 0.0))
     
     def _compile_rate_function(self, expr: str) -> Callable:
         """Compile rate function expression to callable.
@@ -216,14 +221,16 @@ class ContinuousBehavior(TransitionBehavior):
         # Check each input place for positive tokens
         for arc in input_arcs:
             # Check ALL input arcs (normal, test, inhibitor) for token presence
-            # All arc types require tokens > 0 for continuous enablement
+            # All arc types require tokens > min_token_threshold for continuous enablement
             source_place = self._get_place(arc.source_id)
             if source_place is None:
                 return False, f"missing-source-place-{arc.source_id}"
             
-            # Continuous requires positive, not >= weight
-            if source_place.tokens <= 0:
-                return False, f"input-place-empty-P{arc.source_id}"
+            # Continuous requires tokens above threshold
+            # Default threshold is 0.0 (strict zero check)
+            # Can be set higher (e.g., 1e-6) to prevent numerical precision issues
+            if source_place.tokens <= self.min_token_threshold:
+                return False, f"input-place-below-threshold-P{arc.source_id}"
         
         return True, "enabled-continuous"
     
@@ -316,15 +323,19 @@ class ContinuousBehavior(TransitionBehavior):
             rate = self.rate_function(places_dict, current_time)
             rate = max(self.min_rate, min(self.max_rate, rate))
             
-            # If rate is zero, nothing to integrate
-            if rate <= 0:
+            # If rate is effectively zero or too small, nothing to integrate
+            # Use min_token_threshold as minimum meaningful rate to prevent
+            # transitions from firing with infinitesimally small rates
+            effective_min_rate = max(self.min_rate, self.min_token_threshold * 1e-3)
+            if rate <= effective_min_rate:
                 return True, {
                     'consumed': {},
                     'produced': {},
                     'continuous_mode': True,
-                    'rate': 0.0,
+                    'rate': rate,
                     'dt': dt,
-                    'method': 'rk4'
+                    'method': 'rk4',
+                    'reason': 'rate-below-threshold'
                 }
             
             # Check if this is a source or sink transition
