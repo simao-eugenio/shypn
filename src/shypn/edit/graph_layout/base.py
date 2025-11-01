@@ -152,12 +152,23 @@ class LayoutAlgorithm(ABC):
                             next_layer_set.add(successor)
                         processed.add(successor)
                         
-                        # CRITICAL: Also process catalyst predecessors of this successor
-                        # Catalysts should be at the same layer as the transitions they connect to
+                        # CRITICAL: Process catalyst predecessors of this transition
+                        # Catalysts are PLACES, so they should be at the same layer as
+                        # the INPUT PLACES of this transition, NOT at the transition layer
                         for pred in graph.predecessors(successor):
                             if getattr(pred, 'is_catalyst', False) and pred not in processed:
-                                # Place catalyst at same layer as the reaction it catalyzes
-                                layers[pred] = successor_layer
+                                # Find the layer of input places (not catalysts) to this transition
+                                input_place_layers = [
+                                    layers.get(p, 0) 
+                                    for p in graph.predecessors(successor)
+                                    if not getattr(p, 'is_catalyst', False) and p in layers
+                                ]
+                                if input_place_layers:
+                                    # Place catalyst at same layer as input places
+                                    layers[pred] = max(input_place_layers)
+                                else:
+                                    # No input places found, use transition layer - 1
+                                    layers[pred] = max(0, successor_layer - 1)
                                 processed.add(pred)
                                 # Don't add to next_layer - catalysts don't propagate
             
@@ -170,17 +181,28 @@ class LayoutAlgorithm(ABC):
                 # Find the reactions (transitions) this catalyst connects to
                 successors = list(graph.successors(node))
                 if successors:
-                    # Position catalyst at same layer as first catalyzed reaction
-                    # (Test arcs connect catalyst → transition)
-                    catalyzed_layers = [layers.get(succ, 0) for succ in successors]
-                    layers[node] = max(catalyzed_layers) if catalyzed_layers else 0
+                    # Find input places of the catalyzed reaction
+                    for transition in successors:
+                        if transition in layers:
+                            transition_layer = layers[transition]
+                            # Catalyst should be at same layer as input places
+                            # (transition_layer - 1)
+                            layers[node] = max(0, transition_layer - 1)
+                            break
+                    else:
+                        # No transition found in layers, fallback
+                        layers[node] = 0
                 else:
-                    # No connections (shouldn't happen for catalysts, but fallback)
+                    # No connections - this shouldn't happen for catalysts
                     layers[node] = 0
         
         # Handle any remaining unprocessed nodes (disconnected components)
         for node in graph.nodes():
             if node not in layers:
+                # Check if it's completely isolated (degree=0)
+                if graph.degree(node) == 0:
+                    # Skip isolated nodes - they shouldn't be positioned
+                    continue
                 layers[node] = 0
         
         return layers
