@@ -525,6 +525,9 @@ class SBMLCategory(BasePathwayCategory):
                 # Use self.model_canvas which is set by the parent panel
                 canvas_loader = self.model_canvas
                 
+                if not canvas_loader:
+                    raise ValueError("Model canvas not available - please open the application with GUI")
+                
                 # Get base name for tab
                 base_name = os.path.splitext(os.path.basename(saved_filepath))[0]
                 
