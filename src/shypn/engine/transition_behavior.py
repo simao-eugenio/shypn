@@ -138,17 +138,22 @@ class TransitionBehavior(ABC):
         """Manual enablement check (fallback if model doesn't provide method).
         
         SHYPN uses "living systems" cooperation semantics:
-        - ALL input arcs (normal and inhibitor) check: tokens >= weight
-        - Normal arc meaning: "I need weight tokens to function" (necessity)
-        - Inhibitor arc meaning: "I need weight tokens surplus to share" (cooperation)
+        - Normal arcs: tokens >= weight (need AT LEAST weight tokens)
+        - Inhibitor arcs: tokens > weight (need MORE THAN weight tokens as surplus)
         
-        Both prevent firing when tokens < weight, but for different reasons:
-        - Normal: insufficient resources
-        - Inhibitor: insufficient surplus (starvation prevention)
+        Semantics:
+        - Normal arc: "I need weight tokens to function" (necessity)
+        - Inhibitor arc: "I need MORE than weight tokens to share" (strict surplus)
+        
+        Example with weight=5:
+        - Normal arc: enabled at 5+ tokens (consumes 5, can have 0 left)
+        - Inhibitor arc: enabled at 6+ tokens (consumes 5, must keep 1+ reserve)
         
         Returns:
             bool: True if enabled, False otherwise
         """
+        from shypn.netobjs.inhibitor_arc import InhibitorArc
+        
         input_arcs = self.get_input_arcs()
         
         for arc in input_arcs:
@@ -157,10 +162,17 @@ class TransitionBehavior(ABC):
             if source_place is None:
                 return False
             
-            # Living systems semantics: ALL arcs check for sufficient tokens
-            # The semantic meaning differs (need vs. surplus) but check is same
-            if source_place.tokens < arc.weight:
-                return False
+            # Check based on arc type
+            if isinstance(arc, InhibitorArc):
+                # Inhibitor: STRICT surplus check (tokens > weight)
+                # Can only share if we have MORE than the reserve threshold
+                if source_place.tokens <= arc.weight:
+                    return False
+            else:
+                # Normal: Standard check (tokens >= weight)
+                # Can fire as long as we have exactly what we need
+                if source_place.tokens < arc.weight:
+                    return False
         
         return True
     
