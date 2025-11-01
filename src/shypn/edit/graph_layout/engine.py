@@ -114,6 +114,14 @@ class LayoutEngine:
         # This automatically avoids ID collisions since Python objects are unique by identity
         place_count = 0
         for i, place in enumerate(doc.places):
+            # Check if this place is an enzyme/catalyst place
+            # Enzyme places have metadata['is_enzyme'] = True
+            is_enzyme = place.metadata.get('is_enzyme', False)
+            
+            # Set is_catalyst attribute on place object for layout algorithm
+            # The hierarchical layout base.py checks this with getattr(node, 'is_catalyst', False)
+            place.is_catalyst = is_enzyme
+            
             graph.add_node(place, type='place')  # Use object itself as node ID
             place_count += 1
             if i < 5:  # Show first 5

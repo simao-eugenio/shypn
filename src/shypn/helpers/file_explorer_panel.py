@@ -1887,7 +1887,8 @@ class FileExplorerPanel:
                 self.persistency.set_filepath(filepath)
                 self.persistency.mark_clean()
             
-            drawing_area.queue_draw()
+            # Force redraw to display loaded objects
+            manager.mark_needs_redraw()
 
     def new_document(self):
         """Create a new document.
