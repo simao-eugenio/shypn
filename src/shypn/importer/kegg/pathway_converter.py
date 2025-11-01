@@ -185,21 +185,40 @@ class StandardConversionStrategy(ConversionStrategy):
             # These represent catalysts in Biological Petri Nets
             # Set options.create_enzyme_places = True to enable biological analysis
             # Set False (default) to maintain clean KEGG layout
+            # DESIGN: Enzyme places use KGML coordinates and participate in normal layout
+            # (not positioned separately above reactions - let them be part of the network)
             if options.create_enzyme_places:
-                # Store enzyme entries for positioning AFTER reactions are created
-                # This allows us to position enzymes relative to their catalyzed reactions
-                enzyme_entries_to_create = []
-                
                 for entry_id, entry in pathway.entries.items():
                     if entry.is_gene() and entry.reaction:
                         # This is an enzyme entry that catalyzes a reaction
-                        # DON'T position yet - store for later positioning
-                        enzyme_entries_to_create.append((entry_id, entry))
-                
-                # Add placeholder dict for enzyme places (will be populated after reactions)
-                # This ensures place_map has entries for enzymes when building test arcs
-                for entry_id, entry in enzyme_entries_to_create:
-                    place_map[entry_id] = None  # Placeholder - will be updated later
+                        # Create place using KGML coordinates (same as compounds)
+                        x = entry.graphics.x * options.coordinate_scale + options.center_x
+                        y = entry.graphics.y * options.coordinate_scale + options.center_y
+                        
+                        # Get enzyme name from graphics
+                        label = entry.graphics.name if entry.graphics and entry.graphics.name else entry.name
+                        label = label.replace('\n', ' ').strip()
+                        
+                        place_id = f"P{entry.id}"
+                        place_name = f"P{entry.id}"
+                        
+                        # Create enzyme place (participates in network like any other place)
+                        place = Place(x, y, place_id, place_name, label=label)
+                        place.tokens = 1  # Enzymes typically have 1 token (present/active)
+                        place.initial_marking = 1
+                        
+                        # Mark as enzyme in metadata
+                        if not hasattr(place, 'metadata'):
+                            place.metadata = {}
+                        place.metadata['kegg_id'] = entry.name
+                        place.metadata['kegg_entry_id'] = entry.id
+                        place.metadata['kegg_type'] = entry.type
+                        place.metadata['source'] = 'KEGG'
+                        place.metadata['is_enzyme'] = True
+                        place.metadata['catalyzes_reaction'] = entry.reaction
+                        
+                        document.places.append(place)
+                        place_map[entry.id] = place
         else:
             # Create places for all compounds (old behavior when filtering disabled)
             compounds = pathway.get_compounds()
@@ -209,13 +228,34 @@ class StandardConversionStrategy(ConversionStrategy):
                     document.places.append(place)
                     place_map[entry.id] = place
             
-            # Store enzyme entries for positioning AFTER reactions (same as filtered path)
+            # Create enzyme places using KGML coordinates (same as compounds)
             if options.create_enzyme_places:
-                enzyme_entries_to_create = []
                 for entry_id, entry in pathway.entries.items():
                     if entry.is_gene() and entry.reaction:
-                        enzyme_entries_to_create.append((entry_id, entry))
-                        place_map[entry_id] = None  # Placeholder
+                        x = entry.graphics.x * options.coordinate_scale + options.center_x
+                        y = entry.graphics.y * options.coordinate_scale + options.center_y
+                        
+                        label = entry.graphics.name if entry.graphics and entry.graphics.name else entry.name
+                        label = label.replace('\n', ' ').strip()
+                        
+                        place_id = f"P{entry.id}"
+                        place_name = f"P{entry.id}"
+                        
+                        place = Place(x, y, place_id, place_name, label=label)
+                        place.tokens = 1
+                        place.initial_marking = 1
+                        
+                        if not hasattr(place, 'metadata'):
+                            place.metadata = {}
+                        place.metadata['kegg_id'] = entry.name
+                        place.metadata['kegg_entry_id'] = entry.id
+                        place.metadata['kegg_type'] = entry.type
+                        place.metadata['source'] = 'KEGG'
+                        place.metadata['is_enzyme'] = True
+                        place.metadata['catalyzes_reaction'] = entry.reaction
+                        
+                        document.places.append(place)
+                        place_map[entry.id] = place
         
         
         # Phase 1.5: Pre-fetch EC numbers in parallel (if metadata enhancement enabled)
@@ -260,55 +300,12 @@ class StandardConversionStrategy(ConversionStrategy):
                 )
                 document.arcs.extend(arcs)
         
-        # Phase 2.5a: Create enzyme places AFTER reactions (positioned above catalyzed reactions)
-        # This prevents enzyme places from being included in hierarchical layout (no flattening)
-        if options.create_enzyme_places and 'enzyme_entries_to_create' in locals():
-            logger.info(f"Creating enzyme places positioned above catalyzed reactions...")
-            
-            for entry_id, entry in enzyme_entries_to_create:
-                # Get the transition for the reaction this enzyme catalyzes
-                reaction_transition = reaction_name_to_transition.get(entry.reaction)
-                
-                # Position enzyme ABOVE the catalyzed reaction
-                if reaction_transition:
-                    enzyme_x = reaction_transition.x
-                    enzyme_y = reaction_transition.y - 100.0  # Position 100 units above
-                else:
-                    # Fallback: use KGML coordinates if reaction not found
-                    enzyme_x = entry.graphics.x * options.coordinate_scale + options.center_x
-                    enzyme_y = entry.graphics.y * options.coordinate_scale + options.center_y
-                
-                # Get enzyme name from graphics
-                label = entry.graphics.name if entry.graphics and entry.graphics.name else entry.name
-                label = label.replace('\n', ' ').strip()
-                
-                place_id = f"P{entry.id}"
-                place_name = f"P{entry.id}"
-                
-                # Create enzyme place
-                place = Place(enzyme_x, enzyme_y, place_id, place_name, label=label)
-                place.tokens = 1  # Enzymes typically have 1 token (present/active)
-                place.initial_marking = 1
-                
-                # Mark as enzyme in metadata
-                if not hasattr(place, 'metadata'):
-                    place.metadata = {}
-                place.metadata['kegg_id'] = entry.name
-                place.metadata['kegg_entry_id'] = entry.id
-                place.metadata['kegg_type'] = entry.type
-                place.metadata['source'] = 'KEGG'
-                place.metadata['is_enzyme'] = True
-                place.metadata['catalyzes_reaction'] = entry.reaction
-                
-                document.places.append(place)
-                place_map[entry_id] = place  # Update placeholder with actual place
-            
-            logger.info(f"Created {len(enzyme_entries_to_create)} enzyme places above reactions")
-        
-        # Phase 2.5b: Convert enzyme entries to test arcs (Biological Petri Net)
+        # Phase 2.5: Convert enzyme entries to test arcs (Biological Petri Net)
         # ONLY if create_enzyme_places option is enabled
         # KEGG enzyme entries (type="gene"/"enzyme"/"ortholog") with reaction attribute
         # become test arcs connecting enzyme places to reaction transitions
+        # NOTE: Enzyme places are created earlier in Phase 1 using KGML coordinates,
+        # so they participate in the network naturally (not isolated above)
         if options.create_enzyme_places:
             enzyme_converter = KEGGEnzymeConverter(
                 pathway=pathway,
