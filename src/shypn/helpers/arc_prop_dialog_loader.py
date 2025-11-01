@@ -10,7 +10,7 @@ import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, GObject
 from shypn.helpers.color_picker import setup_color_picker_in_dialog
-from shypn.utils.arc_transform import is_inhibitor, convert_to_inhibitor, convert_to_normal
+from shypn.utils.arc_transform import is_inhibitor, is_test, convert_to_inhibitor, convert_to_normal, convert_to_test
 
 class ArcPropDialogLoader(GObject.GObject):
     """Loader for Arc properties dialog.
@@ -133,11 +133,12 @@ class ArcPropDialogLoader(GObject.GObject):
         if type_combo:
             # Determine current arc type
             # 0 = Normal, 1 = Inhibitor, 2 = Test
-            if is_inhibitor(self.arc_obj):
+            if is_test(self.arc_obj):
+                type_combo.set_active(2)  # Test
+            elif is_inhibitor(self.arc_obj):
                 type_combo.set_active(1)  # Inhibitor
             else:
                 type_combo.set_active(0)  # Normal
-            # TODO: Add Test arc detection when Test arc class is implemented
         
         threshold_textview = self.builder.get_object('prop_arc_threshold_entry')
         if threshold_textview and hasattr(self.arc_obj, 'threshold'):
@@ -232,13 +233,14 @@ class ArcPropDialogLoader(GObject.GObject):
             new_type_index = type_combo.get_active()
             # 0 = Normal, 1 = Inhibitor, 2 = Test
             current_is_inhibitor = is_inhibitor(self.arc_obj)
+            current_is_test = is_test(self.arc_obj)
             
-            if new_type_index == 0 and current_is_inhibitor:
-                # Convert from Inhibitor to Normal
+            if new_type_index == 0 and (current_is_inhibitor or current_is_test):
+                # Convert from Inhibitor/Test to Normal
                 self.arc_obj = convert_to_normal(self.arc_obj)
                 self._replace_arc_in_model()
             elif new_type_index == 1 and not current_is_inhibitor:
-                # Convert from Normal to Inhibitor
+                # Convert from Normal/Test to Inhibitor
                 try:
                     self.arc_obj = convert_to_inhibitor(self.arc_obj)
                     self._replace_arc_in_model()
@@ -255,7 +257,27 @@ class ArcPropDialogLoader(GObject.GObject):
                     error_dialog.run()
                     error_dialog.destroy()
                     return  # Don't apply other changes
-            # TODO: Add Test arc conversion when Test arc class is implemented
+            elif new_type_index == 2 and not current_is_test:
+                # Convert from Normal/Inhibitor to Test
+                try:
+                    self.arc_obj = convert_to_test(self.arc_obj)
+                    self._replace_arc_in_model()
+                except ValueError as e:
+                    # Show error dialog if conversion invalid (e.g., Transition → Place)
+                    error_dialog = Gtk.MessageDialog(
+                        transient_for=self.dialog,
+                        flags=0,
+                        message_type=Gtk.MessageType.ERROR,
+                        buttons=Gtk.ButtonsType.OK,
+                        text="Cannot convert to Test Arc"
+                    )
+                    error_dialog.format_secondary_text(
+                        f"{e}\n\nTest arcs model catalysts/enzymes that enable reactions "
+                        "without being consumed. They must connect Place → Transition only."
+                    )
+                    error_dialog.run()
+                    error_dialog.destroy()
+                    return  # Don't apply other changes
         
         description_text = self.builder.get_object('description_text')
         if description_text and hasattr(self.arc_obj, 'label'):

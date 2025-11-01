@@ -139,6 +139,10 @@ class ImmediateBehavior(TransitionBehavior):
                     if kind != 'normal':
                         continue
                     
+                    # Skip test arcs - they check enablement but don't consume tokens
+                    if hasattr(arc, 'consumes_tokens') and not arc.consumes_tokens():
+                        continue
+                    
                     # Get source place directly from arc reference
                     source_place = arc.source
                     if source_place is None:

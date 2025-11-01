@@ -368,6 +368,10 @@ class StochasticBehavior(TransitionBehavior):
                     if kind != 'normal':
                         continue
                     
+                    # Skip test arcs - they check enablement but don't consume tokens
+                    if hasattr(arc, 'consumes_tokens') and not arc.consumes_tokens():
+                        continue
+                    
                     source_place = self._get_place(arc.source_id)
                     if source_place is None:
                         return False, {

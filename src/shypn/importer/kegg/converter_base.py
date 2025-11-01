@@ -41,6 +41,11 @@ class ConversionOptions:
             (stochastic vs continuous) and reasonable parameter defaults
             Uses the heuristic system to fill gaps since KEGG lacks explicit kinetic data
         
+        create_enzyme_places: Create explicit places for enzyme entries (default: False)
+            When True, creates places for gene/enzyme/ortholog entries and test arcs (Biological PN)
+            When False, enzymes remain implicit (cleaner layout, classical PN, matches original KEGG visualization)
+            Recommendation: Set True for biological analysis, False for visual clarity
+        
         center_x: X coordinate offset for positioning (default: 0.0)
         center_y: Y coordinate offset for positioning (default: 0.0)
         initial_tokens: Number of tokens to add to each place when add_initial_marking is True (default: 1)
@@ -51,6 +56,7 @@ class ConversionOptions:
     add_initial_marking: bool = False  # KEGG has no initial concentrations - leave empty by default
     filter_isolated_compounds: bool = True
     enhance_kinetics: bool = True  # Auto-enhance kinetics for better simulation
+    create_enzyme_places: bool = False  # Keep layout clean by default - set True for biological analysis
     center_x: float = 0.0
     center_y: float = 0.0
     initial_tokens: int = 1

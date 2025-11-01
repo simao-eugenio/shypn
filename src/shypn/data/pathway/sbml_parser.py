@@ -199,7 +199,7 @@ class ReactionExtractor(BaseExtractor):
             sbml_reaction: libsbml Reaction object
             
         Returns:
-            Reaction object
+            Reaction object with reactants, products, and modifiers
         """
         # Extract basic info
         reaction_id = sbml_reaction.getId()
@@ -222,6 +222,15 @@ class ReactionExtractor(BaseExtractor):
             stoichiometry = species_ref.getStoichiometry()
             products.append((species_id, stoichiometry))
         
+        # Extract modifiers (catalysts/enzymes/inhibitors)
+        # These will be converted to test arcs in Biological Petri Nets
+        modifiers = []
+        for i in range(sbml_reaction.getNumModifiers()):
+            modifier_ref = sbml_reaction.getModifier(i)
+            species_id = modifier_ref.getSpecies()
+            modifiers.append(species_id)
+            self.logger.debug(f"    Modifier: {species_id} (catalyst/enzyme)")
+        
         # Extract kinetic law
         kinetic_law = None
         if sbml_reaction.isSetKineticLaw():
@@ -235,6 +244,7 @@ class ReactionExtractor(BaseExtractor):
             name=name,
             reactants=reactants,
             products=products,
+            modifiers=modifiers,  # NEW: Catalysts from SBML modifiers
             kinetic_law=kinetic_law,
             reversible=reversible
         )

@@ -351,6 +351,10 @@ class ContinuousBehavior(TransitionBehavior):
                     if kind != 'normal':
                         continue
                     
+                    # Skip test arcs - they check enablement but don't consume tokens
+                    if hasattr(arc, 'consumes_tokens') and not arc.consumes_tokens():
+                        continue
+                    
                     source_place = self._get_place(arc.source_id)
                     if source_place is None:
                         continue
@@ -364,6 +368,10 @@ class ContinuousBehavior(TransitionBehavior):
                 for arc in input_arcs:
                     kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
                     if kind != 'normal':
+                        continue
+                    
+                    # Skip test arcs - they check enablement but don't consume tokens
+                    if hasattr(arc, 'consumes_tokens') and not arc.consumes_tokens():
                         continue
                     
                     source_place = self._get_place(arc.source_id)

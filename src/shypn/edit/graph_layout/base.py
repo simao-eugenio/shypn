@@ -108,11 +108,21 @@ class LayoutAlgorithm(ABC):
         layers = {}
         
         # Find source nodes (no predecessors)
-        sources = [n for n in graph.nodes() if graph.in_degree(n) == 0]
+        # CRITICAL: Exclude catalyst places (enzyme places with only test arcs)
+        # Catalysts are NOT input places - they're decorations showing enzyme presence.
+        # Including them as sources causes layout flattening (too many layer 0 nodes).
+        sources = [
+            n for n in graph.nodes() 
+            if graph.in_degree(n) == 0 and not getattr(n, 'is_catalyst', False)
+        ]
         
         if not sources:
-            # Graph has no sources, use arbitrary starting node
-            sources = [list(graph.nodes())[0]]
+            # Graph has no sources, use arbitrary starting node (but not a catalyst)
+            non_catalyst_nodes = [n for n in graph.nodes() if not getattr(n, 'is_catalyst', False)]
+            if non_catalyst_nodes:
+                sources = [non_catalyst_nodes[0]]
+            else:
+                sources = [list(graph.nodes())[0]]
         
         # BFS layer assignment
         for source in sources:
@@ -128,13 +138,35 @@ class LayoutAlgorithm(ABC):
                 for successor in graph.successors(node):
                     if successor not in processed:
                         # Layer = max(predecessor layers) + 1
-                        pred_layers = [layers.get(pred, 0) for pred in graph.predecessors(successor)]
+                        # CRITICAL: Exclude catalyst predecessors from layer calculation
+                        # Catalysts shouldn't influence the hierarchical structure
+                        pred_layers = [
+                            layers.get(pred, 0) 
+                            for pred in graph.predecessors(successor)
+                            if not getattr(pred, 'is_catalyst', False)
+                        ]
                         layers[successor] = max(pred_layers) + 1 if pred_layers else 0
                         next_layer.append(successor)
                         processed.add(successor)
             current_layer = next_layer
         
-        # Handle any unprocessed nodes (disconnected components)
+        # Position catalyst places AFTER main BFS
+        # Place catalysts at the same layer as the reactions they catalyze
+        # (or one layer above for visual separation)
+        for node in graph.nodes():
+            if getattr(node, 'is_catalyst', False) and node not in layers:
+                # Find the reactions (transitions) this catalyst connects to
+                successors = list(graph.successors(node))
+                if successors:
+                    # Position catalyst at same layer as first catalyzed reaction
+                    # (Test arcs connect catalyst → transition)
+                    catalyzed_layers = [layers.get(succ, 0) for succ in successors]
+                    layers[node] = max(catalyzed_layers) if catalyzed_layers else 0
+                else:
+                    # No connections (shouldn't happen for catalysts, but fallback)
+                    layers[node] = 0
+        
+        # Handle any remaining unprocessed nodes (disconnected components)
         for node in graph.nodes():
             if node not in layers:
                 layers[node] = 0
