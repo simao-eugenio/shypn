@@ -74,17 +74,20 @@ class ImmediateBehavior(TransitionBehavior):
         
         # Check each input place for sufficient tokens
         for arc in input_arcs:
-            # Skip inhibitor arcs (they don't consume tokens)
+            # Skip inhibitor arcs in enablement check (they have inverted logic)
             kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
-            if kind != 'normal':
+            if kind == 'inhibitor':
                 continue
+            
+            # Test arcs (catalysts) SHOULD be checked for token presence
+            # They require enzyme to be present but won't consume the tokens
             
             # Get source place directly from arc reference
             source_place = arc.source
             if source_place is None:
                 return False, f"missing-source-place-{arc.name}"
             
-            # Check sufficient tokens
+            # Check sufficient tokens (applies to both normal arcs and test arcs)
             if source_place.tokens < arc.weight:
                 return False, f"insufficient-tokens-{source_place.name}"
         

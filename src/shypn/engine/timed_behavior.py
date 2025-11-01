@@ -144,9 +144,8 @@ class TimedBehavior(TransitionBehavior):
         if not is_source:
             input_arcs = self.get_input_arcs()
             for arc in input_arcs:
-                kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
-                if kind != 'normal':
-                    continue
+                # Check ALL input arcs (normal, test, inhibitor) for token availability
+                # All arc types require tokens >= weight for enablement
                 source_place = self._get_place(arc.source_id)
                 if source_place is None:
                     return (False, f'missing-source-place-{arc.source_id}')
@@ -186,38 +185,20 @@ class TimedBehavior(TransitionBehavior):
         return (True, f'enabled-in-window (elapsed={elapsed:.3f})')
 
     def fire(self, input_arcs: List, output_arcs: List) -> Tuple[bool, Dict[str, Any]]:
-        """Execute timed discrete firing.
+        """Fire the transition if timing window is satisfied.
         
-        Firing process (identical to immediate, but respects timing):
-            pass
-        1. Validate enablement (tokens + timing window)
-        2. Consume exactly arc_weight tokens from each input place
-        3. Produce exactly arc_weight tokens to each output place
-        4. Clear enablement time (will be reset if re-enabled)
-        5. Record firing event with timing info
-        
-        Args:
-            input_arcs: List of incoming Arc objects
-            output_arcs: List of outgoing Arc objects
+        Process:
+        1. Validate timing window (earliest <= elapsed <= latest)
+        2. Check structural enablement (guard, tokens)
+        3. Consume tokens from input places (skip test arcs!)
+        4. Produce tokens to output places
+        5. Clear enablement
+        6. Record transition event
         
         Returns:
-            Tuple of (success: bool, details: dict)
-            
-            Success case:
-                (True, {
-                    'consumed': {place_id: amount, ...},
-                    'produced': {place_id: amount, ...},
-                    'timed_mode': True,
-                    'discrete_firing': True,
-                    'elapsed_time': float,
-                    'timing_window': [earliest, latest]
-                })
-            
-            Failure case:
-                (False, {
-                    'reason': 'error-description',
-                    'timed_mode': True
-                })
+            (success: bool, details: dict)
+                success=True with details={'consumed', 'produced', 'timed_mode', ...}
+                success=False with details={'reason', 'timed_mode', ...}
         """
         try:
             can_fire, reason = self.can_fire()
@@ -236,10 +217,6 @@ class TimedBehavior(TransitionBehavior):
             # Consume tokens from input places (skip if source transition)
             if not is_source:
                 for arc in input_arcs:
-                    kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
-                    if kind != 'normal':
-                        continue
-                    
                     # Skip test arcs - they check enablement but don't consume tokens
                     if hasattr(arc, 'consumes_tokens') and not arc.consumes_tokens():
                         continue

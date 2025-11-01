@@ -472,6 +472,13 @@ class DocumentModel:
         document._next_transition_id = max_transition_id + 1
         document._next_arc_id = max_arc_id + 1
         
+        # IMPORTANT: Reset all places to their initial marking
+        # When loading a saved file, we want to start with the initial state,
+        # not the simulation state that was active when the file was saved
+        for place in document.places:
+            if hasattr(place, 'initial_marking'):
+                place.tokens = place.initial_marking
+        
         # Restore view state if present
         if "view_state" in data:
             document.view_state = data["view_state"]

@@ -300,9 +300,9 @@ class SimulationController:
             input_arcs = behavior.get_input_arcs()
             locally_enabled = True
             for arc in input_arcs:
-                kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
-                if kind != 'normal':
-                    continue
+                # Check ALL arc types for enablement (normal, test, inhibitor)
+                # Test arcs check presence but don't consume (catalysts)
+                # Inhibitor arcs check surplus and do consume (cooperation)
                 source_place = behavior._get_place(arc.source_id)
                 if source_place is None or source_place.tokens < arc.weight:
                     locally_enabled = False
@@ -489,9 +489,7 @@ class SimulationController:
                     if not is_source:
                         input_arcs = behavior.get_input_arcs()
                         for arc in input_arcs:
-                            kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
-                            if kind != 'normal':
-                                continue
+                            # Check ALL arc types (normal, test, inhibitor) for token availability
                             source_place = self.model_adapter.places.get(arc.source_id)
                             if source_place is None or source_place.tokens < arc.weight:
                                 has_tokens = False
@@ -506,8 +504,8 @@ class SimulationController:
                         # Consume tokens from input places
                         if not is_source:
                             for arc in behavior.get_input_arcs():
-                                kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
-                                if kind != 'normal':
+                                # Skip test arcs - they check enablement but don't consume tokens
+                                if hasattr(arc, 'consumes_tokens') and not arc.consumes_tokens():
                                     continue
                                 source_place = self.model_adapter.places.get(arc.source_id)
                                 source_place.set_tokens(source_place.tokens - arc.weight)
