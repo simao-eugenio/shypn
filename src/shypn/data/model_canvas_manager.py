@@ -695,13 +695,12 @@ class ModelCanvasManager:
         When a new arc creates a parallel situation (same source/target or opposite),
         convert all involved arcs to curved arcs for better visualization.
         
+        Parallel arcs MUST always be curved - never straight. This prevents
+        visual overlap and maintains clear distinction between different flows.
+        
         Args:
             new_arc: The newly added arc that may create parallels
         """
-        # DISABLED: Keep all arcs straight/linear for imported pathways
-        # Curved arcs can cause coordinate calculation issues
-        return
-        
         from shypn.netobjs import CurvedArc, CurvedInhibitorArc, InhibitorArc
         from shypn.utils.arc_transform import make_curved
         
