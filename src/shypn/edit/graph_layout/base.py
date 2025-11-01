@@ -134,25 +134,37 @@ class LayoutAlgorithm(ABC):
         
         while current_layer:
             next_layer = []
+            next_layer_set = set()
+            
             for node in current_layer:
                 for successor in graph.successors(node):
                     if successor not in processed:
-                        # Layer = max(predecessor layers) + 1
-                        # CRITICAL: Exclude catalyst predecessors from layer calculation
-                        # Catalysts shouldn't influence the hierarchical structure
+                        # Calculate layer for this successor
                         pred_layers = [
                             layers.get(pred, 0) 
                             for pred in graph.predecessors(successor)
-                            if not getattr(pred, 'is_catalyst', False)
                         ]
-                        layers[successor] = max(pred_layers) + 1 if pred_layers else 0
-                        next_layer.append(successor)
+                        successor_layer = max(pred_layers) + 1 if pred_layers else 0
+                        layers[successor] = successor_layer
+                        
+                        if successor not in next_layer_set:
+                            next_layer.append(successor)
+                            next_layer_set.add(successor)
                         processed.add(successor)
+                        
+                        # CRITICAL: Also process catalyst predecessors of this successor
+                        # Catalysts should be at the same layer as the transitions they connect to
+                        for pred in graph.predecessors(successor):
+                            if getattr(pred, 'is_catalyst', False) and pred not in processed:
+                                # Place catalyst at same layer as the reaction it catalyzes
+                                layers[pred] = successor_layer
+                                processed.add(pred)
+                                # Don't add to next_layer - catalysts don't propagate
+            
             current_layer = next_layer
         
-        # Position catalyst places AFTER main BFS
-        # Place catalysts at the same layer as the reactions they catalyze
-        # (or one layer above for visual separation)
+        # Handle any remaining unprocessed catalyst places
+        # (edge case: catalyst with no successors or disconnected)
         for node in graph.nodes():
             if getattr(node, 'is_catalyst', False) and node not in layers:
                 # Find the reactions (transitions) this catalyst connects to

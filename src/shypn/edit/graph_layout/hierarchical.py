@@ -65,14 +65,10 @@ class HierarchicalLayout(LayoutAlgorithm):
             connected_graph.remove_nodes_from(isolated_nodes)
             print(f"🔍 Hierarchical layout: Filtered {len(isolated_nodes)} isolated nodes (no arcs)")
         
-        # Also filter catalyst places (only test arcs, not part of main hierarchy)
-        catalyst_nodes = [
-            n for n in connected_graph.nodes()
-            if getattr(n, 'is_catalyst', False)
-        ]
-        if catalyst_nodes:
-            connected_graph.remove_nodes_from(catalyst_nodes)
-            print(f"🔍 Hierarchical layout: Filtered {len(catalyst_nodes)} catalyst nodes (test arcs only)")
+        # NOTE: Catalysts (is_catalyst=True) are now treated as NORMAL places
+        # They participate in the layout algorithm like any other place
+        # The only special handling is in base.py to exclude them from being
+        # treated as "source" nodes (layer 0) when they have no incoming arcs
         
         if connected_graph.number_of_nodes() == 0:
             print("⚠️ Hierarchical layout: No connected nodes after filtering")
