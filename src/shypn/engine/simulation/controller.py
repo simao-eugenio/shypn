@@ -219,6 +219,11 @@ class SimulationController:
         dynamic type changes during simulation. If type changes, invalidates
         and recreates the behavior instance.
         
+        Cache invalidation strategy:
+        - Type mismatch: Invalidates and recreates behavior (handles type changes)
+        - reset(): Clears entire cache (prevents stale state across model reloads)
+        - _on_model_changed: Removes specific transition behaviors (handles deletions)
+        
         Args:
             transition: Transition object with transition_type property
             
@@ -1601,7 +1606,8 @@ class SimulationController:
         """Reset the simulation to initial marking.
         
         This stops any running simulation and resets all places to their
-        initial marking values.
+        initial marking values. Also clears the behavior cache to prevent
+        stale state from persisting across model reloads.
         """
         if self._running:
             self.stop()
@@ -1613,9 +1619,15 @@ class SimulationController:
         if self.data_collector is not None:
             self.data_collector.clear()
         self.transition_states.clear()
+        
+        # Clear behavior cache to prevent stale state across model reloads
+        # This fixes the issue where cached behaviors from a previous model
+        # (with same transition IDs) persist and cause transitions not to fire
         for behavior in self.behavior_cache.values():
             if hasattr(behavior, 'clear_enablement'):
                 behavior.clear_enablement()
+        self.behavior_cache.clear()
+        
         for place in self.model.places:
             if hasattr(place, 'initial_marking'):
                 place.tokens = place.initial_marking
