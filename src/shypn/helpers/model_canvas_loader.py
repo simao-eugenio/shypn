@@ -2096,12 +2096,18 @@ class ModelCanvasLoader:
             from shypn.utils.arc_transform import is_straight, is_curved, is_inhibitor, is_normal
             from shypn.netobjs.place import Place
             from shypn.netobjs.transition import Transition
+            from shypn.netobjs.test_arc import TestArc
+            from shypn.netobjs.inhibitor_arc import InhibitorArc
             
             transform_submenu_item = Gtk.MenuItem(label='Transform Arc ►')
             transform_submenu = Gtk.Menu()
             
-            # Check if arc can be converted to inhibitor (Place → Transition only)
+            # Check arc type capabilities
             can_be_inhibitor = isinstance(obj.source, Place) and isinstance(obj.target, Transition)
+            can_be_test = isinstance(obj.source, Place) and isinstance(obj.target, Transition)
+            is_test = isinstance(obj, TestArc)
+            is_inhibitor_arc = isinstance(obj, InhibitorArc)
+            is_normal_arc = not is_test and not is_inhibitor_arc
             
             # Curve/Straight transformation options
             if is_curved(obj):
@@ -2117,26 +2123,54 @@ class ModelCanvasLoader:
                 curved_item.show()
                 transform_submenu.append(curved_item)
             
-            # Add separator if we have both curve/straight and normal/inhibitor options
+            # Add separator if we have both curve/straight and type conversion options
             if transform_submenu.get_children():
                 separator = Gtk.SeparatorMenuItem()
                 separator.show()
                 transform_submenu.append(separator)
             
-            # Normal/Inhibitor options
-            if is_normal(obj):
+            # Arc Type Conversion Options (Normal ↔ Test ↔ Inhibitor)
+            if can_be_test or can_be_inhibitor:
+                # Show checkmark for current type
+                type_label = "Arc Type ►"
+                type_submenu_item = Gtk.MenuItem(label=type_label)
+                type_submenu = Gtk.Menu()
+                
+                # Normal arc option
+                normal_label = "✓ Normal Arc" if is_normal_arc else "   Normal Arc"
+                normal_item = Gtk.MenuItem(label=normal_label)
+                if not is_normal_arc:
+                    normal_item.connect('activate', lambda w: self._on_arc_convert_to_normal(obj, manager, drawing_area))
+                else:
+                    normal_item.set_sensitive(False)
+                normal_item.show()
+                type_submenu.append(normal_item)
+                
+                # Test arc option (catalyst) - only for Place → Transition
+                if can_be_test:
+                    test_label = "✓ Test Arc (Catalyst)" if is_test else "   Test Arc (Catalyst)"
+                    test_item = Gtk.MenuItem(label=test_label)
+                    if not is_test:
+                        test_item.connect('activate', lambda w: self._on_arc_convert_to_test(obj, manager, drawing_area))
+                    else:
+                        test_item.set_sensitive(False)
+                    test_item.show()
+                    type_submenu.append(test_item)
+                
+                # Inhibitor arc option - only for Place → Transition
                 if can_be_inhibitor:
-                    inhibitor_item = Gtk.MenuItem(label='Convert to Inhibitor Arc')
-                    inhibitor_item.connect('activate', lambda w: self._on_arc_convert_to_inhibitor(obj, manager, drawing_area))
+                    inhibitor_label = "✓ Inhibitor Arc" if is_inhibitor_arc else "   Inhibitor Arc"
+                    inhibitor_item = Gtk.MenuItem(label=inhibitor_label)
+                    if not is_inhibitor_arc:
+                        inhibitor_item.connect('activate', lambda w: self._on_arc_convert_to_inhibitor(obj, manager, drawing_area))
+                    else:
+                        inhibitor_item.set_sensitive(False)
                     inhibitor_item.show()
-                    transform_submenu.append(inhibitor_item)
-                # If arc is Transition → Place, don't show inhibitor option at all
-            else:
-                # Already an inhibitor arc, show option to convert back to normal
-                inhibitor_item = Gtk.MenuItem(label='Convert to Normal Arc')
-                inhibitor_item.connect('activate', lambda w: self._on_arc_convert_to_normal(obj, manager, drawing_area))
-                inhibitor_item.show()
-                transform_submenu.append(inhibitor_item)
+                    type_submenu.append(inhibitor_item)
+                
+                type_submenu_item.set_submenu(type_submenu)
+                type_submenu_item.show()
+                transform_submenu.append(type_submenu_item)
             
             # Only show Transform submenu if there are options
             if transform_submenu.get_children():
@@ -3266,6 +3300,25 @@ class ModelCanvasLoader:
         new_arc = convert_to_normal(arc)
         manager.replace_arc(arc, new_arc)
         drawing_area.queue_draw()
+    
+    def _on_arc_convert_to_test(self, arc, manager, drawing_area):
+        """Convert arc to test type (catalyst).
+        
+        Args:
+            arc: Arc object
+            manager: ModelCanvasManager instance
+            drawing_area: GtkDrawingArea widget
+        """
+        from shypn.utils.arc_transform import convert_to_test
+        
+        try:
+            new_arc = convert_to_test(arc)
+            manager.replace_arc(arc, new_arc)
+            drawing_area.queue_draw()
+        except ValueError as e:
+            # Invalid transformation (e.g., Transition → Place)
+            self._show_error_dialog(str(e))
+            return
     
     def _cut_selection(self, manager, widget):
         """Cut selected objects to clipboard.

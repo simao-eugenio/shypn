@@ -650,6 +650,11 @@ class BiochemicalLayoutProcessor:
                     graph.add_edge(species_id, reaction.id)
                 for species_id, _ in reaction.products:
                     graph.add_edge(reaction.id, species_id)
+                # CRITICAL: Add modifiers/catalysts to graph for proper distribution
+                # This ensures catalyst places are positioned in the force-directed layout
+                if hasattr(reaction, 'modifiers') and reaction.modifiers:
+                    for modifier_id in reaction.modifiers:
+                        graph.add_edge(modifier_id, reaction.id)
             
             # Calculate layout
             pos = nx.spring_layout(
