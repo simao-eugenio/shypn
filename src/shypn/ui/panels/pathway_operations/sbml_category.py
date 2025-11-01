@@ -521,88 +521,126 @@ class SBMLCategory(BasePathwayCategory):
             # ===== AUTO-LOAD MODEL TO CANVAS =====
             # Load the saved model into canvas automatically (same as KEGG import)
             self.logger.info("=== Starting SBML canvas auto-load ===")
-            try:
-                from shypn.helpers.model_canvas_loader import ModelCanvasLoader
-                # Use self.model_canvas which is set by the parent panel
-                canvas_loader = self.model_canvas
-                self.logger.info(f"Canvas loader: {canvas_loader}")
-                
-                if not canvas_loader:
-                    raise ValueError("Model canvas not available - please open the application with GUI")
-                
-                # Get base name for tab
-                base_name = os.path.splitext(os.path.basename(saved_filepath))[0]
-                self.logger.info(f"Loading model: {base_name}")
-                
-                # Check if current tab is empty and can be reused
-                current_drawing_area = canvas_loader.get_current_drawing_area()
-                current_manager = None
-                if current_drawing_area:
-                    current_manager = canvas_loader.get_canvas_manager(current_drawing_area)
-                
-                canvas_manager = None
-                
-                # If current tab is empty, reuse it
-                if current_manager and current_manager.is_empty():
-                    canvas_manager = current_manager
-                    self.logger.info("Reusing empty tab for SBML import")
-                    # CRITICAL: Reset manager state before loading
-                    canvas_loader._reset_manager_for_load(canvas_manager, base_name)
+            
+            # Detect if we have a loader or direct manager
+            canvas_loader = None
+            canvas_manager = None
+            
+            if self.model_canvas:
+                if hasattr(self.model_canvas, 'get_current_model'):
+                    # It's a loader - get reference and current manager
+                    canvas_loader = self.model_canvas
+                    canvas_manager = canvas_loader.get_current_model()
+                    self.logger.info(f"Detected canvas loader, current manager={canvas_manager is not None}")
                 else:
-                    # Create new tab
-                    self.logger.info("Creating new tab for SBML import")
-                    page_index, drawing_area = canvas_loader.add_document(filename=base_name)
-                    canvas_manager = canvas_loader.get_canvas_manager(drawing_area)
-                
-                if not canvas_manager:
-                    raise ValueError("Failed to get canvas manager after tab creation")
-                
-                # Load objects using UNIFIED path (same as KEGG and File→Open)
-                canvas_manager.load_objects(
-                    places=document_model.places,
-                    transitions=document_model.transitions,
-                    arcs=document_model.arcs
-                )
-                
-                # Set change callback for proper state management
-                canvas_manager.document_controller.set_change_callback(
-                    canvas_manager._on_object_changed
-                )
-                
-                # Set filepath and mark as clean (just imported/saved)
-                canvas_manager.set_filepath(saved_filepath)
-                canvas_manager.mark_clean()
-                
-                # Mark as imported
-                canvas_manager.mark_as_imported(base_name)
-                
-                # Fit to page to show entire model (with padding)
-                canvas_manager.fit_to_page(
-                    padding_percent=15,
-                    deferred=True,
-                    horizontal_offset_percent=30,
-                    vertical_offset_percent=10
-                )
-                
-                # Force redraw to display loaded objects
-                canvas_manager.mark_needs_redraw()
-                
-                self.logger.info("=== SBML canvas auto-load COMPLETED ===")
-                self._show_status(
-                    f"✅ Model loaded to canvas: {base_name}\n"
-                    f"💡 Use View → Fit to Page (Ctrl+0) to adjust view if needed"
-                )
-                
-            except Exception as load_error:
-                self.logger.error(f"=== SBML canvas auto-load FAILED ===")
-                self.logger.error(f"Failed to auto-load model to canvas: {load_error}")
-                import traceback
-                traceback.print_exc()
-                # Show fallback message
+                    # It's already a manager
+                    canvas_manager = self.model_canvas
+                    self.logger.info("Direct canvas manager provided")
+            
+            self.logger.info(f"Auto-load check: model_canvas={self.model_canvas is not None}, "
+                           f"canvas_loader={canvas_loader is not None}, "
+                           f"canvas_manager={canvas_manager is not None}, "
+                           f"document_model={document_model is not None}, "
+                           f"saved_filepath={saved_filepath is not None}")
+            
+            # For auto-load, we need the canvas_loader to create a new tab
+            if canvas_loader and document_model and saved_filepath:
+                try:
+                    self.logger.info("✓ Auto-loading imported model into new canvas tab...")
+                    
+                    # Get base name for tab
+                    base_name = os.path.splitext(os.path.basename(saved_filepath))[0]
+                    self.logger.info(f"Loading model: {base_name}")
+                    
+                    # Check if current tab can be reused (empty + default name)
+                    can_reuse_tab = False
+                    current_page = canvas_loader.notebook.get_current_page()
+                    
+                    if current_page >= 0:
+                        page_widget = canvas_loader.notebook.get_nth_page(current_page)
+                        drawing_area = canvas_loader._get_drawing_area_from_page(page_widget)
+                        if drawing_area:
+                            manager = canvas_loader.get_canvas_manager(drawing_area)
+                            if manager:
+                                is_empty = (len(manager.places) == 0 and 
+                                           len(manager.transitions) == 0 and 
+                                           len(manager.arcs) == 0)
+                                is_default_name = (manager.filename == 'default' or 
+                                                  manager.get_display_name() == 'default')
+                                is_clean = not manager.is_dirty()
+                                can_reuse_tab = is_empty and is_default_name and is_clean
+                                self.logger.info(f"Current tab check: empty={is_empty}, default={is_default_name}, clean={is_clean}, reuse={can_reuse_tab}")
+                    
+                    # Either reuse current empty tab or create new one
+                    if can_reuse_tab:
+                        # Reuse the current empty default tab
+                        self.logger.info("Reusing current empty tab")
+                        canvas_manager = manager  # Already set from check above
+                        # CRITICAL: Reset manager state before loading
+                        canvas_loader._reset_manager_for_load(canvas_manager, base_name)
+                    else:
+                        # Create a new tab for this document (like File → Open does)
+                        self.logger.info(f"Creating new tab for: {base_name}")
+                        page_index, drawing_area = canvas_loader.add_document(filename=base_name)
+                        canvas_manager = canvas_loader.get_canvas_manager(drawing_area)
+                    
+                    if not canvas_manager:
+                        raise ValueError("Failed to get canvas manager after tab creation")
+                    
+                    # ===== UNIFIED OBJECT LOADING =====
+                    # Use load_objects() for consistent initialization (same as File → Open)
+                    canvas_manager.load_objects(
+                        places=document_model.places,
+                        transitions=document_model.transitions,
+                        arcs=document_model.arcs
+                    )
+                    
+                    # CRITICAL: Set change callback for proper state management
+                    canvas_manager.document_controller.set_change_callback(
+                        canvas_manager._on_object_changed
+                    )
+                    
+                    # Set filepath and mark as clean (just imported/saved)
+                    canvas_manager.set_filepath(saved_filepath)
+                    canvas_manager.mark_clean()
+                    
+                    # Mark as imported
+                    canvas_manager.mark_as_imported(base_name)
+                    
+                    # Fit to page to show entire model (with padding)
+                    canvas_manager.fit_to_page(
+                        padding_percent=15,
+                        deferred=True,
+                        horizontal_offset_percent=30,
+                        vertical_offset_percent=10
+                    )
+                    
+                    # Force redraw to display loaded objects
+                    canvas_manager.mark_needs_redraw()
+                    
+                    self.logger.info("=== SBML canvas auto-load COMPLETED ===")
+                    self._show_status(
+                        f"✅ Model loaded to canvas: {base_name}\n"
+                        f"💡 Use View → Fit to Page (Ctrl+0) to adjust view if needed"
+                    )
+                    
+                except Exception as load_error:
+                    self.logger.error(f"=== SBML canvas auto-load FAILED ===")
+                    self.logger.error(f"Failed to auto-load model to canvas: {load_error}")
+                    import traceback
+                    traceback.print_exc()
+                    # Show fallback message
+                    self._show_status(
+                        f"✅ Model saved to {saved_filepath}\n"
+                        f"⚠️ Auto-load failed, use File → Open to load manually\n"
+                        f"💡 Use View → Fit to Page (Ctrl+0) to see the entire model"
+                    )
+            else:
+                # No canvas loader available
+                self.logger.warning("Canvas loader not available for auto-load")
                 self._show_status(
                     f"✅ Model saved to {saved_filepath}\n"
-                    f"⚠️ Auto-load failed, use File → Open to load manually\n"
-                    f"💡 Use View → Fit to Page (Ctrl+0) to see the entire model"
+                    f"💡 Use File → Open to load the model"
                 )
             
             # Re-enable button
