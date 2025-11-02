@@ -389,16 +389,22 @@ class DocumentModel:
         """
         from datetime import datetime
         
+        # Build metadata - preserve existing metadata and add serialization info
+        metadata = {}
+        if hasattr(self, 'metadata') and self.metadata:
+            metadata.update(self.metadata)  # Preserve existing metadata (source, has_test_arcs, etc.)
+        
+        # Add serialization metadata
+        metadata["created"] = datetime.now().isoformat()
+        metadata["object_counts"] = {
+            "places": len(self.places),
+            "transitions": len(self.transitions),
+            "arcs": len(self.arcs)
+        }
+        
         return {
             "version": "2.0",
-            "metadata": {
-                "created": datetime.now().isoformat(),
-                "object_counts": {
-                    "places": len(self.places),
-                    "transitions": len(self.transitions),
-                    "arcs": len(self.arcs)
-                }
-            },
+            "metadata": metadata,
             "view_state": self.view_state,
             "places": [place.to_dict() for place in self.places],
             "transitions": [transition.to_dict() for transition in self.transitions],
@@ -482,6 +488,15 @@ class DocumentModel:
         # Restore view state if present
         if "view_state" in data:
             document.view_state = data["view_state"]
+        
+        # Restore metadata if present (source, has_test_arcs, model_type, etc.)
+        if "metadata" in data:
+            # Filter out serialization-only metadata (created, object_counts)
+            # and only restore application metadata
+            metadata = {k: v for k, v in data["metadata"].items() 
+                       if k not in ("created", "object_counts")}
+            if metadata:
+                document.metadata = metadata
         
         return document
     
