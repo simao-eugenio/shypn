@@ -139,9 +139,10 @@ class ModelsCategory(BaseReportCategory):
             tuple: (ScrolledWindow, TreeView, ListStore)
         """
         # Create ListStore with column types
-        # Columns: index (int), id (str), name (str), kegg_id (str), 
-        #          tokens (float), formula (str), mass (float), type (str)
-        store = Gtk.ListStore(int, str, str, str, float, str, float, str)
+        # Columns: index (int), id (str), name (str), extended_name (str), 
+        #          db_id (str), db_id_source (str), tokens (float), 
+        #          formula (str), formula_source (str), mass (float), mass_source (str), type (str)
+        store = Gtk.ListStore(int, str, str, str, str, str, float, str, str, float, str, str)
         
         # Create TreeView
         treeview = Gtk.TreeView(model=store)
@@ -149,15 +150,16 @@ class ModelsCategory(BaseReportCategory):
         treeview.set_enable_search(True)
         treeview.set_search_column(2)  # Search by biological name
         
-        # Add columns with renderers
+        # Add columns with renderers (colored for source tracking)
         self._add_column(treeview, "#", 0, width=50, sortable=False)
-        self._add_column(treeview, "Petri Net ID", 1, sortable=True, width=120)
-        self._add_column(treeview, "Biological Name", 2, sortable=True, width=200)
-        self._add_column(treeview, "Database ID", 3, sortable=True, width=140)
-        self._add_column(treeview, "Initial Tokens", 4, sortable=True, numeric=True, width=120)
-        self._add_column(treeview, "Formula", 5, sortable=True, width=120)
-        self._add_column(treeview, "Mass (g/mol)", 6, sortable=True, numeric=True, width=120)
-        self._add_column(treeview, "Type", 7, sortable=True, width=100)
+        self._add_column(treeview, "Petri Net ID", 1, sortable=True, width=100)
+        self._add_column(treeview, "Biological Name", 2, sortable=True, width=150)
+        self._add_column(treeview, "Extended Name", 3, sortable=True, width=200)
+        self._add_colored_column(treeview, "Database ID", 4, 5, sortable=True, width=120)
+        self._add_column(treeview, "Initial Tokens", 6, sortable=True, numeric=True, width=100)
+        self._add_colored_column(treeview, "Formula", 7, 8, sortable=True, width=100)
+        self._add_colored_column(treeview, "Mass (g/mol)", 9, 10, sortable=True, numeric=True, width=100)
+        self._add_column(treeview, "Type", 11, sortable=True, width=90)
         
         # Create scrolled window
         scrolled = Gtk.ScrolledWindow()
@@ -229,6 +231,67 @@ class ModelsCategory(BaseReportCategory):
             column.set_clickable(True)
         
         treeview.append_column(column)
+    
+    def _add_colored_column(self, treeview, title, data_column_id, source_column_id,
+                            sortable=False, width=None, numeric=False):
+        """Helper to add a colored column to TreeView based on data source.
+        
+        Args:
+            treeview: TreeView widget
+            title: Column title
+            data_column_id: Column index for data in ListStore
+            source_column_id: Column index for source info in ListStore
+            sortable: Whether column is sortable
+            width: Fixed width (None for auto)
+            numeric: Whether to right-align (for numbers)
+        """
+        renderer = Gtk.CellRendererText()
+        if numeric:
+            renderer.set_property('xalign', 1.0)  # Right-align numbers
+        
+        column = Gtk.TreeViewColumn(title, renderer, text=data_column_id)
+        column.set_resizable(True)
+        if width:
+            column.set_min_width(width)
+        if sortable:
+            column.set_sort_column_id(data_column_id)
+            column.set_clickable(True)
+        
+        # Set cell data func to color based on source
+        column.set_cell_data_func(renderer, self._color_cell_by_source, 
+                                   (data_column_id, source_column_id))
+        
+        treeview.append_column(column)
+    
+    def _color_cell_by_source(self, column, renderer, model, iter, user_data):
+        """Color cell based on data source.
+        
+        Color scheme:
+        - Green (#2d5016): Raw import data (KEGG/SBML)
+        - Blue (#1e3a8a): BRENDA-enriched data
+        - Orange (#c2410c): User-edited values
+        - Gray (#6b7280): Missing/unknown data
+        """
+        data_column_id, source_column_id = user_data
+        value = model.get_value(iter, data_column_id)
+        source = model.get_value(iter, source_column_id)
+        
+        # Determine color based on source
+        if not value or value == "-" or value == 0.0:
+            # Missing data - gray
+            renderer.set_property('foreground', '#6b7280')
+        elif source in ('kegg_import', 'sbml_import', 'biopax_import'):
+            # Raw import - green
+            renderer.set_property('foreground', '#2d5016')
+        elif source == 'brenda_enriched':
+            # BRENDA enriched - blue
+            renderer.set_property('foreground', '#1e3a8a')
+        elif source == 'user_edited':
+            # User edited - orange
+            renderer.set_property('foreground', '#c2410c')
+        else:
+            # Unknown - default black
+            renderer.set_property('foreground', '#000000')
     
     def refresh(self):
         """Refresh models data with comprehensive scientific information."""
@@ -446,6 +509,7 @@ class ModelsCategory(BaseReportCategory):
             
             # Database ID (KEGG, ChEBI, or other)
             db_id = "-"
+            db_id_source = "unknown"
             if hasattr(place, 'metadata') and place.metadata:
                 # Try different database IDs in order of preference
                 db_id = place.metadata.get('kegg_id',
@@ -455,6 +519,21 @@ class ModelsCategory(BaseReportCategory):
                 # Clean up ID format
                 if db_id and db_id != '-':
                     db_id = db_id.replace('cpd:', '')  # Clean KEGG format
+                    # Determine source
+                    db_id_source = place.metadata.get('db_id_source',
+                                   place.metadata.get('data_source', 'kegg_import'))
+            
+            # Extended Name - infer from database ID if possible
+            extended_name = "-"
+            if hasattr(place, 'metadata') and place.metadata:
+                # First try metadata
+                extended_name = place.metadata.get('extended_name',
+                               place.metadata.get('compound_name',
+                               place.metadata.get('full_name', '-')))
+                
+                # If still missing and we have a KEGG ID, try to infer
+                if extended_name == "-" and db_id.startswith('C') and len(db_id) == 6:
+                    extended_name = self._infer_compound_name(db_id)
             
             # Initial tokens
             tokens = 0.0
@@ -465,17 +544,24 @@ class ModelsCategory(BaseReportCategory):
             
             # Formula
             formula = "-"
+            formula_source = "unknown"
             if hasattr(place, 'metadata') and place.metadata:
                 formula = place.metadata.get('formula', '-')
+                if formula != '-':
+                    formula_source = place.metadata.get('formula_source',
+                                    place.metadata.get('data_source', 'kegg_import'))
             
             # Mass
             mass = 0.0
+            mass_source = "unknown"
             if hasattr(place, 'metadata') and place.metadata:
                 mass_val = place.metadata.get('mass', 
                            place.metadata.get('molecular_weight', 0))
                 if mass_val:
                     try:
                         mass = float(mass_val)
+                        mass_source = place.metadata.get('mass_source',
+                                     place.metadata.get('data_source', 'kegg_import'))
                     except (ValueError, TypeError):
                         mass = 0.0
             
@@ -484,17 +570,78 @@ class ModelsCategory(BaseReportCategory):
             if hasattr(place, 'metadata') and place.metadata:
                 type_val = place.metadata.get('type', 'unknown')
             
-            # Add row to table
+            # Add row to table with source tracking
             self.species_store.append([
-                i,           # index
-                place_id,    # Petri Net ID
-                name,        # Biological Name
-                db_id,       # Database ID (KEGG/ChEBI/etc)
-                tokens,      # Initial Tokens
-                formula,     # Formula
-                mass,        # Mass
-                type_val     # Type
+                i,                # 0: index
+                place_id,         # 1: Petri Net ID
+                name,             # 2: Biological Name
+                extended_name,    # 3: Extended Name
+                db_id,            # 4: Database ID (KEGG/ChEBI/etc)
+                db_id_source,     # 5: Database ID source
+                tokens,           # 6: Initial Tokens
+                formula,          # 7: Formula
+                formula_source,   # 8: Formula source
+                mass,             # 9: Mass
+                mass_source,      # 10: Mass source
+                type_val          # 11: Type
             ])
+    
+    def _infer_compound_name(self, compound_id):
+        """Infer compound name from KEGG compound ID.
+        
+        Args:
+            compound_id: KEGG compound ID (e.g., "C00033")
+            
+        Returns:
+            Compound name or "-" if not found
+        """
+        # Check cache first
+        if not hasattr(self, '_compound_name_cache'):
+            self._compound_name_cache = {}
+        
+        if compound_id in self._compound_name_cache:
+            return self._compound_name_cache[compound_id]
+        
+        # Common compounds hardcoded (to avoid API calls for every common metabolite)
+        common_compounds = {
+            'C00001': 'H2O (Water)',
+            'C00002': 'ATP (Adenosine triphosphate)',
+            'C00003': 'NAD+ (Nicotinamide adenine dinucleotide)',
+            'C00004': 'NADH (Reduced nicotinamide adenine dinucleotide)',
+            'C00005': 'NADPH (Reduced nicotinamide adenine dinucleotide phosphate)',
+            'C00006': 'NADP+ (Nicotinamide adenine dinucleotide phosphate)',
+            'C00008': 'ADP (Adenosine diphosphate)',
+            'C00009': 'Orthophosphate',
+            'C00010': 'CoA (Coenzyme A)',
+            'C00011': 'CO2 (Carbon dioxide)',
+            'C00013': 'Diphosphate',
+            'C00014': 'Ammonia',
+            'C00020': 'AMP (Adenosine monophosphate)',
+            'C00025': 'L-Glutamate',
+            'C00033': 'Acetate',
+            'C00035': 'GDP (Guanosine diphosphate)',
+            'C00044': 'GTP (Guanosine triphosphate)',
+            'C00063': 'CTP (Cytidine triphosphate)',
+            'C00080': 'H+ (Hydrogen ion)',
+            'C00081': 'ITP (Inosine triphosphate)',
+            'C00082': 'L-Tyrosine',
+            'C00086': 'Urea',
+            'C00103': 'D-Glucose 1-phosphate',
+            'C00122': 'Fumarate',
+            'C00149': 'L-Malate',
+            'C00158': 'Citrate',
+            'C00183': 'L-Valine',
+        }
+        
+        if compound_id in common_compounds:
+            result = common_compounds[compound_id]
+            self._compound_name_cache[compound_id] = result
+            return result
+        
+        # For uncommon compounds, return the ID (avoids API calls during display)
+        # Could be enhanced with async API fetching in the future
+        self._compound_name_cache[compound_id] = f"Compound {compound_id}"
+        return f"Compound {compound_id}"
     
     def _populate_reactions_table(self, model):
         """Populate reactions table with current model data.
@@ -780,24 +927,25 @@ class ModelsCategory(BaseReportCategory):
         lines = [
             f"Total Species/Places: {len(self.species_store)}",
             "",
-            "{:<5} {:<15} {:<25} {:<18} {:<15} {:<15} {:<12} {:<12}".format(
-                "#", "Petri Net ID", "Biological Name", "Database ID", 
-                "Initial Tokens", "Formula", "Mass (g/mol)", "Type"
+            "{:<5} {:<12} {:<20} {:<25} {:<12} {:<12} {:<10} {:<12}".format(
+                "#", "Petri ID", "Name", "Extended Name", "DB ID", 
+                "Tokens", "Formula", "Mass"
             ),
-            "-" * 133
+            "-" * 125
         ]
         
         for row in self.species_store:
+            # Skip source columns (5, 8, 10) in export
             lines.append(
-                "{:<5} {:<15} {:<25} {:<18} {:<15.4g} {:<15} {:<12.2f} {:<12}".format(
-                    row[0],  # index
-                    row[1][:14],  # Petri Net ID (truncate if needed)
-                    row[2][:24],  # Biological Name
-                    row[3][:17],  # Database ID (KEGG/ChEBI/SBML)
-                    row[4],  # Initial Tokens
-                    row[5][:14],  # Formula
-                    row[6] if row[6] > 0 else 0,  # Mass
-                    row[7][:11]   # Type
+                "{:<5} {:<12} {:<20} {:<25} {:<12} {:<12.4g} {:<10} {:<12.2f}".format(
+                    row[0],   # index
+                    row[1][:11],   # Petri Net ID
+                    row[2][:19],   # Biological Name
+                    row[3][:24],   # Extended Name
+                    row[4][:11],   # Database ID
+                    row[6],   # Initial Tokens (skip source at 5)
+                    row[7][:9],    # Formula (skip source at 8)
+                    row[9] if row[9] > 0 else 0  # Mass (skip source at 10)
                 )
             )
         
