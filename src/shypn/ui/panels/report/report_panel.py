@@ -480,11 +480,18 @@ class ReportPanel(Gtk.Box):
         Report is a static summary, not live data.
         
         Args:
-            model_canvas: ModelCanvas instance
+            model_canvas: ModelCanvasLoader instance
         """
         self.model_canvas = model_canvas
+        
+        # Get the current model manager (ModelCanvasManager with places/transitions)
+        current_manager = None
+        if self.model_canvas_loader and hasattr(self.model_canvas_loader, 'get_current_model'):
+            current_manager = self.model_canvas_loader.get_current_model()
+        
+        # Pass the manager (not the loader) to categories
         for category in self.categories:
-            category.set_model_canvas(model_canvas)
+            category.set_model_canvas(current_manager)
         
         # Wire up observer for property changes (real-time refresh)
         self._setup_model_observer()
