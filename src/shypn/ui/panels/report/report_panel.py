@@ -476,8 +476,8 @@ class ReportPanel(Gtk.Box):
     def set_model_canvas(self, model_canvas):
         """Set model canvas for all categories.
         
-        Does NOT auto-refresh - user must click refresh button.
-        Report is a static summary, not live data.
+        Auto-refreshes to immediately show imported data (green cells).
+        Report displays raw imported data without requiring manual refresh.
         
         Args:
             model_canvas: ModelCanvasLoader instance
@@ -495,6 +495,13 @@ class ReportPanel(Gtk.Box):
         
         # Wire up observer for property changes (real-time refresh)
         self._setup_model_observer()
+        
+        # Auto-refresh to show imported data immediately
+        # This displays green-colored raw data (KEGG/SBML imports)
+        # Enrich button will ADD blue-colored BRENDA data later
+        if current_manager and hasattr(current_manager, 'transitions'):
+            if len(current_manager.transitions) > 0 or len(current_manager.places) > 0:
+                self.refresh_all()
     
     def _setup_model_observer(self):
         """Setup observer for model changes to enable real-time refresh.

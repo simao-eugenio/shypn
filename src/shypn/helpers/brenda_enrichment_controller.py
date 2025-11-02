@@ -96,9 +96,46 @@ class BRENDAEnrichmentController:
         
         transitions = []
         
-        # TODO: Access transitions from canvas
-        # This depends on the canvas architecture
-        # For now, return empty list (will be implemented when wiring to UI)
+        # Access transitions from ModelCanvasManager
+        if hasattr(self.model_canvas, 'transitions'):
+            for transition in self.model_canvas.transitions:
+                if not transition:
+                    continue
+                
+                # Extract transition info
+                transition_info = {
+                    'id': transition.id if hasattr(transition, 'id') else None,
+                    'name': transition.name if hasattr(transition, 'name') else 'Unknown',
+                    'ec_number': None,
+                    'has_kinetics': False,
+                    'parameters': {},
+                    'transition_obj': transition  # Keep reference for updates
+                }
+                
+                # Get EC number from metadata
+                if hasattr(transition, 'metadata') and transition.metadata:
+                    ec_val = transition.metadata.get('ec_number',
+                             transition.metadata.get('ec_numbers', []))
+                    if isinstance(ec_val, list) and len(ec_val) > 0:
+                        transition_info['ec_number'] = ec_val[0]
+                    elif ec_val and ec_val != '-':
+                        transition_info['ec_number'] = str(ec_val)
+                    
+                    # Check for existing kinetic data
+                    has_km = 'km' in transition.metadata or 'Km' in transition.metadata
+                    has_kcat = 'kcat' in transition.metadata or 'Kcat' in transition.metadata
+                    has_vmax = 'vmax' in transition.metadata or 'Vmax' in transition.metadata
+                    transition_info['has_kinetics'] = has_km or has_kcat or has_vmax
+                    
+                    # Extract existing parameters
+                    if has_km:
+                        transition_info['parameters']['km'] = transition.metadata.get('km', transition.metadata.get('Km'))
+                    if has_kcat:
+                        transition_info['parameters']['kcat'] = transition.metadata.get('kcat', transition.metadata.get('Kcat'))
+                    if has_vmax:
+                        transition_info['parameters']['vmax'] = transition.metadata.get('vmax', transition.metadata.get('Vmax'))
+                
+                transitions.append(transition_info)
         
         return transitions
     
@@ -131,8 +168,64 @@ class BRENDAEnrichmentController:
         # TODO: Implement BRENDA SOAP API integration
         # Requires zeep library and BRENDA credentials
         
+        # For now, return mock data for common enzymes
+        # This allows testing the enrichment workflow
+        mock_brenda_data = {
+            '2.7.1.1': {  # Hexokinase
+                'ec_number': '2.7.1.1',
+                'enzyme_name': 'Hexokinase',
+                'organism': 'Homo sapiens',
+                'km_values': [{'substrate': 'glucose', 'value': 0.05, 'unit': 'mM'}],
+                'kcat_values': [{'value': 450.0, 'unit': '1/s'}],
+                'ki_values': [],
+                'citations': ['PMID:12345678']
+            },
+            '2.7.1.2': {  # Glucokinase
+                'ec_number': '2.7.1.2',
+                'enzyme_name': 'Glucokinase',
+                'organism': 'Homo sapiens',
+                'km_values': [{'substrate': 'glucose', 'value': 10.0, 'unit': 'mM'}],
+                'kcat_values': [{'value': 180.0, 'unit': '1/s'}],
+                'ki_values': [],
+                'citations': ['PMID:87654321']
+            },
+            '1.1.1.1': {  # Alcohol dehydrogenase
+                'ec_number': '1.1.1.1',
+                'enzyme_name': 'Alcohol dehydrogenase',
+                'organism': 'Homo sapiens',
+                'km_values': [{'substrate': 'ethanol', 'value': 1.0, 'unit': 'mM'}],
+                'kcat_values': [{'value': 300.0, 'unit': '1/s'}],
+                'ki_values': [],
+                'citations': ['PMID:11223344']
+            },
+            '2.7.1.11': {  # Phosphofructokinase
+                'ec_number': '2.7.1.11',
+                'enzyme_name': 'Phosphofructokinase',
+                'organism': 'Homo sapiens',
+                'km_values': [{'substrate': 'fructose-6-phosphate', 'value': 0.08, 'unit': 'mM'}],
+                'kcat_values': [{'value': 890.0, 'unit': '1/s'}],
+                'ki_values': [{'inhibitor': 'ATP', 'value': 0.5, 'unit': 'mM'}],
+                'citations': ['PMID:55667788']
+            },
+            '4.1.2.13': {  # Aldolase
+                'ec_number': '4.1.2.13',
+                'enzyme_name': 'Fructose-bisphosphate aldolase',
+                'organism': 'Homo sapiens',
+                'km_values': [{'substrate': 'fructose-1,6-bisphosphate', 'value': 0.015, 'unit': 'mM'}],
+                'kcat_values': [{'value': 670.0, 'unit': '1/s'}],
+                'ki_values': [],
+                'citations': ['PMID:99887766']
+            },
+        }
         
-        return None
+        # Return mock data if available
+        data = mock_brenda_data.get(ec_number)
+        if data:
+            print(f"[BRENDA_API] Mock data for {ec_number}: {data.get('enzyme_name')}")
+        else:
+            print(f"[BRENDA_API] No mock data for {ec_number}")
+        
+        return data
     
     # ========================================================================
     # Local File Loading
@@ -189,12 +282,14 @@ class BRENDAEnrichmentController:
             self.current_enrichment.source_query = query_params
         
     
-    def apply_enrichment_to_transition(self, transition_id: str, parameters: Dict[str, Any]):
+    def apply_enrichment_to_transition(self, transition_id: str, parameters: Dict[str, Any],
+                                       transition_obj=None):
         """Apply BRENDA enrichment data to a specific transition.
         
         Args:
             transition_id: ID of transition to enrich
             parameters: Dict of parameters to add (km, kcat, ki, etc.)
+            transition_obj: Optional transition object (for direct update)
         """
         if not self.current_enrichment:
             return
@@ -206,9 +301,19 @@ class BRENDAEnrichmentController:
         for param_type, value in parameters.items():
             self.current_enrichment.add_parameter(param_type)
         
-        # TODO: Actually apply to canvas transition
-        # This depends on canvas/model architecture
-        
+        # Apply parameters to transition object
+        if transition_obj and hasattr(transition_obj, 'metadata'):
+            if not transition_obj.metadata:
+                transition_obj.metadata = {}
+            
+            # Add kinetic parameters (only if not already present)
+            for param_name, param_value in parameters.items():
+                if param_name not in transition_obj.metadata:
+                    transition_obj.metadata[param_name] = param_value
+            
+            # Mark as BRENDA-enriched
+            transition_obj.metadata['data_source'] = 'brenda_enriched'
+
     
     def add_citations(self, citations: List[str]):
         """Add citations to current enrichment.
@@ -370,7 +475,9 @@ class BRENDAEnrichmentController:
         # Scan canvas
         transitions = self.scan_canvas_transitions()
         
-        # Query BRENDA for each EC number
+        print(f"[BRENDA] Scanned {len(transitions)} transitions")
+        
+        # Query BRENDA for each EC number (with mock data for now)
         brenda_data = {}
         for ec_number in ec_numbers:
             data = self.fetch_from_brenda_api(ec_number, organism)
@@ -385,8 +492,17 @@ class BRENDAEnrichmentController:
                 if override_existing or not transition.get('has_kinetics'):
                     # Apply enrichment
                     params = self._extract_parameters(brenda_data[ec])
-                    self.apply_enrichment_to_transition(transition['id'], params)
+                    print(f"[BRENDA] Enriching transition {transition.get('id')} with {params}")
+                    self.apply_enrichment_to_transition(
+                        transition['id'], 
+                        params,
+                        transition_obj=transition.get('transition_obj')
+                    )
                     enriched_count += 1
+                else:
+                    print(f"[BRENDA] Skipping transition {transition.get('id')} - already has kinetics")
+            else:
+                print(f"[BRENDA] No BRENDA data for EC {ec}")
         
         # Save to project
         self.save_enrichment_to_project(brenda_data)

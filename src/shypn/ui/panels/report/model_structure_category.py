@@ -526,14 +526,18 @@ class ModelsCategory(BaseReportCategory):
             # Extended Name - infer from database ID if possible
             extended_name = "-"
             if hasattr(place, 'metadata') and place.metadata:
-                # First try metadata
-                extended_name = place.metadata.get('extended_name',
-                               place.metadata.get('compound_name',
-                               place.metadata.get('full_name', '-')))
-                
-                # If still missing and we have a KEGG ID, try to infer
-                if extended_name == "-" and db_id.startswith('C') and len(db_id) == 6:
+                # First try metadata (explicit extended_name field)
+                extended_name = place.metadata.get('extended_name', '-')
+            
+            # If not in metadata, try to infer from KEGG compound ID
+            if extended_name == "-" and db_id and db_id != "-":
+                if db_id.startswith('C') and len(db_id) == 6:
                     extended_name = self._infer_compound_name(db_id)
+                else:
+                    # If we have a compound_name or full_name in metadata, use it
+                    if hasattr(place, 'metadata') and place.metadata:
+                        extended_name = place.metadata.get('compound_name',
+                                       place.metadata.get('full_name', '-'))
             
             # Initial tokens
             tokens = 0.0
