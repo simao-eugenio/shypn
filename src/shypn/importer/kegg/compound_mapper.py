@@ -106,6 +106,7 @@ class StandardCompoundMapper(CompoundMapper):
         place.metadata['kegg_id'] = entry.name
         place.metadata['kegg_entry_id'] = entry.id
         place.metadata['source'] = 'KEGG'
+        place.metadata['data_source'] = 'kegg_import'  # For Report panel colored rendering
         
         # Add compound type if available
         if hasattr(entry, 'type'):

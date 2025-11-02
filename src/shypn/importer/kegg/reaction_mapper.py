@@ -96,6 +96,7 @@ class StandardReactionMapper(ReactionMapper):
         transition.metadata['kegg_reaction_id'] = reaction.id
         transition.metadata['kegg_reaction_name'] = reaction.name
         transition.metadata['source'] = 'KEGG'
+        transition.metadata['data_source'] = 'kegg_import'  # For Report panel colored rendering
         transition.metadata['reversible'] = reaction.is_reversible()
         
         # Store reaction type if available
