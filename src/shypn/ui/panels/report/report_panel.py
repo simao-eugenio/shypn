@@ -113,10 +113,17 @@ class ReportPanel(Gtk.Box):
         Args:
             container: Container to add categories to
         """
+        # Get current model manager if available
+        # Initially model_canvas is the loader, not a specific manager
+        current_manager = None
+        if self.model_canvas and hasattr(self.model_canvas, 'get_current_model'):
+            current_manager = self.model_canvas.get_current_model()
+        
         # MODELS (from Model Canvas Panel)
+        # Pass the specific manager if available, otherwise None
         models = ModelsCategory(
             project=self.project,
-            model_canvas=self.model_canvas
+            model_canvas=current_manager
         )
         self.categories.append(models)
         widget = models.get_widget()
@@ -126,7 +133,7 @@ class ReportPanel(Gtk.Box):
         # DYNAMIC ANALYSES (from Pathway Operations Panel - enrichments)
         dynamic = DynamicAnalysesCategory(
             project=self.project,
-            model_canvas=self.model_canvas
+            model_canvas=current_manager
         )
         self.categories.append(dynamic)
         widget = dynamic.get_widget()
@@ -136,7 +143,7 @@ class ReportPanel(Gtk.Box):
         # TOPOLOGY ANALYSES (from Analyses Panel)
         topology = TopologyAnalysesCategory(
             project=self.project,
-            model_canvas=self.model_canvas
+            model_canvas=current_manager
         )
         self.categories.append(topology)
         widget = topology.get_widget()
@@ -146,12 +153,15 @@ class ReportPanel(Gtk.Box):
         # PROVENANCE & LINEAGE (from all panels)
         provenance = ProvenanceCategory(
             project=self.project,
-            model_canvas=self.model_canvas
+            model_canvas=current_manager
         )
         self.categories.append(provenance)
         widget = provenance.get_widget()
         widget.show_all()
         container.pack_start(widget, False, False, 0)
+        
+        # Store the loader separately for getting current model
+        self.model_canvas_loader = self.model_canvas
     
     def _create_export_buttons(self):
         """Create export buttons bar.
@@ -520,14 +530,14 @@ class ReportPanel(Gtk.Box):
         Args:
             drawing_area: The newly active drawing area (GtkDrawingArea)
         """
-        # Extract the ModelCanvasManager from drawing_area
-        # The model_canvas_loader stores managers per drawing_area
-        if hasattr(self.model_canvas, 'managers') and drawing_area in self.model_canvas.managers:
-            current_manager = self.model_canvas.managers[drawing_area]
-            # Update the reference for the MODELS category
-            for category in self.categories:
-                if hasattr(category, 'set_model_canvas'):
-                    category.set_model_canvas(current_manager)
+        # Get the ModelCanvasManager for this drawing area
+        if hasattr(self.model_canvas_loader, 'get_canvas_manager'):
+            current_manager = self.model_canvas_loader.get_canvas_manager(drawing_area)
+            if current_manager:
+                # Update the reference for all categories
+                for category in self.categories:
+                    if hasattr(category, 'set_model_canvas'):
+                        category.set_model_canvas(current_manager)
     
     def on_file_opened(self, filepath):
         """Handle file open event.
@@ -539,8 +549,8 @@ class ReportPanel(Gtk.Box):
             filepath: Path to the opened file
         """
         # Get current model canvas after file load
-        if hasattr(self.model_canvas, 'get_current_manager'):
-            current_manager = self.model_canvas.get_current_manager()
+        if hasattr(self.model_canvas_loader, 'get_current_model'):
+            current_manager = self.model_canvas_loader.get_current_model()
             if current_manager:
                 for category in self.categories:
                     if hasattr(category, 'set_model_canvas'):
@@ -555,8 +565,8 @@ class ReportPanel(Gtk.Box):
         Gets the current model canvas and refreshes the report.
         """
         # Get current model canvas after new file creation
-        if hasattr(self.model_canvas, 'get_current_manager'):
-            current_manager = self.model_canvas.get_current_manager()
+        if hasattr(self.model_canvas_loader, 'get_current_model'):
+            current_manager = self.model_canvas_loader.get_current_model()
             if current_manager:
                 for category in self.categories:
                     if hasattr(category, 'set_model_canvas'):
@@ -574,8 +584,8 @@ class ReportPanel(Gtk.Box):
             source_type: Type of import (KEGG, SBML, etc.)
         """
         # Get current model canvas after import
-        if hasattr(self.model_canvas, 'get_current_manager'):
-            current_manager = self.model_canvas.get_current_manager()
+        if hasattr(self.model_canvas_loader, 'get_current_model'):
+            current_manager = self.model_canvas_loader.get_current_model()
             if current_manager:
                 for category in self.categories:
                     if hasattr(category, 'set_model_canvas'):
