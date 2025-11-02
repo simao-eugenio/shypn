@@ -73,20 +73,19 @@ class PathwayPanelLoader:
             model_canvas=self.model_canvas
         )
         
+        # Content is the panel itself (no wrapper needed, matches Topology pattern)
+        self.content = self.panel
+        
         # Create a window to contain the panel
         self.window = Gtk.Window()
         self.window.set_title("Pathway Operations")
         self.window.set_default_size(400, 600)
         
-        # Create content box (just contains the panel, header is now inside panel)
-        self.content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
-        self.content.pack_start(self.panel, True, True, 0)
-        
-        # Wire float button (now part of the panel)
+        # Wire float button (part of the panel)
         if hasattr(self.panel, 'float_button') and self.panel.float_button:
             self.panel.float_button.connect('toggled', self._on_float_toggled)
         
-        # Add content to window
+        # Add panel to window (will be used when floating)
         self.window.add(self.content)
         
         # Connect delete-event to handle window close
@@ -187,10 +186,16 @@ class PathwayPanelLoader:
         if not self.is_hanged:
             return
         
+        # Remove content from container
         if self.parent_container:
             self.parent_container.remove(self.content)
             self.parent_container.set_visible(False)
         
+        # Hide stack if applicable
+        if hasattr(self, '_stack') and self._stack:
+            self._stack.set_visible(False)
+        
+        # Add content to window
         self.window.add(self.content)
         
         if self.parent_window:
@@ -206,7 +211,8 @@ class PathwayPanelLoader:
         if self.on_float_callback:
             self.on_float_callback()
         
-        self.window.show()
+        self.window.show_all()
+        self.logger.info("Pathway panel detached")
     
     def float(self, parent_window=None):
         """Float panel as a separate window."""
@@ -220,16 +226,20 @@ class PathwayPanelLoader:
         """Attach panel to a container."""
         if self.is_hanged:
             if not self.content.get_visible():
-                self.content.show()
+                self.content.show_all()
             if not container.get_visible():
                 container.set_visible(True)
             return
         
+        # Hide window
         self.window.hide()
+        
+        # Remove content from window
         self.window.remove(self.content)
         
+        # Add content to container
         container.pack_start(self.content, True, True, 0)
-        self.content.show()
+        self.content.show_all()
         container.set_visible(True)
         
         self.is_hanged = True
@@ -242,6 +252,8 @@ class PathwayPanelLoader:
         
         if self.on_attach_callback:
             self.on_attach_callback()
+        
+        self.logger.info("Pathway panel attached")
     
     def attach_to(self, container, parent_window=None):
         """Attach panel to container."""
