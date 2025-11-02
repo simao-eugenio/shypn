@@ -232,7 +232,15 @@ class ModelsCategory(BaseReportCategory):
     
     def refresh(self):
         """Refresh models data with comprehensive scientific information."""
+        print(f"[MODELS CATEGORY] refresh() called")
+        print(f"[MODELS CATEGORY] model_canvas: {self.model_canvas}")
+        if self.model_canvas:
+            print(f"[MODELS CATEGORY] has model attr: {hasattr(self.model_canvas, 'model')}")
+            if hasattr(self.model_canvas, 'model'):
+                print(f"[MODELS CATEGORY] model: {self.model_canvas.model}")
+        
         if not self.model_canvas or not hasattr(self.model_canvas, 'model'):
+            print("[MODELS CATEGORY] No model, clearing display")
             self.overview_label.set_text("No model loaded")
             self.structure_label.set_text("No data")
             self.provenance_label.set_text("No import data")
@@ -242,6 +250,8 @@ class ModelsCategory(BaseReportCategory):
             return
         
         model = self.model_canvas.model
+        print(f"[MODELS CATEGORY] Model loaded, type: {type(model)}")
+        print(f"[MODELS CATEGORY] Model has places: {hasattr(model, 'places')}")
         
         # === BUILD MODEL OVERVIEW ===
         overview_lines = []
