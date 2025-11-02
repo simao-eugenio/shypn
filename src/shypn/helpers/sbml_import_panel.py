@@ -103,6 +103,9 @@ class SBMLImportPanel:
         self._import_button_flow = False
         self._fetch_in_progress = False
         
+        # Callback for notifying parent (PathwayOperationsPanel) when import completes
+        self.import_complete_callback = None
+        
         # Get widget references
         self._get_widgets()
         
@@ -780,6 +783,16 @@ class SBMLImportPanel:
                         f"Model {model_filename} saved on {model_filepath}\n"
                         f"Use File → Open to load the model"
                     )
+                    
+                    # Notify parent (PathwayOperationsPanel) that import is complete
+                    # This triggers Report panel refresh
+                    if self.import_complete_callback:
+                        import_data = {
+                            'file_path': model_filepath,
+                            'organism': organism,
+                            'name': pathway_name
+                        }
+                        self.import_complete_callback(import_data)
                     
                 except Exception as save_error:
                     import traceback
