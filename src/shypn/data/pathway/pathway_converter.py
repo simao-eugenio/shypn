@@ -127,6 +127,7 @@ class SpeciesConverter(BaseConverter):
             place.metadata['species_id'] = species.id
             place.metadata['concentration'] = species.initial_concentration
             place.metadata['compartment'] = species.compartment
+            place.metadata['data_source'] = 'sbml_import'  # For Report panel colored rendering
             
             species_to_place[species.id] = place
             self.logger.debug(
@@ -216,6 +217,7 @@ class ReactionConverter(BaseConverter):
                 transition.metadata = {}
             transition.metadata['reaction_id'] = reaction.id
             transition.metadata['reversible'] = reaction.reversible
+            transition.metadata['data_source'] = 'sbml_import'  # For Report panel colored rendering
             if reaction.kinetic_law:
                 transition.metadata['kinetic_formula'] = reaction.kinetic_law.formula
                 transition.metadata['kinetic_parameters'] = reaction.kinetic_law.parameters
