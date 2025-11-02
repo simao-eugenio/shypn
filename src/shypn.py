@@ -658,24 +658,9 @@ def main(argv=None):
 				
 				menu_actions.on_file_new = on_file_new_with_report_notify
 			
-			# Event 4: Project Open (user opens a project)
-			# Wire to project manager if available
-			if hasattr(project_manager, 'set_on_project_opened'):
-				original_project_opened = None
-				if hasattr(project_manager, 'on_project_opened'):
-					original_project_opened = project_manager.on_project_opened
-				
-				def on_project_opened_with_report_notify(project):
-					"""Notify report panel after project opens."""
-					if original_project_opened:
-						original_project_opened(project)
-					if report_panel_loader.panel:
-						report_panel_loader.panel.on_project_opened(project)
-				
-				project_manager.set_on_project_opened(on_project_opened_with_report_notify)
-			
-			# Note: Events 5 & 6 (KEGG/SBML imports, BRENDA enrichments) are already
-			# wired via PathwayOperationsPanel.set_report_refresh_callback() above
+			# Note: Events 4-6 (Project Open, KEGG/SBML imports, BRENDA enrichments)
+			# Project Open: Will be wired when project manager is implemented
+			# KEGG/SBML imports: Already wired via PathwayOperationsPanel.set_report_refresh_callback()
 			
 		except Exception as e:
 			print(f"[SHYPN ERROR] Failed to load Report Panel: {e}", file=sys.stderr)
