@@ -295,8 +295,11 @@ class ModelsCategory(BaseReportCategory):
     
     def refresh(self):
         """Refresh models data with comprehensive scientific information."""
+        print(f"[MODELS_CATEGORY] refresh() called, model_canvas={self.model_canvas}")
+        
         # ModelCanvasManager IS the model - it has places, transitions, arcs directly
         if not self.model_canvas:
+            print(f"[MODELS_CATEGORY] No model_canvas, clearing tables")
             self.overview_label.set_text("No model loaded")
             self.structure_label.set_text("No data")
             self.provenance_label.set_text("No import data")
@@ -304,6 +307,8 @@ class ModelsCategory(BaseReportCategory):
             self.species_store.clear()
             self.reactions_store.clear()
             return
+        
+        print(f"[MODELS_CATEGORY] model_canvas has {len(self.model_canvas.places)} places, {len(self.model_canvas.transitions)} transitions")
         
         # The model_canvas IS the model (ModelCanvasManager with places/transitions/arcs)
         model = self.model_canvas
@@ -494,10 +499,14 @@ class ModelsCategory(BaseReportCategory):
         Args:
             model: DocumentModel instance
         """
+        print(f"[MODELS_CATEGORY] _populate_species_table() called")
         self.species_store.clear()
         
         if not hasattr(model, 'places') or not model.places:
+            print(f"[MODELS_CATEGORY] No places to populate")
             return
+        
+        print(f"[MODELS_CATEGORY] Populating {len(model.places)} places")
         
         for i, place in enumerate(model.places, 1):
             if not place:
