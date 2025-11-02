@@ -592,25 +592,29 @@ def main(argv=None):
 		# ====================================================================
 		# Create and Add Report Panel to stack
 		# ====================================================================
+		report_panel_loader = None
 		try:
-			from shypn.ui.panels.report import ReportPanel
-			report_panel = ReportPanel(project=None, model_canvas=model_canvas_loader)
+			from shypn.helpers.report_panel_loader import ReportPanelLoader
+			report_panel_loader = ReportPanelLoader(project=None, model_canvas=model_canvas_loader)
+			report_panel_loader.load()
+			report_panel_loader.parent_window = window
 			
 			# Wire topology panel to report panel for analysis summary
-			# The loader has a .panel attribute which is the actual TopologyPanel
+			# The loader has a .panel attribute which is the actual ReportPanel
 			if topology_panel_loader and hasattr(topology_panel_loader, 'panel'):
-				report_panel.set_topology_panel(topology_panel_loader.panel)
+				report_panel_loader.panel.set_topology_panel(topology_panel_loader.panel)
 			
 			# Wire dynamic analyses panel to report panel for real-time data
 			if right_panel_loader and hasattr(right_panel_loader, 'dynamic_analyses_panel'):
-				report_panel.set_dynamic_analyses_panel(right_panel_loader.dynamic_analyses_panel)
+				report_panel_loader.panel.set_dynamic_analyses_panel(right_panel_loader.dynamic_analyses_panel)
 			
 			# Wire pathway operations panel to report panel for pathway data
 			if pathway_panel_loader and hasattr(pathway_panel_loader, 'panel'):
-				report_panel.set_pathway_operations_panel(pathway_panel_loader.panel)
+				report_panel_loader.panel.set_pathway_operations_panel(pathway_panel_loader.panel)
 			
-			report_panel_container.pack_start(report_panel, True, True, 0)
-			report_panel.show_all()
+			report_panel_container.pack_start(report_panel_loader.panel, True, True, 0)
+			report_panel_loader.parent_container = report_panel_container
+			report_panel_loader.panel.show_all()
 		except Exception as e:
 			print(f"[SHYPN ERROR] Failed to load Report Panel: {e}", file=sys.stderr)
 			import traceback
