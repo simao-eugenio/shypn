@@ -724,7 +724,14 @@ class ModelCanvasLoader:
         
         # Reset canvas interaction states (CRITICAL for fixing corrupted context menu/drag)
         # These states can get stuck if not properly reset between document loads
-        drawing_area = manager.drawing_area
+        # Find the drawing_area for this manager by looking through self.managers
+        drawing_area = None
+        if hasattr(self, 'managers'):
+            for da, mgr in self.managers.items():
+                if mgr == manager:
+                    drawing_area = da
+                    break
+        
         if drawing_area:
             # Reset drag state (prevents stuck panning/dragging)
             if hasattr(self, '_drag_state') and drawing_area in self._drag_state:
