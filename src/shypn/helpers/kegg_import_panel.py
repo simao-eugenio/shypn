@@ -514,9 +514,14 @@ class KEGGImportPanel:
                     # Trigger file open event to notify Report panel and other observers
                     # This properly loads the model to canvas and triggers all connected events
                     if hasattr(self.file_panel_loader.file_explorer, 'on_file_open_requested'):
-                        self.logger.info(f"Triggering on_file_open_requested: {model_filepath}")
+                        self.logger.info(f"[KEGG] Triggering on_file_open_requested: {model_filepath}")
+                        self.logger.info(f"[KEGG] on_file_open_requested callback exists: {self.file_panel_loader.file_explorer.on_file_open_requested is not None}")
                         self.file_panel_loader.file_explorer.on_file_open_requested(model_filepath)
-                        self.logger.info("File open event triggered - Report panel should populate")
+                        self.logger.info("[KEGG] File open event triggered - Report panel should populate")
+                    else:
+                        self.logger.error("[KEGG] on_file_open_requested not found on file_explorer!")
+                else:
+                    self.logger.error(f"[KEGG] file_panel_loader or file_explorer not available: loader={self.file_panel_loader}, explorer={hasattr(self.file_panel_loader, 'file_explorer') if self.file_panel_loader else 'N/A'}")
                 
                 # Success message
                 self._show_status(f"✅ {model_filename} imported and loaded to canvas")
