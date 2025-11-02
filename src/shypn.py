@@ -434,6 +434,11 @@ def main(argv=None):
 		if pathway_panel_loader and left_panel_loader:
 			left_panel_loader.set_pathway_panel_loader(pathway_panel_loader)
 		
+		# Wire file panel loader to pathway panel for import auto-load
+		# This allows KEGG/SBML imports to trigger on_file_open_requested and populate Report
+		if pathway_panel_loader and left_panel_loader:
+			pathway_panel_loader.set_file_panel_loader(left_panel_loader)
+		
 		# Wire model canvas loader to file panel for project synchronization
 		# This ensures all canvas managers save to correct project directories
 		if model_canvas_loader and left_panel_loader:
