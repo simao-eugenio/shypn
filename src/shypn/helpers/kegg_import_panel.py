@@ -281,10 +281,10 @@ class KEGGImportPanel:
         1. Convert pathway to DocumentModel
         2. Save .shy file to project/models/
         3. Save raw KGML to project/pathways/
-        4. Auto-load model to canvas by triggering on_file_open_requested
-        5. Report panel populates automatically with imported data
+        4. User must manually open file via File → Open or double-click in file explorer
         
-        This provides seamless workflow: Import → Model loaded → Report populated.
+        NOTE: Does NOT auto-load to canvas. File must be explicitly opened.
+        This is intentional design for user control and avoiding state issues.
         """
         # Check if we already have a fetched pathway
         if self.current_pathway and self.current_kgml:
@@ -356,10 +356,11 @@ class KEGGImportPanel:
         - Saves .shy model file to project/models/
         - Saves raw .xml KGML to project/pathways/
         - Sets metadata['data_source'] = 'kegg_import' for Report color coding
-        - Auto-loads model to canvas via on_file_open_requested event
-        - Report panel automatically populates with green-colored imported data
+        - Does NOT auto-load to canvas
+        - User must explicitly open via File → Open or file explorer double-click
         
-        This provides seamless user experience: Import button → Model appears in canvas → Report populates.
+        This is intentional design to give users control over when models load
+        and to avoid canvas state synchronization issues during import.
         """
         self.logger.info("=== _do_import_and_save called ===")
         
@@ -510,21 +511,12 @@ class KEGGImportPanel:
                     if hasattr(self.file_panel_loader.file_explorer, '_load_current_directory'):
                         self.file_panel_loader.file_explorer._load_current_directory()
                         self.logger.info("File tree refreshed after save")
-                    
-                    # Trigger file open event to notify Report panel and other observers
-                    # This properly loads the model to canvas and triggers all connected events
-                    if hasattr(self.file_panel_loader.file_explorer, 'on_file_open_requested'):
-                        self.logger.info(f"[KEGG] Triggering on_file_open_requested: {model_filepath}")
-                        self.logger.info(f"[KEGG] on_file_open_requested callback exists: {self.file_panel_loader.file_explorer.on_file_open_requested is not None}")
-                        self.file_panel_loader.file_explorer.on_file_open_requested(model_filepath)
-                        self.logger.info("[KEGG] File open event triggered - Report panel should populate")
-                    else:
-                        self.logger.error("[KEGG] on_file_open_requested not found on file_explorer!")
-                else:
-                    self.logger.error(f"[KEGG] file_panel_loader or file_explorer not available: loader={self.file_panel_loader}, explorer={hasattr(self.file_panel_loader, 'file_explorer') if self.file_panel_loader else 'N/A'}")
                 
-                # Success message
-                self._show_status(f"✅ {model_filename} imported and loaded to canvas")
+                # Success message with file location
+                self._show_status(
+                    f"Model {model_filename} saved on {model_filepath}\n"
+                    f"Use File → Open to load the model"
+                )
                 
             except Exception as save_error:
                 import traceback
