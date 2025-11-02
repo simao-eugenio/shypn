@@ -686,6 +686,12 @@ class SBMLImportPanel:
             # ============================================================================
             if self.project and self.current_filepath and self.parsed_pathway:
                 try:
+                    # Verify project has valid base path
+                    if not self.project.base_path:
+                        raise ValueError("Project base_path not set - cannot save files")
+                    
+                    self.logger.info(f"Project base path: {self.project.base_path}")
+                    
                     filename = os.path.basename(self.current_filepath)
                     
                     # 1. Save raw SBML file to project/pathways/
@@ -711,15 +717,16 @@ class SBMLImportPanel:
                     # Get models directory from project (creates if needed)
                     models_dir = self.project.get_models_dir()
                     if not models_dir:
-                        raise ValueError("Project models directory not available")
+                        raise ValueError("Project models directory not available - base_path may be None")
                     
+                    self.logger.info(f"Models directory: {models_dir}")
                     os.makedirs(models_dir, exist_ok=True)
                     model_filepath = os.path.join(models_dir, model_filename)
                     
                     # Save document model to file
-                    self.logger.info(f"Saving model file: {model_filepath}")
+                    self.logger.info(f"Saving model file to: {model_filepath}")
                     document_model.save_to_file(model_filepath)
-                    self.logger.info(f"Model saved successfully")
+                    self.logger.info(f"Model saved successfully to: {model_filepath}")
                     
                     # 3. Create and register PathwayDocument metadata
                     from shypn.data.pathway_document import PathwayDocument
