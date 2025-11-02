@@ -306,8 +306,10 @@ class StandardConversionStrategy(ConversionStrategy):
                 reaction_name_to_transition[reaction.name] = transition
                 
                 # Create arcs for this transition
+                # CRITICAL: Pass document so arc builder uses unified arc ID counter
+                # This prevents ID conflicts with test arcs created later
                 arcs = self.arc_builder.create_arcs(
-                    reaction, transition, place_map, pathway, options
+                    reaction, transition, place_map, pathway, options, document
                 )
                 document.arcs.extend(arcs)
         
