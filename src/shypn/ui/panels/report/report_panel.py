@@ -30,12 +30,13 @@ class ReportPanel(Gtk.Box):
         
         Args:
             project: Project instance
-            model_canvas: ModelCanvas instance
+            model_canvas: ModelCanvasLoader instance (not a specific manager)
         """
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         
         self.project = project
-        self.model_canvas = model_canvas
+        # Store the loader for accessing get_current_model()
+        self.model_canvas_loader = model_canvas
         self.topology_panel = None  # Will be set via set_topology_panel()
         self.dynamic_analyses_panel = None  # Will be set via set_dynamic_analyses_panel()
         self.pathway_operations_panel = None  # Will be set via set_pathway_operations_panel()
@@ -59,6 +60,15 @@ class ReportPanel(Gtk.Box):
         header_label.set_halign(Gtk.Align.START)
         header_label.set_valign(Gtk.Align.CENTER)
         header_box.pack_start(header_label, True, True, 0)
+        
+        # Refresh button (updates all categories with current data)
+        self.refresh_button = Gtk.Button()
+        self.refresh_button.set_label("🔄")
+        self.refresh_button.set_tooltip_text("Refresh report with current data")
+        self.refresh_button.set_relief(Gtk.ReliefStyle.NONE)  # Flat button
+        self.refresh_button.set_valign(Gtk.Align.CENTER)
+        self.refresh_button.connect('clicked', self._on_refresh_clicked)
+        header_box.pack_end(self.refresh_button, False, False, 4)
         
         # Float button on the far right (icon only, matching other panels)
         self.float_button = Gtk.ToggleButton()
@@ -104,10 +114,17 @@ class ReportPanel(Gtk.Box):
         Args:
             container: Container to add categories to
         """
+        # Get current model manager if available
+        # Initially model_canvas_loader may not have a loaded model
+        current_manager = None
+        if self.model_canvas_loader and hasattr(self.model_canvas_loader, 'get_current_model'):
+            current_manager = self.model_canvas_loader.get_current_model()
+        
         # MODELS (from Model Canvas Panel)
+        # Pass the specific manager if available, otherwise None
         models = ModelsCategory(
             project=self.project,
-            model_canvas=self.model_canvas
+            model_canvas=current_manager
         )
         self.categories.append(models)
         widget = models.get_widget()
@@ -117,7 +134,7 @@ class ReportPanel(Gtk.Box):
         # DYNAMIC ANALYSES (from Pathway Operations Panel - enrichments)
         dynamic = DynamicAnalysesCategory(
             project=self.project,
-            model_canvas=self.model_canvas
+            model_canvas=current_manager
         )
         self.categories.append(dynamic)
         widget = dynamic.get_widget()
@@ -127,7 +144,7 @@ class ReportPanel(Gtk.Box):
         # TOPOLOGY ANALYSES (from Analyses Panel)
         topology = TopologyAnalysesCategory(
             project=self.project,
-            model_canvas=self.model_canvas
+            model_canvas=current_manager
         )
         self.categories.append(topology)
         widget = topology.get_widget()
@@ -137,7 +154,7 @@ class ReportPanel(Gtk.Box):
         # PROVENANCE & LINEAGE (from all panels)
         provenance = ProvenanceCategory(
             project=self.project,
-            model_canvas=self.model_canvas
+            model_canvas=current_manager
         )
         self.categories.append(provenance)
         widget = provenance.get_widget()
@@ -202,8 +219,28 @@ class ReportPanel(Gtk.Box):
         
         return True
     
+    def _on_refresh_clicked(self, button):
+        """Handle refresh button click - update all categories with current data.
+        
+        Report is intended as a static summary that is manually refreshed.
+        This prevents constant updates that could be distracting while working.
+        """
+        for category in self.categories:
+            category.refresh()
+    
+    def refresh_all(self):
+        """Programmatically refresh all categories.
+        
+        Called when significant events occur (e.g., model loaded, analysis completed).
+        """
+        for category in self.categories:
+            category.refresh()
+    
     def set_project(self, project):
-        """Set project and refresh all categories.
+        """Set project for all categories.
+        
+        Does NOT auto-refresh - user must click refresh button.
+        Report is a static summary, not live data.
         
         Args:
             project: Project instance
@@ -213,7 +250,10 @@ class ReportPanel(Gtk.Box):
             category.set_project(project)
     
     def set_model_canvas(self, model_canvas):
-        """Set model canvas and refresh all categories.
+        """Set model canvas for all categories.
+        
+        Does NOT auto-refresh - user must click refresh button.
+        Report is a static summary, not live data.
         
         Args:
             model_canvas: ModelCanvas instance
@@ -473,3 +513,108 @@ class ReportPanel(Gtk.Box):
         dialog.format_secondary_text("Report text copied to clipboard")
         dialog.run()
         dialog.destroy()
+    
+    # =========================================================================
+    # MODEL LIFECYCLE EVENT HANDLERS
+    # These are called by shypn.py when model-related events occur
+    # =========================================================================
+    
+    def on_tab_switched(self, drawing_area):
+        """Handle canvas tab switch event.
+        
+        Called when user switches between model tabs.
+        Updates the model_canvas reference to the new active tab.
+        
+        Args:
+            drawing_area: The newly active drawing area (GtkDrawingArea)
+        """
+        # Get the ModelCanvasManager for this drawing area
+        if hasattr(self.model_canvas_loader, 'get_canvas_manager'):
+            current_manager = self.model_canvas_loader.get_canvas_manager(drawing_area)
+            if current_manager:
+                # Update the reference for all categories
+                for category in self.categories:
+                    if hasattr(category, 'set_model_canvas'):
+                        category.set_model_canvas(current_manager)
+                # Auto-refresh when switching tabs to show new model
+                self.refresh_all()
+    
+    def on_file_opened(self, filepath):
+        """Handle file open event.
+        
+        Called when user opens a .shypn file.
+        Gets the current model canvas and refreshes the report.
+        
+        Args:
+            filepath: Path to the opened file
+        """
+        # Add a small delay to ensure model is fully loaded
+        from gi.repository import GLib
+        
+        def delayed_refresh():
+            # Get current model canvas after file load
+            if hasattr(self.model_canvas_loader, 'get_current_model'):
+                current_manager = self.model_canvas_loader.get_current_model()
+                if current_manager:
+                    for category in self.categories:
+                        if hasattr(category, 'set_model_canvas'):
+                            category.set_model_canvas(current_manager)
+                    # Auto-refresh on file open (major event)
+                    self.refresh_all()
+            return False  # Don't repeat
+        
+        # Delay 100ms to let model finish loading
+        GLib.timeout_add(100, delayed_refresh)
+    
+    def on_file_new(self):
+        """Handle new file event.
+        
+        Called when user creates a new model.
+        Gets the current model canvas and refreshes the report.
+        """
+        # Get current model canvas after new file creation
+        if hasattr(self.model_canvas_loader, 'get_current_model'):
+            current_manager = self.model_canvas_loader.get_current_model()
+            if current_manager:
+                for category in self.categories:
+                    if hasattr(category, 'set_model_canvas'):
+                        category.set_model_canvas(current_manager)
+                # Auto-refresh on new file (major event)
+                self.refresh_all()
+    
+    def on_model_imported(self, source_type):
+        """Handle model import event.
+        
+        Called when user imports KEGG/SBML/BioPAX model.
+        Gets the current model canvas and refreshes the report.
+        
+        Args:
+            source_type: Type of import (KEGG, SBML, etc.)
+        """
+        # Get current model canvas after import
+        if hasattr(self.model_canvas_loader, 'get_current_model'):
+            current_manager = self.model_canvas_loader.get_current_model()
+            if current_manager:
+                for category in self.categories:
+                    if hasattr(category, 'set_model_canvas'):
+                        category.set_model_canvas(current_manager)
+                # Auto-refresh on import (major event)
+                self.refresh_all()
+    
+    def cleanup(self):
+        """Clean up resources when panel is closed.
+        
+        Called by the loader when the panel is being destroyed.
+        """
+        # Clean up any resources held by categories
+        for category in self.categories:
+            if hasattr(category, 'cleanup'):
+                category.cleanup()
+        
+        # Clear references
+        self.categories.clear()
+        self.project = None
+        self.model_canvas_loader = None
+        self.topology_panel = None
+        self.dynamic_analyses_panel = None
+        self.pathway_operations_panel = None

@@ -70,22 +70,26 @@ class BaseReportCategory:
         pass
     
     def set_project(self, project):
-        """Set project and refresh.
+        """Set project reference.
+        
+        Does NOT auto-refresh. Report categories are static summaries
+        that are manually refreshed via the refresh button.
         
         Args:
             project: Project instance
         """
         self.project = project
-        self.refresh()
     
     def set_model_canvas(self, model_canvas):
-        """Set model canvas and refresh.
+        """Set model canvas reference.
+        
+        Does NOT auto-refresh. Report categories are static summaries
+        that are manually refreshed via the refresh button.
         
         Args:
             model_canvas: ModelCanvas instance
         """
         self.model_canvas = model_canvas
-        self.refresh()
     
     def get_widget(self):
         """Get the category frame widget.
