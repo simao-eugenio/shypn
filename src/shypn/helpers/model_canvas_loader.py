@@ -678,6 +678,8 @@ class ModelCanvasLoader:
         - Objects are cleared
         - ID counters are reset
         - Canvas interaction states are reset (drag, arc, lasso, etc.)
+        - Simulation controllers are reset to initial state
+        - Swiss palettes are reset to default tool/mode
         
         Args:
             manager: ModelCanvasManager instance to reset
@@ -779,6 +781,39 @@ class ModelCanvasLoader:
                     'active': False,
                     'selector': None
                 }
+            
+            # ============================================================
+            # CRITICAL: Reset simulation controller to initial state
+            # ============================================================
+            # The simulation controller maintains state across multiple simulation runs.
+            # When loading a new model, we must reset it to prevent stale state from
+            # affecting the new model (e.g., old schedulers, interaction guards, etc.)
+            if drawing_area in self.simulation_controllers:
+                controller = self.simulation_controllers[drawing_area]
+                # Reset the controller with the new manager's model
+                # This recreates schedulers, guards, and all wiring
+                controller.reset_for_new_model(manager)
+            
+            # ============================================================
+            # CRITICAL: Reset Swiss Knife Palette to default state
+            # ============================================================
+            # The palette maintains tool selection, mode, and visual state.
+            # When loading a new model, reset to default state (no active sub-palette).
+            if drawing_area in self.overlay_managers:
+                overlay_manager = self.overlay_managers[drawing_area]
+                if hasattr(overlay_manager, 'swissknife_palette'):
+                    palette = overlay_manager.swissknife_palette
+                    # Hide any active sub-palette (returns to default state)
+                    if palette.active_sub_palette:
+                        palette._hide_sub_palette(palette.active_category)
+                    # Update palette's model reference to the (reset) manager
+                    palette.model = manager
+                    # If palette has widget palette instances (like SimulateToolsPaletteLoader),
+                    # update their model references too
+                    if hasattr(palette, 'widget_palette_instances'):
+                        for widget_palette in palette.widget_palette_instances.values():
+                            if hasattr(widget_palette, 'model'):
+                                widget_palette.model = manager
         
         # Trigger redraw to show canvas is ready for new content
         manager.mark_needs_redraw()
