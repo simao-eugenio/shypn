@@ -78,37 +78,13 @@ class PathwayPanelLoader:
         self.window.set_title("Pathway Operations")
         self.window.set_default_size(400, 600)
         
-        # Create content box with float button
+        # Create content box (just contains the panel, header is now inside panel)
         self.content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
-        
-        # Add float button at top
-        header_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        header_box.set_margin_start(6)
-        header_box.set_margin_end(6)
-        header_box.set_margin_top(6)
-        header_box.set_margin_bottom(6)
-        
-        title_label = Gtk.Label()
-        title_label.set_markup("<b>Pathway Operations</b>")
-        title_label.set_xalign(0.0)
-        header_box.pack_start(title_label, True, True, 0)
-        
-        # Float button on the far right (icon only, matching other panels)
-        self.float_button = Gtk.ToggleButton()
-        self.float_button.set_label("⬈")
-        self.float_button.set_tooltip_text("Detach panel to floating window")
-        self.float_button.set_relief(Gtk.ReliefStyle.NONE)  # Flat button
-        self.float_button.connect('toggled', self._on_float_toggled)
-        header_box.pack_end(self.float_button, False, False, 0)
-        
-        self.content.pack_start(header_box, False, False, 0)
-        
-        # Add separator
-        sep = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
-        self.content.pack_start(sep, False, False, 0)
-        
-        # Add the panel
         self.content.pack_start(self.panel, True, True, 0)
+        
+        # Wire float button (now part of the panel)
+        if hasattr(self.panel, 'float_button') and self.panel.float_button:
+            self.panel.float_button.connect('toggled', self._on_float_toggled)
         
         # Add content to window
         self.window.add(self.content)
@@ -196,9 +172,9 @@ class PathwayPanelLoader:
         """Handle window close button - hide instead of destroy."""
         self.hide()
         
-        if self.float_button and self.float_button.get_active():
+        if self.panel and hasattr(self.panel, 'float_button') and self.panel.float_button.get_active():
             self._updating_button = True
-            self.float_button.set_active(False)
+            self.panel.float_button.set_active(False)
             self._updating_button = False
         
         if self.parent_container:
@@ -222,9 +198,9 @@ class PathwayPanelLoader:
         
         self.is_hanged = False
         
-        if self.float_button and not self.float_button.get_active():
+        if self.panel and hasattr(self.panel, 'float_button') and not self.panel.float_button.get_active():
             self._updating_button = True
-            self.float_button.set_active(True)
+            self.panel.float_button.set_active(True)
             self._updating_button = False
         
         if self.on_float_callback:
@@ -259,9 +235,9 @@ class PathwayPanelLoader:
         self.is_hanged = True
         self.parent_container = container
         
-        if self.float_button and self.float_button.get_active():
+        if self.panel and hasattr(self.panel, 'float_button') and self.panel.float_button.get_active():
             self._updating_button = True
-            self.float_button.set_active(False)
+            self.panel.float_button.set_active(False)
             self._updating_button = False
         
         if self.on_attach_callback:
