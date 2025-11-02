@@ -23,7 +23,7 @@ try:
     import gi
     gi.require_version('Gtk', '3.0')
     gi.require_version('Gdk', '3.0')
-    from gi.repository import Gtk, Gdk, Gio
+    from gi.repository import Gtk, Gdk, Gio, GLib
     import time
 except Exception as e:
     print('ERROR: GTK3 not available in model_canvas loader:', e, file=sys.stderr)
@@ -677,6 +677,7 @@ class ModelCanvasLoader:
         - Callbacks are enabled
         - Objects are cleared
         - ID counters are reset
+        - Canvas interaction states are reset (drag, arc, lasso, etc.)
         
         Args:
             manager: ModelCanvasManager instance to reset
@@ -720,6 +721,57 @@ class ModelCanvasLoader:
         
         # Reset tool state
         manager.clear_tool()
+        
+        # Reset canvas interaction states (CRITICAL for fixing corrupted context menu/drag)
+        # These states can get stuck if not properly reset between document loads
+        drawing_area = manager.drawing_area
+        if drawing_area:
+            # Reset drag state (prevents stuck panning/dragging)
+            if hasattr(self, '_drag_state') and drawing_area in self._drag_state:
+                self._drag_state[drawing_area] = {
+                    'active': False,
+                    'button': 0,
+                    'start_x': 0,
+                    'start_y': 0,
+                    'is_panning': False,
+                    'is_rect_selecting': False,
+                    'is_transforming': False
+                }
+            
+            # Reset arc creation state (prevents stuck arc drawing)
+            if hasattr(self, '_arc_state') and drawing_area in self._arc_state:
+                self._arc_state[drawing_area] = {
+                    'source': None,
+                    'cursor_pos': (0, 0),
+                    'target_valid': None,
+                    'hovered_target': None,
+                    'ignore_next_release': False
+                }
+            
+            # Reset click state (prevents stuck double-click detection)
+            if hasattr(self, '_click_state') and drawing_area in self._click_state:
+                click_state = self._click_state[drawing_area]
+                # Cancel any pending click timeout
+                if click_state.get('pending_timeout'):
+                    GLib.source_remove(click_state['pending_timeout'])
+                self._click_state[drawing_area] = {
+                    'last_click_time': 0.0,
+                    'last_click_obj': None,
+                    'double_click_threshold': 0.3,
+                    'pending_timeout': None,
+                    'pending_click_data': None
+                }
+            
+            # Reset lasso selection state (prevents stuck lasso mode)
+            if hasattr(self, '_lasso_state') and drawing_area in self._lasso_state:
+                lasso_state = self._lasso_state[drawing_area]
+                # Deactivate any active lasso
+                if lasso_state.get('selector'):
+                    lasso_state['selector'].cancel()
+                self._lasso_state[drawing_area] = {
+                    'active': False,
+                    'selector': None
+                }
         
         # Trigger redraw to show canvas is ready for new content
         manager.mark_needs_redraw()
