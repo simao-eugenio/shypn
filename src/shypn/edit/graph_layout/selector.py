@@ -273,15 +273,20 @@ class LayoutSelector:
         n = metrics['node_count']
         
         # Base spacing on graph size
+        # IMPORTANT: Larger spacing for bigger pathways to prevent overcrowding
+        # This is especially critical for KEGG/SBML imports which often have 50+ nodes
         if n < 10:
             scale = 'small'
-            base_spacing = 150
-        elif n < 50:
+            base_spacing = 150  # Small networks: generous spacing
+        elif n < 30:
             scale = 'medium'
-            base_spacing = 100
-        else:
+            base_spacing = 120  # Medium networks: balanced spacing
+        elif n < 60:
             scale = 'large'
-            base_spacing = 80
+            base_spacing = 100  # Large networks: compact but readable
+        else:
+            scale = 'very_large'
+            base_spacing = 90  # Very large networks: tight but still clear
         
         params = {
             'scale': scale,
@@ -290,6 +295,9 @@ class LayoutSelector:
         
         # Algorithm-specific parameters
         if algorithm == 'hierarchical' or algorithm == 'orthogonal':
+            # Layer spacing: vertical distance between layers (reactions)
+            # Node spacing: horizontal distance between nodes in same layer
+            # Use 1.5x multiplier for layer spacing to emphasize flow direction
             params['layer_spacing'] = base_spacing * 1.5
             params['node_spacing'] = base_spacing
             if algorithm == 'orthogonal':

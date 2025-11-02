@@ -172,6 +172,13 @@ class StandardConversionStrategy(ConversionStrategy):
                 for product in reaction.products:
                     used_compound_ids.add(product.id)
             
+            # Build set of reaction names that are in the pathway
+            # This is used to filter enzyme places - only create places for enzymes
+            # whose reactions are actually in the pathway (prevents isolated enzyme places)
+            pathway_reaction_names = set()
+            for reaction in pathway.reactions:
+                pathway_reaction_names.add(reaction.name)
+            
             # Only create places for compounds used in reactions
             compounds = pathway.get_compounds()
             for entry in compounds:
@@ -190,7 +197,16 @@ class StandardConversionStrategy(ConversionStrategy):
             if options.create_enzyme_places:
                 for entry_id, entry in pathway.entries.items():
                     if entry.is_gene() and entry.reaction:
-                        # This is an enzyme entry that catalyzes a reaction
+                        # CRITICAL: Only create enzyme place if its reaction is in the pathway
+                        # This prevents isolated enzyme places for reactions not in this pathway
+                        if entry.reaction not in pathway_reaction_names:
+                            logger.debug(
+                                f"Skipping enzyme entry {entry_id} ({entry.name}): "
+                                f"reaction {entry.reaction} not in pathway reactions"
+                            )
+                            continue
+                        
+                        # This is an enzyme entry that catalyzes a reaction IN THIS PATHWAY
                         # Create place using KGML coordinates (same as compounds)
                         x = entry.graphics.x * options.coordinate_scale + options.center_x
                         y = entry.graphics.y * options.coordinate_scale + options.center_y
@@ -235,10 +251,23 @@ class StandardConversionStrategy(ConversionStrategy):
                     document.places.append(place)
                     place_map[entry.id] = place
             
+            # Build set of reaction names for enzyme filtering (even when compound filtering is off)
+            pathway_reaction_names = set()
+            for reaction in pathway.reactions:
+                pathway_reaction_names.add(reaction.name)
+            
             # Create enzyme places using KGML coordinates (same as compounds)
             if options.create_enzyme_places:
                 for entry_id, entry in pathway.entries.items():
                     if entry.is_gene() and entry.reaction:
+                        # CRITICAL: Only create enzyme place if its reaction is in the pathway
+                        if entry.reaction not in pathway_reaction_names:
+                            logger.debug(
+                                f"Skipping enzyme entry {entry_id} ({entry.name}): "
+                                f"reaction {entry.reaction} not in pathway reactions"
+                            )
+                            continue
+                        
                         x = entry.graphics.x * options.coordinate_scale + options.center_x
                         y = entry.graphics.y * options.coordinate_scale + options.center_y
                         
@@ -306,8 +335,10 @@ class StandardConversionStrategy(ConversionStrategy):
                 reaction_name_to_transition[reaction.name] = transition
                 
                 # Create arcs for this transition
+                # CRITICAL: Pass document so arc builder uses unified arc ID counter
+                # This prevents ID conflicts with test arcs created later
                 arcs = self.arc_builder.create_arcs(
-                    reaction, transition, place_map, pathway, options
+                    reaction, transition, place_map, pathway, options, document
                 )
                 document.arcs.extend(arcs)
         

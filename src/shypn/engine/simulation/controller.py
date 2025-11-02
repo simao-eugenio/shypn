@@ -1645,6 +1645,65 @@ class SimulationController:
         # Schedule time-dependent transitions (timed/stochastic) after reset
         self._update_enablement_states()
         self._notify_step_listeners()
+    
+    def reset_for_new_model(self, new_model):
+        """Reset controller for a completely new model (File→Open, Import, etc.).
+        
+        This is more comprehensive than reset() - it recreates all internal
+        components with the new model reference, ensuring no stale state from
+        the previous model persists.
+        
+        Called when:
+        - Loading a file (File→Open)
+        - Importing a pathway (KEGG, SBML)
+        - Reusing a canvas tab for a new document
+        
+        This ensures:
+        - Model adapter is recreated with new model reference
+        - All caches are cleared (behaviors, states, transitions)
+        - State detector gets fresh model reference
+        - Interaction guard is reset
+        - No cross-contamination between old and new models
+        
+        Args:
+            new_model: The new ModelCanvasManager instance
+        """
+        # Stop any running simulation first
+        if self._running:
+            self.stop()
+            if self._timeout_id is not None and GLIB_AVAILABLE:
+                GLib.source_remove(self._timeout_id)
+                self._timeout_id = None
+                self._running = False
+        
+        # Update model reference
+        self.model = new_model
+        
+        # Recreate model adapter with new model
+        self.model_adapter = ModelAdapter(new_model, controller=self)
+        
+        # Clear all state and caches
+        self.time = 0.0
+        self.behavior_cache.clear()
+        self.transition_states.clear()
+        self._round_robin_index = 0
+        
+        # Reset data collector if exists
+        if self.data_collector is not None:
+            self.data_collector.clear()
+        
+        # State detector already has reference to self (controller)
+        # so it will automatically use the new self.model reference
+        # But we invalidate any cached state
+        if hasattr(self.state_detector, '_cached_states'):
+            self.state_detector._cached_states = {}
+        
+        # Interaction guard already has reference to state_detector
+        # which has reference to self, so it will use new model automatically
+        
+        # Re-register observer for new model
+        if hasattr(new_model, 'register_observer'):
+            new_model.register_observer(self._on_model_changed)
 
     def is_running(self) -> bool:
         """Check if simulation is currently running.

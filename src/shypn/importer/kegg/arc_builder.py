@@ -22,7 +22,7 @@ class StandardArcBuilder(ArcBuilder):
     
     def create_arcs(self, reaction: KEGGReaction, transition: Transition,
                    place_map: Dict[str, Place], pathway: KEGGPathway,
-                   options: ConversionOptions) -> List[Arc]:
+                   options: ConversionOptions, document=None) -> List[Arc]:
         """Create arcs for a reaction.
         
         Args:
@@ -31,10 +31,15 @@ class StandardArcBuilder(ArcBuilder):
             place_map: Mapping from KEGG entry ID to Place
             pathway: Complete pathway
             options: Conversion options
+            document: Optional DocumentModel for unified arc ID counter
             
         Returns:
             List of Arc objects
         """
+        # Use document's arc counter if available (avoids ID conflicts with test arcs)
+        if document and hasattr(document, '_next_arc_id'):
+            self.arc_counter = document._next_arc_id
+        
         arcs = []
         
         # Check if this is a reverse transition (from split reversible)
@@ -49,6 +54,10 @@ class StandardArcBuilder(ArcBuilder):
             # Normal or forward direction
             arcs.extend(self._create_input_arcs(reaction.substrates, transition, place_map))
             arcs.extend(self._create_output_arcs(reaction.products, transition, place_map))
+        
+        # Sync counter back to document (for unified ID management)
+        if document and hasattr(document, '_next_arc_id'):
+            document._next_arc_id = self.arc_counter
         
         return arcs
     
