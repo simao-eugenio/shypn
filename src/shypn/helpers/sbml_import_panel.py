@@ -1111,12 +1111,14 @@ class SBMLImportPanel:
     def _on_import_clicked(self, button):
         """Handle unified import button click.
         
-        NEW APPROACH (Wayland workaround):
-        1. Browse/fetch + parse + convert in background
-        2. Save .shy file to project/models/
-        3. Let user open it via File → Open
+        CURRENT FLOW:
+        1. Browse/fetch SBML file
+        2. Parse and convert to DocumentModel
+        3. Save .shy file to project/models/
+        4. User must manually open file via File → Open or double-click in file explorer
         
-        This avoids Wayland protocol errors by skipping canvas creation during import.
+        NOTE: Does NOT auto-load to canvas. File must be explicitly opened.
+        This is intentional design for user control and avoiding state issues.
         """
         # Set flag to enable auto-continue workflow
         self._import_button_flow = True

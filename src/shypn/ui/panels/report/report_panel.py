@@ -2,6 +2,19 @@
 """Report Panel - Main container for scientific reports.
 
 Displays comprehensive project reports organized by the 4 main panels.
+
+DATA FLOW:
+1. KEGG/SBML Import → Saves .shy file (does NOT auto-load to canvas)
+2. User opens file via File → Open or double-click
+3. File loads to canvas → on_file_opened() event fired
+4. Report panel populates with raw imported data (green cells)
+5. User clicks Enrich → BRENDA data added (blue cells)
+6. User manually edits → Fields marked as edited (orange cells)
+
+KEY BEHAVIOR:
+- Report does NOT populate immediately after KEGG/SBML import
+- Report populates only AFTER user explicitly opens the saved file
+- This is intentional: import saves file, user controls when to load
 """
 import gi
 gi.require_version('Gtk', '3.0')
