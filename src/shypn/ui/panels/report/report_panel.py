@@ -288,33 +288,152 @@ class ReportPanel(Gtk.Box):
             ec_numbers: List of EC numbers to enrich
             model_manager: ModelCanvasManager instance
         """
+        # Analyze what data is missing in the model
+        missing_data_count = self._count_missing_kinetic_data(model_manager)
+        
         dialog = Gtk.MessageDialog(
             transient_for=None,
             message_type=Gtk.MessageType.QUESTION,
             buttons=Gtk.ButtonsType.OK_CANCEL,
-            text=f"Enrich with BRENDA Data"
+            text=f"Batch Enrich Missing Data with BRENDA"
         )
         dialog.format_secondary_text(
-            f"Found {len(ec_numbers)} unique EC numbers in model.\n\n"
-            f"This will query BRENDA database for kinetic parameters\n"
-            f"(Km, kcat, Ki, etc.) and update transitions.\n\n"
+            f"Found {len(ec_numbers)} unique EC numbers in model.\n"
+            f"Missing kinetic data in {missing_data_count} transitions.\n\n"
+            f"This will automatically query BRENDA database for:\n"
+            f"  • Km values (substrate affinity)\n"
+            f"  • Kcat values (turnover number)\n"
+            f"  • Ki values (inhibition constants)\n"
+            f"  • Other kinetic parameters\n\n"
+            f"⚠️ Only MISSING data will be filled.\n"
+            f"⚠️ Existing data will NOT be overwritten.\n\n"
             f"Enriched data will be shown in BLUE in the report.\n\n"
-            f"Continue with BRENDA enrichment?"
+            f"Continue with BRENDA batch enrichment?"
         )
         
         response = dialog.run()
         dialog.destroy()
         
         if response == Gtk.ResponseType.OK:
-            # TODO: Launch BRENDA enrichment controller
-            # For now, just show a notification
-            self._show_info_dialog(
-                "BRENDA Enrichment",
-                f"BRENDA enrichment initiated for {len(ec_numbers)} EC numbers.\n"
-                f"Integration with BRENDAEnrichmentController coming soon.\n\n"
-                f"EC Numbers: {', '.join(ec_numbers[:5])}" + 
-                (f" ... and {len(ec_numbers)-5} more" if len(ec_numbers) > 5 else "")
+            # Launch BRENDA enrichment
+            success = self._execute_brenda_enrichment(ec_numbers, model_manager)
+            
+            if success:
+                # Refresh report to show enriched data
+                self.refresh_all()
+                self._show_info_dialog(
+                    "BRENDA Enrichment Complete",
+                    f"Successfully enriched {missing_data_count} transitions.\n\n"
+                    f"Check the report for BLUE-colored enriched fields."
+                )
+            else:
+                self._show_info_dialog(
+                    "BRENDA Enrichment Failed",
+                    "BRENDA enrichment could not be completed.\n"
+                    "This feature requires BRENDA API credentials or local BRENDA data file.\n\n"
+                    "To enable:\n"
+                    "1. Register at BRENDA website for API access, OR\n"
+                    "2. Download BRENDA data files and configure path in settings"
+                )
+    
+    
+    def _count_missing_kinetic_data(self, model_manager):
+        """Count transitions with missing kinetic data.
+        
+        Args:
+            model_manager: ModelCanvasManager instance
+            
+        Returns:
+            int: Number of transitions missing kinetic data
+        """
+        missing_count = 0
+        
+        if not hasattr(model_manager, 'transitions'):
+            return 0
+        
+        for transition in model_manager.transitions:
+            if not transition:
+                continue
+            
+            # Check if transition has kinetic data
+            has_kinetics = False
+            
+            # Check metadata for kinetic parameters
+            if hasattr(transition, 'metadata') and transition.metadata:
+                has_km = 'km' in transition.metadata or 'Km' in transition.metadata
+                has_kcat = 'kcat' in transition.metadata or 'Kcat' in transition.metadata
+                has_vmax = 'vmax' in transition.metadata or 'Vmax' in transition.metadata
+                has_kinetics = has_km or has_kcat or has_vmax
+            
+            # Check kinetic_metadata object
+            if not has_kinetics and hasattr(transition, 'kinetic_metadata') and transition.kinetic_metadata:
+                has_kinetics = True
+            
+            # Check properties dict
+            if not has_kinetics and hasattr(transition, 'properties') and transition.properties:
+                has_kinetics = ('km' in transition.properties or 
+                               'kcat' in transition.properties or
+                               'vmax' in transition.properties)
+            
+            if not has_kinetics:
+                missing_count += 1
+        
+        return missing_count
+    
+    def _execute_brenda_enrichment(self, ec_numbers, model_manager):
+        """Execute BRENDA batch enrichment for missing data.
+        
+        Args:
+            ec_numbers: List of EC numbers to query
+            model_manager: ModelCanvasManager instance
+            
+        Returns:
+            bool: True if enrichment succeeded, False otherwise
+        """
+        try:
+            from shypn.helpers.brenda_enrichment_controller import BRENDAEnrichmentController
+            
+            # Create controller
+            controller = BRENDAEnrichmentController(
+                model_canvas=model_manager,
+                project=self.project
             )
+            
+            # Execute batch enrichment (only fills missing data, doesn't override)
+            result = controller.enrich_canvas_from_api(
+                ec_numbers=ec_numbers,
+                organism=None,  # Auto-detect or use default
+                override_existing=False  # CRITICAL: Only fill missing data!
+            )
+            
+            # Update metadata with source tracking for enriched transitions
+            if result.get('success') and hasattr(model_manager, 'transitions'):
+                for transition in model_manager.transitions:
+                    if not transition or not hasattr(transition, 'metadata'):
+                        continue
+                    
+                    # Check if this transition was enriched
+                    # (has kinetic data but no source field)
+                    if transition.metadata:
+                        has_kinetics = ('km' in transition.metadata or 
+                                       'kcat' in transition.metadata or
+                                       'vmax' in transition.metadata)
+                        has_source = 'data_source' in transition.metadata
+                        
+                        # Mark as BRENDA-enriched if it has kinetics but no source
+                        if has_kinetics and not has_source:
+                            transition.metadata['data_source'] = 'brenda_enriched'
+            
+            return result.get('success', False)
+            
+        except ImportError:
+            # BRENDA controller not available
+            return False
+        except Exception as e:
+            print(f"[Report] BRENDA enrichment error: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
     
     def _show_info_dialog(self, title, message):
         """Show information dialog.
