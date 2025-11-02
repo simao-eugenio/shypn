@@ -213,7 +213,8 @@ class Place(PetriNetObject):
             "initial_marking": self.initial_marking,  # Store initial marking for reset
             "capacity": self.capacity,  # Store capacity constraint
             "border_color": list(self.border_color),
-            "border_width": self.border_width
+            "border_width": self.border_width,
+            "is_catalyst": getattr(self, 'is_catalyst', False)  # Save catalyst flag
         })
         return data
     
@@ -248,6 +249,9 @@ class Place(PetriNetObject):
         else:
             # If no initial_marking stored, use current marking as initial
             place.initial_marking = place.tokens
+        
+        # Restore catalyst flag (for hierarchical layout)
+        place.is_catalyst = data.get("is_catalyst", False)
         if "capacity" in data:
             place.capacity = data["capacity"]
         if "border_color" in data:

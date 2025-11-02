@@ -295,11 +295,59 @@ class ReportPanel(Gtk.Box):
     
     def _on_pathway_imported(self):
         """Called by pathway operations panel when new pathway is imported."""
+        # Refresh Models category (shows new import provenance)
+        for category in self.categories:
+            if isinstance(category, ModelsCategory):
+                category.refresh()
+                break
+        
         # Refresh the dynamic analyses category (shows pathway enrichments)
         for category in self.categories:
             if isinstance(category, DynamicAnalysesCategory):
                 category.refresh()
                 break
+    
+    def on_file_opened(self, filepath):
+        """Called when a file is opened (File → Open or double-click).
+        
+        Args:
+            filepath: Path to the opened file
+        """
+        # Refresh Models category to show new model information
+        for category in self.categories:
+            if isinstance(category, ModelsCategory):
+                category.refresh()
+                break
+    
+    def on_file_new(self):
+        """Called when a new file is created (File → New)."""
+        # Refresh Models category to show new model
+        for category in self.categories:
+            if isinstance(category, ModelsCategory):
+                category.refresh()
+                break
+    
+    def on_tab_switched(self, drawing_area):
+        """Called when user switches between model tabs.
+        
+        Args:
+            drawing_area: The newly active drawing area
+        """
+        # Refresh Models category to show current tab's model
+        for category in self.categories:
+            if isinstance(category, ModelsCategory):
+                category.refresh()
+                break
+    
+    def on_project_opened(self, project):
+        """Called when a project is opened.
+        
+        Args:
+            project: Opened Project instance
+        """
+        self.set_project(project)
+        # Refresh all categories with new project context
+        self.refresh_all()
     
     def refresh_all(self):
         """Refresh all categories."""
