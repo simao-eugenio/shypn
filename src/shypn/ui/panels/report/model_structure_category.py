@@ -539,22 +539,6 @@ class ModelsCategory(BaseReportCategory):
                     db_id_source = place.metadata.get('db_id_source',
                                    place.metadata.get('data_source', 'kegg_import'))
             
-            # Extended Name - infer from database ID if possible
-            extended_name = "-"
-            if hasattr(place, 'metadata') and place.metadata:
-                # First try metadata (explicit extended_name field)
-                extended_name = place.metadata.get('extended_name', '-')
-            
-            # If not in metadata, try to infer from KEGG compound ID
-            if extended_name == "-" and db_id and db_id != "-":
-                if db_id.startswith('C') and len(db_id) == 6:
-                    extended_name = self._infer_compound_name(db_id)
-                else:
-                    # If we have a compound_name or full_name in metadata, use it
-                    if hasattr(place, 'metadata') and place.metadata:
-                        extended_name = place.metadata.get('compound_name',
-                                       place.metadata.get('full_name', '-'))
-            
             # Initial tokens
             tokens = 0.0
             if hasattr(place, 'initial_marking'):
@@ -595,73 +579,15 @@ class ModelsCategory(BaseReportCategory):
                 i,                # 0: index
                 place_id,         # 1: Petri Net ID
                 name,             # 2: Biological Name
-                extended_name,    # 3: Extended Name
-                db_id,            # 4: Database ID (KEGG/ChEBI/etc)
-                db_id_source,     # 5: Database ID source
-                tokens,           # 6: Initial Tokens
-                formula,          # 7: Formula
-                formula_source,   # 8: Formula source
-                mass,             # 9: Mass
-                mass_source,      # 10: Mass source
-                type_val          # 11: Type
+                db_id,            # 3: Database ID (KEGG/ChEBI/etc)
+                db_id_source,     # 4: Database ID source
+                tokens,           # 5: Initial Tokens
+                formula,          # 6: Formula
+                formula_source,   # 7: Formula source
+                mass,             # 8: Mass
+                mass_source,      # 9: Mass source
+                type_val          # 10: Type
             ])
-    
-    def _infer_compound_name(self, compound_id):
-        """Infer compound name from KEGG compound ID.
-        
-        Args:
-            compound_id: KEGG compound ID (e.g., "C00033")
-            
-        Returns:
-            Compound name or "-" if not found
-        """
-        # Check cache first
-        if not hasattr(self, '_compound_name_cache'):
-            self._compound_name_cache = {}
-        
-        if compound_id in self._compound_name_cache:
-            return self._compound_name_cache[compound_id]
-        
-        # Common compounds hardcoded (to avoid API calls for every common metabolite)
-        common_compounds = {
-            'C00001': 'H2O (Water)',
-            'C00002': 'ATP (Adenosine triphosphate)',
-            'C00003': 'NAD+ (Nicotinamide adenine dinucleotide)',
-            'C00004': 'NADH (Reduced nicotinamide adenine dinucleotide)',
-            'C00005': 'NADPH (Reduced nicotinamide adenine dinucleotide phosphate)',
-            'C00006': 'NADP+ (Nicotinamide adenine dinucleotide phosphate)',
-            'C00008': 'ADP (Adenosine diphosphate)',
-            'C00009': 'Orthophosphate',
-            'C00010': 'CoA (Coenzyme A)',
-            'C00011': 'CO2 (Carbon dioxide)',
-            'C00013': 'Diphosphate',
-            'C00014': 'Ammonia',
-            'C00020': 'AMP (Adenosine monophosphate)',
-            'C00025': 'L-Glutamate',
-            'C00033': 'Acetate',
-            'C00035': 'GDP (Guanosine diphosphate)',
-            'C00044': 'GTP (Guanosine triphosphate)',
-            'C00063': 'CTP (Cytidine triphosphate)',
-            'C00080': 'H+ (Hydrogen ion)',
-            'C00081': 'ITP (Inosine triphosphate)',
-            'C00082': 'L-Tyrosine',
-            'C00086': 'Urea',
-            'C00103': 'D-Glucose 1-phosphate',
-            'C00122': 'Fumarate',
-            'C00149': 'L-Malate',
-            'C00158': 'Citrate',
-            'C00183': 'L-Valine',
-        }
-        
-        if compound_id in common_compounds:
-            result = common_compounds[compound_id]
-            self._compound_name_cache[compound_id] = result
-            return result
-        
-        # For uncommon compounds, return the ID (avoids API calls during display)
-        # Could be enhanced with async API fetching in the future
-        self._compound_name_cache[compound_id] = f"Compound {compound_id}"
-        return f"Compound {compound_id}"
     
     def _populate_reactions_table(self, model):
         """Populate reactions table with current model data.
