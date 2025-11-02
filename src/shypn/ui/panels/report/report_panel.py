@@ -60,6 +60,15 @@ class ReportPanel(Gtk.Box):
         header_label.set_valign(Gtk.Align.CENTER)
         header_box.pack_start(header_label, True, True, 0)
         
+        # Refresh button (updates all categories with current data)
+        self.refresh_button = Gtk.Button()
+        self.refresh_button.set_label("🔄")
+        self.refresh_button.set_tooltip_text("Refresh report with current data")
+        self.refresh_button.set_relief(Gtk.ReliefStyle.NONE)  # Flat button
+        self.refresh_button.set_valign(Gtk.Align.CENTER)
+        self.refresh_button.connect('clicked', self._on_refresh_clicked)
+        header_box.pack_end(self.refresh_button, False, False, 4)
+        
         # Float button on the far right (icon only, matching other panels)
         self.float_button = Gtk.ToggleButton()
         self.float_button.set_label("⬈")
@@ -202,8 +211,28 @@ class ReportPanel(Gtk.Box):
         
         return True
     
+    def _on_refresh_clicked(self, button):
+        """Handle refresh button click - update all categories with current data.
+        
+        Report is intended as a static summary that is manually refreshed.
+        This prevents constant updates that could be distracting while working.
+        """
+        for category in self.categories:
+            category.refresh()
+    
+    def refresh_all(self):
+        """Programmatically refresh all categories.
+        
+        Called when significant events occur (e.g., model loaded, analysis completed).
+        """
+        for category in self.categories:
+            category.refresh()
+    
     def set_project(self, project):
-        """Set project and refresh all categories.
+        """Set project for all categories.
+        
+        Does NOT auto-refresh - user must click refresh button.
+        Report is a static summary, not live data.
         
         Args:
             project: Project instance
@@ -213,7 +242,10 @@ class ReportPanel(Gtk.Box):
             category.set_project(project)
     
     def set_model_canvas(self, model_canvas):
-        """Set model canvas and refresh all categories.
+        """Set model canvas for all categories.
+        
+        Does NOT auto-refresh - user must click refresh button.
+        Report is a static summary, not live data.
         
         Args:
             model_canvas: ModelCanvas instance
