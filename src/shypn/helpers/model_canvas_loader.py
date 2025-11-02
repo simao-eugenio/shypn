@@ -289,18 +289,18 @@ class ModelCanvasLoader:
         Returns:
             tuple: (tab_box, label_widget, close_button) for later updates
         """
-        tab_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
+        tab_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=3)
         
         # Apply CSS styling for elevated tab appearance
         css_provider = Gtk.CssProvider()
         css = b"""
         .tab-box {
-            padding: 4px 8px;
+            padding: 2px 6px;
             border: 1px solid #ccc;
             border-bottom: none;
-            border-radius: 6px 6px 0 0;
+            border-radius: 4px 4px 0 0;
             background: #f5f5f5;
-            min-height: 20px;
+            min-height: 18px;
             margin-top: 0;
             margin-bottom: -1px;
             margin-left: 0;
@@ -325,8 +325,8 @@ class ModelCanvasLoader:
         style_context.add_provider(css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         style_context.add_class('tab-box')
         
-        # File type icon (document icon for Petri nets)
-        file_icon = Gtk.Image.new_from_icon_name('text-x-generic', Gtk.IconSize.MENU)
+        # File type icon (document icon for Petri nets) - using SMALL_TOOLBAR for compact size
+        file_icon = Gtk.Image.new_from_icon_name('text-x-generic', Gtk.IconSize.SMALL_TOOLBAR)
         file_icon.show()
         tab_box.pack_start(file_icon, False, False, 0)
         
@@ -346,11 +346,11 @@ class ModelCanvasLoader:
         tab_label.show()
         tab_box.pack_start(tab_label, expand=True, fill=True, padding=0)
         
-        # Close button (X)
+        # Close button (X) - using MENU size for compact appearance
         close_button = Gtk.Button()
         close_button.set_relief(Gtk.ReliefStyle.NONE)
         close_button.set_focus_on_click(False)
-        close_icon = Gtk.Image.new_from_icon_name('window-close-symbolic', Gtk.IconSize.BUTTON)
+        close_icon = Gtk.Image.new_from_icon_name('window-close-symbolic', Gtk.IconSize.MENU)
         close_button.set_image(close_icon)
         close_button.show()
         tab_box.pack_start(close_button, False, False, 0)
