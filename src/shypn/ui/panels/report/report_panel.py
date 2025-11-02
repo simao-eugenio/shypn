@@ -61,6 +61,15 @@ class ReportPanel(Gtk.Box):
         header_label.set_valign(Gtk.Align.CENTER)
         header_box.pack_start(header_label, True, True, 0)
         
+        # BRENDA enrichment button
+        self.brenda_button = Gtk.Button()
+        self.brenda_button.set_label("🧬 Enrich")
+        self.brenda_button.set_tooltip_text("Enrich model with BRENDA kinetic parameters")
+        self.brenda_button.set_relief(Gtk.ReliefStyle.NONE)
+        self.brenda_button.set_valign(Gtk.Align.CENTER)
+        self.brenda_button.connect('clicked', self._on_brenda_enrich_clicked)
+        header_box.pack_end(self.brenda_button, False, False, 4)
+        
         # Refresh button (updates all categories with current data)
         self.refresh_button = Gtk.Button()
         self.refresh_button.set_label("🔄")
@@ -228,6 +237,102 @@ class ReportPanel(Gtk.Box):
         for category in self.categories:
             category.refresh()
     
+    def _on_brenda_enrich_clicked(self, button):
+        """Handle BRENDA enrichment button click.
+        
+        Collects EC numbers from all reactions in the current model and
+        launches BRENDA enrichment workflow.
+        """
+        # Get current model
+        if not self.model_canvas_loader:
+            self._show_info_dialog("No Model", "Please load a model first")
+            return
+        
+        current_manager = self.model_canvas_loader.get_current_model()
+        if not current_manager:
+            self._show_info_dialog("No Model", "No active model found")
+            return
+        
+        # Collect EC numbers from transitions
+        ec_numbers = []
+        if hasattr(current_manager, 'transitions'):
+            for transition in current_manager.transitions:
+                if not transition:
+                    continue
+                if hasattr(transition, 'metadata') and transition.metadata:
+                    ec_val = transition.metadata.get('ec_number',
+                             transition.metadata.get('ec_numbers', []))
+                    if isinstance(ec_val, list):
+                        ec_numbers.extend(ec_val)
+                    elif ec_val and ec_val != '-':
+                        ec_numbers.append(str(ec_val))
+        
+        # Remove duplicates
+        ec_numbers = list(set(ec_numbers))
+        
+        if not ec_numbers:
+            self._show_info_dialog(
+                "No EC Numbers",
+                "No EC numbers found in model reactions.\n"
+                "Import a KEGG pathway or add EC numbers to transitions first."
+            )
+            return
+        
+        # Show enrichment dialog
+        self._show_brenda_dialog(ec_numbers, current_manager)
+    
+    def _show_brenda_dialog(self, ec_numbers, model_manager):
+        """Show BRENDA enrichment dialog.
+        
+        Args:
+            ec_numbers: List of EC numbers to enrich
+            model_manager: ModelCanvasManager instance
+        """
+        dialog = Gtk.MessageDialog(
+            transient_for=None,
+            message_type=Gtk.MessageType.QUESTION,
+            buttons=Gtk.ButtonsType.OK_CANCEL,
+            text=f"Enrich with BRENDA Data"
+        )
+        dialog.format_secondary_text(
+            f"Found {len(ec_numbers)} unique EC numbers in model.\n\n"
+            f"This will query BRENDA database for kinetic parameters\n"
+            f"(Km, kcat, Ki, etc.) and update transitions.\n\n"
+            f"Enriched data will be shown in BLUE in the report.\n\n"
+            f"Continue with BRENDA enrichment?"
+        )
+        
+        response = dialog.run()
+        dialog.destroy()
+        
+        if response == Gtk.ResponseType.OK:
+            # TODO: Launch BRENDA enrichment controller
+            # For now, just show a notification
+            self._show_info_dialog(
+                "BRENDA Enrichment",
+                f"BRENDA enrichment initiated for {len(ec_numbers)} EC numbers.\n"
+                f"Integration with BRENDAEnrichmentController coming soon.\n\n"
+                f"EC Numbers: {', '.join(ec_numbers[:5])}" + 
+                (f" ... and {len(ec_numbers)-5} more" if len(ec_numbers) > 5 else "")
+            )
+    
+    def _show_info_dialog(self, title, message):
+        """Show information dialog.
+        
+        Args:
+            title: Dialog title
+            message: Dialog message
+        """
+        dialog = Gtk.MessageDialog(
+            transient_for=None,
+            message_type=Gtk.MessageType.INFO,
+            buttons=Gtk.ButtonsType.OK,
+            text=title
+        )
+        dialog.format_secondary_text(message)
+        dialog.run()
+        dialog.destroy()
+    
     def refresh_all(self):
         """Programmatically refresh all categories.
         
@@ -261,6 +366,43 @@ class ReportPanel(Gtk.Box):
         self.model_canvas = model_canvas
         for category in self.categories:
             category.set_model_canvas(model_canvas)
+        
+        # Wire up observer for property changes (real-time refresh)
+        self._setup_model_observer()
+    
+    def _setup_model_observer(self):
+        """Setup observer for model changes to enable real-time refresh.
+        
+        Hooks into the mark_dirty callback from ModelCanvasManager.
+        When properties are edited (via property dialogs), document is marked dirty
+        and report automatically refreshes to show updated data.
+        """
+        if not self.model_canvas_loader:
+            return
+        
+        current_manager = self.model_canvas_loader.get_current_model()
+        if not current_manager:
+            return
+        
+        # Hook into on_dirty_changed callback
+        # This is triggered whenever document is modified (via property dialogs, etc.)
+        if hasattr(current_manager, 'on_dirty_changed'):
+            # Store original callback
+            original_callback = current_manager.on_dirty_changed
+            
+            # Create wrapper that also refreshes report
+            def on_dirty_with_refresh(is_dirty):
+                # Call original callback first (updates tab labels, etc.)
+                if original_callback:
+                    original_callback(is_dirty)
+                
+                # If document was just marked dirty, refresh report
+                # (Shows updated property values after edits)
+                if is_dirty:
+                    self.refresh_all()
+            
+            # Install our wrapped callback
+            current_manager.on_dirty_changed = on_dirty_with_refresh
     
     def set_topology_panel(self, topology_panel):
         """Set topology panel reference for fetching analysis data.
