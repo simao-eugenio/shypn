@@ -117,12 +117,17 @@ class LayoutEngine:
             # Check if this place is an enzyme/catalyst place
             # Enzyme places have metadata['is_enzyme'] = True
             # Use getattr() to safely access metadata attribute
-            metadata = getattr(place, 'metadata', {})
-            is_enzyme = metadata.get('is_enzyme', False) if metadata else False
-            
-            # Set is_catalyst attribute on place object for layout algorithm
-            # The hierarchical layout base.py checks this with getattr(node, 'is_catalyst', False)
-            place.is_catalyst = is_enzyme
+            # Check for catalyst flag (enzyme place)
+            # Priority: Use existing is_catalyst attribute if set (from loaded file),
+            # fallback to metadata['is_enzyme'] for KEGG imports
+            if hasattr(place, 'is_catalyst') and place.is_catalyst:
+                # Already set (from file load or KEGG import) - preserve it!
+                pass
+            else:
+                # Not set yet - check metadata
+                metadata = getattr(place, 'metadata', {})
+                is_enzyme = metadata.get('is_enzyme', False) if metadata else False
+                place.is_catalyst = is_enzyme
             
             graph.add_node(place, type='place')  # Use object itself as node ID
             place_count += 1
