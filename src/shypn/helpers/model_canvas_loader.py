@@ -697,7 +697,9 @@ class ModelCanvasLoader:
         manager.zoom = 1.0
         manager.pan_x = 0.0
         manager.pan_y = 0.0
+        # CRITICAL: Reset initial_pan_set flag in BOTH manager and viewport_controller
         manager._initial_pan_set = False
+        manager.viewport_controller._initial_pan_set = False
         
         # CRITICAL: Ensure callbacks are enabled
         # This is the most common cause of "frozen canvas" bugs

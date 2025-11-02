@@ -6,6 +6,14 @@ Displays comprehensive scientific information about the current model:
 - Petri net structure (places, transitions, arcs)
 - Import provenance (KEGG/SBML source information)
 - Detailed species and reactions lists with metadata
+
+WHEN IT POPULATES:
+- NOT immediately after KEGG/SBML import (import only saves file)
+- ONLY after user opens file via File → Open or double-click
+- on_file_opened event → report_panel.set_model_canvas() → refresh()
+- Raw imported data shown in green cells
+- Enriched BRENDA data shown in blue cells
+- Manually edited fields shown in orange cells
 """
 import gi
 gi.require_version('Gtk', '3.0')
@@ -139,10 +147,10 @@ class ModelsCategory(BaseReportCategory):
             tuple: (ScrolledWindow, TreeView, ListStore)
         """
         # Create ListStore with column types
-        # Columns: index (int), id (str), name (str), extended_name (str), 
+        # Columns: index (int), id (str), name (str), 
         #          db_id (str), db_id_source (str), tokens (float), 
         #          formula (str), formula_source (str), mass (float), mass_source (str), type (str)
-        store = Gtk.ListStore(int, str, str, str, str, str, float, str, str, float, str, str)
+        store = Gtk.ListStore(int, str, str, str, str, float, str, str, float, str, str)
         
         # Create TreeView
         treeview = Gtk.TreeView(model=store)
@@ -153,13 +161,12 @@ class ModelsCategory(BaseReportCategory):
         # Add columns with renderers (colored for source tracking)
         self._add_column(treeview, "#", 0, width=50, sortable=False)
         self._add_column(treeview, "Petri Net ID", 1, sortable=True, width=100)
-        self._add_column(treeview, "Biological Name", 2, sortable=True, width=150)
-        self._add_column(treeview, "Extended Name", 3, sortable=True, width=200)
-        self._add_colored_column(treeview, "Database ID", 4, 5, sortable=True, width=120)
-        self._add_column(treeview, "Initial Tokens", 6, sortable=True, numeric=True, width=100)
-        self._add_colored_column(treeview, "Formula", 7, 8, sortable=True, width=100)
-        self._add_colored_column(treeview, "Mass (g/mol)", 9, 10, sortable=True, numeric=True, width=100)
-        self._add_column(treeview, "Type", 11, sortable=True, width=90)
+        self._add_column(treeview, "Biological Name", 2, sortable=True, width=200)
+        self._add_colored_column(treeview, "Database ID", 3, 4, sortable=True, width=120)
+        self._add_column(treeview, "Initial Tokens", 5, sortable=True, numeric=True, width=100)
+        self._add_colored_column(treeview, "Formula", 6, 7, sortable=True, width=100)
+        self._add_colored_column(treeview, "Mass (g/mol)", 8, 9, sortable=True, numeric=True, width=100)
+        self._add_column(treeview, "Type", 10, sortable=True, width=90)
         
         # Create scrolled window
         scrolled = Gtk.ScrolledWindow()

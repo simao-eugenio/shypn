@@ -277,12 +277,14 @@ class KEGGImportPanel:
     def _on_import_clicked(self, button):
         """Handle unified import button click.
         
-        NEW APPROACH (Wayland workaround):
-        1. Convert pathway to model
+        CURRENT FLOW:
+        1. Convert pathway to DocumentModel
         2. Save .shy file to project/models/
-        3. Let user open it via File → Open
+        3. Save raw KGML to project/pathways/
+        4. User must manually open file via File → Open or double-click in file explorer
         
-        This avoids Wayland issues during import by using the proven file-open workflow.
+        NOTE: Does NOT auto-load to canvas. File must be explicitly opened.
+        This is intentional design for user control and avoiding state issues.
         """
         # Check if we already have a fetched pathway
         if self.current_pathway and self.current_kgml:
@@ -350,8 +352,15 @@ class KEGGImportPanel:
     def _do_import_and_save(self):
         """Convert current pathway to model and save .shy file.
         
-        NEW APPROACH: Save file only, no canvas creation.
-        User can then open via File → Open (proven working path).
+        CURRENT BEHAVIOR:
+        - Saves .shy model file to project/models/
+        - Saves raw .xml KGML to project/pathways/
+        - Sets metadata['data_source'] = 'kegg_import' for Report color coding
+        - Does NOT auto-load to canvas
+        - User must explicitly open via File → Open or file explorer double-click
+        
+        This is intentional design to give users control over when models load
+        and to avoid canvas state synchronization issues during import.
         """
         self.logger.info("=== _do_import_and_save called ===")
         
@@ -535,10 +544,19 @@ class KEGGImportPanel:
             return False
     
     def _do_import_to_canvas(self):
-        """DEPRECATED: Old canvas-based import.
+        """DEPRECATED: Old direct-to-canvas import.
         
-        Kept for reference but no longer used.
-        New approach: _do_import_and_save()
+        HISTORY:
+        - Previously loaded KEGG pathway directly to canvas
+        - Caused Wayland rendering issues and state synchronization bugs
+        - Replaced with file-based workflow (save then open)
+        
+        CURRENT APPROACH:
+        - Import now saves to .shy file only (_do_import_and_save)
+        - User explicitly opens via File → Open or file explorer
+        - This avoids canvas state issues and gives user control
+        
+        This function kept for reference only. Not called in current code.
         """
         # Show deprecation message
         self._show_status("⚠️ Direct canvas import disabled - use File → Open instead", error=True)

@@ -1853,7 +1853,11 @@ class FileExplorerPanel:
                 manager.zoom = zoom
                 manager.pan_x = pan_x
                 manager.pan_y = pan_y
-                manager._initial_pan_set = True  # Mark as set to prevent auto-centering
+                
+                # CRITICAL: Set initial_pan_set flag in BOTH manager and viewport_controller
+                # These can get out of sync, causing pan/zoom disruption
+                manager._initial_pan_set = True  # Manager's flag
+                manager.viewport_controller._initial_pan_set = True  # Controller's flag
                 
                 # Restore transformations (rotation) if available
                 if 'transformations' in document.view_state:
