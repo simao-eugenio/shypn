@@ -488,6 +488,11 @@ class ReportPanel(Gtk.Box):
         current_manager = None
         if self.model_canvas_loader and hasattr(self.model_canvas_loader, 'get_current_model'):
             current_manager = self.model_canvas_loader.get_current_model()
+            print(f"[REPORT] set_model_canvas: Got current_manager: {current_manager}")
+            if current_manager:
+                print(f"[REPORT] Manager has {len(current_manager.places)} places, {len(current_manager.transitions)} transitions")
+        else:
+            print(f"[REPORT] set_model_canvas: No model_canvas_loader! self.model_canvas_loader={self.model_canvas_loader}")
         
         # Pass the manager (not the loader) to categories
         for category in self.categories:
@@ -501,7 +506,12 @@ class ReportPanel(Gtk.Box):
         # Enrich button will ADD blue-colored BRENDA data later
         if current_manager and hasattr(current_manager, 'transitions'):
             if len(current_manager.transitions) > 0 or len(current_manager.places) > 0:
+                print(f"[REPORT] Auto-refreshing to show {len(current_manager.places)} places and {len(current_manager.transitions)} transitions")
                 self.refresh_all()
+            else:
+                print(f"[REPORT] Skipping auto-refresh - model is empty")
+        else:
+            print(f"[REPORT] Skipping auto-refresh - no current_manager or no transitions attribute")
     
     def _setup_model_observer(self):
         """Setup observer for model changes to enable real-time refresh.
@@ -823,6 +833,8 @@ class ReportPanel(Gtk.Box):
         Args:
             filepath: Path to the opened file
         """
+        print(f"[REPORT] on_file_opened: {filepath}")
+        
         # Add a small delay to ensure model is fully loaded
         from gi.repository import GLib
         
@@ -830,11 +842,14 @@ class ReportPanel(Gtk.Box):
             # Get current model canvas after file load
             if hasattr(self.model_canvas_loader, 'get_current_model'):
                 current_manager = self.model_canvas_loader.get_current_model()
+                print(f"[REPORT] on_file_opened delayed: Got manager: {current_manager}")
                 if current_manager:
+                    print(f"[REPORT] Manager has {len(current_manager.places)} places, {len(current_manager.transitions)} transitions")
                     for category in self.categories:
                         if hasattr(category, 'set_model_canvas'):
                             category.set_model_canvas(current_manager)
                     # Auto-refresh on file open (major event)
+                    print(f"[REPORT] Calling refresh_all()")
                     self.refresh_all()
             return False  # Don't repeat
         
