@@ -93,9 +93,13 @@ class PathwayPanelLoader:
         title_label.set_xalign(0.0)
         header_box.pack_start(title_label, True, True, 0)
         
-        self.float_button = Gtk.ToggleButton(label="Float")
+        # Float button on the far right (icon only, matching other panels)
+        self.float_button = Gtk.ToggleButton()
+        self.float_button.set_label("⬈")
+        self.float_button.set_tooltip_text("Detach panel to floating window")
+        self.float_button.set_relief(Gtk.ReliefStyle.NONE)  # Flat button
         self.float_button.connect('toggled', self._on_float_toggled)
-        header_box.pack_start(self.float_button, False, False, 0)
+        header_box.pack_end(self.float_button, False, False, 0)
         
         self.content.pack_start(header_box, False, False, 0)
         
