@@ -1843,24 +1843,25 @@ class FileExplorerPanel:
             # Restore view state (zoom, pan, and rotation) if available
             has_view_state = False
             if hasattr(document, 'view_state') and document.view_state:
-                # Check if view state has meaningful values (not just default zeros)
+                # Always restore view state, even if it's default (0, 0, 1.0)
+                # This prevents unwanted auto-centering on canvas draw
                 zoom = document.view_state.get('zoom', 1.0)
                 pan_x = document.view_state.get('pan_x', 0.0)
                 pan_y = document.view_state.get('pan_y', 0.0)
                 
-                # Consider view state valid if pan values are non-zero
-                # (zoom=1.0, pan_x=0, pan_y=0 is the default/new file state)
-                has_view_state = (pan_x != 0.0 or pan_y != 0.0 or zoom != 1.0)
+                # Restore zoom and pan (even if default values)
+                manager.zoom = zoom
+                manager.pan_x = pan_x
+                manager.pan_y = pan_y
+                manager._initial_pan_set = True  # Mark as set to prevent auto-centering
                 
-                if has_view_state:
-                    manager.zoom = zoom
-                    manager.pan_x = pan_x
-                    manager.pan_y = pan_y
-                    manager._initial_pan_set = True  # Mark as set to prevent auto-centering
-                    
-                    # Restore transformations (rotation) if available
-                    if 'transformations' in document.view_state:
-                        manager.transformation_manager.from_dict(document.view_state['transformations'])
+                # Restore transformations (rotation) if available
+                if 'transformations' in document.view_state:
+                    manager.transformation_manager.from_dict(document.view_state['transformations'])
+                
+                # Consider view state as "custom" if different from defaults
+                # Used to decide whether to call fit_to_page later
+                has_view_state = (pan_x != 0.0 or pan_y != 0.0 or zoom != 1.0)
             
             # Only fit to page if no saved view state exists
             # This preserves user's saved view position and zoom level
