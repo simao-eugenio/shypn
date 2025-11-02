@@ -8,9 +8,9 @@ Displays comprehensive scientific information about the current model:
 - Detailed species and reactions lists with metadata
 
 WHEN IT POPULATES:
-- NOT immediately after KEGG/SBML import (import only saves file)
-- ONLY after user opens file via File → Open or double-click
-- on_file_opened event → report_panel.set_model_canvas() → refresh()
+- Automatically after KEGG/SBML import completes
+- Import triggers on_file_open_requested → loads to canvas → on_file_opened event
+- report_panel.on_file_opened() → set_model_canvas() → refresh()
 - Raw imported data shown in green cells
 - Enriched BRENDA data shown in blue cells
 - Manually edited fields shown in orange cells
