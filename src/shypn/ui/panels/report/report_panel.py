@@ -505,3 +505,98 @@ class ReportPanel(Gtk.Box):
         dialog.format_secondary_text("Report text copied to clipboard")
         dialog.run()
         dialog.destroy()
+    
+    # =========================================================================
+    # MODEL LIFECYCLE EVENT HANDLERS
+    # These are called by shypn.py when model-related events occur
+    # =========================================================================
+    
+    def on_tab_switched(self, drawing_area):
+        """Handle canvas tab switch event.
+        
+        Called when user switches between model tabs.
+        Updates the model_canvas reference to the new active tab.
+        
+        Args:
+            drawing_area: The newly active drawing area (GtkDrawingArea)
+        """
+        # Extract the ModelCanvasManager from drawing_area
+        # The model_canvas_loader stores managers per drawing_area
+        if hasattr(self.model_canvas, 'managers') and drawing_area in self.model_canvas.managers:
+            current_manager = self.model_canvas.managers[drawing_area]
+            # Update the reference for the MODELS category
+            for category in self.categories:
+                if hasattr(category, 'set_model_canvas'):
+                    category.set_model_canvas(current_manager)
+    
+    def on_file_opened(self, filepath):
+        """Handle file open event.
+        
+        Called when user opens a .shypn file.
+        Gets the current model canvas and refreshes the report.
+        
+        Args:
+            filepath: Path to the opened file
+        """
+        # Get current model canvas after file load
+        if hasattr(self.model_canvas, 'get_current_manager'):
+            current_manager = self.model_canvas.get_current_manager()
+            if current_manager:
+                for category in self.categories:
+                    if hasattr(category, 'set_model_canvas'):
+                        category.set_model_canvas(current_manager)
+                # Auto-refresh on file open (major event)
+                self.refresh_all()
+    
+    def on_file_new(self):
+        """Handle new file event.
+        
+        Called when user creates a new model.
+        Gets the current model canvas and refreshes the report.
+        """
+        # Get current model canvas after new file creation
+        if hasattr(self.model_canvas, 'get_current_manager'):
+            current_manager = self.model_canvas.get_current_manager()
+            if current_manager:
+                for category in self.categories:
+                    if hasattr(category, 'set_model_canvas'):
+                        category.set_model_canvas(current_manager)
+                # Auto-refresh on new file (major event)
+                self.refresh_all()
+    
+    def on_model_imported(self, source_type):
+        """Handle model import event.
+        
+        Called when user imports KEGG/SBML/BioPAX model.
+        Gets the current model canvas and refreshes the report.
+        
+        Args:
+            source_type: Type of import (KEGG, SBML, etc.)
+        """
+        # Get current model canvas after import
+        if hasattr(self.model_canvas, 'get_current_manager'):
+            current_manager = self.model_canvas.get_current_manager()
+            if current_manager:
+                for category in self.categories:
+                    if hasattr(category, 'set_model_canvas'):
+                        category.set_model_canvas(current_manager)
+                # Auto-refresh on import (major event)
+                self.refresh_all()
+    
+    def cleanup(self):
+        """Clean up resources when panel is closed.
+        
+        Called by the loader when the panel is being destroyed.
+        """
+        # Clean up any resources held by categories
+        for category in self.categories:
+            if hasattr(category, 'cleanup'):
+                category.cleanup()
+        
+        # Clear references
+        self.categories.clear()
+        self.project = None
+        self.model_canvas = None
+        self.topology_panel = None
+        self.dynamic_analyses_panel = None
+        self.pathway_operations_panel = None
