@@ -546,8 +546,6 @@ class ReportPanel(Gtk.Box):
         Args:
             filepath: Path to the opened file
         """
-        print(f"[REPORT] on_file_opened called: {filepath}")
-        
         # Add a small delay to ensure model is fully loaded
         from gi.repository import GLib
         
@@ -555,20 +553,12 @@ class ReportPanel(Gtk.Box):
             # Get current model canvas after file load
             if hasattr(self.model_canvas_loader, 'get_current_model'):
                 current_manager = self.model_canvas_loader.get_current_model()
-                print(f"[REPORT] Current manager: {current_manager}")
                 if current_manager:
-                    print(f"[REPORT] Updating {len(self.categories)} categories")
                     for category in self.categories:
                         if hasattr(category, 'set_model_canvas'):
                             category.set_model_canvas(current_manager)
-                            print(f"[REPORT] Updated category: {category.title}")
                     # Auto-refresh on file open (major event)
-                    print("[REPORT] Calling refresh_all()")
                     self.refresh_all()
-                else:
-                    print("[REPORT] WARNING: current_manager is None")
-            else:
-                print("[REPORT] ERROR: model_canvas_loader doesn't have get_current_model")
             return False  # Don't repeat
         
         # Delay 100ms to let model finish loading
