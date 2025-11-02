@@ -58,6 +58,14 @@ class TopologyPanel(Gtk.Box):
         header_label.set_valign(Gtk.Align.CENTER)
         header_box.pack_start(header_label, True, True, 0)
         
+        # Float button on the far right (icon only)
+        self.float_button = Gtk.ToggleButton()
+        self.float_button.set_label("⬈")
+        self.float_button.set_tooltip_text("Detach panel to floating window")
+        self.float_button.set_relief(Gtk.ReliefStyle.NONE)  # Flat button
+        self.float_button.set_valign(Gtk.Align.CENTER)
+        header_box.pack_end(self.float_button, False, False, 0)
+        
         self.pack_start(header_box, False, False, 0)
         
         # Separator
