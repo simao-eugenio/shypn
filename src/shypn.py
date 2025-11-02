@@ -615,6 +615,68 @@ def main(argv=None):
 			report_panel_container.pack_start(report_panel_loader.panel, True, True, 0)
 			report_panel_loader.parent_container = report_panel_container
 			report_panel_loader.panel.show_all()
+			
+			# ===================================================================
+			# WIRE REPORT PANEL TO MODEL LIFECYCLE EVENTS
+			# This ensures Report automatically updates when model changes
+			# ===================================================================
+			
+			# Event 1: Tab Switching (user switches between models)
+			def on_canvas_tab_switched_report(notebook, page, page_num):
+				"""Notify report panel when user switches model tabs."""
+				drawing_area = model_canvas_loader.get_current_document()
+				if drawing_area and report_panel_loader.panel:
+					report_panel_loader.panel.on_tab_switched(drawing_area)
+			
+			if model_canvas_loader.notebook:
+				model_canvas_loader.notebook.connect('switch-page', on_canvas_tab_switched_report)
+			
+			# Event 2: File Open (user opens a .shy file)
+			if file_explorer:
+				original_on_file_open_report = file_explorer.on_file_open_requested
+				
+				def on_file_open_with_report_notify(filepath):
+					"""Notify report panel after file opens."""
+					if original_on_file_open_report:
+						original_on_file_open_report(filepath)
+					if report_panel_loader.panel:
+						report_panel_loader.panel.on_file_opened(filepath)
+				
+				file_explorer.on_file_open_requested = on_file_open_with_report_notify
+			
+			# Event 3: File New (user creates new model)
+			# Wire to menu action if available
+			if hasattr(menu_actions, 'on_file_new'):
+				original_file_new = menu_actions.on_file_new
+				
+				def on_file_new_with_report_notify(action, param):
+					"""Notify report panel after new file is created."""
+					result = original_file_new(action, param)
+					if report_panel_loader.panel:
+						report_panel_loader.panel.on_file_new()
+					return result
+				
+				menu_actions.on_file_new = on_file_new_with_report_notify
+			
+			# Event 4: Project Open (user opens a project)
+			# Wire to project manager if available
+			if hasattr(project_manager, 'set_on_project_opened'):
+				original_project_opened = None
+				if hasattr(project_manager, 'on_project_opened'):
+					original_project_opened = project_manager.on_project_opened
+				
+				def on_project_opened_with_report_notify(project):
+					"""Notify report panel after project opens."""
+					if original_project_opened:
+						original_project_opened(project)
+					if report_panel_loader.panel:
+						report_panel_loader.panel.on_project_opened(project)
+				
+				project_manager.set_on_project_opened(on_project_opened_with_report_notify)
+			
+			# Note: Events 5 & 6 (KEGG/SBML imports, BRENDA enrichments) are already
+			# wired via PathwayOperationsPanel.set_report_refresh_callback() above
+			
 		except Exception as e:
 			print(f"[SHYPN ERROR] Failed to load Report Panel: {e}", file=sys.stderr)
 			import traceback
