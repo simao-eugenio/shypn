@@ -30,12 +30,13 @@ class ReportPanel(Gtk.Box):
         
         Args:
             project: Project instance
-            model_canvas: ModelCanvas instance
+            model_canvas: ModelCanvasLoader instance (not a specific manager)
         """
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         
         self.project = project
-        self.model_canvas = model_canvas
+        # Store the loader for accessing get_current_model()
+        self.model_canvas_loader = model_canvas
         self.topology_panel = None  # Will be set via set_topology_panel()
         self.dynamic_analyses_panel = None  # Will be set via set_dynamic_analyses_panel()
         self.pathway_operations_panel = None  # Will be set via set_pathway_operations_panel()
@@ -114,10 +115,10 @@ class ReportPanel(Gtk.Box):
             container: Container to add categories to
         """
         # Get current model manager if available
-        # Initially model_canvas is the loader, not a specific manager
+        # Initially model_canvas_loader may not have a loaded model
         current_manager = None
-        if self.model_canvas and hasattr(self.model_canvas, 'get_current_model'):
-            current_manager = self.model_canvas.get_current_model()
+        if self.model_canvas_loader and hasattr(self.model_canvas_loader, 'get_current_model'):
+            current_manager = self.model_canvas_loader.get_current_model()
         
         # MODELS (from Model Canvas Panel)
         # Pass the specific manager if available, otherwise None
@@ -159,9 +160,6 @@ class ReportPanel(Gtk.Box):
         widget = provenance.get_widget()
         widget.show_all()
         container.pack_start(widget, False, False, 0)
-        
-        # Store the loader separately for getting current model
-        self.model_canvas_loader = self.model_canvas
     
     def _create_export_buttons(self):
         """Create export buttons bar.
@@ -548,15 +546,33 @@ class ReportPanel(Gtk.Box):
         Args:
             filepath: Path to the opened file
         """
-        # Get current model canvas after file load
-        if hasattr(self.model_canvas_loader, 'get_current_model'):
-            current_manager = self.model_canvas_loader.get_current_model()
-            if current_manager:
-                for category in self.categories:
-                    if hasattr(category, 'set_model_canvas'):
-                        category.set_model_canvas(current_manager)
-                # Auto-refresh on file open (major event)
-                self.refresh_all()
+        print(f"[REPORT] on_file_opened called: {filepath}")
+        
+        # Add a small delay to ensure model is fully loaded
+        from gi.repository import GLib
+        
+        def delayed_refresh():
+            # Get current model canvas after file load
+            if hasattr(self.model_canvas_loader, 'get_current_model'):
+                current_manager = self.model_canvas_loader.get_current_model()
+                print(f"[REPORT] Current manager: {current_manager}")
+                if current_manager:
+                    print(f"[REPORT] Updating {len(self.categories)} categories")
+                    for category in self.categories:
+                        if hasattr(category, 'set_model_canvas'):
+                            category.set_model_canvas(current_manager)
+                            print(f"[REPORT] Updated category: {category.title}")
+                    # Auto-refresh on file open (major event)
+                    print("[REPORT] Calling refresh_all()")
+                    self.refresh_all()
+                else:
+                    print("[REPORT] WARNING: current_manager is None")
+            else:
+                print("[REPORT] ERROR: model_canvas_loader doesn't have get_current_model")
+            return False  # Don't repeat
+        
+        # Delay 100ms to let model finish loading
+        GLib.timeout_add(100, delayed_refresh)
     
     def on_file_new(self):
         """Handle new file event.
@@ -606,7 +622,7 @@ class ReportPanel(Gtk.Box):
         # Clear references
         self.categories.clear()
         self.project = None
-        self.model_canvas = None
+        self.model_canvas_loader = None
         self.topology_panel = None
         self.dynamic_analyses_panel = None
         self.pathway_operations_panel = None
