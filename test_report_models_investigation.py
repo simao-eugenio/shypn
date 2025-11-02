@@ -65,8 +65,10 @@ def investigate_models_category():
         'provenance_frame': category.provenance_frame,
         'species_expander': category.species_expander,
         'reactions_expander': category.reactions_expander,
-        'species_buffer': category.species_buffer,
-        'reactions_buffer': category.reactions_buffer,
+        'species_store': category.species_store,
+        'reactions_store': category.reactions_store,
+        'species_treeview': category.species_treeview,
+        'reactions_treeview': category.reactions_treeview,
     }
     
     for name, component in ui_components.items():
@@ -138,25 +140,21 @@ def investigate_models_category():
         print()
         
         # Check Species List
-        species_text = category_with_model.species_buffer.get_text(
-            category_with_model.species_buffer.get_start_iter(),
-            category_with_model.species_buffer.get_end_iter(),
-            False
-        )
-        print("Species/Places List (first 500 chars):")
-        print(species_text[:500])
-        print("...")
+        species_count = len(category_with_model.species_store)
+        print(f"Species/Places Table (rows={species_count}):")
+        if species_count > 0:
+            # Show first 3 rows
+            for i, row in enumerate(list(category_with_model.species_store)[:3]):
+                print(f"  Row {i+1}: [{row[1]}] {row[2]} | KEGG:{row[3]} | Tokens:{row[4]} | Formula:{row[5]} | Mass:{row[6]:.2f}")
         print()
         
         # Check Reactions List
-        reactions_text = category_with_model.reactions_buffer.get_text(
-            category_with_model.reactions_buffer.get_start_iter(),
-            category_with_model.reactions_buffer.get_end_iter(),
-            False
-        )
-        print("Reactions/Transitions List (first 500 chars):")
-        print(reactions_text[:500])
-        print("...")
+        reactions_count = len(category_with_model.reactions_store)
+        print(f"Reactions/Transitions Table (rows={reactions_count}):")
+        if reactions_count > 0:
+            # Show first 3 rows
+            for i, row in enumerate(list(category_with_model.reactions_store)[:3]):
+                print(f"  Row {i+1}: [{row[1]}] {row[2]} | Type:{row[3]} | KEGG:{row[4]} | EC:{row[5]} | Rate:{row[6]}")
         print()
         
         # === TEST 5: Check metadata extraction ===

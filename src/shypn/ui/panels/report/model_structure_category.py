@@ -109,21 +109,17 @@ class ModelsCategory(BaseReportCategory):
         
         # === SUB-EXPANDERS (Collapsed by default) ===
         
-        # Species/Places List
-        self.species_expander = Gtk.Expander(label="Show Species/Places List")
+        # Species/Places Table
+        self.species_expander = Gtk.Expander(label="Show Species/Places Table (sortable)")
         self.species_expander.set_expanded(False)
-        scrolled_species, self.species_textview, self.species_buffer = self._create_scrolled_textview(
-            "No data"
-        )
+        scrolled_species, self.species_treeview, self.species_store = self._create_species_table()
         self.species_expander.add(scrolled_species)
         box.pack_start(self.species_expander, False, False, 0)
         
-        # Reactions/Transitions List
-        self.reactions_expander = Gtk.Expander(label="Show Reactions/Transitions List")
+        # Reactions/Transitions Table
+        self.reactions_expander = Gtk.Expander(label="Show Reactions/Transitions Table (sortable)")
         self.reactions_expander.set_expanded(False)
-        scrolled_reactions, self.reactions_textview, self.reactions_buffer = self._create_scrolled_textview(
-            "No data"
-        )
+        scrolled_reactions, self.reactions_treeview, self.reactions_store = self._create_reactions_table()
         self.reactions_expander.add(scrolled_reactions)
         box.pack_start(self.reactions_expander, False, False, 0)
         
@@ -136,6 +132,104 @@ class ModelsCategory(BaseReportCategory):
         """No longer needed - summary is in frame."""
         pass
     
+    def _create_species_table(self):
+        """Create TreeView for species/places with sortable columns.
+        
+        Returns:
+            tuple: (ScrolledWindow, TreeView, ListStore)
+        """
+        # Create ListStore with column types
+        # Columns: index (int), id (str), name (str), kegg_id (str), 
+        #          tokens (float), formula (str), mass (float), type (str)
+        store = Gtk.ListStore(int, str, str, str, float, str, float, str)
+        
+        # Create TreeView
+        treeview = Gtk.TreeView(model=store)
+        treeview.set_grid_lines(Gtk.TreeViewGridLines.BOTH)
+        treeview.set_enable_search(True)
+        treeview.set_search_column(2)  # Search by biological name
+        
+        # Add columns with renderers
+        self._add_column(treeview, "#", 0, width=50, sortable=False)
+        self._add_column(treeview, "Petri Net ID", 1, sortable=True, width=120)
+        self._add_column(treeview, "Biological Name", 2, sortable=True, width=200)
+        self._add_column(treeview, "KEGG ID", 3, sortable=True, width=120)
+        self._add_column(treeview, "Initial Tokens", 4, sortable=True, numeric=True, width=120)
+        self._add_column(treeview, "Formula", 5, sortable=True, width=120)
+        self._add_column(treeview, "Mass (g/mol)", 6, sortable=True, numeric=True, width=120)
+        self._add_column(treeview, "Type", 7, sortable=True, width=100)
+        
+        # Create scrolled window
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        scrolled.set_min_content_height(300)
+        scrolled.add(treeview)
+        
+        return scrolled, treeview, store
+    
+    def _create_reactions_table(self):
+        """Create TreeView for reactions/transitions with sortable columns.
+        
+        Returns:
+            tuple: (ScrolledWindow, TreeView, ListStore)
+        """
+        # Create ListStore with column types
+        # Columns: index (int), id (str), name (str), type (str), 
+        #          kegg_reaction (str), ec_number (str), rate_law (str),
+        #          parameters (str), reversible (str)
+        store = Gtk.ListStore(int, str, str, str, str, str, str, str, str)
+        
+        # Create TreeView
+        treeview = Gtk.TreeView(model=store)
+        treeview.set_grid_lines(Gtk.TreeViewGridLines.BOTH)
+        treeview.set_enable_search(True)
+        treeview.set_search_column(2)  # Search by biological name
+        
+        # Add columns with renderers
+        self._add_column(treeview, "#", 0, width=50, sortable=False)
+        self._add_column(treeview, "Petri Net ID", 1, sortable=True, width=120)
+        self._add_column(treeview, "Biological Name", 2, sortable=True, width=200)
+        self._add_column(treeview, "Type", 3, sortable=True, width=100)
+        self._add_column(treeview, "KEGG Reaction", 4, sortable=True, width=130)
+        self._add_column(treeview, "EC Number", 5, sortable=True, width=100)
+        self._add_column(treeview, "Rate Law", 6, sortable=True, width=150)
+        self._add_column(treeview, "Parameters", 7, sortable=False, width=200)
+        self._add_column(treeview, "Reversible", 8, sortable=True, width=90)
+        
+        # Create scrolled window
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        scrolled.set_min_content_height(300)
+        scrolled.add(treeview)
+        
+        return scrolled, treeview, store
+    
+    def _add_column(self, treeview, title, column_id, sortable=False, 
+                    width=None, numeric=False):
+        """Helper to add a column to TreeView.
+        
+        Args:
+            treeview: TreeView widget
+            title: Column title
+            column_id: Column index in ListStore
+            sortable: Whether column is sortable
+            width: Fixed width (None for auto)
+            numeric: Whether to right-align (for numbers)
+        """
+        renderer = Gtk.CellRendererText()
+        if numeric:
+            renderer.set_property('xalign', 1.0)  # Right-align numbers
+        
+        column = Gtk.TreeViewColumn(title, renderer, text=column_id)
+        column.set_resizable(True)
+        if width:
+            column.set_min_width(width)
+        if sortable:
+            column.set_sort_column_id(column_id)
+            column.set_clickable(True)
+        
+        treeview.append_column(column)
+    
     def refresh(self):
         """Refresh models data with comprehensive scientific information."""
         if not self.model_canvas or not hasattr(self.model_canvas, 'model'):
@@ -143,8 +237,8 @@ class ModelsCategory(BaseReportCategory):
             self.structure_label.set_text("No data")
             self.provenance_label.set_text("No import data")
             self.provenance_frame.set_visible(False)
-            self.species_buffer.set_text("No model loaded")
-            self.reactions_buffer.set_text("No model loaded")
+            self.species_store.clear()
+            self.reactions_store.clear()
             return
         
         model = self.model_canvas.model
@@ -289,12 +383,9 @@ class ModelsCategory(BaseReportCategory):
             self.provenance_label.set_text("No import data available (manually created model)")
             self.provenance_frame.set_visible(False)
         
-        # === BUILD DETAILED LISTS ===
-        species_text = self._build_species_list(model)
-        self.species_buffer.set_text(species_text)
-        
-        reactions_text = self._build_reactions_list(model)
-        self.reactions_buffer.set_text(reactions_text)
+        # === BUILD DETAILED TABLES ===
+        self._populate_species_table(model)
+        self._populate_reactions_table(model)
     
     def _find_linked_pathway_document(self, model):
         """Find the PathwayDocument linked to this model.
@@ -332,11 +423,163 @@ class ModelsCategory(BaseReportCategory):
         
         return None
     
-    def _build_species_list(self, model):
-        """Build comprehensive species/places list with metadata.
+    def _populate_species_table(self, model):
+        """Populate species table with current model data.
         
-        Format:
-        Internal ID | Label | Metadata (KEGG codes, formulas, etc.)
+        Args:
+            model: DocumentModel instance
+        """
+        self.species_store.clear()
+        
+        if not hasattr(model, 'places') or not model.places:
+            return
+        
+        for i, place in enumerate(model.places, 1):
+            if not place:
+                continue
+            
+            # Extract data
+            place_id = place.id if hasattr(place, 'id') else f"P{i}"
+            name = place.label if hasattr(place, 'label') and place.label else place_id
+            
+            # KEGG ID
+            kegg_id = "-"
+            if hasattr(place, 'metadata') and place.metadata:
+                kegg_id = place.metadata.get('kegg_id', 
+                          place.metadata.get('compound_id', '-'))
+                # Clean up KEGG ID format
+                if kegg_id and kegg_id != '-':
+                    kegg_id = kegg_id.replace('cpd:', '')
+            
+            # Initial tokens
+            tokens = 0.0
+            if hasattr(place, 'initial_marking'):
+                tokens = float(place.initial_marking)
+            elif hasattr(place, 'tokens'):
+                tokens = float(place.tokens)
+            
+            # Formula
+            formula = "-"
+            if hasattr(place, 'metadata') and place.metadata:
+                formula = place.metadata.get('formula', '-')
+            
+            # Mass
+            mass = 0.0
+            if hasattr(place, 'metadata') and place.metadata:
+                mass_val = place.metadata.get('mass', 
+                           place.metadata.get('molecular_weight', 0))
+                if mass_val:
+                    try:
+                        mass = float(mass_val)
+                    except (ValueError, TypeError):
+                        mass = 0.0
+            
+            # Type
+            type_val = "unknown"
+            if hasattr(place, 'metadata') and place.metadata:
+                type_val = place.metadata.get('type', 'unknown')
+            
+            # Add row to table
+            self.species_store.append([
+                i,           # index
+                place_id,    # Petri Net ID
+                name,        # Biological Name
+                kegg_id,     # KEGG ID
+                tokens,      # Initial Tokens
+                formula,     # Formula
+                mass,        # Mass
+                type_val     # Type
+            ])
+    
+    def _populate_reactions_table(self, model):
+        """Populate reactions table with current model data.
+        
+        Args:
+            model: DocumentModel instance
+        """
+        self.reactions_store.clear()
+        
+        if not hasattr(model, 'transitions') or not model.transitions:
+            return
+        
+        for i, transition in enumerate(model.transitions, 1):
+            if not transition:
+                continue
+            
+            # Extract data
+            trans_id = transition.id if hasattr(transition, 'id') else f"T{i}"
+            name = transition.label if hasattr(transition, 'label') and transition.label else trans_id
+            
+            # Type
+            trans_type = "unknown"
+            if hasattr(transition, 'transition_type'):
+                trans_type = transition.transition_type
+            
+            # KEGG Reaction
+            kegg_reaction = "-"
+            if hasattr(transition, 'metadata') and transition.metadata:
+                kegg_reaction = transition.metadata.get('kegg_reaction_id',
+                               transition.metadata.get('kegg_reaction_name', '-'))
+                # Clean up KEGG reaction format
+                if kegg_reaction and kegg_reaction != '-':
+                    kegg_reaction = kegg_reaction.replace('rn:', '')
+            
+            # EC Number
+            ec_number = "-"
+            if hasattr(transition, 'metadata') and transition.metadata:
+                ec_val = transition.metadata.get('ec_number',
+                         transition.metadata.get('ec_numbers', []))
+                if isinstance(ec_val, list) and ec_val:
+                    ec_number = ec_val[0]
+                elif ec_val and ec_val != '-':
+                    ec_number = str(ec_val)
+            
+            # Rate Law
+            rate_law = "-"
+            if hasattr(transition, 'metadata') and transition.metadata:
+                rate_law = transition.metadata.get('kinetic_law',
+                           transition.metadata.get('kinetics_rule', '-'))
+            
+            # Parameters (formatted string)
+            parameters = "-"
+            if hasattr(transition, 'metadata') and transition.metadata:
+                params = transition.metadata.get('kinetics_parameters', {})
+                if params and isinstance(params, dict):
+                    params_list = []
+                    for k, v in params.items():
+                        if isinstance(v, float):
+                            params_list.append(f"{k}={v:.4g}")
+                        else:
+                            params_list.append(f"{k}={v}")
+                    parameters = ", ".join(params_list)
+            
+            # Reversible
+            reversible = "Unknown"
+            if hasattr(transition, 'metadata') and transition.metadata:
+                rev_val = transition.metadata.get('reversible')
+                if rev_val is not None:
+                    reversible = "Yes" if rev_val else "No"
+            
+            # Add row to table
+            self.reactions_store.append([
+                i,               # index
+                trans_id,        # Petri Net ID
+                name,            # Biological Name
+                trans_type,      # Type
+                kegg_reaction,   # KEGG Reaction
+                ec_number,       # EC Number
+                rate_law,        # Rate Law
+                parameters,      # Parameters
+                reversible       # Reversible
+            ])
+    
+    def _build_species_list(self, model):
+        """DEPRECATED: Old text-based species list builder.
+        
+        Kept for backwards compatibility with export functions.
+        Use _populate_species_table() for UI display.
+        
+        Format: Internal ID | Label | Metadata (KEGG codes, formulas, etc.)
         """
         if not hasattr(model, 'places') or not model.places:
             return "No species found"
@@ -496,31 +739,94 @@ class ModelsCategory(BaseReportCategory):
                 ""
             ])
         
-        # Add detailed lists if expanders are expanded
+        # Add detailed tables if expanders are expanded
         if self.species_expander.get_expanded():
             sections.extend([
-                "## Species/Places List",
+                "## Species/Places Table",
                 "-" * 80,
-                self.species_buffer.get_text(
-                    self.species_buffer.get_start_iter(),
-                    self.species_buffer.get_end_iter(),
-                    False
-                ),
+                self._export_species_table(),
                 ""
             ])
         
         if self.reactions_expander.get_expanded():
             sections.extend([
-                "## Reactions/Transitions List",
+                "## Reactions/Transitions Table",
                 "-" * 80,
-                self.reactions_buffer.get_text(
-                    self.reactions_buffer.get_start_iter(),
-                    self.reactions_buffer.get_end_iter(),
-                    False
-                ),
+                self._export_reactions_table(),
                 ""
             ])
         
         sections.append("=" * 80)
         
         return "\n".join(sections)
+    
+    def _export_species_table(self):
+        """Export species table as formatted text.
+        
+        Returns:
+            str: Formatted table as text
+        """
+        if not self.species_store or len(self.species_store) == 0:
+            return "No species data"
+        
+        lines = [
+            f"Total Species/Places: {len(self.species_store)}",
+            "",
+            "{:<5} {:<15} {:<25} {:<15} {:<15} {:<15} {:<12} {:<12}".format(
+                "#", "Petri Net ID", "Biological Name", "KEGG ID", 
+                "Initial Tokens", "Formula", "Mass (g/mol)", "Type"
+            ),
+            "-" * 130
+        ]
+        
+        for row in self.species_store:
+            lines.append(
+                "{:<5} {:<15} {:<25} {:<15} {:<15.4g} {:<15} {:<12.2f} {:<12}".format(
+                    row[0],  # index
+                    row[1][:14],  # Petri Net ID (truncate if needed)
+                    row[2][:24],  # Biological Name
+                    row[3][:14],  # KEGG ID
+                    row[4],  # Initial Tokens
+                    row[5][:14],  # Formula
+                    row[6] if row[6] > 0 else 0,  # Mass
+                    row[7][:11]   # Type
+                )
+            )
+        
+        return "\n".join(lines)
+    
+    def _export_reactions_table(self):
+        """Export reactions table as formatted text.
+        
+        Returns:
+            str: Formatted table as text
+        """
+        if not self.reactions_store or len(self.reactions_store) == 0:
+            return "No reactions data"
+        
+        lines = [
+            f"Total Reactions/Transitions: {len(self.reactions_store)}",
+            "",
+            "{:<5} {:<15} {:<25} {:<12} {:<15} {:<12} {:<18} {:<30} {:<10}".format(
+                "#", "Petri Net ID", "Biological Name", "Type", 
+                "KEGG Reaction", "EC Number", "Rate Law", "Parameters", "Reversible"
+            ),
+            "-" * 160
+        ]
+        
+        for row in self.reactions_store:
+            lines.append(
+                "{:<5} {:<15} {:<25} {:<12} {:<15} {:<12} {:<18} {:<30} {:<10}".format(
+                    row[0],  # index
+                    row[1][:14],  # Petri Net ID
+                    row[2][:24],  # Biological Name
+                    row[3][:11],  # Type
+                    row[4][:14],  # KEGG Reaction
+                    row[5][:11],  # EC Number
+                    row[6][:17],  # Rate Law
+                    row[7][:29],  # Parameters
+                    row[8][:9]    # Reversible
+                )
+            )
+        
+        return "\n".join(lines)
