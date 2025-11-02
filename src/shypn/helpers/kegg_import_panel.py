@@ -87,6 +87,9 @@ class KEGGImportPanel:
         self.current_pathway_id = None  # Store pathway ID for later saving
         self.current_pathway_doc = None  # PathwayDocument for metadata tracking
         
+        # Callback for notifying parent (PathwayOperationsPanel) when import completes
+        self.import_complete_callback = None
+        
         # Lazy loading: store canvas info for later model injection
         self._pending_canvas_info = None
         
@@ -517,6 +520,16 @@ class KEGGImportPanel:
                     f"Model {model_filename} saved on {model_filepath}\n"
                     f"Use File → Open to load the model"
                 )
+                
+                # Notify parent (PathwayOperationsPanel) that import is complete
+                # This triggers Report panel refresh
+                if self.import_complete_callback:
+                    import_data = {
+                        'pathway_id': self.current_pathway_id,
+                        'file_path': model_filepath,
+                        'organism': self.current_pathway.org if self.current_pathway else None
+                    }
+                    self.import_complete_callback(import_data)
                 
             except Exception as save_error:
                 import traceback
