@@ -208,17 +208,18 @@ class ModelsCategory(BaseReportCategory):
         model_types = []
         if hasattr(model, 'transitions') and model.transitions:
             # Check for different transition types
+            # Note: transitions is a list, not a dict
             has_stochastic = any(
                 hasattr(t, 'transition_type') and t.transition_type == 'stochastic'
-                for t in model.transitions.values() if t
+                for t in model.transitions if t
             )
             has_continuous = any(
                 hasattr(t, 'transition_type') and t.transition_type == 'continuous'
-                for t in model.transitions.values() if t
+                for t in model.transitions if t
             )
             has_timed = any(
                 hasattr(t, 'transition_type') and t.transition_type == 'timed'
-                for t in model.transitions.values() if t
+                for t in model.transitions if t
             )
             
             if has_stochastic:
@@ -229,6 +230,7 @@ class ModelsCategory(BaseReportCategory):
                 model_types.append("Timed")
             
             # Check for test arcs (biological petri nets)
+            # Note: arcs is a list, not a dict
             has_test_arcs = any(
                 hasattr(arc, 'arc_type') and arc.arc_type == 'test'
                 for arc in model.arcs if hasattr(model, 'arcs') and arc
@@ -347,9 +349,13 @@ class ModelsCategory(BaseReportCategory):
             ""
         ]
         
-        for i, (place_id, place) in enumerate(sorted(model.places.items()), 1):
+        # Note: places is a list, not a dict
+        for i, place in enumerate(model.places, 1):
             if not place:
                 continue
+            
+            # Get internal ID
+            place_id = place.id if hasattr(place, 'id') else f"P{i}"
             
             # Get label
             label = "Unnamed"
@@ -408,9 +414,13 @@ class ModelsCategory(BaseReportCategory):
             ""
         ]
         
-        for i, (trans_id, transition) in enumerate(sorted(model.transitions.items()), 1):
+        # Note: transitions is a list, not a dict
+        for i, transition in enumerate(model.transitions, 1):
             if not transition:
                 continue
+            
+            # Get internal ID
+            trans_id = transition.id if hasattr(transition, 'id') else f"T{i}"
             
             # Get label
             label = "Unnamed"
