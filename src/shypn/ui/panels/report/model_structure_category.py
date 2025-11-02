@@ -153,7 +153,7 @@ class ModelsCategory(BaseReportCategory):
         self._add_column(treeview, "#", 0, width=50, sortable=False)
         self._add_column(treeview, "Petri Net ID", 1, sortable=True, width=120)
         self._add_column(treeview, "Biological Name", 2, sortable=True, width=200)
-        self._add_column(treeview, "KEGG ID", 3, sortable=True, width=120)
+        self._add_column(treeview, "Database ID", 3, sortable=True, width=140)
         self._add_column(treeview, "Initial Tokens", 4, sortable=True, numeric=True, width=120)
         self._add_column(treeview, "Formula", 5, sortable=True, width=120)
         self._add_column(treeview, "Mass (g/mol)", 6, sortable=True, numeric=True, width=120)
@@ -190,7 +190,7 @@ class ModelsCategory(BaseReportCategory):
         self._add_column(treeview, "Petri Net ID", 1, sortable=True, width=120)
         self._add_column(treeview, "Biological Name", 2, sortable=True, width=200)
         self._add_column(treeview, "Type", 3, sortable=True, width=100)
-        self._add_column(treeview, "KEGG Reaction", 4, sortable=True, width=130)
+        self._add_column(treeview, "Reaction ID", 4, sortable=True, width=140)
         self._add_column(treeview, "EC Number", 5, sortable=True, width=100)
         self._add_column(treeview, "Rate Law", 6, sortable=True, width=150)
         self._add_column(treeview, "Parameters", 7, sortable=False, width=200)
@@ -444,14 +444,17 @@ class ModelsCategory(BaseReportCategory):
             place_id = place.id if hasattr(place, 'id') else f"P{i}"
             name = place.label if hasattr(place, 'label') and place.label else place_id
             
-            # KEGG ID
-            kegg_id = "-"
+            # Database ID (KEGG, ChEBI, or other)
+            db_id = "-"
             if hasattr(place, 'metadata') and place.metadata:
-                kegg_id = place.metadata.get('kegg_id', 
-                          place.metadata.get('compound_id', '-'))
-                # Clean up KEGG ID format
-                if kegg_id and kegg_id != '-':
-                    kegg_id = kegg_id.replace('cpd:', '')
+                # Try different database IDs in order of preference
+                db_id = place.metadata.get('kegg_id',
+                        place.metadata.get('chebi_id',
+                        place.metadata.get('compound_id', 
+                        place.metadata.get('sbml_species_id', '-'))))
+                # Clean up ID format
+                if db_id and db_id != '-':
+                    db_id = db_id.replace('cpd:', '')  # Clean KEGG format
             
             # Initial tokens
             tokens = 0.0
@@ -486,7 +489,7 @@ class ModelsCategory(BaseReportCategory):
                 i,           # index
                 place_id,    # Petri Net ID
                 name,        # Biological Name
-                kegg_id,     # KEGG ID
+                db_id,       # Database ID (KEGG/ChEBI/etc)
                 tokens,      # Initial Tokens
                 formula,     # Formula
                 mass,        # Mass
@@ -517,14 +520,17 @@ class ModelsCategory(BaseReportCategory):
             if hasattr(transition, 'transition_type'):
                 trans_type = transition.transition_type
             
-            # KEGG Reaction
-            kegg_reaction = "-"
+            # Reaction ID (KEGG, SBML, or other)
+            reaction_id = "-"
             if hasattr(transition, 'metadata') and transition.metadata:
-                kegg_reaction = transition.metadata.get('kegg_reaction_id',
-                               transition.metadata.get('kegg_reaction_name', '-'))
-                # Clean up KEGG reaction format
-                if kegg_reaction and kegg_reaction != '-':
-                    kegg_reaction = kegg_reaction.replace('rn:', '')
+                # Try different reaction IDs in order of preference
+                reaction_id = transition.metadata.get('kegg_reaction_id',
+                             transition.metadata.get('sbml_reaction_id',
+                             transition.metadata.get('kegg_reaction_name', 
+                             transition.metadata.get('reaction_id', '-'))))
+                # Clean up reaction ID format
+                if reaction_id and reaction_id != '-':
+                    reaction_id = reaction_id.replace('rn:', '')  # Clean KEGG format
             
             # EC Number
             ec_number = "-"
@@ -568,7 +574,7 @@ class ModelsCategory(BaseReportCategory):
                 trans_id,        # Petri Net ID
                 name,            # Biological Name
                 trans_type,      # Type
-                kegg_reaction,   # KEGG Reaction
+                reaction_id,     # Reaction ID (KEGG/SBML/etc)
                 ec_number,       # EC Number
                 rate_law,        # Rate Law
                 parameters,      # Parameters
@@ -774,20 +780,20 @@ class ModelsCategory(BaseReportCategory):
         lines = [
             f"Total Species/Places: {len(self.species_store)}",
             "",
-            "{:<5} {:<15} {:<25} {:<15} {:<15} {:<15} {:<12} {:<12}".format(
-                "#", "Petri Net ID", "Biological Name", "KEGG ID", 
+            "{:<5} {:<15} {:<25} {:<18} {:<15} {:<15} {:<12} {:<12}".format(
+                "#", "Petri Net ID", "Biological Name", "Database ID", 
                 "Initial Tokens", "Formula", "Mass (g/mol)", "Type"
             ),
-            "-" * 130
+            "-" * 133
         ]
         
         for row in self.species_store:
             lines.append(
-                "{:<5} {:<15} {:<25} {:<15} {:<15.4g} {:<15} {:<12.2f} {:<12}".format(
+                "{:<5} {:<15} {:<25} {:<18} {:<15.4g} {:<15} {:<12.2f} {:<12}".format(
                     row[0],  # index
                     row[1][:14],  # Petri Net ID (truncate if needed)
                     row[2][:24],  # Biological Name
-                    row[3][:14],  # KEGG ID
+                    row[3][:17],  # Database ID (KEGG/ChEBI/SBML)
                     row[4],  # Initial Tokens
                     row[5][:14],  # Formula
                     row[6] if row[6] > 0 else 0,  # Mass
@@ -809,21 +815,21 @@ class ModelsCategory(BaseReportCategory):
         lines = [
             f"Total Reactions/Transitions: {len(self.reactions_store)}",
             "",
-            "{:<5} {:<15} {:<25} {:<12} {:<15} {:<12} {:<18} {:<30} {:<10}".format(
+            "{:<5} {:<15} {:<25} {:<12} {:<18} {:<12} {:<18} {:<30} {:<10}".format(
                 "#", "Petri Net ID", "Biological Name", "Type", 
-                "KEGG Reaction", "EC Number", "Rate Law", "Parameters", "Reversible"
+                "Reaction ID", "EC Number", "Rate Law", "Parameters", "Reversible"
             ),
-            "-" * 160
+            "-" * 163
         ]
         
         for row in self.reactions_store:
             lines.append(
-                "{:<5} {:<15} {:<25} {:<12} {:<15} {:<12} {:<18} {:<30} {:<10}".format(
+                "{:<5} {:<15} {:<25} {:<12} {:<18} {:<12} {:<18} {:<30} {:<10}".format(
                     row[0],  # index
                     row[1][:14],  # Petri Net ID
                     row[2][:24],  # Biological Name
                     row[3][:11],  # Type
-                    row[4][:14],  # KEGG Reaction
+                    row[4][:17],  # Reaction ID (KEGG/SBML/etc)
                     row[5][:11],  # EC Number
                     row[6][:17],  # Rate Law
                     row[7][:29],  # Parameters

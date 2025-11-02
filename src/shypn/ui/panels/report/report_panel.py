@@ -536,6 +536,8 @@ class ReportPanel(Gtk.Box):
                 for category in self.categories:
                     if hasattr(category, 'set_model_canvas'):
                         category.set_model_canvas(current_manager)
+                # Auto-refresh when switching tabs to show new model
+                self.refresh_all()
     
     def on_file_opened(self, filepath):
         """Handle file open event.
