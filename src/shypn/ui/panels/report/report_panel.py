@@ -329,14 +329,15 @@ class ReportPanel(Gtk.Box):
         
         if response == Gtk.ResponseType.OK:
             # Launch BRENDA enrichment
-            success = self._execute_brenda_enrichment(ec_numbers, model_manager)
+            result = self._execute_brenda_enrichment(ec_numbers, model_manager)
             
-            if success:
+            if result and result.get('success'):
+                enriched_count = result.get('transitions_enriched', 0)
                 # Refresh report to show enriched data
                 self.refresh_all()
                 self._show_info_dialog(
                     "BRENDA Enrichment Complete",
-                    f"Successfully enriched {missing_data_count} transitions.\n\n"
+                    f"Successfully enriched {enriched_count} transitions.\n\n"
                     f"Check the report for BLUE-colored enriched fields."
                 )
             else:
@@ -401,7 +402,7 @@ class ReportPanel(Gtk.Box):
             model_manager: ModelCanvasManager instance
             
         Returns:
-            bool: True if enrichment succeeded, False otherwise
+            dict: Result dictionary with success status and enrichment counts
         """
         try:
             from shypn.helpers.brenda_enrichment_controller import BRENDAEnrichmentController
@@ -418,6 +419,8 @@ class ReportPanel(Gtk.Box):
                 organism=None,  # Auto-detect or use default
                 override_existing=False  # CRITICAL: Only fill missing data!
             )
+            
+            print(f"[REPORT] BRENDA enrichment result: {result}")
             
             # Update metadata with source tracking for enriched transitions
             if result.get('success') and hasattr(model_manager, 'transitions'):
@@ -437,16 +440,17 @@ class ReportPanel(Gtk.Box):
                         if has_kinetics and not has_source:
                             transition.metadata['data_source'] = 'brenda_enriched'
             
-            return result.get('success', False)
+            return result
             
-        except ImportError:
+        except ImportError as e:
             # BRENDA controller not available
-            return False
+            print(f"[REPORT] BRENDA controller import error: {e}")
+            return {'success': False, 'error': 'BRENDA controller not available'}
         except Exception as e:
             print(f"[Report] BRENDA enrichment error: {e}")
             import traceback
             traceback.print_exc()
-            return False
+            return {'success': False, 'error': str(e)}
     
     def _show_info_dialog(self, title, message):
         """Show information dialog.
