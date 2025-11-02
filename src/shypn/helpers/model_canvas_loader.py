@@ -295,12 +295,12 @@ class ModelCanvasLoader:
         css_provider = Gtk.CssProvider()
         css = b"""
         .tab-box {
-            padding: 8px 12px;
+            padding: 4px 8px;
             border: 1px solid #ccc;
             border-bottom: none;
             border-radius: 6px 6px 0 0;
             background: #f5f5f5;
-            min-height: 32px;
+            min-height: 20px;
             margin-top: 0;
             margin-bottom: -1px;
             margin-left: 0;
