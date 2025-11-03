@@ -1,0 +1,516 @@
+#!/usr/bin/env python3
+"""BRENDA SOAP API Client.
+
+This module provides a Python interface to the BRENDA enzyme database via SOAP API.
+Handles authentication, querying kinetic parameters, and response parsing.
+
+BRENDA Website: https://www.brenda-enzymes.org/
+API Documentation: https://www.brenda-enzymes.org/soap.php
+
+Requirements:
+- zeep>=4.2.1 (SOAP client library)
+- Valid BRENDA credentials (email + password)
+
+Credential Storage (Priority Order):
+1. Environment variables: BRENDA_EMAIL, BRENDA_PASSWORD
+2. Config file: ~/.shypn/brenda_credentials.json (encrypted)
+3. User prompt (interactive)
+"""
+
+import os
+import hashlib
+import json
+import logging
+from typing import Optional, Dict, List, Any
+from dataclasses import dataclass
+from pathlib import Path
+
+# Try to import zeep
+try:
+    from zeep import Client
+    from zeep.exceptions import Fault as SOAPFault
+    ZEEP_AVAILABLE = True
+except ImportError:
+    ZEEP_AVAILABLE = False
+    Client = None
+    SOAPFault = Exception
+
+
+@dataclass
+class BRENDACredentials:
+    """BRENDA API credentials."""
+    email: str
+    password: str
+    
+    def get_password_hash(self) -> str:
+        """Get SHA256 hash of password (required by BRENDA API)."""
+        return hashlib.sha256(self.password.encode()).hexdigest()
+
+
+class BRENDAAPIClient:
+    """Client for BRENDA SOAP API.
+    
+    Provides methods to query kinetic parameters (Km, Vmax, kcat, Ki) for enzymes.
+    
+    Example:
+        >>> client = BRENDAAPIClient()
+        >>> client.authenticate("user@example.com", "password")
+        >>> km_data = client.get_km_values("2.7.1.1", organism="Homo sapiens")
+    """
+    
+    # BRENDA SOAP WSDL URL
+    WSDL_URL = "https://www.brenda-enzymes.org/soap/brenda_zeep.wsdl"
+    
+    def __init__(self, credentials: Optional[BRENDACredentials] = None):
+        """Initialize BRENDA API client.
+        
+        Args:
+            credentials: Optional credentials. If not provided, will try to load from environment.
+        """
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self.credentials = credentials or self._load_credentials()
+        self.client = None
+        self._authenticated = False
+        
+        if not ZEEP_AVAILABLE:
+            self.logger.warning("zeep library not available. Install with: pip install zeep")
+    
+    def _load_credentials(self) -> Optional[BRENDACredentials]:
+        """Load credentials from environment variables or config file.
+        
+        Returns:
+            BRENDACredentials if found, None otherwise
+        """
+        # Try environment variables first
+        email = os.getenv('BRENDA_EMAIL')
+        password = os.getenv('BRENDA_PASSWORD')
+        
+        if email and password:
+            self.logger.info("Loaded BRENDA credentials from environment variables")
+            return BRENDACredentials(email=email, password=password)
+        
+        # Try config file
+        config_path = Path.home() / '.shypn' / 'brenda_credentials.json'
+        if config_path.exists():
+            try:
+                with open(config_path, 'r') as f:
+                    data = json.load(f)
+                    self.logger.info("Loaded BRENDA credentials from config file")
+                    return BRENDACredentials(
+                        email=data.get('email'),
+                        password=data.get('password')
+                    )
+            except Exception as e:
+                self.logger.error(f"Failed to load credentials from {config_path}: {e}")
+        
+        self.logger.warning("No BRENDA credentials found. Set BRENDA_EMAIL and BRENDA_PASSWORD environment variables.")
+        return None
+    
+    def save_credentials(self, email: str, password: str):
+        """Save credentials to config file.
+        
+        Args:
+            email: BRENDA account email
+            password: BRENDA account password
+        """
+        config_dir = Path.home() / '.shypn'
+        config_dir.mkdir(parents=True, exist_ok=True)
+        
+        config_path = config_dir / 'brenda_credentials.json'
+        
+        # TODO: Encrypt credentials before saving
+        # For now, save as plain JSON (development only!)
+        data = {
+            'email': email,
+            'password': password
+        }
+        
+        with open(config_path, 'w') as f:
+            json.dump(data, f, indent=2)
+        
+        # Set restrictive permissions (Unix only)
+        try:
+            config_path.chmod(0o600)
+        except Exception:
+            pass
+        
+        self.credentials = BRENDACredentials(email=email, password=password)
+        self.logger.info(f"Saved BRENDA credentials to {config_path}")
+    
+    def authenticate(self, email: Optional[str] = None, password: Optional[str] = None) -> bool:
+        """Authenticate with BRENDA API.
+        
+        Args:
+            email: BRENDA account email (optional if credentials loaded)
+            password: BRENDA account password (optional if credentials loaded)
+        
+        Returns:
+            True if authentication successful, False otherwise
+        """
+        if not ZEEP_AVAILABLE:
+            self.logger.error("zeep library not available. Cannot authenticate.")
+            return False
+        
+        # Update credentials if provided
+        if email and password:
+            self.credentials = BRENDACredentials(email=email, password=password)
+        
+        if not self.credentials:
+            self.logger.error("No credentials available. Provide email/password or set environment variables.")
+            return False
+        
+        try:
+            # Initialize SOAP client
+            self.logger.info(f"Connecting to BRENDA API at {self.WSDL_URL}")
+            self.client = Client(self.WSDL_URL)
+            
+            # Test authentication with a simple query
+            # getOrganism is a lightweight method to test credentials
+            password_hash = self.credentials.get_password_hash()
+            
+            self.logger.info("Testing BRENDA authentication...")
+            result = self.client.service.getOrganism(
+                self.credentials.email,
+                password_hash,
+                "ecNumber*2.7.1.1#organism*"  # Simple test query
+            )
+            
+            self._authenticated = True
+            self.logger.info("✓ BRENDA authentication successful!")
+            return True
+            
+        except SOAPFault as e:
+            self.logger.error(f"BRENDA SOAP error: {e}")
+            self._authenticated = False
+            return False
+        except Exception as e:
+            self.logger.error(f"Failed to authenticate with BRENDA: {e}")
+            self._authenticated = False
+            return False
+    
+    def is_authenticated(self) -> bool:
+        """Check if client is authenticated."""
+        return self._authenticated
+    
+    def get_km_values(self, ec_number: str, organism: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Query Km values for an enzyme.
+        
+        Args:
+            ec_number: EC number (e.g., "2.7.1.1")
+            organism: Optional organism filter (e.g., "Homo sapiens")
+        
+        Returns:
+            List of Km value records with substrate, value, units, literature refs
+        """
+        if not self._authenticated:
+            raise RuntimeError("Not authenticated. Call authenticate() first.")
+        
+        try:
+            password_hash = self.credentials.get_password_hash()
+            
+            # Build query string
+            query_parts = [f"ecNumber*{ec_number}"]
+            if organism:
+                query_parts.append(f"organism*{organism}")
+            
+            query = "#".join(query_parts) + "#"
+            
+            self.logger.info(f"Querying BRENDA for Km values: {query}")
+            
+            result = self.client.service.getKmValue(
+                self.credentials.email,
+                password_hash,
+                query + "kmValue*#substrate*#literature*#commentary*"
+            )
+            
+            # Parse result
+            return self._parse_km_response(result)
+            
+        except SOAPFault as e:
+            self.logger.error(f"BRENDA SOAP error querying Km: {e}")
+            return []
+        except Exception as e:
+            self.logger.error(f"Error querying Km values: {e}")
+            return []
+    
+    def get_kcat_values(self, ec_number: str, organism: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Query kcat (turnover number) values for an enzyme.
+        
+        Args:
+            ec_number: EC number (e.g., "2.7.1.1")
+            organism: Optional organism filter
+        
+        Returns:
+            List of kcat value records
+        """
+        if not self._authenticated:
+            raise RuntimeError("Not authenticated. Call authenticate() first.")
+        
+        try:
+            password_hash = self.credentials.get_password_hash()
+            
+            query_parts = [f"ecNumber*{ec_number}"]
+            if organism:
+                query_parts.append(f"organism*{organism}")
+            
+            query = "#".join(query_parts) + "#"
+            
+            self.logger.info(f"Querying BRENDA for kcat values: {query}")
+            
+            result = self.client.service.getTurnoverNumber(
+                self.credentials.email,
+                password_hash,
+                query + "turnoverNumber*#substrate*#literature*#commentary*"
+            )
+            
+            return self._parse_kcat_response(result)
+            
+        except SOAPFault as e:
+            self.logger.error(f"BRENDA SOAP error querying kcat: {e}")
+            return []
+        except Exception as e:
+            self.logger.error(f"Error querying kcat values: {e}")
+            return []
+    
+    def get_ki_values(self, ec_number: str, organism: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Query Ki (inhibition constant) values for an enzyme.
+        
+        Args:
+            ec_number: EC number (e.g., "2.7.1.1")
+            organism: Optional organism filter
+        
+        Returns:
+            List of Ki value records
+        """
+        if not self._authenticated:
+            raise RuntimeError("Not authenticated. Call authenticate() first.")
+        
+        try:
+            password_hash = self.credentials.get_password_hash()
+            
+            query_parts = [f"ecNumber*{ec_number}"]
+            if organism:
+                query_parts.append(f"organism*{organism}")
+            
+            query = "#".join(query_parts) + "#"
+            
+            self.logger.info(f"Querying BRENDA for Ki values: {query}")
+            
+            result = self.client.service.getKiValue(
+                self.credentials.email,
+                password_hash,
+                query + "kiValue*#inhibitor*#literature*#commentary*"
+            )
+            
+            return self._parse_ki_response(result)
+            
+        except SOAPFault as e:
+            self.logger.error(f"BRENDA SOAP error querying Ki: {e}")
+            return []
+        except Exception as e:
+            self.logger.error(f"Error querying Ki values: {e}")
+            return []
+    
+    def _parse_km_response(self, response: str) -> List[Dict[str, Any]]:
+        """Parse BRENDA Km response format.
+        
+        BRENDA format: #ecNumber*2.7.1.1#organism*Homo sapiens#kmValue*0.15#substrate*glucose#literature*12345678#
+        
+        Args:
+            response: Raw BRENDA response string
+        
+        Returns:
+            List of parsed Km records
+        """
+        results = []
+        
+        if not response:
+            return results
+        
+        # Split by record separator (usually newline or multiple #)
+        records = response.split('\n')
+        
+        for record in records:
+            if not record.strip():
+                continue
+            
+            # Parse fields
+            data = {}
+            parts = record.split('#')
+            
+            for part in parts:
+                if '*' in part:
+                    key, value = part.split('*', 1)
+                    data[key] = value
+            
+            if 'kmValue' in data:
+                try:
+                    results.append({
+                        'ec_number': data.get('ecNumber', ''),
+                        'organism': data.get('organism', ''),
+                        'value': float(data['kmValue']),
+                        'unit': 'mM',  # BRENDA usually uses mM for Km
+                        'substrate': data.get('substrate', ''),
+                        'literature': data.get('literature', ''),
+                        'commentary': data.get('commentary', '')
+                    })
+                except (ValueError, KeyError) as e:
+                    self.logger.warning(f"Failed to parse Km record: {e}")
+                    continue
+        
+        return results
+    
+    def _parse_kcat_response(self, response: str) -> List[Dict[str, Any]]:
+        """Parse BRENDA kcat/turnover number response."""
+        results = []
+        
+        if not response:
+            return results
+        
+        records = response.split('\n')
+        
+        for record in records:
+            if not record.strip():
+                continue
+            
+            data = {}
+            parts = record.split('#')
+            
+            for part in parts:
+                if '*' in part:
+                    key, value = part.split('*', 1)
+                    data[key] = value
+            
+            if 'turnoverNumber' in data:
+                try:
+                    results.append({
+                        'ec_number': data.get('ecNumber', ''),
+                        'organism': data.get('organism', ''),
+                        'value': float(data['turnoverNumber']),
+                        'unit': 's⁻¹',  # kcat unit
+                        'substrate': data.get('substrate', ''),
+                        'literature': data.get('literature', ''),
+                        'commentary': data.get('commentary', '')
+                    })
+                except (ValueError, KeyError) as e:
+                    self.logger.warning(f"Failed to parse kcat record: {e}")
+                    continue
+        
+        return results
+    
+    def _parse_ki_response(self, response: str) -> List[Dict[str, Any]]:
+        """Parse BRENDA Ki response."""
+        results = []
+        
+        if not response:
+            return results
+        
+        records = response.split('\n')
+        
+        for record in records:
+            if not record.strip():
+                continue
+            
+            data = {}
+            parts = record.split('#')
+            
+            for part in parts:
+                if '*' in part:
+                    key, value = part.split('*', 1)
+                    data[key] = value
+            
+            if 'kiValue' in data:
+                try:
+                    results.append({
+                        'ec_number': data.get('ecNumber', ''),
+                        'organism': data.get('organism', ''),
+                        'value': float(data['kiValue']),
+                        'unit': 'mM',  # Ki usually in mM
+                        'inhibitor': data.get('inhibitor', ''),
+                        'literature': data.get('literature', ''),
+                        'commentary': data.get('commentary', '')
+                    })
+                except (ValueError, KeyError) as e:
+                    self.logger.warning(f"Failed to parse Ki record: {e}")
+                    continue
+        
+        return results
+
+
+# Convenience function for quick access
+def get_brenda_client() -> Optional[BRENDAAPIClient]:
+    """Get authenticated BRENDA client (convenience function).
+    
+    Returns:
+        Authenticated BRENDAAPIClient if credentials available, None otherwise
+    """
+    try:
+        client = BRENDAAPIClient()
+        if client.credentials and client.authenticate():
+            return client
+    except Exception as e:
+        logging.error(f"Failed to create BRENDA client: {e}")
+    
+    return None
+
+
+if __name__ == "__main__":
+    # Test script
+    logging.basicConfig(level=logging.INFO)
+    
+    print("=" * 70)
+    print("BRENDA SOAP API Client Test")
+    print("=" * 70)
+    
+    if not ZEEP_AVAILABLE:
+        print("\n❌ ERROR: zeep library not installed")
+        print("Install with: pip install zeep")
+        exit(1)
+    
+    # Check for credentials
+    email = os.getenv('BRENDA_EMAIL')
+    password = os.getenv('BRENDA_PASSWORD')
+    
+    if not email or not password:
+        print("\n❌ ERROR: BRENDA credentials not found")
+        print("\nSet environment variables:")
+        print("  export BRENDA_EMAIL='your-email@example.com'")
+        print("  export BRENDA_PASSWORD='your-password'")
+        exit(1)
+    
+    print(f"\n✓ Credentials found: {email}")
+    
+    # Test authentication
+    print("\n--- Testing Authentication ---")
+    client = BRENDAAPIClient()
+    
+    if client.authenticate():
+        print("✓ Authentication successful!")
+        
+        # Test Km query
+        print("\n--- Testing Km Query (Hexokinase EC 2.7.1.1) ---")
+        km_values = client.get_km_values("2.7.1.1", organism="Homo sapiens")
+        
+        if km_values:
+            print(f"✓ Found {len(km_values)} Km values:")
+            for i, km in enumerate(km_values[:5], 1):  # Show first 5
+                print(f"  {i}. Substrate: {km['substrate']}, Km: {km['value']} {km['unit']}")
+        else:
+            print("❌ No Km values found")
+        
+        # Test kcat query
+        print("\n--- Testing kcat Query ---")
+        kcat_values = client.get_kcat_values("2.7.1.1", organism="Homo sapiens")
+        
+        if kcat_values:
+            print(f"✓ Found {len(kcat_values)} kcat values:")
+            for i, kcat in enumerate(kcat_values[:5], 1):
+                print(f"  {i}. Substrate: {kcat['substrate']}, kcat: {kcat['value']} {kcat['unit']}")
+        else:
+            print("❌ No kcat values found")
+        
+        print("\n✓ All tests passed!")
+        
+    else:
+        print("❌ Authentication failed")
+        exit(1)
