@@ -132,15 +132,23 @@ class BRENDAAPIClient:
             self.logger.info(f"Connecting to BRENDA API at {self.WSDL_URL}")
             self.client = Client(self.WSDL_URL)
             
-            # Test authentication with a simple query
-            # getOrganism is a lightweight method to test credentials
+            # Test authentication with a lightweight query
+            # Use getKmValue with minimal parameters to test login
             password_hash = self.credentials.get_password_hash()
             
             self.logger.info("Testing BRENDA authentication...")
-            result = self.client.service.getOrganism(
+            # Call with all required parameters (empty strings for unused filters)
+            result = self.client.service.getKmValue(
                 self.credentials.email,
                 password_hash,
-                "ecNumber*2.7.1.1#organism*"  # Simple test query
+                'ecNumber*2.7.1.1#',  # EC number for hexokinase (simple test)
+                '',  # organism (empty = all organisms)
+                '',  # kmValue
+                '',  # kmValueMaximum
+                '',  # substrate
+                '',  # commentary
+                '',  # ligandStructureId
+                ''   # literature
             )
             
             self._authenticated = True
@@ -176,19 +184,23 @@ class BRENDAAPIClient:
         try:
             password_hash = self.credentials.get_password_hash()
             
-            # Build query string
-            query_parts = [f"ecNumber*{ec_number}"]
-            if organism:
-                query_parts.append(f"organism*{organism}")
+            # Build EC number query
+            ec_query = f"ecNumber*{ec_number}#"
             
-            query = "#".join(query_parts) + "#"
+            self.logger.info(f"Querying BRENDA for Km values: EC={ec_number}, organism={organism or 'all'}")
             
-            self.logger.info(f"Querying BRENDA for Km values: {query}")
-            
+            # Call with all required parameters
             result = self.client.service.getKmValue(
                 self.credentials.email,
                 password_hash,
-                query + "kmValue*#substrate*#literature*#commentary*"
+                ec_query,
+                organism or '',  # organism filter (empty = all)
+                '',  # kmValue
+                '',  # kmValueMaximum
+                '',  # substrate
+                '',  # commentary
+                '',  # ligandStructureId
+                ''   # literature
             )
             
             # Parse result
@@ -217,18 +229,21 @@ class BRENDAAPIClient:
         try:
             password_hash = self.credentials.get_password_hash()
             
-            query_parts = [f"ecNumber*{ec_number}"]
-            if organism:
-                query_parts.append(f"organism*{organism}")
+            ec_query = f"ecNumber*{ec_number}#"
             
-            query = "#".join(query_parts) + "#"
-            
-            self.logger.info(f"Querying BRENDA for kcat values: {query}")
+            self.logger.info(f"Querying BRENDA for kcat values: EC={ec_number}, organism={organism or 'all'}")
             
             result = self.client.service.getTurnoverNumber(
                 self.credentials.email,
                 password_hash,
-                query + "turnoverNumber*#substrate*#literature*#commentary*"
+                ec_query,
+                organism or '',  # organism filter
+                '',  # turnoverNumber
+                '',  # turnoverNumberMaximum
+                '',  # substrate
+                '',  # commentary
+                '',  # ligandStructureId
+                ''   # literature
             )
             
             return self._parse_kcat_response(result)
@@ -256,18 +271,21 @@ class BRENDAAPIClient:
         try:
             password_hash = self.credentials.get_password_hash()
             
-            query_parts = [f"ecNumber*{ec_number}"]
-            if organism:
-                query_parts.append(f"organism*{organism}")
+            ec_query = f"ecNumber*{ec_number}#"
             
-            query = "#".join(query_parts) + "#"
-            
-            self.logger.info(f"Querying BRENDA for Ki values: {query}")
+            self.logger.info(f"Querying BRENDA for Ki values: EC={ec_number}, organism={organism or 'all'}")
             
             result = self.client.service.getKiValue(
                 self.credentials.email,
                 password_hash,
-                query + "kiValue*#inhibitor*#literature*#commentary*"
+                ec_query,
+                organism or '',  # organism filter
+                '',  # kiValue
+                '',  # kiValueMaximum
+                '',  # inhibitor
+                '',  # commentary
+                '',  # ligandStructureId
+                ''   # literature
             )
             
             return self._parse_ki_response(result)
