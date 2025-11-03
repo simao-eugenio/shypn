@@ -106,12 +106,12 @@ class BRENDAAPIClient:
         self.credentials = BRENDACredentials(email=email, password=password)
         self.logger.info(f"Saved BRENDA credentials to {config_path}")
     
-    def authenticate(self, email: str, password: str) -> bool:
+    def authenticate(self, email: Optional[str] = None, password: Optional[str] = None) -> bool:
         """Authenticate with BRENDA API and establish SOAP client session.
         
         Args:
-            email: BRENDA account email (required)
-            password: BRENDA account password (required)
+            email: BRENDA account email (required - must be provided)
+            password: BRENDA account password (required - must be provided)
         
         Returns:
             True if authentication successful, False otherwise
@@ -124,7 +124,7 @@ class BRENDAAPIClient:
             self.logger.error("Email and password are required for authentication.")
             return False
         
-        # Store credentials
+        # Store credentials for this session
         self.credentials = BRENDACredentials(email=email, password=password)
         
         try:
