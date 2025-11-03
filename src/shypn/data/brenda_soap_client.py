@@ -136,33 +136,31 @@ class BRENDAAPIClient:
             # Use getKmValue with minimal parameters to test login
             password_hash = self.credentials.get_password_hash()
             
-            self.logger.info("Testing BRENDA authentication...")
-            # Call with all required parameters (empty strings for unused filters)
-            result = self.client.service.getKmValue(
+            self.logger.info("Testing BRENDA authentication with handshake...")
+            # Use lightweight getEcNumber() as handshake (much faster than getKmValue)
+            # This just checks if EC 2.7.1.1 exists in BRENDA (doesn't retrieve data)
+            result = self.client.service.getEcNumber(
                 self.credentials.email,
                 password_hash,
-                'ecNumber*2.7.1.1#',  # EC number for hexokinase (simple test)
-                '',  # organism (empty = all organisms)
-                '',  # kmValue
-                '',  # kmValueMaximum
-                '',  # substrate
-                '',  # commentary
-                '',  # ligandStructureId
-                ''   # literature
+                'ecNumber*2.7.1.1',   # EC number for hexokinase (lightweight test)
+                'organism*',           # Organism filter (empty but required)
+                'transferredToEc*'     # Required field (checks if EC was transferred)
             )
             
             # Check if authentication test returned data
-            self.logger.info(f"[AUTH_TEST] Test query result type: {type(result)}")
-            self.logger.info(f"[AUTH_TEST] Test query result repr: {repr(result)}")
+            self.logger.info(f"[AUTH_TEST] Handshake result type: {type(result)}")
+            self.logger.info(f"[AUTH_TEST] Handshake result repr: {repr(result)}")
             if result:
-                self.logger.info(f"[AUTH_TEST] Test data length: {len(str(result))} chars")
+                self.logger.info(f"[AUTH_TEST] Handshake data length: {len(str(result))} chars")
                 self.logger.info(f"[AUTH_TEST] Preview: {str(result)[:500]}")
-                self.logger.info("✓ BRENDA authentication successful - SOAP API access confirmed!")
+                self.logger.info("✓ BRENDA authentication successful - SOAP API handshake OK!")
+                self.logger.info("✓ Your account can query the BRENDA database")
             else:
-                self.logger.warning("✓ BRENDA authentication successful BUT no data returned")
-                self.logger.warning("⚠ Your account has LIMITED SOAP API access")
-                self.logger.warning("⚠ Free academic accounts may not have access to kinetic data")
+                self.logger.warning("✓ BRENDA authentication accepted BUT handshake returned no data")
+                self.logger.warning("⚠ This suggests LIMITED API access (authentication only, no data retrieval)")
+                self.logger.warning("⚠ Free academic accounts may not have access to BRENDA data via SOAP API")
                 self.logger.warning("⚠ Contact BRENDA support for full API access: info@brenda-enzymes.org")
+                self.logger.warning("⚠ Website: https://www.brenda-enzymes.org/contact.php")
             
             self._authenticated = True
             return True
