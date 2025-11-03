@@ -151,8 +151,20 @@ class BRENDAAPIClient:
                 ''   # literature
             )
             
+            # Check if authentication test returned data
+            self.logger.info(f"[AUTH_TEST] Test query result type: {type(result)}")
+            self.logger.info(f"[AUTH_TEST] Test query result repr: {repr(result)}")
+            if result:
+                self.logger.info(f"[AUTH_TEST] Test data length: {len(str(result))} chars")
+                self.logger.info(f"[AUTH_TEST] Preview: {str(result)[:500]}")
+                self.logger.info("✓ BRENDA authentication successful - SOAP API access confirmed!")
+            else:
+                self.logger.warning("✓ BRENDA authentication successful BUT no data returned")
+                self.logger.warning("⚠ Your account has LIMITED SOAP API access")
+                self.logger.warning("⚠ Free academic accounts may not have access to kinetic data")
+                self.logger.warning("⚠ Contact BRENDA support for full API access: info@brenda-enzymes.org")
+            
             self._authenticated = True
-            self.logger.info("✓ BRENDA authentication successful!")
             return True
             
         except SOAPFault as e:
@@ -190,6 +202,10 @@ class BRENDAAPIClient:
             self.logger.info(f"Querying BRENDA for Km values: EC={ec_number}, organism={organism or 'all'}")
             
             # Call with all required parameters
+            self.logger.info(f"[BRENDA_QUERY] Sending SOAP request for EC {ec_number}")
+            self.logger.info(f"[BRENDA_QUERY]   Email: {self.credentials.email}")
+            self.logger.info(f"[BRENDA_QUERY]   EC query: {ec_query}")
+            
             result = self.client.service.getKmValue(
                 self.credentials.email,
                 password_hash,
@@ -203,14 +219,20 @@ class BRENDAAPIClient:
                 ''   # literature
             )
             
-            # Debug: Log raw response
+            # Debug: Log raw response with detailed type info
             self.logger.info(f"[BRENDA_RAW] EC {ec_number} raw response type: {type(result)}")
-            self.logger.info(f"[BRENDA_RAW] EC {ec_number} raw response length: {len(str(result)) if result else 0}")
-            if result:
-                result_str = str(result)[:500]  # First 500 chars
+            self.logger.info(f"[BRENDA_RAW] EC {ec_number} raw response repr: {repr(result)}")
+            self.logger.info(f"[BRENDA_RAW] EC {ec_number} raw response bool: {bool(result)}")
+            if result is not None:
+                self.logger.info(f"[BRENDA_RAW] EC {ec_number} response length: {len(str(result))}")
+                result_str = str(result)[:1000]  # First 1000 chars
                 self.logger.info(f"[BRENDA_RAW] EC {ec_number} response preview: {result_str}")
             else:
                 self.logger.warning(f"[BRENDA_RAW] EC {ec_number} returned None/empty response")
+                self.logger.warning(f"[BRENDA_RAW] This likely means:")
+                self.logger.warning(f"[BRENDA_RAW]   1. BRENDA database has no Km data for EC {ec_number}")
+                self.logger.warning(f"[BRENDA_RAW]   2. Your account lacks SOAP API data access (free academic accounts)")
+                self.logger.warning(f"[BRENDA_RAW]   3. EC number is invalid or obsolete")
             
             # Parse result
             parsed = self._parse_km_response(result)
