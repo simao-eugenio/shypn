@@ -726,10 +726,13 @@ class BRENDACategory(BasePathwayCategory):
         """Background task: query BRENDA for all canvas transitions.
         
         Returns:
-            Results dict with transitions and their BRENDA data
+            Dict with 'results' list containing transition data and BRENDA kinetics
         """
         if not self.brenda_controller:
             raise RuntimeError("BRENDA controller not available")
+        
+        if not self.brenda_api or not self.brenda_api.is_authenticated():
+            raise RuntimeError("Not authenticated with BRENDA")
         
         # Set canvas reference
         self.brenda_controller.set_model_canvas(self.model_canvas)
@@ -738,31 +741,122 @@ class BRENDACategory(BasePathwayCategory):
         transitions = self.brenda_controller.scan_canvas_transitions()
         
         if not transitions:
-            return {
-                'success': False,
-                'error': 'No transitions found on canvas'
-            }
+            raise ValueError('No transitions found on canvas')
         
         # Filter for continuous transitions (those with EC numbers)
         continuous_transitions = [t for t in transitions if t.get('ec_number')]
         
         if not continuous_transitions:
-            return {
-                'success': False,
-                'error': 'No continuous transitions (with EC numbers) found on canvas'
-            }
+            raise ValueError('No continuous transitions (with EC numbers) found on canvas')
         
-        # Extract unique EC numbers
-        ec_numbers = list(set(t['ec_number'] for t in continuous_transitions if t.get('ec_number')))
+        self.logger.info(f"Found {len(continuous_transitions)} continuous transitions to query")
         
-        # Enrich from BRENDA API (uses mock DB)
-        result = self.brenda_controller.enrich_canvas_from_api(
-            ec_numbers=ec_numbers,
-            organism=None,  # Use all organisms for now
-            override_existing=override_existing
+        # Query BRENDA for each unique EC number
+        results = []
+        ec_numbers_seen = set()
+        
+        for trans in continuous_transitions:
+            ec_number = trans.get('ec_number')
+            if not ec_number or ec_number in ec_numbers_seen:
+                continue
+            
+            ec_numbers_seen.add(ec_number)
+            
+            try:
+                self.logger.info(f"Querying BRENDA for EC {ec_number}...")
+                
+                # Get Km values from BRENDA
+                km_data = self.brenda_api.get_km_values(ec_number, organism=None)
+                
+                if km_data:
+                    # Add result for each Km value found
+                    for km in km_data:
+                        results.append({
+                            'transition_id': trans.get('id'),
+                            'transition_name': trans.get('name', 'Unknown'),
+                            'ec_number': ec_number,
+                            'parameter_type': 'Km',
+                            'value': km.get('value'),
+                            'unit': km.get('unit', 'mM'),
+                            'substrate': km.get('substrate', 'Unknown'),
+                            'organism': km.get('organism', 'Unknown'),
+                            'literature': km.get('literature', '')
+                        })
+                
+            except Exception as e:
+                self.logger.error(f"Error querying EC {ec_number}: {e}")
+                continue
+        
+        return {'results': results, 'transitions_queried': len(ec_numbers_seen)}
+    
+    def _on_query_all_complete(self, result: Dict[str, Any]):
+        """Callback when query all completes successfully."""
+        self.query_all_button.set_sensitive(True)
+        self.search_button.set_sensitive(True)
+        
+        results = result.get('results', [])
+        transitions_queried = result.get('transitions_queried', 0)
+        
+        if not results:
+            self._show_status(f"No BRENDA data found for {transitions_queried} transitions", error=True)
+            return
+        
+        # Clear existing results
+        for child in self.results_box.get_children():
+            self.results_box.remove(child)
+        
+        # Update count label
+        self.results_count_label.set_text(f"Found {len(results)} results")
+        
+        # Populate results table
+        for result_data in results:
+            self._add_result_row(result_data)
+        
+        self.results_box.show_all()
+        self._show_status(f"Found {len(results)} BRENDA results from {transitions_queried} EC numbers", error=False)
+    
+    def _on_query_all_error(self, error: Exception):
+        """Callback when query all fails."""
+        self.query_all_button.set_sensitive(True)
+        self.search_button.set_sensitive(True)
+        error_msg = str(error)
+        self._show_status(f"Query error: {error_msg}", error=True)
+        self._show_error_dialog("BRENDA Query Error", 
+                               f"Failed to query BRENDA:\n\n{error_msg}")
+    
+    def _add_result_row(self, result_data: Dict[str, Any]):
+        """Add a result row to the results table with checkbox.
+        
+        Args:
+            result_data: Dict with keys: transition_id, transition_name, ec_number,
+                        parameter_type, value, unit, substrate, organism, literature
+        """
+        # Create horizontal box for this result row
+        row_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        row_box.set_margin_top(2)
+        row_box.set_margin_bottom(2)
+        
+        # Checkbox for selection
+        checkbox = Gtk.CheckButton()
+        checkbox.result_data = result_data  # Attach data to checkbox
+        row_box.pack_start(checkbox, False, False, 0)
+        
+        # Result label with formatted information
+        label_text = (
+            f"{result_data.get('transition_name', 'Unknown')} | "
+            f"EC {result_data.get('ec_number', 'N/A')} | "
+            f"{result_data.get('parameter_type', 'Km')}: {result_data.get('value', 'N/A')} {result_data.get('unit', 'mM')} | "
+            f"Substrate: {result_data.get('substrate', 'Unknown')} | "
+            f"Organism: {result_data.get('organism', 'Unknown')}"
         )
         
-        return result
+        label = Gtk.Label(label=label_text)
+        label.set_xalign(0.0)
+        label.set_line_wrap(True)
+        label.set_max_width_chars(80)
+        row_box.pack_start(label, True, True, 0)
+        
+        self.results_box.pack_start(row_box, False, False, 0)
     
     def _on_quick_enrich_complete(self, result: Dict[str, Any]):
         """Callback when quick enrichment completes successfully."""
