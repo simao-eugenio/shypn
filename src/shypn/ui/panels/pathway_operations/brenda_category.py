@@ -99,6 +99,12 @@ class BRENDACategory(BasePathwayCategory):
     def _build_content(self) -> Gtk.Widget:
         """Build the BRENDA category content.
         
+        Streamlined design:
+        1. Authentication (top)
+        2. Query (manual query OR batch all transitions button)
+        3. Results (table with checkboxes: Transition ID, EC, Name, Vmax, Km, etc.)
+        4. Apply (override checkboxes + Apply button at bottom)
+        
         Returns:
             Gtk.Box containing all BRENDA enrichment UI elements
         """
@@ -108,39 +114,21 @@ class BRENDACategory(BasePathwayCategory):
         main_box.set_margin_top(10)
         main_box.set_margin_bottom(10)
         
-        # Authentication section
+        # 1. Authentication section
         auth_section = self._build_authentication_section()
         main_box.pack_start(auth_section, False, False, 0)
         
-        # Quick Enrich section (NEW - batch enrichment)
-        quick_enrich_section = self._build_quick_enrich_section()
-        main_box.pack_start(quick_enrich_section, False, False, 0)
-        
-        # Query section (manual query)
+        # 2. Query section (manual OR batch all)
         query_section = self._build_query_section()
         main_box.pack_start(query_section, False, False, 0)
         
-        # Results section (scrollable)
+        # 3. Results section (table with checkboxes, scrollable)
         results_section = self._build_results_section()
         main_box.pack_start(results_section, True, True, 0)
         
-        # Status label
-        self.status_label = Gtk.Label()
-        self.status_label.set_markup("<span foreground='gray'>Ready to query BRENDA</span>")
-        self.status_label.set_xalign(0.0)
-        main_box.pack_start(self.status_label, False, False, 0)
-        
-        # Apply button
-        button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        button_box.set_halign(Gtk.Align.END)
-        
-        self.apply_button = Gtk.Button(label="Apply Selected to Model")
-        self.apply_button.get_style_context().add_class('suggested-action')
-        self.apply_button.set_sensitive(False)
-        self.apply_button.connect('clicked', self._on_apply_clicked)
-        button_box.pack_start(self.apply_button, False, False, 0)
-        
-        main_box.pack_start(button_box, False, False, 0)
+        # 4. Apply section (status + override markers + apply button)
+        apply_section = self._build_apply_section()
+        main_box.pack_start(apply_section, False, False, 0)
         
         main_box.show_all()
         
@@ -369,26 +357,59 @@ class BRENDACategory(BasePathwayCategory):
         
         box.pack_start(common_box, False, False, 0)
         
-        # Search button
-        search_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        search_box.set_halign(Gtk.Align.END)
+        # Query buttons (horizontal layout)
+        button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        button_box.set_halign(Gtk.Align.END)
         
-        self.search_button = Gtk.Button(label="Search BRENDA")
+        # Query All button (batch all canvas transitions)
+        self.query_all_button = Gtk.Button(label="Query All Canvas Transitions")
+        self.query_all_button.set_sensitive(False)  # Requires authentication
+        self.query_all_button.set_tooltip_text("Query BRENDA for all continuous transitions on canvas")
+        self.query_all_button.connect('clicked', self._on_query_all_clicked)
+        button_box.pack_start(self.query_all_button, False, False, 0)
+        
+        # Single Query button (manual query)
+        self.search_button = Gtk.Button(label="Query BRENDA")
         self.search_button.get_style_context().add_class('suggested-action')
-        self.search_button.set_sensitive(False)
+        self.search_button.set_sensitive(False)  # Requires authentication
+        self.search_button.set_tooltip_text("Query BRENDA with specified EC number or name")
         self.search_button.connect('clicked', self._on_search_clicked)
-        search_box.pack_start(self.search_button, False, False, 0)
+        button_box.pack_start(self.search_button, False, False, 0)
         
-        box.pack_start(search_box, False, False, 0)
+        box.pack_start(button_box, False, False, 0)
         
         frame.add(box)
         return frame
     
     def _build_results_section(self) -> Gtk.Widget:
-        """Build results section with scrollable parameter list."""
+        """Build results section with scrollable table and Mark All button."""
         frame = Gtk.Frame()
         frame.set_label("BRENDA Results")
         
+        container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        container.set_margin_start(10)
+        container.set_margin_end(10)
+        container.set_margin_top(10)
+        container.set_margin_bottom(10)
+        
+        # Header with Mark All button
+        header_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        
+        results_count_label = Gtk.Label()
+        results_count_label.set_markup("<i>0 results</i>")
+        results_count_label.set_xalign(0.0)
+        self.results_count_label = results_count_label
+        header_box.pack_start(results_count_label, True, True, 0)
+        
+        self.mark_all_button = Gtk.Button(label="Mark All")
+        self.mark_all_button.set_sensitive(False)
+        self.mark_all_button.set_tooltip_text("Select all results for application")
+        self.mark_all_button.connect('clicked', self._on_mark_all_clicked)
+        header_box.pack_end(self.mark_all_button, False, False, 0)
+        
+        container.pack_start(header_box, False, False, 0)
+        
+        # Scrollable results area
         scrolled = Gtk.ScrolledWindow()
         scrolled.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
         scrolled.set_size_request(-1, 200)
@@ -401,14 +422,61 @@ class BRENDACategory(BasePathwayCategory):
         
         # Initial empty state
         placeholder = Gtk.Label()
-        placeholder.set_markup("<i>No results yet. Authenticate and search to see kinetic parameters.</i>")
+        placeholder.set_markup("<i>No results yet. Authenticate and query to see kinetic parameters.</i>")
         placeholder.set_line_wrap(True)
         self.results_box.pack_start(placeholder, False, False, 0)
         
         scrolled.add(self.results_box)
-        frame.add(scrolled)
+        container.pack_start(scrolled, True, True, 0)
         
+        frame.add(container)
         return frame
+    
+    def _build_apply_section(self) -> Gtk.Widget:
+        """Build apply section with status, override checkboxes, and apply button.
+        
+        All on one line: Status | Override KEGG ☑ | Override SBML ☐ | [Apply Selected]
+        """
+        box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        box.set_margin_start(10)
+        box.set_margin_end(10)
+        
+        # Status label (left)
+        self.status_label = Gtk.Label()
+        self.status_label.set_markup("<span foreground='gray'>Ready to query BRENDA</span>")
+        self.status_label.set_xalign(0.0)
+        self.status_label.set_hexpand(True)
+        box.pack_start(self.status_label, True, True, 0)
+        
+        # Override KEGG checkbox
+        self.override_kegg_checkbox = Gtk.CheckButton()
+        self.override_kegg_checkbox.set_label("Override KEGG")
+        self.override_kegg_checkbox.set_active(True)  # Default ON
+        self.override_kegg_checkbox.set_tooltip_text(
+            "Replace KEGG heuristics (vmax=10.0, km=0.5) with real BRENDA data\n"
+            "Recommended: KEGG has no real kinetic parameters"
+        )
+        box.pack_start(self.override_kegg_checkbox, False, False, 0)
+        
+        # Override SBML checkbox
+        self.override_sbml_checkbox = Gtk.CheckButton()
+        self.override_sbml_checkbox.set_label("Override SBML")
+        self.override_sbml_checkbox.set_active(False)  # Default OFF
+        self.override_sbml_checkbox.set_tooltip_text(
+            "Replace SBML curated kinetic data with BRENDA data\n"
+            "Warning: SBML data is manually curated and may be more accurate"
+        )
+        box.pack_start(self.override_sbml_checkbox, False, False, 0)
+        
+        # Apply button (right)
+        self.apply_button = Gtk.Button(label="Apply Selected to Model")
+        self.apply_button.get_style_context().add_class('suggested-action')
+        self.apply_button.set_sensitive(False)
+        self.apply_button.set_tooltip_text("Apply selected BRENDA results to model transitions")
+        self.apply_button.connect('clicked', self._on_apply_clicked)
+        box.pack_start(self.apply_button, False, False, 0)
+        
+        return box
     
     # Event handlers
     
@@ -480,7 +548,7 @@ class BRENDACategory(BasePathwayCategory):
         self.authenticated = True
         self.auth_status.set_markup("<span foreground='green'>✓ Authenticated</span>")
         self.search_button.set_sensitive(True)
-        self.quick_enrich_button.set_sensitive(True)
+        self.query_all_button.set_sensitive(True)
         self._show_status("Authenticated successfully", error=False)
         self.validate_button.set_sensitive(True)
     
@@ -489,7 +557,7 @@ class BRENDACategory(BasePathwayCategory):
         self.authenticated = False
         self.auth_status.set_markup("<span foreground='red'>✗ Authentication failed</span>")
         self.search_button.set_sensitive(False)
-        self.quick_enrich_button.set_sensitive(False)
+        self.query_all_button.set_sensitive(False)
         self._show_status(f"Authentication failed: {error}", error=True)
         self.validate_button.set_sensitive(True)
     
@@ -608,17 +676,32 @@ class BRENDACategory(BasePathwayCategory):
         self._show_status(f"Search failed: {error}", error=True)
     
     # ========================================================================
-    # Quick Canvas Enrichment (Batch)
+    # Results Selection
     # ========================================================================
     
-    def _on_quick_enrich_clicked(self, button):
-        """Handle quick canvas enrichment button click.
+    def _on_mark_all_clicked(self, button):
+        """Handle Mark All button click - select all results."""
+        # Find all checkboxes in results_box and set them to active
+        for child in self.results_box.get_children():
+            if isinstance(child, Gtk.CheckButton):
+                child.set_active(True)
+            elif isinstance(child, Gtk.Box):
+                # Search within boxes for checkboxes
+                for subchild in child.get_children():
+                    if isinstance(subchild, Gtk.CheckButton):
+                        subchild.set_active(True)
         
-        Scans all continuous transitions on canvas and enriches them from BRENDA.
-        Uses smart override logic:
-        - Always enrich transitions without kinetics
-        - Override KEGG heuristics if checkbox enabled (default ON)
-        - Override SBML curated data if checkbox enabled (default OFF)
+        self._show_status("All results selected", error=False)
+    
+    # ========================================================================
+    # Query All Canvas Transitions (Batch Query)
+    # ========================================================================
+    
+    def _on_query_all_clicked(self, button):
+        """Handle 'Query All Canvas Transitions' button click.
+        
+        Scans all continuous transitions on canvas and queries BRENDA for each.
+        Results populate the results table with checkboxes for selection.
         """
         if not self.authenticated:
             self._show_status("Please authenticate first", error=True)
@@ -628,33 +711,23 @@ class BRENDACategory(BasePathwayCategory):
             self._show_status("No model loaded on canvas", error=True)
             return
         
-        # Get override settings from checkboxes
-        override_kegg = self.override_kegg_checkbox.get_active()
-        override_sbml = self.override_sbml_checkbox.get_active()
-        
-        # For the controller, if override_sbml is True, we override everything
-        # If False, we still override KEGG (handled by controller's smart logic)
-        override_existing = override_sbml
-        
         # Prepare UI
-        self.quick_enrich_button.set_sensitive(False)
-        self._show_status("Scanning canvas for continuous transitions...")
+        self.query_all_button.set_sensitive(False)
+        self.search_button.set_sensitive(False)
+        self._show_status("Querying BRENDA for all canvas transitions...")
         
-        # Run enrichment in background thread
+        # Run query in background thread
         self._run_in_thread(
-            task_func=lambda: self._run_quick_enrichment(override_existing),
-            on_complete=self._on_quick_enrich_complete,
-            on_error=self._on_quick_enrich_error
+            task_func=self._query_all_transitions,
+            on_complete=self._on_query_all_complete,
+            on_error=self._on_query_all_error
         )
     
-    def _run_quick_enrichment(self, override_existing: bool) -> Dict[str, Any]:
-        """Background task: scan canvas and enrich all transitions from BRENDA.
-        
-        Args:
-            override_existing: Whether to override SBML curated data (KEGG always overridden)
+    def _query_all_transitions(self) -> Dict[str, Any]:
+        """Background task: query BRENDA for all canvas transitions.
         
         Returns:
-            Summary dict with enrichment results
+            Results dict with transitions and their BRENDA data
         """
         if not self.brenda_controller:
             raise RuntimeError("BRENDA controller not available")
