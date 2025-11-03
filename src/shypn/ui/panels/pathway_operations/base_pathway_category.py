@@ -185,9 +185,18 @@ class BasePathwayCategory(CategoryFrame):
         """Set or update the model canvas.
         
         Args:
-            model_canvas: ModelCanvasManager instance
+            model_canvas: ModelCanvasLoader instance (not ModelCanvasManager!)
+                         We extract the current manager from the loader.
         """
+        # Store the loader (for backward compatibility with existing code)
         self.model_canvas = model_canvas
+        
+        # CRITICAL FIX: Extract the actual ModelCanvasManager from the loader
+        # The loader has multiple canvas managers (one per tab), we need the current one
+        if model_canvas and hasattr(model_canvas, 'get_current_model'):
+            self.model_canvas_manager = model_canvas.get_current_model()
+        else:
+            self.model_canvas_manager = None
     
     # ========================================================================
     # Import Lifecycle (Override in subclasses)
