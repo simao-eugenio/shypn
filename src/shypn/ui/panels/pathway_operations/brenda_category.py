@@ -34,6 +34,13 @@ except ImportError as e:
     print(f'Warning: BRENDA backend not available: {e}', file=sys.stderr)
     BRENDAEnrichmentController = None
 
+# Import BRENDA SOAP API client
+try:
+    from shypn.data.brenda_soap_client import BRENDAAPIClient, ZEEP_AVAILABLE
+except ImportError:
+    BRENDAAPIClient = None
+    ZEEP_AVAILABLE = False
+
 
 class BRENDACategory(BasePathwayCategory):
     """BRENDA enrichment category for Pathway Operations panel.
@@ -72,6 +79,13 @@ class BRENDACategory(BasePathwayCategory):
         else:
             self.brenda_controller = None
             print("Warning: BRENDA controller not available", file=sys.stderr)
+        
+        # Initialize BRENDA API client
+        if BRENDAAPIClient:
+            self.brenda_api = BRENDAAPIClient()
+        else:
+            self.brenda_api = None
+            print("Warning: BRENDA API client not available", file=sys.stderr)
         
         # State
         self.authenticated = False
@@ -435,17 +449,31 @@ class BRENDACategory(BasePathwayCategory):
         )
     
     def _validate_credentials(self):
-        """Background task to validate BRENDA credentials."""
-        # TODO: Implement actual BRENDA API validation
-        # For now, just simulate validation
-        import time
-        time.sleep(1)
+        """Background task to validate BRENDA credentials using real SOAP API."""
+        if not self.brenda_api:
+            raise RuntimeError("BRENDA API client not available. Install zeep: pip install zeep")
         
-        # Mock validation - in reality, would test BRENDA SOAP API
-        if '@' in self.credentials['email'] and len(self.credentials['password']) > 3:
-            return {'valid': True, 'message': 'Credentials validated'}
+        if not ZEEP_AVAILABLE:
+            raise RuntimeError("zeep library not installed. Install with: pip install zeep")
+        
+        # Try to authenticate with BRENDA SOAP API
+        email = self.credentials['email']
+        password = self.credentials['password']
+        
+        if not email or not password:
+            raise ValueError("Email and password required")
+        
+        self.logger.info(f"Validating BRENDA credentials for {email}...")
+        
+        # Authenticate with real BRENDA API
+        success = self.brenda_api.authenticate(email, password)
+        
+        if success:
+            # Save credentials for future use
+            self.brenda_api.save_credentials(email, password)
+            return {'valid': True, 'message': 'Successfully authenticated with BRENDA API'}
         else:
-            raise ValueError('Invalid credentials format')
+            raise ValueError('BRENDA authentication failed. Check your credentials.')
     
     def _on_validate_complete(self, result):
         """Callback when credential validation completes."""
