@@ -1804,7 +1804,7 @@ class FileExplorerPanel:
             drawing_area = self.canvas_loader._get_drawing_area_from_page(page_widget)
             if drawing_area:
                 manager = self.canvas_loader.get_canvas_manager(drawing_area)
-                # Only reuse tab if it's empty (no objects) and has default name
+                # Only reuse tab if it's empty (no objects) AND not dirty
                 if manager:
                     is_empty = (len(manager.places) == 0 and 
                                len(manager.transitions) == 0 and 
@@ -1812,7 +1812,18 @@ class FileExplorerPanel:
                     is_default_name = (manager.filename == 'default' or 
                                       manager.get_display_name() == 'default')
                     is_clean = not manager.is_dirty()
+                    
+                    # DEBUG: Print tab reuse decision
+                    print(f"[TAB_REUSE] Checking current tab:")
+                    print(f"  Empty: {is_empty} (places={len(manager.places)}, trans={len(manager.transitions)}, arcs={len(manager.arcs)})")
+                    print(f"  Default name: {is_default_name} (filename='{manager.filename}')")
+                    print(f"  Clean: {is_clean} (is_dirty={manager.is_dirty()})")
+                    
+                    # CRITICAL FIX: Only reuse if ALL conditions are met
+                    # If tab has ANY content or is dirty, create new tab
                     can_reuse_tab = is_empty and is_default_name and is_clean
+                    
+                    print(f"  Decision: {'REUSE tab' if can_reuse_tab else 'CREATE new tab'}")
         
         # Either reuse current empty tab or create new one
         if can_reuse_tab:

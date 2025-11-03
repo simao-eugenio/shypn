@@ -646,8 +646,16 @@ class KEGGCategory(BasePathwayCategory):
                                 is_default_name = (manager.filename == 'default' or 
                                                   manager.get_display_name() == 'default')
                                 is_clean = not manager.is_dirty()
+                                
+                                # CRITICAL FIX: Never reuse tab if it has ANY content or is not default
+                                # This prevents overwriting imported models when opening new files
                                 can_reuse_tab = is_empty and is_default_name and is_clean
-                                self.logger.info(f"Current tab check: empty={is_empty}, default={is_default_name}, clean={is_clean}, reuse={can_reuse_tab}")
+                                
+                                self.logger.info(f"[TAB_REUSE] Current tab check:")
+                                self.logger.info(f"  Empty: {is_empty} (places={len(manager.places)}, trans={len(manager.transitions)}, arcs={len(manager.arcs)})")
+                                self.logger.info(f"  Default name: {is_default_name} (filename='{manager.filename}')")
+                                self.logger.info(f"  Clean: {is_clean} (dirty={manager.is_dirty()})")
+                                self.logger.info(f"  Decision: {'REUSE tab' if can_reuse_tab else 'CREATE new tab'}")
                     
                     # Either reuse current empty tab or create new one
                     if can_reuse_tab:
@@ -761,6 +769,11 @@ class KEGGCategory(BasePathwayCategory):
                 'model': document_model
             }
             self._on_import_complete(imported_data)
+            
+            # CRITICAL: Trigger callback for Report panel refresh
+            # This must happen AFTER model is loaded to canvas (above)
+            print(f"[KEGG_CATEGORY] Triggering import_complete_callback with {len(document_model.places) if document_model else 0} places")
+            self._trigger_import_complete(imported_data)
             
         except Exception as e:
             self.logger.error(f"Failed to save import: {e}")

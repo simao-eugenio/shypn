@@ -154,7 +154,9 @@ class PathwayOperationsPanel(Gtk.Box):
             data['source'] = 'kegg'
             self.brenda_category.receive_import_data(data)
             # Notify Report panel if callback is set
+            print(f"[PATHWAY_OPS] KEGG import complete, report_refresh_callback={self.report_refresh_callback is not None}")
             if self.report_refresh_callback:
+                print("[PATHWAY_OPS] Calling report_refresh_callback()")
                 self.report_refresh_callback()
         
         # SBML → BRENDA data flow
@@ -163,7 +165,9 @@ class PathwayOperationsPanel(Gtk.Box):
             data['source'] = 'sbml'
             self.brenda_category.receive_import_data(data)
             # Notify Report panel if callback is set
+            print(f"[PATHWAY_OPS] SBML import complete, report_refresh_callback={self.report_refresh_callback is not None}")
             if self.report_refresh_callback:
+                print("[PATHWAY_OPS] Calling report_refresh_callback()")
                 self.report_refresh_callback()
         
         # Connect the signals (categories emit these via _trigger_import_complete)
