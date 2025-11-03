@@ -706,7 +706,7 @@ class BRENDACategory(BasePathwayCategory):
             self._show_status("Please authenticate first", error=True)
             return
         
-        if not self.model_canvas:
+        if not self.model_canvas_manager:
             self._show_status("No model loaded on canvas", error=True)
             return
         
@@ -735,14 +735,14 @@ class BRENDACategory(BasePathwayCategory):
             raise RuntimeError("Not authenticated with BRENDA")
         
         # Debug: check model_canvas
-        self.logger.info(f"Model canvas: {self.model_canvas}")
-        self.logger.info(f"Model canvas type: {type(self.model_canvas)}")
+        self.logger.info(f"Model canvas loader: {self.model_canvas}")
+        self.logger.info(f"Model canvas manager: {self.model_canvas_manager}")
         
-        if not self.model_canvas:
-            raise ValueError('No model canvas set. Please ensure a model is loaded.')
+        if not self.model_canvas_manager:
+            raise ValueError('No model canvas manager available. Please ensure a model is loaded and try again.')
         
-        # Set canvas reference
-        self.brenda_controller.set_model_canvas(self.model_canvas)
+        # Set canvas reference - pass the MANAGER not the LOADER
+        self.brenda_controller.set_model_canvas(self.model_canvas_manager)
         
         # Scan canvas for all transitions
         transitions = self.brenda_controller.scan_canvas_transitions()
