@@ -132,10 +132,17 @@ class BRENDAEnrichmentController:
                     transition_info['data_source'] = transition.metadata.get('data_source', 'unknown')
                     ec_val = transition.metadata.get('ec_number',
                              transition.metadata.get('ec_numbers', []))
+                    
+                    print(f"[BRENDA_SCAN] Transition {transition_info['name']}: ec_val={ec_val}, type={type(ec_val)}")
+                    
                     if isinstance(ec_val, list) and len(ec_val) > 0:
                         transition_info['ec_number'] = ec_val[0]
+                        print(f"[BRENDA_SCAN]   -> Extracted EC from list: {ec_val[0]}")
                     elif ec_val and ec_val != '-':
                         transition_info['ec_number'] = str(ec_val)
+                        print(f"[BRENDA_SCAN]   -> Extracted EC directly: {ec_val}")
+                    else:
+                        print(f"[BRENDA_SCAN]   -> No valid EC number (ec_val={ec_val})")
                     
                     # Check for existing kinetic data
                     has_km = 'km' in transition.metadata or 'Km' in transition.metadata
