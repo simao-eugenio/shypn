@@ -533,12 +533,11 @@ class BRENDACategory(BasePathwayCategory):
         
         self.logger.info(f"Validating BRENDA credentials for {email}...")
         
-        # Authenticate with real BRENDA API
+        # Authenticate with real BRENDA API - this establishes the SOAP session
+        # The authenticated session is maintained in brenda_api.client for subsequent queries
         success = self.brenda_api.authenticate(email, password)
         
         if success:
-            # Save credentials for future use
-            self.brenda_api.save_credentials(email, password)
             return {'valid': True, 'message': 'Successfully authenticated with BRENDA API'}
         else:
             raise ValueError('BRENDA authentication failed. Check your credentials.')

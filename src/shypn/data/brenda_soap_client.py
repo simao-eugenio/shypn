@@ -61,50 +61,19 @@ class BRENDAAPIClient:
     # BRENDA SOAP WSDL URL
     WSDL_URL = "https://www.brenda-enzymes.org/soap/brenda_zeep.wsdl"
     
-    def __init__(self, credentials: Optional[BRENDACredentials] = None):
+    def __init__(self):
         """Initialize BRENDA API client.
         
-        Args:
-            credentials: Optional credentials. If not provided, will try to load from environment.
+        Client starts unauthenticated. Call authenticate(email, password) to establish connection.
+        Credentials are provided dynamically by the user, not loaded from files.
         """
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.credentials = credentials or self._load_credentials()
+        self.credentials = None
         self.client = None
         self._authenticated = False
         
         if not ZEEP_AVAILABLE:
             self.logger.warning("zeep library not available. Install with: pip install zeep")
-    
-    def _load_credentials(self) -> Optional[BRENDACredentials]:
-        """Load credentials from environment variables or config file.
-        
-        Returns:
-            BRENDACredentials if found, None otherwise
-        """
-        # Try environment variables first
-        email = os.getenv('BRENDA_EMAIL')
-        password = os.getenv('BRENDA_PASSWORD')
-        
-        if email and password:
-            self.logger.info("Loaded BRENDA credentials from environment variables")
-            return BRENDACredentials(email=email, password=password)
-        
-        # Try config file
-        config_path = Path.home() / '.shypn' / 'brenda_credentials.json'
-        if config_path.exists():
-            try:
-                with open(config_path, 'r') as f:
-                    data = json.load(f)
-                    self.logger.info("Loaded BRENDA credentials from config file")
-                    return BRENDACredentials(
-                        email=data.get('email'),
-                        password=data.get('password')
-                    )
-            except Exception as e:
-                self.logger.error(f"Failed to load credentials from {config_path}: {e}")
-        
-        self.logger.warning("No BRENDA credentials found. Set BRENDA_EMAIL and BRENDA_PASSWORD environment variables.")
-        return None
     
     def save_credentials(self, email: str, password: str):
         """Save credentials to config file.
@@ -137,12 +106,12 @@ class BRENDAAPIClient:
         self.credentials = BRENDACredentials(email=email, password=password)
         self.logger.info(f"Saved BRENDA credentials to {config_path}")
     
-    def authenticate(self, email: Optional[str] = None, password: Optional[str] = None) -> bool:
-        """Authenticate with BRENDA API.
+    def authenticate(self, email: str, password: str) -> bool:
+        """Authenticate with BRENDA API and establish SOAP client session.
         
         Args:
-            email: BRENDA account email (optional if credentials loaded)
-            password: BRENDA account password (optional if credentials loaded)
+            email: BRENDA account email (required)
+            password: BRENDA account password (required)
         
         Returns:
             True if authentication successful, False otherwise
@@ -151,13 +120,12 @@ class BRENDAAPIClient:
             self.logger.error("zeep library not available. Cannot authenticate.")
             return False
         
-        # Update credentials if provided
-        if email and password:
-            self.credentials = BRENDACredentials(email=email, password=password)
-        
-        if not self.credentials:
-            self.logger.error("No credentials available. Provide email/password or set environment variables.")
+        if not email or not password:
+            self.logger.error("Email and password are required for authentication.")
             return False
+        
+        # Store credentials
+        self.credentials = BRENDACredentials(email=email, password=password)
         
         try:
             # Initialize SOAP client
