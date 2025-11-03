@@ -98,7 +98,11 @@ class BRENDACategory(BasePathwayCategory):
         auth_section = self._build_authentication_section()
         main_box.pack_start(auth_section, False, False, 0)
         
-        # Query section
+        # Quick Enrich section (NEW - batch enrichment)
+        quick_enrich_section = self._build_quick_enrich_section()
+        main_box.pack_start(quick_enrich_section, False, False, 0)
+        
+        # Query section (manual query)
         query_section = self._build_query_section()
         main_box.pack_start(query_section, False, False, 0)
         
@@ -189,6 +193,76 @@ class BRENDACategory(BasePathwayCategory):
         self.auth_status.set_markup("<span foreground='gray'>Not authenticated</span>")
         self.auth_status.set_xalign(0.0)
         box.pack_start(self.auth_status, False, False, 0)
+        
+        frame.add(box)
+        return frame
+    
+    def _build_quick_enrich_section(self) -> Gtk.Widget:
+        """Build quick canvas enrichment section for batch processing.
+        
+        This section provides one-click enrichment of all continuous transitions
+        on the canvas using their EC numbers. Faster than manual query workflow.
+        """
+        frame = Gtk.Frame()
+        frame.set_label("Quick Canvas Enrichment")
+        
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        box.set_margin_start(10)
+        box.set_margin_end(10)
+        box.set_margin_top(10)
+        box.set_margin_bottom(10)
+        
+        # Info label
+        info_label = Gtk.Label()
+        info_label.set_markup(
+            '<i>Auto-enrich all continuous transitions from canvas using their EC numbers. '
+            'Faster than manual query for batch processing.</i>'
+        )
+        info_label.set_line_wrap(True)
+        info_label.set_xalign(0.0)
+        box.pack_start(info_label, False, False, 0)
+        
+        # Enrich button
+        button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        
+        self.quick_enrich_button = Gtk.Button(label="🧬 Enrich All Continuous")
+        self.quick_enrich_button.get_style_context().add_class('suggested-action')
+        self.quick_enrich_button.set_sensitive(False)  # Requires authentication
+        self.quick_enrich_button.set_tooltip_text(
+            "Query BRENDA for all continuous transitions with EC numbers\n"
+            "and apply kinetic parameters automatically"
+        )
+        self.quick_enrich_button.connect('clicked', self._on_quick_enrich_clicked)
+        button_box.pack_start(self.quick_enrich_button, False, False, 0)
+        
+        box.pack_start(button_box, False, False, 0)
+        
+        # Override settings
+        override_label = Gtk.Label()
+        override_label.set_markup("<b>Override Settings:</b>")
+        override_label.set_xalign(0.0)
+        override_label.set_margin_top(6)
+        box.pack_start(override_label, False, False, 0)
+        
+        # Override KEGG checkbox (default ON)
+        self.override_kegg_checkbox = Gtk.CheckButton()
+        self.override_kegg_checkbox.set_label("Override KEGG Heuristics")
+        self.override_kegg_checkbox.set_active(True)  # Default ON
+        self.override_kegg_checkbox.set_tooltip_text(
+            "Always replace KEGG placeholder values (vmax=10.0, km=0.5) with BRENDA data.\n"
+            "RECOMMENDED: KEGG provides no kinetics, only Shypn heuristics."
+        )
+        box.pack_start(self.override_kegg_checkbox, False, False, 0)
+        
+        # Override SBML checkbox (default OFF)
+        self.override_sbml_checkbox = Gtk.CheckButton()
+        self.override_sbml_checkbox.set_label("Override SBML Curated Data")
+        self.override_sbml_checkbox.set_active(False)  # Default OFF
+        self.override_sbml_checkbox.set_tooltip_text(
+            "Replace curated SBML kinetic parameters with BRENDA data.\n"
+            "⚠️ CAUTION: SBML models may contain validated experimental kinetics."
+        )
+        box.pack_start(self.override_sbml_checkbox, False, False, 0)
         
         frame.add(box)
         return frame
@@ -378,6 +452,7 @@ class BRENDACategory(BasePathwayCategory):
         self.authenticated = True
         self.auth_status.set_markup("<span foreground='green'>✓ Authenticated</span>")
         self.search_button.set_sensitive(True)
+        self.quick_enrich_button.set_sensitive(True)
         self._show_status("Authenticated successfully", error=False)
         self.validate_button.set_sensitive(True)
     
@@ -386,6 +461,7 @@ class BRENDACategory(BasePathwayCategory):
         self.authenticated = False
         self.auth_status.set_markup("<span foreground='red'>✗ Authentication failed</span>")
         self.search_button.set_sensitive(False)
+        self.quick_enrich_button.set_sensitive(False)
         self._show_status(f"Authentication failed: {error}", error=True)
         self.validate_button.set_sensitive(True)
     
@@ -502,6 +578,129 @@ class BRENDACategory(BasePathwayCategory):
         """Callback when BRENDA search fails."""
         self.search_button.set_sensitive(True)
         self._show_status(f"Search failed: {error}", error=True)
+    
+    # ========================================================================
+    # Quick Canvas Enrichment (Batch)
+    # ========================================================================
+    
+    def _on_quick_enrich_clicked(self, button):
+        """Handle quick canvas enrichment button click.
+        
+        Scans all continuous transitions on canvas and enriches them from BRENDA.
+        Uses smart override logic:
+        - Always enrich transitions without kinetics
+        - Override KEGG heuristics if checkbox enabled (default ON)
+        - Override SBML curated data if checkbox enabled (default OFF)
+        """
+        if not self.authenticated:
+            self._show_status("Please authenticate first", error=True)
+            return
+        
+        if not self.model_canvas:
+            self._show_status("No model loaded on canvas", error=True)
+            return
+        
+        # Get override settings from checkboxes
+        override_kegg = self.override_kegg_checkbox.get_active()
+        override_sbml = self.override_sbml_checkbox.get_active()
+        
+        # For the controller, if override_sbml is True, we override everything
+        # If False, we still override KEGG (handled by controller's smart logic)
+        override_existing = override_sbml
+        
+        # Prepare UI
+        self.quick_enrich_button.set_sensitive(False)
+        self._show_status("Scanning canvas for continuous transitions...")
+        
+        # Run enrichment in background thread
+        self._run_in_thread(
+            task_func=lambda: self._run_quick_enrichment(override_existing),
+            on_complete=self._on_quick_enrich_complete,
+            on_error=self._on_quick_enrich_error
+        )
+    
+    def _run_quick_enrichment(self, override_existing: bool) -> Dict[str, Any]:
+        """Background task: scan canvas and enrich all transitions from BRENDA.
+        
+        Args:
+            override_existing: Whether to override SBML curated data (KEGG always overridden)
+        
+        Returns:
+            Summary dict with enrichment results
+        """
+        if not self.brenda_controller:
+            raise RuntimeError("BRENDA controller not available")
+        
+        # Set canvas reference
+        self.brenda_controller.set_model_canvas(self.model_canvas)
+        
+        # Scan canvas for all transitions
+        transitions = self.brenda_controller.scan_canvas_transitions()
+        
+        if not transitions:
+            return {
+                'success': False,
+                'error': 'No transitions found on canvas'
+            }
+        
+        # Filter for continuous transitions (those with EC numbers)
+        continuous_transitions = [t for t in transitions if t.get('ec_number')]
+        
+        if not continuous_transitions:
+            return {
+                'success': False,
+                'error': 'No continuous transitions (with EC numbers) found on canvas'
+            }
+        
+        # Extract unique EC numbers
+        ec_numbers = list(set(t['ec_number'] for t in continuous_transitions if t.get('ec_number')))
+        
+        # Enrich from BRENDA API (uses mock DB)
+        result = self.brenda_controller.enrich_canvas_from_api(
+            ec_numbers=ec_numbers,
+            organism=None,  # Use all organisms for now
+            override_existing=override_existing
+        )
+        
+        return result
+    
+    def _on_quick_enrich_complete(self, result: Dict[str, Any]):
+        """Callback when quick enrichment completes successfully."""
+        self.quick_enrich_button.set_sensitive(True)
+        
+        if not result.get('success'):
+            error_msg = result.get('error', 'Unknown error')
+            self._show_status(f"Enrichment failed: {error_msg}", error=True)
+            return
+        
+        # Extract summary
+        scanned = result.get('transitions_scanned', 0)
+        enriched = result.get('transitions_enriched', 0)
+        skipped = scanned - enriched
+        
+        # Show completion dialog
+        message = (
+            f"Canvas enrichment complete!\n\n"
+            f"Transitions scanned: {scanned}\n"
+            f"Transitions enriched: {enriched}\n"
+            f"Transitions skipped: {skipped}\n\n"
+            f"Enriched transitions now have BRENDA kinetic data."
+        )
+        
+        self._show_info_dialog("BRENDA Enrichment Complete", message)
+        self._show_status(f"Enriched {enriched} transitions from BRENDA", error=False)
+        
+        # Trigger canvas redraw to update colors
+        if self.model_canvas and hasattr(self.model_canvas, 'queue_draw'):
+            GLib.idle_add(self.model_canvas.queue_draw)
+    
+    def _on_quick_enrich_error(self, error: Exception):
+        """Callback when quick enrichment fails."""
+        self.quick_enrich_button.set_sensitive(True)
+        error_msg = str(error)
+        self._show_status(f"Enrichment error: {error_msg}", error=True)
+        self._show_error_dialog("BRENDA Enrichment Error", 
+                               f"Failed to enrich canvas:\n\n{error_msg}")
     
     def _display_results(self, results):
         """Display BRENDA results in the results box."""
@@ -684,6 +883,52 @@ class BRENDACategory(BasePathwayCategory):
         self.logger.info(f"Would apply {len(params)} parameters to {transition_id}")
         for param in params:
             self.logger.info(f"  {param['type']} = {param['value']} {param['unit']}")
+    
+    # ========================================================================
+    # Dialog Helpers
+    # ========================================================================
+    
+    def _show_info_dialog(self, title: str, message: str):
+        """Show an information dialog (Wayland-safe).
+        
+        Args:
+            title: Dialog title
+            message: Message to display
+        """
+        def show():
+            dialog = Gtk.MessageDialog(
+                transient_for=self.parent_window,
+                flags=Gtk.DialogFlags.MODAL,
+                message_type=Gtk.MessageType.INFO,
+                buttons=Gtk.ButtonsType.OK,
+                text=title
+            )
+            dialog.format_secondary_text(message)
+            dialog.run()
+            dialog.destroy()
+        
+        GLib.idle_add(show)
+    
+    def _show_error_dialog(self, title: str, message: str):
+        """Show an error dialog (Wayland-safe).
+        
+        Args:
+            title: Dialog title
+            message: Error message to display
+        """
+        def show():
+            dialog = Gtk.MessageDialog(
+                transient_for=self.parent_window,
+                flags=Gtk.DialogFlags.MODAL,
+                message_type=Gtk.MessageType.ERROR,
+                buttons=Gtk.ButtonsType.OK,
+                text=title
+            )
+            dialog.format_secondary_text(message)
+            dialog.run()
+            dialog.destroy()
+        
+        GLib.idle_add(show)
     
     def _show_status(self, message: str, error: bool = False):
         """Update status label (Wayland-safe)."""
