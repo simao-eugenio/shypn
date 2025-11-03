@@ -734,20 +734,29 @@ class BRENDACategory(BasePathwayCategory):
         if not self.brenda_api or not self.brenda_api.is_authenticated():
             raise RuntimeError("Not authenticated with BRENDA")
         
+        # Debug: check model_canvas
+        self.logger.info(f"Model canvas: {self.model_canvas}")
+        self.logger.info(f"Model canvas type: {type(self.model_canvas)}")
+        
+        if not self.model_canvas:
+            raise ValueError('No model canvas set. Please ensure a model is loaded.')
+        
         # Set canvas reference
         self.brenda_controller.set_model_canvas(self.model_canvas)
         
         # Scan canvas for all transitions
         transitions = self.brenda_controller.scan_canvas_transitions()
         
+        self.logger.info(f"Scanned transitions: {len(transitions) if transitions else 0}")
+        
         if not transitions:
-            raise ValueError('No transitions found on canvas')
+            raise ValueError('No transitions found on canvas. The model may be empty or not properly loaded.')
         
         # Filter for continuous transitions (those with EC numbers)
         continuous_transitions = [t for t in transitions if t.get('ec_number')]
         
         if not continuous_transitions:
-            raise ValueError('No continuous transitions (with EC numbers) found on canvas')
+            raise ValueError(f'No continuous transitions (with EC numbers) found on canvas. Found {len(transitions)} total transitions but none have EC numbers.')
         
         self.logger.info(f"Found {len(continuous_transitions)} continuous transitions to query")
         
