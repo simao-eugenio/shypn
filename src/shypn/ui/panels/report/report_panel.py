@@ -74,14 +74,27 @@ class ReportPanel(Gtk.Box):
         header_label.set_valign(Gtk.Align.CENTER)
         header_box.pack_start(header_label, True, True, 0)
         
-        # BRENDA enrichment button
+        # BRENDA enrichment button with override checkbox
+        brenda_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        
+        self.brenda_override_checkbox = Gtk.CheckButton()
+        self.brenda_override_checkbox.set_label("Override")
+        self.brenda_override_checkbox.set_tooltip_text(
+            "Replace KEGG placeholder rate functions with BRENDA-optimized ones\n"
+            "(KEGG uses vmax=10.0, km=0.5 heuristics - BRENDA provides real experimental data)"
+        )
+        self.brenda_override_checkbox.set_active(True)  # Default to TRUE - BRENDA data is better!
+        brenda_box.pack_start(self.brenda_override_checkbox, False, False, 0)
+        
         self.brenda_button = Gtk.Button()
         self.brenda_button.set_label("🧬 Enrich")
         self.brenda_button.set_tooltip_text("Enrich model with BRENDA kinetic parameters")
         self.brenda_button.set_relief(Gtk.ReliefStyle.NONE)
         self.brenda_button.set_valign(Gtk.Align.CENTER)
         self.brenda_button.connect('clicked', self._on_brenda_enrich_clicked)
-        header_box.pack_end(self.brenda_button, False, False, 4)
+        brenda_box.pack_start(self.brenda_button, False, False, 0)
+        
+        header_box.pack_end(brenda_box, False, False, 4)
         
         # Refresh button (updates all categories with current data)
         self.refresh_button = Gtk.Button()
@@ -266,9 +279,15 @@ class ReportPanel(Gtk.Box):
             self._show_info_dialog("No Model", "No active model found")
             return
         
+        print(f"[BRENDA_ENRICH] === STARTING ENRICHMENT ===")
+        print(f"[BRENDA_ENRICH] Current model: {current_manager.get_display_name()}")
+        print(f"[BRENDA_ENRICH] Model filepath: {current_manager.filepath if hasattr(current_manager, 'filepath') else 'N/A'}")
+        print(f"[BRENDA_ENRICH] Model ID: {id(current_manager)}")
+        
         # Collect EC numbers from transitions
         ec_numbers = []
         if hasattr(current_manager, 'transitions'):
+            print(f"[BRENDA_ENRICH] Scanning {len(current_manager.transitions)} transitions for EC numbers")
             for transition in current_manager.transitions:
                 if not transition:
                     continue
@@ -282,6 +301,8 @@ class ReportPanel(Gtk.Box):
         
         # Remove duplicates
         ec_numbers = list(set(ec_numbers))
+        
+        print(f"[BRENDA_ENRICH] Found {len(ec_numbers)} unique EC numbers: {ec_numbers[:10]}...")  # Show first 10
         
         if not ec_numbers:
             self._show_info_dialog(
@@ -304,24 +325,40 @@ class ReportPanel(Gtk.Box):
         # Analyze what data is missing in the model
         missing_data_count = self._count_missing_kinetic_data(model_manager)
         
+        # Check override setting
+        override_enabled = self.brenda_override_checkbox.get_active()
+        
+        override_text = ""
+        if override_enabled:
+            override_text = (
+                "🔄 OVERRIDE MODE ENABLED:\n"
+                "  • Will replace existing rate functions with BRENDA-optimized versions\n"
+                "  • KEGG heuristics (vmax=10.0, km=0.5) → BRENDA experimental data\n\n"
+            )
+        else:
+            override_text = (
+                "⚠️ Override disabled:\n"
+                "  • Will only fill missing data\n"
+                "  • Existing rate functions will NOT be replaced\n\n"
+            )
+        
         dialog = Gtk.MessageDialog(
             transient_for=None,
             message_type=Gtk.MessageType.QUESTION,
             buttons=Gtk.ButtonsType.OK_CANCEL,
-            text=f"Batch Enrich Missing Data with BRENDA"
+            text=f"Batch Enrich with BRENDA"
         )
         dialog.format_secondary_text(
             f"Found {len(ec_numbers)} unique EC numbers in model.\n"
             f"Missing kinetic data in {missing_data_count} transitions.\n\n"
-            f"This will automatically query BRENDA database for:\n"
+            f"{override_text}"
+            f"This will query BRENDA database for:\n"
             f"  • Km values (substrate affinity)\n"
             f"  • Kcat values (turnover number)\n"
-            f"  • Ki values (inhibition constants)\n"
-            f"  • Other kinetic parameters\n\n"
-            f"⚠️ Only MISSING data will be filled.\n"
-            f"⚠️ Existing data will NOT be overwritten.\n\n"
+            f"  • Vmax values (maximum velocity)\n"
+            f"  • Ki values (inhibition constants)\n\n"
             f"Enriched data will be shown in BLUE in the report.\n\n"
-            f"Continue with BRENDA batch enrichment?"
+            f"Continue with BRENDA enrichment?"
         )
         
         response = dialog.run()
@@ -407,17 +444,22 @@ class ReportPanel(Gtk.Box):
         try:
             from shypn.helpers.brenda_enrichment_controller import BRENDAEnrichmentController
             
+            # Get override setting from checkbox
+            override_existing = self.brenda_override_checkbox.get_active()
+            
+            print(f"[BRENDA_ENRICH] Override existing rate functions: {override_existing}")
+            
             # Create controller
             controller = BRENDAEnrichmentController(
                 model_canvas=model_manager,
                 project=self.project
             )
             
-            # Execute batch enrichment (only fills missing data, doesn't override)
+            # Execute batch enrichment
             result = controller.enrich_canvas_from_api(
                 ec_numbers=ec_numbers,
                 organism=None,  # Auto-detect or use default
-                override_existing=False  # CRITICAL: Only fill missing data!
+                override_existing=override_existing  # Use checkbox value!
             )
             
             print(f"[REPORT] BRENDA enrichment result: {result}")
@@ -637,17 +679,33 @@ class ReportPanel(Gtk.Box):
     
     def _on_pathway_imported(self):
         """Called by pathway operations panel when new pathway is imported."""
-        # Refresh Models category (shows new import provenance)
-        for category in self.categories:
-            if isinstance(category, ModelsCategory):
-                category.refresh()
-                break
+        print("[REPORT] _on_pathway_imported() called")
         
-        # Refresh the dynamic analyses category (shows pathway enrichments)
-        for category in self.categories:
-            if isinstance(category, DynamicAnalysesCategory):
-                category.refresh()
-                break
+        # Get current model canvas manager
+        if hasattr(self.model_canvas_loader, 'get_current_model'):
+            current_manager = self.model_canvas_loader.get_current_model()
+            print(f"[REPORT] Current model canvas manager: {current_manager}")
+            
+            if current_manager:
+                # Check if current_manager has the model data
+                if hasattr(current_manager, 'places'):
+                    print(f"[REPORT] Current manager has {len(current_manager.places)} places, {len(current_manager.transitions)} transitions")
+                else:
+                    print(f"[REPORT] WARNING: Current manager has no places/transitions attributes!")
+                
+                # Update all categories with the current model canvas
+                for category in self.categories:
+                    if hasattr(category, 'set_model_canvas'):
+                        print(f"[REPORT] Setting model_canvas for {category.__class__.__name__}")
+                        category.set_model_canvas(current_manager)
+                
+                # Refresh all categories to show imported data
+                print("[REPORT] Calling refresh_all()")
+                self.refresh_all()
+            else:
+                print("[REPORT] ERROR: get_current_model() returned None!")
+        else:
+            print("[REPORT] ERROR: model_canvas_loader has no get_current_model() method!")
     
     def on_file_opened(self, filepath):
         """Called when a file is opened (File → Open or double-click).

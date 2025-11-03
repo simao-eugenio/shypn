@@ -129,6 +129,16 @@ class SpeciesConverter(BaseConverter):
             place.metadata['compartment'] = species.compartment
             place.metadata['data_source'] = 'sbml_import'  # For Report panel colored rendering
             
+            # Transfer database IDs if available (for Report panel Database ID column)
+            if hasattr(species, 'kegg_id') and species.kegg_id:
+                place.metadata['kegg_id'] = species.kegg_id
+                if 'db_id_source' not in place.metadata:
+                    place.metadata['db_id_source'] = 'sbml_import'
+            if hasattr(species, 'chebi_id') and species.chebi_id:
+                place.metadata['chebi_id'] = species.chebi_id
+                if 'db_id_source' not in place.metadata:
+                    place.metadata['db_id_source'] = 'sbml_import'
+            
             species_to_place[species.id] = place
             self.logger.debug(
                 f"Converted species '{species.id}' to place '{place.name}' "

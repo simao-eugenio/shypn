@@ -185,8 +185,10 @@ class ModelsCategory(BaseReportCategory):
         # Create ListStore with column types
         # Columns: index (int), id (str), name (str), type (str), 
         #          kegg_reaction (str), ec_number (str), rate_law (str),
-        #          parameters (str), reversible (str)
-        store = Gtk.ListStore(int, str, str, str, str, str, str, str, str)
+        #          km (float), km_source (str), kcat (float), kcat_source (str),
+        #          vmax (float), vmax_source (str), ki (float), ki_source (str), reversible (str)
+        store = Gtk.ListStore(int, str, str, str, str, str, str, 
+                             float, str, float, str, float, str, float, str, str)
         
         # Create TreeView
         treeview = Gtk.TreeView(model=store)
@@ -202,8 +204,13 @@ class ModelsCategory(BaseReportCategory):
         self._add_column(treeview, "Reaction ID", 4, sortable=True, width=140)
         self._add_column(treeview, "EC Number", 5, sortable=True, width=100)
         self._add_column(treeview, "Rate Law", 6, sortable=True, width=150)
-        self._add_column(treeview, "Parameters", 7, sortable=False, width=200)
-        self._add_column(treeview, "Reversible", 8, sortable=True, width=90)
+        # Add colored kinetic parameter columns
+        self._add_colored_column(treeview, "Km", 7, 8, sortable=True, width=100, numeric=True)
+        self._add_colored_column(treeview, "Kcat", 9, 10, sortable=True, width=100, numeric=True)
+        self._add_colored_column(treeview, "Vmax", 11, 12, sortable=True, width=100, numeric=True)
+        self._add_colored_column(treeview, "Ki", 13, 14, sortable=True, width=100, numeric=True)
+        self._add_column(treeview, "Reversible", 15, sortable=True, width=100)
+        self._add_column(treeview, "Reversible", 13, sortable=True, width=90)
         
         # Create scrolled window
         scrolled = Gtk.ScrolledWindow()
@@ -274,31 +281,51 @@ class ModelsCategory(BaseReportCategory):
         """Color cell based on data source.
         
         Color scheme:
-        - Green (#2d5016): Raw import data (KEGG/SBML)
-        - Blue (#1e3a8a): BRENDA-enriched data
-        - Orange (#c2410c): User-edited values
-        - Gray (#6b7280): Missing/unknown data
+        - Green (#16a34a): Real data from KEGG/SBML database
+        - Blue (#2563eb): BRENDA-enriched experimental data
+        - Orange (#ea580c): User-edited values
+        - Gray (#6b7280): KEGG heuristic estimates (placeholder values)
+        - Light Gray (#9ca3af): Missing/unknown data
         """
         data_column_id, source_column_id = user_data
         value = model.get_value(iter, data_column_id)
         source = model.get_value(iter, source_column_id)
         
+        # Debug: Print source values for non-zero kinetic parameters
+        if value and value != "-" and value != 0.0 and data_column_id in [7, 9, 11, 13]:  # Km, Kcat, Vmax, Ki columns
+            print(f"[COLOR_DEBUG] Column {data_column_id}: value={value}, source='{source}' (type: {type(source).__name__})")
+        
         # Determine color based on source
         if not value or value == "-" or value == 0.0:
-            # Missing data - gray
-            renderer.set_property('foreground', '#6b7280')
+            # Missing data - light gray
+            renderer.set_property('foreground', '#9ca3af')
+            renderer.set_property('weight', 400)  # Normal weight
+            renderer.set_property('style', 0)  # Normal style
         elif source in ('kegg_import', 'sbml_import', 'biopax_import'):
-            # Raw import - green
-            renderer.set_property('foreground', '#2d5016')
+            # Real database data - bright green
+            renderer.set_property('foreground', '#16a34a')
+            renderer.set_property('weight', 600)  # Semi-bold
+            renderer.set_property('style', 0)  # Normal style
         elif source == 'brenda_enriched':
-            # BRENDA enriched - blue
-            renderer.set_property('foreground', '#1e3a8a')
+            # BRENDA enriched - bright blue
+            renderer.set_property('foreground', '#2563eb')
+            renderer.set_property('weight', 600)  # Semi-bold
+            renderer.set_property('style', 0)  # Normal style
+        elif source == 'kegg_heuristic':
+            # KEGG heuristic estimates (10.0, 0.5) - gray italic
+            renderer.set_property('foreground', '#6b7280')
+            renderer.set_property('weight', 400)  # Normal weight
+            renderer.set_property('style', 2)  # Italic (Pango.Style.ITALIC = 2)
         elif source == 'user_edited':
-            # User edited - orange
-            renderer.set_property('foreground', '#c2410c')
+            # User edited - bright orange
+            renderer.set_property('foreground', '#ea580c')
+            renderer.set_property('weight', 600)  # Semi-bold
+            renderer.set_property('style', 0)  # Normal style
         else:
             # Unknown - default black
             renderer.set_property('foreground', '#000000')
+            renderer.set_property('weight', 400)  # Normal weight
+            renderer.set_property('style', 0)  # Normal style
     
     def refresh(self):
         """Refresh models data with comprehensive scientific information."""
@@ -526,6 +553,7 @@ class ModelsCategory(BaseReportCategory):
             # Database ID (KEGG, ChEBI, or other)
             db_id = "-"
             db_id_source = "unknown"
+            
             if hasattr(place, 'metadata') and place.metadata:
                 # Try different database IDs in order of preference
                 db_id = place.metadata.get('kegg_id',
@@ -638,21 +666,94 @@ class ModelsCategory(BaseReportCategory):
             # Rate Law
             rate_law = "-"
             if hasattr(transition, 'metadata') and transition.metadata:
-                rate_law = transition.metadata.get('kinetic_law',
-                           transition.metadata.get('kinetics_rule', '-'))
+                rate_law = transition.metadata.get('kinetic_formula',
+                           transition.metadata.get('kinetic_law',
+                           transition.metadata.get('kinetics_rule', '-')))
             
-            # Parameters (formatted string)
-            parameters = "-"
+            # Extract individual kinetic parameters
+            km = 0.0
+            km_source = "unknown"
+            kcat = 0.0
+            kcat_source = "unknown"
+            vmax = 0.0
+            vmax_source = "unknown"
+            ki = 0.0
+            ki_source = "unknown"
+            
             if hasattr(transition, 'metadata') and transition.metadata:
-                params = transition.metadata.get('kinetics_parameters', {})
+                # First check if parameters are directly in metadata (BRENDA enrichment)
+                if 'km' in transition.metadata:
+                    km = float(transition.metadata['km'])
+                    km_source = transition.metadata.get('km_source', 
+                               transition.metadata.get('data_source', 'unknown'))
+                    print(f"[REPORT] Transition {trans_id}: Found km={km}, source={km_source}")
+                
+                if 'kcat' in transition.metadata:
+                    kcat = float(transition.metadata['kcat'])
+                    kcat_source = transition.metadata.get('kcat_source',
+                                 transition.metadata.get('data_source', 'unknown'))
+                    print(f"[REPORT] Transition {trans_id}: Found kcat={kcat}, source={kcat_source}")
+                
+                if 'vmax' in transition.metadata:
+                    vmax = float(transition.metadata['vmax'])
+                    vmax_source = transition.metadata.get('vmax_source',
+                                 transition.metadata.get('data_source', 'unknown'))
+                    print(f"[REPORT] Transition {trans_id}: Found vmax={vmax}, source={vmax_source}")
+                
+                if 'ki' in transition.metadata:
+                    ki = float(transition.metadata['ki'])
+                    ki_source = transition.metadata.get('ki_source',
+                               transition.metadata.get('data_source', 'unknown'))
+                    print(f"[REPORT] Transition {trans_id}: Found ki={ki}, source={ki_source}")
+                
+                # Also check kinetic_parameters dict (SBML/KEGG import)
+                params = transition.metadata.get('kinetic_parameters', {})
                 if params and isinstance(params, dict):
-                    params_list = []
-                    for k, v in params.items():
-                        if isinstance(v, float):
-                            params_list.append(f"{k}={v:.4g}")
-                        else:
-                            params_list.append(f"{k}={v}")
-                    parameters = ", ".join(params_list)
+                    # Try different parameter name variations
+                    if km == 0.0:
+                        km_val = params.get('Km', params.get('km', params.get('KM', 0.0)))
+                        if km_val:
+                            km = float(km_val)
+                            km_source = transition.metadata.get('data_source', 'kegg_import')
+                            print(f"[REPORT] Transition {trans_id}: Extracted km={km} from kinetic_parameters, source={km_source}")
+                    
+                    if kcat == 0.0:
+                        kcat_val = params.get('Kcat', params.get('kcat', params.get('k_cat', 0.0)))
+                        if kcat_val:
+                            kcat = float(kcat_val)
+                            kcat_source = transition.metadata.get('data_source', 'kegg_import')
+                            print(f"[REPORT] Transition {trans_id}: Extracted kcat={kcat} from kinetic_parameters, source={kcat_source}")
+                    
+                    if vmax == 0.0:
+                        vmax_val = params.get('Vmax', params.get('vmax', params.get('V_max', 0.0)))
+                        if vmax_val:
+                            vmax = float(vmax_val)
+                            vmax_source = transition.metadata.get('data_source', 'kegg_import')
+                            print(f"[REPORT] Transition {trans_id}: Extracted vmax={vmax} from kinetic_parameters, source={vmax_source}")
+                    
+                    if ki == 0.0:
+                        ki_val = params.get('Ki', params.get('ki', params.get('KI', 0.0)))
+                        if ki_val:
+                            ki = float(ki_val)
+                            ki_source = transition.metadata.get('data_source', 'kegg_import')
+                            print(f"[REPORT] Transition {trans_id}: Extracted ki={ki} from kinetic_parameters, source={ki_source}")
+                
+                # Also check estimated_parameters dict (KEGG heuristic estimator)
+                estimated_params = transition.metadata.get('estimated_parameters', {})
+                if estimated_params and isinstance(estimated_params, dict):
+                    if km == 0.0:
+                        km_val = estimated_params.get('km', 0.0)
+                        if km_val:
+                            km = float(km_val)
+                            km_source = 'kegg_heuristic'  # Mark as heuristic, not real data
+                            print(f"[REPORT] Transition {trans_id}: Extracted km={km} from estimated_parameters (heuristic), source={km_source}")
+                    
+                    if vmax == 0.0:
+                        vmax_val = estimated_params.get('vmax', 0.0)
+                        if vmax_val:
+                            vmax = float(vmax_val)
+                            vmax_source = 'kegg_heuristic'  # Mark as heuristic, not real data
+                            print(f"[REPORT] Transition {trans_id}: Extracted vmax={vmax} from estimated_parameters (heuristic), source={vmax_source}")
             
             # Reversible
             reversible = "Unknown"
@@ -661,17 +762,32 @@ class ModelsCategory(BaseReportCategory):
                 if rev_val is not None:
                     reversible = "Yes" if rev_val else "No"
             
+            # Debug output for transitions with kinetic parameters
+            if km > 0.0 or kcat > 0.0 or vmax > 0.0 or ki > 0.0:
+                print(f"[TABLE_DEBUG] Adding transition {trans_id}:")
+                print(f"  Km={km}, source='{km_source}'")
+                print(f"  Kcat={kcat}, source='{kcat_source}'")
+                print(f"  Vmax={vmax}, source='{vmax_source}'")
+                print(f"  Ki={ki}, source='{ki_source}'")
+            
             # Add row to table
             self.reactions_store.append([
-                i,               # index
-                trans_id,        # Petri Net ID
-                name,            # Biological Name
-                trans_type,      # Type
-                reaction_id,     # Reaction ID (KEGG/SBML/etc)
-                ec_number,       # EC Number
-                rate_law,        # Rate Law
-                parameters,      # Parameters
-                reversible       # Reversible
+                i,               # 0: index
+                trans_id,        # 1: Petri Net ID
+                name,            # 2: Biological Name
+                trans_type,      # 3: Type
+                reaction_id,     # 4: Reaction ID (KEGG/SBML/etc)
+                ec_number,       # 5: EC Number
+                rate_law,        # 6: Rate Law
+                km,              # 7: Km value
+                km_source,       # 8: Km source
+                kcat,            # 9: Kcat value
+                kcat_source,     # 10: Kcat source
+                vmax,            # 11: Vmax value
+                vmax_source,     # 12: Vmax source
+                ki,              # 13: Ki value
+                ki_source,       # 14: Ki source
+                reversible       # 15: Reversible
             ])
     
     def _build_species_list(self, model):

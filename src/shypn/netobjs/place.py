@@ -216,6 +216,11 @@ class Place(PetriNetObject):
             "border_width": self.border_width,
             "is_catalyst": getattr(self, 'is_catalyst', False)  # Save catalyst flag
         })
+        
+        # Serialize metadata (KEGG IDs, ChEBI IDs, data sources, etc.)
+        if hasattr(self, 'metadata') and self.metadata:
+            data["metadata"] = self.metadata
+        
         return data
     
     @classmethod
@@ -258,5 +263,9 @@ class Place(PetriNetObject):
             place.border_color = tuple(data["border_color"])
         if "border_width" in data:
             place.border_width = data["border_width"]
+        
+        # Restore metadata (KEGG IDs, ChEBI IDs, data sources, etc.)
+        if "metadata" in data:
+            place.metadata = data["metadata"]
         
         return place
