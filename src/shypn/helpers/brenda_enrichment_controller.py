@@ -97,6 +97,13 @@ class BRENDAEnrichmentController:
         
         print(f"[BRENDA_SCAN] Scanning model: {self.model_canvas.get_display_name() if hasattr(self.model_canvas, 'get_display_name') else 'Unknown'}")
         print(f"[BRENDA_SCAN] Model ID: {id(self.model_canvas)}")
+        print(f"[BRENDA_SCAN] Model type: {type(self.model_canvas)}")
+        print(f"[BRENDA_SCAN] Has 'transitions' attr: {hasattr(self.model_canvas, 'transitions')}")
+        if hasattr(self.model_canvas, 'transitions'):
+            print(f"[BRENDA_SCAN] Transitions type: {type(self.model_canvas.transitions)}")
+        
+        # Debug: list all attributes
+        print(f"[BRENDA_SCAN] Model attributes: {[a for a in dir(self.model_canvas) if not a.startswith('_')][:20]}")
         
         transitions = []
         
