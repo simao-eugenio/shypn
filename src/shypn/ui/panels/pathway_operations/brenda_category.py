@@ -772,15 +772,17 @@ class BRENDACategory(BasePathwayCategory):
             ec_numbers_seen.add(ec_number)
             
             try:
-                self.logger.info(f"Querying BRENDA for EC {ec_number}...")
+                self.logger.info(f"[QUERY_BRENDA] Querying BRENDA for EC {ec_number}...")
                 
                 # Get Km values from BRENDA
                 km_data = self.brenda_api.get_km_values(ec_number, organism=None)
                 
+                self.logger.info(f"[QUERY_BRENDA] EC {ec_number} returned {len(km_data) if km_data else 0} Km values")
+                
                 if km_data:
                     # Add result for each Km value found
                     for km in km_data:
-                        results.append({
+                        result_entry = {
                             'transition_id': trans.get('id'),
                             'transition_name': trans.get('name', 'Unknown'),
                             'ec_number': ec_number,
@@ -790,27 +792,41 @@ class BRENDACategory(BasePathwayCategory):
                             'substrate': km.get('substrate', 'Unknown'),
                             'organism': km.get('organism', 'Unknown'),
                             'literature': km.get('literature', '')
-                        })
+                        }
+                        self.logger.info(f"[QUERY_BRENDA] Adding result: {result_entry['transition_name']} Km={result_entry['value']} {result_entry['unit']}")
+                        results.append(result_entry)
+                else:
+                    self.logger.warning(f"[QUERY_BRENDA] No Km data found for EC {ec_number}")
                 
             except Exception as e:
-                self.logger.error(f"Error querying EC {ec_number}: {e}")
+                self.logger.error(f"[QUERY_BRENDA] Error querying EC {ec_number}: {e}")
+                import traceback
+                traceback.print_exc()
                 continue
         
+        self.logger.info(f"[QUERY_BRENDA] Total results collected: {len(results)}")
         return {'results': results, 'transitions_queried': len(ec_numbers_seen)}
     
     def _on_query_all_complete(self, result: Dict[str, Any]):
         """Callback when query all completes successfully."""
+        self.logger.info(f"[QUERY_ALL_COMPLETE] Callback triggered with result: {result}")
+        
         self.query_all_button.set_sensitive(True)
         self.search_button.set_sensitive(True)
         
         results = result.get('results', [])
         transitions_queried = result.get('transitions_queried', 0)
         
+        self.logger.info(f"[QUERY_ALL_COMPLETE] Results count: {len(results)}")
+        self.logger.info(f"[QUERY_ALL_COMPLETE] Transitions queried: {transitions_queried}")
+        
         if not results:
+            self.logger.warning(f"[QUERY_ALL_COMPLETE] No results found!")
             self._show_status(f"No BRENDA data found for {transitions_queried} transitions", error=True)
             return
         
         # Clear existing results
+        self.logger.info(f"[QUERY_ALL_COMPLETE] Clearing {len(self.results_box.get_children())} existing result rows")
         for child in self.results_box.get_children():
             self.results_box.remove(child)
         
@@ -818,10 +834,13 @@ class BRENDACategory(BasePathwayCategory):
         self.results_count_label.set_text(f"Found {len(results)} results")
         
         # Populate results table
-        for result_data in results:
+        self.logger.info(f"[QUERY_ALL_COMPLETE] Adding {len(results)} result rows to table")
+        for idx, result_data in enumerate(results):
+            self.logger.info(f"[QUERY_ALL_COMPLETE] Adding row {idx+1}: {result_data.get('transition_name')} - EC {result_data.get('ec_number')}")
             self._add_result_row(result_data)
         
         self.results_box.show_all()
+        self.logger.info(f"[QUERY_ALL_COMPLETE] Results table shown, total children: {len(self.results_box.get_children())}")
         self._show_status(f"Found {len(results)} BRENDA results from {transitions_queried} EC numbers", error=False)
     
     def _on_query_all_error(self, error: Exception):
