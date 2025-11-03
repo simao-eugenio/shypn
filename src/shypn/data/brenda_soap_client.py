@@ -203,8 +203,19 @@ class BRENDAAPIClient:
                 ''   # literature
             )
             
+            # Debug: Log raw response
+            self.logger.info(f"[BRENDA_RAW] EC {ec_number} raw response type: {type(result)}")
+            self.logger.info(f"[BRENDA_RAW] EC {ec_number} raw response length: {len(str(result)) if result else 0}")
+            if result:
+                result_str = str(result)[:500]  # First 500 chars
+                self.logger.info(f"[BRENDA_RAW] EC {ec_number} response preview: {result_str}")
+            else:
+                self.logger.warning(f"[BRENDA_RAW] EC {ec_number} returned None/empty response")
+            
             # Parse result
-            return self._parse_km_response(result)
+            parsed = self._parse_km_response(result)
+            self.logger.info(f"[BRENDA_PARSE] EC {ec_number} parsed {len(parsed)} Km records")
+            return parsed
             
         except SOAPFault as e:
             self.logger.error(f"BRENDA SOAP error querying Km: {e}")
