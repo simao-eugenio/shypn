@@ -235,6 +235,9 @@ class HeuristicParametersController:
             # Refresh canvas
             drawing_area.queue_draw()
             
+            # Store in database for future use
+            self._store_applied_parameters(transition_id, transition_type, parameters)
+            
             self.logger.info(f"Successfully applied parameters to {transition_id}")
             return True
             
@@ -246,13 +249,79 @@ class HeuristicParametersController:
         """Clear results cache."""
         self._results_cache.clear()
     
+    def _store_applied_parameters(self, 
+                                  transition_id: str,
+                                  transition_type: str,
+                                  parameters: Dict[str, Any]):
+        """Store applied parameters in database for future use.
+        
+        Args:
+            transition_id: Transition ID
+            transition_type: Type of transition
+            parameters: Full parameters dict
+        """
+        try:
+            params = parameters.get('parameters', {})
+            
+            # Only store if confidence is reasonable and source is not just heuristic
+            confidence = parameters.get('confidence_score', 0.0)
+            source = parameters.get('source', 'Heuristic')
+            
+            # Store parameter in database
+            param_id = self.inference_engine.db.store_parameter(
+                transition_type=transition_type,
+                organism=parameters.get('organism', 'Homo sapiens'),
+                parameters=params,
+                source=source,
+                confidence_score=confidence,
+                biological_semantics=parameters.get('biological_semantics'),
+                ec_number=parameters.get('ec_number'),
+                enzyme_name=parameters.get('enzyme_name'),
+                reaction_id=parameters.get('reaction_id'),
+                temperature=parameters.get('temperature'),
+                ph=parameters.get('ph'),
+                notes=parameters.get('notes')
+            )
+            
+            # Record enrichment
+            pathway_id = getattr(self.model_canvas_loader, 'current_pathway_id', None)
+            pathway_name = getattr(self.model_canvas_loader, 'current_pathway_name', None)
+            
+            self.inference_engine.db.record_enrichment(
+                parameter_id=param_id,
+                transition_id=transition_id,
+                pathway_id=pathway_id,
+                pathway_name=pathway_name,
+                reaction_id=parameters.get('reaction_id')
+            )
+            
+            self.logger.debug(f"Stored parameters for {transition_id} in database (ID: {param_id})")
+            
+        except Exception as e:
+            self.logger.warning(f"Failed to store parameters in database: {e}")
+    
     def get_statistics(self) -> Dict[str, Any]:
-        """Get inference engine statistics.
+        """Get inference engine and database statistics.
         
         Returns:
             Dictionary with statistics
         """
-        return {
-            'cache_size': len(self._results_cache),
-            'fetcher_stats': self.inference_engine.sabio_rk_fetcher.get_statistics()
+        stats = {
+            'cache_size': len(self._results_cache)
         }
+        
+        # Add database statistics
+        try:
+            db_stats = self.inference_engine.db.get_statistics()
+            stats['database'] = db_stats
+        except Exception as e:
+            self.logger.warning(f"Failed to get database statistics: {e}")
+        
+        # Add fetcher statistics if available
+        if self.inference_engine.sabio_rk_fetcher:
+            try:
+                stats['fetcher_stats'] = self.inference_engine.sabio_rk_fetcher.get_statistics()
+            except Exception as e:
+                self.logger.warning(f"Failed to get fetcher statistics: {e}")
+        
+        return stats
