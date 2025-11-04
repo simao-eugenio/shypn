@@ -537,6 +537,10 @@ class ModelCanvasLoader:
         # This ensures the canvas is fully initialized before receiving focus/events
         self._setup_canvas_manager(drawing, overlay_box, overlay, filename=filename)
         
+        # CRITICAL: Reset simulation to initial state after creating new document
+        # Ensures clean slate with no stale cached behaviors
+        self._ensure_simulation_reset(drawing)
+        
         # Switch to the newly created tab to give it focus (AFTER setup is complete)
         self.notebook.set_current_page(page_index)
         
@@ -819,6 +823,43 @@ class ModelCanvasLoader:
         
         # Trigger redraw to show canvas is ready for new content
         manager.mark_needs_redraw()
+    
+    def _ensure_simulation_reset(self, drawing_area):
+        """Ensure simulation is reset to initial state for a canvas.
+        
+        CRITICAL for consistent behavior across all flows:
+        This must be called after any operation that creates or modifies a model:
+        - File → New
+        - File → Open
+        - Double-click file in explorer
+        - KEGG import
+        - SBML import
+        - Parameter application (Heuristic/BRENDA/SABIO-RK)
+        
+        The reset ensures:
+        - Behavior cache is cleared (old behaviors don't persist)
+        - Places are set to initial marking (clean start)
+        - Simulation time is reset to 0.0
+        - Enablement states are recalculated
+        
+        See: CANVAS_STATE_ISSUES_COMPARISON.md for recurring pattern history
+        
+        Args:
+            drawing_area: GtkDrawingArea for the canvas to reset
+        """
+        if not drawing_area:
+            return
+        
+        try:
+            if drawing_area in self.simulation_controllers:
+                controller = self.simulation_controllers[drawing_area]
+                # Full reset: clear cache AND reset places to initial marking
+                controller.reset()
+                print(f"[RESET] Simulation reset for canvas: {drawing_area}")
+        except Exception as e:
+            print(f"[RESET] Error resetting simulation: {e}")
+            import traceback
+            traceback.print_exc()
         
 
     def _setup_edit_palettes(self, overlay_widget, canvas_manager, drawing_area, overlay_manager):

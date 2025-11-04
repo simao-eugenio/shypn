@@ -705,6 +705,11 @@ class KEGGCategory(BasePathwayCategory):
                     # Force redraw to display loaded objects
                     canvas_manager.mark_needs_redraw()
                     
+                    # CRITICAL: Ensure simulation is reset after loading objects
+                    # This guarantees clean initial state for the imported model
+                    if canvas_loader and hasattr(canvas_loader, '_ensure_simulation_reset'):
+                        canvas_loader._ensure_simulation_reset(drawing_area if not can_reuse_tab else canvas_loader.get_current_document())
+                    
                     self.logger.info(
                         f"Model auto-loaded: {len(document_model.places)} places, "
                         f"{len(document_model.transitions)} transitions, "
