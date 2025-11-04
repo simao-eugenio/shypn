@@ -18,6 +18,7 @@ from ..models.transition_types import (
     ContinuousParameters, InferenceResult
 )
 from ..fetchers.sabio_rk_kinetics_fetcher import SabioRKKineticsFetcher
+from ..database.heuristic_db import HeuristicDatabase
 
 
 class TransitionTypeDetector:
@@ -116,16 +117,20 @@ class HeuristicInferenceEngine:
     - BRENDA: Future, additional validation
     """
     
-    def __init__(self, use_background_fetch: bool = False):
+    def __init__(self, use_background_fetch: bool = False, db_path: Optional[str] = None):
         """Initialize inference engine.
         
         Args:
             use_background_fetch: If True, enhance with database queries in background
+            db_path: Optional path to database file (default: ~/.shypn/heuristic_parameters.db)
         """
         self.logger = logging.getLogger(self.__class__.__name__)
         
         # Configuration
         self.use_background_fetch = use_background_fetch
+        
+        # Initialize database
+        self.db = HeuristicDatabase(db_path)
         
         # Initialize fetchers (lazy - only if needed)
         self._sabio_rk_fetcher = None
@@ -133,7 +138,7 @@ class HeuristicInferenceEngine:
         # Type detector
         self.type_detector = TransitionTypeDetector()
         
-        # Local cache for database results
+        # Local cache for database results (in-memory cache for session)
         self._parameter_cache: Dict[Tuple[str, str], ContinuousParameters] = {}
     
     @property
@@ -145,12 +150,14 @@ class HeuristicInferenceEngine:
     
     def infer_parameters(self,
                         transition: Any,
-                        organism: str = "Homo sapiens") -> InferenceResult:
+                        organism: str = "Homo sapiens",
+                        use_cache: bool = True) -> InferenceResult:
         """Infer parameters for a transition.
         
         Args:
             transition: Transition object from model
             organism: Target organism
+            use_cache: If True, check database cache first
             
         Returns:
             InferenceResult with inferred parameters and alternatives
@@ -161,7 +168,30 @@ class HeuristicInferenceEngine:
         # Step 2: Infer biological semantics
         semantics = self.type_detector.infer_semantics(transition, transition_type)
         
-        # Step 3: Infer parameters based on type
+        # Step 3: Try database lookup first (if caching enabled)
+        if use_cache:
+            ec_number = getattr(transition, 'ec_number', None)
+            reaction_id = getattr(transition, 'reaction_id', None)
+            
+            db_params = self._query_database(
+                transition_type, ec_number, reaction_id, organism
+            )
+            
+            if db_params:
+                # Found in database - return immediately
+                result = InferenceResult(
+                    transition_id=getattr(transition, 'id', 'unknown'),
+                    parameters=db_params,
+                    alternatives=[],
+                    inference_metadata={
+                        'detected_type': transition_type.value,
+                        'inferred_semantics': semantics.value,
+                        'source': 'database_cache'
+                    }
+                )
+                return result
+        
+        # Step 4: Infer parameters based on type (heuristics fallback)
         if transition_type == TransitionType.IMMEDIATE:
             parameters = self._infer_immediate(transition, semantics, organism)
         elif transition_type == TransitionType.TIMED:
@@ -190,6 +220,178 @@ class HeuristicInferenceEngine:
         )
         
         return result
+    
+    def _query_database(self,
+                       transition_type: TransitionType,
+                       ec_number: Optional[str],
+                       reaction_id: Optional[str],
+                       organism: str) -> Optional[TransitionParameters]:
+        """Query database for cached parameters.
+        
+        Args:
+            transition_type: Type of transition
+            ec_number: Optional EC number
+            reaction_id: Optional reaction ID
+            organism: Target organism
+        
+        Returns:
+            Cached parameters if found, None otherwise
+        """
+        # Generate query key for cache lookup
+        type_str = transition_type.value if transition_type != TransitionType.UNKNOWN else None
+        if not type_str:
+            return None
+        
+        # Try exact match first
+        if ec_number:
+            query_key = f"{type_str}|EC:{ec_number}|{organism}"
+        elif reaction_id:
+            query_key = f"{type_str}|R:{reaction_id}|{organism}"
+        else:
+            return None
+        
+        # Check query cache
+        cached = self.db.get_cached_query(query_key)
+        if cached:
+            # Get full parameter details
+            param = self.db.get_parameter(cached['recommended_parameter_id'])
+            if param:
+                self.logger.info(f"Database cache hit: {query_key}")
+                return self._dict_to_parameters(param, transition_type)
+        
+        # Try direct parameter query
+        results = self.db.query_parameters(
+            transition_type=type_str,
+            ec_number=ec_number,
+            reaction_id=reaction_id,
+            organism=organism,
+            min_confidence=0.5,
+            limit=1
+        )
+        
+        if results:
+            self.logger.info(f"Database parameter found: {ec_number or reaction_id}")
+            return self._dict_to_parameters(results[0], transition_type)
+        
+        # Try cross-species match
+        if organism != "generic":
+            results = self.db.query_parameters(
+                transition_type=type_str,
+                ec_number=ec_number,
+                reaction_id=reaction_id,
+                min_confidence=0.5,
+                limit=5
+            )
+            
+            if results:
+                # Get organism compatibility and adjust confidence
+                best_result = None
+                best_score = 0.0
+                
+                for result in results:
+                    compat_score = self.db.get_compatibility_score(
+                        result['organism'],
+                        organism,
+                        ec_number.split('.')[0:2] if ec_number else None
+                    )
+                    
+                    adjusted_confidence = result['confidence_score'] * compat_score
+                    if adjusted_confidence > best_score:
+                        best_score = adjusted_confidence
+                        best_result = result
+                
+                if best_result and best_score >= 0.5:
+                    self.logger.info(f"Database cross-species match: {best_result['organism']} → {organism}")
+                    params = self._dict_to_parameters(best_result, transition_type)
+                    # Adjust confidence for cross-species
+                    params.confidence_score = best_score
+                    params.notes = f"Cross-species: {best_result['organism']} → {organism}"
+                    return params
+        
+        return None
+    
+    def _dict_to_parameters(self, 
+                           param_dict: Dict[str, Any],
+                           transition_type: TransitionType) -> TransitionParameters:
+        """Convert database dict to TransitionParameters object.
+        
+        Args:
+            param_dict: Database row as dict
+            transition_type: Type of transition
+        
+        Returns:
+            Appropriate TransitionParameters subclass
+        """
+        params = param_dict['parameters']  # JSON dict
+        
+        if transition_type == TransitionType.IMMEDIATE:
+            return ImmediateParameters(
+                biological_semantics=BiologicalSemantics(param_dict.get('biological_semantics', 'burst')),
+                priority=params.get('priority', 50),
+                weight=params.get('weight', 1.0),
+                ec_number=param_dict.get('ec_number'),
+                reaction_id=param_dict.get('reaction_id'),
+                organism=param_dict['organism'],
+                confidence_score=param_dict['confidence_score'],
+                source=param_dict['source'],
+                notes=param_dict.get('notes')
+            )
+        
+        elif transition_type == TransitionType.TIMED:
+            return TimedParameters(
+                biological_semantics=BiologicalSemantics(param_dict.get('biological_semantics', 'deterministic')),
+                delay=params.get('delay', 5.0),
+                time_unit=params.get('time_unit', 'minutes'),
+                ec_number=param_dict.get('ec_number'),
+                reaction_id=param_dict.get('reaction_id'),
+                organism=param_dict['organism'],
+                confidence_score=param_dict['confidence_score'],
+                source=param_dict['source'],
+                notes=param_dict.get('notes')
+            )
+        
+        elif transition_type == TransitionType.STOCHASTIC:
+            return StochasticParameters(
+                biological_semantics=BiologicalSemantics(param_dict.get('biological_semantics', 'mass_action')),
+                lambda_param=params.get('lambda', 0.05),
+                k_forward=params.get('k_forward'),
+                k_reverse=params.get('k_reverse'),
+                ec_number=param_dict.get('ec_number'),
+                reaction_id=param_dict.get('reaction_id'),
+                enzyme_name=param_dict.get('enzyme_name'),
+                organism=param_dict['organism'],
+                temperature=param_dict.get('temperature'),
+                ph=param_dict.get('ph'),
+                confidence_score=param_dict['confidence_score'],
+                source=param_dict['source'],
+                notes=param_dict.get('notes')
+            )
+        
+        elif transition_type == TransitionType.CONTINUOUS:
+            return ContinuousParameters(
+                biological_semantics=BiologicalSemantics(param_dict.get('biological_semantics', 'enzyme_kinetics')),
+                vmax=params.get('vmax', 100.0),
+                km=params.get('km', 0.1),
+                kcat=params.get('kcat'),
+                ki=params.get('ki'),
+                hill_coefficient=params.get('hill_coefficient'),
+                ec_number=param_dict.get('ec_number'),
+                reaction_id=param_dict.get('reaction_id'),
+                enzyme_name=param_dict.get('enzyme_name'),
+                organism=param_dict['organism'],
+                temperature=param_dict.get('temperature'),
+                ph=param_dict.get('ph'),
+                confidence_score=param_dict['confidence_score'],
+                source=param_dict['source'],
+                notes=param_dict.get('notes')
+            )
+        
+        # Fallback
+        return TransitionParameters(
+            transition_type=transition_type,
+            biological_semantics=BiologicalSemantics.UNKNOWN,
+            organism=param_dict['organism']
+        )
     
     def _infer_immediate(self,
                         transition: Any,
