@@ -199,76 +199,6 @@ class BRENDACategory(BasePathwayCategory):
         frame.add(box)
         return frame
     
-    def _build_quick_enrich_section(self) -> Gtk.Widget:
-        """Build quick canvas enrichment section for batch processing.
-        
-        This section provides one-click enrichment of all continuous transitions
-        on the canvas using their EC numbers. Faster than manual query workflow.
-        """
-        frame = Gtk.Frame()
-        frame.set_label("Quick Canvas Enrichment")
-        
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        box.set_margin_start(10)
-        box.set_margin_end(10)
-        box.set_margin_top(10)
-        box.set_margin_bottom(10)
-        
-        # Info label
-        info_label = Gtk.Label()
-        info_label.set_markup(
-            '<i>Auto-enrich all continuous transitions from canvas using their EC numbers. '
-            'Faster than manual query for batch processing.</i>'
-        )
-        info_label.set_line_wrap(True)
-        info_label.set_xalign(0.0)
-        box.pack_start(info_label, False, False, 0)
-        
-        # Enrich button
-        button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        
-        self.quick_enrich_button = Gtk.Button(label="🧬 Enrich All Continuous")
-        self.quick_enrich_button.get_style_context().add_class('suggested-action')
-        self.quick_enrich_button.set_sensitive(False)  # Requires authentication
-        self.quick_enrich_button.set_tooltip_text(
-            "Query BRENDA for all continuous transitions with EC numbers\n"
-            "and apply kinetic parameters automatically"
-        )
-        self.quick_enrich_button.connect('clicked', self._on_quick_enrich_clicked)
-        button_box.pack_start(self.quick_enrich_button, False, False, 0)
-        
-        box.pack_start(button_box, False, False, 0)
-        
-        # Override settings
-        override_label = Gtk.Label()
-        override_label.set_markup("<b>Override Settings:</b>")
-        override_label.set_xalign(0.0)
-        override_label.set_margin_top(6)
-        box.pack_start(override_label, False, False, 0)
-        
-        # Override KEGG checkbox (default ON)
-        self.override_kegg_checkbox = Gtk.CheckButton()
-        self.override_kegg_checkbox.set_label("Override KEGG Heuristics")
-        self.override_kegg_checkbox.set_active(True)  # Default ON
-        self.override_kegg_checkbox.set_tooltip_text(
-            "Always replace KEGG placeholder values (vmax=10.0, km=0.5) with BRENDA data.\n"
-            "RECOMMENDED: KEGG provides no kinetics, only Shypn heuristics."
-        )
-        box.pack_start(self.override_kegg_checkbox, False, False, 0)
-        
-        # Override SBML checkbox (default OFF)
-        self.override_sbml_checkbox = Gtk.CheckButton()
-        self.override_sbml_checkbox.set_label("Override SBML Curated Data")
-        self.override_sbml_checkbox.set_active(False)  # Default OFF
-        self.override_sbml_checkbox.set_tooltip_text(
-            "Replace curated SBML kinetic parameters with BRENDA data.\n"
-            "⚠️ CAUTION: SBML models may contain validated experimental kinetics."
-        )
-        box.pack_start(self.override_sbml_checkbox, False, False, 0)
-        
-        frame.add(box)
-        return frame
-    
     def _build_query_section(self) -> Gtk.Widget:
         """Build query section with reaction name/EC number."""
         frame = Gtk.Frame()
@@ -284,13 +214,16 @@ class BRENDACategory(BasePathwayCategory):
         mode_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
         
         self.name_radio = Gtk.RadioButton.new_with_label_from_widget(None, "Reaction Name")
-        self.name_radio.set_active(True)
+        self.name_radio.set_active(False)
+        self.name_radio.set_sensitive(False)  # Disable until implemented
+        self.name_radio.set_tooltip_text("Name search not yet available. Use EC number.")
         self.name_radio.connect('toggled', self._on_search_mode_changed)
         mode_box.pack_start(self.name_radio, False, False, 0)
         
         self.ec_radio = Gtk.RadioButton.new_with_label_from_widget(
             self.name_radio, "EC Number"
         )
+        self.ec_radio.set_active(True)  # Default to EC mode
         self.ec_radio.connect('toggled', self._on_search_mode_changed)
         mode_box.pack_start(self.ec_radio, False, False, 0)
         
@@ -306,6 +239,7 @@ class BRENDACategory(BasePathwayCategory):
         self.reaction_name_entry = Gtk.Entry()
         self.reaction_name_entry.set_placeholder_text("e.g., Alcohol dehydrogenase")
         self.reaction_name_entry.set_hexpand(True)
+        self.reaction_name_entry.set_sensitive(False)  # Disabled by default
         name_box.pack_start(self.reaction_name_entry, True, True, 0)
         
         box.pack_start(name_box, False, False, 0)
@@ -320,7 +254,7 @@ class BRENDACategory(BasePathwayCategory):
         self.ec_entry = Gtk.Entry()
         self.ec_entry.set_placeholder_text("e.g., 1.1.1.1")
         self.ec_entry.set_hexpand(True)
-        self.ec_entry.set_sensitive(False)
+        self.ec_entry.set_sensitive(True)  # Enabled by default
         ec_box.pack_start(self.ec_entry, True, True, 0)
         
         box.pack_start(ec_box, False, False, 0)
@@ -591,66 +525,79 @@ class BRENDACategory(BasePathwayCategory):
         )
     
     def _search_brenda(self, search_term: str, search_type: str, organism: str = ""):
-        """Background task to search BRENDA database."""
-        # TODO: Implement actual BRENDA API search
-        # For now, return mock data
-        import time
-        time.sleep(1)
+        """Background task to search BRENDA database via SOAP API."""
+        if not self.brenda_api:
+            raise RuntimeError("BRENDA API client not available")
         
-        # Mock BRENDA results
-        if search_type == 'ec':
-            ec_number = search_term
-            name = "Alcohol dehydrogenase"
-        else:
-            ec_number = "1.1.1.1"
-            name = search_term
+        # For name search, we would need EC number lookup first
+        # BRENDA API works primarily with EC numbers
+        if search_type == 'name':
+            # TODO: Implement enzyme name -> EC number lookup
+            # For now, raise error to guide user to use EC number
+            raise ValueError("Name search not yet implemented. Please use EC number search.")
+        
+        # Query BRENDA API with EC number
+        ec_number = search_term
+        
+        # Get Km values
+        km_results = self.brenda_api.get_km_values(ec_number, organism)
+        
+        # Get kcat values
+        kcat_results = self.brenda_api.get_kcat_values(ec_number, organism)
+        
+        # Get Ki values
+        ki_results = self.brenda_api.get_ki_values(ec_number, organism)
+        
+        # Format results for UI display
+        parameters = []
+        
+        # Add Km values
+        for i, km_record in enumerate(km_results):
+            param_id = f"km_{i}"
+            parameters.append({
+                'id': param_id,
+                'type': 'Km',
+                'value': km_record.get('value'),
+                'unit': km_record.get('unit', 'mM'),
+                'substrate': km_record.get('substrate', 'unknown'),
+                'citation': km_record.get('literature', 'N/A'),
+                'organism': km_record.get('organism', organism),
+                'confidence': 'experimental'
+            })
+        
+        # Add kcat values
+        for i, kcat_record in enumerate(kcat_results):
+            param_id = f"kcat_{i}"
+            parameters.append({
+                'id': param_id,
+                'type': 'kcat',
+                'value': kcat_record.get('value'),
+                'unit': kcat_record.get('unit', 's⁻¹'),
+                'substrate': kcat_record.get('substrate', None),
+                'citation': kcat_record.get('literature', 'N/A'),
+                'organism': kcat_record.get('organism', organism),
+                'confidence': 'experimental'
+            })
+        
+        # Add Ki values
+        for i, ki_record in enumerate(ki_results):
+            param_id = f"ki_{i}"
+            parameters.append({
+                'id': param_id,
+                'type': 'Ki',
+                'value': ki_record.get('value'),
+                'unit': ki_record.get('unit', 'mM'),
+                'substrate': ki_record.get('inhibitor', 'unknown'),
+                'citation': ki_record.get('literature', 'N/A'),
+                'organism': ki_record.get('organism', organism),
+                'confidence': 'experimental'
+            })
         
         return {
             'ec_number': ec_number,
-            'name': name,
-            'organism': organism if organism else "Saccharomyces cerevisiae",
-            'parameters': [
-                {
-                    'id': 'km_ethanol',
-                    'type': 'Km',
-                    'value': 0.5,
-                    'unit': 'mM',
-                    'substrate': 'Ethanol',
-                    'citation': 'PMID:12345678',
-                    'confidence': 'high'
-                },
-                {
-                    'id': 'vmax',
-                    'type': 'Vmax',
-                    'value': 10.0,
-                    'unit': 'μmol/min/mg',
-                    'substrate': None,
-                    'citation': 'PMID:12345678',
-                    'confidence': 'high'
-                },
-                {
-                    'id': 'kcat',
-                    'type': 'kcat',
-                    'value': 50.0,
-                    'unit': 's⁻¹',
-                    'substrate': None,
-                    'citation': 'PMID:87654321',
-                    'confidence': 'medium'
-                },
-                {
-                    'id': 'ki_nad',
-                    'type': 'Ki',
-                    'value': 0.1,
-                    'unit': 'mM',
-                    'substrate': 'NAD+',
-                    'citation': 'PMID:11111111',
-                    'confidence': 'low'
-                }
-            ],
-            'conditions': {
-                'temperature': {'value': 30, 'unit': '°C'},
-                'ph': {'value': 7.0}
-            }
+            'name': f"EC {ec_number}",  # BRENDA doesn't return enzyme name in kinetics queries
+            'organism': organism if organism else "All organisms",
+            'parameters': parameters
         }
     
     def _on_search_complete(self, results):
@@ -672,7 +619,28 @@ class BRENDACategory(BasePathwayCategory):
     def _on_search_error(self, error):
         """Callback when BRENDA search fails."""
         self.search_button.set_sensitive(True)
-        self._show_status(f"Search failed: {error}", error=True)
+        
+        error_str = str(error)
+        
+        # Check if it's a "not implemented" error
+        if "not yet implemented" in error_str.lower():
+            self._show_status(f"Search error: {error}", error=True)
+        else:
+            # Show detailed help for BRENDA API issues
+            error_message = (
+                f"BRENDA query failed:\n\n{error}\n\n"
+                "Common causes:\n\n"
+                "1. Your BRENDA account lacks SOAP API data access\n"
+                "   (Free accounts may only authenticate, not retrieve data)\n\n"
+                "2. BRENDA database has no data for this EC number\n\n"
+                "3. Network connectivity issues\n\n"
+                "Solution:\n"
+                "• Contact BRENDA support (info@brenda-enzymes.org)\n"
+                "• Try a different EC number (e.g., 2.7.1.1 for hexokinase)\n"
+                "• Check your internet connection"
+            )
+            self._show_error_dialog("BRENDA Query Failed", error_message)
+            self._show_status(f"Search failed: {error}", error=True)
     
     # ========================================================================
     # Results Selection
@@ -822,6 +790,21 @@ class BRENDACategory(BasePathwayCategory):
         
         if not results:
             self.logger.warning(f"[QUERY_ALL_COMPLETE] No results found!")
+            
+            # Show helpful error dialog explaining the issue
+            error_message = (
+                f"BRENDA returned no kinetic data for {transitions_queried} EC numbers.\n\n"
+                "This usually means:\n\n"
+                "1. Your BRENDA account has authentication-only access\n"
+                "   (Free academic accounts may not have SOAP API data retrieval)\n\n"
+                "2. BRENDA database doesn't have Km data for these enzymes\n\n"
+                "3. EC numbers are obsolete or invalid\n\n"
+                "Solution:\n"
+                "• Contact BRENDA support (info@brenda-enzymes.org) for full API access\n"
+                "• Use manual data entry or local BRENDA files instead\n"
+                "• Check BRENDA website directly for these EC numbers"
+            )
+            self._show_error_dialog("No BRENDA Data Retrieved", error_message)
             self._show_status(f"No BRENDA data found for {transitions_queried} transitions", error=True)
             return
         
@@ -831,16 +814,56 @@ class BRENDACategory(BasePathwayCategory):
             self.results_box.remove(child)
         
         # Update count label
-        self.results_count_label.set_text(f"Found {len(results)} results")
+        self.results_count_label.set_markup(f"<i>{len(results)} results</i>")
         
-        # Populate results table
+        # Build unified data structure matching manual search format
+        self.current_results = {
+            'ec_number': 'multiple',
+            'name': 'Canvas Transitions',
+            'organism': 'Various',
+            'parameters': []
+        }
+        
+        # Clear previous param tracking
+        self.selected_params = {}
+        
+        # Populate results table and build unified data structure
         self.logger.info(f"[QUERY_ALL_COMPLETE] Adding {len(results)} result rows to table")
         for idx, result_data in enumerate(results):
             self.logger.info(f"[QUERY_ALL_COMPLETE] Adding row {idx+1}: {result_data.get('transition_name')} - EC {result_data.get('ec_number')}")
-            self._add_result_row(result_data)
+            
+            param_id = f"batch_{idx}"
+            
+            # Add to unified parameters list (matches manual search structure)
+            self.current_results['parameters'].append({
+                'id': param_id,
+                'type': result_data.get('parameter_type', 'Km'),
+                'value': result_data.get('value'),
+                'unit': result_data.get('unit', 'mM'),
+                'substrate': result_data.get('substrate', 'Unknown'),
+                'organism': result_data.get('organism', 'Unknown'),
+                'citation': result_data.get('literature', 'N/A'),
+                'confidence': 'experimental',
+                'transition_id': result_data.get('transition_id'),  # CRITICAL for apply!
+                'transition_name': result_data.get('transition_name'),
+                'ec_number': result_data.get('ec_number')
+            })
+            
+            # Add visual row and track checkbox
+            checkbox = self._add_result_row(result_data)
+            if checkbox:
+                self.selected_params[param_id] = checkbox
         
         self.results_box.show_all()
         self.logger.info(f"[QUERY_ALL_COMPLETE] Results table shown, total children: {len(self.results_box.get_children())}")
+        
+        # Enable Mark All button
+        if len(results) > 0:
+            self.mark_all_button.set_sensitive(True)
+        
+        # Enable Apply button
+        self.apply_button.set_sensitive(True)
+        
         self._show_status(f"Found {len(results)} BRENDA results from {transitions_queried} EC numbers", error=False)
     
     def _on_query_all_error(self, error: Exception):
@@ -858,6 +881,9 @@ class BRENDACategory(BasePathwayCategory):
         Args:
             result_data: Dict with keys: transition_id, transition_name, ec_number,
                         parameter_type, value, unit, substrate, organism, literature
+        
+        Returns:
+            Gtk.CheckButton: The checkbox widget for tracking selection
         """
         # Create horizontal box for this result row
         row_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
@@ -885,44 +911,8 @@ class BRENDACategory(BasePathwayCategory):
         row_box.pack_start(label, True, True, 0)
         
         self.results_box.pack_start(row_box, False, False, 0)
-    
-    def _on_quick_enrich_complete(self, result: Dict[str, Any]):
-        """Callback when quick enrichment completes successfully."""
-        self.quick_enrich_button.set_sensitive(True)
         
-        if not result.get('success'):
-            error_msg = result.get('error', 'Unknown error')
-            self._show_status(f"Enrichment failed: {error_msg}", error=True)
-            return
-        
-        # Extract summary
-        scanned = result.get('transitions_scanned', 0)
-        enriched = result.get('transitions_enriched', 0)
-        skipped = scanned - enriched
-        
-        # Show completion dialog
-        message = (
-            f"Canvas enrichment complete!\n\n"
-            f"Transitions scanned: {scanned}\n"
-            f"Transitions enriched: {enriched}\n"
-            f"Transitions skipped: {skipped}\n\n"
-            f"Enriched transitions now have BRENDA kinetic data."
-        )
-        
-        self._show_info_dialog("BRENDA Enrichment Complete", message)
-        self._show_status(f"Enriched {enriched} transitions from BRENDA", error=False)
-        
-        # Trigger canvas redraw to update colors
-        if self.model_canvas and hasattr(self.model_canvas, 'queue_draw'):
-            GLib.idle_add(self.model_canvas.queue_draw)
-    
-    def _on_quick_enrich_error(self, error: Exception):
-        """Callback when quick enrichment fails."""
-        self.quick_enrich_button.set_sensitive(True)
-        error_msg = str(error)
-        self._show_status(f"Enrichment error: {error_msg}", error=True)
-        self._show_error_dialog("BRENDA Enrichment Error", 
-                               f"Failed to enrich canvas:\n\n{error_msg}")
+        return checkbox  # Return checkbox for tracking
     
     def _display_results(self, results):
         """Display BRENDA results in the results box."""
@@ -949,6 +939,14 @@ class BRENDACategory(BasePathwayCategory):
         for param in results['parameters']:
             param_box = self._create_parameter_checkbox(param)
             self.results_box.pack_start(param_box, False, False, 0)
+        
+        # Update results count
+        param_count = len(results.get('parameters', []))
+        self.results_count_label.set_markup(f"<i>{param_count} results</i>")
+        
+        # Enable Mark All button if we have results
+        if param_count > 0:
+            self.mark_all_button.set_sensitive(True)
         
         # Conditions section
         if results.get('conditions'):
@@ -1021,8 +1019,136 @@ class BRENDACategory(BasePathwayCategory):
             self._show_status("No parameters selected", error=True)
             return
         
-        # Show dialog to choose target transition
-        self._show_apply_dialog(selected)
+        # Check if this is batch mode (parameters have transition_id)
+        # Group by transition for batch application
+        transition_groups = {}
+        has_transition_ids = False
+        
+        for param in selected:
+            trans_id = param.get('transition_id')
+            if trans_id:
+                has_transition_ids = True
+                if trans_id not in transition_groups:
+                    transition_groups[trans_id] = {
+                        'name': param.get('transition_name', 'Unknown'),
+                        'ec_number': param.get('ec_number', 'Unknown'),
+                        'params': []
+                    }
+                transition_groups[trans_id]['params'].append(param)
+        
+        if has_transition_ids and transition_groups:
+            # Batch mode - apply directly to specific transitions
+            self._apply_batch_parameters(transition_groups)
+        else:
+            # Single transition mode - show dialog to choose target
+            self._show_apply_dialog(selected)
+    
+    def _apply_batch_parameters(self, transition_groups: Dict[str, Dict[str, Any]]):
+        """Apply parameters to multiple transitions in batch mode.
+        
+        Args:
+            transition_groups: Dict mapping transition_id to {name, ec_number, params}
+        """
+        if not self.brenda_controller:
+            self._show_status("BRENDA controller not available", error=True)
+            return
+        
+        # Get override settings
+        override_kegg = self.override_kegg_checkbox.get_active()
+        override_sbml = self.override_sbml_checkbox.get_active()
+        
+        self.logger.info(f"[BATCH_APPLY] Applying to {len(transition_groups)} transitions")
+        self.logger.info(f"[BATCH_APPLY] Override KEGG: {override_kegg}, Override SBML: {override_sbml}")
+        
+        try:
+            applied_count = 0
+            skipped_count = 0
+            
+            # Start enrichment session
+            self.brenda_controller.start_enrichment(
+                source="brenda_api",
+                query_params={'batch_mode': True, 'override_kegg': override_kegg, 'override_sbml': override_sbml}
+            )
+            
+            for trans_id, group_data in transition_groups.items():
+                params = group_data['params']
+                
+                self.logger.info(f"[BATCH_APPLY] Processing transition {trans_id} ({group_data['name']})")
+                self.logger.info(f"[BATCH_APPLY]   {len(params)} parameters to apply")
+                
+                # Find transition object from canvas
+                transition_obj = None
+                if self.model_canvas_manager and hasattr(self.model_canvas_manager, 'transitions'):
+                    for trans in self.model_canvas_manager.transitions:
+                        if str(trans.id) == str(trans_id):
+                            transition_obj = trans
+                            break
+                
+                if not transition_obj:
+                    self.logger.warning(f"[BATCH_APPLY] Transition {trans_id} not found on canvas, skipping")
+                    skipped_count += 1
+                    continue
+                
+                # Check if we should apply based on data source
+                data_source = transition_obj.metadata.get('data_source', 'unknown') if hasattr(transition_obj, 'metadata') and transition_obj.metadata else 'unknown'
+                has_kinetics = transition_obj.metadata.get('has_kinetics', False) if hasattr(transition_obj, 'metadata') and transition_obj.metadata else False
+                
+                should_apply = False
+                if not has_kinetics:
+                    should_apply = True
+                elif data_source == 'kegg_import' and override_kegg:
+                    should_apply = True
+                elif data_source == 'sbml_import' and override_sbml:
+                    should_apply = True
+                elif data_source not in ['kegg_import', 'sbml_import'] and override_kegg:
+                    # Unknown source, use KEGG override setting
+                    should_apply = True
+                
+                if not should_apply:
+                    self.logger.info(f"[BATCH_APPLY] Skipping {trans_id} (data_source={data_source}, has_kinetics={has_kinetics})")
+                    skipped_count += 1
+                    continue
+                
+                # Build parameters dict from all selected params for this transition
+                params_dict = {'_override_rate_function': True}
+                for param in params:
+                    param_type = param.get('type', 'Km').lower()
+                    param_value = param.get('value')
+                    if param_value is not None:
+                        params_dict[param_type] = param_value
+                
+                # Apply enrichment
+                self.brenda_controller.apply_enrichment_to_transition(
+                    trans_id,
+                    params_dict,
+                    transition_obj=transition_obj
+                )
+                
+                applied_count += 1
+                self.logger.info(f"[BATCH_APPLY] ✓ Applied to {trans_id}")
+            
+            # Finish enrichment session
+            self.brenda_controller.finish_enrichment()
+            
+            # CRITICAL: Reset simulation state after applying parameters
+            # This clears cached behaviors that might have old parameter values
+            # See: CANVAS_STATE_ISSUES_COMPARISON.md for historical context
+            if applied_count > 0:
+                self._reset_simulation_after_parameter_changes()
+            
+            # Show success message
+            message = f"Applied parameters to {applied_count} transition(s)"
+            if skipped_count > 0:
+                message += f" ({skipped_count} skipped)"
+            self._show_status(message, error=False)
+            
+            # Trigger canvas redraw
+            if self.model_canvas and hasattr(self.model_canvas, 'queue_draw'):
+                GLib.idle_add(self.model_canvas.queue_draw)
+            
+        except Exception as e:
+            self.logger.error(f"[BATCH_APPLY] Error: {e}", exc_info=True)
+            self._show_status(f"Batch apply failed: {str(e)}", error=True)
     
     def _show_apply_dialog(self, selected_params: List[Dict[str, Any]]):
         """Show dialog to choose target transition and apply parameters."""
@@ -1261,4 +1387,58 @@ class BRENDACategory(BasePathwayCategory):
                 "Please enter query manually.",
                 error=True
             )
+    
+    def _reset_simulation_after_parameter_changes(self):
+        """Reset simulation to initial state after applying parameter changes.
+        
+        CRITICAL for correct simulation behavior:
+        When parameters are applied to transitions via BRENDA enrichment,
+        the simulation controller's behavior cache contains old TransitionBehavior 
+        instances with old parameter values. If we don't reset the simulation, 
+        these cached behaviors continue to be used, causing transitions to fire 
+        incorrectly or not at all.
+        
+        This is the same root cause as:
+        - Behavior Cache Bug (commit 864ae92) - transitions not firing after reload
+        - Canvas Freeze Bug (commit df037a6) - canvas frozen after save/reload
+        - Comprehensive Reset (commit be02ff5) - stale state across model loads
+        
+        See: CANVAS_STATE_ISSUES_COMPARISON.md for detailed analysis.
+        
+        The fix: Call controller.reset() which clears behavior cache AND resets
+        place tokens to initial marking, ensuring a clean slate for testing the
+        new parameter values.
+        """
+        try:
+            # Get current document and canvas manager
+            if not self.canvas_loader:
+                self.logger.warning("No canvas loader available for simulation reset")
+                return
+            
+            drawing_area = self.canvas_loader.get_current_document()
+            if not drawing_area:
+                self.logger.warning("No active document for simulation reset")
+                return
+            
+            # Find simulation controller for this drawing area
+            if hasattr(self.canvas_loader, 'simulation_controllers'):
+                if drawing_area in self.canvas_loader.simulation_controllers:
+                    controller = self.canvas_loader.simulation_controllers[drawing_area]
+                    
+                    # Full reset: clears behavior cache AND resets places to initial marking
+                    # This ensures clean state for testing new parameter values
+                    controller.reset()
+                    
+                    self.logger.info("Simulation reset to initial state after BRENDA parameter changes")
+                    
+                    # Refresh canvas to show reset token values
+                    if drawing_area:
+                        drawing_area.queue_draw()
+                else:
+                    self.logger.debug("No simulation controller for current document")
+            else:
+                self.logger.warning("Canvas loader has no simulation_controllers attribute")
+                
+        except Exception as e:
+            self.logger.error(f"Error resetting simulation after parameter changes: {e}", exc_info=True)
 

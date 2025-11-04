@@ -925,6 +925,25 @@ def main(argv=None):
 					pass  # Ignore paned errors
 			# NOTE: DO NOT call master_palette.set_active() here - creates circular callbacks
 		
+		# Define float/attach callbacks for pathway panel
+		def on_pathway_float():
+			"""Collapse left paned when Pathways panel floats."""
+			if left_paned:
+				try:
+					left_paned.set_position(0)
+				except Exception:
+					pass  # Ignore paned errors
+			# NOTE: Do NOT call master_palette.set_active() here - creates circular callbacks
+		
+		def on_pathway_attach():
+			"""Expand left paned when Pathways panel attaches."""
+			if left_paned:
+				try:
+					left_paned.set_position(270)
+				except Exception:
+					pass  # Ignore paned errors
+			# NOTE: Do NOT call master_palette.set_active() here - creates circular callbacks
+		
 		# Define float/attach callbacks for topology panel
 		def on_topology_float():
 			"""Collapse left paned when Topology panel floats."""
@@ -949,6 +968,9 @@ def main(argv=None):
 		left_panel_loader.on_attach_callback = on_left_attach
 		right_panel_loader.on_float_callback = on_right_float
 		right_panel_loader.on_attach_callback = on_right_attach
+		if pathway_panel_loader:
+			pathway_panel_loader.on_float_callback = on_pathway_float
+			pathway_panel_loader.on_attach_callback = on_pathway_attach
 		if topology_panel_loader:
 			topology_panel_loader.on_float_callback = on_topology_float
 			topology_panel_loader.on_attach_callback = on_topology_attach
