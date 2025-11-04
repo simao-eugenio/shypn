@@ -1902,6 +1902,12 @@ class FileExplorerPanel:
                 self.persistency.set_filepath(filepath)
                 self.persistency.mark_clean()
             
+            # CRITICAL: Ensure simulation is reset after loading file
+            # This guarantees clean initial state for the loaded model
+            if hasattr(self.canvas_loader, '_ensure_simulation_reset'):
+                drawing_area = self.canvas_loader.get_current_document()
+                self.canvas_loader._ensure_simulation_reset(drawing_area)
+            
             # Force redraw to display loaded objects
             manager.mark_needs_redraw()
 
