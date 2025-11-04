@@ -142,6 +142,7 @@ class ContextMenuHandler:
         # Add BRENDA enrichment option for transitions
         if isinstance(obj, Transition) and self.pathway_operations_panel:
             self._add_brenda_enrichment_menu(menu, obj)
+            self._add_sabio_rk_enrichment_menu(menu, obj)
             
     
     def _add_transition_locality_submenu(self, menu, transition, panel):
@@ -294,6 +295,92 @@ class ContextMenuHandler:
             # This makes the pre-filled query visible to the user
             if hasattr(self.pathway_operations_panel, 'switch_to_category'):
                 self.pathway_operations_panel.switch_to_category('BRENDA')
+    
+    def _add_sabio_rk_enrichment_menu(self, menu, transition):
+        """Add SABIO-RK enrichment menu item for transitions.
+        
+        Extracts enzyme/reaction information from the transition metadata
+        and pre-fills the SABIO-RK query in the Pathway Operations panel.
+        
+        Args:
+            menu: Gtk.Menu instance to add menu item to
+            transition: Transition object
+        """
+        menu_item = Gtk.MenuItem(label="Enrich with SABIO-RK")
+        menu_item.connect("activate", lambda w: self._on_enrich_with_sabio_rk(transition))
+        menu_item.show()
+        menu.append(menu_item)
+    
+    def _on_enrich_with_sabio_rk(self, transition):
+        """Handle SABIO-RK enrichment request.
+        
+        Extracts transition data and pre-fills SABIO-RK query fields:
+        - EC number from metadata
+        - Reaction ID from metadata (KEGG reaction ID preferred over EC)
+        - Organism from metadata if available
+        
+        Args:
+            transition: Transition object to enrich
+        """
+        # Extract data from transition
+        ec_number = ""
+        reaction_id = ""
+        organism = ""
+        
+        # Check metadata for enzyme/reaction information
+        if hasattr(transition, 'metadata') and transition.metadata:
+            metadata = transition.metadata
+            
+            # Try to get reaction ID (KEGG reaction ID preferred for SABIO-RK)
+            if 'reaction_id' in metadata:
+                reaction_id = metadata['reaction_id']
+            elif 'kegg_reaction_id' in metadata:
+                reaction_id = metadata['kegg_reaction_id']
+            elif 'reaction' in metadata:
+                reaction_id = metadata['reaction']
+            
+            # Try to get EC number as fallback
+            if 'ec_number' in metadata:
+                ec_number = metadata['ec_number']
+            elif 'ec_numbers' in metadata and metadata['ec_numbers']:
+                # Take first EC number if list
+                ec_list = metadata['ec_numbers']
+                if isinstance(ec_list, list) and ec_list:
+                    ec_number = ec_list[0]
+                elif isinstance(ec_list, str):
+                    ec_number = ec_list
+            
+            # Try to get organism from metadata
+            if 'organism' in metadata:
+                organism = metadata['organism']
+            elif 'species' in metadata:
+                organism = metadata['species']
+        
+        # If EC number is empty but reaction_id looks like EC format, use it
+        if not ec_number and reaction_id:
+            # Check if reaction_id is EC format (e.g., "2.7.1.1")
+            import re
+            if re.match(r'^\d+\.\d+\.\d+\.\d+$', reaction_id):
+                ec_number = reaction_id
+                reaction_id = ""
+        
+        # Access SABIO-RK category in pathway operations panel
+        if hasattr(self.pathway_operations_panel, 'sabio_rk_category'):
+            sabio_rk_category = self.pathway_operations_panel.sabio_rk_category
+            
+            # Pre-fill the query fields
+            if hasattr(sabio_rk_category, 'set_query_from_transition'):
+                sabio_rk_category.set_query_from_transition(
+                    ec_number=ec_number,
+                    reaction_id=reaction_id,
+                    organism=organism,
+                    transition_id=transition.id
+                )
+            
+            # Switch to Pathway Operations panel and expand SABIO-RK category
+            # This makes the pre-filled query visible to the user
+            if hasattr(self.pathway_operations_panel, 'switch_to_category'):
+                self.pathway_operations_panel.switch_to_category('SABIO-RK')
     
     def _on_add_to_analysis_clicked(self, obj, panel):
         """Handle "Add to Analysis" menu item click.

@@ -283,6 +283,7 @@ class ModelsCategory(BaseReportCategory):
         Color scheme:
         - Green (#16a34a): Real data from KEGG/SBML database
         - Blue (#2563eb): BRENDA-enriched experimental data
+        - Purple (#9333ea): SABIO-RK-enriched kinetic data
         - Orange (#ea580c): User-edited values
         - Gray (#6b7280): KEGG heuristic estimates (placeholder values)
         - Light Gray (#9ca3af): Missing/unknown data
@@ -309,6 +310,11 @@ class ModelsCategory(BaseReportCategory):
         elif source == 'brenda_enriched':
             # BRENDA enriched - bright blue
             renderer.set_property('foreground', '#2563eb')
+            renderer.set_property('weight', 600)  # Semi-bold
+            renderer.set_property('style', 0)  # Normal style
+        elif source == 'sabio_rk_enriched':
+            # SABIO-RK enriched - bright purple
+            renderer.set_property('foreground', '#9333ea')
             renderer.set_property('weight', 600)  # Semi-bold
             renderer.set_property('style', 0)  # Normal style
         elif source == 'kegg_heuristic':

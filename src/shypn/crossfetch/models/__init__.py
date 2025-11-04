@@ -20,6 +20,17 @@ from .enrichment_request import (
     EnrichmentPriority
 )
 
+from .transition_types import (
+    TransitionType,
+    BiologicalSemantics,
+    TransitionParameters,
+    ImmediateParameters,
+    TimedParameters,
+    StochasticParameters,
+    ContinuousParameters,
+    InferenceResult
+)
+
 __all__ = [
     # Fetch result models
     "FetchResult",
@@ -31,4 +42,14 @@ __all__ = [
     "EnrichmentRequest",
     "DataType",
     "EnrichmentPriority",
+    
+    # Transition type models
+    "TransitionType",
+    "BiologicalSemantics",
+    "TransitionParameters",
+    "ImmediateParameters",
+    "TimedParameters",
+    "StochasticParameters",
+    "ContinuousParameters",
+    "InferenceResult",
 ]
