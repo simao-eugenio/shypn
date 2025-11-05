@@ -1973,10 +1973,9 @@ class ModelCanvasManager:
         document.arcs = list(self.arcs)
         
         
-        # Sync ID counters
-        document._next_place_id = self._next_place_id
-        document._next_transition_id = self._next_transition_id
-        document._next_arc_id = self._next_arc_id
+        # Sync ID counters from DocumentController's IDManager to DocumentModel's IDManager
+        place_id, trans_id, arc_id = self.document_controller.id_manager.get_state()
+        document.id_manager.set_state(place_id, trans_id, arc_id)
         
         # Sync view state (zoom, pan, and transformations including rotation)
         document.view_state = {

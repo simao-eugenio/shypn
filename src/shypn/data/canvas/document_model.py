@@ -28,10 +28,8 @@ class DocumentModel:
         self.transitions: List[Transition] = []
         self.arcs: List[Arc] = []
         
-        # Track next available IDs for objects
-        self._next_place_id = 1
-        self._next_transition_id = 1
-        self._next_arc_id = 1
+        # Centralized ID management
+        self.id_manager = IDManager()
         
         # View state (zoom and pan position)
         self.view_state = {
@@ -55,9 +53,8 @@ class DocumentModel:
         Returns:
             The created Place object
         """
-        place_id = f"P{self._next_place_id}"  # String ID with prefix
+        place_id = self.id_manager.generate_place_id()
         place_name = place_id  # Name matches ID
-        self._next_place_id += 1
         
         place = Place(x=x, y=y, id=place_id, name=place_name, label=label or place_name)
         self.places.append(place)
@@ -74,9 +71,8 @@ class DocumentModel:
         Returns:
             The created Transition object
         """
-        transition_id = f"T{self._next_transition_id}"  # String ID with prefix
+        transition_id = self.id_manager.generate_transition_id()
         transition_name = transition_id  # Name matches ID
-        self._next_transition_id += 1
         
         transition = Transition(x=x, y=y, id=transition_id, name=transition_name, label=label or transition_name)
         self.transitions.append(transition)
@@ -102,9 +98,8 @@ class DocumentModel:
             # Both same type → invalid
             return None
         
-        arc_id = f"A{self._next_arc_id}"  # String ID with prefix
+        arc_id = self.id_manager.generate_arc_id()
         arc_name = arc_id  # Name matches ID
-        self._next_arc_id += 1
         
         try:
             arc = Arc(source=source, target=target, id=arc_id, name=arc_name, weight=weight)
@@ -351,9 +346,7 @@ class DocumentModel:
         self.places.clear()
         self.transitions.clear()
         self.arcs.clear()
-        self._next_place_id = 1
-        self._next_transition_id = 1
-        self._next_arc_id = 1
+        self.id_manager.reset()
     
     # ============================================================================
     # Statistics
@@ -432,55 +425,28 @@ class DocumentModel:
         
         # Restore places first (they have no dependencies)
         places_dict = {}
-        max_place_id = 0
         for place_data in data.get("places", []):
             place = Place.from_dict(place_data)
             document.places.append(place)
             places_dict[place.id] = place  # Use string ID as dict key
-            # Track maximum numeric part of ID (e.g., "P101" → 101) to update counter
-            try:
-                # Extract numeric part from string ID (e.g., "P101" → 101, "101" → 101)
-                id_str = str(place.id).lstrip('P')  # Remove P prefix if present
-                place_id_int = int(id_str)
-                max_place_id = max(max_place_id, place_id_int)
-            except (ValueError, TypeError):
-                pass  # Skip non-parseable IDs
+            # Register ID to update counter
+            document.id_manager.register_place_id(place.id)
         
         # Restore transitions second (they have no dependencies)
         transitions_dict = {}
-        max_transition_id = 0
         for transition_data in data.get("transitions", []):
             transition = Transition.from_dict(transition_data)
             document.transitions.append(transition)
             transitions_dict[transition.id] = transition  # Use string ID as dict key
-            # Track maximum numeric part of ID (e.g., "T35" → 35, "35" → 35) to update counter
-            try:
-                # Extract numeric part from string ID (e.g., "T35" → 35, "35" → 35)
-                id_str = str(transition.id).lstrip('T')  # Remove T prefix if present
-                transition_id_int = int(id_str)
-                max_transition_id = max(max_transition_id, transition_id_int)
-            except (ValueError, TypeError):
-                pass  # Skip non-parseable IDs
+            # Register ID to update counter
+            document.id_manager.register_transition_id(transition.id)
         
         # Restore arcs last (they depend on places and transitions)
-        max_arc_id = 0
         for arc_data in data.get("arcs", []):
             arc = Arc.from_dict(arc_data, places=places_dict, transitions=transitions_dict)
             document.arcs.append(arc)
-            # Track maximum numeric part of ID (e.g., "A113" → 113, "113" → 113) to update counter
-            try:
-                # Extract numeric part from string ID (e.g., "A113" → 113, "113" → 113)
-                id_str = str(arc.id).lstrip('A')  # Remove A prefix if present
-                arc_id_int = int(id_str)
-                max_arc_id = max(max_arc_id, arc_id_int)
-            except (ValueError, TypeError):
-                pass  # Skip non-parseable IDs
-        
-        # Update ID counters to prevent duplicates when creating new objects
-        # Set to max_id + 1 so next created object gets a unique ID
-        document._next_place_id = max_place_id + 1
-        document._next_transition_id = max_transition_id + 1
-        document._next_arc_id = max_arc_id + 1
+            # Register ID to update counter
+            document.id_manager.register_arc_id(arc.id)
         
         # IMPORTANT: Reset all places to their initial marking
         # When loading a saved file, we want to start with the initial state,

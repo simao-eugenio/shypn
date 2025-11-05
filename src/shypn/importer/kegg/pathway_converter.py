@@ -92,8 +92,7 @@ class KEGGEnzymeConverter:
                 continue
             
             # Create test arc: enzyme_place → reaction_transition
-            arc_id = f"A{self.document._next_arc_id}"
-            self.document._next_arc_id += 1
+            arc_id = self.document.id_manager.generate_arc_id()
             
             test_arc = TestArc(
                 source=enzyme_place,
@@ -374,13 +373,13 @@ class StandardConversionStrategy(ConversionStrategy):
         if options.enhance_kinetics:
             self._enhance_transition_kinetics(document, reaction_transition_map, pathway)
         
-        # Update ID counters
-        if document.places:
-            document._next_place_id = len(document.places) + 1
-        if document.transitions:
-            document._next_transition_id = len(document.transitions) + 1
-        if document.arcs:
-            document._next_arc_id = len(document.arcs) + 1
+        # Register all IDs with the IDManager to ensure correct counter values
+        for place in document.places:
+            document.id_manager.register_place_id(place.id)
+        for transition in document.transitions:
+            document.id_manager.register_transition_id(transition.id)
+        for arc in document.arcs:
+            document.id_manager.register_arc_id(arc.id)
         
         # VALIDATION: Ensure bipartite property
         self._validate_bipartite_property(document, pathway)
