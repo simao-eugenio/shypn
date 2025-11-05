@@ -79,8 +79,8 @@ class DocumentController:
         Returns:
             Place: The newly created place instance.
         """
-        place_id = self._next_place_id
-        place_name = f"P{place_id}"
+        place_id = f"P{self._next_place_id}"  # String ID with prefix
+        place_name = place_id  # Name matches ID
         self._next_place_id += 1
         
         place = Place(x, y, place_id, place_name, **kwargs)
@@ -102,8 +102,8 @@ class DocumentController:
         Returns:
             Transition: The newly created transition instance.
         """
-        transition_id = self._next_transition_id
-        transition_name = f"T{transition_id}"
+        transition_id = f"T{self._next_transition_id}"  # String ID with prefix
+        transition_name = transition_id  # Name matches ID
         self._next_transition_id += 1
         
         transition = Transition(x, y, transition_id, transition_name, **kwargs)
@@ -125,8 +125,8 @@ class DocumentController:
         Returns:
             Arc: The newly created arc instance.
         """
-        arc_id = self._next_arc_id
-        arc_name = f"A{arc_id}"
+        arc_id = f"A{self._next_arc_id}"  # String ID with prefix
+        arc_name = arc_id  # Name matches ID
         self._next_arc_id += 1
         
         arc = Arc(source, target, arc_id, arc_name, **kwargs)
