@@ -228,10 +228,46 @@ class HeuristicParametersController:
                 if 'lambda' in params:
                     # Lambda is stored as rate
                     transition.rate = params['lambda']
-                if 'rate_function' in params:
-                    if not hasattr(transition, 'properties'):
-                        transition.properties = {}
+                
+                # Store parameters in properties dict
+                if not hasattr(transition, 'properties'):
+                    transition.properties = {}
+                
+                # Store k_forward if available
+                if 'k_forward' in params and params['k_forward'] is not None:
+                    transition.properties['k_forward'] = params['k_forward']
+                if 'k_reverse' in params and params['k_reverse'] is not None:
+                    transition.properties['k_reverse'] = params['k_reverse']
+                
+                # Build or use rate_function
+                if 'rate_function' in params and params['rate_function']:
                     transition.properties['rate_function'] = params['rate_function']
+                elif params.get('k_forward') or params.get('lambda'):
+                    # Auto-generate rate_function using actual substrate place names
+                    # Get substrate places from transition's input arcs
+                    substrate_places = []
+                    for arc in getattr(transition, 'input_arcs', []):
+                        if hasattr(arc, 'source'):
+                            substrate_places.append(arc.source)
+                    
+                    k = params.get('k_forward') or params.get('lambda')
+                    
+                    if len(substrate_places) >= 2:
+                        # Bimolecular: mass_action(A, B, k)
+                        sub1_name = substrate_places[0].name if hasattr(substrate_places[0], 'name') else f"P{substrate_places[0].id}"
+                        sub2_name = substrate_places[1].name if hasattr(substrate_places[1], 'name') else f"P{substrate_places[1].id}"
+                        rate_function = f"mass_action({sub1_name}, {sub2_name}, {k})"
+                        transition.properties['rate_function'] = rate_function
+                        self.logger.info(f"Generated bimolecular rate_function: {rate_function}")
+                    elif len(substrate_places) == 1:
+                        # Unimolecular: mass_action(A, 1.0, k)
+                        sub_name = substrate_places[0].name if hasattr(substrate_places[0], 'name') else f"P{substrate_places[0].id}"
+                        rate_function = f"mass_action({sub_name}, 1.0, {k})"
+                        transition.properties['rate_function'] = rate_function
+                        self.logger.info(f"Generated unimolecular rate_function: {rate_function}")
+                    else:
+                        self.logger.warning(f"No substrate places found for {transition_id}, using constant rate")
+                        # No rate_function needed, just use transition.rate
                     
             elif transition_type == 'continuous':
                 # Store parameters in properties dict
