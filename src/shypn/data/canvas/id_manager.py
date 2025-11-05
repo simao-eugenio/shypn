@@ -136,45 +136,6 @@ class IDManager:
         except (ValueError, TypeError) as e:
             raise ValueError(f"Cannot extract numeric ID from '{id_value}': {e}")
     
-    @staticmethod
-    def normalize_place_id(id_value: any) -> str:
-        """Normalize a place ID to standard format.
-        
-        Args:
-            id_value: ID in any format (str, int)
-            
-        Returns:
-            Normalized ID string (e.g., "P101")
-        """
-        numeric_id = IDManager.extract_numeric_id(id_value, 'P')
-        return f"P{numeric_id}"
-    
-    @staticmethod
-    def normalize_transition_id(id_value: any) -> str:
-        """Normalize a transition ID to standard format.
-        
-        Args:
-            id_value: ID in any format (str, int)
-            
-        Returns:
-            Normalized ID string (e.g., "T35")
-        """
-        numeric_id = IDManager.extract_numeric_id(id_value, 'T')
-        return f"T{numeric_id}"
-    
-    @staticmethod
-    def normalize_arc_id(id_value: any) -> str:
-        """Normalize an arc ID to standard format.
-        
-        Args:
-            id_value: ID in any format (str, int)
-            
-        Returns:
-            Normalized ID string (e.g., "A113")
-        """
-        numeric_id = IDManager.extract_numeric_id(id_value, 'A')
-        return f"A{numeric_id}"
-    
     def reset(self):
         """Reset all counters to 1."""
         self._next_place_id = 1

@@ -76,18 +76,17 @@ class Transition(PetriNetObject):
         # Kinetic metadata (optional, added by importers or enrichment)
         self.kinetic_metadata: Optional[KineticMetadata] = None
     
-    def render(self, cr, transform=None, zoom=1.0):
-        """Render the transition using Cairo.
+    def render(self, cr, zoom=1.0):
+        """Render the transition as a filled rectangle with optional markers.
         
         Uses legacy rendering style with Cairo transform approach:
-        - Black fill with colored border
-        - 3.0px line width (compensated for zoom to maintain constant pixel size)
+        - Solid fill color (white by default)
+        - Black border (3.0px compensated for zoom)
         - fill_preserve to maintain path for border
         - Draws in world coordinates (Cairo transform handles scaling)
         
         Args:
             cr: Cairo context (with zoom transformation already applied)
-            transform: Optional function (deprecated, for backward compatibility)
             zoom: Current zoom level for line width compensation
         """
         # Use world coordinates directly (Cairo transform handles conversion)
@@ -498,10 +497,6 @@ class Transition(PetriNetObject):
         if hasattr(self, 'properties') and self.properties:
             data["properties"] = self.properties
         
-        # Serialize legacy metadata (EC numbers, enzyme info) - deprecated
-        if hasattr(self, 'metadata') and self.metadata:
-            data["metadata"] = self.metadata
-        
         # Serialize kinetic metadata (new structured metadata)
         if self.kinetic_metadata is not None:
             data["kinetic_metadata"] = self.kinetic_metadata.to_dict()
@@ -662,10 +657,6 @@ class Transition(PetriNetObject):
             transition.is_source = data["is_source"]
         if "is_sink" in data:
             transition.is_sink = data["is_sink"]
-        
-        # Restore legacy metadata (EC numbers, enzyme info) - deprecated
-        if "metadata" in data:
-            transition.metadata = data["metadata"]
         
         # Restore kinetic metadata (new structured metadata)
         if "kinetic_metadata" in data and create_metadata_from_dict is not None:

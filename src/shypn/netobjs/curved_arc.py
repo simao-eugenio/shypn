@@ -168,7 +168,7 @@ class CurvedArc(Arc):
         x, y = bezier_point(t_mid)
         return (x, y)
     
-    def render(self, cr, transform=None, zoom=1.0):
+    def render(self, cr, zoom=1.0):
         """Render curved arc using bezier path.
         
         Overrides Arc.render() to draw a quadratic bezier curve
@@ -177,7 +177,6 @@ class CurvedArc(Arc):
         
         Args:
             cr: Cairo context (with zoom transformation already applied)
-            transform: Optional function (deprecated, for backward compatibility)
             zoom: Current zoom level for line width compensation
         """
         # Ensure clean Cairo context state
@@ -204,7 +203,7 @@ class CurvedArc(Arc):
         
         if control_point is None:
             # Degenerate case: fall back to straight line
-            super().render(cr, transform, zoom)
+            super().render(cr, zoom)
             return
         
         cp_x, cp_y = control_point
@@ -218,7 +217,7 @@ class CurvedArc(Arc):
         length_start = math.sqrt(dx_start*dx_start + dy_start*dy_start)
         
         if length_start < 1e-6:
-            super().render(cr, transform, zoom)
+            super().render(cr, zoom)
             return
         
         dx_start /= length_start
@@ -230,7 +229,7 @@ class CurvedArc(Arc):
         length_end = math.sqrt(dx_end*dx_end + dy_end*dy_end)
         
         if length_end < 1e-6:
-            super().render(cr, transform, zoom)
+            super().render(cr, zoom)
             return
         
         dx_end /= length_end

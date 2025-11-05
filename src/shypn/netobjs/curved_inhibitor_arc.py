@@ -54,7 +54,7 @@ class CurvedInhibitorArc(CurvedArc):
         # This is composition through method delegation
         InhibitorArc._render_arrowhead(self, cr, x, y, dx, dy, zoom)
     
-    def render(self, cr, transform=None, zoom=1.0):
+    def render(self, cr, zoom=1.0):
         """Render curved inhibitor arc with line stopping before the hollow circle.
         
         Overrides CurvedArc.render() to adjust the endpoint so the curve doesn't
@@ -62,7 +62,6 @@ class CurvedInhibitorArc(CurvedArc):
         
         Args:
             cr: Cairo context (with zoom transformation already applied)
-            transform: Optional function (deprecated, for backward compatibility)
             zoom: Current zoom level for line width compensation
         """
         # Ensure clean Cairo context state
@@ -84,7 +83,7 @@ class CurvedInhibitorArc(CurvedArc):
         
         if control_point is None:
             # Degenerate case: fall back to straight line
-            super(CurvedArc, self).render(cr, transform, zoom)  # Call Arc.render()
+            super(CurvedArc, self).render(cr, zoom)  # Call Arc.render()
             return
         
         cp_x, cp_y = control_point
@@ -95,7 +94,7 @@ class CurvedInhibitorArc(CurvedArc):
         length_end = math.sqrt(dx_end*dx_end + dy_end*dy_end)
         
         if length_end < 1e-6:
-            super(CurvedArc, self).render(cr, transform, zoom)
+            super(CurvedArc, self).render(cr, zoom)
             return
         
         dx_end /= length_end
@@ -107,7 +106,7 @@ class CurvedInhibitorArc(CurvedArc):
         length_start = math.sqrt(dx_start*dx_start + dy_start*dy_start)
         
         if length_start < 1e-6:
-            super(CurvedArc, self).render(cr, transform, zoom)
+            super(CurvedArc, self).render(cr, zoom)
             return
         
         dx_start /= length_start
