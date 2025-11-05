@@ -632,6 +632,7 @@ class KEGGCategory(BasePathwayCategory):
                     
                     # Check if current tab can be reused (empty + default name)
                     can_reuse_tab = False
+                    drawing_area = None  # Initialize to None - will be set in reuse or create path
                     current_page = canvas_loader.notebook.get_current_page()
                     
                     if current_page >= 0:
@@ -662,6 +663,7 @@ class KEGGCategory(BasePathwayCategory):
                         # Reuse the current empty default tab
                         self.logger.info("Reusing current empty tab")
                         canvas_manager = manager  # Already set from check above
+                        # drawing_area already defined from the check above (line 639)
                         # CRITICAL: Reset manager state before loading
                         canvas_loader._reset_manager_for_load(canvas_manager, base_name)
                     else:
@@ -694,7 +696,30 @@ class KEGGCategory(BasePathwayCategory):
                     # Mark as imported (Canvas Health standard)
                     canvas_manager.mark_as_imported(base_name)
                     
+                    # CRITICAL: Ensure callbacks are enabled before display
+                    # (Should already be False from setup, but verify)
+                    if hasattr(canvas_manager, '_suppress_callbacks'):
+                        canvas_manager._suppress_callbacks = False
+                        self.logger.info(f"Callbacks enabled: _suppress_callbacks={canvas_manager._suppress_callbacks}")
+                    
+                    # CRITICAL: Ensure simulation is reset BEFORE display operations
+                    # This guarantees clean initial state and proper token display
+                    if canvas_loader and hasattr(canvas_loader, '_ensure_simulation_reset'):
+                        # Get the drawing_area for the canvas_manager we just loaded into
+                        target_drawing_area = None
+                        for da, mgr in canvas_loader.canvas_managers.items():
+                            if mgr == canvas_manager:
+                                target_drawing_area = da
+                                break
+                        
+                        if target_drawing_area:
+                            canvas_loader._ensure_simulation_reset(target_drawing_area)
+                            self.logger.info("Simulation reset completed")
+                        else:
+                            self.logger.warning("Could not find drawing_area for simulation reset")
+                    
                     # Fit to page to show entire model (with padding)
+                    self.logger.info("Calling fit_to_page...")
                     canvas_manager.fit_to_page(
                         padding_percent=15,
                         deferred=True,
@@ -703,12 +728,8 @@ class KEGGCategory(BasePathwayCategory):
                     )
                     
                     # Force redraw to display loaded objects
+                    self.logger.info("Calling mark_needs_redraw...")
                     canvas_manager.mark_needs_redraw()
-                    
-                    # CRITICAL: Ensure simulation is reset after loading objects
-                    # This guarantees clean initial state for the imported model
-                    if canvas_loader and hasattr(canvas_loader, '_ensure_simulation_reset'):
-                        canvas_loader._ensure_simulation_reset(drawing_area if not can_reuse_tab else canvas_loader.get_current_document())
                     
                     self.logger.info(
                         f"Model auto-loaded: {len(document_model.places)} places, "
