@@ -235,12 +235,7 @@ class PathwayBuilder:
     
     def _reset(self):
         """Reset builder state for new build."""
-        self._next_place_id = 1
-        self._next_transition_id = 1
-        self._next_arc_id = 1
-        self._next_place_name = 1
-        self._next_transition_name = 1
-        self._next_arc_name = 1
+        self.id_manager.reset()
         
         self._species_to_place.clear()
         self._reaction_to_transition.clear()
