@@ -217,42 +217,37 @@ class TransitionBehavior(ABC):
             Place object or None if not found
         """
         if not hasattr(self.model, 'places'):
-            print(f"DEBUG _get_place: model has no 'places' attribute")
             return None
         
         # ModelAdapter provides places as dict {place_id: place_obj}
         # Try direct lookup first
-        place_id_str = str(place_id)
-        print(f"DEBUG _get_place: Looking for place_id={place_id} (str={place_id_str})")
-        print(f"DEBUG _get_place: Available place IDs in dict: {list(self.model.places.keys())}")
-        
         place = self.model.places.get(place_id)
         if place:
-            print(f"DEBUG _get_place: Direct lookup succeeded for {place_id}")
             return place
         
-        # Fallback: if place_id is string like "P101", try without prefix (legacy numeric IDs)
+        # Fallback 1: if place_id is string like "P101", try without prefix
+        # This handles cases where model has numeric IDs like 101 instead of "P101"
         if isinstance(place_id, str) and place_id.startswith('P'):
             try:
                 numeric_id = int(place_id[1:])  # "P101" -> 101
-                print(f"DEBUG _get_place: Trying fallback with numeric_id={numeric_id}")
                 place = self.model.places.get(numeric_id)
                 if place:
-                    print(f"DEBUG _get_place: Fallback lookup succeeded for {numeric_id}")
+                    return place
+                # Also try as string without prefix (e.g., "101")
+                place = self.model.places.get(str(numeric_id))
+                if place:
                     return place
             except ValueError:
                 pass
         
-        # Fallback: if place_id is int, try with "P" prefix (new string IDs)
+        # Fallback 2: if place_id is int, try with "P" prefix
+        # This handles cases where arc references use int but model has string IDs
         if isinstance(place_id, int):
             prefixed_id = f"P{place_id}"
-            print(f"DEBUG _get_place: Trying prefixed lookup with {prefixed_id}")
             place = self.model.places.get(prefixed_id)
             if place:
-                print(f"DEBUG _get_place: Prefixed lookup succeeded for {prefixed_id}")
                 return place
         
-        print(f"DEBUG _get_place: NO MATCH - returning None for {place_id}")
         return None
     
     def _get_current_time(self) -> float:
