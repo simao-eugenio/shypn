@@ -9,7 +9,7 @@ code expects, allowing gradual migration without breaking existing functionality
 """
 
 import logging
-from typing import Optional, Dict
+from typing import Optional, Dict, Any
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk
@@ -48,6 +48,13 @@ class LifecycleAdapter:
         """
         self.lifecycle_manager = lifecycle_manager
         
+        # Legacy dictionaries - kept in sync for backward compatibility
+        self.document_models: Dict[Any, Any] = {}
+        self.simulation_controllers: Dict[Any, Any] = {}
+        self.swissknife_palettes: Dict[Any, Any] = {}
+        
+        logger.info("LifecycleAdapter initialized (legacy compatibility mode)")
+        
     def register_canvas(self, 
                        drawing_area: Any,
                        document_model: Any,
@@ -66,64 +73,30 @@ class LifecycleAdapter:
             swissknife_palette: UI palette
         """
         # Create context from existing components
+        # Note: canvas_manager is same as document_model in current architecture
         context = CanvasContext(
             drawing_area=drawing_area,
             document_model=document_model,
             controller=simulation_controller,
             palette=swissknife_palette,
-            id_scope=id(drawing_area)  # Use drawing_area id as scope
+            id_scope=f"canvas_{id(drawing_area)}",
+            canvas_manager=document_model  # Same as document_model
         )
         
         # Register with lifecycle manager
-        self.lifecycle_manager.active_contexts[drawing_area] = context
+        canvas_id = id(drawing_area)
+        self.lifecycle_manager.canvas_registry[canvas_id] = context
         
         # Set ID scope for this canvas
-        self.lifecycle_manager.id_manager.set_scope(context.id_scope)
+        scope_id = f"canvas_{id(drawing_area)}"
+        self.lifecycle_manager.id_manager.set_scope(scope_id)
         
-        # Legacy dictionaries - kept in sync for backward compatibility
-        self.document_models: Dict[Gtk.DrawingArea, any] = {}
-        self.simulation_controllers: Dict[Gtk.DrawingArea, any] = {}
-        self.swissknife_palettes: Dict[Gtk.DrawingArea, any] = {}
+        # Update legacy dictionaries for backward compatibility
+        self.document_models[drawing_area] = document_model
+        self.simulation_controllers[drawing_area] = simulation_controller
+        self.swissknife_palettes[drawing_area] = swissknife_palette
         
-        logger.info("LifecycleAdapter initialized (legacy compatibility mode)")
-    
-    def register_canvas(
-        self,
-        drawing_area: Gtk.DrawingArea,
-        canvas_manager: any,
-        controller: any = None,
-        palette: any = None
-    ):
-        """Register a canvas and its components.
-        
-        This method can be called in two ways:
-        
-        1. New code (via lifecycle manager):
-           context = lifecycle_manager.create_canvas(...)
-           adapter.sync_from_context(context)
-        
-        2. Legacy code (direct registration):
-           adapter.register_canvas(area, manager, controller, palette)
-        
-        Args:
-            drawing_area: GTK DrawingArea widget
-            canvas_manager: ModelCanvasManager (document model)
-            controller: Optional SimulationController
-            palette: Optional SwissKnifePalette
-        """
-        logger.debug(f"Registering canvas {id(drawing_area)} via adapter")
-        
-        # Update legacy dictionaries
-        self.document_models[drawing_area] = canvas_manager
-        
-        if controller:
-            self.simulation_controllers[drawing_area] = controller
-        
-        if palette:
-            self.swissknife_palettes[drawing_area] = palette
-        
-        logger.debug(f"  Legacy dicts updated: model={canvas_manager is not None}, "
-                    f"controller={controller is not None}, palette={palette is not None}")
+        logger.debug(f"Registered canvas {id(drawing_area)} with lifecycle system")
     
     def sync_from_context(self, context: CanvasContext):
         """Sync legacy dictionaries from a CanvasContext.
@@ -144,7 +117,7 @@ class LifecycleAdapter:
                     f"{len(self.simulation_controllers)} controllers, "
                     f"{len(self.swissknife_palettes)} palettes")
     
-    def get_document_model(self, drawing_area: Gtk.DrawingArea) -> Optional[any]:
+    def get_document_model(self, drawing_area: Gtk.DrawingArea) -> Optional[Any]:
         """Get document model for a canvas.
         
         Args:
@@ -161,7 +134,7 @@ class LifecycleAdapter:
         # Fall back to legacy dictionary
         return self.document_models.get(drawing_area)
     
-    def get_controller(self, drawing_area: Gtk.DrawingArea) -> Optional[any]:
+    def get_controller(self, drawing_area: Gtk.DrawingArea) -> Optional[Any]:
         """Get simulation controller for a canvas.
         
         Args:
@@ -178,7 +151,7 @@ class LifecycleAdapter:
         # Fall back to legacy dictionary
         return self.simulation_controllers.get(drawing_area)
     
-    def get_palette(self, drawing_area: Gtk.DrawingArea) -> Optional[any]:
+    def get_palette(self, drawing_area: Gtk.DrawingArea) -> Optional[Any]:
         """Get SwissKnifePalette for a canvas.
         
         Args:
@@ -258,7 +231,8 @@ class LifecycleAdapter:
         Args:
             drawing_area: Target canvas widget
         """
-        result = self.lifecycle_manager.switch_canvas(drawing_area)
+        # Call with from_area=None (adapter doesn't track current)
+        result = self.lifecycle_manager.switch_canvas(None, drawing_area)
         return result
         
     def destroy_canvas(self, drawing_area: Any) -> bool:
@@ -283,7 +257,8 @@ class LifecycleAdapter:
         Returns:
             CanvasContext if found, None otherwise
         """
-        return self.lifecycle_manager.active_contexts.get(drawing_area)
+        canvas_id = id(drawing_area)
+        return self.lifecycle_manager.canvas_registry.get(canvas_id)
     
     def has_canvas(self, drawing_area: Gtk.DrawingArea) -> bool:
         """Check if canvas is registered in either system.
