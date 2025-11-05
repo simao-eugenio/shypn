@@ -675,8 +675,7 @@ class ModifierConverter(BaseConverter):
                 
                 # Create test arc from catalyst place to transition
                 # Test arcs are non-consuming: check tokens but don't consume
-                arc_id = f"A{self.document._next_arc_id}"
-                self.document._next_arc_id += 1
+                arc_id = self.document.id_manager.generate_arc_id()
                 
                 test_arc = TestArc(
                     source=place,

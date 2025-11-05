@@ -36,9 +36,11 @@ class StandardArcBuilder(ArcBuilder):
         Returns:
             List of Arc objects
         """
-        # Use document's arc counter if available (avoids ID conflicts with test arcs)
-        if document and hasattr(document, '_next_arc_id'):
-            self.arc_counter = document._next_arc_id
+        # Use document's IDManager if available (avoids ID conflicts with test arcs)
+        if document and hasattr(document, 'id_manager'):
+            # Get current counter state
+            _, _, arc_counter = document.id_manager.get_state()
+            self.arc_counter = arc_counter
         
         arcs = []
         
@@ -55,9 +57,10 @@ class StandardArcBuilder(ArcBuilder):
             arcs.extend(self._create_input_arcs(reaction.substrates, transition, place_map))
             arcs.extend(self._create_output_arcs(reaction.products, transition, place_map))
         
-        # Sync counter back to document (for unified ID management)
-        if document and hasattr(document, '_next_arc_id'):
-            document._next_arc_id = self.arc_counter
+        # Sync counter back to document's IDManager (for unified ID management)
+        if document and hasattr(document, 'id_manager'):
+            place_id, trans_id, _ = document.id_manager.get_state()
+            document.id_manager.set_state(place_id, trans_id, self.arc_counter)
         
         return arcs
     
