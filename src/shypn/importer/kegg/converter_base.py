@@ -144,13 +144,14 @@ class ReactionMapper(ABC):
     
     @abstractmethod
     def create_transitions(self, reaction: 'KEGGReaction', pathway: 'KEGGPathway',
-                          options: ConversionOptions) -> List['Transition']:
+                          options: ConversionOptions, id_manager=None) -> List['Transition']:
         """Create Transition(s) from a KEGG reaction.
         
         Args:
             reaction: KEGG reaction to convert
             pathway: Complete pathway (for context)
             options: Conversion options
+            id_manager: Optional IDManager for generating unique IDs
             
         Returns:
             List of Transition objects (typically one, but two for split reversible)

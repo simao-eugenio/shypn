@@ -183,7 +183,7 @@ class StandardConversionStrategy(ConversionStrategy):
             for entry in compounds:
                 if entry.id in used_compound_ids:
                     if self.compound_mapper.should_include(entry, options):
-                        place = self.compound_mapper.create_place(entry, options)
+                        place = self.compound_mapper.create_place(entry, options, document.id_manager)
                         document.places.append(place)
                         place_map[entry.id] = place
             
@@ -214,8 +214,9 @@ class StandardConversionStrategy(ConversionStrategy):
                         label = entry.graphics.name if entry.graphics and entry.graphics.name else entry.name
                         label = label.replace('\n', ' ').strip()
                         
-                        place_id = f"P{entry.id}"
-                        place_name = f"P{entry.id}"
+                        # Use IDManager to generate unique place ID
+                        place_id = document.id_manager.generate_place_id()
+                        place_name = place_id
                         
                         # Create enzyme place (participates in network like any other place)
                         place = Place(x, y, place_id, place_name, label=label)
@@ -246,7 +247,7 @@ class StandardConversionStrategy(ConversionStrategy):
             compounds = pathway.get_compounds()
             for entry in compounds:
                 if self.compound_mapper.should_include(entry, options):
-                    place = self.compound_mapper.create_place(entry, options)
+                    place = self.compound_mapper.create_place(entry, options, document.id_manager)
                     document.places.append(place)
                     place_map[entry.id] = place
             
@@ -273,8 +274,9 @@ class StandardConversionStrategy(ConversionStrategy):
                         label = entry.graphics.name if entry.graphics and entry.graphics.name else entry.name
                         label = label.replace('\n', ' ').strip()
                         
-                        place_id = f"P{entry.id}"
-                        place_name = f"P{entry.id}"
+                        # Use IDManager to generate unique place ID
+                        place_id = document.id_manager.generate_place_id()
+                        place_name = place_id
                         
                         place = Place(x, y, place_id, place_name, label=label)
                         place.tokens = 1
@@ -323,7 +325,7 @@ class StandardConversionStrategy(ConversionStrategy):
         
         for reaction in pathway.reactions:
             # Create transition(s)
-            transitions = self.reaction_mapper.create_transitions(reaction, pathway, options)
+            transitions = self.reaction_mapper.create_transitions(reaction, pathway, options, document.id_manager)
             
             for transition in transitions:
                 document.transitions.append(transition)
@@ -372,14 +374,6 @@ class StandardConversionStrategy(ConversionStrategy):
         # Phase 3: Enhance transitions with kinetic properties
         if options.enhance_kinetics:
             self._enhance_transition_kinetics(document, reaction_transition_map, pathway)
-        
-        # Register all IDs with the IDManager to ensure correct counter values
-        for place in document.places:
-            document.id_manager.register_place_id(place.id)
-        for transition in document.transitions:
-            document.id_manager.register_transition_id(transition.id)
-        for arc in document.arcs:
-            document.id_manager.register_arc_id(arc.id)
         
         # VALIDATION: Ensure bipartite property
         self._validate_bipartite_property(document, pathway)

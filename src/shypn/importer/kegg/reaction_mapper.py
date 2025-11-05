@@ -25,6 +25,7 @@ class StandardReactionMapper(ReactionMapper):
         """Initialize reaction mapper."""
         self.transition_counter = 1
         self.ec_cache: Dict[str, List[str]] = {}  # Cache for pre-fetched EC numbers
+        self.id_manager = None  # Will be set during conversion
     
     def set_ec_cache(self, ec_cache: Dict[str, List[str]]):
         """
@@ -40,17 +41,21 @@ class StandardReactionMapper(ReactionMapper):
         logger.debug(f"EC cache set with {len(ec_cache)} entries")
     
     def create_transitions(self, reaction: KEGGReaction, pathway: KEGGPathway,
-                          options: ConversionOptions) -> List[Transition]:
+                          options: ConversionOptions, id_manager=None) -> List[Transition]:
         """Create Transition(s) from a KEGG reaction.
         
         Args:
             reaction: KEGG reaction to convert
             pathway: Complete pathway (for context)
             options: Conversion options
+            id_manager: Optional IDManager for generating unique IDs
             
         Returns:
             List of Transition objects (one for normal, two for split reversible)
         """
+        # Store id_manager for use in helper methods
+        if id_manager:
+            self.id_manager = id_manager
         # Get substrate and product entries for position calculation
         substrates = [pathway.get_entry_by_id(s.id) for s in reaction.substrates]
         substrates = [s for s in substrates if s is not None]
@@ -82,9 +87,14 @@ class StandardReactionMapper(ReactionMapper):
         Returns:
             Transition object
         """
-        transition_id = f"T{self.transition_counter}"
-        transition_name = f"T{self.transition_counter}"  # System-assigned name
-        self.transition_counter += 1
+        # Use IDManager if available, otherwise fall back to local counter
+        if self.id_manager:
+            transition_id = self.id_manager.generate_transition_id()
+            transition_name = transition_id
+        else:
+            transition_id = f"T{self.transition_counter}"
+            transition_name = f"T{self.transition_counter}"
+            self.transition_counter += 1
         
         # Create transition with correct arguments: (x, y, id, name)
         # The reaction name becomes the label, not the system name
@@ -163,9 +173,13 @@ class StandardReactionMapper(ReactionMapper):
                 logger.warning(f"Failed to fetch EC numbers for {reaction.name}: {e}")
         
         # Forward transition
-        forward_id = f"T{self.transition_counter}"
-        forward_sys_name = f"T{self.transition_counter}"  # System-assigned name
-        self.transition_counter += 1
+        if self.id_manager:
+            forward_id = self.id_manager.generate_transition_id()
+            forward_sys_name = forward_id
+        else:
+            forward_id = f"T{self.transition_counter}"
+            forward_sys_name = f"T{self.transition_counter}"
+            self.transition_counter += 1
         forward_label = f"{base_name} (forward)"  # User-visible label
         forward = Transition(x - 10, y, forward_id, forward_sys_name, label=forward_label)
         
@@ -182,9 +196,13 @@ class StandardReactionMapper(ReactionMapper):
         transitions.append(forward)
         
         # Backward transition
-        backward_id = f"T{self.transition_counter}"
-        backward_sys_name = f"T{self.transition_counter}"  # System-assigned name
-        self.transition_counter += 1
+        if self.id_manager:
+            backward_id = self.id_manager.generate_transition_id()
+            backward_sys_name = backward_id
+        else:
+            backward_id = f"T{self.transition_counter}"
+            backward_sys_name = f"T{self.transition_counter}"
+            self.transition_counter += 1
         backward_label = f"{base_name} (backward)"  # User-visible label
         backward = Transition(x + 10, y, backward_id, backward_sys_name, label=backward_label)
         

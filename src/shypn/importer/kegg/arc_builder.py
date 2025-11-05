@@ -19,6 +19,7 @@ class StandardArcBuilder(ArcBuilder):
     def __init__(self):
         """Initialize arc builder."""
         self.arc_counter = 1
+        self.id_manager = None  # Will be set during conversion
     
     def create_arcs(self, reaction: KEGGReaction, transition: Transition,
                    place_map: Dict[str, Place], pathway: KEGGPathway,
@@ -36,11 +37,9 @@ class StandardArcBuilder(ArcBuilder):
         Returns:
             List of Arc objects
         """
-        # Use document's IDManager if available (avoids ID conflicts with test arcs)
+        # Use document's IDManager if available
         if document and hasattr(document, 'id_manager'):
-            # Get current counter state
-            _, _, arc_counter = document.id_manager.get_state()
-            self.arc_counter = arc_counter
+            self.id_manager = document.id_manager
         
         arcs = []
         
@@ -56,11 +55,6 @@ class StandardArcBuilder(ArcBuilder):
             # Normal or forward direction
             arcs.extend(self._create_input_arcs(reaction.substrates, transition, place_map))
             arcs.extend(self._create_output_arcs(reaction.products, transition, place_map))
-        
-        # Sync counter back to document's IDManager (for unified ID management)
-        if document and hasattr(document, 'id_manager'):
-            place_id, trans_id, _ = document.id_manager.get_state()
-            document.id_manager.set_state(place_id, trans_id, self.arc_counter)
         
         return arcs
     
@@ -97,8 +91,11 @@ class StandardArcBuilder(ArcBuilder):
                 )
             
             # Create arc from place to transition
-            arc_id = f"A{self.arc_counter}"
-            self.arc_counter += 1
+            if self.id_manager:
+                arc_id = self.id_manager.generate_arc_id()
+            else:
+                arc_id = f"A{self.arc_counter}"
+                self.arc_counter += 1
             
             # Use stoichiometry from substrate as arc weight
             weight = substrate.stoichiometry
@@ -149,8 +146,11 @@ class StandardArcBuilder(ArcBuilder):
                 )
             
             # Create arc from transition to place
-            arc_id = f"A{self.arc_counter}"
-            self.arc_counter += 1
+            if self.id_manager:
+                arc_id = self.id_manager.generate_arc_id()
+            else:
+                arc_id = f"A{self.arc_counter}"
+                self.arc_counter += 1
             
             # Use stoichiometry from product as arc weight
             weight = product.stoichiometry

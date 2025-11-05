@@ -69,12 +69,13 @@ class StandardCompoundMapper(CompoundMapper):
         
         return True
     
-    def create_place(self, entry: KEGGEntry, options: ConversionOptions) -> Place:
+    def create_place(self, entry: KEGGEntry, options: ConversionOptions, id_manager=None) -> Place:
         """Create a Place from a KEGG compound entry.
         
         Args:
             entry: KEGG compound entry
             options: Conversion options
+            id_manager: Optional IDManager for generating unique IDs
             
         Returns:
             Place object representing the compound
@@ -86,9 +87,14 @@ class StandardCompoundMapper(CompoundMapper):
         # Get clean compound name from graphics
         label = self.get_compound_name(entry)
         
-        # Create place ID and name
-        place_id = f"P{entry.id}"
-        place_name = f"P{entry.id}"  # Name should match ID for KEGG compounds
+        # Create place ID using IDManager if available
+        if id_manager:
+            place_id = id_manager.generate_place_id()
+            place_name = place_id
+        else:
+            # Fallback to old behavior for backwards compatibility
+            place_id = f"P{entry.id}"
+            place_name = f"P{entry.id}"  # Name should match ID for KEGG compounds
         
         # Determine initial marking
         marking = options.initial_tokens if options.add_initial_marking else 0
