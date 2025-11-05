@@ -732,10 +732,10 @@ class ModelCanvasLoader:
         
         # Reset canvas interaction states (CRITICAL for fixing corrupted context menu/drag)
         # These states can get stuck if not properly reset between document loads
-        # Find the drawing_area for this manager by looking through self.managers
+        # Find the drawing_area for this manager by looking through self.canvas_managers
         drawing_area = None
-        if hasattr(self, 'managers'):
-            for da, mgr in self.managers.items():
+        if hasattr(self, 'canvas_managers'):
+            for da, mgr in self.canvas_managers.items():
                 if mgr == manager:
                     drawing_area = da
                     break
@@ -810,8 +810,10 @@ class ModelCanvasLoader:
                 if hasattr(overlay_manager, 'swissknife_palette'):
                     palette = overlay_manager.swissknife_palette
                     # Hide any active sub-palette (returns to default state)
-                    if palette.active_sub_palette:
-                        palette._hide_sub_palette(palette.active_category)
+                    # Note: active_sub_palette only exists in old palette, not new refactored one
+                    if hasattr(palette, 'active_sub_palette') and palette.active_sub_palette:
+                        if hasattr(palette, '_hide_sub_palette') and hasattr(palette, 'active_category'):
+                            palette._hide_sub_palette(palette.active_category)
                     # Update palette's model reference to the (reset) manager
                     palette.model = manager
                     # If palette has widget palette instances (like SimulateToolsPaletteLoader),

@@ -85,6 +85,20 @@ class HeuristicParametersController:
             'unknown': []
         }
         
+        # Attach arcs to transitions for stoichiometry analysis
+        for transition in document_model.transitions:
+            # Find input arcs (Place → Transition)
+            input_arcs = [arc for arc in document_model.arcs 
+                         if hasattr(arc, 'target') and arc.target == transition]
+            
+            # Find output arcs (Transition → Place)
+            output_arcs = [arc for arc in document_model.arcs 
+                          if hasattr(arc, 'source') and arc.source == transition]
+            
+            # Attach as properties
+            transition.input_arcs = input_arcs
+            transition.output_arcs = output_arcs
+        
         # Process each transition
         for transition in document_model.transitions:
             try:
@@ -142,6 +156,12 @@ class HeuristicParametersController:
         if not transition:
             self.logger.error(f"Transition {transition_id} not found")
             return None
+        
+        # Attach arcs for stoichiometry analysis
+        transition.input_arcs = [arc for arc in document_model.arcs 
+                                if hasattr(arc, 'target') and arc.target == transition]
+        transition.output_arcs = [arc for arc in document_model.arcs 
+                                 if hasattr(arc, 'source') and arc.source == transition]
         
         # Infer parameters
         try:

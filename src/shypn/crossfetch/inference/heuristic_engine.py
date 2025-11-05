@@ -168,30 +168,7 @@ class HeuristicInferenceEngine:
         # Step 2: Infer biological semantics
         semantics = self.type_detector.infer_semantics(transition, transition_type)
         
-        # Step 3: Try database lookup first (if caching enabled)
-        if use_cache:
-            ec_number = getattr(transition, 'ec_number', None)
-            reaction_id = getattr(transition, 'reaction_id', None)
-            
-            db_params = self._query_database(
-                transition_type, ec_number, reaction_id, organism
-            )
-            
-            if db_params:
-                # Found in database - return immediately
-                result = InferenceResult(
-                    transition_id=getattr(transition, 'id', 'unknown'),
-                    parameters=db_params,
-                    alternatives=[],
-                    inference_metadata={
-                        'detected_type': transition_type.value,
-                        'inferred_semantics': semantics.value,
-                        'source': 'database_cache'
-                    }
-                )
-                return result
-        
-        # Step 4: Infer parameters based on type (heuristics fallback)
+        # Step 3: Infer parameters based on type (pure heuristics)
         if transition_type == TransitionType.IMMEDIATE:
             parameters = self._infer_immediate(transition, semantics, organism)
         elif transition_type == TransitionType.TIMED:
@@ -207,6 +184,9 @@ class HeuristicInferenceEngine:
                 biological_semantics=BiologicalSemantics.UNKNOWN,
                 organism=organism
             )
+        
+        # Step 4: Refine with stoichiometry analysis
+        parameters = self.infer_from_stoichiometry(transition, parameters)
         
         # Create result
         result = InferenceResult(
@@ -289,10 +269,13 @@ class HeuristicInferenceEngine:
                 best_score = 0.0
                 
                 for result in results:
+                    # Get enzyme class (first two parts of EC number, e.g., "2.7")
+                    enzyme_class = '.'.join(ec_number.split('.')[0:2]) if ec_number and '.' in ec_number else None
+                    
                     compat_score = self.db.get_compatibility_score(
                         result['organism'],
                         organism,
-                        ec_number.split('.')[0:2] if ec_number else None
+                        enzyme_class
                     )
                     
                     adjusted_confidence = result['confidence_score'] * compat_score
@@ -622,19 +605,318 @@ class HeuristicInferenceEngine:
                 return (40.0, 0.3, 4.0)  # Slower, moderate affinity
         
         # Label-based defaults (when no EC number)
+        
+        # KEGG gene symbols (common glycolysis/metabolism genes)
+        # Hexokinases/Glucokinases
+        if label.startswith('hk') or label.startswith('gck'):
+            return (50.0, 0.05, 5.0)  # Hexokinase/Glucokinase
+        # Pyruvate kinase (pk, pklr, pkm)
+        elif label.startswith('pk') or label == 'pklr' or label == 'pkm':
+            return (50.0, 0.05, 5.0)  # Pyruvate kinase
+        # Phosphofructokinase
+        elif label.startswith('pfk'):
+            return (50.0, 0.05, 5.0)  # PFK
+        # Phosphoglycerate kinase (pgk)
+        elif label.startswith('pgk'):
+            return (50.0, 0.05, 5.0)  # PGK
+        # Dehydrogenases (gapdh, ldh, aldh, adh, pdh, idh, mdh, etc.)
+        elif 'dh' in label or label.startswith('gapdh') or label.startswith('ldh') or label.startswith('aldh') or label.startswith('adh') or label.startswith('pdh') or label.startswith('idh') or label.startswith('mdh'):
+            return (150.0, 0.2, 15.0)  # Dehydrogenases
+        # Aldolases
+        elif label.startswith('aldo') or label.startswith('ald'):
+            return (90.0, 0.2, 9.0)  # Aldolases
+        # Isomerases (tpi, gpi, etc.)
+        elif label.startswith('tpi') or label.startswith('gpi'):
+            return (70.0, 0.12, 7.0)  # Isomerases
+        # Phosphoglycerate mutase (pgam)
+        elif label.startswith('pgam'):
+            return (70.0, 0.12, 7.0)  # Mutases
+        # Phosphoglucomutase (pgm)
+        elif label.startswith('pgm') and not label.startswith('pgam'):
+            return (70.0, 0.12, 7.0)  # Phosphoglucomutase
+        # Enolases
+        elif label.startswith('eno'):
+            return (90.0, 0.2, 9.0)  # Enolases (lyases)
+        # Fructose-bisphosphatase (fbp, fbpase)
+        elif label.startswith('fbp'):
+            return (100.0, 0.1, 10.0)  # FBPase (phosphatase-like)
+        # Reductases/Oxidases (akr, cox, etc.)
+        elif label.startswith('akr') or label.startswith('cox') or label.startswith('nox'):
+            return (120.0, 0.15, 12.0)  # Reductases/Oxidases
+        # Transferases (dlat, glut, etc.)
+        elif label.startswith('dlat') or label.startswith('glut'):
+            return (55.0, 0.08, 5.5)  # Transferases
+        
+        # Enzyme name patterns (full names)
         if 'kinase' in label or 'phosphorylation' in label:
             return (50.0, 0.05, 5.0)  # Kinases
         elif 'phosphatase' in label or 'dephosphorylation' in label:
             return (100.0, 0.1, 10.0)  # Phosphatases
         elif 'dehydrogenase' in label:
             return (150.0, 0.2, 15.0)  # Dehydrogenases
-        elif 'synthase' in label or 'synthesis' in label:
+        elif 'synthase' in label or 'synthesis' in label or 'synthetase' in label:
             return (80.0, 0.3, 8.0)  # Synthases
         elif 'protease' in label or 'peptidase' in label:
             return (200.0, 0.5, 20.0)  # Proteases
         elif 'glycosylase' in label or 'glycosyl' in label:
             return (120.0, 0.15, 12.0)  # Glycosylases
+        elif 'reductase' in label or 'oxidase' in label:
+            return (120.0, 0.15, 12.0)  # Oxidoreductases
+        elif 'isomerase' in label or 'epimerase' in label or 'mutase' in label:
+            return (70.0, 0.12, 7.0)  # Isomerases
+        elif 'lyase' in label or 'decarboxylase' in label or 'aldolase' in label:
+            return (90.0, 0.2, 9.0)  # Lyases
+        elif 'ligase' in label or 'carboxylase' in label:
+            return (45.0, 0.25, 4.5)  # Ligases
+        elif 'transferase' in label or 'transaminase' in label:
+            return (55.0, 0.08, 5.5)  # Transferases
+        elif 'hydrolase' in label or 'lipase' in label or 'esterase' in label:
+            return (180.0, 0.4, 18.0)  # Hydrolases
+        elif 'polymerase' in label or 'polymerization' in label:
+            return (30.0, 0.4, 3.0)  # Slow, high substrate requirement
+        elif 'binding' in label or 'association' in label:
+            return (200.0, 0.05, 20.0)  # Fast binding
+        elif 'transport' in label or 'transporter' in label or 'channel' in label:
+            return (150.0, 0.1, 15.0)  # Transport
+        elif 'cleavage' in label or 'degradation' in label:
+            return (100.0, 0.2, 10.0)  # Degradation
         
         # Generic enzymatic reaction
         return (100.0, 0.1, 10.0)
+    
+    def infer_from_stoichiometry(self, transition: Any, base_params: TransitionParameters) -> TransitionParameters:
+        """Refine parameters using stoichiometry and network structure.
+        
+        Uses local balance (input/output stoichiometry) and global balance
+        (overall network conservation) to adjust parameter values.
+        
+        Args:
+            transition: Transition object with arc information
+            base_params: Base parameters from label/type heuristics
+            
+        Returns:
+            Refined parameters based on stoichiometry
+        """
+        # Extract stoichiometry information
+        stoich_info = self._analyze_stoichiometry(transition)
+        
+        if not stoich_info:
+            # No stoichiometry info available, return base params
+            return base_params
+        
+        # Apply stoichiometry-based adjustments
+        if isinstance(base_params, ContinuousParameters):
+            return self._adjust_continuous_by_stoichiometry(base_params, stoich_info)
+        elif isinstance(base_params, StochasticParameters):
+            return self._adjust_stochastic_by_stoichiometry(base_params, stoich_info)
+        
+        return base_params
+    
+    def _analyze_stoichiometry(self, transition: Any) -> Optional[Dict[str, Any]]:
+        """Analyze stoichiometry from transition arcs.
+        
+        Extracts:
+        - Input places and weights (substrates)
+        - Output places and weights (products)
+        - Total input/output balance
+        - Locality properties
+        
+        Args:
+            transition: Transition object
+            
+        Returns:
+            Dict with stoichiometry info or None
+        """
+        try:
+            # Get input arcs (places → transition)
+            inputs = []
+            if hasattr(transition, 'input_arcs'):
+                for arc in transition.input_arcs:
+                    weight = getattr(arc, 'weight', 1)
+                    place_id = getattr(arc, 'source_id', None) or getattr(arc, 'place_id', None)
+                    initial_marking = getattr(arc.source, 'initial_marking', 0) if hasattr(arc, 'source') else 0
+                    inputs.append({
+                        'place_id': place_id,
+                        'weight': weight,
+                        'marking': initial_marking
+                    })
+            
+            # Get output arcs (transition → places)
+            outputs = []
+            if hasattr(transition, 'output_arcs'):
+                for arc in transition.output_arcs:
+                    weight = getattr(arc, 'weight', 1)
+                    place_id = getattr(arc, 'target_id', None) or getattr(arc, 'place_id', None)
+                    initial_marking = getattr(arc.target, 'initial_marking', 0) if hasattr(arc, 'target') else 0
+                    outputs.append({
+                        'place_id': place_id,
+                        'weight': weight,
+                        'marking': initial_marking
+                    })
+            
+            if not inputs and not outputs:
+                return None
+            
+            # Calculate balance metrics
+            total_input_weight = sum(inp['weight'] for inp in inputs)
+            total_output_weight = sum(out['weight'] for out in outputs)
+            total_input_marking = sum(inp['marking'] for inp in inputs)
+            
+            # Balance ratio (how balanced is the reaction)
+            balance_ratio = min(total_input_weight, total_output_weight) / max(total_input_weight, total_output_weight, 1)
+            
+            # Locality metric (how localized are the markings)
+            locality_score = total_input_marking / max(len(inputs), 1)
+            
+            return {
+                'inputs': inputs,
+                'outputs': outputs,
+                'total_input_weight': total_input_weight,
+                'total_output_weight': total_output_weight,
+                'total_input_marking': total_input_marking,
+                'balance_ratio': balance_ratio,
+                'locality_score': locality_score,
+                'num_substrates': len(inputs),
+                'num_products': len(outputs)
+            }
+            
+        except Exception as e:
+            self.logger.warning(f"Failed to analyze stoichiometry: {e}")
+            return None
+    
+    def _adjust_continuous_by_stoichiometry(self, 
+                                           params: ContinuousParameters,
+                                           stoich: Dict[str, Any]) -> ContinuousParameters:
+        """Adjust continuous parameters based on stoichiometry.
+        
+        Heuristics:
+        - Multi-substrate reactions → Lower Vmax (more complex)
+        - High input weights → Higher Km (more substrate needed)
+        - Balanced reactions → Higher confidence
+        - High locality (concentrated substrates) → Higher Vmax
+        
+        Args:
+            params: Base continuous parameters
+            stoich: Stoichiometry information
+            
+        Returns:
+            Adjusted parameters
+        """
+        vmax = params.vmax
+        km = params.km
+        confidence = params.confidence_score
+        notes = params.notes or ""
+        
+        # Multi-substrate penalty
+        num_substrates = stoich['num_substrates']
+        if num_substrates > 2:
+            vmax *= 0.7  # Complex reactions are slower
+            notes += f" | Multi-substrate ({num_substrates}) penalty applied"
+        
+        # Stoichiometry adjustment for Km
+        total_input_weight = stoich['total_input_weight']
+        if total_input_weight > 2:
+            # High stoichiometry → Higher Km (need more substrate)
+            km *= (total_input_weight / 2.0)
+            notes += f" | Km adjusted for stoichiometry ({total_input_weight})"
+        
+        # Balance bonus
+        balance_ratio = stoich['balance_ratio']
+        if balance_ratio > 0.8:  # Well balanced reaction
+            confidence = min(confidence + 0.1, 0.85)
+            notes += " | Balanced reaction (+10% confidence)"
+        
+        # Locality adjustment for Vmax
+        locality_score = stoich['locality_score']
+        if locality_score > 10:  # High concentration of substrates
+            vmax *= 1.3  # Faster reaction with abundant substrates
+            notes += f" | High substrate locality (×1.3 Vmax)"
+        elif locality_score < 1:  # Low substrate availability
+            vmax *= 0.7
+            notes += f" | Low substrate locality (×0.7 Vmax)"
+        
+        return ContinuousParameters(
+            biological_semantics=params.biological_semantics,
+            vmax=vmax,
+            km=km,
+            kcat=params.kcat,
+            ki=params.ki,
+            hill_coefficient=params.hill_coefficient,
+            ec_number=params.ec_number,
+            reaction_id=params.reaction_id,
+            enzyme_name=params.enzyme_name,
+            organism=params.organism,
+            temperature=params.temperature,
+            ph=params.ph,
+            confidence_score=confidence,
+            source="Heuristic + Stoichiometry",
+            notes=notes
+        )
+    
+    def _adjust_stochastic_by_stoichiometry(self,
+                                           params: StochasticParameters,
+                                           stoich: Dict[str, Any]) -> StochasticParameters:
+        """Adjust stochastic parameters based on stoichiometry.
+        
+        Heuristics:
+        - More substrates → Lower rate (less likely to have all present)
+        - High weights → Scale rate by stoichiometry
+        - Balanced reactions → Higher confidence
+        
+        Args:
+            params: Base stochastic parameters
+            stoich: Stoichiometry information
+            
+        Returns:
+            Adjusted parameters
+        """
+        lambda_param = params.lambda_param
+        confidence = params.confidence_score
+        notes = params.notes or ""
+        
+        # Multi-substrate penalty (harder to get all molecules together)
+        num_substrates = stoich['num_substrates']
+        if num_substrates > 1:
+            # Each additional substrate decreases rate
+            lambda_param *= (0.5 ** (num_substrates - 1))
+            notes += f" | Multi-substrate ({num_substrates}) rate adjustment"
+        
+        # Stoichiometry scaling
+        total_input_weight = stoich['total_input_weight']
+        if total_input_weight > 1:
+            # Higher order reactions are less frequent
+            lambda_param /= total_input_weight
+            notes += f" | Rate scaled by stoichiometry (/{total_input_weight})"
+        
+        # Balance bonus
+        balance_ratio = stoich['balance_ratio']
+        if balance_ratio > 0.8:
+            confidence = min(confidence + 0.1, 0.85)
+            notes += " | Balanced reaction (+10% confidence)"
+        
+        # Locality adjustment
+        locality_score = stoich['locality_score']
+        if locality_score > 10:
+            lambda_param *= 1.5  # More molecules → More frequent reactions
+            notes += f" | High locality (×1.5 rate)"
+        elif locality_score < 1:
+            lambda_param *= 0.5
+            notes += f" | Low locality (×0.5 rate)"
+        
+        return StochasticParameters(
+            biological_semantics=params.biological_semantics,
+            lambda_param=lambda_param,
+            k_forward=lambda_param,
+            k_reverse=params.k_reverse,
+            ec_number=params.ec_number,
+            reaction_id=params.reaction_id,
+            enzyme_name=params.enzyme_name,
+            organism=params.organism,
+            temperature=params.temperature,
+            ph=params.ph,
+            confidence_score=confidence,
+            source="Heuristic + Stoichiometry",
+            notes=notes
+        )
+
 

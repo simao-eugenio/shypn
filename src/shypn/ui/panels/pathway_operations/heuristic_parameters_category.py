@@ -64,42 +64,11 @@ class HeuristicParametersCategory(BasePathwayCategory):
         
         # Description
         desc = Gtk.Label()
-        desc.set_text("Intelligent parameter inference for all transition types")
+        desc.set_text("Intelligent parameter defaults based on transition type and biological context")
         desc.set_halign(Gtk.Align.START)
         desc.set_line_wrap(True)
         desc.get_style_context().add_class('dim-label')
         content_box.pack_start(desc, False, False, 0)
-        
-        # Organism selector
-        organism_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
-        organism_label = Gtk.Label(label="Organism:")
-        organism_box.pack_start(organism_label, False, False, 0)
-        
-        self.organism_combo = Gtk.ComboBoxText()
-        self.organism_combo.append_text("Homo sapiens")
-        self.organism_combo.append_text("Saccharomyces cerevisiae")
-        self.organism_combo.append_text("Escherichia coli")
-        self.organism_combo.set_active(0)
-        organism_box.pack_start(self.organism_combo, True, True, 0)
-        
-        content_box.pack_start(organism_box, False, False, 0)
-        
-        # Mode selector (Fast vs Enhanced)
-        mode_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
-        mode_label = Gtk.Label(label="Mode:")
-        mode_box.pack_start(mode_label, False, False, 0)
-        
-        self.mode_combo = Gtk.ComboBoxText()
-        self.mode_combo.append_text("Fast (Heuristics Only)")
-        self.mode_combo.append_text("Enhanced (Database Fetch)")
-        self.mode_combo.set_active(0)
-        self.mode_combo.set_tooltip_text(
-            "Fast: Instant results with literature defaults\n"
-            "Enhanced: Fetch real data from SABIO-RK (slower, higher confidence)"
-        )
-        mode_box.pack_start(self.mode_combo, True, True, 0)
-        
-        content_box.pack_start(mode_box, False, False, 0)
         
         # Analyze button
         self.analyze_button = Gtk.Button(label="Analyze & Infer Parameters")
@@ -151,8 +120,8 @@ class HeuristicParametersCategory(BasePathwayCategory):
         
         # Define columns with widths
         columns = [
-            ("ID", 1, 60),
-            ("Type", 2, 100),
+            ("ID", 1, 100),
+            ("Type", 2, 90),
             ("Vmax", 3, 80),
             ("Km", 4, 80),
             ("Kcat", 5, 80),
@@ -179,12 +148,7 @@ class HeuristicParametersCategory(BasePathwayCategory):
         self.apply_selected_button = Gtk.Button(label="Apply Selected")
         self.apply_selected_button.connect('clicked', self._on_apply_selected)
         self.apply_selected_button.set_sensitive(False)
-        action_box.pack_start(self.apply_selected_button, False, False, 0)
-        
-        self.apply_all_button = Gtk.Button(label="Apply All High Confidence")
-        self.apply_all_button.connect('clicked', self._on_apply_all)
-        self.apply_all_button.set_sensitive(False)
-        action_box.pack_start(self.apply_all_button, False, False, 0)
+        action_box.pack_start(self.apply_selected_button, True, True, 0)
         
         content_box.pack_start(action_box, False, False, 0)
         
@@ -202,34 +166,16 @@ class HeuristicParametersCategory(BasePathwayCategory):
     def _on_analyze_clicked(self, button):
         """Handle analyze button click."""
         self.analyze_button.set_sensitive(False)
-        
-        # Get mode
-        mode_idx = self.mode_combo.get_active()
-        use_db_fetch = (mode_idx == 1)  # Enhanced mode
-        
-        if use_db_fetch:
-            self.status_label.set_text("Analyzing model and fetching database parameters...")
-        else:
-            self.status_label.set_text("Analyzing model with fast heuristics...")
-        
-        # Get organism
-        organism = self.organism_combo.get_active_text()
-        
-        # Update controller mode
-        self.controller.set_fetch_mode(use_db_fetch)
+        self.status_label.set_text("Analyzing model and inferring parameters...")
         
         # Run analysis in background (to avoid blocking UI)
-        GLib.idle_add(self._do_analysis, organism)
+        GLib.idle_add(self._do_analysis)
     
-    def _do_analysis(self, organism: str):
-        """Perform analysis (called from idle handler).
-        
-        Args:
-            organism: Target organism
-        """
+    def _do_analysis(self):
+        """Perform analysis (called from idle handler)."""
         try:
-            # Analyze model
-            results = self.controller.analyze_model(organism)
+            # Analyze model with generic organism (heuristics don't use it)
+            results = self.controller.analyze_model(organism="generic")
             
             # Clear previous results
             self.results_store.clear()
@@ -292,7 +238,6 @@ class HeuristicParametersCategory(BasePathwayCategory):
             self._all_selected = False
             self.select_column.set_title("☐")  # Unchecked
             self.apply_selected_button.set_sensitive(False)  # No selection yet
-            self.apply_all_button.set_sensitive(True)
             
         except Exception as e:
             self.logger.error(f"Analysis failed: {e}")
@@ -416,10 +361,6 @@ class HeuristicParametersCategory(BasePathwayCategory):
         details.append(f"Type: {params.transition_type.value}")
         details.append(f"Semantics: {params.biological_semantics.value}")
         details.append(f"Confidence: {int(params.confidence_score * 100)}%")
-        details.append(f"Source: {params.source}")
-        
-        if params.ec_number:
-            details.append(f"EC: {params.ec_number}")
         
         # Type-specific parameters
         param_dict = params.to_dict().get('parameters', {})
@@ -481,32 +422,6 @@ class HeuristicParametersCategory(BasePathwayCategory):
             else:
                 self.status_label.set_text("No transitions selected")
     
-    def _on_apply_all(self, button):
-        """Handle apply all high confidence button click."""
-        applied_count = 0
-        
-        # Iterate all rows
-        iter = self.results_store.get_iter_first()
-        while iter:
-            result = self.results_store.get_value(iter, 10)  # InferenceResult object at column 10
-            
-            # Only apply high confidence (>= 70%)
-            if result.parameters.confidence_score >= 0.70:
-                success = self.controller.apply_parameters(
-                    result.transition_id,
-                    result.parameters.to_dict()
-                )
-                if success:
-                    applied_count += 1
-            
-            iter = self.results_store.iter_next(iter)
-        
-        # CRITICAL: Reset simulation state after applying parameters
-        if applied_count > 0:
-            self._reset_simulation_after_parameter_changes()
-        
-        self.status_label.set_text(f"Applied parameters to {applied_count} transitions")
-    
     def _reset_simulation_after_parameter_changes(self):
         """Reset simulation to initial state after applying parameter changes.
         
@@ -543,11 +458,21 @@ class HeuristicParametersCategory(BasePathwayCategory):
                 if drawing_area in self.canvas_loader.simulation_controllers:
                     controller = self.canvas_loader.simulation_controllers[drawing_area]
                     
-                    # Full reset: clears behavior cache AND resets places to initial marking
-                    # This ensures clean state for testing new parameter values
-                    controller.reset()
+                    # Get the canvas manager
+                    canvas_manager = self.canvas_loader.canvas_managers.get(drawing_area)
                     
-                    self.logger.info("Simulation reset to initial state after parameter changes")
+                    if canvas_manager:
+                        # CRITICAL: Use reset_for_new_model() instead of reset()
+                        # This recreates the model adapter and clears ALL caches
+                        # After applying parameters, the transition objects have changed
+                        # and we need to rebuild the entire simulation state
+                        controller.reset_for_new_model(canvas_manager)
+                        
+                        self.logger.info("Simulation fully reset after parameter changes (model adapter recreated)")
+                    else:
+                        # Fallback to basic reset if we can't get canvas_manager
+                        controller.reset()
+                        self.logger.info("Simulation reset to initial state after parameter changes")
                     
                     # Refresh canvas to show reset token values
                     if drawing_area:

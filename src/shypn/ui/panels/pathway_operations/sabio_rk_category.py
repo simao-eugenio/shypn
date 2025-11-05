@@ -883,11 +883,21 @@ class SabioRKCategory(BasePathwayCategory):
                 if drawing_area in self.canvas_loader.simulation_controllers:
                     controller = self.canvas_loader.simulation_controllers[drawing_area]
                     
-                    # Full reset: clears behavior cache AND resets places to initial marking
-                    # This ensures clean state for testing new parameter values
-                    controller.reset()
+                    # Get the canvas manager
+                    canvas_manager = self.canvas_loader.canvas_managers.get(drawing_area)
                     
-                    self.logger.info("Simulation reset to initial state after SABIO-RK parameter changes")
+                    if canvas_manager:
+                        # CRITICAL: Use reset_for_new_model() instead of reset()
+                        # This recreates the model adapter and clears ALL caches
+                        # After applying parameters, the transition objects have changed
+                        # and we need to rebuild the entire simulation state
+                        controller.reset_for_new_model(canvas_manager)
+                        
+                        self.logger.info("Simulation fully reset after SABIO-RK parameter changes (model adapter recreated)")
+                    else:
+                        # Fallback to basic reset if we can't get canvas_manager
+                        controller.reset()
+                        self.logger.info("Simulation reset to initial state after SABIO-RK parameter changes")
                     
                     # Refresh canvas to show reset token values
                     if drawing_area:
