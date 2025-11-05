@@ -600,54 +600,18 @@ class ModelCanvasManager:
         
         
         # Update ID counters to avoid collisions
-        # Handle both numeric IDs (int) and string IDs ("123", "P123", "T45", "A12")
+        # Register all existing IDs with the IDManager
         if places:
-            place_ids = []
             for p in self.places:
-                if isinstance(p.id, int):
-                    place_ids.append(p.id)
-                elif isinstance(p.id, str):
-                    # Try to extract numeric part - handle both "10" and "P10" formats
-                    if p.id.isdigit():
-                        # Plain numeric string like "10"
-                        place_ids.append(int(p.id))
-                    elif len(p.id) > 1 and p.id[1:].isdigit():
-                        # Prefixed format like "P10"
-                        place_ids.append(int(p.id[1:]))
-            if place_ids:
-                self.document_controller._next_place_id = max(place_ids) + 1
+                self.document_controller.id_manager.register_place_id(p.id)
         
         if transitions:
-            trans_ids = []
             for t in self.transitions:
-                if isinstance(t.id, int):
-                    trans_ids.append(t.id)
-                elif isinstance(t.id, str):
-                    # Try to extract numeric part - handle both "10" and "T10" formats
-                    if t.id.isdigit():
-                        # Plain numeric string like "10"
-                        trans_ids.append(int(t.id))
-                    elif len(t.id) > 1 and t.id[1:].isdigit():
-                        # Prefixed format like "T10"
-                        trans_ids.append(int(t.id[1:]))
-            if trans_ids:
-                self.document_controller._next_transition_id = max(trans_ids) + 1
+                self.document_controller.id_manager.register_transition_id(t.id)
         
         if arcs:
-            arc_ids = []
             for a in self.arcs:
-                if isinstance(a.id, int):
-                    arc_ids.append(a.id)
-                elif isinstance(a.id, str):
-                    # Try to extract numeric part - handle both "10" and "A10" formats
-                    if a.id.isdigit():
-                        # Plain numeric string like "10"
-                        arc_ids.append(int(a.id))
-                    elif len(a.id) > 1 and a.id[1:].isdigit():
-                        # Prefixed format like "A10"
-                        arc_ids.append(int(a.id[1:]))
-            if arc_ids:
-                self.document_controller._next_arc_id = max(arc_ids) + 1
+                self.document_controller.id_manager.register_arc_id(a.id)
         
         # CRITICAL: Reset all places to their initial marking
         # When loading (File Open, KEGG import, SBML import, etc), we want to start

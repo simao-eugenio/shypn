@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from shypn.netobjs.place import Place
 from shypn.netobjs.transition import Transition
 from shypn.netobjs.arc import Arc
+from shypn.data.canvas.id_manager import IDManager
 from shypn.crossfetch.models.fetch_result import FetchResult
 
 logger = logging.getLogger(__name__)
@@ -82,24 +83,17 @@ class PathwayBuilder:
     
     def __init__(self):
         """Initialize pathway builder."""
-        # ID counters (start from 1)
-        self._next_place_id = 1
-        self._next_transition_id = 1
-        self._next_arc_id = 1
-        
-        # Name counters (P1, P2, T1, T2, A1, A2)
-        self._next_place_name = 1
-        self._next_transition_name = 1
-        self._next_arc_name = 1
+        # Centralized ID management
+        self.id_manager = IDManager()
         
         # Mapping from external IDs to internal objects
         self._species_to_place: Dict[str, Place] = {}
         self._reaction_to_transition: Dict[str, Transition] = {}
         
-        # Created objects
-        self._places: Dict[int, Place] = {}
-        self._transitions: Dict[int, Transition] = {}
-        self._arcs: Dict[int, Arc] = {}
+        # Created objects (keyed by string ID)
+        self._places: Dict[str, Place] = {}
+        self._transitions: Dict[str, Transition] = {}
+        self._arcs: Dict[str, Arc] = {}
         
         # Build warnings
         self._warnings: List[str] = []
@@ -262,8 +256,8 @@ class PathwayBuilder:
             species: Set of species ID strings
         """
         for species_id in sorted(species):  # Sort for deterministic order
-            place_id = self._next_place_id
-            place_name = f"P{self._next_place_name}"
+            place_id = self.id_manager.generate_place_id()
+            place_name = place_id  # Name matches ID
             
             # Create place at origin (will be positioned later)
             place = Place(
@@ -276,9 +270,6 @@ class PathwayBuilder:
             
             self._places[place_id] = place
             self._species_to_place[species_id] = place
-            
-            self._next_place_id += 1
-            self._next_place_name += 1
         
         logger.debug(f"Created {len(self._places)} places")
     
@@ -295,8 +286,8 @@ class PathwayBuilder:
             
             reaction_id = reaction.get('id') or reaction.get('name', f'R{self._next_transition_name}')
             
-            transition_id = self._next_transition_id
-            transition_name = f"T{self._next_transition_name}"
+            transition_id = self.id_manager.generate_transition_id()
+            transition_name = transition_id  # Name matches ID
             
             # Create transition at origin (will be positioned later)
             transition = Transition(
@@ -313,9 +304,6 @@ class PathwayBuilder:
             
             self._transitions[transition_id] = transition
             self._reaction_to_transition[reaction_id] = transition
-            
-            self._next_transition_id += 1
-            self._next_transition_name += 1
             
             # Create arcs from substrates to transition
             substrates = reaction.get('substrates', []) or reaction.get('reactants', [])
@@ -389,8 +377,8 @@ class PathwayBuilder:
             Arc object if created, None if validation failed
         """
         try:
-            arc_id = self._next_arc_id
-            arc_name = f"A{self._next_arc_name}"
+            arc_id = self.id_manager.generate_arc_id()
+            arc_name = arc_id  # Name matches ID
             
             arc = Arc(
                 source=source,
@@ -401,8 +389,6 @@ class PathwayBuilder:
             )
             
             self._arcs[arc_id] = arc
-            self._next_arc_id += 1
-            self._next_arc_name += 1
             
             return arc
         except ValueError as e:
