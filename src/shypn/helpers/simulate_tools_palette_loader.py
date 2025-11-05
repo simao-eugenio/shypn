@@ -134,28 +134,21 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         self._initialize_duration_controls()
         self._load_settings_panel()
         self._create_widget_container()
+        
+        # Reveal the palette by default when added to SwissKnife
+        if self.simulate_tools_revealer:
+            self.simulate_tools_revealer.set_reveal_child(True)
     
     def _create_widget_container(self):
         """Create a container for the simulate tools palette.
         
-        PHASE 2 REFACTOR: This now returns ONLY the tool buttons container,
-        not the settings panel. Settings panel will be managed separately
-        by the universal parameter panel manager (Phase 3).
-        
-        The widget_container will be returned by get_widget() and must fit
-        within the 50px constant height constraint.
+        FIXED: Return the revealer (not the grid) to maintain proper widget hierarchy.
+        The revealer contains the grid with all controls including the progress bar.
+        This ensures proper visibility and layout.
         """
-        # For Phase 2: widget_container is just the tools container (no settings)
-        # Settings panel will be extracted in Phase 3 to universal parameter panel
-        
-        # IMPORTANT: Remove simulate_tools_container from its parent revealer
-        # (from UI file) to avoid "widget already in container" warning
-        if self.simulate_tools_container:
-            parent = self.simulate_tools_container.get_parent()
-            if parent:
-                parent.remove(self.simulate_tools_container)
-        
-        self.widget_container = self.simulate_tools_container
+        # Use the revealer from the UI file - do NOT extract the grid from it
+        # The revealer is needed to control visibility and maintain widget hierarchy
+        self.widget_container = self.simulate_tools_revealer
         
         # Note: settings_revealer still loaded but not included in widget_container
         # It will be accessed via create_settings_panel() factory method (Phase 3)
@@ -944,11 +937,12 @@ class SimulateToolsPaletteLoader(GObject.GObject):
     def get_widget(self):
         """Get the root widget for adding to container.
         
-        PHASE 2 REFACTOR: Returns ONLY the tools palette (50px max height).
-        Settings panel is available via create_settings_panel() factory method.
+        Returns the revealer containing the simulation tools palette.
+        This maintains proper widget hierarchy and ensures all child widgets
+        (including progress bar and time display) are properly visible.
         
         Returns:
-            Gtk.Widget: Tools palette container (buttons only, fits 50px height).
+            Gtk.Revealer: Revealer containing the tools palette grid.
         """
         return self.widget_container
     
