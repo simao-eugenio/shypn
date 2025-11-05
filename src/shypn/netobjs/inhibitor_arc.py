@@ -136,7 +136,7 @@ class InhibitorArc(Arc):
         cr.set_line_width(self.width / max(zoom, 1e-6))  # Compensate for zoom
         cr.stroke()
     
-    def render(self, cr, transform=None, zoom=1.0):
+    def render(self, cr, zoom=1.0):
         """Render inhibitor arc with line stopping before the hollow circle.
         
         Overrides Arc.render() to adjust the endpoint so the line doesn't
@@ -144,7 +144,6 @@ class InhibitorArc(Arc):
         
         Args:
             cr: Cairo context (with zoom transformation already applied)
-            transform: Optional function (deprecated, for backward compatibility)
             zoom: Current zoom level for line width compensation
         """
         # Check if this arc should be rendered as curved

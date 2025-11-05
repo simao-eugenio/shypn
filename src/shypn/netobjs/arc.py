@@ -153,8 +153,8 @@ class Arc(PetriNetObject):
                 f"Valid connections: Place→Transition or Transition→Place."
             )
     
-    def render(self, cr, transform=None, zoom=1.0):
-        """Render the arc using Cairo.
+    def render(self, cr, zoom=1.0):
+        """Render the arc as a line with arrowhead.
         
         Uses legacy rendering style with Cairo transform approach:
         - 3.0px line width (compensated for zoom to maintain constant pixel size)
@@ -165,7 +165,6 @@ class Arc(PetriNetObject):
         
         Args:
             cr: Cairo context (with zoom transformation already applied)
-            transform: Optional function (deprecated, for backward compatibility)
             zoom: Current zoom level for line width compensation
         """
         # Ensure clean Cairo context state

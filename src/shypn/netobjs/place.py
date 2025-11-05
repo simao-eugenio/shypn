@@ -49,8 +49,8 @@ class Place(PetriNetObject):
         self.initial_marking = 0  # Initial marking for simulation reset
         self.capacity = float('inf')  # Maximum token capacity (infinite by default)
     
-    def render(self, cr, transform=None, zoom=1.0):
-        """Render the place using Cairo.
+    def render(self, cr, zoom=1.0):
+        """Render the place as a hollow circle with optional tokens.
         
         Uses legacy rendering style with Cairo transform approach:
         - Hollow circle (stroke only, no fill) like classic Petri nets
@@ -60,7 +60,6 @@ class Place(PetriNetObject):
         
         Args:
             cr: Cairo context (with zoom transformation already applied)
-            transform: Optional function (deprecated, for backward compatibility)
             zoom: Current zoom level for line width compensation
         """
         # Use world coordinates directly (Cairo transform handles conversion)

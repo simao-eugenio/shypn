@@ -94,8 +94,8 @@ def test_arc_render_call():
     
     mock_cr = MockCairoContext()
     
-    # Call render without transform
-    a1.render(mock_cr, transform=None)
+    # Call render without transform parameter
+    a1.render(mock_cr)
     
     # Check operations
     has_move = any(op[0] == 'move_to' for op in mock_cr.operations)
