@@ -8,6 +8,7 @@ This is a stateful controller managing object collections and document state.
 
 from datetime import datetime
 from shypn.netobjs import Place, Arc, Transition
+from shypn.data.canvas.id_manager import IDManager
 
 
 class DocumentController:
@@ -26,7 +27,7 @@ class DocumentController:
     - places: List of Place instances
     - transitions: List of Transition instances
     - arcs: List of Arc instances
-    - _next_place_id, _next_transition_id, _next_arc_id: ID counters
+    - id_manager: Centralized IDManager for consistent ID generation
     - filename: Document base filename (without extension)
     - modified: Document modified flag
     - created_at, modified_at: Timestamps
@@ -49,10 +50,8 @@ class DocumentController:
         self.transitions = []  # List of Transition instances
         self.arcs = []  # List of Arc instances
         
-        # ID counters for object naming
-        self._next_place_id = 1
-        self._next_transition_id = 1
-        self._next_arc_id = 1
+        # Centralized ID management
+        self.id_manager = IDManager()
         
         # Document metadata
         self.filename = filename
@@ -79,9 +78,8 @@ class DocumentController:
         Returns:
             Place: The newly created place instance.
         """
-        place_id = f"P{self._next_place_id}"  # String ID with prefix
+        place_id = self.id_manager.generate_place_id()
         place_name = place_id  # Name matches ID
-        self._next_place_id += 1
         
         place = Place(x, y, place_id, place_name, **kwargs)
         if self._on_change_callback:
@@ -102,9 +100,8 @@ class DocumentController:
         Returns:
             Transition: The newly created transition instance.
         """
-        transition_id = f"T{self._next_transition_id}"  # String ID with prefix
+        transition_id = self.id_manager.generate_transition_id()
         transition_name = transition_id  # Name matches ID
-        self._next_transition_id += 1
         
         transition = Transition(x, y, transition_id, transition_name, **kwargs)
         if self._on_change_callback:
@@ -125,9 +122,8 @@ class DocumentController:
         Returns:
             Arc: The newly created arc instance.
         """
-        arc_id = f"A{self._next_arc_id}"  # String ID with prefix
+        arc_id = self.id_manager.generate_arc_id()
         arc_name = arc_id  # Name matches ID
-        self._next_arc_id += 1
         
         arc = Arc(source, target, arc_id, arc_name, **kwargs)
         if self._on_change_callback:
@@ -292,9 +288,7 @@ class DocumentController:
         self.arcs.clear()
         
         # Reset ID counters
-        self._next_place_id = 1
-        self._next_transition_id = 1
-        self._next_arc_id = 1
+        self.id_manager.reset()
         
         self.mark_dirty()
     

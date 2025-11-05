@@ -280,33 +280,33 @@ class ModelCanvasManager:
     
     @property
     def _next_place_id(self):
-        """Get next place ID (delegates to DocumentController)."""
-        return self.document_controller._next_place_id
+        """Get next place ID counter (delegates to IDManager)."""
+        return self.document_controller.id_manager._next_place_id
     
     @_next_place_id.setter
     def _next_place_id(self, value):
-        """Set next place ID (delegates to DocumentController)."""
-        self.document_controller._next_place_id = value
+        """Set next place ID counter (delegates to IDManager)."""
+        self.document_controller.id_manager._next_place_id = value
     
     @property
     def _next_transition_id(self):
-        """Get next transition ID (delegates to DocumentController)."""
-        return self.document_controller._next_transition_id
+        """Get next transition ID counter (delegates to IDManager)."""
+        return self.document_controller.id_manager._next_transition_id
     
     @_next_transition_id.setter
     def _next_transition_id(self, value):
-        """Set next transition ID (delegates to DocumentController)."""
-        self.document_controller._next_transition_id = value
+        """Set next transition ID counter (delegates to IDManager)."""
+        self.document_controller.id_manager._next_transition_id = value
     
     @property
     def _next_arc_id(self):
-        """Get next arc ID (delegates to DocumentController)."""
-        return self.document_controller._next_arc_id
+        """Get next arc ID counter (delegates to IDManager)."""
+        return self.document_controller.id_manager._next_arc_id
     
     @_next_arc_id.setter
     def _next_arc_id(self, value):
-        """Set next arc ID (delegates to DocumentController)."""
-        self.document_controller._next_arc_id = value
+        """Set next arc ID counter (delegates to IDManager)."""
+        self.document_controller.id_manager._next_arc_id = value
     
     # ==================== DPI and Physical Units ====================
     

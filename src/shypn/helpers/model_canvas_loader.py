@@ -716,9 +716,7 @@ class ModelCanvasLoader:
         manager.arcs.clear()
         
         # Reset ID counters to avoid collisions
-        manager.document_controller._next_place_id = 1
-        manager.document_controller._next_transition_id = 1
-        manager.document_controller._next_arc_id = 1
+        manager.document_controller.id_manager.reset()
         
         # Mark as clean (document will be loaded)
         manager.mark_clean()
