@@ -125,9 +125,10 @@ class StochasticParameters(TransitionParameters):
         if self.biological_semantics == BiologicalSemantics.UNKNOWN:
             self.biological_semantics = BiologicalSemantics.MASS_ACTION
         
-        # Auto-generate rate function if not provided
-        if not self.rate_function and self.k_forward:
-            self.rate_function = f"mass_action({self.k_forward})"
+        # NOTE: rate_function should be provided by the caller with actual substrate place names
+        # Do NOT auto-generate here with placeholder - that causes incorrect function calls
+        # The calling code (heuristic_engine, heuristic_parameters_controller) must build the 
+        # rate_function with actual place identifiers like: "mass_action(P1, P2, 0.1)"
     
     def to_dict(self) -> Dict[str, Any]:
         data = super().to_dict()
