@@ -394,6 +394,7 @@ class SimulateToolsPaletteLoader(GObject.GObject):
             controller: The SimulationController instance
             time: Current simulation time
         """
+        print(f"[PALETTE._on_simulation_step] time={time:.4f}")
         self.emit('step-executed', time)
         self._update_progress_display()
 
@@ -630,17 +631,40 @@ class SimulateToolsPaletteLoader(GObject.GObject):
 
     def _on_run_clicked(self, button):
         """Handle Run button click - start continuous simulation."""
+        print("=" * 60)
+        print("[RUN_BUTTON] Run button clicked!")
+        print("=" * 60)
+        
         if self.simulation is None:
+            print("[RUN_BUTTON] ❌ ERROR: self.simulation is None")
             return
+        
+        print(f"[RUN_BUTTON] Simulation controller: {type(self.simulation).__name__}")
+        print(f"[RUN_BUTTON] Controller ID: {id(self.simulation)}")
+        print(f"[RUN_BUTTON] Simulation.model has {len(self.simulation.model.places)} places, {len(self.simulation.model.transitions)} transitions")
+        print(f"[RUN_BUTTON] transition_states has {len(self.simulation.transition_states)} entries")
+        
+        # Get some transitions to check (model.transitions is a list, not dict)
+        transitions = self.simulation.model.transitions[:5]
+        print(f"[RUN_BUTTON] Sample transition IDs: {[t.id for t in transitions]}")
+        
+        # Check transition_states directly
+        for t in transitions:
+            state = self.simulation.transition_states.get(t.id)
+            print(f"[RUN_BUTTON] transition_states[{t.id}] = {state}")
         
         # Hide settings panel if open
         self._hide_settings_panel()
         
         # Use effective dt from settings (no hardcoded time_step)
+        print("[RUN_BUTTON] Calling simulation.run()...")
         self.simulation.run()
+        print("[RUN_BUTTON] simulation.run() returned")
         
         # Update button states for running simulation
         self._update_button_states(running=True)
+        print("[RUN_BUTTON] Button states updated")
+        print("=" * 60)
 
     def _on_step_clicked(self, button):
         """Handle Step button click - execute one simulation step."""
@@ -842,12 +866,16 @@ class SimulateToolsPaletteLoader(GObject.GObject):
     def _update_progress_display(self):
         """Update progress bar and time display label."""
         if not self.progress_bar or not self.time_display_label:
+            print(f"[PALETTE._update_progress_display] ❌ Missing widgets: progress_bar={self.progress_bar is not None}, time_label={self.time_display_label is not None}")
             return
         
         if self.simulation is None:
+            print(f"[PALETTE._update_progress_display] ❌ No simulation controller")
             return
         
         settings = self.simulation.settings
+        
+        print(f"[PALETTE._update_progress_display] time={self.simulation.time:.4f}, duration={settings.duration}")
         
         # Update progress bar
         if settings.duration:
@@ -855,9 +883,11 @@ class SimulateToolsPaletteLoader(GObject.GObject):
             self.progress_bar.set_fraction(min(progress, 1.0))
             self.progress_bar.set_text(f"{int(progress * 100)}%")
             self.progress_bar.set_show_text(True)
+            print(f"[PALETTE._update_progress_display] Progress bar: {progress*100:.1f}%")
         else:
             self.progress_bar.set_fraction(0.0)
             self.progress_bar.set_show_text(False)
+            print(f"[PALETTE._update_progress_display] No duration set - progress bar hidden")
         
         # Update time display with speed indicator
         if settings.duration:

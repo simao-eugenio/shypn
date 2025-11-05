@@ -217,6 +217,43 @@ class SimulationController:
             from shypn.netobjs.place import Place
             if isinstance(obj, (Place, Transition, Arc)):
                 self.model_adapter.invalidate_caches()
+            
+            # If a new transition was created, initialize its state and enablement
+            if isinstance(obj, Transition):
+                if obj.id not in self.transition_states:
+                    self.transition_states[obj.id] = TransitionState()
+                    print(f"[CONTROLLER._on_model_changed] Created TransitionState for new transition {obj.id}")
+                
+                # Immediately update enablement for the new transition
+                # This ensures source transitions are immediately ready to fire
+                behavior = self._get_behavior(obj)
+                is_source = getattr(obj, 'is_source', False)
+                
+                if is_source:
+                    # Source transitions are always enabled
+                    state = self.transition_states[obj.id]
+                    state.enablement_time = self.time
+                    if hasattr(behavior, 'set_enablement_time'):
+                        behavior.set_enablement_time(self.time)
+                    print(f"[CONTROLLER._on_model_changed] Enabled source transition {obj.id} at time={self.time}")
+                else:
+                    # Check if transition is structurally enabled (has enough input tokens)
+                    input_arcs = behavior.get_input_arcs()
+                    locally_enabled = True
+                    for arc in input_arcs:
+                        source_place = behavior._get_place(arc.source_id)
+                        if source_place is None or source_place.tokens < arc.weight:
+                            locally_enabled = False
+                            break
+                    
+                    if locally_enabled:
+                        state = self.transition_states[obj.id]
+                        state.enablement_time = self.time
+                        if hasattr(behavior, 'set_enablement_time'):
+                            behavior.set_enablement_time(self.time)
+                        print(f"[CONTROLLER._on_model_changed] Enabled transition {obj.id} at time={self.time}")
+                    else:
+                        print(f"[CONTROLLER._on_model_changed] Transition {obj.id} not enabled (insufficient input tokens)")
 
     def _get_behavior(self, transition):
         """Get or create behavior instance for a transition.
@@ -446,6 +483,10 @@ class SimulationController:
         Returns:
             bool: True if any transition fired/integrated, False if deadlocked/complete
         """
+        # Debug output for first few steps only
+        if self._steps_executed < 3:
+            print(f"\n[STEP {self._steps_executed}] ========================================")
+        
         # Use effective dt if not specified
         if time_step is None:
             time_step = self.get_effective_dt()
@@ -461,6 +502,32 @@ class SimulationController:
             logger.warning(f"Large time step ({time_step}s) may cause timed transitions to miss firing windows")
         
         self._update_enablement_states()
+        
+        # Debug: Check which transitions are enabled
+        if self._steps_executed < 3:
+            print(f"[STEP] Checking enablement for {len(self.model.transitions)} transitions...")
+            enabled_count = 0
+            # Show first 5 AND last 5 transitions
+            transitions_to_check = list(self.model.transitions[:5]) + list(self.model.transitions[-5:])
+            for t in transitions_to_check:
+                is_enabled = self._is_transition_enabled(t)
+                if is_enabled:
+                    enabled_count += 1
+                # Get input places to check tokens
+                behavior = self._get_behavior(t)
+                input_arcs = behavior.get_input_arcs()
+                input_info = []
+                for arc in input_arcs:
+                    place = arc.source if hasattr(arc, 'source') else None
+                    if place:
+                        input_info.append(f"{place.id}:{place.tokens}")
+                input_str = ", ".join(input_info) if input_info else "NO_INPUTS(source)"
+                print(f"[STEP] T={t.id}, type={t.transition_type}, enabled={is_enabled}, inputs=[{input_str}]")
+            
+            # Count ALL enabled transitions
+            enabled_count = sum(1 for t in self.model.transitions if self._is_transition_enabled(t))
+            print(f"[STEP] Total enabled: {enabled_count}/{len(self.model.transitions)}")
+        
         immediate_fired_total = 0
         max_immediate_iterations = 1000
         for iteration in range(max_immediate_iterations):
@@ -1481,17 +1548,27 @@ class SimulationController:
         Returns:
             bool: True if started successfully, False if already running
         """
+        print("[CONTROLLER.RUN] Starting run() method")
+        print(f"[CONTROLLER.RUN] Model has {len(self.model.places)} places, {len(self.model.transitions)} transitions")
+        
         if not GLIB_AVAILABLE:
+            print("[CONTROLLER.RUN] ❌ ERROR: GLIB not available")
             return False
         if self._running:
+            print("[CONTROLLER.RUN] ⚠️ Already running")
             return False
-        for transition in self.model.transitions:
+        
+        print(f"[CONTROLLER.RUN] Checking {len(self.model.transitions)} transitions...")
+        for i, transition in enumerate(self.model.transitions[:5]):  # Check first 5 only
             state = self.transition_states.get(transition.id)
             behavior = self._get_behavior(transition)
+            print(f"[CONTROLLER.RUN] Transition {i+1}/{len(self.model.transitions)}: {transition.id}, state={state}, behavior={type(behavior).__name__ if behavior else None}")
         
         # Use effective dt if not specified
         if time_step is None:
             time_step = self.get_effective_dt()
+        
+        print(f"[CONTROLLER.RUN] time_step={time_step}")
         
         # Calculate max_steps from duration if not specified
         if max_steps is None:
@@ -1499,11 +1576,15 @@ class SimulationController:
             if estimated_steps is not None:
                 max_steps = estimated_steps
         
+        print(f"[CONTROLLER.RUN] max_steps={max_steps}")
+        
         self._running = True
         self._stop_requested = False
         self._max_steps = max_steps
         self._steps_executed = 0
         self._time_step = time_step
+        
+        print("[CONTROLLER.RUN] Setting up timeout callback...")
         
         # Calculate optimal step batching for smooth animation with time scale
         # Target: Execute multiple steps per GUI update to maintain smooth visualization
@@ -1704,6 +1785,31 @@ class SimulationController:
         # Re-register observer for new model
         if hasattr(new_model, 'register_observer'):
             new_model.register_observer(self._on_model_changed)
+        
+        # CRITICAL: Restore initial marking for all places
+        # This was missing and caused all loaded models to have zero tokens!
+        print(f"[RESET_FOR_NEW_MODEL] Restoring initial marking for {len(self.model.places)} places...")
+        for place in self.model.places:
+            if hasattr(place, 'initial_marking'):
+                place.tokens = place.initial_marking
+                if place.tokens > 0:
+                    print(f"[RESET_FOR_NEW_MODEL] Place {place.id}: tokens={place.tokens} (from initial_marking)")
+            else:
+                place.tokens = 0
+        
+        # CRITICAL: Initialize transition states after model reset
+        # This populates self.transition_states with enablement tracking
+        # Without this, transitions won't have state and simulation won't run
+        print(f"[RESET_FOR_NEW_MODEL] Controller ID: {id(self)}")
+        print(f"[RESET_FOR_NEW_MODEL] Before _update_enablement_states: {len(self.transition_states)} transition states")
+        self._update_enablement_states()
+        print(f"[RESET_FOR_NEW_MODEL] After _update_enablement_states: {len(self.transition_states)} transition states")
+        
+        # Show first 5 transition states
+        for t_id in list(self.transition_states.keys())[:5]:
+            print(f"[RESET_FOR_NEW_MODEL] transition_states[{t_id}] = {self.transition_states[t_id]}")
+        
+        self._notify_step_listeners()
 
     def is_running(self) -> bool:
         """Check if simulation is currently running.

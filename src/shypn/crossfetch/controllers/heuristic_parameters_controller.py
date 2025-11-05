@@ -246,8 +246,26 @@ class HeuristicParametersController:
                     transition.properties['kcat'] = params['kcat']
                 if 'ki' in params and params['ki'] is not None:
                     transition.properties['ki'] = params['ki']
-                if 'rate_function' in params:
+                
+                # Build or use rate_function
+                if 'rate_function' in params and params['rate_function']:
                     transition.properties['rate_function'] = params['rate_function']
+                elif params.get('vmax') and params.get('km'):
+                    # Auto-generate rate_function using actual substrate place name
+                    # Get substrate place from transition's input arcs
+                    substrate_places = []
+                    for arc in getattr(transition, 'input_arcs', []):
+                        if hasattr(arc, 'source'):
+                            substrate_places.append(arc.source)
+                    
+                    if substrate_places:
+                        substrate_name = substrate_places[0].name if hasattr(substrate_places[0], 'name') else f"P{substrate_places[0].id}"
+                        rate_function = f"michaelis_menten({substrate_name}, {params['vmax']}, {params['km']})"
+                        transition.properties['rate_function'] = rate_function
+                        self.logger.info(f"Generated rate_function: {rate_function}")
+                    else:
+                        self.logger.warning(f"No substrate place found for {transition_id}, using constant rate")
+                        transition.rate = params['vmax']
             
             # Mark document as dirty (manager has mark_dirty directly)
             canvas_manager.mark_dirty()

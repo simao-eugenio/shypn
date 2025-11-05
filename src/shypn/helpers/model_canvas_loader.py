@@ -797,16 +797,13 @@ class ModelCanvasLoader:
                 }
             
             # ============================================================
-            # CRITICAL: Reset simulation controller to initial state
+            # NOTE: Simulation controller reset moved to AFTER load_objects()
             # ============================================================
-            # The simulation controller maintains state across multiple simulation runs.
-            # When loading a new model, we must reset it to prevent stale state from
-            # affecting the new model (e.g., old schedulers, interaction guards, etc.)
-            if drawing_area in self.simulation_controllers:
-                controller = self.simulation_controllers[drawing_area]
-                # Reset the controller with the new manager's model
-                # This recreates schedulers, guards, and all wiring
-                controller.reset_for_new_model(manager)
+            # The simulation controller should be reset AFTER objects are loaded,
+            # not here when the manager is still empty. The reset happens in
+            # _ensure_simulation_reset() which is called after load_objects().
+            # This ensures the controller sees the full loaded model.
+            print(f"[LOAD] Skipping controller reset here (will reset after objects loaded)")
             
             # ============================================================
             # CRITICAL: Reset Swiss Knife Palette to default state
@@ -863,9 +860,75 @@ class ModelCanvasLoader:
         try:
             if drawing_area in self.simulation_controllers:
                 controller = self.simulation_controllers[drawing_area]
-                # Full reset: clear cache AND reset places to initial marking
-                controller.reset()
+                manager = self.canvas_managers.get(drawing_area)
+                print(f"[RESET] _ensure_simulation_reset called for canvas")
+                print(f"[RESET] Controller ID: {id(controller)}")
+                if manager:
+                    print(f"[RESET] Manager has {len(manager.places)} places, {len(manager.transitions)} transitions")
+                    # CRITICAL: Use reset_for_new_model() instead of reset()
+                    # This recreates the model adapter and ensures the controller
+                    # references the correct manager with the loaded objects
+                    controller.reset_for_new_model(manager)
+                    print(f"[RESET] Full reset complete (model adapter recreated)")
+                    
+                    # CRITICAL: Update SimulateToolsPaletteLoader's controller reference
+                    # The palette has its own simulation controller reference that needs
+                    # to be updated when we reset/recreate the controller for a loaded model
+                    print(f"[RESET] Looking for overlay_manager...")
+                    overlay_manager = self.overlay_managers.get(drawing_area)
+                    if overlay_manager:
+                        print(f"[RESET] Found overlay_manager: {type(overlay_manager).__name__}")
+                        swissknife = getattr(overlay_manager, 'swissknife_palette', None)
+                        print(f"[RESET] swissknife_palette: {swissknife}")
+                        if swissknife:
+                            # Use registry.get_widget_palette_instance() instead
+                            if hasattr(swissknife, 'registry'):
+                                print(f"[RESET] Has registry attribute")
+                                simulate_tools_palette = swissknife.registry.get_widget_palette_instance('simulate')
+                                print(f"[RESET] simulate_tools_palette: {simulate_tools_palette}")
+                                if simulate_tools_palette:
+                                    print(f"[RESET] ✅ Updating SimulateToolsPaletteLoader.simulation reference")
+                                    print(f"[RESET] Old controller ID: {id(simulate_tools_palette.simulation) if simulate_tools_palette.simulation else 'None'}")
+                                    
+                                    # CRITICAL: Preserve step listeners from old controller
+                                    # When we replace the controller reference, we need to re-register
+                                    # the step listeners on the new controller, otherwise the UI won't update!
+                                    old_controller = simulate_tools_palette.simulation
+                                    if old_controller and hasattr(old_controller, 'step_listeners'):
+                                        print(f"[RESET] Old controller had {len(old_controller.step_listeners)} step listeners")
+                                    
+                                    simulate_tools_palette.simulation = controller
+                                    print(f"[RESET] New controller ID: {id(simulate_tools_palette.simulation)}")
+                                    
+                                    # Re-register step listeners on new controller
+                                    # The palette's _on_simulation_step callback updates progress and triggers redraws
+                                    if hasattr(simulate_tools_palette, '_on_simulation_step'):
+                                        controller.add_step_listener(simulate_tools_palette._on_simulation_step)
+                                        print(f"[RESET] Re-registered palette step listener")
+                                    if hasattr(simulate_tools_palette, 'data_collector'):
+                                        controller.add_step_listener(simulate_tools_palette.data_collector.on_simulation_step)
+                                        print(f"[RESET] Re-registered data collector step listener")
+                                    
+                                    # Update data collector reference
+                                    if hasattr(controller, 'data_collector') and hasattr(simulate_tools_palette, 'data_collector'):
+                                        controller.data_collector = simulate_tools_palette.data_collector
+                                        print(f"[RESET] Updated controller.data_collector reference")
+                                else:
+                                    print(f"[RESET] ❌ simulate_tools_palette not found in registry")
+                            else:
+                                print(f"[RESET] ❌ No registry attribute on swissknife")
+                        else:
+                            print(f"[RESET] ❌ No swissknife_palette")
+                    else:
+                        print(f"[RESET] ❌ overlay_manager not found for drawing_area")
+                else:
+                    # Fallback to basic reset if we can't get the manager
+                    controller.reset()
+                    print(f"[RESET] Basic reset complete (no manager reference)")
                 print(f"[RESET] Simulation reset for canvas: {drawing_area}")
+                if manager:
+                    print(f"[RESET] Controller.model has {len(controller.model.places)} places, {len(controller.model.transitions)} transitions")
+                    print(f"[RESET] Controller.transition_states has {len(controller.transition_states)} entries")
         except Exception as e:
             print(f"[RESET] Error resetting simulation: {e}")
             import traceback

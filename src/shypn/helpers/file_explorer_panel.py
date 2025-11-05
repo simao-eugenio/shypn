@@ -1830,22 +1830,28 @@ class FileExplorerPanel:
             # Reuse the current empty default tab
             # CRITICAL: Reset manager state before loading to avoid stale state bugs
             # This ensures callbacks are enabled and all flags are reset
+            print(f"[TAB_REUSE] Reusing tab - calling _reset_manager_for_load")
             self.canvas_loader._reset_manager_for_load(manager, base_name)
+            print(f"[TAB_REUSE] After reset - manager has {len(manager.places)} places, {len(manager.transitions)} transitions")
         else:
             # Create a new tab for this document
+            print(f"[TAB_REUSE] Creating new tab with filename='{base_name}'")
             page_index, drawing_area = self.canvas_loader.add_document(filename=base_name)
             manager = self.canvas_loader.get_canvas_manager(drawing_area)
+            print(f"[TAB_REUSE] New tab created - manager has {len(manager.places)} places, {len(manager.transitions)} transitions")
         
         if manager:
             # ===== UNIFIED OBJECT LOADING =====
             # Use load_objects() for consistent, unified initialization path
             # This replaces direct assignment + manual notification loop
             # Benefits: Single code path, automatic notifications, proper references
+            print(f"[TAB_REUSE] Loading {len(document.places)} places, {len(document.transitions)} transitions, {len(document.arcs)} arcs")
             manager.load_objects(
                 places=document.places,
                 transitions=document.transitions,
                 arcs=document.arcs
             )
+            print(f"[TAB_REUSE] After load_objects - manager has {len(manager.places)} places, {len(manager.transitions)} transitions")
             
             # CRITICAL: Set on_changed callback on all loaded objects
             # This is required for proper object state management and dirty tracking
