@@ -78,6 +78,55 @@ class MenuActions:
 		except Exception as e:
 			self._show_error_dialog("Save As Error", f"Failed to save document: {e}")
 	
+	def on_file_reset_canvas(self, action, param):
+		"""Reset the current canvas (clear all elements, restart IDs).
+		
+		PHASE 5: Canvas lifecycle - reset current canvas to initial state.
+		Clears all places, transitions, arcs and resets ID sequence to P1, T1, A1.
+		Shows confirmation dialog before resetting.
+		"""
+		try:
+			if not self.model_canvas_loader:
+				print("[RESET] No canvas loader available")
+				return
+			
+			# Get current canvas info
+			info = self.model_canvas_loader.get_current_canvas_info()
+			if not info:
+				self._show_info_dialog("No Canvas", "No canvas is currently open.")
+				return
+			
+			# Show confirmation dialog
+			dialog = Gtk.MessageDialog(
+				transient_for=self.window,
+				flags=0,
+				message_type=Gtk.MessageType.WARNING,
+				buttons=Gtk.ButtonsType.YES_NO,
+				text="Reset Current Canvas?"
+			)
+			dialog.format_secondary_text(
+				f"This will clear all elements in the current canvas and reset IDs.\n\n"
+				f"Canvas: {info.get('scope_name', 'Unknown')}\n"
+				f"Elements: {info.get('element_count', 0)} (places, transitions, arcs)\n\n"
+				f"This action cannot be undone. Continue?"
+			)
+			
+			response = dialog.run()
+			dialog.destroy()
+			
+			if response == Gtk.ResponseType.YES:
+				# Reset the canvas
+				success = self.model_canvas_loader.reset_current_canvas()
+				if success:
+					self._show_info_dialog("Canvas Reset", "Canvas has been reset successfully.")
+				else:
+					self._show_error_dialog("Reset Failed", "Failed to reset canvas.")
+					
+		except Exception as e:
+			import traceback
+			traceback.print_exc()
+			self._show_error_dialog("Reset Canvas Error", f"Failed to reset canvas: {e}")
+	
 	def on_file_quit(self, action, param):
 		"""Quit the application."""
 		self.app.quit()
@@ -184,6 +233,7 @@ class MenuActions:
 		self._register_action("open", self.on_file_open, "<Primary>o")
 		self._register_action("save", self.on_file_save, "<Primary>s")
 		self._register_action("save-as", self.on_file_save_as, "<Primary><Shift>s")
+		self._register_action("reset-canvas", self.on_file_reset_canvas, "<Primary><Shift>n")
 		self._register_action("quit", self.on_file_quit, "<Primary>q")
 		
 		# Edit menu actions
@@ -236,6 +286,24 @@ class MenuActions:
 			transient_for=self.window,
 			modal=True,
 			message_type=Gtk.MessageType.ERROR,
+			buttons=Gtk.ButtonsType.OK,
+			text=title
+		)
+		dialog.format_secondary_text(message)
+		dialog.run()
+		dialog.destroy()
+	
+	def _show_info_dialog(self, title, message):
+		"""Show an information dialog to the user.
+		
+		Args:
+			title: Dialog title
+			message: Information message to display
+		"""
+		dialog = Gtk.MessageDialog(
+			transient_for=self.window,
+			modal=True,
+			message_type=Gtk.MessageType.INFO,
 			buttons=Gtk.ButtonsType.OK,
 			text=title
 		)

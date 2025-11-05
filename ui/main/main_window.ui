@@ -108,6 +108,20 @@
                       </object>
                     </child>
                     <child>
+                      <object class="GtkMenuItem" id="file_reset_canvas">
+                        <property name="visible">True</property>
+                        <property name="label">_Reset Canvas</property>
+                        <property name="use-underline">True</property>
+                        <property name="action-name">app.reset-canvas</property>
+                        <property name="tooltip-text">Clear current canvas and reset ID sequence (Ctrl+Shift+N)</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkSeparatorMenuItem">
+                        <property name="visible">True</property>
+                      </object>
+                    </child>
+                    <child>
                       <object class="GtkMenuItem" id="file_quit">
                         <property name="visible">True</property>
                         <property name="label">_Quit</property>
