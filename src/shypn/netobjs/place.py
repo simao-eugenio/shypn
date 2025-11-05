@@ -227,14 +227,27 @@ class Place(PetriNetObject):
     def from_dict(cls, data: dict) -> 'Place':
         """Create place from dictionary (deserialization).
         
+        All IDs must be in correct string format with "P" prefix (e.g., "P1", "P101").
+        
         Args:
             data: Dictionary containing place properties
             
         Returns:
             Place: New place instance with restored properties
+            
+        Raises:
+            ValueError: If ID format is invalid
         """
-        # IDs are now always strings - just convert to string
-        place_id = str(data.get("id"))
+        # Validate ID format - must be string with "P" prefix
+        raw_id = data.get("id")
+        place_id = str(raw_id)
+        
+        if not place_id.startswith("P"):
+            raise ValueError(
+                f"Invalid place ID format: '{place_id}'. "
+                f"Place IDs must start with 'P' (e.g., 'P1', 'P101')"
+            )
+        
         name = str(data.get("name", place_id))
         
         place = cls(

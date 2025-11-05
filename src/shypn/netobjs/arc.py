@@ -668,12 +668,7 @@ class Arc(PetriNetObject):
     def from_dict(cls, data: dict, places: dict, transitions: dict) -> 'Arc':
         """Create arc from dictionary (deserialization).
         
-        NOTE: source_id and target_id can be either:
-        - Integer IDs (modern format) - look up by ID
-        - String names like 'P45', 'T12' (legacy format) - look up by name
-        
-        The places/transitions dicts are keyed by integer IDs, so for legacy
-        string names, we need to find objects by name instead.
+        All IDs must be in correct string format with prefix (e.g., "P45", "T12", "A5").
         
         IMPORTANT: Checks arc_type to create TestArc or InhibitorArc instances
         instead of regular Arc instances when appropriate.
@@ -706,24 +701,13 @@ class Arc(PetriNetObject):
         raw_source_id = data["source_id"]
         raw_target_id = data["target_id"]
         
-        # Helper function to find object by ID (string or int) or name
+        # Helper function to find object by ID
         def find_object(raw_id, obj_dict, obj_type_name):
-            # Try looking up by ID directly (works for both string and int IDs)
+            # Direct lookup only - IDs must be in correct format
             obj = obj_dict.get(raw_id)
-            if obj is not None:
-                return obj
-            
-            # If not found, try converting to string (in case dict keys are strings)
-            obj = obj_dict.get(str(raw_id))
-            if obj is not None:
-                return obj
-            
-            # Last resort: search by name (for legacy compatibility)
-            for obj in obj_dict.values():
-                if obj.name == str(raw_id):
-                    return obj
-            
-            raise ValueError(f"{obj_type_name} not found with ID/name: {raw_id}")
+            if obj is None:
+                raise ValueError(f"{obj_type_name} not found with ID: {raw_id}")
+            return obj
         
         # Find source object
         if data["source_type"] == "place":
@@ -737,9 +721,17 @@ class Arc(PetriNetObject):
         else:
             target = find_object(raw_target_id, transitions, "Target transition")
         
-        # Handle arc ID (keep as string, don't convert to int)
-        arc_id = str(data.get("id"))  # Always store as string
-        arc_name = str(data.get("name", f"A{arc_id}"))
+        # Validate and extract arc ID - must be string with "A" prefix
+        raw_arc_id = data.get("id")
+        arc_id = str(raw_arc_id)
+        
+        if not arc_id.startswith("A"):
+            raise ValueError(
+                f"Invalid arc ID format: '{arc_id}'. "
+                f"Arc IDs must start with 'A' (e.g., 'A1', 'A113')"
+            )
+        
+        arc_name = str(data.get("name", arc_id))
         
         # Create arc using the appropriate class (Arc, TestArc, or InhibitorArc)
         arc = arc_class(
