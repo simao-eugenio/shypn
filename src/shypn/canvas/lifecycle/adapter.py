@@ -40,12 +40,45 @@ class LifecycleAdapter:
     """
     
     def __init__(self, lifecycle_manager: CanvasLifecycleManager):
-        """Initialize adapter with lifecycle manager.
+        """
+        Initialize adapter with reference to lifecycle manager.
         
         Args:
-            lifecycle_manager: The new CanvasLifecycleManager instance
+            lifecycle_manager: The lifecycle manager to wrap
         """
         self.lifecycle_manager = lifecycle_manager
+        
+    def register_canvas(self, 
+                       drawing_area: Any,
+                       document_model: Any,
+                       simulation_controller: Any,
+                       swissknife_palette: Any) -> None:
+        """
+        Register existing canvas components with lifecycle system.
+        
+        This method allows gradual migration by registering components
+        that were created outside the lifecycle system.
+        
+        Args:
+            drawing_area: Canvas widget (scope key)
+            document_model: Document model/canvas manager
+            simulation_controller: Simulation engine
+            swissknife_palette: UI palette
+        """
+        # Create context from existing components
+        context = CanvasContext(
+            drawing_area=drawing_area,
+            document_model=document_model,
+            controller=simulation_controller,
+            palette=swissknife_palette,
+            id_scope=id(drawing_area)  # Use drawing_area id as scope
+        )
+        
+        # Register with lifecycle manager
+        self.lifecycle_manager.active_contexts[drawing_area] = context
+        
+        # Set ID scope for this canvas
+        self.lifecycle_manager.id_manager.set_scope(context.id_scope)
         
         # Legacy dictionaries - kept in sync for backward compatibility
         self.document_models: Dict[Gtk.DrawingArea, any] = {}
@@ -218,17 +251,39 @@ class LifecycleAdapter:
                 if hasattr(controller, 'behavior_cache'):
                     controller.behavior_cache.clear()
     
-    def switch_canvas(self, from_area: Optional[Gtk.DrawingArea], to_area: Gtk.DrawingArea):
-        """Handle canvas switching.
+    def switch_to_canvas(self, drawing_area: Any) -> None:
+        """
+        Switch to a different canvas, updating ID scope.
         
         Args:
-            from_area: Previous canvas (None if first switch)
-            to_area: New canvas to activate
+            drawing_area: Target canvas widget
         """
-        logger.debug(f"Switching canvas: {id(from_area) if from_area else 'None'} → {id(to_area)}")
+        result = self.lifecycle_manager.switch_canvas(drawing_area)
+        return result
         
-        # Delegate to lifecycle manager
-        self.lifecycle_manager.switch_canvas(from_area, to_area)
+    def destroy_canvas(self, drawing_area: Any) -> bool:
+        """
+        Destroy canvas and cleanup resources.
+        
+        Args:
+            drawing_area: Canvas widget to destroy
+            
+        Returns:
+            bool: True if successful
+        """
+        return self.lifecycle_manager.destroy_canvas(drawing_area)
+        
+    def get_canvas_context(self, drawing_area: Any) -> Optional[CanvasContext]:
+        """
+        Get canvas context for drawing_area.
+        
+        Args:
+            drawing_area: Canvas widget
+            
+        Returns:
+            CanvasContext if found, None otherwise
+        """
+        return self.lifecycle_manager.active_contexts.get(drawing_area)
     
     def has_canvas(self, drawing_area: Gtk.DrawingArea) -> bool:
         """Check if canvas is registered in either system.
