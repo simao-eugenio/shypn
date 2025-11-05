@@ -741,6 +741,16 @@ class ModelCanvasLoader:
                     break
         
         if drawing_area:
+            # Ensure event masks and focus are set (critical for interaction)
+            drawing_area.set_events(
+                Gdk.EventMask.BUTTON_PRESS_MASK | 
+                Gdk.EventMask.BUTTON_RELEASE_MASK | 
+                Gdk.EventMask.POINTER_MOTION_MASK | 
+                Gdk.EventMask.SCROLL_MASK | 
+                Gdk.EventMask.KEY_PRESS_MASK
+            )
+            drawing_area.set_can_focus(True)
+            
             # Reset drag state (prevents stuck panning/dragging)
             if hasattr(self, '_drag_state') and drawing_area in self._drag_state:
                 self._drag_state[drawing_area] = {
