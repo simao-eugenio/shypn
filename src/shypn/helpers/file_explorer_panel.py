@@ -1447,6 +1447,7 @@ class FileExplorerPanel:
         - If manager.is_default_filename() (imported/default): Auto-save to workspace
         - Otherwise: Save directly to manager's filepath
         """
+        print("[SAVE] save_current_document() called")
         try:
             if not hasattr(self, 'canvas_loader') or self.canvas_loader is None:
                 pass
@@ -1575,6 +1576,7 @@ class FileExplorerPanel:
         Opens a file chooser dialog with 'default.shy' as the default filename.
         User can choose location and filename interactively.
         """
+        print("[SAVE_AS] save_current_document_as() called")
         try:
             if not hasattr(self, 'canvas_loader') or self.canvas_loader is None:
                 pass
@@ -1615,6 +1617,7 @@ class FileExplorerPanel:
                 default_filename = "default.shy"
             
             # Create file chooser dialog
+            print(f"[SAVE_AS] Creating file chooser dialog with parent={self.parent_window}")
             dialog = Gtk.FileChooserDialog(
                 title="Save As",
                 parent=self.parent_window,
@@ -1624,6 +1627,7 @@ class FileExplorerPanel:
                     Gtk.STOCK_SAVE, Gtk.ResponseType.OK
                 )
             )
+            print(f"[SAVE_AS] Dialog created: {dialog}")
             
             # Set initial directory
             dialog.set_current_folder(initial_dir)
@@ -1646,7 +1650,9 @@ class FileExplorerPanel:
             dialog.set_do_overwrite_confirmation(True)
             
             # Run dialog
+            print(f"[SAVE_AS] Running dialog.run()...")
             response = dialog.run()
+            print(f"[SAVE_AS] Dialog response: {response}")
             filepath = None
             
             if response == Gtk.ResponseType.OK:
