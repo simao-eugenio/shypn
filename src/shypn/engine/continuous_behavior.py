@@ -180,9 +180,18 @@ class ContinuousBehavior(TransitionBehavior):
                 result = eval(expr, {"__builtins__": {}}, context)
                 return float(result)
             except Exception as e:
-                # Log error for debugging
-                print(f"[RATE ERROR] {self.transition.name}: {e}")
-                return 0.0  # Safe fallback
+                # FAIL LOUDLY - do not use silent fallbacks in development
+                print(f"❌ [RATE_EVAL_ERROR] Failed to evaluate rate function")
+                print(f"   Transition: {self.transition.name} ({self.transition.id})")
+                print(f"   Expression: {expr}")
+                print(f"   Error: {e}")
+                print(f"   Available functions: {list(FUNCTION_CATALOG.keys())[:10]}")
+                print(f"   Place tokens in context: {[k for k in context.keys() if k.startswith('P')][:10]}")
+                raise RuntimeError(
+                    f"Failed to evaluate rate function for transition {self.transition.name}: {e}\n"
+                    f"Expression: {expr}\n"
+                    f"Context keys: {list(context.keys())}"
+                ) from e
         
         return evaluate_rate
     
@@ -313,11 +322,11 @@ class ContinuousBehavior(TransitionBehavior):
                 for place in self.model.get_all_places():
                     places_dict[place.id] = place
             else:
-                # Fallback: gather from arcs (may be incomplete!)
-                for arc in input_arcs + output_arcs:
-                    place = self._get_place(arc.source_id if hasattr(arc, 'source_id') else arc.target_id)
-                    if place:
-                        places_dict[place.id] = place
+                # FAIL LOUDLY - model must provide place access
+                raise AttributeError(
+                    f"Model {self.model} does not have 'places' or 'get_all_places()'. "
+                    f"Cannot gather places for rate function evaluation in transition {self.transition.id}"
+                )
             
             # Evaluate rate function
             rate = self.rate_function(places_dict, current_time)

@@ -163,20 +163,21 @@ class StochasticBehavior(TransitionBehavior):
             
             # Ensure positive rate (required for exponential distribution)
             if rate <= 0:
-                self.logger.warning(
+                raise ValueError(
                     f"Stochastic transition '{self.transition.name}' formula evaluated to "
-                    f"non-positive rate {rate:.3f}. This may indicate a reversible reaction "
-                    f"that should be modeled as continuous, not stochastic. Using fallback rate {self.rate}."
+                    f"non-positive rate {rate:.3f}. This indicates a reversible reaction "
+                    f"that should be modeled as continuous (not stochastic), or the formula is incorrect. "
+                    f"Expression: {self.rate_function_expr}, Context: {context}"
                 )
-                return self.rate
             
             return rate
             
         except Exception as e:
-            self.logger.warning(
-                f"Failed to evaluate rate_function: {e}, using fallback {self.rate}"
-            )
-            return self.rate
+            raise RuntimeError(
+                f"Failed to evaluate rate_function for stochastic transition '{self.transition.name}': {e}\n"
+                f"Expression: {self.rate_function_expr}\n"
+                f"Context: {context}"
+            ) from e
     
     def _get_places_dict(self) -> Dict:
         """Get current place tokens as dict for formula evaluation."""

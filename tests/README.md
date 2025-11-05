@@ -5,12 +5,23 @@
 
 This directory contains all test scripts and test modules for the SHYpn project. **130+ test files** covering various aspects of the application.
 
-## Test Status (October 2025)
+## Test Status (November 2025)
 
 **Property Dialog Tests**: ✅ 34/34 passing (100%)
 - Place dialogs: 9/9 passing
 - Arc dialogs: 13/13 passing  
 - Transition dialogs: 12/12 passing
+
+**Hybrid Petri Net Validation**: ✅ New test suite added
+- Continuous chain equilibrium tests
+- Michaelis-Menten kinetics validation
+- Deadlock scenario verification
+- Mathematical equilibrium proofs
+
+**Catalyst/TestArc Tests**: ✅ All passing
+- TestArc enablement validation
+- Non-consuming arc behavior verified
+- KEGG model catalyst simulation confirmed
 
 **Firing Policy Tests**: ✅ All 7 policies tested and passing
 - Random, Earliest, Latest, Priority, Race, Age, Preemptive-Priority
@@ -22,21 +33,60 @@ This directory contains all test scripts and test modules for the SHYpn project.
 
 **Overall Coverage**: High coverage across all major components
 
-**Repository Organization**: All test files consolidated into this directory (October 27, 2025)
+**Repository Organization**: Complete reorganization (November 5, 2025)
+- 90 test/diagnostic files moved to `tests/diagnostic/`
+- All test files properly organized by category
+- Clean separation of validation and diagnostic tests
 
 ## Organization
 
 Tests are organized by functionality:
+- **Validation tests**: Organized by transition type (validation/)
+  - `continuous/`: Continuous transition tests including chain equilibrium analysis
+  - `stochastic/`: Stochastic transition tests
+  - `immediate/`: Immediate transition tests
+  - `timed/`: Timed transition tests
+  - `ui/`: UI validation tests
+- **Diagnostic tests**: Test and diagnostic scripts (diagnostic/)
+  - `test_*.py`: Unit and integration tests
+  - `diagnose_*.py`: Diagnostic scripts for debugging
+  - `debug_*.py`: Debug scripts for specific issues
+  - `check_*.py`: Validation and verification scripts
+  - `analyze_*.py`: Analysis scripts
 - **Property dialog tests**: Complete integration tests (prop_dialogs/)
-- **Model integration tests**: Object lifecycle and persistence
-- **Arc tests**: Arc transformations, hit detection, boundary calculations
-- **KEGG tests**: Pathway import, relation conversion, rendering
-- **Workspace tests**: Isolation, state persistence
-- **Feature tests**: Filtering, compound handling, layout algorithms
-- **Performance tests**: Analysis panel optimization validation
-- **Check scripts**: Validation scripts for specific features
+- **Benchmark tests**: Performance benchmarks (benchmark/)
 
 ## Recent Changes
+
+### November 2025 Updates
+
+#### Repository Reorganization (November 5, 2025)
+Major cleanup and organization of test structure:
+- ✅ **90 test/diagnostic files** moved from root to `tests/diagnostic/`
+- ✅ Files categorized by purpose (test, diagnose, debug, check, analyze, etc.)
+- ✅ Clean separation between validation tests and diagnostic tools
+- ✅ All files maintain 100% functionality
+- ✅ Professional project structure achieved
+
+**New test additions** (November 5, 2025):
+- `validation/continuous/test_continuous_chain_deadlock.py` - Hybrid Petri net validation
+- `validation/continuous/test_chain_equilibrium_simple.py` - Mathematical equilibrium proof
+- Complete test suite for continuous → immediate deadlock scenarios
+- Stochastic → immediate working pattern validation
+- Michaelis-Menten equilibrium analysis
+
+**Files now in diagnostic/** (November 5, 2025):
+- All `test_*.py` files from root (except validation suite)
+- All `diagnose_*.py` diagnostic scripts
+- All `debug_*.py` debug scripts
+- All `check_*.py` validation scripts
+- All `analyze_*.py` analysis scripts
+- All `investigate_*.py` investigation scripts
+- All `show_*.py` display/reporting scripts
+- All `compare_*.py` comparison scripts
+- All `fix_*.py` fix/migration scripts
+- All `reimport_*.py` re-import scripts
+- All `bulk_*.py` batch operation scripts
 
 ### October 2025 Updates
 

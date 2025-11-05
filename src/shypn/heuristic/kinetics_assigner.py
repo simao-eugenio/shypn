@@ -159,9 +159,25 @@ class KineticsAssigner:
             vmax = kinetic.parameters.get("vmax", 10.0)
             km = kinetic.parameters.get("km", 5.0)
             
-            # Build rate function (simplified - full implementation in pathway_converter)
+            # Build rate function using actual substrate place name
+            # CRITICAL: Must use place.name or place.id, not literal "substrate"
             parameters = {'vmax': vmax, 'km': km}
-            rate_function = f"michaelis_menten(substrate, {vmax}, {km})"
+            
+            # Try to get substrate place from reaction
+            substrate_places = []
+            if hasattr(reaction, 'substrates'):
+                substrate_places = list(reaction.substrates)
+            
+            if substrate_places:
+                substrate_name = substrate_places[0].name
+                rate_function = f"michaelis_menten({substrate_name}, {vmax}, {km})"
+            else:
+                # Fallback: use generic "S" but this will fail at runtime
+                # Better to use a constant rate
+                self.logger.warning(
+                    f"No substrate place found for {transition.name}, using constant rate"
+                )
+                rate_function = str(vmax)  # Constant rate fallback
             
             if not hasattr(transition, 'properties'):
                 transition.properties = {}
@@ -277,7 +293,11 @@ class KineticsAssigner:
                 substrate_place = substrate_places[0]
                 rate_function = f"michaelis_menten({substrate_place.name}, {vmax}, {km})"
             else:
-                rate_function = f"michaelis_menten(substrate, {vmax}, {km})"
+                # No substrate places - use constant rate instead of undefined "substrate"
+                self.logger.warning(
+                    f"No substrate place found for {transition.name}, using constant rate {vmax}"
+                )
+                rate_function = str(vmax)  # Constant rate fallback
             
             # Store rate function
             if not hasattr(transition, 'properties'):

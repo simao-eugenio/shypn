@@ -123,40 +123,46 @@ class TransitionBehavior(ABC):
         This checks the standard Petri net enablement condition:
         For all input places p: marking(p) >= arc_weight
         
+        Handles all arc types:
+        - Normal arcs: tokens >= weight (standard enablement)
+        - Test arcs: tokens >= weight (catalyst presence, non-consuming)
+        - Inhibitor arcs: tokens < weight (negative feedback)
+        
         Does not check type-specific constraints (timing, rates, etc.).
         
         Returns:
             bool: True if structurally enabled, False otherwise
         """
-        if not hasattr(self.model, 'is_transition_enabled_logical'):
-            # Fallback: check manually
-            return self._check_enablement_manual()
-        
-        return self.model.is_transition_enabled_logical(self.transition.id)
+        return self._check_enablement_manual()
     
     def _check_enablement_manual(self) -> bool:
-        """Manual enablement check (fallback if model doesn't provide method).
+        """Manual enablement check with proper handling of ALL arc types.
         
-        SHYPN uses CLASSICAL (biological) inhibitor semantics:
-        - Normal arcs: tokens >= weight (standard enablement)
+        SHYPN Arc Semantics:
+        - Normal arcs: tokens >= weight (standard enablement, CONSUMES)
+        - Test arcs: tokens >= weight (catalyst presence, NON-CONSUMING)
         - Inhibitor arcs: tokens < weight (INVERTED - negative feedback)
         
         Biological Semantics:
         - Normal arc: "I need weight tokens to function" (substrate requirement)
+        - Test arc: "Catalyst/enzyme must be present" (non-consuming check)
         - Inhibitor arc: "Inhibit reaction when product >= weight" (negative feedback)
         
         Example with weight=10:
-        - Normal arc: enabled at 10+ tokens (direct requirement)
+        - Normal arc: enabled at 10+ tokens, CONSUMES 10 tokens on fire
+        - Test arc: enabled at 10+ tokens, DOES NOT consume on fire
         - Inhibitor arc: DISABLED at 10+ tokens (product inhibition)
         
-        This models end-product inhibition, the most common biological regulation:
-        - Enzyme active when product LOW (product < threshold)
-        - Enzyme inhibited when product HIGH (product >= threshold)
+        This models biological reactions correctly:
+        - Substrates are consumed (normal arcs)
+        - Enzymes enable but aren't consumed (test arcs)
+        - Products can inhibit their own production (inhibitor arcs)
         
         Returns:
             bool: True if enabled, False otherwise
         """
         from shypn.netobjs.inhibitor_arc import InhibitorArc
+        from shypn.netobjs.test_arc import TestArc
         
         input_arcs = self.get_input_arcs()
         
@@ -164,7 +170,7 @@ class TransitionBehavior(ABC):
             # Get source place directly from arc reference
             source_place = arc.source
             if source_place is None:
-                return False
+                raise ValueError(f"Arc {arc.id if hasattr(arc, 'id') else 'unknown'} has no source place")
             
             # Check based on arc type
             if isinstance(arc, InhibitorArc):
@@ -173,6 +179,12 @@ class TransitionBehavior(ABC):
                 # Transition ENABLED when place has few tokens (allows production)
                 if source_place.tokens >= arc.weight:
                     return False  # INHIBITED by excess product
+            elif isinstance(arc, TestArc):
+                # Test arc: Same enablement as normal (tokens >= weight)
+                # BUT does NOT consume tokens on fire (catalyst behavior)
+                # This is checked separately in fire() methods via consumes_tokens()
+                if source_place.tokens < arc.weight:
+                    return False  # Catalyst not present in sufficient quantity
             else:
                 # Normal: Standard check (tokens >= weight)
                 # Transition enabled when enough substrate available
@@ -186,26 +198,58 @@ class TransitionBehavior(ABC):
         
         Returns:
             List of Arc objects that target this transition
+            
+        Raises:
+            AttributeError: If model doesn't have arcs attribute
         """
         if not hasattr(self.model, 'arcs'):
-            return []
+            raise AttributeError(
+                f"Model {self.model} does not have 'arcs' attribute. "
+                f"Cannot determine input arcs for transition {self.transition.id}"
+            )
+        
+        # Handle both dict and list representations
+        arcs_collection = self.model.arcs
+        if isinstance(arcs_collection, dict):
+            arcs = arcs_collection.values()
+        elif isinstance(arcs_collection, list):
+            arcs = arcs_collection
+        else:
+            raise TypeError(
+                f"Model.arcs must be dict or list, got {type(arcs_collection)}"
+            )
         
         # Use object reference comparison, not ID
-        return [arc for arc in self.model.arcs.values() 
-                if arc.target == self.transition]
+        return [arc for arc in arcs if arc.target == self.transition]
     
     def get_output_arcs(self) -> List:
         """Get all output arcs from this transition.
         
         Returns:
             List of Arc objects that originate from this transition
+            
+        Raises:
+            AttributeError: If model doesn't have arcs attribute
         """
         if not hasattr(self.model, 'arcs'):
-            return []
+            raise AttributeError(
+                f"Model {self.model} does not have 'arcs' attribute. "
+                f"Cannot determine output arcs for transition {self.transition.id}"
+            )
+        
+        # Handle both dict and list representations
+        arcs_collection = self.model.arcs
+        if isinstance(arcs_collection, dict):
+            arcs = arcs_collection.values()
+        elif isinstance(arcs_collection, list):
+            arcs = arcs_collection
+        else:
+            raise TypeError(
+                f"Model.arcs must be dict or list, got {type(arcs_collection)}"
+            )
         
         # Use object reference comparison, not ID
-        return [arc for arc in self.model.arcs.values() 
-                if arc.source == self.transition]
+        return [arc for arc in arcs if arc.source == self.transition]
     
     def _get_place(self, place_id):
         """Get place object by ID.
@@ -215,12 +259,28 @@ class TransitionBehavior(ABC):
             
         Returns:
             Place object or None if not found
+            
+        Raises:
+            AttributeError: If model doesn't have places attribute
         """
         if not hasattr(self.model, 'places'):
-            return None
+            raise AttributeError(
+                f"Model {self.model} does not have 'places' attribute. "
+                f"Cannot look up place {place_id}"
+            )
         
-        # Direct lookup only - all IDs must be in correct format
-        return self.model.places.get(place_id)
+        # Handle both dict and list representations
+        places_collection = self.model.places
+        if isinstance(places_collection, dict):
+            # Direct lookup
+            return places_collection.get(place_id)
+        elif isinstance(places_collection, list):
+            # Linear search
+            return next((p for p in places_collection if p.id == place_id), None)
+        else:
+            raise TypeError(
+                f"Model.places must be dict or list, got {type(places_collection)}"
+            )
     
     def _get_current_time(self) -> float:
         """Get current simulation time from model.

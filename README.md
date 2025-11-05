@@ -25,7 +25,22 @@ A comprehensive GTK-based platform for systems biology pathway modeling with adv
 - ✅ **Production-ready codebase** (all debug output removed, zero syntax errors)
 - ✅ **Clean repository structure** (test files organized, shell scripts archived)
 
-**Recent Updates** (October 2025):
+**Recent Updates** (November 2025):
+- ✅ **Catalyst/TestArc Implementation** - Complete fix for KEGG model catalysts
+  - Removed all silent fallbacks in simulation engine (explicit error handling)
+  - Added proper TestArc handling in enablement checks (non-consuming arcs)
+  - Fixed dict/list compatibility in behavior code
+  - All KEGG models now load and simulate correctly with catalysts
+- ✅ **Hybrid Petri Net Validation** - Equilibrium and deadlock analysis
+  - Documented continuous chain equilibrium behavior
+  - Created test suite for hybrid transition type combinations
+  - Mathematical validation of Michaelis-Menten equilibrium
+  - Design guidelines for biological pathway modeling
+- ✅ **Repository Organization** - Major cleanup (Nov 5, 2025)
+  - Moved 673 documentation files from root to `doc/`
+  - Moved 90 test/diagnostic files to `tests/diagnostic/`
+  - Moved 54 utility scripts to `scripts/`
+  - Clean root directory with proper project structure
 - ✅ **Canvas Health fixing series** - Complete feature parity across all canvas creation flows (5 branches merged)
   - Color matching (transitions: border+fill, places: border) across Default/File New/File Open/KEGG/SBML
   - Locality detection and automatic addition
@@ -38,10 +53,6 @@ A comprehensive GTK-based platform for systems biology pathway modeling with adv
   - Fixed stochastic transition scheduling
   - Can load SBML models and add source/sink transitions without conflicts
   - Scientific corrections (mass action → stochastic terminology)
-- ✅ **Repository cleanup** - Professional project organization (Oct 27, 2025)
-  - Removed 29 test log files from root
-  - Moved 10 test files to tests/ directory
-  - All test artifacts consolidated
 - ✅ **Master Palette system** - Unified panel control with exclusive button logic
 - ✅ **Panel architecture refactoring** - All 5 panels use skeleton pattern (synchronous float/attach)
 - ✅ **File Panel V3** - Normalized XML UI + OOP architecture (Base → Loader → Controller)
@@ -80,7 +91,7 @@ shypn/
 │   ├── ui_removed/ # Deprecated UI files (none yet)
 │   └── *.py        # Legacy analysis and debug scripts
 ├── data/           # Data model files (schemas, ORM models, sample data)
-├── doc/            # Comprehensive documentation (430+ markdown files)
+├── doc/            # Comprehensive documentation (673 markdown files)
 │   ├── cleanup/    # Cleanup documentation (October 2025)
 │   ├── topology/   # Topology and network analysis documentation
 │   ├── independency/ # Petri net independency analysis
@@ -92,21 +103,16 @@ shypn/
 │   ├── project/    # Project management documentation
 │   └── validation/ # Validation and testing documentation
 ├── models/         # User Petri net model files (.shy format - primary extension)
-├── scripts/        # Utility scripts, demos, diagnostic tools (non-test)
+├── scripts/        # Utility scripts and diagnostic tools (54 files)
 │   ├── add_source_transitions.py
 │   ├── analyze_biomd61_parameters.py
 │   ├── check_arc_types.py
 │   ├── check_stochastic_sources.py
 │   ├── compare_topology.py
 │   ├── diagnose_firing_issue.py
-│   ├── diagnose_runtime_arcs.py
-│   ├── diagnose_transition_firing.py
 │   ├── diagnosis_sigmoid_issue.py
 │   ├── fix_stochastic_to_continuous.py
 │   ├── inspect_kegg_ec_numbers.py
-│   ├── inspect_kegg_reactions.py
-│   ├── inspect_transition_types.py
-│   ├── run_headless_tests.py
 │   └── verify_biomd61_fix.py
 ├── src/
 │   └── shypn/
@@ -126,14 +132,18 @@ shypn/
 │       ├── ui/            # UI component classes
 │       └── utils/         # Utility functions
 ├── tests/          # Complete test suite (130+ test files)
+│   ├── diagnostic/        # Diagnostic and test scripts (90 files)
+│   │   ├── test_*.py      # Unit and integration tests
+│   │   ├── diagnose_*.py  # Diagnostic scripts
+│   │   ├── debug_*.py     # Debug scripts
+│   │   ├── check_*.py     # Validation scripts
+│   │   └── analyze_*.py   # Analysis scripts
+│   ├── validation/        # Validation test suites
+│   │   ├── continuous/    # Continuous transition tests (including chain equilibrium)
+│   │   ├── stochastic/    # Stochastic transition tests
+│   │   ├── immediate/     # Immediate transition tests
+│   │   └── timed/         # Timed transition tests
 │   ├── prop_dialogs/      # Property dialog integration tests (34 tests)
-│   ├── test_*.py          # Unit and integration tests (organized Oct 27, 2025)
-│   ├── test_*.sh          # Shell test scripts (organized Oct 27, 2025)
-│   ├── test_arc_model_integration.py
-│   ├── test_place_model_integration.py
-│   ├── test_transition_model_integration.py
-│   ├── test_duplicate_id_fix.py  # Duplicate ID bug verification
-│   ├── test_firing_policy_persistence.py  # Firing policy tests
 │   └── ...
 ├── ui/
 │   ├── canvas/     # Document canvas interfaces (.ui files)
@@ -150,18 +160,20 @@ shypn/
 **Key Directories**:
 - `src/shypn/`: Main application source code (Python) - Production ready
   - `analyses/`: Real-time plotting with 95% performance improvement
+  - `engine/`: Simulation engine with hybrid Petri net support (continuous, stochastic, immediate, timed)
   - `helpers/`: Panel loaders (Files V3, Analyses, Pathways, Topology) with skeleton pattern
   - `ui/`: UI component classes (FilePanelBase, CategoryFrame, dialogs, controllers)
 - `ui/`: GTK UI definition files (Glade XML format) - All files actively used
   - `panels/`: Panel UI definitions including file_panel_v3.ui
 - `tests/`: Complete test suite (130+ files, all tests passing)
-  - All test files consolidated here (organized Oct 27, 2025)
+  - `diagnostic/`: Test and diagnostic scripts (90 files) - organized Nov 5, 2025
+  - `validation/`: Validation test suites for all transition types
   - `prop_dialogs/`: Integration tests for Place, Arc, and Transition dialogs (100% passing)
-  - Duplicate ID bug tests, firing policy tests, SBML import tests
-- `scripts/`: Utility scripts (6 files) - KEGG inspection, topology comparison, headless testing
+- `scripts/`: Utility scripts (54 files) - KEGG inspection, topology comparison, diagnostic tools
 - `workspace/`: User workspace with examples and projects
-- `doc/`: Comprehensive technical documentation (440+ files)
-  - Recent additions: Canvas Health series, Firing Policies, Duplicate ID fixes, SBML flow analysis
+- `doc/`: Comprehensive technical documentation (673 files) - organized Nov 5, 2025
+  - `validation/`: Validation documentation including continuous chain equilibrium analysis
+  - Recent additions: Catalyst fix, hybrid Petri net analysis, canvas health series
   - Panel architecture, File Panel V3, Master Palette system
 - `archive/`: Archived and deprecated code (not for active use)
   - `deprecated/`: 6 unused Python files

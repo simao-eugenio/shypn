@@ -212,21 +212,19 @@ These scripts are designed for:
 
 ## Migration from Root (November 2025)
 
-These scripts were moved from the repository root to `scripts/` in November 2025 as part of project organization improvements. They maintain 100% functionality with the same command-line interfaces.
+These scripts were moved from the repository root to `scripts/` in November 2025 as part of comprehensive project organization improvements. A total of **54 Python scripts** were moved to this directory, maintaining 100% functionality with the same command-line interfaces.
 
-**Previously in root, now in scripts/**:
-- `add_source_transitions.py` → `scripts/add_source_transitions.py`
-- `analyze_biomd61_parameters.py` → `scripts/analyze_biomd61_parameters.py`
-- `check_arc_types.py` → `scripts/check_arc_types.py`
-- `check_stochastic_sources.py` → `scripts/check_stochastic_sources.py`
-- `compare_topology.py` → `scripts/compare_topology.py`
-- `diagnose_firing_issue.py` → `scripts/diagnose_firing_issue.py`
-- `diagnose_runtime_arcs.py` → `scripts/diagnose_runtime_arcs.py`
-- `diagnose_transition_firing.py` → `scripts/diagnose_transition_firing.py`
-- `diagnosis_sigmoid_issue.py` → `scripts/diagnosis_sigmoid_issue.py`
-- `fix_stochastic_to_continuous.py` → `scripts/fix_stochastic_to_continuous.py`
-- `inspect_kegg_ec_numbers.py` → `scripts/inspect_kegg_ec_numbers.py`
-- `inspect_kegg_reactions.py` → `scripts/inspect_kegg_reactions.py`
-- `inspect_transition_types.py` → `scripts/inspect_transition_types.py`
-- `run_headless_tests.py` → `scripts/run_headless_tests.py`
-- `verify_biomd61_fix.py` → `scripts/verify_biomd61_fix.py`
+**Organization highlights (November 5, 2025)**:
+- 54 utility scripts moved from root to `scripts/`
+- 90 test/diagnostic files moved to `tests/diagnostic/`
+- 673 documentation files organized in `doc/`
+- Clean project root achieved
+- All scripts maintain backward compatibility
+
+**Key scripts in this directory**:
+- Model inspection tools (inspect_*.py)
+- Model modification utilities (add_*, fix_*)
+- Comparison and analysis tools (compare_*, analyze_*)
+- Diagnostic scripts (diagnose_*, diagnosis_*)
+- Verification scripts (verify_*, check_*)
+- Testing utilities (run_headless_tests.py)
