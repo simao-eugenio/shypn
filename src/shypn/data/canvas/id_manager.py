@@ -14,9 +14,39 @@ ID Format Convention:
 
 All IDs are strings, never integers. The numeric part is extracted when needed
 for counter management.
+
+PHASE 4 - LIFECYCLE INTEGRATION:
+This IDManager can optionally delegate to a global IDScopeManager for
+canvas-scoped ID generation. Set _lifecycle_scope_manager at module level
+to enable multi-canvas support with isolated ID sequences.
 """
 
-from typing import Tuple
+from typing import Tuple, Optional
+
+# Global reference to lifecycle ID scope manager (set by lifecycle system)
+_lifecycle_scope_manager: Optional['IDScopeManager'] = None  # type: ignore
+
+
+def set_lifecycle_scope_manager(scope_manager: Optional['IDScopeManager']):  # type: ignore
+    """Set global lifecycle scope manager for multi-canvas ID isolation.
+    
+    When set, all IDManager instances will delegate ID generation to this
+    scope manager, enabling independent ID sequences per canvas.
+    
+    Args:
+        scope_manager: IDScopeManager instance or None to disable
+    """
+    global _lifecycle_scope_manager
+    _lifecycle_scope_manager = scope_manager
+
+
+def get_lifecycle_scope_manager() -> Optional['IDScopeManager']:  # type: ignore
+    """Get current lifecycle scope manager if set.
+    
+    Returns:
+        IDScopeManager instance or None
+    """
+    return _lifecycle_scope_manager
 
 
 class IDManager:
@@ -41,9 +71,19 @@ class IDManager:
     def generate_place_id(self) -> str:
         """Generate a new place ID.
         
+        Delegates to lifecycle scope manager if available for canvas isolation.
+        Otherwise uses local counter.
+        
         Returns:
             String ID in format "P1", "P2", etc.
         """
+        global _lifecycle_scope_manager
+        if _lifecycle_scope_manager is not None:
+            try:
+                return _lifecycle_scope_manager.generate_place_id()
+            except Exception:
+                pass  # Fallback to local counter
+        
         place_id = f"P{self._next_place_id}"
         self._next_place_id += 1
         return place_id
@@ -51,9 +91,19 @@ class IDManager:
     def generate_transition_id(self) -> str:
         """Generate a new transition ID.
         
+        Delegates to lifecycle scope manager if available for canvas isolation.
+        Otherwise uses local counter.
+        
         Returns:
             String ID in format "T1", "T2", etc.
         """
+        global _lifecycle_scope_manager
+        if _lifecycle_scope_manager is not None:
+            try:
+                return _lifecycle_scope_manager.generate_transition_id()
+            except Exception:
+                pass  # Fallback to local counter
+        
         transition_id = f"T{self._next_transition_id}"
         self._next_transition_id += 1
         return transition_id
@@ -61,9 +111,19 @@ class IDManager:
     def generate_arc_id(self) -> str:
         """Generate a new arc ID.
         
+        Delegates to lifecycle scope manager if available for canvas isolation.
+        Otherwise uses local counter.
+        
         Returns:
             String ID in format "A1", "A2", etc.
         """
+        global _lifecycle_scope_manager
+        if _lifecycle_scope_manager is not None:
+            try:
+                return _lifecycle_scope_manager.generate_arc_id()
+            except Exception:
+                pass  # Fallback to local counter
+        
         arc_id = f"A{self._next_arc_id}"
         self._next_arc_id += 1
         return arc_id
@@ -72,10 +132,18 @@ class IDManager:
         """Register an existing place ID to prevent duplicates.
         
         Updates the counter if the registered ID is higher than current.
+        Delegates to lifecycle scope manager if available.
         
         Args:
             place_id: Existing ID (e.g., "P101", "101", or numeric)
         """
+        global _lifecycle_scope_manager
+        if _lifecycle_scope_manager is not None:
+            try:
+                _lifecycle_scope_manager.register_place_id(str(place_id))
+            except Exception:
+                pass  # Continue with local registration
+        
         numeric_id = self.extract_numeric_id(place_id, 'P')
         if numeric_id >= self._next_place_id:
             self._next_place_id = numeric_id + 1
@@ -84,10 +152,18 @@ class IDManager:
         """Register an existing transition ID to prevent duplicates.
         
         Updates the counter if the registered ID is higher than current.
+        Delegates to lifecycle scope manager if available.
         
         Args:
             transition_id: Existing ID (e.g., "T35", "35", or numeric)
         """
+        global _lifecycle_scope_manager
+        if _lifecycle_scope_manager is not None:
+            try:
+                _lifecycle_scope_manager.register_transition_id(str(transition_id))
+            except Exception:
+                pass  # Continue with local registration
+        
         numeric_id = self.extract_numeric_id(transition_id, 'T')
         if numeric_id >= self._next_transition_id:
             self._next_transition_id = numeric_id + 1
@@ -96,10 +172,18 @@ class IDManager:
         """Register an existing arc ID to prevent duplicates.
         
         Updates the counter if the registered ID is higher than current.
+        Delegates to lifecycle scope manager if available.
         
         Args:
             arc_id: Existing ID (e.g., "A113", "113", or numeric)
         """
+        global _lifecycle_scope_manager
+        if _lifecycle_scope_manager is not None:
+            try:
+                _lifecycle_scope_manager.register_arc_id(str(arc_id))
+            except Exception:
+                pass  # Continue with local registration
+        
         numeric_id = self.extract_numeric_id(arc_id, 'A')
         if numeric_id >= self._next_arc_id:
             self._next_arc_id = numeric_id + 1
