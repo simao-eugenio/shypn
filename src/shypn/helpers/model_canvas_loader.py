@@ -58,6 +58,8 @@ except ImportError as e:
 # PHASE 4: Import simulation controller for state-based permissions
 try:
     from shypn.engine.simulation.controller import SimulationController
+    # PHASE 4: Import IDManager lifecycle integration
+    from shypn.data.canvas.id_manager import set_lifecycle_scope_manager
 except ImportError as e:
     print(f'ERROR: Cannot import SimulationController: {e}', file=sys.stderr)
     sys.exit(1)
@@ -97,6 +99,12 @@ class ModelCanvasLoader:
             from shypn.canvas.lifecycle import enable_lifecycle_system
             self.lifecycle_manager, self.lifecycle_adapter = enable_lifecycle_system(self)
             print("[GLOBAL-SYNC] ✓ Canvas lifecycle system enabled")
+            
+            # PHASE 4: Connect global IDManager to lifecycle scoping
+            # This makes all ID generation canvas-scoped automatically
+            if self.lifecycle_manager and hasattr(self.lifecycle_manager, 'id_manager'):
+                set_lifecycle_scope_manager(self.lifecycle_manager.id_manager)
+                print("[GLOBAL-SYNC] ✓ IDManager lifecycle scoping enabled")
         except Exception as e:
             print(f"[GLOBAL-SYNC] ⚠️  Failed to enable lifecycle system: {e}")
             print("[GLOBAL-SYNC] Falling back to legacy canvas management")
@@ -459,8 +467,21 @@ class ModelCanvasLoader:
                     self.notebook.set_current_page(current_page)
                     return False
         self.notebook.remove_page(page_num)
+        
+        # ============================================================
+        # GLOBAL-SYNC: Destroy canvas in lifecycle system
+        # ============================================================
+        if self.lifecycle_adapter and drawing_area:
+            try:
+                self.lifecycle_adapter.destroy_canvas(drawing_area)
+                print(f"[GLOBAL-SYNC] ✓ Canvas {id(drawing_area)} destroyed and removed from lifecycle")
+            except Exception as e:
+                print(f"[GLOBAL-SYNC] ⚠️  Failed to destroy canvas in lifecycle: {e}")
+        
         if drawing_area and drawing_area in self.canvas_managers:
             del self.canvas_managers[drawing_area]
+        if drawing_area and drawing_area in self.simulation_controllers:
+            del self.simulation_controllers[drawing_area]
         if drawing_area and drawing_area in self.overlay_managers:
             # Cleanup overlay manager and all its palettes
             overlay_manager = self.overlay_managers[drawing_area]
@@ -2607,6 +2628,64 @@ class ModelCanvasLoader:
         if drawing_area is None:
             return None
         return self.get_canvas_manager(drawing_area)
+    
+    def reset_current_canvas(self):
+        """Reset the current canvas to initial state (File → New equivalent).
+        
+        Clears all objects, resets simulation, reinitializes palette.
+        Preserves the canvas instance and ID scope.
+        Uses the lifecycle system when available, falls back to legacy clear otherwise.
+        
+        Returns:
+            bool: True if reset succeeded, False if no canvas or reset failed
+            
+        Example:
+            # From File menu handler:
+            if model_canvas_loader.reset_current_canvas():
+                print("Canvas reset successfully")
+        """
+        drawing_area = self.get_current_document()
+        if drawing_area is None:
+            print("[RESET] No active canvas to reset")
+            return False
+        
+        # PHASE 4: Use lifecycle system if available
+        if self.lifecycle_manager:
+            try:
+                self.lifecycle_manager.reset_canvas(drawing_area)
+                print(f"[RESET] ✓ Canvas reset via lifecycle system")
+                # Trigger redraw
+                drawing_area.queue_draw()
+                return True
+            except Exception as e:
+                print(f"[RESET] ⚠️  Lifecycle reset failed: {e}")
+                print("[RESET] Falling back to legacy reset")
+        
+        # Legacy fallback: Manual cleanup
+        try:
+            manager = self.get_canvas_manager(drawing_area)
+            if manager:
+                # Clear objects
+                manager.places.clear()
+                manager.transitions.clear()
+                manager.arcs.clear()
+                
+                # Reset simulation if controller exists
+                if drawing_area in self.simulation_controllers:
+                    controller = self.simulation_controllers[drawing_area]
+                    if hasattr(controller, 'reset'):
+                        controller.reset()
+                
+                # Trigger redraw
+                drawing_area.queue_draw()
+                print("[RESET] ✓ Canvas reset via legacy method")
+                return True
+        except Exception as e:
+            print(f"[RESET] ✗ Reset failed: {e}")
+            return False
+        
+        return False
+
 
     def get_notebook(self):
         """Get the notebook widget for direct access.
