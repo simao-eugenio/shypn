@@ -2685,6 +2685,67 @@ class ModelCanvasLoader:
             return False
         
         return False
+    
+    def get_current_canvas_info(self):
+        """Get information about the current canvas for UI display.
+        
+        Returns a dictionary with canvas metadata including:
+        - canvas_id: Unique canvas identifier
+        - scope_name: ID scope name  
+        - next_place_id: Next place ID that will be generated
+        - next_transition_id: Next transition ID that will be generated
+        - next_arc_id: Next arc ID that will be generated
+        - element_count: Number of elements in canvas
+        
+        Returns:
+            dict: Canvas information, or None if no active canvas
+            
+        Example:
+            info = model_canvas_loader.get_current_canvas_info()
+            if info:
+                print(f"Canvas: {info['scope_name']}")
+                print(f"Next IDs: P{info['next_place_id']}, T{info['next_transition_id']}")
+        """
+        drawing_area = self.get_current_document()
+        if drawing_area is None:
+            return None
+        
+        info = {
+            'canvas_id': id(drawing_area),
+            'scope_name': None,
+            'next_place_id': '?',
+            'next_transition_id': '?',
+            'next_arc_id': '?',
+            'element_count': 0
+        }
+        
+        # Get scope information from lifecycle if available
+        if self.lifecycle_manager:
+            try:
+                context = self.lifecycle_manager.get_context(drawing_area)
+                if context:
+                    info['scope_name'] = context.id_scope
+                    
+                    # Get next IDs from the ID manager
+                    # We can't generate without side effects, so we peek at counters
+                    id_mgr = self.lifecycle_manager.id_manager
+                    if hasattr(id_mgr, '_scopes') and context.id_scope in id_mgr._scopes:
+                        scope_data = id_mgr._scopes[context.id_scope]
+                        info['next_place_id'] = scope_data.get('place', 0) + 1
+                        info['next_transition_id'] = scope_data.get('transition', 0) + 1
+                        info['next_arc_id'] = scope_data.get('arc', 0) + 1
+            except Exception as e:
+                print(f"[INFO] Could not get lifecycle info: {e}")
+        
+        # Get element count from canvas manager
+        manager = self.get_canvas_manager(drawing_area)
+        if manager:
+            place_count = len(manager.places) if hasattr(manager, 'places') else 0
+            trans_count = len(manager.transitions) if hasattr(manager, 'transitions') else 0
+            arc_count = len(manager.arcs) if hasattr(manager, 'arcs') else 0
+            info['element_count'] = place_count + trans_count + arc_count
+        
+        return info
 
 
     def get_notebook(self):
