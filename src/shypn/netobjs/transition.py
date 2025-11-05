@@ -596,14 +596,27 @@ class Transition(PetriNetObject):
     def from_dict(cls, data: dict) -> 'Transition':
         """Create transition from dictionary (deserialization).
         
+        All IDs must be in correct string format with "T" prefix (e.g., "T1", "T35").
+        
         Args:
             data: Dictionary containing transition properties
             
         Returns:
             Transition: New transition instance with restored properties
+            
+        Raises:
+            ValueError: If ID format is invalid
         """
-        # IDs are now always strings - just convert to string
-        transition_id = str(data.get("id"))
+        # Validate ID format - must be string with "T" prefix
+        raw_id = data.get("id")
+        transition_id = str(raw_id)
+        
+        if not transition_id.startswith("T"):
+            raise ValueError(
+                f"Invalid transition ID format: '{transition_id}'. "
+                f"Transition IDs must start with 'T' (e.g., 'T1', 'T35')"
+            )
+        
         name = str(data.get("name", transition_id))
         
         # Extract required properties with type conversion

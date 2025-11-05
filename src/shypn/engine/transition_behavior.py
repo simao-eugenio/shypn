@@ -211,7 +211,7 @@ class TransitionBehavior(ABC):
         """Get place object by ID.
         
         Args:
-            place_id: ID of the place (string like "P101" or int for legacy)
+            place_id: ID of the place (string like "P101")
             
         Returns:
             Place object or None if not found
@@ -219,36 +219,8 @@ class TransitionBehavior(ABC):
         if not hasattr(self.model, 'places'):
             return None
         
-        # ModelAdapter provides places as dict {place_id: place_obj}
-        # Try direct lookup first
-        place = self.model.places.get(place_id)
-        if place:
-            return place
-        
-        # Fallback 1: if place_id is string like "P101", try without prefix
-        # This handles cases where model has numeric IDs like 101 instead of "P101"
-        if isinstance(place_id, str) and place_id.startswith('P'):
-            try:
-                numeric_id = int(place_id[1:])  # "P101" -> 101
-                place = self.model.places.get(numeric_id)
-                if place:
-                    return place
-                # Also try as string without prefix (e.g., "101")
-                place = self.model.places.get(str(numeric_id))
-                if place:
-                    return place
-            except ValueError:
-                pass
-        
-        # Fallback 2: if place_id is int, try with "P" prefix
-        # This handles cases where arc references use int but model has string IDs
-        if isinstance(place_id, int):
-            prefixed_id = f"P{place_id}"
-            place = self.model.places.get(prefixed_id)
-            if place:
-                return place
-        
-        return None
+        # Direct lookup only - all IDs must be in correct format
+        return self.model.places.get(place_id)
     
     def _get_current_time(self) -> float:
         """Get current simulation time from model.
