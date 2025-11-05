@@ -219,24 +219,24 @@ class TransitionBehavior(ABC):
         if not hasattr(self.model, 'places'):
             return None
         
-        # Try direct lookup first (works for both string and int keys)
-        place = self.model.places.get(place_id)
-        if place:
-            return place
+        # Model stores places as a list, not a dict - must iterate
+        # Normalize both sides to strings for comparison
+        place_id_str = str(place_id)
         
-        # Fallback: if place_id is string like "P101" but dict uses int keys,
-        # extract numeric part and try again
+        for place in self.model.places:
+            if str(place.id) == place_id_str:
+                return place
+        
+        # Fallback: if place_id is string like "P101", also try matching
+        # against numeric part (handles legacy int IDs)
         if isinstance(place_id, str) and place_id.startswith('P'):
             try:
                 numeric_id = int(place_id[1:])  # "P101" -> 101
-                return self.model.places.get(numeric_id)
-            except (ValueError, KeyError):
+                for place in self.model.places:
+                    if place.id == numeric_id:
+                        return place
+            except ValueError:
                 pass
-        
-        # Fallback: if place_id is int but dict uses string keys,
-        # try with "P" prefix
-        if isinstance(place_id, int):
-            return self.model.places.get(f"P{place_id}")
         
         return None
     
