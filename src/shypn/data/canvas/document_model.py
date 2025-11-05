@@ -1,14 +1,12 @@
-"""Document Model - Petri Net Object Storage and Queries.
+"""Document Model - Core data structure for Petri net models.
 
-This module manages the Petri net objects (Places, Transitions, Arcs) for a document.
-It provides storage, queries, and basic operations without coupling to UI or rendering.
-
-The DocumentModel is purely about data storage and retrieval - it doesn't know about
-viewports, rendering, or UI interactions.
+This module defines the DocumentModel class, which represents a complete
+Petri net model including places, transitions, arcs, and metadata.
 """
 
-from typing import List, Optional, Tuple, Set
+from typing import List, Dict, Optional, Any, Tuple
 from shypn.netobjs import Place, Transition, Arc, PetriNetObject
+from .id_manager import IDManager
 
 
 class DocumentModel:
@@ -57,8 +55,8 @@ class DocumentModel:
         Returns:
             The created Place object
         """
-        place_id = self._next_place_id
-        place_name = f"P{place_id}"
+        place_id = f"P{self._next_place_id}"  # String ID with prefix
+        place_name = place_id  # Name matches ID
         self._next_place_id += 1
         
         place = Place(x=x, y=y, id=place_id, name=place_name, label=label or place_name)
@@ -76,8 +74,8 @@ class DocumentModel:
         Returns:
             The created Transition object
         """
-        transition_id = self._next_transition_id
-        transition_name = f"T{transition_id}"
+        transition_id = f"T{self._next_transition_id}"  # String ID with prefix
+        transition_name = transition_id  # Name matches ID
         self._next_transition_id += 1
         
         transition = Transition(x=x, y=y, id=transition_id, name=transition_name, label=label or transition_name)
@@ -104,8 +102,8 @@ class DocumentModel:
             # Both same type → invalid
             return None
         
-        arc_id = self._next_arc_id
-        arc_name = f"A{arc_id}"
+        arc_id = f"A{self._next_arc_id}"  # String ID with prefix
+        arc_name = arc_id  # Name matches ID
         self._next_arc_id += 1
         
         try:
@@ -439,12 +437,14 @@ class DocumentModel:
             place = Place.from_dict(place_data)
             document.places.append(place)
             places_dict[place.id] = place  # Use string ID as dict key
-            # Track maximum ID to update counter (IDs are stored as strings but generated as ints)
+            # Track maximum numeric part of ID (e.g., "P101" → 101) to update counter
             try:
-                place_id_int = int(place.id)
+                # Extract numeric part from string ID (e.g., "P101" → 101, "101" → 101)
+                id_str = str(place.id).lstrip('P')  # Remove P prefix if present
+                place_id_int = int(id_str)
                 max_place_id = max(max_place_id, place_id_int)
             except (ValueError, TypeError):
-                pass  # Skip non-numeric IDs (shouldn't happen in normal files)
+                pass  # Skip non-parseable IDs
         
         # Restore transitions second (they have no dependencies)
         transitions_dict = {}
@@ -453,24 +453,28 @@ class DocumentModel:
             transition = Transition.from_dict(transition_data)
             document.transitions.append(transition)
             transitions_dict[transition.id] = transition  # Use string ID as dict key
-            # Track maximum ID to update counter (IDs are stored as strings but generated as ints)
+            # Track maximum numeric part of ID (e.g., "T35" → 35, "35" → 35) to update counter
             try:
-                transition_id_int = int(transition.id)
+                # Extract numeric part from string ID (e.g., "T35" → 35, "35" → 35)
+                id_str = str(transition.id).lstrip('T')  # Remove T prefix if present
+                transition_id_int = int(id_str)
                 max_transition_id = max(max_transition_id, transition_id_int)
             except (ValueError, TypeError):
-                pass  # Skip non-numeric IDs (shouldn't happen in normal files)
+                pass  # Skip non-parseable IDs
         
         # Restore arcs last (they depend on places and transitions)
         max_arc_id = 0
         for arc_data in data.get("arcs", []):
             arc = Arc.from_dict(arc_data, places=places_dict, transitions=transitions_dict)
             document.arcs.append(arc)
-            # Track maximum ID to update counter (IDs are stored as strings but generated as ints)
+            # Track maximum numeric part of ID (e.g., "A113" → 113, "113" → 113) to update counter
             try:
-                arc_id_int = int(arc.id)
+                # Extract numeric part from string ID (e.g., "A113" → 113, "113" → 113)
+                id_str = str(arc.id).lstrip('A')  # Remove A prefix if present
+                arc_id_int = int(id_str)
                 max_arc_id = max(max_arc_id, arc_id_int)
             except (ValueError, TypeError):
-                pass  # Skip non-numeric IDs (shouldn't happen in normal files)
+                pass  # Skip non-parseable IDs
         
         # Update ID counters to prevent duplicates when creating new objects
         # Set to max_id + 1 so next created object gets a unique ID
