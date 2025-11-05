@@ -91,6 +91,18 @@ class ModelCanvasLoader:
         # Access pattern: drawing_area → controller → state_detector, interaction_guard
         self.simulation_controllers = {}
         
+        # GLOBAL-SYNC: Canvas lifecycle management
+        # Initialize lifecycle system for coordinated component management
+        try:
+            from shypn.canvas.lifecycle import enable_lifecycle_system
+            self.lifecycle_manager, self.lifecycle_adapter = enable_lifecycle_system(self)
+            print("[GLOBAL-SYNC] ✓ Canvas lifecycle system enabled")
+        except Exception as e:
+            print(f"[GLOBAL-SYNC] ⚠️  Failed to enable lifecycle system: {e}")
+            print("[GLOBAL-SYNC] Falling back to legacy canvas management")
+            self.lifecycle_manager = None
+            self.lifecycle_adapter = None
+        
         self.parent_window = None
         self.persistency = None
         self.right_panel_loader = None
@@ -248,6 +260,17 @@ class ModelCanvasLoader:
                 drawing_area = scrolled.get_child()
                 if hasattr(drawing_area, 'get_child'):
                     drawing_area = drawing_area.get_child()
+        
+        # ============================================================
+        # GLOBAL-SYNC: Switch canvas context when tab changes
+        # ============================================================
+        if self.lifecycle_adapter and drawing_area:
+            try:
+                self.lifecycle_adapter.switch_to_canvas(drawing_area)
+                print(f"[GLOBAL-SYNC] ✓ Switched to canvas {id(drawing_area)}, tab {page_num}")
+            except Exception as e:
+                print(f"[GLOBAL-SYNC] ⚠️  Failed to switch canvas context: {e}")
+        
         if self.persistency:
             if drawing_area and drawing_area in self.canvas_managers:
                 manager = self.canvas_managers[drawing_area]
@@ -1037,6 +1060,25 @@ class ModelCanvasLoader:
         #   - Controller access pattern stays the same (drawing_area → controller)
         simulation_controller = SimulationController(canvas_manager)
         self.simulation_controllers[drawing_area] = simulation_controller
+        
+        # ============================================================
+        # GLOBAL-SYNC: Integrate with canvas lifecycle system
+        # ============================================================
+        # If lifecycle system is enabled, register this canvas with it.
+        # This provides coordinated management of all canvas components.
+        if self.lifecycle_adapter:
+            try:
+                # Register canvas with adapter (maintains legacy dict compatibility)
+                self.lifecycle_adapter.register_canvas(
+                    drawing_area,
+                    canvas_manager,
+                    simulation_controller,
+                    swissknife_palette
+                )
+                print(f"[GLOBAL-SYNC] ✓ Canvas {id(drawing_area)} registered with lifecycle system")
+            except Exception as e:
+                print(f"[GLOBAL-SYNC] ⚠️  Failed to register canvas: {e}")
+                print("[GLOBAL-SYNC] Continuing with legacy management")
         
         # Store reference for mode switching
         if drawing_area not in self.overlay_managers:
