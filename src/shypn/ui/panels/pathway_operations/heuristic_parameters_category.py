@@ -377,7 +377,6 @@ class HeuristicParametersCategory(BasePathwayCategory):
     def _on_apply_selected(self, button):
         """Handle apply selected button click."""
         print("=" * 60)
-        print("[APPLY] Apply Selected button clicked!")
         print("=" * 60)
         self.logger.info("=" * 60)
         self.logger.info("[APPLY] Apply Selected button clicked!")
@@ -416,13 +415,11 @@ class HeuristicParametersCategory(BasePathwayCategory):
             iter = self.results_store.iter_next(iter)
         
         self.logger.info(f"Total rows: {total_rows}, Selected: {selected_count}, Applied: {applied_count}")
-        print(f"[APPLY] Total rows: {total_rows}, Selected: {selected_count}, Applied: {applied_count}")
         
         # CRITICAL: Reset simulation state after applying parameters
         # This clears cached behaviors that might have old parameter values
         # See: CANVAS_STATE_ISSUES_COMPARISON.md for historical context
         if applied_count > 0:
-            print(f"[APPLY] Calling reset for {applied_count} applied transitions...")
             self._reset_simulation_after_parameter_changes()
             self.status_label.set_text(f"Applied parameters to {applied_count} transition(s)")
         else:
@@ -452,51 +449,37 @@ class HeuristicParametersCategory(BasePathwayCategory):
         new parameter values.
         """
         try:
-            print("[RESET] Starting simulation reset after parameter changes...")
             self.logger.info("[RESET] Starting simulation reset after parameter changes...")
             
             # Get current document and canvas manager
             if not self.model_canvas_loader:
-                print("[RESET] FAILED: No canvas loader available for simulation reset")
                 self.logger.error("[RESET] FAILED: No canvas loader available for simulation reset")
                 return
             
-            print(f"[RESET] Canvas loader found: {type(self.model_canvas_loader).__name__}")
             self.logger.info(f"[RESET] Canvas loader found: {type(self.model_canvas_loader).__name__}")
             
             drawing_area = self.model_canvas_loader.get_current_document()
-            print(f"[RESET] Got drawing_area: {drawing_area}")
             
             if not drawing_area:
-                print("[RESET] FAILED: No active document for simulation reset")
                 self.logger.error("[RESET] FAILED: No active document for simulation reset")
                 return
             
-            print(f"[RESET] Drawing area found: {drawing_area}")
             self.logger.info(f"[RESET] Drawing area found: {drawing_area}")
             
             # Find simulation controller for this drawing area
-            print(f"[RESET] Checking for simulation_controllers attribute...")
             if hasattr(self.model_canvas_loader, 'simulation_controllers'):
-                print(f"[RESET] simulation_controllers attribute exists")
-                print(f"[RESET] Available controllers: {list(self.model_canvas_loader.simulation_controllers.keys())}")
                 self.logger.info(f"[RESET] simulation_controllers attribute exists")
                 self.logger.info(f"[RESET] Available controllers: {list(self.model_canvas_loader.simulation_controllers.keys())}")
                 
                 if drawing_area in self.model_canvas_loader.simulation_controllers:
                     controller = self.model_canvas_loader.simulation_controllers[drawing_area]
-                    print(f"[RESET] Simulation controller found: {type(controller).__name__}")
                     self.logger.info(f"[RESET] Simulation controller found: {type(controller).__name__}")
                     self.logger.info(f"[RESET] Controller state - Running: {controller.is_running if hasattr(controller, 'is_running') else 'N/A'}")
                     
                     # Get the canvas manager
                     canvas_manager = self.model_canvas_loader.canvas_managers.get(drawing_area)
-                    print(f"[RESET] Canvas manager: {canvas_manager}")
                     
                     if canvas_manager:
-                        print(f"[RESET] Canvas manager found: {type(canvas_manager).__name__}")
-                        print(f"[RESET] Canvas manager has {len(canvas_manager.places)} places, {len(canvas_manager.transitions)} transitions")
-                        print(f"[RESET] Calling reset_for_new_model()...")
                         self.logger.info(f"[RESET] Canvas manager found: {type(canvas_manager).__name__}")
                         # CRITICAL: Use reset_for_new_model() instead of reset()
                         # This recreates the model adapter and clears ALL caches
@@ -504,34 +487,26 @@ class HeuristicParametersCategory(BasePathwayCategory):
                         # and we need to rebuild the entire simulation state
                         controller.reset_for_new_model(canvas_manager)
                         
-                        print(f"[RESET] After reset - controller.model has {len(controller.model.places)} places, {len(controller.model.transitions)} transitions")
                         print(f"[RESET] Transition IDs in controller.model: {[t.id for t in controller.model.transitions[:5]]}")  # First 5
-                        print("[RESET] ✅ SUCCESS: Simulation fully reset (model adapter recreated)")
                         self.logger.info("[RESET] ✅ SUCCESS: Simulation fully reset (model adapter recreated)")
                         
                         # DO NOT auto-start simulation after reset
                         # User should manually press "Run" button to start simulation
                         # Auto-starting causes conflicts with manual Run button
-                        print("[RESET] Ready for simulation (user should press Run to start)")
                         self.logger.info("[RESET] Ready for simulation (user should press Run to start)")
                     else:
-                        print("[RESET] Canvas manager not found, using fallback reset")
                         self.logger.warning("[RESET] Canvas manager not found, using fallback reset")
                         # Fallback to basic reset if we can't get canvas_manager
                         controller.reset()
-                        print("[RESET] ✅ SUCCESS: Simulation reset to initial state")
                         self.logger.info("[RESET] ✅ SUCCESS: Simulation reset to initial state")
                     
                     # Refresh canvas to show reset token values
                     if drawing_area:
                         drawing_area.queue_draw()
-                        print("[RESET] Canvas refreshed")
                         self.logger.info("[RESET] Canvas refreshed")
                 else:
-                    print("[RESET] FAILED: No simulation controller for current document")
                     self.logger.warning("[RESET] FAILED: No simulation controller for current document")
             else:
-                print("[RESET] FAILED: Canvas loader has no simulation_controllers attribute")
                 self.logger.error("[RESET] FAILED: Canvas loader has no simulation_controllers attribute")
                 
         except Exception as e:

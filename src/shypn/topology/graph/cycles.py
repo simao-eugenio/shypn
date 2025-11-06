@@ -30,9 +30,6 @@ class CycleAnalyzer(TopologyAnalyzer):
         
         if result.success:
             for cycle_info in result.get('cycles', []):
-                print(f"Cycle length {cycle_info['length']}: {cycle_info['names']}")
-                print(f"  Type: {cycle_info['type']}")
-                print(f"  Places: {cycle_info['place_count']}, Transitions: {cycle_info['transition_count']}")
         else:
             print("Analysis failed:", result.errors)
     """

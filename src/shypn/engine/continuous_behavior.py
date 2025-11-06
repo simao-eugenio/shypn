@@ -181,12 +181,9 @@ class ContinuousBehavior(TransitionBehavior):
                 return float(result)
             except Exception as e:
                 # FAIL LOUDLY - do not use silent fallbacks in development
-                print(f"❌ [RATE_EVAL_ERROR] Failed to evaluate rate function")
                 print(f"   Transition: {self.transition.name} ({self.transition.id})")
                 print(f"   Expression: {expr}")
                 print(f"   Error: {e}")
-                print(f"   Available functions: {list(FUNCTION_CATALOG.keys())[:10]}")
-                print(f"   Place tokens in context: {[k for k in context.keys() if k.startswith('P')][:10]}")
                 raise RuntimeError(
                     f"Failed to evaluate rate function for transition {self.transition.name}: {e}\n"
                     f"Expression: {expr}\n"

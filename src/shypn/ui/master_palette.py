@@ -298,7 +298,6 @@ class MasterPalette:
             try:
                 callback(active)
             except Exception as e:
-                print(f"[ERROR] Master Palette callback failed for {category}: {e}", file=sys.stderr)
                 import traceback
                 traceback.print_exc()
             finally:

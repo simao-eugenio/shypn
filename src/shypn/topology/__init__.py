@@ -20,7 +20,6 @@ Usage:
     if result.success:
         print(result.summary)
         for cycle in result.get('cycles', []):
-            print(f"  {cycle['names']}")
 """
 
 from .base import TopologyAnalyzer, AnalysisResult, TopologyError

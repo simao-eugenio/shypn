@@ -650,7 +650,6 @@ class SBMLCategory(BasePathwayCategory):
             
             # CRITICAL: Trigger callback for Report panel refresh
             # This must happen AFTER model is loaded to canvas (above)
-            print(f"[SBML_CATEGORY] Triggering import_complete_callback with {len(document_model.places) if document_model else 0} places")
             imported_data = {
                 'source': 'sbml',
                 'filepath': filepath,
