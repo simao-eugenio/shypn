@@ -858,9 +858,16 @@ class SimulateToolsPaletteLoader(GObject.GObject):
     
     def _update_progress_display(self):
         """Update progress bar and time display label."""
+        print(f"[PROGRESS] _update_progress_display called")
+        print(f"[PROGRESS] progress_bar exists: {self.progress_bar is not None}")
+        print(f"[PROGRESS] time_display_label exists: {self.time_display_label is not None}")
+        
         if not self.progress_bar or not self.time_display_label:
             print(f"[PALETTE._update_progress_display] ❌ Missing widgets: progress_bar={self.progress_bar is not None}, time_label={self.time_display_label is not None}")
             return
+        
+        print(f"[PROGRESS] progress_bar visible: {self.progress_bar.get_visible()}")
+        print(f"[PROGRESS] progress_bar parent: {self.progress_bar.get_parent()}")
         
         if self.simulation is None:
             print(f"[PALETTE._update_progress_display] ❌ No simulation controller")
