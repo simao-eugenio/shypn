@@ -75,7 +75,8 @@ class SimulateToolsPaletteLoader(GObject.GObject):
             ui_dir = os.path.join(project_root, 'ui', 'simulate')
         self.ui_dir = ui_dir
         self.ui_path = os.path.join(ui_dir, 'simulate_tools_palette.ui')
-        self.simulation = None
+        self._simulation = None  # Private attribute - use property
+        self.buffered_settings = None
         self._model = model
         self.data_collector = SimulationDataCollector()
         self.builder = None
@@ -95,6 +96,39 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         # Initialize simulation controller AFTER UI is loaded
         if model is not None:
             self._init_simulation_controller()
+
+    @property
+    def simulation(self):
+        """Get the simulation controller.
+        
+        Returns:
+            SimulationController or None
+        """
+        return self._simulation
+    
+    @simulation.setter
+    def simulation(self, controller):
+        """Set the simulation controller.
+        
+        CRITICAL: When controller changes (e.g., lifecycle reset), we must
+        recreate BufferedSimulationSettings to point to the NEW controller's
+        settings object. Otherwise buffered settings point to stale/orphaned
+        settings from the previous controller!
+        
+        Args:
+            controller: SimulationController instance or None
+        """
+        self._simulation = controller
+        
+        # Recreate BufferedSimulationSettings with new controller's settings
+        if controller is not None:
+            # Create new BufferedSimulationSettings pointing to new controller's settings
+            self.buffered_settings = BufferedSimulationSettings(controller.settings)
+            
+            # Sync UI with new controller's settings
+            self._sync_settings_to_ui()
+        else:
+            self.buffered_settings = None
 
     def _load_ui(self):
         """Load the simulate tools palette UI from file."""
@@ -198,6 +232,9 @@ class SimulateToolsPaletteLoader(GObject.GObject):
             # Wire up control handlers
             self._wire_settings_controls()
             
+            # Force white text on all labels programmatically
+            self._apply_settings_panel_colors()
+            
             # Load CSS
             self._load_settings_css()
             
@@ -210,25 +247,49 @@ class SimulateToolsPaletteLoader(GObject.GObject):
             traceback.print_exc()
             self.settings_revealer = None
     
-    def _load_settings_css(self):
-        """Load CSS styling for settings panel."""
-        css_path = os.path.join(
-            os.path.dirname(self.ui_dir), 'palettes', 'simulate', 'settings_sub_palette.css'
-        )
+    def _apply_settings_panel_colors(self):
+        """Apply bright text colors to settings panel labels programmatically.
         
-        if not os.path.exists(css_path):
+        This is done via GTK API instead of CSS to avoid rendering delays.
+        """
+        if not self.settings_revealer:
             return
         
         try:
-            css_provider = Gtk.CssProvider()
-            css_provider.load_from_path(css_path)
-            screen = Gdk.Screen.get_default()
-            Gtk.StyleContext.add_provider_for_screen(
-                screen, css_provider,
-                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
-            )
+            from gi.repository import Gdk
+            
+            # Define white color
+            white = Gdk.RGBA()
+            white.parse("#ffffff")
+            
+            # Recursively set all label colors to white
+            def set_label_colors(widget):
+                if isinstance(widget, Gtk.Label):
+                    widget.override_color(Gtk.StateFlags.NORMAL, white)
+                    widget.override_color(Gtk.StateFlags.ACTIVE, white)
+                    widget.override_color(Gtk.StateFlags.PRELIGHT, white)
+                    widget.override_color(Gtk.StateFlags.SELECTED, white)
+                    widget.override_color(Gtk.StateFlags.INSENSITIVE, white)
+                
+                # Recurse into containers
+                if isinstance(widget, Gtk.Container):
+                    for child in widget.get_children():
+                        set_label_colors(child)
+            
+            # Apply to entire settings panel
+            set_label_colors(self.settings_revealer)
+            
         except Exception as e:
-            pass  # Silently ignore CSS errors
+            pass  # Silently ignore color setting errors
+    
+    def _load_settings_css(self):
+        """Load CSS styling for settings panel.
+        
+        DISABLED: Custom CSS caused severe rendering delays (text appearing after 1 minute).
+        Now using default SwissKnife palette styling which works instantly.
+        """
+        # CSS loading disabled - using SwissKnife default styling
+        pass
     
     def _wire_settings_controls(self):
         """Wire settings panel controls to simulation settings.
@@ -418,48 +479,52 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         """Initialize the simulation controller with the model."""
         if self._model is None:
             return
+        
+        # Create controller and assign via property setter
+        # The setter automatically creates BufferedSimulationSettings
         self.simulation = SimulationController(self._model)
+        
+        # Set up data collector and listeners
         self.simulation.data_collector = self.data_collector
         self.simulation.add_step_listener(self._on_simulation_step)
         self.simulation.add_step_listener(self.data_collector.on_simulation_step)
         
-        # Initialize BufferedSimulationSettings for atomic updates
-        self.buffered_settings = BufferedSimulationSettings(self.simulation.settings)
-        
-        # Apply default UI values to simulation settings if not already set
+        # Apply default UI values to simulation settings
         self._apply_ui_defaults_to_settings()
         
-        # Sync UI with current settings
-        self._sync_settings_to_ui()
+        # Note: _sync_settings_to_ui() is already called by the setter
     
     def _apply_ui_defaults_to_settings(self):
         """Apply default UI values to simulation settings on initialization.
         
         This ensures the progress bar works from the start by setting
         duration from the UI's default value (60 seconds).
+        
+        ALWAYS applies UI defaults to ensure progress bar works globally
+        for all model loading paths (new models, file loading, etc.).
         """
         if self.simulation is None:
             return
         
-        # If settings don't have a duration, apply the UI default
-        if self.simulation.settings.duration is None:
-            if self.duration_entry:
-                try:
-                    duration_text = self.duration_entry.get_text().strip()
-                    duration = float(duration_text)
-                    
-                    # Get units from combo
-                    units = TimeUnits.SECONDS  # Default
-                    if self.time_units_combo:
-                        units_str = self.time_units_combo.get_active_text()
-                        if units_str:
-                            units = TimeUnits.from_string(units_str)
-                    
-                    # Set duration in simulation settings
-                    self.simulation.settings.set_duration(duration, units)
-                except (ValueError, AttributeError):
-                    # If UI values are invalid, set a reasonable default
-                    self.simulation.settings.set_duration(60.0, TimeUnits.SECONDS)
+        # Always apply UI defaults (removed "if duration is None" check)
+        # This ensures progress bar works for ALL loading paths
+        if self.duration_entry:
+            try:
+                duration_text = self.duration_entry.get_text().strip()
+                duration = float(duration_text)
+                
+                # Get units from combo
+                units = TimeUnits.SECONDS  # Default
+                if self.time_units_combo:
+                    units_str = self.time_units_combo.get_active_text()
+                    if units_str:
+                        units = TimeUnits.from_string(units_str)
+                
+                # Set duration in simulation settings
+                self.simulation.settings.set_duration(duration, units)
+            except (ValueError, AttributeError):
+                # If UI values are invalid, set a reasonable default
+                self.simulation.settings.set_duration(60.0, TimeUnits.SECONDS)
 
     def set_model(self, model):
         """Set the Petri net model for simulation.

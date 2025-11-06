@@ -18,9 +18,6 @@
         <property name="visible">True</property>
         <property name="shadow-type">out</property>
         <property name="margin_bottom">12</property>
-        <style>
-          <class name="settings-panel-frame"/>
-        </style>
         
         <child>
           <object class="GtkBox" id="settings_container">
@@ -28,9 +25,6 @@
             <property name="orientation">vertical</property>
             <property name="spacing">12</property>
             <property name="margin">16</property>
-            <style>
-              <class name="settings-panel"/>
-            </style>
             
             <!-- Header -->
             <child>
@@ -38,9 +32,6 @@
                 <property name="visible">True</property>
                 <property name="label">⚙ Simulation Settings</property>
                 <property name="xalign">0</property>
-                <style>
-                  <class name="settings-header"/>
-                </style>
               </object>
             </child>
             
@@ -60,9 +51,6 @@
                     <property name="visible">True</property>
                     <property name="label">TIME STEP</property>
                     <property name="xalign">0</property>
-                    <style>
-                      <class name="settings-section-label"/>
-                    </style>
                   </object>
                 </child>
                 
@@ -79,9 +67,6 @@
                         <property name="label">Auto</property>
                         <property name="active">True</property>
                         <property name="margin_end">4</property>
-                        <style>
-                          <class name="settings-radio"/>
-                        </style>
                       </object>
                     </child>
                     
@@ -91,9 +76,6 @@
                         <property name="label">Manual</property>
                         <property name="group">dt_auto_radio</property>
                         <property name="margin_end">8</property>
-                        <style>
-                          <class name="settings-radio"/>
-                        </style>
                       </object>
                     </child>
                     
@@ -105,9 +87,6 @@
                         <property name="max-width-chars">8</property>
                         <property name="sensitive">True</property>
                         <property name="margin_end">4</property>
-                        <style>
-                          <class name="settings-entry-small"/>
-                        </style>
                       </object>
                     </child>
                     
@@ -115,9 +94,6 @@
                       <object class="GtkLabel">
                         <property name="visible">True</property>
                         <property name="label">s</property>
-                        <style>
-                          <class name="settings-unit"/>
-                        </style>
                       </object>
                     </child>
                     
@@ -143,9 +119,6 @@
                     <property name="visible">True</property>
                     <property name="label">PLAYBACK SPEED</property>
                     <property name="xalign">0</property>
-                    <style>
-                      <class name="settings-section-label"/>
-                    </style>
                   </object>
                 </child>
                 
@@ -162,9 +135,6 @@
                         <property name="visible">True</property>
                         <property name="label">Speed:</property>
                         <property name="margin_end">4</property>
-                        <style>
-                          <class name="settings-label-small"/>
-                        </style>
                       </object>
                     </child>
                     
@@ -176,9 +146,6 @@
                         <property name="value">1.0</property>
                         <property name="width-chars">7</property>
                         <property name="height-request">32</property>
-                        <style>
-                          <class name="settings-spin"/>
-                        </style>
                       </object>
                     </child>
                     
@@ -187,9 +154,6 @@
                         <property name="visible">True</property>
                         <property name="label">×</property>
                         <property name="margin_start">2</property>
-                        <style>
-                          <class name="settings-unit"/>
-                        </style>
                       </object>
                     </child>
                     

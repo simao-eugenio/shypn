@@ -244,11 +244,26 @@ class CanvasLifecycleManager:
         if hasattr(context.palette, 'reset_tool_selection'):
             context.palette.reset_tool_selection()
         
-        # 5. Reset IDManager scope
+        # 5. Reset simulation tools palette UI state
+        logger.debug("  Resetting simulation palette UI...")
+        sim_palette = context.simulate_tools_palette
+        if sim_palette:
+            # Re-apply UI defaults (duration, units) to ensure progress bar works
+            sim_palette._apply_ui_defaults_to_settings()
+            # Reset progress bar display to 0%
+            if sim_palette.progress_bar:
+                sim_palette.progress_bar.set_fraction(0.0)
+                sim_palette.progress_bar.set_text("0%")
+            # Reset time display
+            if sim_palette.time_display_label:
+                sim_palette.time_display_label.set_text("Time: 0.0 s")
+            logger.debug("  ✓ Simulation palette UI reset complete")
+        
+        # 6. Reset IDManager scope
         logger.debug(f"  Resetting ID scope: {context.id_scope}")
         self.id_manager.reset_scope(context.id_scope)
         
-        # 6. Update context metadata
+        # 7. Update context metadata
         context.file_path = None
         context.is_modified = False
         context.last_save_time = None
