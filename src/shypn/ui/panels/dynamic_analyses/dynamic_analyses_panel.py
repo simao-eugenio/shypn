@@ -143,9 +143,6 @@ class DynamicAnalysesPanel(Gtk.Box):
                     model=self.model,
                     diagnostics_panel=diagnostics_panel
                 )
-                print(f"[DYNAMIC_ANALYSES] Context menu handler created successfully", file=sys.stderr)
-            else:
-                print(f"[DYNAMIC_ANALYSES] Warning: Cannot create context menu handler - panels not ready", file=sys.stderr)
         except Exception as e:
             import traceback
             print(f"[DYNAMIC_ANALYSES] Warning: Could not create context menu handler: {e}", file=sys.stderr)
