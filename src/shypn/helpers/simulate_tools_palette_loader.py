@@ -179,12 +179,8 @@ class SimulateToolsPaletteLoader(GObject.GObject):
             if self.settings_revealer is None:
                 return
             
-            # Get control widgets
-            self.speed_0_1x_button = settings_builder.get_object('speed_0_1x_button')
-            self.speed_1x_button = settings_builder.get_object('speed_1x_button')
-            self.speed_10x_button = settings_builder.get_object('speed_10x_button')
-            self.speed_60x_button = settings_builder.get_object('speed_60x_button')
-            self.time_scale_spin = settings_builder.get_object('time_scale_spin')
+            # Get control widgets (speed buttons removed from UI)
+            self.time_scale_spin = None  # Removed from parameters panel
             self.settings_apply_button = settings_builder.get_object('settings_apply_button')
             self.settings_reset_button = settings_builder.get_object('settings_reset_button')
             
@@ -226,79 +222,9 @@ class SimulateToolsPaletteLoader(GObject.GObject):
     def _wire_settings_controls(self):
         """Wire settings panel controls to simulation settings.
         
-        Connects all UI controls (speed presets, spin button, etc.) to
-        simulation settings with proper validation and callbacks.
+        Note: Playback speed controls have been removed from parameters panel.
+        Speed is controlled directly via main palette if needed.
         """
-        # Speed preset buttons - exclusive toggle group
-        speed_buttons = [
-            (self.speed_0_1x_button, 0.1),
-            (self.speed_1x_button, 1.0),
-            (self.speed_10x_button, 10.0),
-            (self.speed_60x_button, 60.0),
-        ]
-        
-        def on_speed_preset_clicked(clicked_button, speed_value):
-            """Handle speed preset button click - exclusive toggle."""
-            if clicked_button.get_active():
-                # Deactivate other buttons
-                for btn, _ in speed_buttons:
-                    if btn and btn != clicked_button and btn.get_active():
-                        btn.set_active(False)
-                # Apply speed
-                if self.simulation:
-                    # Check if simulation is currently running
-                    was_running = self.simulation.is_running()
-                    
-                    # Stop if running (will restart with new time_scale)
-                    if was_running:
-                        self.simulation.stop()
-                    
-                    # Update time_scale
-                    self.simulation.settings.time_scale = speed_value
-                    if self.time_scale_spin:
-                        self.time_scale_spin.set_value(speed_value)
-                    
-                    # Restart if it was running
-                    if was_running:
-                        time_step = self.simulation.get_effective_dt()
-                        self.simulation.run(time_step=time_step)
-                    
-                    self.emit('settings-changed')
-        
-        # Connect speed preset buttons
-        for btn, speed in speed_buttons:
-            if btn:
-                btn.connect('clicked', on_speed_preset_clicked, speed)
-        
-        # Custom speed spin button
-        if self.time_scale_spin:
-            def on_time_scale_changed(spin):
-                """Handle custom time scale change."""
-                # Deactivate all preset buttons
-                for btn, _ in speed_buttons:
-                    if btn and btn.get_active():
-                        btn.set_active(False)
-                # Apply custom speed
-                if self.simulation:
-                    # Check if simulation is currently running
-                    was_running = self.simulation.is_running()
-                    
-                    # Stop if running (will restart with new time_scale)
-                    if was_running:
-                        self.simulation.stop()
-                    
-                    # Update time_scale
-                    self.simulation.settings.time_scale = spin.get_value()
-                    
-                    # Restart if it was running
-                    if was_running:
-                        time_step = self.simulation.get_effective_dt()
-                        self.simulation.run(time_step=time_step)
-                    
-                    self.emit('settings-changed')
-            
-            self.time_scale_spin.connect('value-changed', on_time_scale_changed)
-        
         # Apply button
         if self.settings_apply_button:
             def on_apply_clicked(button):
@@ -321,34 +247,12 @@ class SimulateToolsPaletteLoader(GObject.GObject):
             self.settings_reset_button.connect('clicked', on_reset_clicked)
     
     def _sync_settings_to_ui(self):
-        """Synchronize current simulation settings to UI controls."""
-        if not self.simulation or not hasattr(self, 'settings_revealer') or self.settings_revealer is None:
-            return
+        """Synchronize current simulation settings to UI controls.
         
-        time_scale = self.simulation.settings.time_scale
-        
-        # Update spin button
-        if self.time_scale_spin:
-            self.time_scale_spin.set_value(time_scale)
-        
-        # Update preset buttons
-        preset_map = {
-            0.1: self.speed_0_1x_button,
-            1.0: self.speed_1x_button,
-            10.0: self.speed_10x_button,
-            60.0: self.speed_60x_button,
-        }
-        
-        # Deactivate all first
-        for btn in preset_map.values():
-            if btn and btn.get_active():
-                btn.set_active(False)
-        
-        # Activate matching preset
-        if time_scale in preset_map:
-            btn = preset_map[time_scale]
-            if btn:
-                btn.set_active(True)
+        Note: Playback speed controls removed from parameters panel.
+        """
+        # No speed controls to sync anymore
+        pass
     
     def _hide_settings_panel(self):
         """Hide the settings panel with animation.
