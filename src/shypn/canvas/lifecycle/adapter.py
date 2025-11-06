@@ -208,6 +208,7 @@ class LifecycleAdapter:
             self.lifecycle_manager.reset_canvas(drawing_area)
             # Sync legacy dicts
             self.sync_from_context(context)
+            # NOTE: Simulation palette UI reset now handled by lifecycle_manager
         else:
             # Legacy reset if not in new system
             logger.debug("  Using legacy reset (canvas not in lifecycle manager)")
@@ -223,6 +224,18 @@ class LifecycleAdapter:
                 controller.reset()
                 if hasattr(controller, 'behavior_cache'):
                     controller.behavior_cache.clear()
+            
+            # LEGACY: Also reset simulation palette UI if in old system
+            palette = self.swissknife_palettes.get(drawing_area)
+            if palette and hasattr(palette, 'registry'):
+                sim_palette = palette.registry.get_widget_palette_instance('simulate')
+                if sim_palette:
+                    sim_palette._apply_ui_defaults_to_settings()
+                    if sim_palette.progress_bar:
+                        sim_palette.progress_bar.set_fraction(0.0)
+                    if sim_palette.time_display_label:
+                        sim_palette.time_display_label.set_text("Time: 0.0 s")
+                    logger.debug("  ✓ Reset simulation palette UI (legacy path)")
     
     def switch_to_canvas(self, drawing_area: Any) -> None:
         """

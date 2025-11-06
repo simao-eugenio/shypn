@@ -12,54 +12,122 @@
 /* Settings container */
 .settings-panel {
     background-color: #3e5266;
-    color: #ffffff;
+    color: #ffffff !important;
+    opacity: 1.0;
+    transition: none;
+    animation: none;
+}
+
+/* Force ALL children to have bright text - override GTK defaults */
+.settings-panel * {
+    color: #ffffff !important;
+    opacity: 1.0 !important;
+    transition: none !important;
+    animation: none !important;
+}
+
+/* Ensure all labels have bright text in ALL states - no fade animations */
+.settings-panel label,
+.settings-panel label:backdrop,
+.settings-panel label:disabled,
+.settings-panel label:hover,
+.settings-panel label:active,
+.settings-panel label:focus,
+label.settings-header,
+label.settings-section-label,
+label.settings-label-small,
+label.settings-unit {
+    color: #ffffff !important;
+    opacity: 1.0 !important;
+    transition: none !important;
+    animation: none !important;
 }
 
 .settings-header {
     font-size: 14px;
     font-weight: bold;
-    color: #ffffff;
+    color: #ffffff !important;
     padding: 4px 0;
+    opacity: 1.0 !important;
+    transition: none !important;
+    animation: none !important;
 }
 
 .settings-section-label {
     font-size: 10px;
     font-weight: bold;
-    color: #ffffff;
+    color: #ffffff !important;
     letter-spacing: 0.5px;
     padding: 2px 0;
+    opacity: 1.0 !important;
+    transition: none !important;
+    animation: none !important;
 }
 
 .settings-label-small {
     font-size: 11px;
-    color: #ffffff;
+    color: #ffffff !important;
     font-weight: 500;
+    opacity: 1.0 !important;
+    transition: none !important;
+    animation: none !important;
 }
 
 .settings-unit {
     font-size: 11px;
-    color: #ffffff;
+    color: #ffffff !important;
     font-weight: bold;
+    opacity: 1.0 !important;
+    transition: none !important;
+    animation: none !important;
 }
 
 /* Radio buttons */
-.settings-radio {
-    color: #ffffff;
+.settings-radio,
+.settings-radio label,
+radiobutton.settings-radio,
+radiobutton.settings-radio label {
+    color: #ffffff !important;
     padding: 4px 8px;
+    opacity: 1.0 !important;
+    transition: none !important;
+    animation: none !important;
 }
 
-.settings-radio:checked {
-    color: #3498db;
+.settings-radio:checked,
+.settings-radio:checked label,
+radiobutton.settings-radio:checked,
+radiobutton.settings-radio:checked label {
+    color: #3498db !important;
+    opacity: 1.0 !important;
+    transition: none !important;
+    animation: none !important;
 }
 
-/* Entry fields */
-.settings-entry-small {
+/* Entry fields - bright white text in ALL states */
+.settings-entry-small,
+.settings-entry-small:backdrop,
+.settings-entry-small:disabled,
+.settings-entry-small:hover,
+.settings-entry-small:active,
+.settings-entry-small:focus,
+entry.settings-entry-small,
+entry.settings-entry-small:backdrop,
+entry.settings-entry-small:disabled,
+entry.settings-entry-small:hover,
+entry.settings-entry-small:active,
+entry.settings-entry-small:focus {
     background-color: #2c3e50;
-    color: #ffffff;
+    color: #ffffff !important;
+    caret-color: #ffffff !important;
     border: 1px solid #34495e;
     border-radius: 4px;
     padding: 4px 6px;
     min-height: 28px;
+    opacity: 1.0 !important;
+    transition: none !important;
+    animation: none !important;
+    -gtk-secondary-caret-color: #ffffff;
 }
 
 /* Entry field error state */
@@ -103,24 +171,54 @@
     text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
 }
 
-/* Spin button */
-.settings-spin {
+/* Spin button - bright white in all states */
+.settings-spin,
+.settings-spin:backdrop,
+.settings-spin:disabled,
+.settings-spin:hover,
+.settings-spin:active,
+.settings-spin:focus,
+spinbutton.settings-spin,
+spinbutton.settings-spin:backdrop,
+spinbutton.settings-spin:disabled,
+spinbutton.settings-spin:hover,
+spinbutton.settings-spin:active,
+spinbutton.settings-spin:focus {
     background-color: #2c3e50;
-    color: #ffffff;
+    color: #ffffff !important;
+    caret-color: #ffffff !important;
     border: 1px solid #34495e;
     border-radius: 4px;
     padding: 4px 6px;
     min-height: 32px;
+    opacity: 1.0 !important;
+    transition: none !important;
+    animation: none !important;
+    -gtk-secondary-caret-color: #ffffff;
 }
 
-/* Combo box */
-.settings-combo {
+/* Combo box - bright white in all states */
+.settings-combo,
+.settings-combo:backdrop,
+.settings-combo:disabled,
+.settings-combo:hover,
+.settings-combo:active,
+.settings-combo:focus,
+combobox.settings-combo,
+combobox.settings-combo:backdrop,
+combobox.settings-combo:disabled,
+combobox.settings-combo:hover,
+combobox.settings-combo:active,
+combobox.settings-combo:focus {
     background-color: #2c3e50;
-    color: #ffffff;
+    color: #ffffff !important;
     border: 1px solid #34495e;
     border-radius: 4px;
     padding: 6px 8px;
     min-height: 36px;
+    opacity: 1.0 !important;
+    transition: none !important;
+    animation: none !important;
 }
 
 /* Action buttons */

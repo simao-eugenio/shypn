@@ -85,6 +85,20 @@ class CanvasContext:
         """Check if simulation is currently running."""
         return hasattr(self.controller, '_running') and self.controller._running
     
+    @property
+    def simulate_tools_palette(self):
+        """Get SimulateToolsPaletteLoader from SwissKnifePalette.
+        
+        Provides access to the simulation tools palette (Run/Step/Stop/Reset buttons,
+        progress bar, time display) as a first-class component of the canvas context.
+        
+        Returns:
+            SimulateToolsPaletteLoader instance or None if not available
+        """
+        if hasattr(self.palette, 'registry'):
+            return self.palette.registry.get_widget_palette_instance('simulate')
+        return None
+    
     def mark_modified(self):
         """Mark document as modified (has unsaved changes)."""
         self.is_modified = True

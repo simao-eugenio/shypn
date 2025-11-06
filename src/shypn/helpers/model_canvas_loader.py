@@ -957,6 +957,12 @@ class ModelCanvasLoader:
                                     if hasattr(controller, 'data_collector') and hasattr(simulate_tools_palette, 'data_collector'):
                                         controller.data_collector = simulate_tools_palette.data_collector
                                         print(f"[RESET] Updated controller.data_collector reference")
+                                    
+                                    # CRITICAL: Re-apply UI defaults to new controller
+                                    # This ensures progress bar works globally after controller reset
+                                    # (for File → Open, File → Reset, KEGG/SBML imports, parameter changes)
+                                    simulate_tools_palette._apply_ui_defaults_to_settings()
+                                    print(f"[RESET] ✅ Re-applied UI defaults (duration, units) to new controller")
                                 else:
                                     print(f"[RESET] ❌ simulate_tools_palette not found in registry")
                             else:
