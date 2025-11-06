@@ -439,14 +439,17 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         duration from the UI's default value (60 seconds).
         """
         if self.simulation is None:
+            print("[INIT] No simulation in _apply_ui_defaults_to_settings")
             return
         
         # If settings don't have a duration, apply the UI default
         if self.simulation.settings.duration is None:
+            print("[INIT] Duration is None, applying UI defaults")
             if self.duration_entry:
                 try:
                     duration_text = self.duration_entry.get_text().strip()
                     duration = float(duration_text)
+                    print(f"[INIT] Got duration from UI: {duration}")
                     
                     # Get units from combo
                     units = TimeUnits.SECONDS  # Default
@@ -454,12 +457,17 @@ class SimulateToolsPaletteLoader(GObject.GObject):
                         units_str = self.time_units_combo.get_active_text()
                         if units_str:
                             units = TimeUnits.from_string(units_str)
+                    print(f"[INIT] Got units: {units}")
                     
                     # Set duration in simulation settings
                     self.simulation.settings.set_duration(duration, units)
-                except (ValueError, AttributeError):
+                    print(f"[INIT] Duration set to {self.simulation.settings.duration} {self.simulation.settings.time_units}")
+                except (ValueError, AttributeError) as e:
                     # If UI values are invalid, set a reasonable default
+                    print(f"[INIT] Error reading UI: {e}, using default 60s")
                     self.simulation.settings.set_duration(60.0, TimeUnits.SECONDS)
+        else:
+            print(f"[INIT] Duration already set: {self.simulation.settings.duration}")
 
     def set_model(self, model):
         """Set the Petri net model for simulation.
@@ -951,9 +959,11 @@ class SimulateToolsPaletteLoader(GObject.GObject):
     def _update_progress_display(self):
         """Update progress bar and time display label."""
         if not self.progress_bar or not self.time_display_label:
+            print("[PROGRESS] Widgets not available")
             return
         
         if self.simulation is None:
+            print("[PROGRESS] No simulation")
             return
         
         settings = self.simulation.settings
@@ -961,10 +971,12 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         # Update progress bar
         if settings.duration:
             progress = self.simulation.get_progress()
+            print(f"[PROGRESS] t={self.simulation.time:.2f}, duration={settings.duration}, progress={progress:.2%}")
             self.progress_bar.set_fraction(min(progress, 1.0))
             self.progress_bar.set_text(f"{int(progress * 100)}%")
             self.progress_bar.set_show_text(True)
         else:
+            print("[PROGRESS] No duration set")
             self.progress_bar.set_fraction(0.0)
             self.progress_bar.set_show_text(False)
         
