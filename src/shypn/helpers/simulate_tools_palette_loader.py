@@ -424,8 +424,40 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         # Initialize BufferedSimulationSettings for atomic updates
         self.buffered_settings = BufferedSimulationSettings(self.simulation.settings)
         
+        # Apply default UI values to simulation settings if not already set
+        self._apply_ui_defaults_to_settings()
+        
         # Sync UI with current settings
         self._sync_settings_to_ui()
+    
+    def _apply_ui_defaults_to_settings(self):
+        """Apply default UI values to simulation settings on initialization.
+        
+        This ensures the progress bar works from the start by setting
+        duration from the UI's default value (60 seconds).
+        """
+        if self.simulation is None:
+            return
+        
+        # If settings don't have a duration, apply the UI default
+        if self.simulation.settings.duration is None:
+            if self.duration_entry:
+                try:
+                    duration_text = self.duration_entry.get_text().strip()
+                    duration = float(duration_text)
+                    
+                    # Get units from combo
+                    units = TimeUnits.SECONDS  # Default
+                    if self.time_units_combo:
+                        units_str = self.time_units_combo.get_active_text()
+                        if units_str:
+                            units = TimeUnits.from_string(units_str)
+                    
+                    # Set duration in simulation settings
+                    self.simulation.settings.set_duration(duration, units)
+                except (ValueError, AttributeError):
+                    # If UI values are invalid, set a reasonable default
+                    self.simulation.settings.set_duration(60.0, TimeUnits.SECONDS)
 
     def set_model(self, model):
         """Set the Petri net model for simulation.
@@ -446,7 +478,6 @@ class SimulateToolsPaletteLoader(GObject.GObject):
             controller: The SimulationController instance
             time: Current simulation time
         """
-        print(f"[PALETTE._on_simulation_step] time={time:.4f}")
         self.emit('step-executed', time)
         self._update_progress_display()
 
@@ -917,24 +948,13 @@ class SimulateToolsPaletteLoader(GObject.GObject):
     
     def _update_progress_display(self):
         """Update progress bar and time display label."""
-        print(f"[PROGRESS] _update_progress_display called")
-        print(f"[PROGRESS] progress_bar exists: {self.progress_bar is not None}")
-        print(f"[PROGRESS] time_display_label exists: {self.time_display_label is not None}")
-        
         if not self.progress_bar or not self.time_display_label:
-            print(f"[PALETTE._update_progress_display] ❌ Missing widgets: progress_bar={self.progress_bar is not None}, time_label={self.time_display_label is not None}")
             return
         
-        print(f"[PROGRESS] progress_bar visible: {self.progress_bar.get_visible()}")
-        print(f"[PROGRESS] progress_bar parent: {self.progress_bar.get_parent()}")
-        
         if self.simulation is None:
-            print(f"[PALETTE._update_progress_display] ❌ No simulation controller")
             return
         
         settings = self.simulation.settings
-        
-        print(f"[PALETTE._update_progress_display] time={self.simulation.time:.4f}, duration={settings.duration}")
         
         # Update progress bar
         if settings.duration:
@@ -942,11 +962,9 @@ class SimulateToolsPaletteLoader(GObject.GObject):
             self.progress_bar.set_fraction(min(progress, 1.0))
             self.progress_bar.set_text(f"{int(progress * 100)}%")
             self.progress_bar.set_show_text(True)
-            print(f"[PALETTE._update_progress_display] Progress bar: {progress*100:.1f}%")
         else:
             self.progress_bar.set_fraction(0.0)
             self.progress_bar.set_show_text(False)
-            print(f"[PALETTE._update_progress_display] No duration set - progress bar hidden")
         
         # Update time display with speed indicator
         if settings.duration:
