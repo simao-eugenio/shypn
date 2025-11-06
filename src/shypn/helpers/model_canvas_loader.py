@@ -1057,6 +1057,9 @@ class ModelCanvasLoader:
         # Add to overlay
         overlay_widget.add_overlay(swissknife_widget)
         
+        # Show all widgets in the palette (including nested widgets and revealers)
+        swissknife_widget.show_all()
+        
         # Wire SwissKnifePalette signals
         swissknife_palette.connect('tool-activated', self._on_swissknife_tool_activated, canvas_manager, drawing_area)
         swissknife_palette.connect('mode-change-requested', self._on_swissknife_mode_change_requested, canvas_manager, drawing_area)
