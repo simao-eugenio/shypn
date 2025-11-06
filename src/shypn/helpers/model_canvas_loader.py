@@ -98,16 +98,12 @@ class ModelCanvasLoader:
         try:
             from shypn.canvas.lifecycle import enable_lifecycle_system
             self.lifecycle_manager, self.lifecycle_adapter = enable_lifecycle_system(self)
-            print("[GLOBAL-SYNC] ✓ Canvas lifecycle system enabled")
             
             # PHASE 4: Connect global IDManager to lifecycle scoping
             # This makes all ID generation canvas-scoped automatically
             if self.lifecycle_manager and hasattr(self.lifecycle_manager, 'id_manager'):
                 set_lifecycle_scope_manager(self.lifecycle_manager.id_manager)
-                print("[GLOBAL-SYNC] ✓ IDManager lifecycle scoping enabled")
         except Exception as e:
-            print(f"[GLOBAL-SYNC] ⚠️  Failed to enable lifecycle system: {e}")
-            print("[GLOBAL-SYNC] Falling back to legacy canvas management")
             self.lifecycle_manager = None
             self.lifecycle_adapter = None
         
@@ -275,9 +271,8 @@ class ModelCanvasLoader:
         if self.lifecycle_adapter and drawing_area:
             try:
                 self.lifecycle_adapter.switch_to_canvas(drawing_area)
-                print(f"[GLOBAL-SYNC] ✓ Switched to canvas {id(drawing_area)}, tab {page_num}")
             except Exception as e:
-                print(f"[GLOBAL-SYNC] ⚠️  Failed to switch canvas context: {e}")
+                pass  # Failed to switch canvas context
         
         if self.persistency:
             if drawing_area and drawing_area in self.canvas_managers:
@@ -474,9 +469,8 @@ class ModelCanvasLoader:
         if self.lifecycle_adapter and drawing_area:
             try:
                 self.lifecycle_adapter.destroy_canvas(drawing_area)
-                print(f"[GLOBAL-SYNC] ✓ Canvas {id(drawing_area)} destroyed and removed from lifecycle")
             except Exception as e:
-                print(f"[GLOBAL-SYNC] ⚠️  Failed to destroy canvas in lifecycle: {e}")
+                pass  # Failed to destroy canvas in lifecycle
         
         if drawing_area and drawing_area in self.canvas_managers:
             del self.canvas_managers[drawing_area]
@@ -1102,10 +1096,8 @@ class ModelCanvasLoader:
                     simulation_controller,
                     swissknife_palette
                 )
-                print(f"[GLOBAL-SYNC] ✓ Canvas {id(drawing_area)} registered with lifecycle system")
             except Exception as e:
-                print(f"[GLOBAL-SYNC] ⚠️  Failed to register canvas: {e}")
-                print("[GLOBAL-SYNC] Continuing with legacy management")
+                pass  # Failed to register canvas, continuing with legacy management
         
         # Store reference for mode switching
         if drawing_area not in self.overlay_managers:
