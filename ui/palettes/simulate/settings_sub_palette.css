@@ -62,6 +62,20 @@
     min-height: 28px;
 }
 
+/* Entry field error state */
+.settings-entry-small.error {
+    background-color: #c0392b;
+    border: 2px solid #e74c3c;
+    color: #ffffff;
+    animation: shake 0.3s;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-4px); }
+    75% { transform: translateX(4px); }
+}
+
 /* Speed preset buttons */
 .speed-preset-button {
     background-color: #2c3e50;

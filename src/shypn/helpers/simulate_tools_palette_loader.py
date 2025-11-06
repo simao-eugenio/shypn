@@ -24,8 +24,9 @@ methods directly rather than emitting signals for external handling.
 import os
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk, Gdk, GObject
+from gi.repository import Gtk, Gdk, GObject, GLib
 from shypn.engine.simulation import SimulationController
+from shypn.engine.simulation.buffered import BufferedSimulationSettings
 from shypn.analyses import SimulationDataCollector
 from shypn.utils.time_utils import TimeUnits, TimeFormatter
 
@@ -182,8 +183,15 @@ class SimulateToolsPaletteLoader(GObject.GObject):
             # Get control widgets (most controls removed - parameters panel simplified)
             # Only keeping the settings revealer for potential future use
             self.time_scale_spin = settings_builder.get_object('time_scale_spin')
+            self.dt_auto_radio = settings_builder.get_object('dt_auto_radio')
+            self.dt_manual_radio = settings_builder.get_object('dt_manual_radio')
+            self.dt_manual_entry = settings_builder.get_object('dt_manual_entry')
             self.settings_apply_button = None  # Removed from parameters panel
             self.settings_reset_button = None  # Removed from parameters panel
+            
+            # Create buffered settings for atomic updates
+            self.buffered_settings = None  # Will be initialized when simulation is set
+            self._debounce_timer = None  # For entry field debouncing
             
             # Wire up control handlers
             self._wire_settings_controls()
@@ -223,40 +231,177 @@ class SimulateToolsPaletteLoader(GObject.GObject):
     def _wire_settings_controls(self):
         """Wire settings panel controls to simulation settings.
         
-        Note: Most controls have been removed from parameters panel.
-        The panel now displays TIME STEP configuration and PLAYBACK SPEED spinner.
-        Apply/Reset buttons and Conflict Policy have been removed.
+        Now uses BufferedSimulationSettings for atomic updates without Apply button.
+        All changes are buffered, validated, and committed atomically.
+        Entry fields are debounced to prevent excessive updates.
         """
+        # Wire playback speed spinner (immediate atomic update)
         if self.time_scale_spin:
             self.time_scale_spin.connect('value-changed', self._on_speed_changed)
+        
+        # Wire time step radio buttons (immediate atomic update)
+        if self.dt_auto_radio:
+            self.dt_auto_radio.connect('toggled', self._on_dt_mode_changed)
+        
+        # Wire manual time step entry (debounced atomic update)
+        if self.dt_manual_entry:
+            self.dt_manual_entry.connect('changed', self._on_dt_entry_changed)
+            self.dt_manual_entry.connect('activate', self._on_dt_entry_activate)
     
     def _on_speed_changed(self, spin):
-        """Handle playback speed spinner change."""
-        if self.simulation:
-            # Check if simulation is currently running
-            was_running = self.simulation.is_running()
-            
-            if was_running:
-                # Temporarily stop, apply new speed, restart
+        """Handle playback speed spinner change (atomic).
+        
+        Uses BufferedSimulationSettings for atomic update.
+        """
+        if not self.simulation or not self.buffered_settings:
+            return
+        
+        new_value = spin.get_value()
+        
+        # Write to buffer
+        self.buffered_settings.buffer.time_scale = new_value
+        self.buffered_settings.mark_dirty()
+        
+        # Commit atomically
+        if self.buffered_settings.commit():
+            # Restart simulation if it was running
+            if self.simulation.is_running():
                 self.simulation.stop()
                 time_step = self.simulation.get_effective_dt()
                 self.simulation.run(time_step=time_step)
             
             self.emit('settings-changed')
+        else:
+            # Validation failed - restore previous value
+            self.time_scale_spin.set_value(self.simulation.settings.time_scale)
+    
+    def _on_dt_mode_changed(self, radio_button):
+        """Handle time step mode change (Auto/Manual) - atomic.
+        
+        Uses BufferedSimulationSettings for atomic update.
+        """
+        if not radio_button.get_active():
+            return  # Only handle activation, not deactivation
+        
+        if not self.simulation or not self.buffered_settings:
+            return
+        
+        # Determine which mode is selected
+        is_auto = (radio_button == self.dt_auto_radio)
+        
+        # Write to buffer
+        self.buffered_settings.buffer.dt_auto = is_auto
+        self.buffered_settings.mark_dirty()
+        
+        # Commit atomically
+        if self.buffered_settings.commit():
+            # Update entry sensitivity
+            if self.dt_manual_entry:
+                self.dt_manual_entry.set_sensitive(not is_auto)
+            
+            self.emit('settings-changed')
+        else:
+            # Validation failed - restore previous state
+            if self.simulation.settings.dt_auto:
+                self.dt_auto_radio.set_active(True)
+            else:
+                self.dt_manual_radio.set_active(True)
+    
+    def _on_dt_entry_changed(self, entry):
+        """Handle manual time step entry change (debounced).
+        
+        Debounces input to avoid excessive validation during typing.
+        """
+        # Cancel pending timer
+        if self._debounce_timer:
+            GLib.source_remove(self._debounce_timer)
+        
+        # Schedule update after 500ms of no typing
+        self._debounce_timer = GLib.timeout_add(500, self._apply_dt_entry_value, entry)
+    
+    def _on_dt_entry_activate(self, entry):
+        """Handle manual time step entry activation (Enter key) - immediate.
+        
+        When user presses Enter, apply immediately without debounce.
+        """
+        # Cancel pending debounce timer
+        if self._debounce_timer:
+            GLib.source_remove(self._debounce_timer)
+            self._debounce_timer = None
+        
+        # Apply immediately
+        self._apply_dt_entry_value(entry)
+    
+    def _apply_dt_entry_value(self, entry):
+        """Apply manual time step entry value atomically.
+        
+        Uses BufferedSimulationSettings for atomic update with validation.
+        """
+        self._debounce_timer = None  # Clear timer reference
+        
+        if not self.simulation or not self.buffered_settings:
+            return False  # Return False to stop timer
+        
+        try:
+            # Parse value
+            text = entry.get_text().strip()
+            value = float(text)
+            
+            # Write to buffer
+            self.buffered_settings.buffer.dt_manual = value
+            self.buffered_settings.mark_dirty()
+            
+            # Commit atomically (with validation)
+            if self.buffered_settings.commit():
+                # Success - remove error styling
+                entry.get_style_context().remove_class('error')
+                self.emit('settings-changed')
+            else:
+                # Validation failed - show error
+                entry.get_style_context().add_class('error')
+                # Restore previous value after brief delay
+                GLib.timeout_add(2000, self._restore_dt_entry_value, entry)
+        
+        except ValueError:
+            # Parse error - show error styling
+            entry.get_style_context().add_class('error')
+            # Restore previous value after brief delay
+            GLib.timeout_add(2000, self._restore_dt_entry_value, entry)
+        
+        return False  # Return False to stop timer (one-shot)
+    
+    def _restore_dt_entry_value(self, entry):
+        """Restore entry to valid value after error."""
+        if self.simulation:
+            entry.set_text(str(self.simulation.settings.dt_manual))
+            entry.get_style_context().remove_class('error')
+        return False  # One-shot timer
     
     def _sync_settings_to_ui(self):
         """Synchronize current simulation settings to UI controls.
         
-        Syncs playback speed spinner with simulation settings.
+        Syncs all settings panel controls with current simulation settings.
         """
         if not self.simulation or not hasattr(self, 'settings_revealer') or self.settings_revealer is None:
             return
         
-        time_scale = self.simulation.settings.time_scale
+        settings = self.simulation.settings
         
-        # Update spin button
+        # Update playback speed spinner
         if self.time_scale_spin:
-            self.time_scale_spin.set_value(time_scale)
+            self.time_scale_spin.set_value(settings.time_scale)
+        
+        # Update time step mode radio buttons
+        if self.dt_auto_radio and self.dt_manual_radio:
+            if settings.dt_auto:
+                self.dt_auto_radio.set_active(True)
+            else:
+                self.dt_manual_radio.set_active(True)
+        
+        # Update manual time step entry
+        if self.dt_manual_entry:
+            self.dt_manual_entry.set_text(str(settings.dt_manual))
+            self.dt_manual_entry.set_sensitive(not settings.dt_auto)
     
     def _hide_settings_panel(self):
         """Hide the settings panel with animation.
@@ -275,6 +420,12 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         self.simulation.data_collector = self.data_collector
         self.simulation.add_step_listener(self._on_simulation_step)
         self.simulation.add_step_listener(self.data_collector.on_simulation_step)
+        
+        # Initialize BufferedSimulationSettings for atomic updates
+        self.buffered_settings = BufferedSimulationSettings(self.simulation.settings)
+        
+        # Sync UI with current settings
+        self._sync_settings_to_ui()
 
     def set_model(self, model):
         """Set the Petri net model for simulation.
