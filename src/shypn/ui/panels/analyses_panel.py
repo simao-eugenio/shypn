@@ -50,7 +50,6 @@ class AnalysesPanelController(BasePanel):
     
     def initialize(self):
         """Initialize Analyses panel widgets - build complete UI."""
-        print(f"[ANALYSES_PANEL] Initializing...", file=sys.stderr)
         
         try:
             # Get container from builder
@@ -72,12 +71,10 @@ class AnalysesPanelController(BasePanel):
             self._container.pack_start(content_box, True, True, 0)
             self._container.show_all()
             
-            print(f"[ANALYSES_PANEL] Initialized successfully", file=sys.stderr)
             self._emit_ready()
             
         except Exception as e:
             error_msg = f"Failed to initialize Analyses panel: {e}"
-            print(f"[ANALYSES_PANEL] ERROR: {error_msg}", file=sys.stderr)
             import traceback
             traceback.print_exc()
             self._emit_error(error_msg)
@@ -189,10 +186,8 @@ class AnalysesPanelController(BasePanel):
     
     def activate(self):
         """Called when Analyses panel becomes visible."""
-        print(f"[ANALYSES_PANEL] Activated", file=sys.stderr)
         # TODO Phase 4: Refresh plots if needed
     
     def deactivate(self):
         """Called when Analyses panel becomes hidden."""
-        print(f"[ANALYSES_PANEL] Deactivated", file=sys.stderr)
         # TODO Phase 4: Pause plotting operations

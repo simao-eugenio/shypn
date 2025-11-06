@@ -55,7 +55,6 @@ class FilesPanelController(BasePanel):
     
     def initialize(self):
         """Initialize Files panel widgets - build complete UI."""
-        print(f"[FILES_PANEL] Initializing...", file=sys.stderr)
         
         try:
             # Get container from builder
@@ -77,12 +76,10 @@ class FilesPanelController(BasePanel):
             # Show all widgets
             self._container.show_all()
             
-            print(f"[FILES_PANEL] Initialized successfully", file=sys.stderr)
             self._emit_ready()
             
         except Exception as e:
             error_msg = f"Failed to initialize Files panel: {e}"
-            print(f"[FILES_PANEL] ERROR: {error_msg}", file=sys.stderr)
             import traceback
             traceback.print_exc()
             self._emit_error(error_msg)
@@ -266,10 +263,8 @@ class FilesPanelController(BasePanel):
     
     def activate(self):
         """Called when Files panel becomes visible."""
-        print(f"[FILES_PANEL] Activated", file=sys.stderr)
         # TODO: Refresh file tree if needed
     
     def deactivate(self):
         """Called when Files panel becomes hidden."""
-        print(f"[FILES_PANEL] Deactivated", file=sys.stderr)
         # TODO: Save state if needed

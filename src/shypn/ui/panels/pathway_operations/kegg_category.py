@@ -798,7 +798,6 @@ class KEGGCategory(BasePathwayCategory):
             
             # CRITICAL: Trigger callback for Report panel refresh
             # This must happen AFTER model is loaded to canvas (above)
-            print(f"[KEGG_CATEGORY] Triggering import_complete_callback with {len(document_model.places) if document_model else 0} places")
             self._trigger_import_complete(imported_data)
             
         except Exception as e:

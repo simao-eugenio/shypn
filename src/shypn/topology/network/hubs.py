@@ -31,7 +31,6 @@ class HubAnalyzer(TopologyAnalyzer):
         result = analyzer.analyze(min_degree=5)
         
         for hub in result.get('hubs', []):
-            print(f"{hub['name']}: degree {hub['degree']}")
     """
     
     def analyze(

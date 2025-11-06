@@ -1447,7 +1447,6 @@ class FileExplorerPanel:
         - If manager.is_default_filename() (imported/default): Auto-save to workspace
         - Otherwise: Save directly to manager's filepath
         """
-        print("[SAVE] save_current_document() called")
         try:
             if not hasattr(self, 'canvas_loader') or self.canvas_loader is None:
                 pass
@@ -1576,7 +1575,6 @@ class FileExplorerPanel:
         Opens a file chooser dialog with 'default.shy' as the default filename.
         User can choose location and filename interactively.
         """
-        print("[SAVE_AS] save_current_document_as() called")
         try:
             if not hasattr(self, 'canvas_loader') or self.canvas_loader is None:
                 pass
@@ -1617,7 +1615,6 @@ class FileExplorerPanel:
                 default_filename = "default.shy"
             
             # Create file chooser dialog
-            print(f"[SAVE_AS] Creating file chooser dialog with parent={self.parent_window}")
             dialog = Gtk.FileChooserDialog(
                 title="Save As",
                 parent=self.parent_window,
@@ -1627,7 +1624,6 @@ class FileExplorerPanel:
                     Gtk.STOCK_SAVE, Gtk.ResponseType.OK
                 )
             )
-            print(f"[SAVE_AS] Dialog created: {dialog}")
             
             # Set initial directory
             dialog.set_current_folder(initial_dir)
@@ -1650,9 +1646,7 @@ class FileExplorerPanel:
             dialog.set_do_overwrite_confirmation(True)
             
             # Run dialog
-            print(f"[SAVE_AS] Running dialog.run()...")
             response = dialog.run()
-            print(f"[SAVE_AS] Dialog response: {response}")
             filepath = None
             
             if response == Gtk.ResponseType.OK:
@@ -1696,7 +1690,6 @@ class FileExplorerPanel:
             if not hasattr(self, 'canvas_loader') or self.canvas_loader is None:
                 return
             if not hasattr(self, 'parent_window') or self.parent_window is None:
-                print("[FILES] ERROR: No parent window set for file chooser dialog")
                 return
             
             # Create FileChooserDialog for opening files
@@ -1820,7 +1813,6 @@ class FileExplorerPanel:
                     is_clean = not manager.is_dirty()
                     
                     # DEBUG: Print tab reuse decision
-                    print(f"[TAB_REUSE] Checking current tab:")
                     print(f"  Empty: {is_empty} (places={len(manager.places)}, trans={len(manager.transitions)}, arcs={len(manager.arcs)})")
                     print(f"  Default name: {is_default_name} (filename='{manager.filename}')")
                     print(f"  Clean: {is_clean} (is_dirty={manager.is_dirty()})")
@@ -1836,28 +1828,22 @@ class FileExplorerPanel:
             # Reuse the current empty default tab
             # CRITICAL: Reset manager state before loading to avoid stale state bugs
             # This ensures callbacks are enabled and all flags are reset
-            print(f"[TAB_REUSE] Reusing tab - calling _reset_manager_for_load")
             self.canvas_loader._reset_manager_for_load(manager, base_name)
-            print(f"[TAB_REUSE] After reset - manager has {len(manager.places)} places, {len(manager.transitions)} transitions")
         else:
             # Create a new tab for this document
-            print(f"[TAB_REUSE] Creating new tab with filename='{base_name}'")
             page_index, drawing_area = self.canvas_loader.add_document(filename=base_name)
             manager = self.canvas_loader.get_canvas_manager(drawing_area)
-            print(f"[TAB_REUSE] New tab created - manager has {len(manager.places)} places, {len(manager.transitions)} transitions")
         
         if manager:
             # ===== UNIFIED OBJECT LOADING =====
             # Use load_objects() for consistent, unified initialization path
             # This replaces direct assignment + manual notification loop
             # Benefits: Single code path, automatic notifications, proper references
-            print(f"[TAB_REUSE] Loading {len(document.places)} places, {len(document.transitions)} transitions, {len(document.arcs)} arcs")
             manager.load_objects(
                 places=document.places,
                 transitions=document.transitions,
                 arcs=document.arcs
             )
-            print(f"[TAB_REUSE] After load_objects - manager has {len(manager.places)} places, {len(manager.transitions)} transitions")
             
             # CRITICAL: Set on_changed callback on all loaded objects
             # This is required for proper object state management and dirty tracking

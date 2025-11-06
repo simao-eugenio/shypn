@@ -85,7 +85,6 @@ class MainWindowController(GObject.GObject):
             self.emit('window-ready')
             
         except Exception as e:
-            print(f"[MAIN_WINDOW] ERROR: Failed to initialize: {e}", file=sys.stderr)
             raise
     
     def _get_widgets(self):

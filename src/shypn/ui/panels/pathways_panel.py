@@ -44,7 +44,6 @@ class PathwaysPanelController(BasePanel):
     
     def initialize(self):
         """Initialize Pathways panel widgets - build complete UI."""
-        print(f"[PATHWAYS_PANEL] Initializing...", file=sys.stderr)
         
         try:
             # Get container from builder
@@ -81,12 +80,10 @@ class PathwaysPanelController(BasePanel):
             self._container.pack_start(content_box, True, True, 0)
             self._container.show_all()
             
-            print(f"[PATHWAYS_PANEL] Initialized successfully", file=sys.stderr)
             self._emit_ready()
             
         except Exception as e:
             error_msg = f"Failed to initialize Pathways panel: {e}"
-            print(f"[PATHWAYS_PANEL] ERROR: {error_msg}", file=sys.stderr)
             import traceback
             traceback.print_exc()
             self._emit_error(error_msg)
@@ -185,10 +182,8 @@ class PathwaysPanelController(BasePanel):
     
     def activate(self):
         """Called when Pathways panel becomes visible."""
-        print(f"[PATHWAYS_PANEL] Activated", file=sys.stderr)
         # TODO Phase 4: Refresh import state
     
     def deactivate(self):
         """Called when Pathways panel becomes hidden."""
-        print(f"[PATHWAYS_PANEL] Deactivated", file=sys.stderr)
         # TODO Phase 4: Cancel ongoing imports if needed

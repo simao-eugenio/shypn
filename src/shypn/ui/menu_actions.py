@@ -87,7 +87,6 @@ class MenuActions:
 		"""
 		try:
 			if not self.model_canvas_loader:
-				print("[RESET] No canvas loader available")
 				return
 			
 			# Get current canvas info
