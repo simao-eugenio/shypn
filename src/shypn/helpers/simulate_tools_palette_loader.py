@@ -179,10 +179,11 @@ class SimulateToolsPaletteLoader(GObject.GObject):
             if self.settings_revealer is None:
                 return
             
-            # Get control widgets (speed buttons removed from UI)
+            # Get control widgets (most controls removed - parameters panel simplified)
+            # Only keeping the settings revealer for potential future use
             self.time_scale_spin = None  # Removed from parameters panel
-            self.settings_apply_button = settings_builder.get_object('settings_apply_button')
-            self.settings_reset_button = settings_builder.get_object('settings_reset_button')
+            self.settings_apply_button = None  # Removed from parameters panel
+            self.settings_reset_button = None  # Removed from parameters panel
             
             # Wire up control handlers
             self._wire_settings_controls()
@@ -222,29 +223,12 @@ class SimulateToolsPaletteLoader(GObject.GObject):
     def _wire_settings_controls(self):
         """Wire settings panel controls to simulation settings.
         
-        Note: Playback speed controls have been removed from parameters panel.
-        Speed is controlled directly via main palette if needed.
+        Note: Most controls have been removed from parameters panel.
+        The panel now only displays TIME STEP configuration.
+        Apply/Reset buttons and Conflict Policy have been removed.
         """
-        # Apply button
-        if self.settings_apply_button:
-            def on_apply_clicked(button):
-                """Apply settings and close panel."""
-                self._hide_settings_panel()
-                self.emit('settings-changed')
-            
-            self.settings_apply_button.connect('clicked', on_apply_clicked)
-        
-        # Reset button
-        if self.settings_reset_button:
-            def on_reset_clicked(button):
-                """Reset settings to defaults."""
-                if self.simulation:
-                    # Reset time_scale to 1.0
-                    self.simulation.settings.time_scale = 1.0
-                    self._sync_settings_to_ui()
-                    self.emit('settings-changed')
-            
-            self.settings_reset_button.connect('clicked', on_reset_clicked)
+        # No controls to wire - panel is now display-only
+        pass
     
     def _sync_settings_to_ui(self):
         """Synchronize current simulation settings to UI controls.
