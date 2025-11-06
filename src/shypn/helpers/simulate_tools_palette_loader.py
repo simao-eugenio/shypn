@@ -78,8 +78,6 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         self.simulation = None
         self._model = model
         self.data_collector = SimulationDataCollector()
-        if model is not None:
-            self._init_simulation_controller()
         self.builder = None
         self.simulate_tools_revealer = None
         self.simulate_tools_container = None
@@ -93,6 +91,10 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         self.progress_bar = None
         self.time_display_label = None
         self._load_ui()
+        
+        # Initialize simulation controller AFTER UI is loaded
+        if model is not None:
+            self._init_simulation_controller()
 
     def _load_ui(self):
         """Load the simulate tools palette UI from file."""
