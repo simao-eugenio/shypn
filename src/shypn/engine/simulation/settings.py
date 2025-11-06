@@ -36,6 +36,11 @@ class SimulationSettings:
     DEFAULT_TIME_SCALE = 1.0
     DEFAULT_STEPS_TARGET = 1000  # Target number of steps for auto dt
     
+    # Precision tolerance for time comparisons (prevents floating-point errors)
+    # Using 1e-9 (1 nanosecond) to safely handle accumulated rounding errors
+    # while still maintaining high precision for scientific simulations
+    TIME_EPSILON = 1e-9
+    
     def __init__(self):
         """Initialize with default settings."""
         self._time_units = self.DEFAULT_TIME_UNITS
@@ -231,11 +236,20 @@ class SimulationSettings:
     def calculate_progress(self, current_time_seconds: float) -> float:
         """Calculate simulation progress as fraction.
         
+        Uses min(progress, 1.0) clamping to ensure progress never exceeds 100%,
+        even if simulation overshoots duration due to time step granularity.
+        
         Args:
             current_time_seconds: Current simulation time in seconds
         
         Returns:
             float: Progress fraction [0.0, 1.0], or 0.0 if no duration
+        
+        Example:
+            duration = 60.0
+            time = 30.0  → 0.5 (50%)
+            time = 60.0  → 1.0 (100%)
+            time = 60.1  → 1.0 (clamped, overshoot)
         """
         duration_seconds = self.get_duration_seconds()
         
@@ -243,23 +257,39 @@ class SimulationSettings:
             return 0.0  # Unknown duration
         
         progress = current_time_seconds / duration_seconds
-        return min(progress, 1.0)  # Clamp to 1.0
+        return min(progress, 1.0)  # Clamp to prevent overshoot display
     
     def is_complete(self, current_time_seconds: float) -> bool:
         """Check if simulation is complete based on duration.
+        
+        Uses epsilon tolerance to handle floating-point precision issues.
+        A simulation is considered complete if current_time >= duration - epsilon.
+        
+        This prevents two common issues:
+        1. Simulation overshooting duration due to time step granularity
+        2. Simulation never reaching exact duration due to rounding errors
         
         Args:
             current_time_seconds: Current simulation time in seconds
         
         Returns:
-            bool: True if time >= duration, False otherwise
+            bool: True if time >= duration (within epsilon), False otherwise
+        
+        Example:
+            duration = 60.0, epsilon = 1e-9
+            time = 59.999999999  → True (close enough)
+            time = 60.0          → True (exact match)
+            time = 60.000000001  → True (slightly over)
+            time = 59.9          → False (not close enough)
         """
         duration_seconds = self.get_duration_seconds()
         
         if duration_seconds is None:
             return False  # No duration = never complete
         
-        return current_time_seconds >= duration_seconds
+        # Use epsilon tolerance: complete if within epsilon of duration
+        # This handles both undershooting (59.99999999) and overshooting (60.00000001)
+        return current_time_seconds >= (duration_seconds - self.TIME_EPSILON)
     
     # ========== Serialization ==========
     

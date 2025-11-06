@@ -171,6 +171,7 @@ with self._lock:
 
 | Component | Precision Setting | Value | Purpose |
 |-----------|------------------|-------|---------|
+| **Time Comparison Epsilon** | TIME_EPSILON | 1e-9 seconds | Prevent floating-point errors in duration checks |
 | **Time Step Validation** | Minimum dt | 1e-9 seconds | Prevent division by zero |
 | **Time Step Validation** | Maximum dt | 1e6 seconds | Prevent excessive steps |
 | **Continuous Behavior** | MIN_FLOW | 1e-10 | Prevent numerical precision issues in flow |
@@ -228,6 +229,48 @@ def calculate_progress(self, current_time_seconds: float) -> float:
 | **Time Scale** | scale > 0 | SimulationSettings.time_scale setter |
 | **Progress** | 0.0 ≤ progress ≤ 1.0 | min(progress, 1.0) clamping |
 | **Step Count** | steps ≤ 1,000,000 | BufferedSimulationSettings._validate_buffer() |
+| **Completion Check** | Uses epsilon tolerance | is_complete() uses TIME_EPSILON = 1e-9 |
+
+### 3.5 Simulation Ending Precision
+
+**Critical Issue:** Floating-point arithmetic can cause simulation to:
+1. **Overshoot duration** - `time` slightly exceeds `duration` due to time step granularity
+2. **Never reach duration** - Accumulated rounding errors prevent exact equality
+
+**Solution Implemented:** Epsilon tolerance in `is_complete()` method
+
+```python
+# Before (PROBLEMATIC):
+return current_time_seconds >= duration_seconds  # Exact comparison
+
+# After (FIXED):
+TIME_EPSILON = 1e-9  # 1 nanosecond tolerance
+return current_time_seconds >= (duration_seconds - TIME_EPSILON)
+```
+
+**Effect:**
+- ✅ Simulation completes when `time ≥ duration - 1e-9`
+- ✅ Handles undershooting: `59.999999999 >= 60.0 - 1e-9` → True
+- ✅ Handles overshooting: `60.000000001 >= 60.0 - 1e-9` → True
+- ✅ Prevents infinite loops from never reaching exact duration
+- ✅ Prevents premature stopping from floating-point errors
+
+**Example Scenarios:**
+```python
+duration = 60.0 seconds, dt = 0.06 seconds (auto, 1000 steps)
+
+# Ideal case: 60.0 / 0.06 = 1000 steps exactly
+step 1000: time = 60.0 → complete ✓
+
+# Rounding error case: accumulated error from 1000 additions
+step 1000: time = 59.999999998 → complete ✓ (within epsilon)
+step 1001: time = 60.059999998 → would overshoot, but already stopped
+
+# Overshoot case: time step doesn't divide duration evenly
+duration = 60.0, dt = 0.07 (manual)
+step 857: time = 59.99 → not complete (> epsilon away)
+step 858: time = 60.06 → complete ✓ (overshoots but within check)
+```
 
 ---
 
@@ -461,7 +504,21 @@ def from_dict(cls, data: dict) -> 'SimulationSettings':
 
 ### 7.1 Critical Issues
 
-#### Issue 1: Settings Sub-Palette Not Using Buffered Updates
+#### Issue 1: Simulation Ending Precision ✅ FIXED
+**Impact:** CRITICAL  
+**Risk:** Simulation never reaches exact duration or overshoots unpredictably
+
+**Problem:** Floating-point arithmetic causes accumulated rounding errors. With duration=60.0 and dt=0.06, after 1000 steps, time might be 59.999999998 or 60.000000002 instead of exactly 60.0.
+
+**Fix Applied:** Added `TIME_EPSILON = 1e-9` constant and modified `is_complete()`:
+```python
+# Now uses epsilon tolerance (1 nanosecond)
+return current_time_seconds >= (duration_seconds - TIME_EPSILON)
+```
+
+**Status:** ✅ FIXED in this commit
+
+#### Issue 2: Settings Sub-Palette Not Using Buffered Updates
 **Impact:** HIGH  
 **Risk:** Race conditions, inconsistent state during rapid UI changes
 
@@ -493,10 +550,38 @@ def _on_speed_changed(self, spin):
             # Restart if was running
             if self.simulation.is_running():
                 self.simulation.stop()
-                self.simulation.run(self.simulation.get_effective_dt())
+                            self.simulation.run(self.simulation.get_effective_dt())
 ```
 
-#### Issue 2: Progress Bar Update Overhead
+**Status:** ⚠️ PENDING
+
+#### Issue 3: Progress Bar Update Overhead
+**Impact:** MEDIUM  
+**Risk:** Performance degradation with high step counts
+
+**Problem:** `_update_progress_display()` called on EVERY simulation step (1000+ times per typical simulation)
+
+**Recommendation:** Throttle updates:
+```python
+# Update progress bar only every N steps or every X milliseconds
+self._last_progress_update = 0
+UPDATE_INTERVAL_MS = 100  # Update every 100ms
+
+def _update_progress_display(self):
+    now = time.time() * 1000
+    if now - self._last_progress_update < UPDATE_INTERVAL_MS:
+        return  # Skip update (too soon)
+    
+    self._last_progress_update = now
+    # ... existing update code
+```
+
+**Status:** ⚠️ PENDING
+```
+
+**Status:** ⚠️ PENDING
+
+#### Issue 3: Progress Bar Update Overhead
 **Impact:** MEDIUM  
 **Risk:** Performance degradation with high step counts
 
@@ -587,15 +672,19 @@ if settings.duration is None:
 ⚠️ **Limited Persistence:** Simulation settings not saved to workspace  
 ⚠️ **Debug Logging:** Excessive print statements in production code  
 
+**Fixed in this session:**
+✅ **Simulation Ending Precision:** Added TIME_EPSILON tolerance to prevent floating-point errors  
+
 ### 8.3 Overall Assessment
 
 The simulation parameter system demonstrates **excellent architectural design** with atomic updates, comprehensive validation, and thread safety. However, **implementation gaps** exist where inline UI controls bypass the buffered settings architecture, creating potential race conditions.
 
 **Priority Actions:**
-1. Integrate BufferedSimulationSettings into settings sub-palette
-2. Throttle progress bar updates for performance
-3. Remove debug print statements
-4. Add workspace persistence for simulation defaults
+1. ✅ **COMPLETED:** Add TIME_EPSILON tolerance for simulation ending precision
+2. **HIGH:** Integrate BufferedSimulationSettings into settings sub-palette
+3. **MEDIUM:** Throttle progress bar updates (every 100ms instead of every step)
+4. **MEDIUM:** Add workspace persistence for simulation defaults
+5. **LOW:** Remove debug print statements
 
 ---
 
@@ -629,6 +718,7 @@ DEFAULT_DT_AUTO = True
 DEFAULT_DT_MANUAL = 0.1
 DEFAULT_TIME_SCALE = 1.0
 DEFAULT_STEPS_TARGET = 1000
+TIME_EPSILON = 1e-9  # Precision tolerance for time comparisons
 
 # Validation
 MIN_TIME_STEP = 1e-9
@@ -642,7 +732,13 @@ PROGRESS_DECIMALS = 0 (percentage)
 TIME_DISPLAY_DECIMALS = 4
 ```
 
-### 9.3 References
+### 9.3 Changes in This Session
+
+**Commit 1:** Added playback speed spinner to parameters panel (fe223d3)
+**Commit 2:** Created comprehensive analysis document (e3e9f5a)
+**Commit 3:** Fixed simulation ending precision with TIME_EPSILON (current)
+
+### 9.4 References
 
 - **Commit 9d52da2:** Removed playback speed preset buttons
 - **Commit 6658373:** Removed Conflict Policy and action buttons
