@@ -127,6 +127,78 @@
               </object>
             </child>
             
+            <!-- ─────────────────────────────────────────────── -->
+            <!-- Playback Speed Section -->
+            <!-- ─────────────────────────────────────────────── -->
+            
+            <child>
+              <object class="GtkBox">
+                <property name="visible">True</property>
+                <property name="orientation">vertical</property>
+                <property name="spacing">4</property>
+                <property name="margin_top">8</property>
+                
+                <child>
+                  <object class="GtkLabel">
+                    <property name="visible">True</property>
+                    <property name="label">PLAYBACK SPEED</property>
+                    <property name="xalign">0</property>
+                    <style>
+                      <class name="settings-section-label"/>
+                    </style>
+                  </object>
+                </child>
+                
+                <!-- Speed control row -->
+                <child>
+                  <object class="GtkBox">
+                    <property name="visible">True</property>
+                    <property name="orientation">horizontal</property>
+                    <property name="spacing">8</property>
+                    <property name="margin_top">4</property>
+                    
+                    <child>
+                      <object class="GtkLabel">
+                        <property name="visible">True</property>
+                        <property name="label">Speed:</property>
+                        <property name="margin_end">4</property>
+                        <style>
+                          <class name="settings-label-small"/>
+                        </style>
+                      </object>
+                    </child>
+                    
+                    <child>
+                      <object class="GtkSpinButton" id="time_scale_spin">
+                        <property name="visible">True</property>
+                        <property name="adjustment">time_scale_adjustment</property>
+                        <property name="digits">2</property>
+                        <property name="value">1.0</property>
+                        <property name="width-chars">7</property>
+                        <property name="height-request">32</property>
+                        <style>
+                          <class name="settings-spin"/>
+                        </style>
+                      </object>
+                    </child>
+                    
+                    <child>
+                      <object class="GtkLabel">
+                        <property name="visible">True</property>
+                        <property name="label">×</property>
+                        <property name="margin_start">2</property>
+                        <style>
+                          <class name="settings-unit"/>
+                        </style>
+                      </object>
+                    </child>
+                    
+                  </object>
+                </child>
+                
+              </object>
+            </child>
+            
           </object>
         </child>
       </object>
