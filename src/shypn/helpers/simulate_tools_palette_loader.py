@@ -181,7 +181,7 @@ class SimulateToolsPaletteLoader(GObject.GObject):
             
             # Get control widgets (most controls removed - parameters panel simplified)
             # Only keeping the settings revealer for potential future use
-            self.time_scale_spin = None  # Removed from parameters panel
+            self.time_scale_spin = settings_builder.get_object('time_scale_spin')
             self.settings_apply_button = None  # Removed from parameters panel
             self.settings_reset_button = None  # Removed from parameters panel
             
@@ -224,19 +224,39 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         """Wire settings panel controls to simulation settings.
         
         Note: Most controls have been removed from parameters panel.
-        The panel now only displays TIME STEP configuration.
+        The panel now displays TIME STEP configuration and PLAYBACK SPEED spinner.
         Apply/Reset buttons and Conflict Policy have been removed.
         """
-        # No controls to wire - panel is now display-only
-        pass
+        if self.time_scale_spin:
+            self.time_scale_spin.connect('value-changed', self._on_speed_changed)
+    
+    def _on_speed_changed(self, spin):
+        """Handle playback speed spinner change."""
+        if self.simulation:
+            # Check if simulation is currently running
+            was_running = self.simulation.is_running()
+            
+            if was_running:
+                # Temporarily stop, apply new speed, restart
+                self.simulation.stop()
+                time_step = self.simulation.get_effective_dt()
+                self.simulation.run(time_step=time_step)
+            
+            self.emit('settings-changed')
     
     def _sync_settings_to_ui(self):
         """Synchronize current simulation settings to UI controls.
         
-        Note: Playback speed controls removed from parameters panel.
+        Syncs playback speed spinner with simulation settings.
         """
-        # No speed controls to sync anymore
-        pass
+        if not self.simulation or not hasattr(self, 'settings_revealer') or self.settings_revealer is None:
+            return
+        
+        time_scale = self.simulation.settings.time_scale
+        
+        # Update spin button
+        if self.time_scale_spin:
+            self.time_scale_spin.set_value(time_scale)
     
     def _hide_settings_panel(self):
         """Hide the settings panel with animation.
