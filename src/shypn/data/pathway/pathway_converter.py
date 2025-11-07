@@ -342,11 +342,11 @@ class ReactionConverter(BaseConverter):
             )
             return
         
-        # Build rate function based on number of substrates
+        # Build rate function based on number of substrates with NAMED PARAMETERS
         # Use place.name for rate function string (this is acceptable - it's a formula string, not object reference)
         if len(substrate_places) == 1:
             # Single substrate - standard Michaelis-Menten
-            rate_func = f"michaelis_menten({substrate_places[0].name}, {vmax}, {km})"
+            rate_func = f"michaelis_menten({substrate_places[0].name}, vmax={vmax}, km={km})"
             self.logger.info(
                 f"  Michaelis-Menten (single substrate): rate_function = '{rate_func}'"
             )
@@ -355,8 +355,8 @@ class ReactionConverter(BaseConverter):
             # Primary substrate uses full MM, others use saturation terms
             # Formula: Vmax * [S1]/(Km+[S1]) * [S2]/(Km+[S2]) * ...
             
-            # Primary substrate (first reactant)
-            rate_func = f"michaelis_menten({substrate_places[0].name}, {vmax}, {km})"
+            # Primary substrate (first reactant) with named parameters
+            rate_func = f"michaelis_menten({substrate_places[0].name}, vmax={vmax}, km={km})"
             
             # Additional substrates as saturation terms
             for i, substrate_place in enumerate(substrate_places[1:], start=2):
@@ -407,7 +407,7 @@ class ReactionConverter(BaseConverter):
                     reactant_places.append(place)
             
             if len(reactant_places) == 2:
-                rate_func = f"mass_action({reactant_places[0].name}, {reactant_places[1].name}, {k})"
+                rate_func = f"mass_action({reactant_places[0].name}, {reactant_places[1].name}, rate_constant={k})"
                 transition.properties['rate_function'] = rate_func
                 self.logger.info(f"    Rate function: '{rate_func}'")
     

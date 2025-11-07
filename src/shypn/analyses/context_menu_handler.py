@@ -291,6 +291,20 @@ class ContextMenuHandler:
                     transition_id=transition.id
                 )
             
+            # Keep transition highlighted on canvas to remind user which transition is being enriched
+            transition.selected = True
+            
+            # Store reference to transition so BRENDA panel can clear selection later if needed
+            brenda_category._enrichment_transition = transition
+            
+            # Trigger canvas redraw to show selection
+            if hasattr(self, 'canvas_loader') and self.canvas_loader:
+                # Find the drawing area for this manager
+                for drawing_area, manager in self.canvas_loader.managers.items():
+                    if transition in manager.transitions:
+                        drawing_area.queue_draw()
+                        break
+            
             # Switch to Pathway Operations panel and expand BRENDA category
             # This makes the pre-filled query visible to the user
             if hasattr(self.pathway_operations_panel, 'switch_to_category'):

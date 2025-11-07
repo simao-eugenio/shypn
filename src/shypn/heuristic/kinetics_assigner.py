@@ -170,7 +170,7 @@ class KineticsAssigner:
             
             if substrate_places:
                 substrate_name = substrate_places[0].name
-                rate_function = f"michaelis_menten({substrate_name}, {vmax}, {km})"
+                rate_function = f"michaelis_menten({substrate_name}, vmax={vmax}, km={km})"
             else:
                 # Fallback: use generic "S" but this will fail at runtime
                 # Better to use a constant rate
@@ -288,10 +288,10 @@ class KineticsAssigner:
             if km is None:
                 km = params.get('km', 0.5)
             
-            # Build rate function
+            # Build rate function with named parameters
             if substrate_places:
                 substrate_place = substrate_places[0]
-                rate_function = f"michaelis_menten({substrate_place.name}, {vmax}, {km})"
+                rate_function = f"michaelis_menten({substrate_place.name}, vmax={vmax}, km={km})"
             else:
                 # No substrate places - use constant rate instead of undefined "substrate"
                 self.logger.warning(
