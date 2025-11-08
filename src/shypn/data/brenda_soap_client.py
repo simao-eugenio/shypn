@@ -43,19 +43,29 @@ class BRENDACredentials:
     password: str
     
     def get_password_hash(self) -> str:
-        """Get SHA256 hash of password.
+        """Get SHA256 hash of password for BRENDA API authentication.
         
-        Note: BRENDA API has changed over time. Some versions use:
-        - Plain password (current)
-        - SHA256 hash (older)
-        Try plain password first, then hash if that fails.
+        Note: BRENDA API uses SHA256 password hashing (verified Nov 2025).
+        This is the current and correct authentication method according to
+        official BRENDA documentation at:
+        https://www.brenda-enzymes.org/soap.php
+        
+        All examples in the official documentation use SHA256 hashing:
+        - Python 3: hashlib.sha256("myPassword".encode("utf-8")).hexdigest()
+        - PHP: hash("sha256","myPassword")
+        - Perl: sha256_hex("myPassword")
+        - Java: MessageDigest.getInstance("SHA-256")
         """
         return hashlib.sha256(self.password.encode()).hexdigest()
     
     def get_password_plain(self) -> str:
-        """Get plain password for BRENDA API.
+        """Get plain password for BRENDA API authentication.
         
-        Recent BRENDA API versions use plain password instead of hash.
+        Returns the password in plain text format.
+        
+        Note: This method exists for backwards compatibility but should NOT
+        be used. BRENDA requires SHA256 hashed passwords according to the
+        official documentation (verified Nov 2025).
         """
         return self.password
 
