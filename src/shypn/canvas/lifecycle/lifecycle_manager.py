@@ -182,10 +182,14 @@ class CanvasLifecycleManager:
                 controller.add_step_listener(simulate_tools._on_simulation_step)
                 logger.debug("    Registered palette step listener")
             
+            # PHASE 1-2 FIX: Do NOT overwrite controller.data_collector
+            # The controller has its own DataCollector (for Report Panel tables)
+            # The simulate_tools has its own SimulationDataCollector (for real-time plots)
+            # Both need to coexist and receive step notifications
             if hasattr(simulate_tools, 'data_collector'):
                 controller.add_step_listener(simulate_tools.data_collector.on_simulation_step)
-                controller.data_collector = simulate_tools.data_collector
-                logger.debug("    Registered data collector step listener")
+                # DO NOT OVERWRITE: controller.data_collector = simulate_tools.data_collector
+                logger.debug("    Registered simulate_tools data collector step listener")
         else:
             logger.warning("    simulate_tools palette not found - simulation signals won't work!")
     

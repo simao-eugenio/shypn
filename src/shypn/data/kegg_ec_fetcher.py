@@ -189,6 +189,102 @@ class KEGGECFetcher:
         
         return ec_numbers
     
+    def fetch_reaction_name(self, reaction_id: str) -> Optional[str]:
+        """
+        Fetch reaction name for a KEGG reaction ID.
+        
+        Args:
+            reaction_id: KEGG reaction ID (e.g., "R00710")
+            
+        Returns:
+            Reaction name (e.g., "ATP:D-hexose 6-phosphotransferase")
+            None if not found or request fails
+            
+        Example:
+            >>> fetcher = KEGGECFetcher()
+            >>> fetcher.fetch_reaction_name("R00710")
+            'ATP:D-hexose 6-phosphotransferase'
+        """
+        # Normalize reaction ID (remove "rn:" prefix if present)
+        normalized_id = reaction_id
+        if reaction_id.startswith("rn:"):
+            normalized_id = reaction_id[3:]
+        
+        # Fetch from KEGG API
+        try:
+            url = f"{self.base_url}/get/{normalized_id}"
+            logger.debug(f"Fetching reaction name from KEGG: {url}")
+            
+            response = requests.get(url, timeout=self.timeout)
+            response.raise_for_status()
+            
+            # Parse response for NAME field
+            name = self._parse_kegg_name(response.text)
+            
+            if name:
+                logger.info(f"Found reaction name for {reaction_id}: {name}")
+            else:
+                logger.debug(f"No reaction name found for {reaction_id}")
+            
+            return name
+            
+        except requests.exceptions.RequestException as e:
+            logger.warning(f"KEGG API error fetching name for {reaction_id}: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Unexpected error fetching name for {reaction_id}: {e}")
+            return None
+    
+    def _parse_kegg_name(self, response_text: str) -> Optional[str]:
+        """
+        Parse KEGG response text to extract reaction name.
+        
+        KEGG response format:
+            ENTRY       R00710              Reaction
+            NAME        ATP:D-hexose 6-phosphotransferase;
+                        Hexokinase
+            ENZYME      2.7.1.1
+            
+        Args:
+            response_text: Raw KEGG API response
+            
+        Returns:
+            Reaction name (first name if multiple, semicolon-separated)
+        """
+        name_lines = []
+        in_name_section = False
+        
+        for line in response_text.split('\n'):
+            stripped = line.strip()
+            
+            # Start of NAME section
+            if stripped.startswith('NAME'):
+                in_name_section = True
+                # Get text after "NAME"
+                name_text = stripped[4:].strip()
+                if name_text:
+                    name_lines.append(name_text)
+            # Continuation of NAME section (indented lines)
+            elif in_name_section and line.startswith('            '):
+                name_lines.append(stripped)
+            # End of NAME section (new field starting)
+            elif in_name_section and not line.startswith('            '):
+                break
+        
+        if not name_lines:
+            return None
+        
+        # Join multiple lines and take first name (before semicolon)
+        full_name = ' '.join(name_lines)
+        # Remove trailing semicolons
+        full_name = full_name.rstrip(';').strip()
+        
+        # If multiple names separated by semicolon, take the first one
+        if ';' in full_name:
+            return full_name.split(';')[0].strip()
+        
+        return full_name
+    
     def _is_valid_ec_number(self, ec: str) -> bool:
         """
         Validate EC number format.

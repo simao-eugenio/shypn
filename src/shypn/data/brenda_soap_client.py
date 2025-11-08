@@ -43,8 +43,21 @@ class BRENDACredentials:
     password: str
     
     def get_password_hash(self) -> str:
-        """Get SHA256 hash of password (required by BRENDA API)."""
+        """Get SHA256 hash of password.
+        
+        Note: BRENDA API has changed over time. Some versions use:
+        - Plain password (current)
+        - SHA256 hash (older)
+        Try plain password first, then hash if that fails.
+        """
         return hashlib.sha256(self.password.encode()).hexdigest()
+    
+    def get_password_plain(self) -> str:
+        """Get plain password for BRENDA API.
+        
+        Recent BRENDA API versions use plain password instead of hash.
+        """
+        return self.password
 
 
 class BRENDAAPIClient:
@@ -60,6 +73,9 @@ class BRENDAAPIClient:
     
     # BRENDA SOAP WSDL URL
     WSDL_URL = "https://www.brenda-enzymes.org/soap/brenda_zeep.wsdl"
+    
+    # Alternative WSDL URL (if main is blocked)
+    WSDL_URL_ALT = "https://www.brenda-enzymes.org/soap/brenda.wsdl"
     
     def __init__(self):
         """Initialize BRENDA API client.
@@ -124,19 +140,21 @@ class BRENDAAPIClient:
             self.logger.error("Email and password are required for authentication.")
             return False
         
-        # Store credentials for this session
+        # Store credentials for this session (dynamic - not from file)
         self.credentials = BRENDACredentials(email=email, password=password)
         
         try:
-            # Initialize SOAP client
+            # Initialize SOAP client (simple version like commit 0d76f45)
             self.logger.info(f"Connecting to BRENDA API at {self.WSDL_URL}")
             self.client = Client(self.WSDL_URL)
             
             # Test authentication with a lightweight query
-            # Use getKmValue with minimal parameters to test login
+            # BRENDA requires SHA256 hash of password
             password_hash = self.credentials.get_password_hash()
             
-            self.logger.info("Testing BRENDA authentication with handshake...")
+            self.logger.info(f"Testing BRENDA authentication for {email}...")
+            self.logger.info(f"Using password hash: {password_hash[:10]}... (first 10 chars)")
+            
             # Use lightweight getEcNumber() as handshake (much faster than getKmValue)
             # This just checks if EC 2.7.1.1 exists in BRENDA (doesn't retrieve data)
             result = self.client.service.getEcNumber(
@@ -149,10 +167,8 @@ class BRENDAAPIClient:
             
             # Check if authentication test returned data
             self.logger.info(f"[AUTH_TEST] Handshake result type: {type(result)}")
-            self.logger.info(f"[AUTH_TEST] Handshake result repr: {repr(result)}")
             if result:
                 self.logger.info(f"[AUTH_TEST] Handshake data length: {len(str(result))} chars")
-                self.logger.info(f"[AUTH_TEST] Preview: {str(result)[:500]}")
                 self.logger.info("✓ BRENDA authentication successful - SOAP API handshake OK!")
                 self.logger.info("✓ Your account can query the BRENDA database")
             else:
@@ -160,17 +176,23 @@ class BRENDAAPIClient:
                 self.logger.warning("⚠ This suggests LIMITED API access (authentication only, no data retrieval)")
                 self.logger.warning("⚠ Free academic accounts may not have access to BRENDA data via SOAP API")
                 self.logger.warning("⚠ Contact BRENDA support for full API access: info@brenda-enzymes.org")
-                self.logger.warning("⚠ Website: https://www.brenda-enzymes.org/contact.php")
             
             self._authenticated = True
             return True
             
-        except SOAPFault as e:
-            self.logger.error(f"BRENDA SOAP error: {e}")
-            self._authenticated = False
-            return False
         except Exception as e:
-            self.logger.error(f"Failed to authenticate with BRENDA: {e}")
+            error_msg = str(e)
+            self.logger.error(f"Failed to authenticate with BRENDA: {type(e).__name__}: {error_msg}")
+            
+            if "403" in error_msg or "Forbidden" in error_msg:
+                self.logger.error("❌ BRENDA server returned 403 Forbidden")
+                self.logger.error("💡 Possible causes:")
+                self.logger.error("   1. BRENDA may be blocking automated SOAP access temporarily")
+                self.logger.error("   2. Rate limiting - try again in a few minutes")
+                self.logger.error("   3. Check BRENDA service status at https://www.brenda-enzymes.org/")
+            else:
+                self.logger.error("💡 Check your internet connection and BRENDA service status")
+            
             self._authenticated = False
             return False
     
@@ -192,10 +214,12 @@ class BRENDAAPIClient:
             raise RuntimeError("Not authenticated. Call authenticate() first.")
         
         try:
+            # Use SHA256 hash of password (BRENDA API requirement)
             password_hash = self.credentials.get_password_hash()
             
-            # Build EC number query
-            ec_query = f"ecNumber*{ec_number}#"
+            # Build EC number query - BRENDA format: "ecNumber*EC#" 
+            # Based on successful getEcNumber() call which used 'ecNumber*2.7.1.1'
+            ec_query = f"ecNumber*{ec_number}"
             
             self.logger.info(f"Querying BRENDA for Km values: EC={ec_number}, organism={organism or 'all'}")
             
@@ -258,6 +282,7 @@ class BRENDAAPIClient:
             raise RuntimeError("Not authenticated. Call authenticate() first.")
         
         try:
+            # Use SHA256 hash of password (BRENDA API requirement)
             password_hash = self.credentials.get_password_hash()
             
             ec_query = f"ecNumber*{ec_number}#"
@@ -300,6 +325,7 @@ class BRENDAAPIClient:
             raise RuntimeError("Not authenticated. Call authenticate() first.")
         
         try:
+            # Use SHA256 hash of password (BRENDA API requirement)
             password_hash = self.credentials.get_password_hash()
             
             ec_query = f"ecNumber*{ec_number}#"
@@ -328,13 +354,14 @@ class BRENDAAPIClient:
             self.logger.error(f"Error querying Ki values: {e}")
             return []
     
-    def _parse_km_response(self, response: str) -> List[Dict[str, Any]]:
+    def _parse_km_response(self, response) -> List[Dict[str, Any]]:
         """Parse BRENDA Km response format.
         
-        BRENDA format: #ecNumber*2.7.1.1#organism*Homo sapiens#kmValue*0.15#substrate*glucose#literature*12345678#
+        BRENDA returns a zeep ArrayOfKmValues object containing kmValueObject items.
+        Each kmValueObject has attributes like: kmValue, substrate, organism, literature, etc.
         
         Args:
-            response: Raw BRENDA response string
+            response: Raw BRENDA response (zeep ArrayOfKmValues object or string)
         
         Returns:
             List of parsed Km records
@@ -344,112 +371,186 @@ class BRENDAAPIClient:
         if not response:
             return results
         
-        # Split by record separator (usually newline or multiple #)
-        records = response.split('\n')
-        
-        for record in records:
-            if not record.strip():
-                continue
-            
-            # Parse fields
-            data = {}
-            parts = record.split('#')
-            
-            for part in parts:
-                if '*' in part:
-                    key, value = part.split('*', 1)
-                    data[key] = value
-            
-            if 'kmValue' in data:
+        # Handle zeep object (modern BRENDA SOAP API)
+        try:
+            # zeep returns an iterable of kmValueObject items
+            for item in response:
                 try:
-                    results.append({
-                        'ec_number': data.get('ecNumber', ''),
-                        'organism': data.get('organism', ''),
-                        'value': float(data['kmValue']),
-                        'unit': 'mM',  # BRENDA usually uses mM for Km
-                        'substrate': data.get('substrate', ''),
-                        'literature': data.get('literature', ''),
-                        'commentary': data.get('commentary', '')
-                    })
-                except (ValueError, KeyError) as e:
+                    # Each item has attributes we can access
+                    km_value = getattr(item, 'kmValue', None)
+                    if km_value is not None:
+                        results.append({
+                            'ec_number': getattr(item, 'ecNumber', ''),
+                            'organism': getattr(item, 'organism', ''),
+                            'value': float(km_value) if km_value else None,
+                            'unit': 'mM',  # BRENDA Km values are typically in mM
+                            'substrate': getattr(item, 'substrate', ''),
+                            'literature': str(getattr(item, 'literature', '')),
+                            'commentary': getattr(item, 'commentary', '')
+                        })
+                except (ValueError, AttributeError, TypeError) as e:
                     self.logger.warning(f"Failed to parse Km record: {e}")
                     continue
+            return results
+        except TypeError:
+            # Fallback: might be a string (old API format)
+            pass
+        
+        # Legacy string parsing (keep for backward compatibility)
+        if isinstance(response, str):
+            records = response.split('\n')
+            
+            for record in records:
+                if not record.strip():
+                    continue
+                
+                # Parse fields
+                data = {}
+                parts = record.split('#')
+                
+                for part in parts:
+                    if '*' in part:
+                        key, value = part.split('*', 1)
+                        data[key] = value
+                
+                if 'kmValue' in data:
+                    try:
+                        results.append({
+                            'ec_number': data.get('ecNumber', ''),
+                            'organism': data.get('organism', ''),
+                            'value': float(data['kmValue']),
+                            'unit': 'mM',
+                            'substrate': data.get('substrate', ''),
+                            'literature': data.get('literature', ''),
+                            'commentary': data.get('commentary', '')
+                        })
+                    except (ValueError, KeyError) as e:
+                        self.logger.warning(f"Failed to parse Km record: {e}")
+                        continue
         
         return results
     
-    def _parse_kcat_response(self, response: str) -> List[Dict[str, Any]]:
+    def _parse_kcat_response(self, response) -> List[Dict[str, Any]]:
         """Parse BRENDA kcat/turnover number response."""
         results = []
         
         if not response:
             return results
         
-        records = response.split('\n')
-        
-        for record in records:
-            if not record.strip():
-                continue
-            
-            data = {}
-            parts = record.split('#')
-            
-            for part in parts:
-                if '*' in part:
-                    key, value = part.split('*', 1)
-                    data[key] = value
-            
-            if 'turnoverNumber' in data:
+        # Handle zeep object
+        try:
+            for item in response:
                 try:
-                    results.append({
-                        'ec_number': data.get('ecNumber', ''),
-                        'organism': data.get('organism', ''),
-                        'value': float(data['turnoverNumber']),
-                        'unit': 's⁻¹',  # kcat unit
-                        'substrate': data.get('substrate', ''),
-                        'literature': data.get('literature', ''),
-                        'commentary': data.get('commentary', '')
-                    })
-                except (ValueError, KeyError) as e:
+                    turnover_number = getattr(item, 'turnoverNumber', None)
+                    if turnover_number is not None:
+                        results.append({
+                            'ec_number': getattr(item, 'ecNumber', ''),
+                            'organism': getattr(item, 'organism', ''),
+                            'value': float(turnover_number) if turnover_number else None,
+                            'unit': 's⁻¹',  # kcat unit
+                            'substrate': getattr(item, 'substrate', ''),
+                            'literature': str(getattr(item, 'literature', '')),
+                            'commentary': getattr(item, 'commentary', '')
+                        })
+                except (ValueError, AttributeError, TypeError) as e:
                     self.logger.warning(f"Failed to parse kcat record: {e}")
                     continue
+            return results
+        except TypeError:
+            pass
+        
+        # Legacy string parsing
+        if isinstance(response, str):
+            records = response.split('\n')
+            
+            for record in records:
+                if not record.strip():
+                    continue
+                
+                data = {}
+                parts = record.split('#')
+                
+                for part in parts:
+                    if '*' in part:
+                        key, value = part.split('*', 1)
+                        data[key] = value
+                
+                if 'turnoverNumber' in data:
+                    try:
+                        results.append({
+                            'ec_number': data.get('ecNumber', ''),
+                            'organism': data.get('organism', ''),
+                            'value': float(data['turnoverNumber']),
+                            'unit': 's⁻¹',
+                            'substrate': data.get('substrate', ''),
+                            'literature': data.get('literature', ''),
+                            'commentary': data.get('commentary', '')
+                        })
+                    except (ValueError, KeyError) as e:
+                        self.logger.warning(f"Failed to parse kcat record: {e}")
+                        continue
         
         return results
     
-    def _parse_ki_response(self, response: str) -> List[Dict[str, Any]]:
+    def _parse_ki_response(self, response) -> List[Dict[str, Any]]:
         """Parse BRENDA Ki response."""
         results = []
         
         if not response:
             return results
         
-        records = response.split('\n')
-        
-        for record in records:
-            if not record.strip():
-                continue
-            
-            data = {}
-            parts = record.split('#')
-            
-            for part in parts:
-                if '*' in part:
-                    key, value = part.split('*', 1)
-                    data[key] = value
-            
-            if 'kiValue' in data:
+        # Handle zeep object
+        try:
+            for item in response:
                 try:
-                    results.append({
-                        'ec_number': data.get('ecNumber', ''),
-                        'organism': data.get('organism', ''),
-                        'value': float(data['kiValue']),
-                        'unit': 'mM',  # Ki usually in mM
-                        'inhibitor': data.get('inhibitor', ''),
-                        'literature': data.get('literature', ''),
-                        'commentary': data.get('commentary', '')
-                    })
-                except (ValueError, KeyError) as e:
+                    ki_value = getattr(item, 'kiValue', None)
+                    if ki_value is not None:
+                        results.append({
+                            'ec_number': getattr(item, 'ecNumber', ''),
+                            'organism': getattr(item, 'organism', ''),
+                            'value': float(ki_value) if ki_value else None,
+                            'unit': 'mM',  # Ki usually in mM
+                            'inhibitor': getattr(item, 'inhibitor', ''),
+                            'literature': str(getattr(item, 'literature', '')),
+                            'commentary': getattr(item, 'commentary', '')
+                        })
+                except (ValueError, AttributeError, TypeError) as e:
                     self.logger.warning(f"Failed to parse Ki record: {e}")
                     continue
+            return results
+        except TypeError:
+            pass
+        
+        # Legacy string parsing
+        if isinstance(response, str):
+            records = response.split('\n')
+            
+            for record in records:
+                if not record.strip():
+                    continue
+                
+                data = {}
+                parts = record.split('#')
+                
+                for part in parts:
+                    if '*' in part:
+                        key, value = part.split('*', 1)
+                        data[key] = value
+                
+                if 'kiValue' in data:
+                    try:
+                        results.append({
+                            'ec_number': data.get('ecNumber', ''),
+                            'organism': data.get('organism', ''),
+                            'value': float(data['kiValue']),
+                            'unit': 'mM',
+                            'inhibitor': data.get('inhibitor', ''),
+                            'literature': data.get('literature', ''),
+                            'commentary': data.get('commentary', '')
+                        })
+                    except (ValueError, KeyError) as e:
+                        self.logger.warning(f"Failed to parse Ki record: {e}")
+                        continue
         
         return results
 

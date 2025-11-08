@@ -73,6 +73,9 @@ class Transition(PetriNetObject):
         self.is_source = False  # Source transition (generates tokens without input)
         self.is_sink = False    # Sink transition (consumes tokens without output)
         
+        # Simulation statistics
+        self.firing_count = 0  # Cumulative count of firings during simulation
+        
         # Kinetic metadata (optional, added by importers or enrichment)
         self.kinetic_metadata: Optional[KineticMetadata] = None
     
@@ -463,6 +466,13 @@ class Transition(PetriNetObject):
                 self.properties['guard_function'] = guard_value
             else:
                 self.properties['guard_function'] = str(guard_value)
+    
+    def reset_firing_count(self):
+        """Reset firing count to zero.
+        
+        Called when simulation is reset or a new simulation begins.
+        """
+        self.firing_count = 0
     
     def to_dict(self) -> dict:
         """Serialize transition to dictionary for persistence.

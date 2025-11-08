@@ -243,7 +243,75 @@ class HeuristicDatabase:
             ON organism_compatibility(source_organism, target_organism)
         """)
         
-        # Table 5: Schema Version
+        # Table 5: BRENDA Raw Data Cache
+        cursor.execute("""
+            CREATE TABLE brenda_raw_data (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ec_number TEXT NOT NULL,
+                parameter_type TEXT NOT NULL CHECK(parameter_type IN ('Km', 'Kcat', 'Ki', 'Vmax')),
+                value REAL NOT NULL,
+                unit TEXT NOT NULL,
+                substrate TEXT,
+                organism TEXT,
+                literature TEXT,
+                commentary TEXT,
+                query_date TEXT NOT NULL,  -- ISO8601 timestamp when fetched
+                source_quality REAL,  -- Quality score 0.0-1.0 from BRENDADataFilter
+                
+                -- Prevent duplicate entries
+                UNIQUE(ec_number, parameter_type, substrate, organism, value, literature)
+            )
+        """)
+        
+        # Indexes for BRENDA data
+        cursor.execute("""
+            CREATE INDEX idx_brenda_ec
+            ON brenda_raw_data(ec_number, parameter_type)
+        """)
+        
+        cursor.execute("""
+            CREATE INDEX idx_brenda_organism
+            ON brenda_raw_data(ec_number, organism)
+        """)
+        
+        cursor.execute("""
+            CREATE INDEX idx_brenda_quality
+            ON brenda_raw_data(ec_number, source_quality DESC)
+        """)
+        
+        # Table 6: BRENDA Statistics Cache (Aggregated)
+        cursor.execute("""
+            CREATE TABLE brenda_statistics (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ec_number TEXT NOT NULL,
+                parameter_type TEXT NOT NULL,
+                organism TEXT,  -- NULL means all organisms
+                substrate TEXT,  -- NULL means all substrates
+                
+                -- Statistical values
+                count INTEGER NOT NULL,
+                mean_value REAL NOT NULL,
+                median_value REAL NOT NULL,
+                std_dev REAL,
+                min_value REAL NOT NULL,
+                max_value REAL NOT NULL,
+                
+                -- Confidence metrics
+                confidence_interval_95_lower REAL,
+                confidence_interval_95_upper REAL,
+                
+                last_updated TEXT NOT NULL,  -- ISO8601 timestamp
+                
+                UNIQUE(ec_number, parameter_type, organism, substrate)
+            )
+        """)
+        
+        cursor.execute("""
+            CREATE INDEX idx_brenda_stats
+            ON brenda_statistics(ec_number, parameter_type, organism)
+        """)
+        
+        # Table 7: Schema Version
         cursor.execute("""
             CREATE TABLE schema_version (
                 version INTEGER PRIMARY KEY
@@ -750,6 +818,264 @@ class HeuristicDatabase:
             stats['most_used'] = [dict(row) for row in cursor.fetchall()]
             
             return stats
+    
+    # ==================== BRENDA Data Management ====================
+    
+    def insert_brenda_raw_data(self, results: List[Dict[str, Any]]) -> int:
+        """Bulk insert BRENDA query results into raw data table.
+        
+        Args:
+            results: List of BRENDA result dictionaries with keys:
+                    ec_number, parameter_type, value, unit, substrate,
+                    organism, literature, commentary, quality
+        
+        Returns:
+            Number of records inserted (duplicates skipped)
+        """
+        if not results:
+            return 0
+        
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            inserted = 0
+            
+            for result in results:
+                try:
+                    cursor.execute("""
+                        INSERT OR IGNORE INTO brenda_raw_data
+                        (ec_number, parameter_type, value, unit, substrate, organism,
+                         literature, commentary, query_date, source_quality)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?)
+                    """, (
+                        result.get('ec_number', ''),
+                        result.get('parameter_type', ''),
+                        result.get('value', 0.0),
+                        result.get('unit', ''),
+                        result.get('substrate', ''),
+                        result.get('organism', ''),
+                        result.get('literature', ''),
+                        result.get('commentary', ''),
+                        result.get('quality', 0.0)
+                    ))
+                    if cursor.rowcount > 0:
+                        inserted += 1
+                except sqlite3.IntegrityError:
+                    # Duplicate entry, skip
+                    continue
+            
+            conn.commit()
+            self.logger.info(f"Inserted {inserted}/{len(results)} BRENDA records")
+            return inserted
+    
+    def query_brenda_data(self, 
+                         ec_number: str = None,
+                         parameter_type: str = None,
+                         organism: str = None,
+                         substrate: str = None,
+                         min_quality: float = 0.0,
+                         limit: int = None) -> List[Dict[str, Any]]:
+        """Query BRENDA raw data with optional filters.
+        
+        Args:
+            ec_number: EC number filter
+            parameter_type: Parameter type (Km, kcat, Ki)
+            organism: Organism name (partial match)
+            substrate: Substrate name (partial match)
+            min_quality: Minimum quality score (0.0-1.0)
+            limit: Maximum records to return
+        
+        Returns:
+            List of matching BRENDA records
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            
+            query = "SELECT * FROM brenda_raw_data WHERE 1=1"
+            params = []
+            
+            if ec_number:
+                query += " AND ec_number = ?"
+                params.append(ec_number)
+            
+            if parameter_type:
+                query += " AND parameter_type = ?"
+                params.append(parameter_type)
+            
+            if organism:
+                query += " AND organism LIKE ?"
+                params.append(f"%{organism}%")
+            
+            if substrate:
+                query += " AND substrate LIKE ?"
+                params.append(f"%{substrate}%")
+            
+            if min_quality > 0.0:
+                query += " AND source_quality >= ?"
+                params.append(min_quality)
+            
+            query += " ORDER BY source_quality DESC, query_date DESC"
+            
+            if limit:
+                query += f" LIMIT {limit}"
+            
+            cursor.execute(query, params)
+            return [dict(row) for row in cursor.fetchall()]
+    
+    def calculate_brenda_statistics(self, 
+                                    ec_number: str,
+                                    parameter_type: str,
+                                    organism: str = None,
+                                    substrate: str = None) -> Dict[str, Any]:
+        """Calculate statistics from BRENDA raw data and cache in statistics table.
+        
+        Args:
+            ec_number: EC number
+            parameter_type: Parameter type (Km, kcat, Ki)
+            organism: Optional organism filter
+            substrate: Optional substrate filter
+        
+        Returns:
+            Statistics dictionary with mean, median, std_dev, etc.
+        """
+        # Query raw data
+        raw_data = self.query_brenda_data(
+            ec_number=ec_number,
+            parameter_type=parameter_type,
+            organism=organism,
+            substrate=substrate
+        )
+        
+        if not raw_data:
+            return None
+        
+        # Extract values
+        values = [float(row['value']) for row in raw_data if row['value'] is not None]
+        
+        if not values:
+            return None
+        
+        # Calculate statistics
+        import statistics
+        stats = {
+            'ec_number': ec_number,
+            'parameter_type': parameter_type,
+            'organism': organism or 'all',
+            'substrate': substrate or 'all',
+            'count': len(values),
+            'mean_value': statistics.mean(values),
+            'median_value': statistics.median(values),
+            'std_dev': statistics.stdev(values) if len(values) > 1 else 0.0,
+            'min_value': min(values),
+            'max_value': max(values)
+        }
+        
+        # Calculate 95% confidence interval (assuming normal distribution)
+        if len(values) > 1:
+            import math
+            sem = stats['std_dev'] / math.sqrt(len(values))  # Standard error
+            ci_margin = 1.96 * sem  # 95% CI
+            stats['confidence_interval_95_lower'] = stats['mean_value'] - ci_margin
+            stats['confidence_interval_95_upper'] = stats['mean_value'] + ci_margin
+        else:
+            stats['confidence_interval_95_lower'] = stats['mean_value']
+            stats['confidence_interval_95_upper'] = stats['mean_value']
+        
+        # Cache in database
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT OR REPLACE INTO brenda_statistics
+                (ec_number, parameter_type, organism, substrate, count,
+                 mean_value, median_value, std_dev, min_value, max_value,
+                 confidence_interval_95_lower, confidence_interval_95_upper, last_updated)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+            """, (
+                stats['ec_number'],
+                stats['parameter_type'],
+                stats['organism'],
+                stats['substrate'],
+                stats['count'],
+                stats['mean_value'],
+                stats['median_value'],
+                stats['std_dev'],
+                stats['min_value'],
+                stats['max_value'],
+                stats['confidence_interval_95_lower'],
+                stats['confidence_interval_95_upper']
+            ))
+            conn.commit()
+        
+        self.logger.info(f"Calculated statistics for {ec_number} {parameter_type}: "
+                        f"mean={stats['mean_value']:.3f}, n={stats['count']}")
+        return stats
+    
+    def get_brenda_statistics(self,
+                             ec_number: str,
+                             parameter_type: str,
+                             organism: str = None,
+                             substrate: str = None) -> Dict[str, Any]:
+        """Retrieve cached BRENDA statistics.
+        
+        Args:
+            ec_number: EC number
+            parameter_type: Parameter type (Km, kcat, Ki)
+            organism: Optional organism filter
+            substrate: Optional substrate filter
+        
+        Returns:
+            Statistics dictionary or None if not cached
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT * FROM brenda_statistics
+                WHERE ec_number = ? AND parameter_type = ?
+                  AND organism = ? AND substrate = ?
+            """, (ec_number, parameter_type, organism or 'all', substrate or 'all'))
+            
+            row = cursor.fetchone()
+            return dict(row) if row else None
+    
+    def get_brenda_summary(self) -> Dict[str, Any]:
+        """Get summary statistics of BRENDA data in database.
+        
+        Returns:
+            Summary with counts by EC, parameter type, organism
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            
+            summary = {}
+            
+            # Total records
+            cursor.execute("SELECT COUNT(*) FROM brenda_raw_data")
+            summary['total_records'] = cursor.fetchone()[0]
+            
+            # By parameter type
+            cursor.execute("""
+                SELECT parameter_type, COUNT(*) as count
+                FROM brenda_raw_data
+                GROUP BY parameter_type
+            """)
+            summary['by_parameter_type'] = dict(cursor.fetchall())
+            
+            # Unique EC numbers
+            cursor.execute("SELECT COUNT(DISTINCT ec_number) FROM brenda_raw_data")
+            summary['unique_ec_numbers'] = cursor.fetchone()[0]
+            
+            # Unique organisms
+            cursor.execute("SELECT COUNT(DISTINCT organism) FROM brenda_raw_data")
+            summary['unique_organisms'] = cursor.fetchone()[0]
+            
+            # Average quality
+            cursor.execute("SELECT AVG(source_quality) FROM brenda_raw_data")
+            summary['average_quality'] = cursor.fetchone()[0] or 0.0
+            
+            # Statistics cache
+            cursor.execute("SELECT COUNT(*) FROM brenda_statistics")
+            summary['cached_statistics'] = cursor.fetchone()[0]
+            
+            return summary
     
     # ==================== Utilities ====================
     

@@ -86,7 +86,8 @@ class PathwayOperationsPanel(Gtk.Box):
         
         self.brenda_category = BRENDACategory(
             workspace_settings=workspace_settings,
-            parent_window=parent_window
+            parent_window=parent_window,
+            model_canvas_loader=model_canvas
         )
         
         self.sabio_rk_category = SabioRKCategory(
