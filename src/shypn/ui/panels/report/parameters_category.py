@@ -447,6 +447,14 @@ class DynamicAnalysesCategory(BaseReportCategory):
             f"<i>Analyzed {num_species} species and {num_reactions} reactions "
             f"over {num_time_points} time points (duration: {duration:.2f}s)</i>"
         )
+        
+        # Ensure all widgets are visible and properly rendered
+        self.summary_label.show()
+        self.simulation_status_label.show()
+        self.species_table.show_all()
+        self.reaction_table.show_all()
+        self.simulation_expander.show_all()
+        print("[DEBUG_TABLES] All widgets shown")
     
     def _update_summary(self, duration: float, data_collector):
         """Update Summary section with simulation metadata.
@@ -546,6 +554,7 @@ class DynamicAnalysesCategory(BaseReportCategory):
             
             print("[SUMMARY] Setting markup...")
             self.summary_label.set_markup(summary_text)
+            self.summary_label.show()  # Ensure label is visible
             print("[SUMMARY] Summary updated successfully")
             
         except Exception as e:
@@ -554,3 +563,4 @@ class DynamicAnalysesCategory(BaseReportCategory):
             import traceback
             traceback.print_exc()
             self.summary_label.set_markup("<i>Error generating summary</i>")
+            self.summary_label.show()  # Show error message
