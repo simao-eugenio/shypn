@@ -130,8 +130,17 @@ class ReactionActivityTable(Gtk.ScrolledWindow):
         Args:
             reaction_metrics: List of ReactionMetrics instances
         """
-        self.store.clear()
+        print(f"[REACTION_TABLE] populate() called with {len(reaction_metrics)} metrics")
         
+        # CRITICAL: Clear BEFORE populating to prevent mixing old and new data
+        self.store.clear()
+        print(f"[REACTION_TABLE] Store cleared")
+        
+        if not reaction_metrics:
+            print(f"[REACTION_TABLE] ⚠️  No metrics to populate")
+            return
+        
+        row_count = 0
         for metrics in reaction_metrics:
             self.store.append([
                 metrics.transition_name,
@@ -142,6 +151,16 @@ class ReactionActivityTable(Gtk.ScrolledWindow):
                 metrics.contribution,
                 metrics.status.value
             ])
+            row_count += 1
+            if row_count <= 3:  # Show first 3 rows as sample
+                print(f"[REACTION_TABLE]   Row {row_count}: {metrics.transition_name}, firings={metrics.firing_count}, rate={metrics.average_rate}")
+        
+        print(f"[REACTION_TABLE] Added {row_count} rows to store")
+        print(f"[REACTION_TABLE] Store now has {len(self.store)} rows")
+        
+        # Force update
+        self.tree_view.queue_draw()
+        print(f"[REACTION_TABLE] Table redraw queued")
             
     def clear(self):
         """Clear all table data."""

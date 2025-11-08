@@ -1165,6 +1165,29 @@ class ModelCanvasLoader:
         self.simulation_controllers[drawing_area] = simulation_controller
         
         # ============================================================
+        # REPORT PANEL INTEGRATION: Wire new controller to Report Panel
+        # ============================================================
+        # When a new controller is created (File→New, interactive model, etc.),
+        # automatically wire it to the Report Panel so simulation data appears
+        print(f"[CONTROLLER_WIRE] Controller created for canvas")
+        print(f"[CONTROLLER_WIRE] Has report_panel_loader: {hasattr(self, 'report_panel_loader')}")
+        if hasattr(self, 'report_panel_loader'):
+            print(f"[CONTROLLER_WIRE] report_panel_loader = {self.report_panel_loader}")
+            if self.report_panel_loader and hasattr(self.report_panel_loader, 'panel'):
+                print(f"[CONTROLLER_WIRE] report_panel_loader.panel = {self.report_panel_loader.panel}")
+                
+        if hasattr(self, 'report_panel_loader') and self.report_panel_loader:
+            try:
+                print(f"[CONTROLLER_WIRE] Wiring new controller to Report Panel")
+                self.report_panel_loader.panel.set_controller(simulation_controller)
+            except Exception as e:
+                print(f"[CONTROLLER_WIRE] Failed to wire controller: {e}")
+                import traceback
+                traceback.print_exc()
+        else:
+            print(f"[CONTROLLER_WIRE] ⚠️  report_panel_loader not available yet (will wire later)")
+        
+        # ============================================================
         # GLOBAL-SYNC: Integrate with canvas lifecycle system
         # ============================================================
         # If lifecycle system is enabled, register this canvas with it.
@@ -1187,6 +1210,24 @@ class ModelCanvasLoader:
         self.overlay_managers[drawing_area].swissknife_palette = swissknife_palette
         # PHASE 4: Also store controller reference for palette access
         self.overlay_managers[drawing_area].simulation_controller = simulation_controller
+        
+        # MULTI-DOCUMENT: Create per-document report data container
+        from shypn.ui.panels.report.document_report_data import DocumentReportData
+        self.overlay_managers[drawing_area].report_data = DocumentReportData(drawing_area=drawing_area)
+        
+        # MULTI-DOCUMENT: Create per-document Report Panel
+        # Each document gets its own Report Panel instance to maintain independent state
+        if not hasattr(self.overlay_managers[drawing_area], 'report_panel_loader'):
+            from shypn.helpers.report_panel_loader import ReportPanelLoader
+            report_panel_loader = ReportPanelLoader(project=None, model_canvas=self)
+            report_panel_loader.load()
+            
+            # Wire controller to this document's Report Panel
+            if hasattr(report_panel_loader, 'panel') and report_panel_loader.panel:
+                report_panel_loader.panel.set_controller(simulation_controller)
+            
+            self.overlay_managers[drawing_area].report_panel_loader = report_panel_loader
+            print(f"[MODEL_CANVAS_LOADER] Created per-document Report Panel for drawing_area {id(drawing_area)}")
         
         # ============================================================
         # OLD PALETTE CODE - Keeping temporarily for reference
@@ -2928,7 +2969,12 @@ class ModelCanvasLoader:
             filepath: Full path to the saved/loaded file
             is_save: True if save operation, False if load operation
         """
+        print(f"\n[FILE_OP] ========================================")
+        print(f"[FILE_OP] File operation: {'SAVE' if is_save else 'LOAD'}")
+        print(f"[FILE_OP] filepath: {filepath}")
+        
         if not filepath:
+            print(f"[FILE_OP] No filepath, returning")
             return
         
         # Extract filename with .shy extension
@@ -2938,27 +2984,38 @@ class ModelCanvasLoader:
             base = os.path.splitext(filename)[0]
             filename = f"{base}.shy"
         
+        print(f"[FILE_OP] Extracted filename: {filename}")
+        
         # Get current page
         current_page_num = self.notebook.get_current_page()
         if current_page_num < 0:
+            print(f"[FILE_OP] No current page, returning")
             return
         
         current_page = self.notebook.get_nth_page(current_page_num)
+        print(f"[FILE_OP] Current page num: {current_page_num}")
         
         # Update tab label with new filename (no asterisk after save/load)
         self._update_tab_label(current_page, filename, is_modified=False)
+        print(f"[FILE_OP] Tab label updated to: {filename}")
         
         # Also update the canvas manager's filename (without extension for internal use)
         drawing_area = self._get_drawing_area_from_page(current_page)
+        print(f"[FILE_OP] drawing_area: {drawing_area} (id={id(drawing_area) if drawing_area else 'None'})")
+        
         if drawing_area and drawing_area in self.canvas_managers:
             manager = self.canvas_managers[drawing_area]
             # Store filename without extension in manager
             base_filename = os.path.splitext(filename)[0]
             manager.filename = base_filename
+            print(f"[FILE_OP] Manager filename updated to: {base_filename}")
             
             # If this was a save operation, mark as saved (clears imported flag)
             if is_save:
                 manager.mark_as_saved()
+                print(f"[FILE_OP] Manager marked as saved")
+        
+        print(f"[FILE_OP] ========================================\n")
 
     def _on_dirty_state_changed(self, is_dirty):
         """Handle dirty state change to update tab label modification indicator.
