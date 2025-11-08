@@ -408,11 +408,21 @@ class KineticsAssigner:
             # Brownian collisions → exponential time distribution (not fixed delay)
             transition.transition_type = "stochastic"
             transition.rate = parameters.get('k', 1.0)
+            self.logger.info(
+                f"[HEURISTIC_ASSIGN] {transition.name}: "
+                f"kinetic_type={kinetic_type} → transition_type=stochastic, "
+                f"rate={transition.rate}, rule={rule}"
+            )
         else:  # michaelis_menten
             transition.transition_type = "continuous"
             if not hasattr(transition, 'properties'):
                 transition.properties = {}
             transition.properties['rate_function'] = rate_function
+            self.logger.info(
+                f"[HEURISTIC_ASSIGN] {transition.name}: "
+                f"kinetic_type={kinetic_type} → transition_type=continuous, "
+                f"rate_function={rate_function}, rule={rule}"
+            )
         
         # Create result
         result = AssignmentResult.from_heuristic(
@@ -447,6 +457,9 @@ class KineticsAssigner:
         """
         # Rule 1: Has EC number → Enzymatic (Michaelis-Menten)
         if hasattr(reaction, 'ec_numbers') and reaction.ec_numbers:
+            self.logger.info(
+                f"[ANALYZE_TYPE] Rule 1: Has EC={reaction.ec_numbers} → michaelis_menten"
+            )
             return (
                 'michaelis_menten',
                 'enzymatic_mm',

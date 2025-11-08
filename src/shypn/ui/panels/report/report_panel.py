@@ -53,6 +53,7 @@ class ReportPanel(Gtk.Box):
         self.topology_panel = None  # Will be set via set_topology_panel()
         self.dynamic_analyses_panel = None  # Will be set via set_dynamic_analyses_panel()
         self.pathway_operations_panel = None  # Will be set via set_pathway_operations_panel()
+        self.controller = None  # Will be set via set_controller()
         
         # Category controllers
         self.categories = []
@@ -467,6 +468,20 @@ class ReportPanel(Gtk.Box):
                 print("[REPORT] ERROR: get_current_model() returned None!")
         else:
             print("[REPORT] ERROR: model_canvas_loader has no get_current_model() method!")
+    
+    def set_controller(self, controller):
+        """Set simulation controller reference for dynamic analyses.
+        
+        Args:
+            controller: SimulationController instance
+        """
+        self.controller = controller
+        
+        # Update dynamic analyses category with controller reference
+        for category in self.categories:
+            if isinstance(category, DynamicAnalysesCategory):
+                category.set_controller(controller)
+                break
     
     def on_file_opened(self, filepath):
         """Called when a file is opened (File → Open or double-click).

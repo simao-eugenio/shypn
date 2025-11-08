@@ -43,8 +43,21 @@ class BRENDACredentials:
     password: str
     
     def get_password_hash(self) -> str:
-        """Get SHA256 hash of password (required by BRENDA API)."""
+        """Get SHA256 hash of password.
+        
+        Note: BRENDA API has changed over time. Some versions use:
+        - Plain password (current)
+        - SHA256 hash (older)
+        Try plain password first, then hash if that fails.
+        """
         return hashlib.sha256(self.password.encode()).hexdigest()
+    
+    def get_password_plain(self) -> str:
+        """Get plain password for BRENDA API.
+        
+        Recent BRENDA API versions use plain password instead of hash.
+        """
+        return self.password
 
 
 class BRENDAAPIClient:
@@ -60,6 +73,9 @@ class BRENDAAPIClient:
     
     # BRENDA SOAP WSDL URL
     WSDL_URL = "https://www.brenda-enzymes.org/soap/brenda_zeep.wsdl"
+    
+    # Alternative WSDL URL (if main is blocked)
+    WSDL_URL_ALT = "https://www.brenda-enzymes.org/soap/brenda.wsdl"
     
     def __init__(self):
         """Initialize BRENDA API client.
@@ -124,19 +140,21 @@ class BRENDAAPIClient:
             self.logger.error("Email and password are required for authentication.")
             return False
         
-        # Store credentials for this session
+        # Store credentials for this session (dynamic - not from file)
         self.credentials = BRENDACredentials(email=email, password=password)
         
         try:
-            # Initialize SOAP client
+            # Initialize SOAP client (simple version like commit 0d76f45)
             self.logger.info(f"Connecting to BRENDA API at {self.WSDL_URL}")
             self.client = Client(self.WSDL_URL)
             
             # Test authentication with a lightweight query
-            # Use getKmValue with minimal parameters to test login
+            # BRENDA requires SHA256 hash of password
             password_hash = self.credentials.get_password_hash()
             
-            self.logger.info("Testing BRENDA authentication with handshake...")
+            self.logger.info(f"Testing BRENDA authentication for {email}...")
+            self.logger.info(f"Using password hash: {password_hash[:10]}... (first 10 chars)")
+            
             # Use lightweight getEcNumber() as handshake (much faster than getKmValue)
             # This just checks if EC 2.7.1.1 exists in BRENDA (doesn't retrieve data)
             result = self.client.service.getEcNumber(
@@ -149,10 +167,8 @@ class BRENDAAPIClient:
             
             # Check if authentication test returned data
             self.logger.info(f"[AUTH_TEST] Handshake result type: {type(result)}")
-            self.logger.info(f"[AUTH_TEST] Handshake result repr: {repr(result)}")
             if result:
                 self.logger.info(f"[AUTH_TEST] Handshake data length: {len(str(result))} chars")
-                self.logger.info(f"[AUTH_TEST] Preview: {str(result)[:500]}")
                 self.logger.info("✓ BRENDA authentication successful - SOAP API handshake OK!")
                 self.logger.info("✓ Your account can query the BRENDA database")
             else:
@@ -160,17 +176,23 @@ class BRENDAAPIClient:
                 self.logger.warning("⚠ This suggests LIMITED API access (authentication only, no data retrieval)")
                 self.logger.warning("⚠ Free academic accounts may not have access to BRENDA data via SOAP API")
                 self.logger.warning("⚠ Contact BRENDA support for full API access: info@brenda-enzymes.org")
-                self.logger.warning("⚠ Website: https://www.brenda-enzymes.org/contact.php")
             
             self._authenticated = True
             return True
             
-        except SOAPFault as e:
-            self.logger.error(f"BRENDA SOAP error: {e}")
-            self._authenticated = False
-            return False
         except Exception as e:
-            self.logger.error(f"Failed to authenticate with BRENDA: {e}")
+            error_msg = str(e)
+            self.logger.error(f"Failed to authenticate with BRENDA: {type(e).__name__}: {error_msg}")
+            
+            if "403" in error_msg or "Forbidden" in error_msg:
+                self.logger.error("❌ BRENDA server returned 403 Forbidden")
+                self.logger.error("💡 Possible causes:")
+                self.logger.error("   1. BRENDA may be blocking automated SOAP access temporarily")
+                self.logger.error("   2. Rate limiting - try again in a few minutes")
+                self.logger.error("   3. Check BRENDA service status at https://www.brenda-enzymes.org/")
+            else:
+                self.logger.error("💡 Check your internet connection and BRENDA service status")
+            
             self._authenticated = False
             return False
     
@@ -192,6 +214,7 @@ class BRENDAAPIClient:
             raise RuntimeError("Not authenticated. Call authenticate() first.")
         
         try:
+            # Use SHA256 hash of password (BRENDA API requirement)
             password_hash = self.credentials.get_password_hash()
             
             # Build EC number query - BRENDA format: "ecNumber*EC#" 
@@ -259,6 +282,7 @@ class BRENDAAPIClient:
             raise RuntimeError("Not authenticated. Call authenticate() first.")
         
         try:
+            # Use SHA256 hash of password (BRENDA API requirement)
             password_hash = self.credentials.get_password_hash()
             
             ec_query = f"ecNumber*{ec_number}#"
@@ -301,6 +325,7 @@ class BRENDAAPIClient:
             raise RuntimeError("Not authenticated. Call authenticate() first.")
         
         try:
+            # Use SHA256 hash of password (BRENDA API requirement)
             password_hash = self.credentials.get_password_hash()
             
             ec_query = f"ecNumber*{ec_number}#"

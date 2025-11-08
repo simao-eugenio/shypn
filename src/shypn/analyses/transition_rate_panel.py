@@ -144,18 +144,27 @@ class TransitionRatePanel(AnalysisPlotPanel):
         Returns:
             List of (time, rate) tuples
         """
-        DEBUG_PLOT_DATA = False  # Disable debug output
+        DEBUG_PLOT_DATA = True  # Enable debug output
+        
+        if DEBUG_PLOT_DATA:
+            print(f"[PLOT] _get_rate_data() called for transition {transition_id}")
+            print(f"[PLOT]   self.data_collector={self.data_collector} (id={id(self.data_collector) if self.data_collector else 'None'})")
         
         # Safety check: return empty if no data collector
         if not self.data_collector:
+            if DEBUG_PLOT_DATA:
+                print(f"[PLOT]   ERROR: No data collector!")
             return []
         
         # Get raw firing event data from collector
         raw_events = self.data_collector.get_transition_data(transition_id)
         
+        if DEBUG_PLOT_DATA:
+            print(f"[PLOT]   raw_events count: {len(raw_events) if raw_events else 0}")
+        
         if not raw_events:
             if DEBUG_PLOT_DATA:
-                pass
+                print(f"[PLOT]   WARNING: No raw events for transition {transition_id}")
             return []
         
         # Determine transition type by checking if details contain 'rate' field

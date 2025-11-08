@@ -141,7 +141,13 @@ class SimulationController:
         self.transition_states = {}
         self.conflict_policy = DEFAULT_POLICY
         self._round_robin_index = 0
-        self.data_collector = None
+        
+        # Data collection for simulation results
+        from shypn.engine.simulation.data_collector import DataCollector
+        self.data_collector = DataCollector(model)
+        
+        # Callback for simulation complete event
+        self.on_simulation_complete = None
         
         # Timing configuration (composition pattern)
         from shypn.engine.simulation.settings import SimulationSettings
@@ -492,6 +498,15 @@ class SimulationController:
             logger = logging.getLogger(__name__)
             logger.warning(f"Large time step ({time_step}s) may cause timed transitions to miss firing windows")
         
+        # PHASE 1-2 DEBUG: Print transition types once
+        if not hasattr(self, '_debug_transition_types_printed'):
+            self._debug_transition_types_printed = True
+            type_counts = {}
+            for t in self.model.transitions:
+                ttype = t.transition_type
+                type_counts[ttype] = type_counts.get(ttype, 0) + 1
+            print(f"[STEP_DEBUG] Model has {len(self.model.transitions)} transitions: {type_counts}")
+        
         self._update_enablement_states()
         
         immediate_fired_total = 0
@@ -575,8 +590,8 @@ class SimulationController:
                         state.enablement_time = None
                         state.scheduled_time = None
                         
-                        # Notify data collector
-                        if self.data_collector is not None:
+                        # Notify data collector (if it has this method - old SimulationDataCollector)
+                        if self.data_collector is not None and hasattr(self.data_collector, 'on_transition_fired'):
                             details = {
                                 'consumed': consumed_map,
                                 'produced': produced_map,
@@ -584,6 +599,21 @@ class SimulationController:
                                 'timing_window': [behavior.earliest, behavior.latest]
                             }
                             self.data_collector.on_transition_fired(transition, self.time, details)
+                        
+                        # PHASE 1-2 FIX: Also notify step listeners if they have on_transition_fired
+                        print(f"[FIRE_NOTIFY] Window crossing: {transition.id}, notifying {len(self.step_listeners)} listeners")
+                        for listener in self.step_listeners:
+                            # Check if listener is a bound method with __self__
+                            listener_obj = listener.__self__ if hasattr(listener, '__self__') else listener
+                            if hasattr(listener_obj, 'on_transition_fired'):
+                                print(f"[FIRE_NOTIFY]   Notifying {type(listener_obj).__name__}")
+                                details = {
+                                    'consumed': consumed_map,
+                                    'produced': produced_map,
+                                    'window_crossing': True,
+                                    'timing_window': [behavior.earliest, behavior.latest]
+                                }
+                                listener_obj.on_transition_fired(transition, self.time, details)
                         
                         window_crossing_fired += 1
         
@@ -602,12 +632,36 @@ class SimulationController:
             success, details = behavior.integrate_step(dt=time_step, input_arcs=input_arcs, output_arcs=output_arcs)
             if success:
                 continuous_active += 1
-                if self.data_collector is not None:
+                if self.data_collector is not None and hasattr(self.data_collector, 'on_transition_fired'):
                     self.data_collector.on_transition_fired(transition, self.time, details)
+                
+                # PHASE 1-2 FIX: Also notify step listeners if they have on_transition_fired
+                if not hasattr(self, '_debug_continuous_printed'):
+                    self._debug_continuous_printed = True
+                    print(f"[FIRE_NOTIFY] Continuous: {transition.id}, notifying {len(self.step_listeners)} listeners")
+                    for i, listener in enumerate(self.step_listeners):
+                        # Check if listener is a bound method with __self__
+                        listener_obj = listener.__self__ if hasattr(listener, '__self__') else listener
+                        print(f"[FIRE_NOTIFY]   Listener {i}: {type(listener).__name__} -> {type(listener_obj).__name__} (id={id(listener_obj)})")
+                        print(f"[FIRE_NOTIFY]     has 'on_transition_fired': {hasattr(listener_obj, 'on_transition_fired')}")
+                        if hasattr(listener_obj, 'on_transition_fired'):
+                            print(f"[FIRE_NOTIFY]     ✅ Calling on_transition_fired()")
+                            listener_obj.on_transition_fired(transition, self.time, details)
+                        else:
+                            print(f"[FIRE_NOTIFY]     ❌ Skipping (no method)")
+                else:
+                    for listener in self.step_listeners:
+                        listener_obj = listener.__self__ if hasattr(listener, '__self__') else listener
+                        if hasattr(listener_obj, 'on_transition_fired'):
+                            listener_obj.on_transition_fired(transition, self.time, details)
         
         # Advance time BEFORE checking discrete transitions
         # This ensures timed transitions are evaluated at the correct time
         self.time += time_step
+        
+        # Record state after time advancement
+        if self.data_collector:
+            self.data_collector.record_state(self.time)
         
         # Now check discrete transitions at the NEW time
         # This allows timed transitions to fire when entering their window mid-step
@@ -713,11 +767,34 @@ class SimulationController:
         output_arcs = behavior.get_output_arcs()
         success, details = behavior.fire(input_arcs, output_arcs)
         if success:
+            # Increment firing count for statistics
+            transition.firing_count += 1
+            
             state = self._get_or_create_state(transition)
             state.enablement_time = None
             state.scheduled_time = None
-        if self.data_collector is not None:
+        if self.data_collector is not None and hasattr(self.data_collector, 'on_transition_fired'):
             self.data_collector.on_transition_fired(transition, self.time, details)
+        
+        # PHASE 1-2 FIX: Also notify step listeners if they have on_transition_fired
+        if not hasattr(self, '_debug_listeners_printed'):
+            self._debug_listeners_printed = True
+            print(f"[FIRE_NOTIFY] Discrete: {transition.id}, notifying {len(self.step_listeners)} listeners")
+            for i, listener in enumerate(self.step_listeners):
+                # Check if listener is a bound method with __self__
+                listener_obj = listener.__self__ if hasattr(listener, '__self__') else listener
+                print(f"[FIRE_NOTIFY]   Listener {i}: {type(listener).__name__} -> {type(listener_obj).__name__} (id={id(listener_obj)})")
+                print(f"[FIRE_NOTIFY]     has 'on_transition_fired': {hasattr(listener_obj, 'on_transition_fired')}")
+                if hasattr(listener_obj, 'on_transition_fired'):
+                    print(f"[FIRE_NOTIFY]     ✅ Calling on_transition_fired()")
+                    listener_obj.on_transition_fired(transition, self.time, details)
+                else:
+                    print(f"[FIRE_NOTIFY]     ❌ Skipping (no method)")
+        else:
+            for listener in self.step_listeners:
+                listener_obj = listener.__self__ if hasattr(listener, '__self__') else listener
+                if hasattr(listener_obj, 'on_transition_fired'):
+                    listener_obj.on_transition_fired(transition, self.time, details)
 
     # ============================================================================
     # Phase 1: Locality Independence Detection (Place-Sharing Analysis)
@@ -1535,6 +1612,12 @@ class SimulationController:
         self._steps_executed = 0
         self._time_step = time_step
         
+        # Start data collection
+        if self.data_collector:
+            self.data_collector.start_collection()
+            # Record initial state
+            self.data_collector.record_state(self.time)
+        
         # Calculate optimal step batching for smooth animation with time scale
         # Target: Execute multiple steps per GUI update to maintain smooth visualization
         # For small time steps (e.g., 0.002s), batch many steps together
@@ -1634,6 +1717,24 @@ class SimulationController:
         if not self._running:
             return
         self._stop_requested = True
+        
+        # Stop data collection
+        if self.data_collector:
+            self.data_collector.stop_collection()
+            print(f"[STOP] Data collector stopped. Has data: {self.data_collector.has_data()}")
+            if self.data_collector.has_data():
+                print(f"[STOP] Time points collected: {len(self.data_collector.time_points)}")
+                print(f"[STOP] Places tracked: {len(self.data_collector.place_data)}")
+                print(f"[STOP] Transitions tracked: {len(self.data_collector.transition_data)}")
+        
+        # Notify completion callback
+        if self.on_simulation_complete:
+            print(f"[STOP] Calling on_simulation_complete callback...")
+            self.on_simulation_complete()
+            print(f"[STOP] Callback completed")
+        else:
+            print(f"[STOP] No on_simulation_complete callback set!")
+        
         for state in self.transition_states.values():
             state.enablement_time = None
             state.scheduled_time = None
@@ -1658,6 +1759,10 @@ class SimulationController:
         if self.data_collector is not None:
             self.data_collector.clear()
         self.transition_states.clear()
+        
+        # Reset firing counts for all transitions
+        for transition in self.model.transitions:
+            transition.reset_firing_count()
         
         # Clear behavior cache to prevent stale state across model reloads
         # This fixes the issue where cached behaviors from a previous model
@@ -1718,7 +1823,11 @@ class SimulationController:
         self.transition_states.clear()
         self._round_robin_index = 0
         
-        # Reset data collector if exists
+        # Recreate data collector with new model
+        from shypn.engine.simulation.data_collector import DataCollector
+        self.data_collector = DataCollector(new_model)
+        
+        # Reset data collector if exists (legacy compatibility)
         if self.data_collector is not None:
             self.data_collector.clear()
         

@@ -8,6 +8,7 @@ gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk
 
 from .base_category import BaseReportCategory
+from .widgets import SpeciesConcentrationTable, ReactionActivityTable
 
 
 class DynamicAnalysesCategory(BaseReportCategory):
@@ -27,6 +28,7 @@ class DynamicAnalysesCategory(BaseReportCategory):
         # because parent may call refresh() which needs these references
         self.dynamic_analyses_panel = None
         self.pathway_operations_panel = None
+        self.controller = None  # Simulation controller reference
         
         super().__init__(
             title="DYNAMIC ANALYSES",
@@ -83,18 +85,46 @@ class DynamicAnalysesCategory(BaseReportCategory):
         self.citations_expander.add(scrolled_cit)
         box.pack_start(self.citations_expander, False, False, 0)
         
-        # Sub-expander: Simulation Results (future)
-        self.simulation_expander = Gtk.Expander(label="Simulation Results")
+        # Sub-expander: Simulation Results (NEW - with tables)
+        self.simulation_expander = Gtk.Expander(label="📊 Simulation Data")
         self.simulation_expander.set_expanded(False)
-        sim_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        
+        # Create simulation data container
+        sim_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         sim_box.set_margin_start(12)
-        sim_box.set_margin_top(6)
-        sim_box.set_margin_bottom(6)
-        self.simulation_label = Gtk.Label(label="(No simulations performed yet)")
-        self.simulation_label.set_xalign(0)
-        sim_box.pack_start(self.simulation_label, False, False, 0)
+        sim_box.set_margin_end(12)
+        sim_box.set_margin_top(12)
+        sim_box.set_margin_bottom(12)
+        
+        # Status label
+        self.simulation_status_label = Gtk.Label()
+        self.simulation_status_label.set_xalign(0)
+        self.simulation_status_label.set_line_wrap(True)
+        self.simulation_status_label.set_markup("<i>No simulation data available. Run a simulation to see results.</i>")
+        sim_box.pack_start(self.simulation_status_label, False, False, 0)
+        
+        # Species Concentration Table
+        species_label = Gtk.Label()
+        species_label.set_markup("<b>Species Concentration</b>")
+        species_label.set_xalign(0)
+        sim_box.pack_start(species_label, False, False, 0)
+        
+        self.species_table = SpeciesConcentrationTable()
+        self.species_table.set_size_request(-1, 200)
+        sim_box.pack_start(self.species_table, True, True, 0)
+        
+        # Reaction Activity Table
+        reaction_label = Gtk.Label()
+        reaction_label.set_markup("<b>Reaction Activity</b>")
+        reaction_label.set_xalign(0)
+        sim_box.pack_start(reaction_label, False, False, 0)
+        
+        self.reaction_table = ReactionActivityTable()
+        self.reaction_table.set_size_request(-1, 200)
+        sim_box.pack_start(self.reaction_table, True, True, 0)
+        
         self.simulation_expander.add(sim_box)
-        box.pack_start(self.simulation_expander, False, False, 0)
+        box.pack_start(self.simulation_expander, True, True, 0)
         
         # Initial populate
         self.refresh()
@@ -137,6 +167,9 @@ class DynamicAnalysesCategory(BaseReportCategory):
     
     def refresh(self):
         """Refresh dynamic analyses data with summary + detailed info."""
+        # Refresh simulation data tables
+        self._refresh_simulation_data()
+        
         # First check if we have dynamic analyses panel connection
         if self.dynamic_analyses_panel:
             try:
@@ -283,5 +316,71 @@ class DynamicAnalysesCategory(BaseReportCategory):
             panel: PathwayOperationsPanel instance
         """
         self.pathway_operations_panel = panel
-        # Refresh to show any existing pathway data
-        self.refresh()
+        
+    def set_controller(self, controller):
+        """Set simulation controller reference.
+        
+        Args:
+            controller: SimulationController instance
+        """
+        self.controller = controller
+        
+        # Register callback for simulation complete
+        if controller:
+            controller.on_simulation_complete = lambda: self._refresh_simulation_data()
+            
+    def _refresh_simulation_data(self):
+        """Refresh simulation data tables."""
+        print(f"[REPORT] _refresh_simulation_data called")
+        print(f"[REPORT] self.controller = {self.controller}")
+        
+        if not self.controller or not self.controller.data_collector:
+            # No simulation data available
+            print(f"[REPORT] No controller or data collector!")
+            self.simulation_status_label.set_markup(
+                "<i>No simulation data available. Run a simulation to see results.</i>"
+            )
+            self.species_table.clear()
+            self.reaction_table.clear()
+            return
+            
+        data_collector = self.controller.data_collector
+        print(f"[REPORT] data_collector = {data_collector}")
+        print(f"[REPORT] has_data() = {data_collector.has_data()}")
+        
+        # Check if we have collected data
+        if not data_collector.has_data():
+            print(f"[REPORT] No data collected yet")
+            self.simulation_status_label.set_markup(
+                "<i>No simulation data available. Run a simulation to see results.</i>"
+            )
+            self.species_table.clear()
+            self.reaction_table.clear()
+            return
+            
+        print(f"[REPORT] Data available! Time points: {len(data_collector.time_points)}")
+        
+        # Get duration
+        duration = self.controller.settings.duration or 0.0
+        
+        # Analyze species
+        from shypn.engine.simulation.analysis import SpeciesAnalyzer, ReactionAnalyzer
+        
+        species_analyzer = SpeciesAnalyzer(data_collector)
+        species_metrics = species_analyzer.analyze_all_species(duration)
+        self.species_table.populate(species_metrics)
+        
+        # Analyze reactions
+        reaction_analyzer = ReactionAnalyzer(data_collector)
+        reaction_metrics = reaction_analyzer.analyze_all_reactions(duration)
+        self.reaction_table.populate(reaction_metrics)
+        
+        # Update status
+        num_species = len(species_metrics)
+        num_reactions = len(reaction_metrics)
+        num_time_points = len(data_collector.time_points)
+        
+        self.simulation_status_label.set_markup(
+            f"<i>Analyzed {num_species} species and {num_reactions} reactions "
+            f"over {num_time_points} time points (duration: {duration:.2f}s)</i>"
+        )
