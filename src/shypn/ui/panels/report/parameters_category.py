@@ -287,8 +287,19 @@ class DynamicAnalysesCategory(BaseReportCategory):
             print(f"[SET_CONTROLLER] Registering on_simulation_complete callback")
             # Use GLib.idle_add to ensure UI update happens on main thread
             from gi.repository import GLib
-            controller.on_simulation_complete = lambda: GLib.idle_add(self._refresh_simulation_data)
-            print(f"[SET_CONTROLLER] Callback registered successfully (with GLib.idle_add wrapper)")
+            # CRITICAL: We need to refresh ONLY if this specific controller is still active
+            # when the callback fires. Don't capture self.controller (which changes on tab switch).
+            # Instead, check at callback time if this controller is still the active one.
+            def on_complete():
+                # Only refresh if this controller is still the active one
+                if self.controller is controller:
+                    print(f"[CALLBACK] Controller {id(controller)} matches active controller, refreshing")
+                    GLib.idle_add(self._refresh_simulation_data)
+                else:
+                    print(f"[CALLBACK] Controller {id(controller)} no longer active (current: {id(self.controller)}), skipping refresh")
+            
+            controller.on_simulation_complete = on_complete
+            print(f"[SET_CONTROLLER] Callback registered successfully (with controller identity check)")
             
     def _refresh_simulation_data(self):
         """Refresh simulation data tables."""
