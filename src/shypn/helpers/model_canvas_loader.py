@@ -1165,6 +1165,18 @@ class ModelCanvasLoader:
         self.simulation_controllers[drawing_area] = simulation_controller
         
         # ============================================================
+        # REPORT PANEL INTEGRATION: Wire new controller to Report Panel
+        # ============================================================
+        # When a new controller is created (File→New, interactive model, etc.),
+        # automatically wire it to the Report Panel so simulation data appears
+        if hasattr(self, 'report_panel_loader') and self.report_panel_loader:
+            try:
+                print(f"[CONTROLLER_WIRE] Wiring new controller to Report Panel")
+                self.report_panel_loader.panel.set_controller(simulation_controller)
+            except Exception as e:
+                print(f"[CONTROLLER_WIRE] Failed to wire controller: {e}")
+        
+        # ============================================================
         # GLOBAL-SYNC: Integrate with canvas lifecycle system
         # ============================================================
         # If lifecycle system is enabled, register this canvas with it.

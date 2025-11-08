@@ -677,6 +677,13 @@ def main(argv=None):
 					result = original_file_new(action, param)
 					if report_panel_loader.panel:
 						report_panel_loader.panel.on_file_new()
+						# IMPORTANT: Wire up the new controller for the new model
+						drawing_area = model_canvas_loader.get_current_document()
+						if drawing_area:
+							controller = model_canvas_loader.get_canvas_controller(drawing_area)
+							if controller:
+								print("[REPORT_WIRE] Wiring controller after File→New")
+								report_panel_loader.panel.set_controller(controller)
 					return result
 				
 				menu_actions.on_file_new = on_file_new_with_report_notify
