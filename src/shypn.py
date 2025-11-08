@@ -599,6 +599,10 @@ def main(argv=None):
 			report_panel_loader.load()
 			report_panel_loader.parent_window = window
 			
+			# PHASE 1-2: Store report panel loader reference in model_canvas_loader
+			# This allows _ensure_simulation_reset() to wire controllers after model load/reset
+			model_canvas_loader.report_panel_loader = report_panel_loader
+			
 			# Wire topology panel to report panel for analysis summary
 			# The loader has a .panel attribute which is the actual ReportPanel
 			if topology_panel_loader and hasattr(topology_panel_loader, 'panel'):

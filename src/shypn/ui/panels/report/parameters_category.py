@@ -323,11 +323,20 @@ class DynamicAnalysesCategory(BaseReportCategory):
         Args:
             controller: SimulationController instance
         """
+        print(f"[REPORT_CATEGORY] set_controller() called")
+        print(f"[REPORT_CATEGORY]   controller={controller} (id={id(controller) if controller else 'None'})")
+        print(f"[REPORT_CATEGORY]   has data_collector: {hasattr(controller, 'data_collector') if controller else False}")
+        if controller and hasattr(controller, 'data_collector'):
+            print(f"[REPORT_CATEGORY]   data_collector={controller.data_collector}")
+        
         self.controller = controller
         
         # Register callback for simulation complete
         if controller:
+            print(f"[REPORT_CATEGORY] Registering on_simulation_complete callback")
             controller.on_simulation_complete = lambda: self._refresh_simulation_data()
+        else:
+            print(f"[REPORT_CATEGORY] WARNING: Controller is None, cannot register callback")
             
     def _refresh_simulation_data(self):
         """Refresh simulation data tables."""

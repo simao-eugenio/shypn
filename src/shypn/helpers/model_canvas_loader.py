@@ -110,6 +110,7 @@ class ModelCanvasLoader:
         self.parent_window = None
         self.persistency = None
         self.right_panel_loader = None
+        self.report_panel_loader = None  # PHASE 1-2: For simulation results tables
         self.context_menu_handler = None
         self._clipboard = []  # Clipboard for cut/copy/paste operations
         
@@ -994,6 +995,18 @@ class ModelCanvasLoader:
                                     # (for File → Open, File → Reset, KEGG/SBML imports, parameter changes)
                                     simulate_tools_palette._apply_ui_defaults_to_settings()
                                     print(f"[RESET] ✅ Re-applied UI defaults (duration, units) to new controller")
+                                    
+                                    # PHASE 1-2 FIX: Wire controller to Report Panel for table population
+                                    # The Report Panel needs the controller reference to access simulation results
+                                    if self.report_panel_loader and hasattr(self.report_panel_loader, 'panel'):
+                                        report_panel = self.report_panel_loader.panel
+                                        if report_panel and hasattr(report_panel, 'set_controller'):
+                                            report_panel.set_controller(controller)
+                                            print(f"[RESET] ✅ Wired controller to Report Panel for simulation tables")
+                                        else:
+                                            print(f"[RESET] ⚠️  Report panel not found or no set_controller method")
+                                    else:
+                                        print(f"[RESET] ⚠️  report_panel_loader not found in model_canvas_loader")
                                 else:
                                     print(f"[RESET] ❌ simulate_tools_palette not found in registry")
                             else:
