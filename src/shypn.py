@@ -629,7 +629,31 @@ def main(argv=None):
 				if controller:
 					print(f"[STARTUP_WIRE] Wiring controller to Report Panel at startup")
 					report_panel_loader.panel.set_controller(controller)
-					print(f"[STARTUP_WIRE] Wiring complete")
+					print(f"[STARTUP_WIRE] Report Panel wiring complete")
+					
+					# CRITICAL FIX: Also update palette's controller reference
+					# The palette creates its own controller at init, but we need it
+					# to use the canvas manager's controller (same one wired to Report Panel)
+					overlay_manager = model_canvas_loader.overlay_managers.get(drawing_area)
+					if overlay_manager:
+						swissknife = getattr(overlay_manager, 'swissknife_palette', None)
+						if swissknife and hasattr(swissknife, 'registry'):
+							simulate_palette = swissknife.registry.get_widget_palette_instance('simulate')
+							if simulate_palette:
+								print(f"[STARTUP_WIRE] Updating palette controller reference")
+								print(f"[STARTUP_WIRE] Old palette controller ID: {id(simulate_palette.simulation) if simulate_palette.simulation else 'None'}")
+								simulate_palette.simulation = controller
+								print(f"[STARTUP_WIRE] New palette controller ID: {id(controller)}")
+								# Re-register step listeners
+								if hasattr(simulate_palette, '_on_simulation_step'):
+									controller.add_step_listener(simulate_palette._on_simulation_step)
+								if hasattr(simulate_palette, 'data_collector'):
+									controller.add_step_listener(simulate_palette.data_collector.on_simulation_step)
+								print(f"[STARTUP_WIRE] Palette controller update complete")
+							else:
+								print(f"[STARTUP_WIRE] ⚠️  Simulate palette not found")
+					else:
+						print(f"[STARTUP_WIRE] ⚠️  Overlay manager not found")
 			else:
 				print(f"[STARTUP_WIRE] ⚠️  No drawing_area found at startup")
 			
