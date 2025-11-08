@@ -59,31 +59,11 @@ class DynamicAnalysesCategory(BaseReportCategory):
         self.summary_label = Gtk.Label()
         self.summary_label.set_xalign(0)
         self.summary_label.set_line_wrap(True)
-        self.summary_label.set_text("No enrichments applied yet")
+        self.summary_label.set_markup("<i>No simulation or experimental data available</i>")
         summary_box.pack_start(self.summary_label, False, False, 0)
         
         summary_frame.add(summary_box)
         box.pack_start(summary_frame, False, False, 0)
-        
-        # === SUB-EXPANDERS (Collapsed by default) ===
-        
-        # Sub-expander: Enrichments Details
-        self.enrichments_expander = Gtk.Expander(label="Show Enrichment Details")
-        self.enrichments_expander.set_expanded(False)
-        scrolled_enrich, self.enrichments_textview, self.enrichments_buffer = self._create_scrolled_textview(
-            "No enrichments applied"
-        )
-        self.enrichments_expander.add(scrolled_enrich)
-        box.pack_start(self.enrichments_expander, False, False, 0)
-        
-        # Sub-expander: Parameter Sources & Citations
-        self.citations_expander = Gtk.Expander(label="Show Parameter Sources & Citations")
-        self.citations_expander.set_expanded(False)
-        scrolled_cit, self.citations_textview, self.citations_buffer = self._create_scrolled_textview(
-            "No data"
-        )
-        self.citations_expander.add(scrolled_cit)
-        box.pack_start(self.citations_expander, False, False, 0)
         
         # Sub-expander: Simulation Results (NEW - with tables)
         self.simulation_expander = Gtk.Expander(label="📊 Simulation Data")
@@ -166,102 +146,74 @@ class DynamicAnalysesCategory(BaseReportCategory):
         return grid
     
     def refresh(self):
-        """Refresh dynamic analyses data with summary + detailed info."""
+        """Refresh dynamic analyses data with experimental and simulation summary."""
         # Refresh simulation data tables
         self._refresh_simulation_data()
         
-        # First check if we have dynamic analyses panel connection
-        if self.dynamic_analyses_panel:
-            try:
-                summary = self.dynamic_analyses_panel.generate_summary_for_report_panel()
-                self.summary_label.set_text(summary.get('formatted_text', 'No data'))
+        # Build comprehensive experimental summary
+        summary_lines = []
+        
+        # 1. Model Information
+        if self.model_canvas and hasattr(self.model_canvas, 'model'):
+            model = self.model_canvas.model
+            num_places = len(model.places) if hasattr(model, 'places') else 0
+            num_transitions = len(model.transitions) if hasattr(model, 'transitions') else 0
+            summary_lines.append(f"<b>Model:</b> {num_places} species, {num_transitions} reactions")
+        
+        # 2. Organism & Pathway Information
+        if self.project and hasattr(self.project, 'pathways'):
+            pathways = self.project.pathways.list_pathways()
+            if pathways:
+                # Get unique organisms
+                organisms = set()
+                for pathway in pathways:
+                    if hasattr(pathway, 'source_organism') and pathway.source_organism:
+                        organisms.add(pathway.source_organism)
                 
-                # For now, keep the old enrichments display in detailed sections
-                # TODO: Integrate with dynamic analyses panel data
-                if not self.project or not hasattr(self.project, 'pathways'):
-                    self.enrichments_buffer.set_text("No project loaded")
-                    self.citations_buffer.set_text("No project loaded")
-                    return
+                if organisms:
+                    summary_lines.append(f"<b>Organism(s):</b> {', '.join(organisms)}")
                 
-                pathways = self.project.pathways.list_pathways()
-                enrichments_text = self._build_enrichments_detail(pathways)
-                self.enrichments_buffer.set_text(enrichments_text)
-                
-                citations_text = self._build_citations_detail(pathways)
-                self.citations_buffer.set_text(citations_text)
-                return
-            except Exception as e:
-                print(f"Warning: Could not get summary from dynamic analyses panel: {e}")
+                # Count enrichments
+                total_enrichments = sum(len(p.enrichments) for p in pathways if hasattr(p, 'enrichments'))
+                if total_enrichments > 0:
+                    summary_lines.append(f"<b>Enrichments Applied:</b> {total_enrichments} from BRENDA/SABIO-RK")
         
-        # Fallback to old behavior if no panel connection
-        if not self.project or not hasattr(self.project, 'pathways'):
-            self.summary_label.set_text("No project loaded")
-            self.enrichments_buffer.set_text("No project loaded")
-            self.citations_buffer.set_text("No project loaded")
-            return
+        # 3. Kinetic Parameters Summary
+        if self.model_canvas and hasattr(self.model_canvas, 'model'):
+            model = self.model_canvas.model
+            kinetic_count = 0
+            has_mm = 0
+            has_ma = 0
+            
+            for transition in model.transitions:
+                if hasattr(transition, 'rate_function') and transition.rate_function:
+                    kinetic_count += 1
+                    rate_func = transition.rate_function.lower()
+                    if 'michaelis' in rate_func or 'km' in rate_func:
+                        has_mm += 1
+                    elif 'mass' in rate_func or 'action' in rate_func:
+                        has_ma += 1
+            
+            if kinetic_count > 0:
+                summary_lines.append(f"<b>Kinetic Parameters:</b> {kinetic_count} reactions with kinetics")
+                if has_mm > 0:
+                    summary_lines.append(f"  • Michaelis-Menten: {has_mm}")
+                if has_ma > 0:
+                    summary_lines.append(f"  • Mass Action: {has_ma}")
         
-        pathways = self.project.pathways.list_pathways()
+        # 4. Simulation Status
+        if self.controller and self.controller.data_collector:
+            data_collector = self.controller.data_collector
+            if data_collector.has_data():
+                duration = self.controller.settings.duration or 0.0
+                num_time_points = len(data_collector.time_points)
+                summary_lines.append(f"<b>Simulation:</b> {duration:.2f}s duration, {num_time_points} time points collected")
         
-        # Count enrichments
-        total_enrichments = sum(len(p.enrichments) for p in pathways)
-        
-        # Build summary
-        if total_enrichments > 0:
-            summary = f"Enrichments Applied: {total_enrichments}\n"
-            summary += "Parameters: Km=0, Kcat=0, Ki=0, Vmax=0 (to be counted)\n"
-            summary += f"Pathways enriched: {len([p for p in pathways if p.enrichments])}"
+        # Set summary text
+        if summary_lines:
+            self.summary_label.set_markup('\n'.join(summary_lines))
         else:
-            summary = "No enrichments applied yet"
-        
-        self.summary_label.set_text(summary)
-        
-        # Build detailed enrichments list
-        enrichments_text = self._build_enrichments_detail(pathways)
-        self.enrichments_buffer.set_text(enrichments_text)
-        
-        # Build citations list
-        citations_text = self._build_citations_detail(pathways)
-        self.citations_buffer.set_text(citations_text)
-    
-    def _build_enrichments_detail(self, pathways):
-        """Build detailed enrichments list."""
-        lines = []
-        enrichment_count = 0
-        
-        for pathway in pathways:
-            if pathway.enrichments:
-                lines.append(f"Pathway: {pathway.name}")
-                for enrichment_id in pathway.enrichments:
-                    enrichment_count += 1
-                    lines.append(f"  {enrichment_count}. Enrichment ID: {enrichment_id}")
-                    lines.append(f"      Source: BRENDA (placeholder)")
-                    lines.append(f"      Transitions enriched: (to be counted)")
-                    lines.append(f"      Parameters added: (to be listed)")
-                lines.append("")
-        
-        if not lines:
-            return "No enrichments applied yet"
-        
-        return "\n".join(lines)
-    
-    def _build_citations_detail(self, pathways):
-        """Build citations and parameter sources list."""
-        lines = ["Parameter Sources:", ""]
-        
-        has_data = False
-        for pathway in pathways:
-            if pathway.enrichments:
-                has_data = True
-                lines.append(f"From pathway: {pathway.name}")
-                lines.append("  • BRENDA database")
-                lines.append(f"  • Organism: {pathway.source_organism}")
-                lines.append("  • Citations: (to be extracted from enrichment data)")
-                lines.append("")
-        
-        if not has_data:
-            return "No parameter sources available"
-        
-        return "\n".join(lines)
+            self.summary_label.set_markup("<i>No simulation or experimental data available</i>")
     
     def export_to_text(self):
         """Export as plain text."""
@@ -271,29 +223,26 @@ class DynamicAnalysesCategory(BaseReportCategory):
         text = [
             "# DYNAMIC ANALYSES",
             "",
-            "## Summary",
-            self.summary_label.get_text(),
-            ""
+            "## Summary"
         ]
         
-        # Include detailed enrichments if expander is expanded
-        if self.enrichments_expander.get_expanded():
-            text.append("## Enrichments Details")
-            text.append(self.enrichments_buffer.get_text(
-                self.enrichments_buffer.get_start_iter(),
-                self.enrichments_buffer.get_end_iter(),
-                False
-            ))
-            text.append("")
+        # Get summary text (remove markup)
+        import re
+        summary_text = self.summary_label.get_text()
+        # Remove markup tags
+        summary_text = re.sub(r'<[^>]+>', '', summary_text)
+        text.append(summary_text)
+        text.append("")
         
-        # Include citations if expander is expanded
-        if self.citations_expander.get_expanded():
-            text.append("## Parameter Sources & Citations")
-            text.append(self.citations_buffer.get_text(
-                self.citations_buffer.get_start_iter(),
-                self.citations_buffer.get_end_iter(),
-                False
-            ))
+        # Include simulation data if available
+        if self.simulation_expander.get_expanded():
+            text.append("## Simulation Data")
+            text.append("")
+            text.append("### Species Concentration")
+            text.append("(Table data - export feature to be implemented)")
+            text.append("")
+            text.append("### Reaction Activity")
+            text.append("(Table data - export feature to be implemented)")
             text.append("")
         
         return "\n".join(text)
