@@ -182,11 +182,12 @@ class SimulationController:
         import traceback
         import sys
         
-        # Log the assignment
+        # Log the assignment with controller ID
+        controller_id = id(self)
         if value is None:
-            print(f"[CALLBACK_TRACE] ⚠️  on_simulation_complete set to None (was: {self._on_simulation_complete is not None})")
+            print(f"[CALLBACK_TRACE] ⚠️  Controller {controller_id}: on_simulation_complete set to None (was: {self._on_simulation_complete is not None})")
         else:
-            print(f"[CALLBACK_TRACE] ✅ on_simulation_complete set to {value}")
+            print(f"[CALLBACK_TRACE] ✅ Controller {controller_id}: on_simulation_complete set to {value}")
         
         # Print stack trace to see WHO is setting it
         print(f"[CALLBACK_TRACE] Stack trace:")
@@ -1751,6 +1752,10 @@ class SimulationController:
             print(f"[DEBUG_STOP] Data collector stopped. has_data() = {self.data_collector.has_data()}")
         
         # Notify completion callback
+        print(f"[DEBUG_STOP] Controller ID: {id(self)}")
+        print(f"[DEBUG_STOP] Callback value: {self.on_simulation_complete}")
+        print(f"[DEBUG_STOP] Private attr: {self._on_simulation_complete}")
+        
         if self.on_simulation_complete:
             print(f"[DEBUG_STOP] Calling on_simulation_complete callback...")
             try:
