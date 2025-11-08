@@ -675,11 +675,12 @@ def main(argv=None):
 				"""
 				drawing_area = model_canvas_loader.get_current_document()
 				if drawing_area and report_panel_loader.panel:
-					report_panel_loader.panel.on_tab_switched(drawing_area)
-					# Wire up the new tab's controller to Report Panel
+					# First, wire up the new tab's controller to Report Panel
 					controller = model_canvas_loader.get_canvas_controller(drawing_area)
 					if controller:
 						report_panel_loader.panel.set_controller(controller)
+					# Then notify about tab switch (this will refresh with the new controller)
+					report_panel_loader.panel.on_tab_switched(drawing_area)
 			
 			if model_canvas_loader.notebook:
 				model_canvas_loader.notebook.connect('switch-page', on_canvas_tab_switched_report)

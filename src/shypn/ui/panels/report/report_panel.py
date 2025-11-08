@@ -509,11 +509,19 @@ class ReportPanel(Gtk.Box):
         Args:
             drawing_area: The newly active drawing area
         """
+        print(f"[REPORT_PANEL] on_tab_switched called, drawing_area={drawing_area}")
+        
         # Refresh Models category to show current tab's model
         for category in self.categories:
             if isinstance(category, ModelsCategory):
                 category.refresh()
-                break
+            # Also refresh Dynamic Analyses to show current tab's simulation data
+            elif hasattr(category, '_refresh_simulation_data'):
+                print(f"[REPORT_PANEL] Refreshing Dynamic Analyses for tab switch")
+                from gi.repository import GLib
+                GLib.idle_add(category._refresh_simulation_data)
+        
+        print(f"[REPORT_PANEL] on_tab_switched completed")
     
     def on_project_opened(self, project):
         """Called when a project is opened.
