@@ -633,8 +633,7 @@ def convert_pathway_enhanced(pathway: KEGGPathway,
                             add_initial_marking: bool = False,
                             filter_isolated_compounds: bool = True,
                             create_enzyme_places: bool = False,
-                            enhancement_options: 'EnhancementOptions' = None,
-                            estimate_kinetics: bool = True) -> DocumentModel:
+                            enhancement_options: 'EnhancementOptions' = None) -> DocumentModel:
     """Convert pathway with optional post-processing enhancements.
     
     This function extends convert_pathway() with an optional enhancement
@@ -642,7 +641,7 @@ def convert_pathway_enhanced(pathway: KEGGPathway,
     - Layout optimization (reduce overlaps)
     - Arc routing (add curved arcs)
     - Metadata enrichment (KEGG data)
-    - Kinetic parameter estimation (automatic for enzyme reactions)
+    - Kinetic parameter estimation (handled by convert_pathway via KineticsAssigner)
     - Visual validation (optional)
     
     Args:
@@ -658,8 +657,6 @@ def convert_pathway_enhanced(pathway: KEGGPathway,
         enhancement_options: Options for post-processing pipeline.
             If None, standard enhancements are applied.
             Set enable_enhancements=False to skip all enhancements.
-        estimate_kinetics: If True, automatically estimate kinetic parameters
-            for transitions based on reaction type (default: True)
         
     Returns:
         DocumentModel (optionally enhanced)
@@ -693,80 +690,6 @@ def convert_pathway_enhanced(pathway: KEGGPathway,
         filter_isolated_compounds=filter_isolated_compounds,
         create_enzyme_places=create_enzyme_places
     )
-    
-    # Apply kinetic parameter estimation if requested
-    if estimate_kinetics:
-        from shypn.heuristic.factory import EstimatorFactory
-        
-        logger.info(f"Estimating kinetic parameters for {len(document.transitions)} transitions...")
-        estimated_count = 0
-        
-        for transition in document.transitions:
-            # Get connected places (substrates and products)
-            substrate_places = []
-            product_places = []
-            
-            for arc in document.arcs:
-                if arc.target == transition:
-                    # Arc from place to transition (substrate)
-                    substrate_places.append(arc.source)
-                elif arc.source == transition:
-                    # Arc from transition to place (product)
-                    product_places.append(arc.target)
-            
-            # Skip if no substrates or products
-            if not substrate_places and not product_places:
-                continue
-            
-            # Determine reaction type from transition type
-            # KEGG reactions are typically enzyme-catalyzed
-            t_type = getattr(transition, 'type', None)
-            
-            # Get estimator based on transition type
-            if t_type in ['enzyme', 'irreversible'] or t_type is None:
-                # Most KEGG reactions are enzyme-catalyzed
-                estimator_type = 'michaelis_menten'
-            elif t_type == 'reversible':
-                estimator_type = 'mass_action'
-            else:
-                # For other types, use stochastic as fallback
-                estimator_type = 'stochastic'
-            
-            # Create estimator and generate parameters
-            try:
-                estimator = EstimatorFactory.create(estimator_type)
-                # Pass None for reaction since we don't have Reaction objects from PathwayData
-                params = estimator.estimate_parameters(
-                    reaction=None,
-                    substrate_places=substrate_places,
-                    product_places=product_places
-                )
-                
-                # Build rate function
-                rate_function = estimator.build_rate_function(
-                    reaction=None,
-                    substrate_places=substrate_places,
-                    product_places=product_places,
-                    parameters=params
-                )
-                
-                # Apply rate function to transition
-                if rate_function:
-                    transition.set_rate(rate_function)
-                    estimated_count += 1
-                
-                # Store additional metadata
-                if not hasattr(transition, 'metadata') or transition.metadata is None:
-                    transition.metadata = {}
-                transition.metadata['kinetic_estimator'] = estimator_type
-                transition.metadata['estimated_parameters'] = params
-                
-            except Exception as e:
-                transition_name = getattr(transition, 'name', 'unknown')
-                logger.warning(f"Failed to estimate parameters for transition {transition_name}: {e}")
-                continue
-        
-        logger.info(f"Estimated kinetic parameters for {estimated_count}/{len(document.transitions)} transitions")
     
     # Apply enhancements if requested
     if enhancement_options is None:

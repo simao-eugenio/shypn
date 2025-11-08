@@ -612,6 +612,17 @@ def main(argv=None):
 			if pathway_panel_loader and hasattr(pathway_panel_loader, 'panel'):
 				report_panel_loader.panel.set_pathway_operations_panel(pathway_panel_loader.panel)
 			
+			# ===================================================================
+			# WIRE SIMULATION CONTROLLER TO REPORT PANEL (Phase 2 Integration)
+			# This enables automatic simulation results display in Dynamic Analyses
+			# ===================================================================
+			# Get controller from current (default) canvas
+			drawing_area = model_canvas_loader.get_current_document()
+			if drawing_area:
+				controller = model_canvas_loader.get_canvas_controller(drawing_area)
+				if controller:
+					report_panel_loader.panel.set_controller(controller)
+			
 			report_panel_container.pack_start(report_panel_loader.panel, True, True, 0)
 			report_panel_loader.parent_container = report_panel_container
 			report_panel_loader.panel.show_all()
@@ -623,10 +634,18 @@ def main(argv=None):
 			
 			# Event 1: Tab Switching (user switches between models)
 			def on_canvas_tab_switched_report(notebook, page, page_num):
-				"""Notify report panel when user switches model tabs."""
+				"""Notify report panel when user switches model tabs.
+				
+				Also updates the controller reference so simulation results from
+				the new tab's controller are displayed correctly.
+				"""
 				drawing_area = model_canvas_loader.get_current_document()
 				if drawing_area and report_panel_loader.panel:
 					report_panel_loader.panel.on_tab_switched(drawing_area)
+					# Wire up the new tab's controller to Report Panel
+					controller = model_canvas_loader.get_canvas_controller(drawing_area)
+					if controller:
+						report_panel_loader.panel.set_controller(controller)
 			
 			if model_canvas_loader.notebook:
 				model_canvas_loader.notebook.connect('switch-page', on_canvas_tab_switched_report)

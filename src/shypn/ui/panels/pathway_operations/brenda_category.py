@@ -400,9 +400,9 @@ class BRENDACategory(BasePathwayCategory):
         # 0: Selected (bool)
         # 1: Transition ID (str)
         # 2: EC Number (str)
-        # 3: Parameter Type (str)
-        # 4: Value (str)
-        # 5: Unit (str)
+        # 3: Km Value (str)
+        # 4: Kcat Value (str)
+        # 5: Ki Value (str)
         # 6: Substrate (str)
         # 7: Organism (str)
         # 8: Quality Score (str)
@@ -412,9 +412,9 @@ class BRENDACategory(BasePathwayCategory):
             bool,    # 0: Selected
             str,     # 1: Transition ID
             str,     # 2: EC Number
-            str,     # 3: Parameter Type
-            str,     # 4: Value
-            str,     # 5: Unit
+            str,     # 3: Km Value (with unit)
+            str,     # 4: Kcat Value (with unit)
+            str,     # 5: Ki Value (with unit)
             str,     # 6: Substrate
             str,     # 7: Organism
             str,     # 8: Quality Score
@@ -444,9 +444,9 @@ class BRENDACategory(BasePathwayCategory):
         columns = [
             ("Transition ID", 1, 120),
             ("EC", 2, 80),
-            ("Type", 3, 60),
-            ("Value", 4, 80),
-            ("Unit", 5, 50),
+            ("Km", 3, 90),
+            ("Kcat", 4, 90),
+            ("Ki", 5, 90),
             ("Substrate", 6, 120),
             ("Organism", 7, 150),
             ("Quality", 8, 80),
@@ -680,48 +680,98 @@ class BRENDACategory(BasePathwayCategory):
         # Get Ki values
         ki_results = self.brenda_api.get_ki_values(ec_number, organism)
         
-        # Format results for UI display
+        # Group parameters by organism + substrate + literature reference
+        # This groups Km, Kcat, Ki that were measured together in the same experiment
+        parameter_groups = {}
+        
+        def get_group_key(record, substrate_key='substrate'):
+            """Create a key to group parameters from the same measurement."""
+            org = (record.get('organism') or '').strip().lower()
+            substrate = (record.get(substrate_key) or '').strip().lower()
+            lit = (record.get('literature') or '').strip()
+            # Group by organism + substrate (literature may vary slightly)
+            return f"{org}|{substrate}"
+        
+        # Process Km values
+        for km_record in km_results:
+            key = get_group_key(km_record, 'substrate')
+            if key not in parameter_groups:
+                parameter_groups[key] = {
+                    'organism': km_record.get('organism', organism),
+                    'substrate': km_record.get('substrate', 'unknown'),
+                    'citation': km_record.get('literature', 'N/A'),
+                    'commentary': km_record.get('commentary', ''),
+                    'km': None,
+                    'km_unit': 'mM',
+                    'kcat': None,
+                    'kcat_unit': 's⁻¹',
+                    'ki': None,
+                    'ki_unit': 'mM'
+                }
+            parameter_groups[key]['km'] = km_record.get('value')
+            parameter_groups[key]['km_unit'] = km_record.get('unit', 'mM')
+            # Use the first literature reference found
+            if not parameter_groups[key]['citation'] or parameter_groups[key]['citation'] == 'N/A':
+                parameter_groups[key]['citation'] = km_record.get('literature', 'N/A')
+        
+        # Process Kcat values
+        for kcat_record in kcat_results:
+            key = get_group_key(kcat_record, 'substrate')
+            if key not in parameter_groups:
+                parameter_groups[key] = {
+                    'organism': kcat_record.get('organism', organism),
+                    'substrate': kcat_record.get('substrate', 'unknown'),
+                    'citation': kcat_record.get('literature', 'N/A'),
+                    'commentary': kcat_record.get('commentary', ''),
+                    'km': None,
+                    'km_unit': 'mM',
+                    'kcat': None,
+                    'kcat_unit': 's⁻¹',
+                    'ki': None,
+                    'ki_unit': 'mM'
+                }
+            parameter_groups[key]['kcat'] = kcat_record.get('value')
+            parameter_groups[key]['kcat_unit'] = kcat_record.get('unit', 's⁻¹')
+            if not parameter_groups[key]['citation'] or parameter_groups[key]['citation'] == 'N/A':
+                parameter_groups[key]['citation'] = kcat_record.get('literature', 'N/A')
+        
+        # Process Ki values
+        for ki_record in ki_results:
+            key = get_group_key(ki_record, 'inhibitor')
+            if key not in parameter_groups:
+                parameter_groups[key] = {
+                    'organism': ki_record.get('organism', organism),
+                    'substrate': ki_record.get('inhibitor', 'unknown'),  # Ki uses 'inhibitor' field
+                    'citation': ki_record.get('literature', 'N/A'),
+                    'commentary': ki_record.get('commentary', ''),
+                    'km': None,
+                    'km_unit': 'mM',
+                    'kcat': None,
+                    'kcat_unit': 's⁻¹',
+                    'ki': None,
+                    'ki_unit': 'mM'
+                }
+            parameter_groups[key]['ki'] = ki_record.get('value')
+            parameter_groups[key]['ki_unit'] = ki_record.get('unit', 'mM')
+            if not parameter_groups[key]['citation'] or parameter_groups[key]['citation'] == 'N/A':
+                parameter_groups[key]['citation'] = ki_record.get('literature', 'N/A')
+        
+        # Convert grouped parameters to list
         parameters = []
-        
-        # Add Km values
-        for i, km_record in enumerate(km_results):
-            param_id = f"km_{i}"
+        for i, (key, group) in enumerate(parameter_groups.items()):
+            param_id = f"param_{i}"
             parameters.append({
                 'id': param_id,
-                'type': 'Km',
-                'value': km_record.get('value'),
-                'unit': km_record.get('unit', 'mM'),
-                'substrate': km_record.get('substrate', 'unknown'),
-                'citation': km_record.get('literature', 'N/A'),
-                'organism': km_record.get('organism', organism),
-                'confidence': 'experimental'
-            })
-        
-        # Add kcat values
-        for i, kcat_record in enumerate(kcat_results):
-            param_id = f"kcat_{i}"
-            parameters.append({
-                'id': param_id,
-                'type': 'kcat',
-                'value': kcat_record.get('value'),
-                'unit': kcat_record.get('unit', 's⁻¹'),
-                'substrate': kcat_record.get('substrate', None),
-                'citation': kcat_record.get('literature', 'N/A'),
-                'organism': kcat_record.get('organism', organism),
-                'confidence': 'experimental'
-            })
-        
-        # Add Ki values
-        for i, ki_record in enumerate(ki_results):
-            param_id = f"ki_{i}"
-            parameters.append({
-                'id': param_id,
-                'type': 'Ki',
-                'value': ki_record.get('value'),
-                'unit': ki_record.get('unit', 'mM'),
-                'substrate': ki_record.get('inhibitor', 'unknown'),
-                'citation': ki_record.get('literature', 'N/A'),
-                'organism': ki_record.get('organism', organism),
+                'organism': group['organism'],
+                'substrate': group['substrate'],
+                'citation': group['citation'],
+                'commentary': group['commentary'],
+                'km': group['km'],
+                'km_unit': group['km_unit'],
+                'kcat': group['kcat'],
+                'kcat_unit': group['kcat_unit'],
+                'ki': group['ki'],
+                'ki_unit': group['ki_unit'],
                 'confidence': 'experimental'
             })
         
@@ -1117,10 +1167,10 @@ class BRENDACategory(BasePathwayCategory):
         # Store current results for application
         self.current_results = results
         
-        param_count = len(results.get('parameters', []))
-        self.results_count_label.set_markup(f"<i>{param_count} results</i>")
+        total_param_count = len(results.get('parameters', []))
         
-        if param_count == 0:
+        if total_param_count == 0:
+            self.results_count_label.set_markup(f"<i>0 results</i>")
             return
         
         # Import filter for quality scoring
@@ -1134,12 +1184,24 @@ class BRENDACategory(BasePathwayCategory):
         
         # Calculate quality scores and relevance for all parameters
         scored_params = []
+        filtered_count = 0
+        
         for param in results['parameters']:
-            # Calculate quality score (0-100%)
+            # FILTER: Only include parameter sets that have Kcat
+            # Kcat is needed to calculate Vmax for rate function generation
+            # Skip parameters that don't have Kcat (cannot generate complete rate function)
+            if param.get('kcat') is None:
+                filtered_count += 1
+                self.logger.info(f"[BRENDA_FILTER] Skipping parameter set without Kcat: "
+                               f"organism={param.get('organism')}, substrate={param.get('substrate')}, "
+                               f"km={param.get('km')}, ki={param.get('ki')}")
+                continue
+            
+            # Calculate quality score (0-100%) based on data completeness
             quality_data = {
                 'organism': param.get('organism', ''),
                 'substrate': param.get('substrate', ''),
-                'value': param.get('value', 0),
+                'value': param.get('km') or param.get('kcat') or param.get('ki'),  # Use any available value
                 'literature': param.get('citation', '')
             }
             quality_score = filter_engine._calculate_quality_score(
@@ -1147,6 +1209,20 @@ class BRENDACategory(BasePathwayCategory):
                 results.get('organism') or context_organism,
                 param.get('substrate')
             )
+            
+            # Bonus for having multiple parameters (Km + Kcat is better than just Km)
+            completeness_bonus = 0.0
+            param_count = sum([
+                1 if param.get('km') is not None else 0,
+                1 if param.get('kcat') is not None else 0,
+                1 if param.get('ki') is not None else 0
+            ])
+            if param_count >= 2:
+                completeness_bonus = 0.15  # 15% bonus for having 2+ parameters
+            if param_count == 3:
+                completeness_bonus = 0.25  # 25% bonus for having all 3 parameters
+            
+            quality_score = min(1.0, quality_score + completeness_bonus)
             
             # Calculate relevance score based on model context
             relevance_score = self._calculate_relevance_score(
@@ -1165,6 +1241,21 @@ class BRENDACategory(BasePathwayCategory):
                 'combined_score': combined_score
             })
         
+        # Log filtering summary
+        if filtered_count > 0:
+            self.logger.info(f"[BRENDA_FILTER] Filtered out {filtered_count} parameter sets without Kcat")
+            self.logger.info(f"[BRENDA_FILTER] Showing {len(scored_params)} parameter sets with Kcat (usable for rate functions)")
+        
+        # Update results count label to show filtering info
+        total_params = len(results.get('parameters', []))
+        usable_params = len(scored_params)
+        if filtered_count > 0:
+            self.results_count_label.set_markup(
+                f"<i>{usable_params} usable results (filtered {filtered_count} without Kcat)</i>"
+            )
+        else:
+            self.results_count_label.set_markup(f"<i>{usable_params} results</i>")
+        
         # Sort by combined score (highest first)
         scored_params.sort(key=lambda x: x['combined_score'], reverse=True)
         
@@ -1182,20 +1273,33 @@ class BRENDACategory(BasePathwayCategory):
             # - Fallback: use transition_name or 'N/A'
             trans_id_display = context_transition_id or param.get('transition_name', param.get('transition_id', 'N/A'))
             
+            # FIX: Ensure param dict has transition_id for self-contained parameter application
+            # This makes BRENDA flow work like Heuristic flow (stores ID with params)
+            if context_transition_id and 'transition_id' not in param:
+                param['transition_id'] = context_transition_id
+            elif not param.get('transition_id') and trans_id_display != 'N/A':
+                # For batch queries, ensure transition_id is set
+                param['transition_id'] = trans_id_display
+            
+            # Format parameter values with units
+            km_str = f"{param['km']:.4f} {param['km_unit']}" if param.get('km') is not None else "—"
+            kcat_str = f"{param['kcat']:.2f} {param['kcat_unit']}" if param.get('kcat') is not None else "—"
+            ki_str = f"{param['ki']:.4f} {param['ki_unit']}" if param.get('ki') is not None else "—"
+            
             # Add row to TreeView
-            # Columns: Selected, TransID, EC, Type, Value, Unit, Substrate, Organism, Quality, Lit, Object
+            # Columns: Selected, TransID, EC, Km, Kcat, Ki, Substrate, Organism, Quality, Lit, Object
             self.results_store.append([
                 False,  # Not selected by default
                 trans_id_display,
                 param.get('ec_number', results.get('ec_number', 'N/A')),
-                param.get('type', 'Km'),
-                f"{param.get('value', 0):.4f}",
-                param.get('unit', 'mM'),
+                km_str,
+                kcat_str,
+                ki_str,
                 param.get('substrate', 'Unknown'),
                 param.get('organism', 'Unknown'),
                 quality_str,
                 param.get('citation', 'N/A'),
-                param  # Store full param object
+                param  # Store full param object (now includes transition_id and all parameters)
             ])
         
         # Show helpful message about ranking
@@ -1324,6 +1428,11 @@ class BRENDACategory(BasePathwayCategory):
             applied_count = 0
             skipped_count = 0
             
+            # CRITICAL: Update controller's canvas reference to ensure it has current model
+            # This is essential in case user switched tabs or models since the last query
+            self.logger.info(f"[BATCH_APPLY] Updating controller's model canvas reference...")
+            self.brenda_controller.set_model_canvas(self.model_canvas_manager)
+            
             # Start enrichment session
             self.brenda_controller.start_enrichment(
                 source="brenda_api",
@@ -1370,12 +1479,22 @@ class BRENDACategory(BasePathwayCategory):
                     continue
                 
                 # Build parameters dict from all selected params for this transition
+                # NEW: Each param now contains km, kcat, ki in the same object
                 params_dict = {'_override_rate_function': True}
+                
                 for param in params:
-                    param_type = param.get('type', 'Km').lower()
-                    param_value = param.get('value')
-                    if param_value is not None:
-                        params_dict[param_type] = param_value
+                    # Extract all available parameters from the grouped object
+                    if param.get('km') is not None:
+                        params_dict['km'] = param['km']
+                        self.logger.info(f"[BATCH_APPLY]   Km = {param['km']} {param.get('km_unit', 'mM')}")
+                    
+                    if param.get('kcat') is not None:
+                        params_dict['kcat'] = param['kcat']
+                        self.logger.info(f"[BATCH_APPLY]   Kcat = {param['kcat']} {param.get('kcat_unit', 's⁻¹')}")
+                    
+                    if param.get('ki') is not None:
+                        params_dict['ki'] = param['ki']
+                        self.logger.info(f"[BATCH_APPLY]   Ki = {param['ki']} {param.get('ki_unit', 'mM')}")
                 
                 # Apply enrichment
                 self.brenda_controller.apply_enrichment_to_transition(
@@ -1389,6 +1508,12 @@ class BRENDACategory(BasePathwayCategory):
             
             # Finish enrichment session
             self.brenda_controller.finish_enrichment()
+            
+            # Mark model as dirty (modified) so changes are saved
+            if applied_count > 0:
+                if self.model_canvas_manager and hasattr(self.model_canvas_manager, 'mark_dirty'):
+                    self.model_canvas_manager.mark_dirty()
+                    self.logger.info(f"[BATCH_APPLY] ✓ Marked model as dirty")
             
             # CRITICAL: Reset simulation state after applying parameters
             # This clears cached behaviors that might have old parameter values
@@ -1418,9 +1543,30 @@ class BRENDACategory(BasePathwayCategory):
         # Get the enrichment transition (the one user right-clicked to enrich)
         enrichment_transition = getattr(self, '_enrichment_transition', None)
         
-        # If we have an enrichment transition, apply directly to it
+        self.logger.info(f"[APPLY_DIALOG] _enrichment_transition: {enrichment_transition}")
         if enrichment_transition:
-            self._apply_single_transition_parameters(enrichment_transition, selected_params)
+            self.logger.info(f"[APPLY_DIALOG] _enrichment_transition.id: {enrichment_transition.id}")
+        
+        # If we have an enrichment transition, apply directly to it
+        # BUT: Re-fetch from canvas manager to ensure we have current instance
+        if enrichment_transition:
+            target_id = enrichment_transition.id
+            self.logger.info(f"[APPLY_DIALOG] Enrichment transition detected: {target_id}")
+            
+            # Re-fetch the transition from canvas manager (ensure fresh instance)
+            target_transition = None
+            if self.model_canvas_manager and hasattr(self.model_canvas_manager, 'transitions'):
+                for trans in self.model_canvas_manager.transitions:
+                    if str(trans.id) == str(target_id):
+                        target_transition = trans
+                        self.logger.info(f"[APPLY_DIALOG] Found matching transition in canvas manager: {trans.id}")
+                        break
+            
+            if target_transition:
+                self._apply_single_transition_parameters(target_transition, selected_params)
+            else:
+                self.logger.error(f"[APPLY_DIALOG] Could not find transition {target_id} in canvas manager!")
+                self._show_status(f"Transition {target_id} not found on canvas", error=True)
             return
         
         # Otherwise, show dialog to select target (fallback for manual queries)
@@ -1520,15 +1666,27 @@ class BRENDACategory(BasePathwayCategory):
         
         # CRITICAL: Re-fetch transition from canvas manager to ensure we have current object
         # The passed transition might be a stale reference from before a file reload
+        self.logger.info(f"[SINGLE_APPLY] Looking for transition with id: {transition.id} (type: {type(transition.id)})")
+        
         fresh_transition = None
-        if self.model_canvas and hasattr(self.model_canvas, 'transitions'):
-            for t in self.model_canvas.transitions:
-                if t.id == transition.id:
+        if self.model_canvas_manager and hasattr(self.model_canvas_manager, 'transitions'):
+            self.logger.info(f"[SINGLE_APPLY] Canvas manager has {len(self.model_canvas_manager.transitions)} transitions")
+            
+            # Debug: Show first few transition IDs
+            for i, t in enumerate(self.model_canvas_manager.transitions[:5]):
+                self.logger.info(f"[SINGLE_APPLY]   Transition {i}: id={t.id} (type: {type(t.id)})")
+            
+            # Try to find the transition
+            for t in self.model_canvas_manager.transitions:
+                # Compare both as strings to handle int vs string mismatch
+                if str(t.id) == str(transition.id):
                     fresh_transition = t
+                    self.logger.info(f"[SINGLE_APPLY] Found matching transition: {t.id}")
                     break
         
         if not fresh_transition:
             self.logger.error(f"[SINGLE_APPLY] Could not find transition {transition.id} in canvas manager")
+            self.logger.error(f"[SINGLE_APPLY] Available transition IDs: {[t.id for t in self.model_canvas_manager.transitions] if self.model_canvas_manager and hasattr(self.model_canvas_manager, 'transitions') else 'N/A'}")
             self._show_status(f"Transition {transition.id} not found", error=True)
             return
         
@@ -1562,6 +1720,11 @@ class BRENDACategory(BasePathwayCategory):
                 self.logger.info(f"[SINGLE_APPLY] Skipping transition {transition.id} (data_source={data_source}, has_kinetics={has_kinetics}, override_kegg={override_kegg}, override_sbml={override_sbml})")
                 self._show_status(f"Skipped {transition.id} - enable override to replace existing kinetics", error=True)
                 return
+            
+            # CRITICAL: Update controller's canvas reference to ensure it has current model
+            # This is essential in case user switched tabs or models since the last query
+            self.logger.info(f"[SINGLE_APPLY] Updating controller's model canvas reference...")
+            self.brenda_controller.set_model_canvas(self.model_canvas_manager)
             
             # Start enrichment session
             self.brenda_controller.start_enrichment(
@@ -1606,9 +1769,9 @@ class BRENDACategory(BasePathwayCategory):
             
             # Get fresh transition object from canvas manager
             verified_transition = None
-            if self.model_canvas and hasattr(self.model_canvas, 'transitions'):
-                for t in self.model_canvas.transitions:
-                    if t.id == transition.id:
+            if self.model_canvas_manager and hasattr(self.model_canvas_manager, 'transitions'):
+                for t in self.model_canvas_manager.transitions:
+                    if str(t.id) == str(transition.id):
                         verified_transition = t
                         break
             
@@ -1651,6 +1814,11 @@ class BRENDACategory(BasePathwayCategory):
             
             # Finish enrichment session
             self.brenda_controller.finish_enrichment()
+            
+            # Mark model as dirty (modified) so changes are saved
+            if self.model_canvas_manager and hasattr(self.model_canvas_manager, 'mark_dirty'):
+                self.model_canvas_manager.mark_dirty()
+                self.logger.info(f"[SINGLE_APPLY] ✓ Marked model as dirty")
             
             # CRITICAL: Reset simulation state after applying parameters
             self._reset_simulation_after_parameter_changes()

@@ -294,6 +294,29 @@ class AnalysisPlotPanel(Gtk.Box):
         # Trigger canvas redraw to show the color reset
         if self._model_manager:
             self._model_manager.mark_needs_redraw()
+    
+    def clear_plot(self):
+        """Clear all plotted objects and reset the plot.
+        
+        This is called when simulation is reset to clear old data from the plot.
+        """
+        # Clear plot lines cache
+        self._plot_lines.clear()
+        
+        # Clear the axes
+        if hasattr(self, 'axes') and self.axes:
+            self.axes.clear()
+            self.axes.set_xlabel('Time (s)')
+            self.axes.set_ylabel(self._get_ylabel())
+            self.axes.set_title(self._get_title())
+            self.axes.grid(True, alpha=0.3)
+            self.canvas.draw_idle()
+        
+        # Clear data length tracking
+        self.last_data_length.clear()
+        
+        # Reset needs_update flag
+        self.needs_update = False
 
     def _add_object_row(self, obj: Any, index: int):
         """Add a single object row to the UI list (optimized for incremental adds).

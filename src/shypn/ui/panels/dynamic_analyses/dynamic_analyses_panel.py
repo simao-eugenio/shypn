@@ -281,3 +281,17 @@ class DynamicAnalysesPanel(Gtk.Box):
                 self._report_refresh_callback()
             except Exception as e:
                 print(f"Warning: Could not refresh report panel: {e}")
+    
+    def reset(self):
+        """Reset all plot panels in this dynamic analyses panel.
+        
+        Called when simulation is reset to clear all plots.
+        """
+        # Clear plots in all categories (self.categories is a list)
+        for category_panel in self.categories:
+            if hasattr(category_panel, 'clear_plot'):
+                try:
+                    category_panel.clear_plot()
+                except Exception as e:
+                    print(f"Warning: Could not clear plot in {category_panel.__class__.__name__}: {e}")
+

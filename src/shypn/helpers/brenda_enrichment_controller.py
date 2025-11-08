@@ -484,9 +484,32 @@ class BRENDAEnrichmentController:
             vmax = kcat
             print(f"[BRENDA_MM] Using kcat={kcat} as Vmax for T{transition.id} (assumes [E]=1)")
         
+        # If no Vmax/Kcat provided, try to preserve existing Vmax from transition
         if not vmax:
-            print(f"[BRENDA_MM] Missing Vmax/Kcat for T{transition.id}, cannot generate rate function")
-            return
+            # Check if transition already has Vmax in metadata or properties
+            existing_vmax = None
+            
+            if hasattr(transition, 'metadata') and transition.metadata:
+                existing_vmax = transition.metadata.get('vmax') or transition.metadata.get('Vmax')
+            
+            if not existing_vmax and hasattr(transition, 'properties') and transition.properties:
+                # Try to parse existing rate_function for Vmax value
+                existing_func = transition.properties.get('rate_function', '')
+                if 'vmax=' in existing_func:
+                    import re
+                    match = re.search(r'vmax=(\d+(?:\.\d+)?)', existing_func)
+                    if match:
+                        existing_vmax = float(match.group(1))
+                        print(f"[BRENDA_MM] Extracted existing Vmax={existing_vmax} from rate_function")
+            
+            if existing_vmax:
+                vmax = existing_vmax
+                print(f"[BRENDA_MM] ⚠️ No Kcat provided, reusing existing Vmax={vmax} with new Km={km}")
+                print(f"[BRENDA_MM] Note: For accurate kinetics, select both Km and Kcat parameters from BRENDA")
+            else:
+                print(f"[BRENDA_MM] ❌ Missing Vmax/Kcat for T{transition.id}, cannot generate rate function")
+                print(f"[BRENDA_MM] ℹ️  TIP: Select BOTH a Km and a Kcat parameter from BRENDA results to generate complete rate function")
+                return
         
         # Find substrate place (first input place)
         substrate_place = None

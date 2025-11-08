@@ -484,8 +484,11 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         # The setter automatically creates BufferedSimulationSettings
         self.simulation = SimulationController(self._model)
         
-        # Set up data collector and listeners
-        self.simulation.data_collector = self.data_collector
+        # PHASE 1-2 FIX: Do NOT overwrite controller.data_collector
+        # The controller creates its own DataCollector (for Report Panel tables)
+        # This palette has its own SimulationDataCollector (for real-time plots)
+        # Both need to coexist - just register our collector as a step listener
+        # DO NOT OVERWRITE: self.simulation.data_collector = self.data_collector
         self.simulation.add_step_listener(self._on_simulation_step)
         self.simulation.add_step_listener(self.data_collector.on_simulation_step)
         
@@ -830,6 +833,13 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         self._hide_settings_panel()
         
         self.simulation.reset()
+        
+        # PHASE 1-2 FIX: Clear OLD data collector (for plots) on reset
+        # The controller.reset() clears the NEW data collector (for Report Panel),
+        # but we also need to clear the OLD one (for real-time plots)
+        if self.data_collector:
+            self.data_collector.clear()
+        
         self.emit('reset-executed')
         self._update_progress_display()  # Reset progress bar
         

@@ -21,6 +21,7 @@ from gi.repository import Gtk
 from datetime import datetime
 
 from .base_category import BaseReportCategory
+from shypn.data.kegg_ec_fetcher import KEGGECFetcher
 
 
 class ModelsCategory(BaseReportCategory):
@@ -42,6 +43,8 @@ class ModelsCategory(BaseReportCategory):
             model_canvas=model_canvas,
             expanded=False
         )
+        # Initialize KEGG EC fetcher for populating EC numbers
+        self.kegg_ec_fetcher = KEGGECFetcher()
     
     def _build_content(self):
         """Build models content with comprehensive scientific information."""
@@ -117,11 +120,26 @@ class ModelsCategory(BaseReportCategory):
         
         # === SUB-EXPANDERS (Collapsed by default) ===
         
-        # Species/Places Table
+        # Species/Places Table with controls
         self.species_expander = Gtk.Expander(label="Show Species/Places Table (sortable)")
         self.species_expander.set_expanded(False)
+        
+        # Container for table and controls
+        species_container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        species_container.set_margin_start(6)
+        species_container.set_margin_end(6)
+        species_container.set_margin_top(6)
+        species_container.set_margin_bottom(6)
+        
+        # Toolbar with column toggles and legend
+        toolbar = self._create_species_toolbar()
+        species_container.pack_start(toolbar, False, False, 0)
+        
+        # Table
         scrolled_species, self.species_treeview, self.species_store = self._create_species_table()
-        self.species_expander.add(scrolled_species)
+        species_container.pack_start(scrolled_species, True, True, 0)
+        
+        self.species_expander.add(species_container)
         box.pack_start(self.species_expander, False, False, 0)
         
         # Reactions/Transitions Table
@@ -140,17 +158,62 @@ class ModelsCategory(BaseReportCategory):
         """No longer needed - summary is in frame."""
         pass
     
+    def _create_species_toolbar(self):
+        """Create toolbar with color legend for species table.
+        
+        Returns:
+            Gtk.Box: Toolbar widget
+        """
+        toolbar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        toolbar.set_margin_start(6)
+        toolbar.set_margin_end(6)
+        toolbar.set_margin_top(6)
+        toolbar.set_margin_bottom(6)
+        
+        # Color Legend (centered)
+        legend_label = Gtk.Label()
+        legend_label.set_markup(
+            "<b>Color Legend:</b> "
+            "<span foreground='#16a34a'>■</span> Database  "
+            "<span foreground='#2563eb'>■</span> BRENDA  "
+            "<span foreground='#9333ea'>■</span> SABIO-RK  "
+            "<span foreground='#ea580c'>■</span> User  "
+            "<span foreground='#6b7280'><i>■</i></span> Heuristic"
+        )
+        legend_label.set_halign(Gtk.Align.CENTER)
+        toolbar.pack_start(legend_label, True, True, 0)
+        
+        return toolbar
+    
     def _create_species_table(self):
         """Create TreeView for species/places with sortable columns.
+        
+        Minimal view with essential columns only:
+        - #, Petri Net ID, Biological Name, Initial Amount, Units, Mass, Conservation
         
         Returns:
             tuple: (ScrolledWindow, TreeView, ListStore)
         """
-        # Create ListStore with column types
-        # Columns: index (int), id (str), name (str), 
-        #          db_id (str), db_id_source (str), tokens (float), 
-        #          formula (str), formula_source (str), mass (float), mass_source (str), type (str)
-        store = Gtk.ListStore(int, str, str, str, str, float, str, str, float, str, str)
+        # Create ListStore with column types (minimal structure)
+        # Columns:
+        #   0: index (int)
+        #   1: id (str)
+        #   2: name (str)
+        #   3: tokens (float)
+        #   4: token_units (str)
+        #   5: mass (float)
+        #   6: mass_source (str)
+        #   7: conservation_status (str)
+        store = Gtk.ListStore(
+            int,    # 0: index
+            str,    # 1: Petri Net ID
+            str,    # 2: Biological Name
+            float,  # 3: Initial Tokens
+            str,    # 4: Token Units
+            float,  # 5: Mass
+            str,    # 6: Mass source
+            str     # 7: Conservation Status
+        )
         
         # Create TreeView
         treeview = Gtk.TreeView(model=store)
@@ -158,15 +221,14 @@ class ModelsCategory(BaseReportCategory):
         treeview.set_enable_search(True)
         treeview.set_search_column(2)  # Search by biological name
         
-        # Add columns with renderers (colored for source tracking)
+        # Add columns (all visible)
         self._add_column(treeview, "#", 0, width=50, sortable=False)
-        self._add_column(treeview, "Petri Net ID", 1, sortable=True, width=100)
-        self._add_column(treeview, "Biological Name", 2, sortable=True, width=200)
-        self._add_colored_column(treeview, "Database ID", 3, 4, sortable=True, width=120)
-        self._add_column(treeview, "Initial Tokens", 5, sortable=True, numeric=True, width=100)
-        self._add_colored_column(treeview, "Formula", 6, 7, sortable=True, width=100)
-        self._add_colored_column(treeview, "Mass (g/mol)", 8, 9, sortable=True, numeric=True, width=100)
-        self._add_column(treeview, "Type", 10, sortable=True, width=90)
+        self._add_column(treeview, "Petri Net ID", 1, sortable=True, width=120)
+        self._add_column(treeview, "Biological Name", 2, sortable=True, width=250)
+        self._add_column(treeview, "Initial Amount", 3, sortable=True, numeric=True, width=120)
+        self._add_column(treeview, "Units", 4, sortable=True, width=100)
+        self._add_colored_column(treeview, "Mass (g/mol)", 5, 6, sortable=True, numeric=True, width=120)
+        self._add_column(treeview, "Conservation", 7, sortable=True, width=120)
         
         # Create scrolled window
         scrolled = Gtk.ScrolledWindow()
@@ -179,16 +241,46 @@ class ModelsCategory(BaseReportCategory):
     def _create_reactions_table(self):
         """Create TreeView for reactions/transitions with sortable columns.
         
+        Column order: #, Petri Net ID, Biological Name, Type, EC Number,
+                     Vmax, Km, Kcat, Ki, Rate Function, Reversible
+        
         Returns:
             tuple: (ScrolledWindow, TreeView, ListStore)
         """
         # Create ListStore with column types
-        # Columns: index (int), id (str), name (str), type (str), 
-        #          kegg_reaction (str), ec_number (str), rate_law (str),
-        #          km (float), km_source (str), kcat (float), kcat_source (str),
-        #          vmax (float), vmax_source (str), ki (float), ki_source (str), reversible (str)
-        store = Gtk.ListStore(int, str, str, str, str, str, str, 
-                             float, str, float, str, float, str, float, str, str)
+        # Columns:
+        #   0: index (int)
+        #   1: id (str)
+        #   2: name (str)
+        #   3: type (str)
+        #   4: ec_number (str)
+        #   5: vmax (float)
+        #   6: vmax_source (str)
+        #   7: km (float)
+        #   8: km_source (str)
+        #   9: kcat (float)
+        #   10: kcat_source (str)
+        #   11: ki (float)
+        #   12: ki_source (str)
+        #   13: rate_function (str)
+        #   14: reversible (str)
+        store = Gtk.ListStore(
+            int,    # 0: index
+            str,    # 1: Petri Net ID
+            str,    # 2: Biological Name
+            str,    # 3: Type
+            str,    # 4: EC Number
+            float,  # 5: Vmax
+            str,    # 6: Vmax source
+            float,  # 7: Km
+            str,    # 8: Km source
+            float,  # 9: Kcat
+            str,    # 10: Kcat source
+            float,  # 11: Ki
+            str,    # 12: Ki source
+            str,    # 13: Rate Function
+            str     # 14: Reversible
+        )
         
         # Create TreeView
         treeview = Gtk.TreeView(model=store)
@@ -201,16 +293,17 @@ class ModelsCategory(BaseReportCategory):
         self._add_column(treeview, "Petri Net ID", 1, sortable=True, width=120)
         self._add_column(treeview, "Biological Name", 2, sortable=True, width=200)
         self._add_column(treeview, "Type", 3, sortable=True, width=100)
-        self._add_column(treeview, "Reaction ID", 4, sortable=True, width=140)
-        self._add_column(treeview, "EC Number", 5, sortable=True, width=100)
-        self._add_column(treeview, "Rate Law", 6, sortable=True, width=150)
-        # Add colored kinetic parameter columns
+        self._add_column(treeview, "EC Number", 4, sortable=True, width=120)
+        
+        # Add colored kinetic parameter columns (reordered: Vmax, Km, Kcat, Ki)
+        self._add_colored_column(treeview, "Vmax", 5, 6, sortable=True, width=100, numeric=True)
         self._add_colored_column(treeview, "Km", 7, 8, sortable=True, width=100, numeric=True)
         self._add_colored_column(treeview, "Kcat", 9, 10, sortable=True, width=100, numeric=True)
-        self._add_colored_column(treeview, "Vmax", 11, 12, sortable=True, width=100, numeric=True)
-        self._add_colored_column(treeview, "Ki", 13, 14, sortable=True, width=100, numeric=True)
-        self._add_column(treeview, "Reversible", 15, sortable=True, width=100)
-        self._add_column(treeview, "Reversible", 13, sortable=True, width=90)
+        self._add_colored_column(treeview, "Ki", 11, 12, sortable=True, width=100, numeric=True)
+        
+        # Rate function and reversible
+        self._add_column(treeview, "Rate Function", 13, sortable=True, width=250)
+        self._add_column(treeview, "Reversible", 14, sortable=True, width=90)
         
         # Create scrolled window
         scrolled = Gtk.ScrolledWindow()
@@ -231,6 +324,9 @@ class ModelsCategory(BaseReportCategory):
             sortable: Whether column is sortable
             width: Fixed width (None for auto)
             numeric: Whether to right-align (for numbers)
+            
+        Returns:
+            Gtk.TreeViewColumn: The created column
         """
         renderer = Gtk.CellRendererText()
         if numeric:
@@ -245,6 +341,7 @@ class ModelsCategory(BaseReportCategory):
             column.set_clickable(True)
         
         treeview.append_column(column)
+        return column
     
     def _add_colored_column(self, treeview, title, data_column_id, source_column_id,
                             sortable=False, width=None, numeric=False):
@@ -258,6 +355,9 @@ class ModelsCategory(BaseReportCategory):
             sortable: Whether column is sortable
             width: Fixed width (None for auto)
             numeric: Whether to right-align (for numbers)
+            
+        Returns:
+            Gtk.TreeViewColumn: The created column
         """
         renderer = Gtk.CellRendererText()
         if numeric:
@@ -276,6 +376,7 @@ class ModelsCategory(BaseReportCategory):
                                    (data_column_id, source_column_id))
         
         treeview.append_column(column)
+        return column
     
     def _color_cell_by_source(self, column, renderer, model, iter, user_data):
         """Color cell based on data source.
@@ -291,10 +392,6 @@ class ModelsCategory(BaseReportCategory):
         data_column_id, source_column_id = user_data
         value = model.get_value(iter, data_column_id)
         source = model.get_value(iter, source_column_id)
-        
-        # Debug: Print source values for non-zero kinetic parameters
-        if value and value != "-" and value != 0.0 and data_column_id in [7, 9, 11, 13]:  # Km, Kcat, Vmax, Ki columns
-            print(f"[COLOR_DEBUG] Column {data_column_id}: value={value}, source='{source}' (type: {type(source).__name__})")
         
         # Determine color based on source
         if not value or value == "-" or value == 0.0:
@@ -525,6 +622,8 @@ class ModelsCategory(BaseReportCategory):
     def _populate_species_table(self, model):
         """Populate species table with current model data.
         
+        Minimal view: only essential columns.
+        
         Args:
             model: DocumentModel instance
         """
@@ -541,23 +640,6 @@ class ModelsCategory(BaseReportCategory):
             place_id = place.id if hasattr(place, 'id') else f"P{i}"
             name = place.label if hasattr(place, 'label') and place.label else place_id
             
-            # Database ID (KEGG, ChEBI, or other)
-            db_id = "-"
-            db_id_source = "unknown"
-            
-            if hasattr(place, 'metadata') and place.metadata:
-                # Try different database IDs in order of preference
-                db_id = place.metadata.get('kegg_id',
-                        place.metadata.get('chebi_id',
-                        place.metadata.get('compound_id', 
-                        place.metadata.get('sbml_species_id', '-'))))
-                # Clean up ID format
-                if db_id and db_id != '-':
-                    db_id = db_id.replace('cpd:', '')  # Clean KEGG format
-                    # Determine source
-                    db_id_source = place.metadata.get('db_id_source',
-                                   place.metadata.get('data_source', 'kegg_import'))
-            
             # Initial tokens
             tokens = 0.0
             if hasattr(place, 'initial_marking'):
@@ -565,14 +647,12 @@ class ModelsCategory(BaseReportCategory):
             elif hasattr(place, 'tokens'):
                 tokens = float(place.tokens)
             
-            # Formula
-            formula = "-"
-            formula_source = "unknown"
+            # Token units
+            token_units = "arbitrary"
             if hasattr(place, 'metadata') and place.metadata:
-                formula = place.metadata.get('formula', '-')
-                if formula != '-':
-                    formula_source = place.metadata.get('formula_source',
-                                    place.metadata.get('data_source', 'kegg_import'))
+                token_units = place.metadata.get('concentration_units',
+                             place.metadata.get('amount_units',
+                             place.metadata.get('units', 'arbitrary')))
             
             # Mass
             mass = 0.0
@@ -588,28 +668,34 @@ class ModelsCategory(BaseReportCategory):
                     except (ValueError, TypeError):
                         mass = 0.0
             
-            # Type
-            type_val = "unknown"
+            # Conservation status
+            conservation_status = "Unknown"
             if hasattr(place, 'metadata') and place.metadata:
-                type_val = place.metadata.get('type', 'unknown')
+                conservation_status = place.metadata.get('conservation_status', 'Unknown')
+            # Infer from boundary condition if not set
+            if conservation_status == "Unknown":
+                if hasattr(place, 'boundary_condition'):
+                    conservation_status = "Buffered" if place.boundary_condition else "Conserved"
+                elif hasattr(place, 'metadata') and place.metadata:
+                    is_boundary = place.metadata.get('boundary_condition', False)
+                    conservation_status = "Buffered" if is_boundary else "Conserved"
             
-            # Add row to table with source tracking
+            # Add row to table (minimal columns)
             self.species_store.append([
-                i,                # 0: index
-                place_id,         # 1: Petri Net ID
-                name,             # 2: Biological Name
-                db_id,            # 3: Database ID (KEGG/ChEBI/etc)
-                db_id_source,     # 4: Database ID source
-                tokens,           # 5: Initial Tokens
-                formula,          # 6: Formula
-                formula_source,   # 7: Formula source
-                mass,             # 8: Mass
-                mass_source,      # 9: Mass source
-                type_val          # 10: Type
+                i,                      # 0: index
+                place_id,               # 1: Petri Net ID
+                name,                   # 2: Biological Name
+                tokens,                 # 3: Initial Tokens
+                token_units,            # 4: Token Units
+                mass,                   # 5: Mass
+                mass_source,            # 6: Mass source
+                conservation_status     # 7: Conservation Status
             ])
     
     def _populate_reactions_table(self, model):
         """Populate reactions table with current model data.
+        
+        New structure: #, ID, Name, Type, EC Number, Vmax, Km, Kcat, Ki, Rate Function, Reversible
         
         Args:
             model: DocumentModel instance
@@ -632,21 +718,74 @@ class ModelsCategory(BaseReportCategory):
             if hasattr(transition, 'transition_type'):
                 trans_type = transition.transition_type
             
-            # Reaction ID (KEGG, SBML, or other)
-            reaction_id = "-"
-            if hasattr(transition, 'metadata') and transition.metadata:
-                # Try different reaction IDs in order of preference
-                reaction_id = transition.metadata.get('kegg_reaction_id',
-                             transition.metadata.get('sbml_reaction_id',
-                             transition.metadata.get('kegg_reaction_name', 
-                             transition.metadata.get('reaction_id', '-'))))
-                # Clean up reaction ID format
-                if reaction_id and reaction_id != '-':
-                    reaction_id = reaction_id.replace('rn:', '')  # Clean KEGG format
-            
-            # EC Number
+            # EC Number - Multi-priority extraction
             ec_number = "-"
-            if hasattr(transition, 'metadata') and transition.metadata:
+            
+            # Priority 1: Extract from reaction_code (e.g., "EC:1.1.1.1")
+            if hasattr(transition, 'reaction_code') and transition.reaction_code:
+                reaction_code = transition.reaction_code
+                if reaction_code.startswith('EC:'):
+                    ec_number = reaction_code.replace('EC:', '')
+                elif reaction_code.startswith('ec:'):
+                    ec_number = reaction_code.replace('ec:', '')
+                elif not reaction_code.startswith('R'):
+                    # If it's not a KEGG R number, assume it's an EC number
+                    ec_number = reaction_code
+            
+            # Priority 2: Extract from KEGG reaction ID (R00XXX -> EC via API/metadata)
+            if ec_number == "-":
+                kegg_reaction_id = None
+                
+                # Check metadata first
+                if hasattr(transition, 'metadata') and transition.metadata:
+                    kegg_reaction_id = transition.metadata.get('kegg_reaction_id',
+                                      transition.metadata.get('reaction_id', ''))
+                
+                # Check reaction_code if it starts with R
+                if not kegg_reaction_id and hasattr(transition, 'reaction_code') and transition.reaction_code:
+                    if transition.reaction_code.startswith('R') or transition.reaction_code.startswith('rn:R'):
+                        kegg_reaction_id = transition.reaction_code
+                
+                # Check label (transition name) if it starts with R - KEGG models often use R codes as labels
+                if not kegg_reaction_id and name and (name.startswith('R') or name.startswith('rn:R')):
+                    kegg_reaction_id = name
+                # Check label (transition name) if it starts with R - KEGG models often use R codes as labels
+                if not kegg_reaction_id and name and (name.startswith('R') or name.startswith('rn:R')):
+                    kegg_reaction_id = name
+                
+                # Clean KEGG format and fetch EC
+                if kegg_reaction_id:
+                    kegg_reaction_id = kegg_reaction_id.replace('rn:', '').strip()
+                    
+                    # If we have KEGG reaction ID, actively fetch from KEGG API
+                    # This is the same pattern used in BRENDA enrichment controller
+                    if kegg_reaction_id.startswith('R'):
+                        # First check if EC already in metadata (from previous fetch)
+                        if hasattr(transition, 'metadata') and transition.metadata:
+                            ec_val = transition.metadata.get('ec_number',
+                                    transition.metadata.get('ec_numbers', []))
+                            if isinstance(ec_val, list) and ec_val:
+                                ec_number = ec_val[0]
+                            elif ec_val and ec_val != '-':
+                                ec_number = str(ec_val)
+                        
+                        # If still not found, actively fetch from KEGG API
+                        if ec_number == "-":
+                            try:
+                                ec_numbers = self.kegg_ec_fetcher.fetch_ec_numbers(kegg_reaction_id)
+                                if ec_numbers and len(ec_numbers) > 0:
+                                    ec_number = ec_numbers[0]
+                                    # Store in metadata for future use
+                                    if not hasattr(transition, 'metadata'):
+                                        transition.metadata = {}
+                                    if not transition.metadata:
+                                        transition.metadata = {}
+                                    transition.metadata['ec_number'] = ec_number
+                            except Exception as e:
+                                pass  # Silently fail - EC number will remain "-"
+            
+            # Priority 3: Fallback to metadata ec_number directly
+            if ec_number == "-" and hasattr(transition, 'metadata') and transition.metadata:
                 ec_val = transition.metadata.get('ec_number',
                          transition.metadata.get('ec_numbers', []))
                 if isinstance(ec_val, list) and ec_val:
@@ -654,97 +793,103 @@ class ModelsCategory(BaseReportCategory):
                 elif ec_val and ec_val != '-':
                     ec_number = str(ec_val)
             
-            # Rate Law
-            rate_law = "-"
-            if hasattr(transition, 'metadata') and transition.metadata:
-                rate_law = transition.metadata.get('kinetic_formula',
-                           transition.metadata.get('kinetic_law',
-                           transition.metadata.get('kinetics_rule', '-')))
-            
             # Extract individual kinetic parameters
+            vmax = 0.0
+            vmax_source = "unknown"
             km = 0.0
             km_source = "unknown"
             kcat = 0.0
             kcat_source = "unknown"
-            vmax = 0.0
-            vmax_source = "unknown"
             ki = 0.0
             ki_source = "unknown"
             
             if hasattr(transition, 'metadata') and transition.metadata:
-                # First check if parameters are directly in metadata (BRENDA enrichment)
+                # Check direct metadata (BRENDA/SABIO-RK enrichment)
+                if 'vmax' in transition.metadata:
+                    vmax = float(transition.metadata['vmax'])
+                    vmax_source = transition.metadata.get('vmax_source',
+                                 transition.metadata.get('data_source', 'unknown'))
+                
                 if 'km' in transition.metadata:
                     km = float(transition.metadata['km'])
                     km_source = transition.metadata.get('km_source', 
                                transition.metadata.get('data_source', 'unknown'))
-                    print(f"[REPORT] Transition {trans_id}: Found km={km}, source={km_source}")
                 
                 if 'kcat' in transition.metadata:
                     kcat = float(transition.metadata['kcat'])
                     kcat_source = transition.metadata.get('kcat_source',
                                  transition.metadata.get('data_source', 'unknown'))
-                    print(f"[REPORT] Transition {trans_id}: Found kcat={kcat}, source={kcat_source}")
-                
-                if 'vmax' in transition.metadata:
-                    vmax = float(transition.metadata['vmax'])
-                    vmax_source = transition.metadata.get('vmax_source',
-                                 transition.metadata.get('data_source', 'unknown'))
-                    print(f"[REPORT] Transition {trans_id}: Found vmax={vmax}, source={vmax_source}")
                 
                 if 'ki' in transition.metadata:
                     ki = float(transition.metadata['ki'])
                     ki_source = transition.metadata.get('ki_source',
                                transition.metadata.get('data_source', 'unknown'))
-                    print(f"[REPORT] Transition {trans_id}: Found ki={ki}, source={ki_source}")
                 
-                # Also check kinetic_parameters dict (SBML/KEGG import)
+                # Check kinetic_parameters dict (SBML/KEGG import)
                 params = transition.metadata.get('kinetic_parameters', {})
                 if params and isinstance(params, dict):
-                    # Try different parameter name variations
+                    if vmax == 0.0:
+                        vmax_val = params.get('Vmax', params.get('vmax', params.get('V_max', 0.0)))
+                        if vmax_val:
+                            vmax = float(vmax_val)
+                            vmax_source = transition.metadata.get('data_source', 'kegg_import')
+                    
                     if km == 0.0:
                         km_val = params.get('Km', params.get('km', params.get('KM', 0.0)))
                         if km_val:
                             km = float(km_val)
                             km_source = transition.metadata.get('data_source', 'kegg_import')
-                            print(f"[REPORT] Transition {trans_id}: Extracted km={km} from kinetic_parameters, source={km_source}")
                     
                     if kcat == 0.0:
                         kcat_val = params.get('Kcat', params.get('kcat', params.get('k_cat', 0.0)))
                         if kcat_val:
                             kcat = float(kcat_val)
                             kcat_source = transition.metadata.get('data_source', 'kegg_import')
-                            print(f"[REPORT] Transition {trans_id}: Extracted kcat={kcat} from kinetic_parameters, source={kcat_source}")
-                    
-                    if vmax == 0.0:
-                        vmax_val = params.get('Vmax', params.get('vmax', params.get('V_max', 0.0)))
-                        if vmax_val:
-                            vmax = float(vmax_val)
-                            vmax_source = transition.metadata.get('data_source', 'kegg_import')
-                            print(f"[REPORT] Transition {trans_id}: Extracted vmax={vmax} from kinetic_parameters, source={vmax_source}")
                     
                     if ki == 0.0:
                         ki_val = params.get('Ki', params.get('ki', params.get('KI', 0.0)))
                         if ki_val:
                             ki = float(ki_val)
                             ki_source = transition.metadata.get('data_source', 'kegg_import')
-                            print(f"[REPORT] Transition {trans_id}: Extracted ki={ki} from kinetic_parameters, source={ki_source}")
                 
-                # Also check estimated_parameters dict (KEGG heuristic estimator)
+                # Check estimated_parameters dict (KEGG heuristic estimator)
                 estimated_params = transition.metadata.get('estimated_parameters', {})
                 if estimated_params and isinstance(estimated_params, dict):
-                    if km == 0.0:
-                        km_val = estimated_params.get('km', 0.0)
-                        if km_val:
-                            km = float(km_val)
-                            km_source = 'kegg_heuristic'  # Mark as heuristic, not real data
-                            print(f"[REPORT] Transition {trans_id}: Extracted km={km} from estimated_parameters (heuristic), source={km_source}")
-                    
                     if vmax == 0.0:
                         vmax_val = estimated_params.get('vmax', 0.0)
                         if vmax_val:
                             vmax = float(vmax_val)
-                            vmax_source = 'kegg_heuristic'  # Mark as heuristic, not real data
-                            print(f"[REPORT] Transition {trans_id}: Extracted vmax={vmax} from estimated_parameters (heuristic), source={vmax_source}")
+                            vmax_source = 'kegg_heuristic'
+                    
+                    if km == 0.0:
+                        km_val = estimated_params.get('km', 0.0)
+                        if km_val:
+                            km = float(km_val)
+                            km_source = 'kegg_heuristic'
+            
+            # Rate Function - Extract as-is from transition properties
+            rate_function = "-"
+            
+            # Priority 1: Check transition.properties['rate_function']
+            if hasattr(transition, 'properties') and transition.properties:
+                if isinstance(transition.properties, dict):
+                    rate_function = transition.properties.get('rate_function', '-')
+            
+            # Priority 2: Check transition.rate_function directly
+            if rate_function == "-" and hasattr(transition, 'rate_function'):
+                if transition.rate_function:
+                    rate_function = transition.rate_function
+            
+            # Priority 3: Check metadata
+            if rate_function == "-" and hasattr(transition, 'metadata') and transition.metadata:
+                rate_function = transition.metadata.get('rate_function',
+                               transition.metadata.get('kinetic_formula',
+                               transition.metadata.get('kinetic_law', '-')))
+            
+            # Priority 4: For stochastic transitions, default to "mass_action"
+            # Stochastic transitions inherently use mass action kinetics
+            if rate_function == "-" and trans_type == 'stochastic':
+                rate_function = "mass_action"
             
             # Reversible
             reversible = "Unknown"
@@ -753,32 +898,23 @@ class ModelsCategory(BaseReportCategory):
                 if rev_val is not None:
                     reversible = "Yes" if rev_val else "No"
             
-            # Debug output for transitions with kinetic parameters
-            if km > 0.0 or kcat > 0.0 or vmax > 0.0 or ki > 0.0:
-                print(f"[TABLE_DEBUG] Adding transition {trans_id}:")
-                print(f"  Km={km}, source='{km_source}'")
-                print(f"  Kcat={kcat}, source='{kcat_source}'")
-                print(f"  Vmax={vmax}, source='{vmax_source}'")
-                print(f"  Ki={ki}, source='{ki_source}'")
-            
-            # Add row to table
+            # Add row to table (new column order)
             self.reactions_store.append([
-                i,               # 0: index
-                trans_id,        # 1: Petri Net ID
-                name,            # 2: Biological Name
-                trans_type,      # 3: Type
-                reaction_id,     # 4: Reaction ID (KEGG/SBML/etc)
-                ec_number,       # 5: EC Number
-                rate_law,        # 6: Rate Law
-                km,              # 7: Km value
-                km_source,       # 8: Km source
-                kcat,            # 9: Kcat value
-                kcat_source,     # 10: Kcat source
-                vmax,            # 11: Vmax value
-                vmax_source,     # 12: Vmax source
-                ki,              # 13: Ki value
-                ki_source,       # 14: Ki source
-                reversible       # 15: Reversible
+                i,                # 0: index
+                trans_id,         # 1: Petri Net ID
+                name,             # 2: Biological Name
+                trans_type,       # 3: Type
+                ec_number,        # 4: EC Number
+                vmax,             # 5: Vmax
+                vmax_source,      # 6: Vmax source
+                km,               # 7: Km
+                km_source,        # 8: Km source
+                kcat,             # 9: Kcat
+                kcat_source,      # 10: Kcat source
+                ki,               # 11: Ki
+                ki_source,        # 12: Ki source
+                rate_function,    # 13: Rate Function
+                reversible        # 14: Reversible
             ])
     
     def _build_species_list(self, model):
@@ -971,6 +1107,8 @@ class ModelsCategory(BaseReportCategory):
     def _export_species_table(self):
         """Export species table as formatted text.
         
+        Minimal view with essential columns only.
+        
         Returns:
             str: Formatted table as text
         """
@@ -980,25 +1118,23 @@ class ModelsCategory(BaseReportCategory):
         lines = [
             f"Total Species/Places: {len(self.species_store)}",
             "",
-            "{:<5} {:<12} {:<20} {:<25} {:<12} {:<12} {:<10} {:<12}".format(
-                "#", "Petri ID", "Name", "Extended Name", "DB ID", 
-                "Tokens", "Formula", "Mass"
+            "{:<5} {:<15} {:<30} {:<15} {:<15} {:<15} {:<15}".format(
+                "#", "Petri Net ID", "Biological Name", "Initial Amount",
+                "Units", "Mass (g/mol)", "Conservation"
             ),
-            "-" * 125
+            "-" * 115
         ]
         
         for row in self.species_store:
-            # Skip source columns (5, 8, 10) in export
             lines.append(
-                "{:<5} {:<12} {:<20} {:<25} {:<12} {:<12.4g} {:<10} {:<12.2f}".format(
-                    row[0],   # index
-                    row[1][:11],   # Petri Net ID
-                    row[2][:19],   # Biological Name
-                    row[3][:24],   # Extended Name
-                    row[4][:11],   # Database ID
-                    row[6],   # Initial Tokens (skip source at 5)
-                    row[7][:9],    # Formula (skip source at 8)
-                    row[9] if row[9] > 0 else 0  # Mass (skip source at 10)
+                "{:<5} {:<15} {:<30} {:<15.4g} {:<15} {:<15.2f} {:<15}".format(
+                    row[0],      # 0: index
+                    row[1][:14], # 1: Petri Net ID
+                    row[2][:29], # 2: Biological Name
+                    row[3],      # 3: Initial Tokens
+                    row[4][:14], # 4: Token Units
+                    row[5] if row[5] > 0 else 0,  # 5: Mass
+                    row[7][:14]  # 7: Conservation Status
                 )
             )
         
@@ -1006,6 +1142,8 @@ class ModelsCategory(BaseReportCategory):
     
     def _export_reactions_table(self):
         """Export reactions table as formatted text.
+        
+        New structure: #, ID, Name, Type, EC Number, Vmax, Km, Kcat, Ki, Rate Function, Reversible
         
         Returns:
             str: Formatted table as text
@@ -1016,25 +1154,30 @@ class ModelsCategory(BaseReportCategory):
         lines = [
             f"Total Reactions/Transitions: {len(self.reactions_store)}",
             "",
-            "{:<5} {:<15} {:<25} {:<12} {:<18} {:<12} {:<18} {:<30} {:<10}".format(
+            "{:<5} {:<15} {:<30} {:<12} {:<15} {:<12} {:<12} {:<12} {:<12} {:<40} {:<10}".format(
                 "#", "Petri Net ID", "Biological Name", "Type", 
-                "Reaction ID", "EC Number", "Rate Law", "Parameters", "Reversible"
+                "EC Number", "Vmax", "Km", "Kcat", "Ki", "Rate Function", "Reversible"
             ),
-            "-" * 163
+            "-" * 180
         ]
         
         for row in self.reactions_store:
+            # Format rate function (truncate if too long)
+            rate_func_str = row[13][:39] if row[13] != "-" else "-"
+            
             lines.append(
-                "{:<5} {:<15} {:<25} {:<12} {:<18} {:<12} {:<18} {:<30} {:<10}".format(
-                    row[0],  # index
-                    row[1][:14],  # Petri Net ID
-                    row[2][:24],  # Biological Name
-                    row[3][:11],  # Type
-                    row[4][:17],  # Reaction ID (KEGG/SBML/etc)
-                    row[5][:11],  # EC Number
-                    row[6][:17],  # Rate Law
-                    row[7][:29],  # Parameters
-                    row[8][:9]    # Reversible
+                "{:<5} {:<15} {:<30} {:<12} {:<15} {:<12.4g} {:<12.4g} {:<12.4g} {:<12.4g} {:<40} {:<10}".format(
+                    row[0],           # 0: index
+                    row[1][:14],      # 1: Petri Net ID
+                    row[2][:29],      # 2: Biological Name
+                    row[3][:11],      # 3: Type
+                    row[4][:14],      # 4: EC Number
+                    row[5] if row[5] > 0 else 0,  # 5: Vmax
+                    row[7] if row[7] > 0 else 0,  # 7: Km
+                    row[9] if row[9] > 0 else 0,  # 9: Kcat
+                    row[11] if row[11] > 0 else 0,  # 11: Ki
+                    rate_func_str,    # 13: Rate Function
+                    row[14][:9]       # 14: Reversible
                 )
             )
         
