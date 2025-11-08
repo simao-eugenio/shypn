@@ -33,12 +33,12 @@ class SpeciesConcentrationTable(Gtk.ScrolledWindow):
         self.store = Gtk.ListStore(
             str,   # 0: Place Name
             str,   # 1: Color (hex)
-            int,   # 2: Initial
-            int,   # 3: Final
-            int,   # 4: Min
-            int,   # 5: Max
+            float, # 2: Initial (changed to float for continuous)
+            float, # 3: Final (changed to float for continuous)
+            float, # 4: Min (changed to float for continuous)
+            float, # 5: Max (changed to float for continuous)
             float, # 6: Average
-            int,   # 7: Change (Δ)
+            float, # 7: Change (Δ) (changed to float for continuous)
             float  # 8: Rate (Δ/time)
         )
         
@@ -64,22 +64,22 @@ class SpeciesConcentrationTable(Gtk.ScrolledWindow):
         self.tree_view.append_column(column)
         
         # Column 1: Initial Tokens
-        self._add_numeric_column("Initial", 2, int)
+        self._add_numeric_column("Initial", 2, float, format_str="{:.2f}")
         
         # Column 2: Final Tokens
-        self._add_numeric_column("Final", 3, int)
+        self._add_numeric_column("Final", 3, float, format_str="{:.2f}")
         
         # Column 3: Minimum
-        self._add_numeric_column("Min", 4, int)
+        self._add_numeric_column("Min", 4, float, format_str="{:.2f}")
         
         # Column 4: Maximum
-        self._add_numeric_column("Max", 5, int)
+        self._add_numeric_column("Max", 5, float, format_str="{:.2f}")
         
         # Column 5: Average
         self._add_numeric_column("Average", 6, float, format_str="{:.2f}")
         
         # Column 6: Total Change
-        self._add_numeric_column("Δ", 7, int, format_str="{:+d}")
+        self._add_numeric_column("Δ", 7, float, format_str="{:+.2f}")
         
         # Column 7: Change Rate
         self._add_numeric_column("Rate (Δ/t)", 8, float, format_str="{:+.4f}")
@@ -134,8 +134,14 @@ class SpeciesConcentrationTable(Gtk.ScrolledWindow):
             species_metrics: List of SpeciesMetrics instances
         """
         print(f"[SPECIES_TABLE] populate() called with {len(species_metrics)} metrics")
+        
+        # CRITICAL: Clear BEFORE populating to prevent mixing old and new data
         self.store.clear()
         print(f"[SPECIES_TABLE] Store cleared")
+        
+        if not species_metrics:
+            print(f"[SPECIES_TABLE] ⚠️  No metrics to populate")
+            return
         
         row_count = 0
         for metrics in species_metrics:
