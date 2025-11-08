@@ -34,7 +34,7 @@ class SimulationSettings:
     DEFAULT_DT_AUTO = True
     DEFAULT_DT_MANUAL = 0.1
     DEFAULT_TIME_SCALE = 1.0
-    DEFAULT_STEPS_TARGET = 1000  # Target number of steps for auto dt
+    DEFAULT_STEPS_TARGET = 10000  # Target number of steps for auto dt
     
     # Precision tolerance for time comparisons (prevents floating-point errors)
     # Using 1e-9 (1 nanosecond) to safely handle accumulated rounding errors

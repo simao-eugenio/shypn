@@ -18,11 +18,20 @@ The controller integrates with the project system to track:
 
 import os
 import json
+import re
 from datetime import datetime
 from typing import Dict, List, Optional, Any, Tuple
 
 from ..data.enrichment_document import EnrichmentDocument
 from ..data.project_models import Project
+from ..data.kegg_ec_fetcher import KEGGECFetcher
+
+# Import BRENDA API client
+try:
+    from ..data.brenda_soap_client import BRENDAAPIClient, ZEEP_AVAILABLE
+except ImportError:
+    BRENDAAPIClient = None
+    ZEEP_AVAILABLE = False
 
 
 class BRENDAEnrichmentController:
@@ -51,6 +60,12 @@ class BRENDAEnrichmentController:
         self.model_canvas = model_canvas
         self.project = project
         self.current_enrichment = None
+        self.kegg_ec_fetcher = KEGGECFetcher()  # For fetching EC numbers from KEGG reaction IDs
+        
+        # Initialize BRENDA API client (will be authenticated when user provides credentials)
+        self.brenda_api = None
+        if BRENDAAPIClient:
+            self.brenda_api = BRENDAAPIClient()
     
     def set_project(self, project: Optional[Project]):
         """Set or update the current project.
@@ -166,19 +181,70 @@ class BRENDAEnrichmentController:
                     if has_vmax:
                         transition_info['parameters']['vmax'] = transition.metadata.get('vmax', transition.metadata.get('Vmax'))
                 
+                # If no EC number found in metadata, try to extract from KEGG reaction ID
+                if not transition_info['ec_number']:
+                    # Check if transition has a label with KEGG reaction ID (e.g., "R00710")
+                    label = getattr(transition, 'label', None) or transition_info['name']
+                    if label and re.match(r'^R\d{5}$', label):
+                        # This is a KEGG reaction ID - fetch EC numbers from KEGG API
+                        print(f"[BRENDA_SCAN] Fetching EC numbers for KEGG reaction {label}...")
+                        try:
+                            ec_numbers = self.kegg_ec_fetcher.fetch_ec_numbers(label)
+                            if ec_numbers:
+                                transition_info['ec_number'] = ec_numbers[0]
+                                transition_info['data_source'] = 'kegg_import'
+                                print(f"[BRENDA_SCAN]   -> Found EC number(s) from KEGG: {ec_numbers}")
+                                
+                                # Also store in transition metadata for future use
+                                if not hasattr(transition, 'metadata'):
+                                    transition.metadata = {}
+                                if not transition.metadata:
+                                    transition.metadata = {}
+                                transition.metadata['ec_numbers'] = ec_numbers
+                                transition.metadata['ec_number'] = ec_numbers[0]
+                            else:
+                                print(f"[BRENDA_SCAN]   -> No EC numbers found for {label}")
+                        except Exception as e:
+                            print(f"[BRENDA_SCAN]   -> Error fetching EC for {label}: {e}")
+                
                 transitions.append(transition_info)
         
         return transitions
     
     # ========================================================================
-    # BRENDA API Integration (Future)
+    # BRENDA API Integration
     # ========================================================================
+    
+    def authenticate_brenda(self, email: str, password: str) -> bool:
+        """Authenticate with BRENDA API.
+        
+        Args:
+            email: BRENDA account email
+            password: BRENDA account password
+        
+        Returns:
+            True if authentication successful, False otherwise
+        """
+        if not self.brenda_api:
+            print("[BRENDA_AUTH] BRENDA API client not available (zeep library missing?)")
+            return False
+        
+        print(f"[BRENDA_AUTH] Authenticating with email: {email}")
+        success = self.brenda_api.authenticate(email, password)
+        
+        if success:
+            print("[BRENDA_AUTH] ✓ Authentication successful")
+        else:
+            print("[BRENDA_AUTH] ✗ Authentication failed")
+        
+        return success
+    
+    def is_brenda_authenticated(self) -> bool:
+        """Check if BRENDA API is authenticated."""
+        return self.brenda_api and self.brenda_api.is_authenticated()
     
     def fetch_from_brenda_api(self, ec_number: str, organism: str = None) -> Optional[Dict[str, Any]]:
         """Fetch kinetic data from BRENDA API.
-        
-        This will be implemented when BRENDA credentials are available.
-        Requires BRENDA SOAP API client with authentication.
         
         Args:
             ec_number: EC number to query (e.g., "2.7.1.1")
@@ -196,223 +262,47 @@ class BRENDAEnrichmentController:
                 'citations': List[str]
             }
         """
-        # TODO: Implement BRENDA SOAP API integration
-        # Requires zeep library and BRENDA credentials
+        if not self.brenda_api:
+            print(f"[QUERY_BRENDA] BRENDA API client not available")
+            return None
         
-        # For now, return mock data for common enzymes
-        # This allows testing the enrichment workflow
-        # Glycolysis pathway (hsa00010) enzymes
-        mock_brenda_data = {
-            '2.7.1.1': {  # Hexokinase
-                'ec_number': '2.7.1.1',
-                'enzyme_name': 'Hexokinase',
-                'organism': 'Homo sapiens',
-                'km_values': [{'substrate': 'glucose', 'value': 0.05, 'unit': 'mM'}],
-                'kcat_values': [{'value': 450.0, 'unit': '1/s'}],
-                'vmax_values': [{'value': 2.5, 'unit': 'mM/s'}],
-                'ki_values': [{'inhibitor': 'glucose-6-phosphate', 'value': 0.1, 'unit': 'mM'}],
-                'citations': ['PMID:12345678']
-            },
-            '2.7.1.2': {  # Glucokinase
-                'ec_number': '2.7.1.2',
-                'enzyme_name': 'Glucokinase',
-                'organism': 'Homo sapiens',
-                'km_values': [{'substrate': 'glucose', 'value': 10.0, 'unit': 'mM'}],
-                'kcat_values': [{'value': 180.0, 'unit': '1/s'}],
-                'vmax_values': [{'value': 1.2, 'unit': 'mM/s'}],
-                'ki_values': [],
-                'citations': ['PMID:87654321']
-            },
-            '5.3.1.9': {  # Glucose-6-phosphate isomerase
-                'ec_number': '5.3.1.9',
-                'enzyme_name': 'Glucose-6-phosphate isomerase',
-                'organism': 'Homo sapiens',
-                'km_values': [{'substrate': 'glucose-6-phosphate', 'value': 0.18, 'unit': 'mM'}],
-                'kcat_values': [{'value': 1200.0, 'unit': '1/s'}],
-                'vmax_values': [{'value': 8.5, 'unit': 'mM/s'}],
-                'ki_values': [],
-                'citations': ['PMID:11111111']
-            },
-            '2.7.1.11': {  # Phosphofructokinase
-                'ec_number': '2.7.1.11',
-                'enzyme_name': 'Phosphofructokinase',
-                'organism': 'Homo sapiens',
-                'km_values': [{'substrate': 'fructose-6-phosphate', 'value': 0.08, 'unit': 'mM'}],
-                'kcat_values': [{'value': 890.0, 'unit': '1/s'}],
-                'vmax_values': [{'value': 5.8, 'unit': 'mM/s'}],
-                'ki_values': [{'inhibitor': 'ATP', 'value': 0.5, 'unit': 'mM'}, {'inhibitor': 'citrate', 'value': 0.35, 'unit': 'mM'}],
-                'citations': ['PMID:55667788']
-            },
-            '4.1.2.13': {  # Aldolase
-                'ec_number': '4.1.2.13',
-                'enzyme_name': 'Fructose-bisphosphate aldolase',
-                'organism': 'Homo sapiens',
-                'km_values': [{'substrate': 'fructose-1,6-bisphosphate', 'value': 0.015, 'unit': 'mM'}],
-                'kcat_values': [{'value': 670.0, 'unit': '1/s'}],
-                'vmax_values': [{'value': 4.2, 'unit': 'mM/s'}],
-                'ki_values': [],
-                'citations': ['PMID:99887766']
-            },
-            '5.4.2.11': {  # Phosphoglycerate mutase
-                'ec_number': '5.4.2.11',
-                'enzyme_name': 'Phosphoglycerate mutase',
-                'organism': 'Homo sapiens',
-                'km_values': [{'substrate': '3-phosphoglycerate', 'value': 0.12, 'unit': 'mM'}],
-                'kcat_values': [{'value': 3500.0, 'unit': '1/s'}],
-                'vmax_values': [{'value': 22.0, 'unit': 'mM/s'}],
-                'ki_values': [{'inhibitor': 'vanadate', 'value': 0.02, 'unit': 'mM'}],
-                'citations': ['PMID:22222222']
-            },
-            '4.2.1.11': {  # Enolase
-                'ec_number': '4.2.1.11',
-                'enzyme_name': 'Enolase',
-                'organism': 'Homo sapiens',
-                'km_values': [{'substrate': '2-phosphoglycerate', 'value': 0.045, 'unit': 'mM'}],
-                'kcat_values': [{'value': 560.0, 'unit': '1/s'}],
-                'vmax_values': [{'value': 3.5, 'unit': 'mM/s'}],
-                'ki_values': [{'inhibitor': 'fluoride', 'value': 1.5, 'unit': 'mM'}],
-                'citations': ['PMID:33333333']
-            },
-            '2.7.1.40': {  # Pyruvate kinase
-                'ec_number': '2.7.1.40',
-                'enzyme_name': 'Pyruvate kinase',
-                'organism': 'Homo sapiens',
-                'km_values': [{'substrate': 'phosphoenolpyruvate', 'value': 0.22, 'unit': 'mM'}],
-                'kcat_values': [{'value': 1800.0, 'unit': '1/s'}],
-                'vmax_values': [{'value': 12.0, 'unit': 'mM/s'}],
-                'ki_values': [{'inhibitor': 'ATP', 'value': 2.0, 'unit': 'mM'}, {'inhibitor': 'alanine', 'value': 1.2, 'unit': 'mM'}],
-                'citations': ['PMID:44444444']
-            },
-            '1.1.1.1': {  # Alcohol dehydrogenase
-                'ec_number': '1.1.1.1',
-                'enzyme_name': 'Alcohol dehydrogenase',
-                'organism': 'Homo sapiens',
-                'km_values': [{'substrate': 'ethanol', 'value': 1.0, 'unit': 'mM'}],
-                'kcat_values': [{'value': 300.0, 'unit': '1/s'}],
-                'vmax_values': [{'value': 2.0, 'unit': 'mM/s'}],
-                'ki_values': [{'inhibitor': 'acetaldehyde', 'value': 5.0, 'unit': 'mM'}],
-                'citations': ['PMID:11223344']
-            },
-            '1.2.1.12': {  # Glyceraldehyde-3-phosphate dehydrogenase
-                'ec_number': '1.2.1.12',
-                'enzyme_name': 'Glyceraldehyde-3-phosphate dehydrogenase',
-                'organism': 'Homo sapiens',
-                'km_values': [{'substrate': 'glyceraldehyde-3-phosphate', 'value': 0.042, 'unit': 'mM'}],
-                'kcat_values': [{'value': 920.0, 'unit': '1/s'}],
-                'vmax_values': [{'value': 6.5, 'unit': 'mM/s'}],
-                'ki_values': [{'inhibitor': 'iodoacetate', 'value': 0.005, 'unit': 'mM'}],
-                'citations': ['PMID:55555555']
-            },
-            '2.7.2.3': {  # Phosphoglycerate kinase (T27 - was missing!)
-                'ec_number': '2.7.2.3',
-                'enzyme_name': 'Phosphoglycerate kinase',
-                'organism': 'Homo sapiens',
-                'km_values': [{'substrate': '3-phosphoglycerate', 'value': 0.24, 'unit': 'mM'}],
-                'kcat_values': [{'value': 2100.0, 'unit': '1/s'}],
-                'vmax_values': [{'value': 14.0, 'unit': 'mM/s'}],
-                'ki_values': [{'inhibitor': 'ADP', 'value': 0.15, 'unit': 'mM'}],
-                'citations': ['PMID:66666666']
-            },
-            '5.3.1.1': {  # Triosephosphate isomerase
-                'ec_number': '5.3.1.1',
-                'enzyme_name': 'Triosephosphate isomerase',
-                'organism': 'Homo sapiens',
-                'km_values': [{'substrate': 'glyceraldehyde-3-phosphate', 'value': 0.47, 'unit': 'mM'}],
-                'kcat_values': [{'value': 8300.0, 'unit': '1/s'}],
-                'vmax_values': [{'value': 55.0, 'unit': 'mM/s'}],
-                'ki_values': [],
-                'citations': ['PMID:77777777']
-            },
-            '5.4.2.2': {  # Phosphoglucomutase
-                'ec_number': '5.4.2.2',
-                'enzyme_name': 'Phosphoglucomutase',
-                'organism': 'Homo sapiens',
-                'km_values': [{'substrate': 'glucose-1-phosphate', 'value': 0.025, 'unit': 'mM'}],
-                'kcat_values': [{'value': 420.0, 'unit': '1/s'}],
-                'vmax_values': [{'value': 2.8, 'unit': 'mM/s'}],
-                'ki_values': [],
-                'citations': ['PMID:88888888']
-            },
-            '1.2.1.3': {  # Aldehyde dehydrogenase (NAD+)
-                'ec_number': '1.2.1.3',
-                'enzyme_name': 'Aldehyde dehydrogenase (NAD+)',
-                'organism': 'Homo sapiens',
-                'km_values': [{'substrate': 'acetaldehyde', 'value': 0.18, 'unit': 'mM'}],
-                'kcat_values': [{'value': 780.0, 'unit': '1/s'}],
-                'vmax_values': [{'value': 5.2, 'unit': 'mM/s'}],
-                'ki_values': [{'inhibitor': 'disulfiram', 'value': 0.001, 'unit': 'mM'}],
-                'citations': ['PMID:99999999']
-            },
-            '1.2.4.1': {  # Pyruvate dehydrogenase (lipoamide)
-                'ec_number': '1.2.4.1',
-                'enzyme_name': 'Pyruvate dehydrogenase (lipoamide)',
-                'organism': 'Homo sapiens',
-                'km_values': [{'substrate': 'pyruvate', 'value': 0.035, 'unit': 'mM'}],
-                'kcat_values': [{'value': 1500.0, 'unit': '1/s'}],
-                'vmax_values': [{'value': 10.0, 'unit': 'mM/s'}],
-                'ki_values': [{'inhibitor': 'acetyl-CoA', 'value': 0.08, 'unit': 'mM'}],
-                'citations': ['PMID:10101010']
-            },
-            '2.3.1.12': {  # Dihydrolipoyllysine-residue acetyltransferase
-                'ec_number': '2.3.1.12',
-                'enzyme_name': 'Dihydrolipoyllysine-residue acetyltransferase',
-                'organism': 'Homo sapiens',
-                'km_values': [{'substrate': 'acetyl-CoA', 'value': 0.012, 'unit': 'mM'}],
-                'kcat_values': [{'value': 650.0, 'unit': '1/s'}],
-                'vmax_values': [{'value': 4.3, 'unit': 'mM/s'}],
-                'ki_values': [],
-                'citations': ['PMID:20202020']
-            },
-            '5.4.2.4': {  # Bisphosphoglycerate mutase
-                'ec_number': '5.4.2.4',
-                'enzyme_name': 'Bisphosphoglycerate mutase',
-                'organism': 'Homo sapiens',
-                'km_values': [{'substrate': '1,3-bisphosphoglycerate', 'value': 0.008, 'unit': 'mM'}],
-                'kcat_values': [{'value': 280.0, 'unit': '1/s'}],
-                'vmax_values': [{'value': 1.9, 'unit': 'mM/s'}],
-                'ki_values': [],
-                'citations': ['PMID:30303030']
-            },
-            '3.1.3.11': {  # Fructose-bisphosphatase
-                'ec_number': '3.1.3.11',
-                'enzyme_name': 'Fructose-bisphosphatase',
-                'organism': 'Homo sapiens',
-                'km_values': [{'substrate': 'fructose-1,6-bisphosphate', 'value': 0.005, 'unit': 'mM'}],
-                'kcat_values': [{'value': 340.0, 'unit': '1/s'}],
-                'vmax_values': [{'value': 2.3, 'unit': 'mM/s'}],
-                'ki_values': [{'inhibitor': 'AMP', 'value': 0.025, 'unit': 'mM'}],
-                'citations': ['PMID:40404040']
-            },
-            '3.1.3.9': {  # Glucose-6-phosphatase
-                'ec_number': '3.1.3.9',
-                'enzyme_name': 'Glucose-6-phosphatase',
-                'organism': 'Homo sapiens',
-                'km_values': [{'substrate': 'glucose-6-phosphate', 'value': 2.0, 'unit': 'mM'}],
-                'kcat_values': [{'value': 150.0, 'unit': '1/s'}],
-                'vmax_values': [{'value': 1.0, 'unit': 'mM/s'}],
-                'ki_values': [],
-                'citations': ['PMID:50505050']
-            },
-            '1.1.1.27': {  # L-lactate dehydrogenase
-                'ec_number': '1.1.1.27',
-                'enzyme_name': 'L-lactate dehydrogenase',
-                'organism': 'Homo sapiens',
-                'km_values': [{'substrate': 'pyruvate', 'value': 0.15, 'unit': 'mM'}],
-                'kcat_values': [{'value': 550.0, 'unit': '1/s'}],
-                'vmax_values': [{'value': 3.7, 'unit': 'mM/s'}],
-                'ki_values': [{'inhibitor': 'oxalate', 'value': 0.5, 'unit': 'mM'}],
-                'citations': ['PMID:60606060']
-            },
-        }
+        if not self.brenda_api.is_authenticated():
+            print(f"[QUERY_BRENDA] Not authenticated with BRENDA. Please authenticate first.")
+            return None
         
-        # Return mock data if available
-        data = mock_brenda_data.get(ec_number)
-        if data:
-            print(f"[BRENDA_API] Mock data for {ec_number}: {data.get('enzyme_name')}")
-        else:
-            print(f"[BRENDA_API] No mock data for {ec_number}")
+        print(f"[QUERY_BRENDA] Querying BRENDA API for EC {ec_number}, organism={organism or 'all'}")
         
-        return data
+        try:
+            # Query Km values
+            km_values = self.brenda_api.get_km_values(ec_number, organism)
+            
+            # Query kcat (turnover number) values
+            kcat_values = self.brenda_api.get_kcat_values(ec_number, organism)
+            
+            # Query Ki (inhibition constant) values
+            ki_values = self.brenda_api.get_ki_values(ec_number, organism)
+            
+            # If we got any data, package it
+            if km_values or kcat_values or ki_values:
+                result = {
+                    'ec_number': ec_number,
+                    'organism': organism or 'all',
+                    'km_values': km_values,
+                    'kcat_values': kcat_values,
+                    'ki_values': ki_values,
+                }
+                
+                print(f"[QUERY_BRENDA] Found data for EC {ec_number}: "
+                      f"{len(km_values)} Km, {len(kcat_values)} kcat, {len(ki_values)} Ki values")
+                
+                return result
+            else:
+                print(f"[QUERY_BRENDA] No Km data found for EC {ec_number}")
+                return None
+        
+        except Exception as e:
+            print(f"[QUERY_BRENDA] Error querying BRENDA for EC {ec_number}: {e}")
+            return None
     
     # ========================================================================
     # Local File Loading
@@ -594,9 +484,32 @@ class BRENDAEnrichmentController:
             vmax = kcat
             print(f"[BRENDA_MM] Using kcat={kcat} as Vmax for T{transition.id} (assumes [E]=1)")
         
+        # If no Vmax/Kcat provided, try to preserve existing Vmax from transition
         if not vmax:
-            print(f"[BRENDA_MM] Missing Vmax/Kcat for T{transition.id}, cannot generate rate function")
-            return
+            # Check if transition already has Vmax in metadata or properties
+            existing_vmax = None
+            
+            if hasattr(transition, 'metadata') and transition.metadata:
+                existing_vmax = transition.metadata.get('vmax') or transition.metadata.get('Vmax')
+            
+            if not existing_vmax and hasattr(transition, 'properties') and transition.properties:
+                # Try to parse existing rate_function for Vmax value
+                existing_func = transition.properties.get('rate_function', '')
+                if 'vmax=' in existing_func:
+                    import re
+                    match = re.search(r'vmax=(\d+(?:\.\d+)?)', existing_func)
+                    if match:
+                        existing_vmax = float(match.group(1))
+                        print(f"[BRENDA_MM] Extracted existing Vmax={existing_vmax} from rate_function")
+            
+            if existing_vmax:
+                vmax = existing_vmax
+                print(f"[BRENDA_MM] ⚠️ No Kcat provided, reusing existing Vmax={vmax} with new Km={km}")
+                print(f"[BRENDA_MM] Note: For accurate kinetics, select both Km and Kcat parameters from BRENDA")
+            else:
+                print(f"[BRENDA_MM] ❌ Missing Vmax/Kcat for T{transition.id}, cannot generate rate function")
+                print(f"[BRENDA_MM] ℹ️  TIP: Select BOTH a Km and a Kcat parameter from BRENDA results to generate complete rate function")
+                return
         
         # Find substrate place (first input place)
         substrate_place = None
@@ -632,24 +545,24 @@ class BRENDAEnrichmentController:
                 substrate_place = "substrate"
                 print(f"[BRENDA_MM] Warning: Using generic substrate name")
         
-        # Build rate function
+        # Build rate function with NAMED PARAMETERS (self-documenting)
         if ki and ki > 0 and inhibitor_place:
             # Competitive inhibition form with actual inhibitor place
             # v = (Vmax * [S]) / (Km * (1 + [I]/Ki) + [S])
             # Expanded: michaelis_menten(S, Vmax, Km * (1 + I/Ki))
-            rate_function = f"michaelis_menten({substrate_place}, {vmax}, {km} * (1 + {inhibitor_place} / {ki}))"
+            rate_function = f"michaelis_menten({substrate_place}, vmax={vmax}, km={km} * (1 + {inhibitor_place} / {ki}))"
             print(f"[BRENDA_MM] Generated MM with competitive inhibition:")
             print(f"[BRENDA_MM]   Substrate: {substrate_place}")
             print(f"[BRENDA_MM]   Inhibitor: {inhibitor_place}, Ki={ki}")
             print(f"[BRENDA_MM]   Rate function: {rate_function}")
         elif ki and ki > 0:
             # Ki available but no inhibitor place detected
-            rate_function = f"michaelis_menten({substrate_place}, {vmax}, {km})"
+            rate_function = f"michaelis_menten({substrate_place}, vmax={vmax}, km={km})"
             print(f"[BRENDA_MM] Generated simple MM (Ki={ki} available but no inhibitor place found)")
             print(f"[BRENDA_MM] Rate function: {rate_function}")
         else:
-            # Simple Michaelis-Menten
-            rate_function = f"michaelis_menten({substrate_place}, {vmax}, {km})"
+            # Simple Michaelis-Menten with named parameters
+            rate_function = f"michaelis_menten({substrate_place}, vmax={vmax}, km={km})"
             print(f"[BRENDA_MM] Generated simple MM: {rate_function}")
         
         # Set rate function in transition properties
@@ -666,6 +579,23 @@ class BRENDAEnrichmentController:
         print(f"[BRENDA_MM] ✅ Successfully set rate_function on transition T{transition.id}")
         print(f"[BRENDA_MM]    transition.properties['rate_function'] = '{rate_function}'")
         print(f"[BRENDA_MM]    transition.transition_type = '{transition.transition_type}'")
+        
+        # VERIFICATION: Read back the values to confirm they were set
+        verify_func = transition.properties.get('rate_function')
+        verify_type = getattr(transition, 'transition_type', 'unknown')
+        
+        if verify_func == rate_function:
+            print(f"[BRENDA_MM] ✓ VERIFIED: rate_function correctly stored")
+        else:
+            print(f"[BRENDA_MM] ✗ WARNING: rate_function mismatch!")
+            print(f"[BRENDA_MM]   Expected: '{rate_function}'")
+            print(f"[BRENDA_MM]   Got:      '{verify_func}'")
+        
+        if verify_type == 'continuous':
+            print(f"[BRENDA_MM] ✓ VERIFIED: transition_type = 'continuous'")
+        else:
+            print(f"[BRENDA_MM] ✗ WARNING: transition_type = '{verify_type}' (expected 'continuous')")
+        
         print(f"[BRENDA_MM] ========================================================\n")
     
     def add_citations(self, citations: List[str]):

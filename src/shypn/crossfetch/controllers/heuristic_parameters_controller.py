@@ -253,16 +253,16 @@ class HeuristicParametersController:
                     k = params.get('k_forward') or params.get('lambda')
                     
                     if len(substrate_places) >= 2:
-                        # Bimolecular: mass_action(A, B, k)
+                        # Bimolecular: mass_action(A, B, rate_constant=k)
                         sub1_name = substrate_places[0].name if hasattr(substrate_places[0], 'name') else f"P{substrate_places[0].id}"
                         sub2_name = substrate_places[1].name if hasattr(substrate_places[1], 'name') else f"P{substrate_places[1].id}"
-                        rate_function = f"mass_action({sub1_name}, {sub2_name}, {k})"
+                        rate_function = f"mass_action({sub1_name}, {sub2_name}, rate_constant={k})"
                         transition.properties['rate_function'] = rate_function
                         self.logger.info(f"Generated bimolecular rate_function: {rate_function}")
                     elif len(substrate_places) == 1:
-                        # Unimolecular: mass_action(A, 1.0, k)
+                        # Unimolecular: mass_action(A, reactant2=1.0, rate_constant=k)
                         sub_name = substrate_places[0].name if hasattr(substrate_places[0], 'name') else f"P{substrate_places[0].id}"
-                        rate_function = f"mass_action({sub_name}, 1.0, {k})"
+                        rate_function = f"mass_action({sub_name}, reactant2=1.0, rate_constant={k})"
                         transition.properties['rate_function'] = rate_function
                         self.logger.info(f"Generated unimolecular rate_function: {rate_function}")
                     else:
@@ -287,7 +287,7 @@ class HeuristicParametersController:
                 if 'rate_function' in params and params['rate_function']:
                     transition.properties['rate_function'] = params['rate_function']
                 elif params.get('vmax') and params.get('km'):
-                    # Auto-generate rate_function using actual substrate place name
+                    # Auto-generate rate_function using actual substrate place name with NAMED PARAMETERS
                     # Get substrate place from transition's input arcs
                     substrate_places = []
                     for arc in getattr(transition, 'input_arcs', []):
@@ -296,7 +296,7 @@ class HeuristicParametersController:
                     
                     if substrate_places:
                         substrate_name = substrate_places[0].name if hasattr(substrate_places[0], 'name') else f"P{substrate_places[0].id}"
-                        rate_function = f"michaelis_menten({substrate_name}, {params['vmax']}, {params['km']})"
+                        rate_function = f"michaelis_menten({substrate_name}, vmax={params['vmax']}, km={params['km']})"
                         transition.properties['rate_function'] = rate_function
                         self.logger.info(f"Generated rate_function: {rate_function}")
                     else:
