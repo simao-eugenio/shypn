@@ -58,46 +58,37 @@ class ReportPanel(Gtk.Box):
         # Category controllers
         self.categories = []
         
+        # Float button (for loader float/detach functionality)
+        self.float_button = None
+        
         # Build UI
         self._build_ui()
     
     def _build_ui(self):
-        """Build report panel UI."""
-        # Panel title header (matches other panels: EXPLORER, PATHWAY OPERATIONS, etc.)
-        header_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
-        header_box.set_size_request(-1, 48)  # Fixed 48px height
-        header_box.set_margin_start(10)
-        header_box.set_margin_end(10)
+        """Build the report panel UI."""
+        print("[REPORT_PANEL] Building UI...")
         
-        header_label = Gtk.Label()
-        header_label.set_markup("<b>REPORT</b>")
-        header_label.set_halign(Gtk.Align.START)
-        header_label.set_valign(Gtk.Align.CENTER)
-        header_box.pack_start(header_label, True, True, 0)
+        # ===== PANEL HEADER =====
+        header_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        header_box.set_margin_start(6)
+        header_box.set_margin_end(6)
+        header_box.set_margin_top(6)
+        header_box.set_margin_bottom(6)
         
-        # Info label: direct users to BRENDA category for enrichment
-        brenda_info = Gtk.Label()
-        brenda_info.set_markup("<span foreground='gray' size='small'>Use Pathway Ops → BRENDA to enrich</span>")
-        brenda_info.set_halign(Gtk.Align.END)
-        brenda_info.set_valign(Gtk.Align.CENTER)
-        header_box.pack_end(brenda_info, False, False, 4)
+        # Title label
+        title_label = Gtk.Label()
+        title_label.set_markup("<b>REPORT</b>")
+        title_label.set_xalign(0)
+        title_label.set_halign(Gtk.Align.START)
+        title_label.set_hexpand(True)
+        header_box.pack_start(title_label, True, True, 0)
         
-        # Refresh button (updates all categories with current data)
-        self.refresh_button = Gtk.Button()
-        self.refresh_button.set_label("🔄")
-        self.refresh_button.set_tooltip_text("Refresh report with current data")
-        self.refresh_button.set_relief(Gtk.ReliefStyle.NONE)  # Flat button
-        self.refresh_button.set_valign(Gtk.Align.CENTER)
-        self.refresh_button.connect('clicked', self._on_refresh_clicked)
-        header_box.pack_end(self.refresh_button, False, False, 4)
-        
-        # Float button on the far right (icon only, matching other panels)
-        self.float_button = Gtk.ToggleButton()
-        self.float_button.set_label("⬈")
-        self.float_button.set_tooltip_text("Detach panel to floating window")
-        self.float_button.set_relief(Gtk.ReliefStyle.NONE)  # Flat button
-        self.float_button.set_valign(Gtk.Align.CENTER)
-        header_box.pack_end(self.float_button, False, False, 0)
+        # Float button
+        self.float_button = Gtk.ToggleButton(label="⇱")
+        self.float_button.set_tooltip_text("Float/Dock panel toggle")
+        self.float_button.set_halign(Gtk.Align.END)
+        self.float_button.get_style_context().add_class("flat")
+        header_box.pack_start(self.float_button, False, False, 0)
         
         self.pack_start(header_box, False, False, 0)
         
@@ -105,29 +96,41 @@ class ReportPanel(Gtk.Box):
         separator = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
         self.pack_start(separator, False, False, 0)
         
-        # Scrolled window for all categories
+        # ===== MAIN CONTENT =====
+        # Main container with scrolling
         scrolled = Gtk.ScrolledWindow()
         scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        print(f"[REPORT_PANEL] Created ScrolledWindow: {scrolled}")
         
-        # Container for categories
-        categories_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        # Content box for categories
+        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        content_box.set_margin_start(12)
+        content_box.set_margin_end(12)
+        content_box.set_margin_top(12)
+        content_box.set_margin_bottom(12)
+        print(f"[REPORT_PANEL] Created content_box: {content_box}")
         
-        # Create categories
-        self._create_categories(categories_box)
+        # Create all categories
+        self._create_categories(content_box)
         
-        # Export buttons at bottom
-        export_box = self._create_export_buttons()
+        print(f"[REPORT_PANEL] content_box children: {content_box.get_children()}")
         
-        scrolled.add(categories_box)
-        
+        scrolled.add(content_box)
         self.pack_start(scrolled, True, True, 0)
-        self.pack_start(export_box, False, False, 0)
         
-        # Setup exclusive expansion
-        self._setup_exclusive_expansion()
+        print(f"[REPORT_PANEL] self.get_children(): {self.get_children()}")
+        print(f"[REPORT_PANEL] scrolled.get_child(): {scrolled.get_child()}")
         
-        # Show all widgets (this ensures categories are visible even if collapsed)
+        # Make everything visible
+        print("[REPORT_PANEL] Calling show_all()...")
+        content_box.show_all()
+        scrolled.show_all()
         self.show_all()
+        
+        print(f"[REPORT_PANEL] After show_all() - self.get_visible(): {self.get_visible()}")
+        print(f"[REPORT_PANEL] After show_all() - scrolled.get_visible(): {scrolled.get_visible()}")
+        print(f"[REPORT_PANEL] After show_all() - content_box.get_visible(): {content_box.get_visible()}")
+        print("[REPORT_PANEL] UI build complete")
     
     def _create_categories(self, container):
         """Create all report categories aligned with panels.
@@ -135,52 +138,70 @@ class ReportPanel(Gtk.Box):
         Args:
             container: Container to add categories to
         """
+        print("[REPORT_PANEL] Creating categories...")
+        
         # Get current model manager if available
         # Initially model_canvas_loader may not have a loaded model
         current_manager = None
         if self.model_canvas_loader and hasattr(self.model_canvas_loader, 'get_current_model'):
             current_manager = self.model_canvas_loader.get_current_model()
         
+        print(f"[REPORT_PANEL] Current model manager: {current_manager}")
+        
         # MODELS (from Model Canvas Panel)
         # Pass the specific manager if available, otherwise None
+        print("[REPORT_PANEL] Creating ModelsCategory...")
         models = ModelsCategory(
             project=self.project,
             model_canvas=current_manager
         )
         self.categories.append(models)
         widget = models.get_widget()
+        print(f"[REPORT_PANEL] ModelsCategory widget: {widget}, visible={widget.get_visible()}")
         widget.show_all()
         container.pack_start(widget, False, False, 0)
+        print("[REPORT_PANEL] ModelsCategory added to container")
         
         # DYNAMIC ANALYSES (from Pathway Operations Panel - enrichments)
+        print("[REPORT_PANEL] Creating DynamicAnalysesCategory...")
         dynamic = DynamicAnalysesCategory(
-            project=self.project,
-            model_canvas=current_manager
+            name='Dynamic Analyses',
+            parent_panel=self
         )
         self.categories.append(dynamic)
         widget = dynamic.get_widget()
+        print(f"[REPORT_PANEL] DynamicAnalysesCategory widget: {widget}, visible={widget.get_visible()}")
         widget.show_all()
         container.pack_start(widget, False, False, 0)
+        print("[REPORT_PANEL] DynamicAnalysesCategory added to container")
         
         # TOPOLOGY ANALYSES (from Analyses Panel)
+        print("[REPORT_PANEL] Creating TopologyAnalysesCategory...")
         topology = TopologyAnalysesCategory(
             project=self.project,
             model_canvas=current_manager
         )
         self.categories.append(topology)
         widget = topology.get_widget()
+        print(f"[REPORT_PANEL] TopologyAnalysesCategory widget: {widget}, visible={widget.get_visible()}")
         widget.show_all()
         container.pack_start(widget, False, False, 0)
+        print("[REPORT_PANEL] TopologyAnalysesCategory added to container")
         
         # PROVENANCE & LINEAGE (from all panels)
+        print("[REPORT_PANEL] Creating ProvenanceCategory...")
         provenance = ProvenanceCategory(
             project=self.project,
             model_canvas=current_manager
         )
         self.categories.append(provenance)
         widget = provenance.get_widget()
+        print(f"[REPORT_PANEL] ProvenanceCategory widget: {widget}, visible={widget.get_visible()}")
         widget.show_all()
         container.pack_start(widget, False, False, 0)
+        print("[REPORT_PANEL] ProvenanceCategory added to container")
+        
+        print(f"[REPORT_PANEL] All {len(self.categories)} categories created")
     
     def _create_export_buttons(self):
         """Create export buttons bar.

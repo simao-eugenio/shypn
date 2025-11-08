@@ -1211,6 +1211,24 @@ class ModelCanvasLoader:
         # PHASE 4: Also store controller reference for palette access
         self.overlay_managers[drawing_area].simulation_controller = simulation_controller
         
+        # MULTI-DOCUMENT: Create per-document report data container
+        from shypn.ui.panels.report.document_report_data import DocumentReportData
+        self.overlay_managers[drawing_area].report_data = DocumentReportData(drawing_area=drawing_area)
+        
+        # MULTI-DOCUMENT: Create per-document Report Panel
+        # Each document gets its own Report Panel instance to maintain independent state
+        if not hasattr(self.overlay_managers[drawing_area], 'report_panel_loader'):
+            from shypn.helpers.report_panel_loader import ReportPanelLoader
+            report_panel_loader = ReportPanelLoader(project=None, model_canvas=self)
+            report_panel_loader.load()
+            
+            # Wire controller to this document's Report Panel
+            if hasattr(report_panel_loader, 'panel') and report_panel_loader.panel:
+                report_panel_loader.panel.set_controller(simulation_controller)
+            
+            self.overlay_managers[drawing_area].report_panel_loader = report_panel_loader
+            print(f"[MODEL_CANVAS_LOADER] Created per-document Report Panel for drawing_area {id(drawing_area)}")
+        
         # ============================================================
         # OLD PALETTE CODE - Keeping temporarily for reference
         # ============================================================
