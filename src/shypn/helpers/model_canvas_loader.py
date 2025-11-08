@@ -2951,7 +2951,12 @@ class ModelCanvasLoader:
             filepath: Full path to the saved/loaded file
             is_save: True if save operation, False if load operation
         """
+        print(f"\n[FILE_OP] ========================================")
+        print(f"[FILE_OP] File operation: {'SAVE' if is_save else 'LOAD'}")
+        print(f"[FILE_OP] filepath: {filepath}")
+        
         if not filepath:
+            print(f"[FILE_OP] No filepath, returning")
             return
         
         # Extract filename with .shy extension
@@ -2961,27 +2966,38 @@ class ModelCanvasLoader:
             base = os.path.splitext(filename)[0]
             filename = f"{base}.shy"
         
+        print(f"[FILE_OP] Extracted filename: {filename}")
+        
         # Get current page
         current_page_num = self.notebook.get_current_page()
         if current_page_num < 0:
+            print(f"[FILE_OP] No current page, returning")
             return
         
         current_page = self.notebook.get_nth_page(current_page_num)
+        print(f"[FILE_OP] Current page num: {current_page_num}")
         
         # Update tab label with new filename (no asterisk after save/load)
         self._update_tab_label(current_page, filename, is_modified=False)
+        print(f"[FILE_OP] Tab label updated to: {filename}")
         
         # Also update the canvas manager's filename (without extension for internal use)
         drawing_area = self._get_drawing_area_from_page(current_page)
+        print(f"[FILE_OP] drawing_area: {drawing_area} (id={id(drawing_area) if drawing_area else 'None'})")
+        
         if drawing_area and drawing_area in self.canvas_managers:
             manager = self.canvas_managers[drawing_area]
             # Store filename without extension in manager
             base_filename = os.path.splitext(filename)[0]
             manager.filename = base_filename
+            print(f"[FILE_OP] Manager filename updated to: {base_filename}")
             
             # If this was a save operation, mark as saved (clears imported flag)
             if is_save:
                 manager.mark_as_saved()
+                print(f"[FILE_OP] Manager marked as saved")
+        
+        print(f"[FILE_OP] ========================================\n")
 
     def _on_dirty_state_changed(self, is_dirty):
         """Handle dirty state change to update tab label modification indicator.
