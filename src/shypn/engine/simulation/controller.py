@@ -1823,9 +1823,18 @@ class SimulationController:
         self.transition_states.clear()
         self._round_robin_index = 0
         
+        # PHASE 1-2 FIX: Preserve callback before recreating data collector
+        # The Report Panel's on_simulation_complete callback must survive controller reset
+        saved_callback = self.on_simulation_complete
+        
         # Recreate data collector with new model
         from shypn.engine.simulation.data_collector import DataCollector
         self.data_collector = DataCollector(new_model)
+        
+        # PHASE 1-2 FIX: Restore callback after recreating data collector
+        self.on_simulation_complete = saved_callback
+        if saved_callback:
+            print(f"[RESET_MODEL] ✅ Preserved on_simulation_complete callback")
         
         # Reset data collector if exists (legacy compatibility)
         if self.data_collector is not None:
