@@ -9,13 +9,22 @@ This script helps diagnose BRENDA API connection issues:
 4. Performs a lightweight data query to verify API access
 
 Usage:
+    # Interactive (prompts for credentials):
     python test_brenda_connection.py
-
-You will be prompted for your BRENDA credentials.
+    
+    # With command-line arguments:
+    python test_brenda_connection.py --email your@email.com --password yourpass
+    
+    # With environment variables:
+    export BRENDA_EMAIL="your@email.com"
+    export BRENDA_PASSWORD="yourpass"
+    python test_brenda_connection.py
 """
 
 import sys
 import logging
+import argparse
+import os
 from pathlib import Path
 
 # Add src to path
@@ -33,7 +42,41 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def test_brenda_connection():
+def get_credentials(args):
+    """Get BRENDA credentials from various sources.
+    
+    Priority:
+    1. Command-line arguments
+    2. Environment variables
+    3. Interactive prompt
+    """
+    email = args.email or os.environ.get('BRENDA_EMAIL')
+    password = args.password or os.environ.get('BRENDA_PASSWORD')
+    
+    # If still missing, prompt interactively
+    if not email:
+        email = input("BRENDA Email: ").strip()
+    else:
+        print(f"Using email: {email}")
+    
+    if not email:
+        print("✗ Email is required")
+        return None, None
+    
+    if not password:
+        import getpass
+        password = getpass.getpass("BRENDA Password: ").strip()
+    else:
+        print("Using password from arguments/environment")
+    
+    if not password:
+        print("✗ Password is required")
+        return None, None
+    
+    return email, password
+
+
+def test_brenda_connection(email, password):
     """Test BRENDA API connection step by step."""
     
     print("=" * 70)
@@ -55,20 +98,8 @@ def test_brenda_connection():
     # Step 2: Get credentials
     print("Step 2: BRENDA Credentials")
     print("-" * 70)
-    print("Enter your BRENDA account credentials.")
-    print("(Register at https://www.brenda-enzymes.org/register.php)")
-    print()
-    
-    email = input("BRENDA Email: ").strip()
-    if not email:
-        print("✗ Email is required")
-        return False
-    
-    import getpass
-    password = getpass.getpass("BRENDA Password: ").strip()
-    if not password:
-        print("✗ Password is required")
-        return False
+    print(f"Email: {email}")
+    print(f"Password: {'*' * len(password)}")
     print()
     
     # Step 3: Test WSDL access
@@ -152,8 +183,34 @@ def test_brenda_connection():
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description='Test BRENDA SOAP API connection',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog='''
+Examples:
+  # Interactive mode:
+  python test_brenda_connection.py
+  
+  # With arguments (password visible in process list):
+  python test_brenda_connection.py --email user@example.com --password mypass
+  
+  # With environment variables (more secure):
+  export BRENDA_EMAIL="user@example.com"
+  export BRENDA_PASSWORD="mypass"
+  python test_brenda_connection.py
+        '''
+    )
+    parser.add_argument('--email', help='BRENDA account email')
+    parser.add_argument('--password', help='BRENDA account password')
+    
+    args = parser.parse_args()
+    
     try:
-        success = test_brenda_connection()
+        email, password = get_credentials(args)
+        if not email or not password:
+            sys.exit(1)
+        
+        success = test_brenda_connection(email, password)
         sys.exit(0 if success else 1)
     except KeyboardInterrupt:
         print("\n\nTest cancelled by user")

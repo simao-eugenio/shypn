@@ -3,14 +3,22 @@
 BRENDA Connection Test with GTK GUI
 
 Simple GUI to test BRENDA credentials safely.
+Uses the BRENDAAPIClient class for proper authentication and data retrieval.
 """
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, GLib
 import json
 import os
-import hashlib
+import sys
 import threading
+from pathlib import Path
+
+# Add src to path
+src_path = Path(__file__).parent.parent / 'src'
+sys.path.insert(0, str(src_path))
+
+from shypn.data.brenda_soap_client import BRENDAAPIClient
 
 try:
     from zeep import Client
@@ -181,10 +189,19 @@ class BrendaTestWindow(Gtk.Window):
             self.append_result(f"❌ Failed to save credentials: {e}\n\n", "error")
     
     def load_credentials_from_file(self):
-        """Load credentials from workspace/.brenda_credentials.json"""
-        creds_path = os.path.join(os.path.dirname(__file__), '..', 'workspace', '.brenda_credentials.json')
+        """Load credentials from workspace/.brenda_credentials.json or ~/.shypn/brenda_credentials.json"""
+        # Try workspace first
+        workspace_path = os.path.join(os.path.dirname(__file__), '..', 'workspace', '.brenda_credentials.json')
+        # Try home directory second
+        home_path = Path.home() / '.shypn' / 'brenda_credentials.json'
         
-        if os.path.exists(creds_path):
+        creds_path = None
+        if os.path.exists(workspace_path):
+            creds_path = workspace_path
+        elif home_path.exists():
+            creds_path = str(home_path)
+        
+        if creds_path:
             try:
                 with open(creds_path, 'r') as f:
                     creds = json.load(f)
@@ -192,11 +209,14 @@ class BrendaTestWindow(Gtk.Window):
                 self.email_entry.set_text(creds.get('email', ''))
                 self.password_entry.set_text(creds.get('password', ''))
                 
-                self.append_result("✅ Credentials loaded from file\n", "success")
+                self.append_result(f"✅ Credentials loaded from:\n   {creds_path}\n", "success")
             except Exception as e:
                 self.append_result(f"⚠️  Could not load credentials: {e}\n", "warning")
         else:
-            self.append_result(f"ℹ️  No credentials file found at:\n   {creds_path}\n", "info")
+            self.append_result(f"ℹ️  No credentials file found\n", "info")
+            self.append_result(f"   Checked:\n", "info")
+            self.append_result(f"   • {workspace_path}\n", "info")
+            self.append_result(f"   • {home_path}\n", "info")
     
     def append_result(self, text, tag=None):
         """Append text to result buffer."""
@@ -237,75 +257,109 @@ class BrendaTestWindow(Gtk.Window):
         thread.start()
     
     def run_test(self, email, password):
-        """Run BRENDA test in background thread."""
+        """Run BRENDA test in background thread using BRENDAAPIClient."""
         try:
             GLib.idle_add(self.append_result, f"🔬 Testing BRENDA connection...\n", None)
             GLib.idle_add(self.append_result, f"📧 Email: {email}\n\n", None)
             
-            # Hash password
-            GLib.idle_add(self.append_result, "🔐 Hashing password...\n", None)
-            password_hash = hashlib.sha256(password.encode('utf-8')).hexdigest()
+            # Create API client
+            GLib.idle_add(self.append_result, "� Initializing BRENDA API client...\n", None)
+            client = BRENDAAPIClient()
             
-            # Connect to BRENDA
-            GLib.idle_add(self.append_result, "🌐 Connecting to BRENDA SOAP service...\n", None)
-            WSDL = 'https://www.brenda-enzymes.org/soap/brenda_zeep.wsdl'
-            client = Client(WSDL)
+            # Step 1: Test authentication
+            GLib.idle_add(self.append_result, "🔐 Testing authentication...\n", None)
+            GLib.idle_add(self.append_result, "   (Using SHA256 password hashing as per BRENDA spec)\n", None)
             
-            # Test with getEcNumber
-            GLib.idle_add(self.append_result, "🔍 Testing API access with getEcNumber()...\n", None)
-            GLib.idle_add(self.append_result, "   Querying EC 2.7.1.1 (Hexokinase)...\n\n", None)
+            success = client.authenticate(email=email, password=password)
             
-            # BRENDA SOAP API requires specific format with all parameters
-            # Based on: https://www.brenda-enzymes.org/soap.php
-            result = client.service.getEcNumber(
-                email,                      # User email
-                password_hash,              # Hashed password (SHA256)
-                "ecNumber*2.7.1.1",        # EC number filter
-                "organism*",                # Organism filter (empty but required)
-                "transferredToEc*"          # Additional required field
-            )
+            if not success:
+                raise Exception("Authentication failed - check credentials and account status")
             
-            # Success!
+            GLib.idle_add(self.append_result, "✅ Authentication successful!\n\n", "success")
+            
+            # Step 2: Test data retrieval - Km values
+            GLib.idle_add(self.append_result, "� Testing data retrieval (Km values)...\n", None)
+            GLib.idle_add(self.append_result, "   Querying EC 2.7.1.1 (Hexokinase) in Homo sapiens...\n", None)
+            
+            km_values = client.get_km_values(ec_number="2.7.1.1", organism="Homo sapiens")
+            
+            if km_values:
+                GLib.idle_add(self.append_result, f"✅ Retrieved {len(km_values)} Km values!\n\n", "success")
+                
+                # Show sample data
+                GLib.idle_add(self.append_result, "📋 Sample Km values:\n", None)
+                for i, km in enumerate(km_values[:3], 1):
+                    substrate = km.get('substrate', 'N/A')
+                    value = km.get('kmValue', 'N/A')
+                    organism = km.get('organism', 'N/A')
+                    GLib.idle_add(self.append_result, f"   {i}. {substrate}: {value} ({organism})\n", "info")
+                
+                if len(km_values) > 3:
+                    GLib.idle_add(self.append_result, f"   ... and {len(km_values) - 3} more\n", "info")
+                
+                GLib.idle_add(self.append_result, "\n", None)
+            else:
+                GLib.idle_add(self.append_result, "⚠️  No Km values returned\n", "warning")
+                GLib.idle_add(self.append_result, "   (This may indicate limited API access)\n\n", "warning")
+            
+            # Step 3: Test kcat values
+            GLib.idle_add(self.append_result, "📊 Testing kcat value retrieval...\n", None)
+            
+            kcat_values = client.get_kcat_values(ec_number="2.7.1.1", organism="Homo sapiens")
+            
+            if kcat_values:
+                GLib.idle_add(self.append_result, f"✅ Retrieved {len(kcat_values)} kcat values!\n\n", "success")
+            else:
+                GLib.idle_add(self.append_result, "ℹ️  No kcat values available for this query\n\n", "info")
+            
+            # Success summary
             GLib.idle_add(self.append_result, "═" * 60 + "\n", None)
-            GLib.idle_add(self.append_result, "✅ SUCCESS! BRENDA connection working!\n", "success")
+            GLib.idle_add(self.append_result, "✅ ALL TESTS PASSED!\n", "success")
             GLib.idle_add(self.append_result, "═" * 60 + "\n\n", None)
-            
-            GLib.idle_add(self.append_result, "📊 Sample result:\n", None)
-            
-            # Convert result to string (might be list, dict, or string)
-            result_str = str(result)
-            result_preview = result_str[:500] if len(result_str) > 500 else result_str
-            GLib.idle_add(self.append_result, result_preview + "\n\n", "info")
-            
-            if len(result_str) > 500:
-                GLib.idle_add(self.append_result, f"... (truncated, total length: {len(result_str)} chars)\n\n", "info")
             
             GLib.idle_add(self.append_result, "✅ Your BRENDA credentials are working correctly!\n", "success")
             GLib.idle_add(self.append_result, "✅ You can now use BRENDA enrichment in shypn\n\n", "success")
             
+            GLib.idle_add(self.append_result, "💡 Next steps:\n", None)
+            GLib.idle_add(self.append_result, "   1. Use BRENDA category in Pathway Operations panel\n", None)
+            GLib.idle_add(self.append_result, "   2. Enter EC numbers to query kinetic parameters\n", None)
+            GLib.idle_add(self.append_result, "   3. Select parameters to add to your model\n\n", None)
+            
         except Exception as e:
             GLib.idle_add(self.append_result, "═" * 60 + "\n", None)
-            GLib.idle_add(self.append_result, "❌ FAILED!\n", "error")
+            GLib.idle_add(self.append_result, "❌ TEST FAILED!\n", "error")
             GLib.idle_add(self.append_result, "═" * 60 + "\n\n", None)
             
             error_msg = str(e)
             GLib.idle_add(self.append_result, f"Error: {error_msg}\n\n", "error")
             
-            # Check for common BRENDA error messages
-            if "credentials" in error_msg.lower() or "authentication" in error_msg.lower() or "login" in error_msg.lower():
+            # Provide specific troubleshooting
+            if "403" in error_msg or "Forbidden" in error_msg:
+                GLib.idle_add(self.append_result, "🚫 403 Forbidden Error\n\n", "error")
+                GLib.idle_add(self.append_result, "BRENDA server rejected the connection.\n\n", None)
+                GLib.idle_add(self.append_result, "Possible causes:\n", None)
+                GLib.idle_add(self.append_result, "  • BRENDA temporarily blocking automated access\n", None)
+                GLib.idle_add(self.append_result, "  • Rate limiting - wait a few minutes and retry\n", None)
+                GLib.idle_add(self.append_result, "  • Check service status: https://www.brenda-enzymes.org/\n\n", None)
+            elif "credentials" in error_msg.lower() or "authentication" in error_msg.lower():
                 GLib.idle_add(self.append_result, "🔐 Authentication Failed\n\n", "error")
-                GLib.idle_add(self.append_result, "This error indicates incorrect credentials.\n\n", None)
-                GLib.idle_add(self.append_result, "Please check:\n", None)
+                GLib.idle_add(self.append_result, "Please verify:\n", None)
                 GLib.idle_add(self.append_result, "  ✓ Email address is correct\n", None)
                 GLib.idle_add(self.append_result, "  ✓ Password is correct (case-sensitive)\n", None)
-                GLib.idle_add(self.append_result, "  ✓ Account has been activated by BRENDA admins\n\n", None)
-                GLib.idle_add(self.append_result, "Reset password: https://www.brenda-enzymes.org/remember.php\n", "info")
+                GLib.idle_add(self.append_result, "  ✓ Account activated by BRENDA (takes 1-2 days)\n\n", None)
+                GLib.idle_add(self.append_result, "🔗 Reset password: https://www.brenda-enzymes.org/remember.php\n", "info")
+            elif "network" in error_msg.lower() or "connection" in error_msg.lower():
+                GLib.idle_add(self.append_result, "🌐 Network Connection Issue\n\n", "error")
+                GLib.idle_add(self.append_result, "Please check:\n", None)
+                GLib.idle_add(self.append_result, "  • Internet connection is working\n", None)
+                GLib.idle_add(self.append_result, "  • Firewall allows HTTPS to brenda-enzymes.org\n", None)
+                GLib.idle_add(self.append_result, "  • Not behind a corporate proxy\n\n", None)
             else:
-                GLib.idle_add(self.append_result, "Possible issues:\n", None)
-                GLib.idle_add(self.append_result, "  • Incorrect email or password\n", None)
-                GLib.idle_add(self.append_result, "  • Account not yet activated (takes 1-2 days)\n", None)
-                GLib.idle_add(self.append_result, "  • Network connection problems\n", None)
-                GLib.idle_add(self.append_result, "  • BRENDA service temporarily unavailable\n\n", None)
+                GLib.idle_add(self.append_result, "💡 Troubleshooting:\n", None)
+                GLib.idle_add(self.append_result, "  • Verify credentials at brenda-enzymes.org\n", None)
+                GLib.idle_add(self.append_result, "  • Account must be activated (1-2 business days)\n", None)
+                GLib.idle_add(self.append_result, "  • Free accounts may have limited SOAP access\n", None)
+                GLib.idle_add(self.append_result, "  • Contact: info@brenda-enzymes.org\n\n", None)
         
         finally:
             # Re-enable button
