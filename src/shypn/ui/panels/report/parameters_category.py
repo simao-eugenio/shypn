@@ -448,13 +448,29 @@ class DynamicAnalysesCategory(BaseReportCategory):
             f"over {num_time_points} time points (duration: {duration:.2f}s)</i>"
         )
         
+        # Auto-expand the simulation data expander when data is available
+        if not self.simulation_expander.get_expanded():
+            print("[DEBUG_TABLES] Auto-expanding simulation data section")
+            self.simulation_expander.set_expanded(True)
+        
+        # Auto-expand the category itself when data arrives
+        if hasattr(self, 'category_frame') and self.category_frame:
+            if not self.category_frame.expanded:
+                print("[DEBUG_TABLES] Auto-expanding Dynamic Analyses category")
+                self.category_frame.set_expanded(True)
+        
         # Ensure all widgets are visible and properly rendered
         self.summary_label.show()
         self.simulation_status_label.show()
         self.species_table.show_all()
         self.reaction_table.show_all()
         self.simulation_expander.show_all()
-        print("[DEBUG_TABLES] All widgets shown")
+        
+        # Force a redraw of the parent widget to ensure visibility
+        if hasattr(self, 'category_frame') and self.category_frame:
+            self.category_frame.queue_draw()
+        
+        print("[DEBUG_TABLES] All widgets shown and expanders expanded")
     
     def _update_summary(self, duration: float, data_collector):
         """Update Summary section with simulation metadata.
