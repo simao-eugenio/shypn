@@ -22,20 +22,18 @@ class DynamicAnalysesCategory(BaseReportCategory):
     - Sub-expanders for detailed data
     """
     
-    def __init__(self, project=None, model_canvas=None):
-        """Initialize dynamic analyses category."""
-        # Set panel references BEFORE calling super().__init__
-        # because parent may call refresh() which needs these references
-        self.dynamic_analyses_panel = None
-        self.pathway_operations_panel = None
-        self.controller = None  # Simulation controller reference
+    def __init__(self, name='Dynamic Analyses', parent_panel=None):
+        """Initialize the Dynamic Analyses category.
         
-        super().__init__(
-            title="DYNAMIC ANALYSES",
-            project=project,
-            model_canvas=model_canvas,
-            expanded=False
-        )
+        Args:
+            name: Category name to display in header
+            parent_panel: Parent ReportPanel instance
+        """
+        super().__init__(name, parent_panel)
+        self.controller = None
+        # Track which controllers have callbacks registered to avoid re-registration
+        self._registered_controllers = set()
+        self._build_content()
     
     def _build_content(self):
         """Build dynamic analyses content: Summary first, then sub-expanders."""
@@ -282,9 +280,9 @@ class DynamicAnalysesCategory(BaseReportCategory):
         
         self.controller = controller
         
-        # Register callback for simulation complete
-        if controller:
-            print(f"[SET_CONTROLLER] Registering on_simulation_complete callback")
+        # Register callback for simulation complete (only once per controller)
+        if controller and id(controller) not in self._registered_controllers:
+            print(f"[SET_CONTROLLER] Registering on_simulation_complete callback (FIRST TIME)")
             # Use GLib.idle_add to ensure UI update happens on main thread
             from gi.repository import GLib
             # CRITICAL: We need to refresh ONLY if this specific controller is still active
@@ -296,10 +294,13 @@ class DynamicAnalysesCategory(BaseReportCategory):
                     print(f"[CALLBACK] Controller {id(controller)} matches active controller, refreshing")
                     GLib.idle_add(self._refresh_simulation_data)
                 else:
-                    print(f"[CALLBACK] Controller {id(controller)} no longer active (current: {id(self.controller)}), skipping refresh")
+                    print(f"[CALLBACK] Controller {id(controller)} no longer active (current: {id(self.controller) if self.controller else 'None'}), skipping refresh")
             
             controller.on_simulation_complete = on_complete
-            print(f"[SET_CONTROLLER] Callback registered successfully (with controller identity check)")
+            self._registered_controllers.add(id(controller))
+            print(f"[SET_CONTROLLER] Callback registered successfully (controller added to registry)")
+        elif controller:
+            print(f"[SET_CONTROLLER] Callback already registered for this controller (skipping re-registration)")
             
     def _refresh_simulation_data(self):
         """Refresh simulation data tables."""
