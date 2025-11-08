@@ -1721,15 +1721,20 @@ class SimulationController:
         # Stop data collection
         if self.data_collector:
             self.data_collector.stop_collection()
+            print(f"[DEBUG_STOP] Data collector stopped. has_data() = {self.data_collector.has_data()}")
         
         # Notify completion callback
         if self.on_simulation_complete:
+            print(f"[DEBUG_STOP] Calling on_simulation_complete callback...")
             try:
                 self.on_simulation_complete()
+                print(f"[DEBUG_STOP] Callback completed successfully")
             except Exception as e:
                 print(f"[ERROR] Exception in on_simulation_complete callback: {e}")
                 import traceback
                 traceback.print_exc()
+        else:
+            print(f"[DEBUG_STOP] ⚠️  No on_simulation_complete callback registered")
         
         for state in self.transition_states.values():
             state.enablement_time = None
