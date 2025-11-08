@@ -1715,7 +1715,15 @@ class SimulationController:
         again, transitions start fresh with enablement time = current time.
         """
         if not self._running:
+            print(f"[STOP] WARNING: stop() called but simulation not running!")
             return
+        
+        print(f"[STOP] ========================================")
+        print(f"[STOP] stop() called - stopping simulation")
+        print(f"[STOP] Controller ID: {id(self)}")
+        print(f"[STOP] on_simulation_complete callback: {self.on_simulation_complete}")
+        print(f"[STOP] ========================================")
+        
         self._stop_requested = True
         
         # Stop data collection
@@ -1730,10 +1738,15 @@ class SimulationController:
         # Notify completion callback
         if self.on_simulation_complete:
             print(f"[STOP] Calling on_simulation_complete callback...")
-            self.on_simulation_complete()
-            print(f"[STOP] Callback completed")
+            try:
+                self.on_simulation_complete()
+                print(f"[STOP] Callback completed successfully")
+            except Exception as e:
+                print(f"[STOP] ERROR in callback: {e}")
+                import traceback
+                traceback.print_exc()
         else:
-            print(f"[STOP] No on_simulation_complete callback set!")
+            print(f"[STOP] ❌ WARNING: No on_simulation_complete callback set!")
         
         for state in self.transition_states.values():
             state.enablement_time = None
