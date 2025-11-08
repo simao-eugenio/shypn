@@ -273,7 +273,12 @@ class DynamicAnalysesCategory(BaseReportCategory):
             controller: SimulationController instance
         """
         print(f"[SET_CONTROLLER] Setting controller: {controller}")
+        print(f"[SET_CONTROLLER] Controller ID: {id(controller) if controller else 'None'}")
         print(f"[SET_CONTROLLER] Controller has data_collector: {hasattr(controller, 'data_collector') if controller else False}")
+        
+        if controller and hasattr(controller, 'data_collector'):
+            print(f"[SET_CONTROLLER] data_collector: {controller.data_collector}")
+            print(f"[SET_CONTROLLER] data_collector ID: {id(controller.data_collector) if controller.data_collector else 'None'}")
         
         self.controller = controller
         
