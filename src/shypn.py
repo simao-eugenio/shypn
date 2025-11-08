@@ -590,158 +590,127 @@ def main(argv=None):
 			topology_panel_loader.add_to_stack(left_dock_stack, topology_panel_container, 'topology')
 		
 		# ====================================================================
-		# Create and Add Report Panel to stack
+		# Report Panel Container (will hold per-document panels)
 		# ====================================================================
-		report_panel_loader = None
+		# Multi-document: Use the existing UI container to switch between
+		# per-document Report Panel instances
 		try:
-			from shypn.helpers.report_panel_loader import ReportPanelLoader
-			report_panel_loader = ReportPanelLoader(project=None, model_canvas=model_canvas_loader)
-			report_panel_loader.load()
-			report_panel_loader.parent_window = window
+			# Store container reference for panel switching
+			# We use the report_panel_container from the UI file directly
+			model_canvas_loader.report_panel_container = report_panel_container
 			
-			# PHASE 1-2: Store report panel loader reference in model_canvas_loader
-			# This allows _ensure_simulation_reset() to wire controllers after model load/reset
-			model_canvas_loader.report_panel_loader = report_panel_loader
+			print("[REPORT_INIT] Report panel container ready for per-document panels")
 			
-			# Wire topology panel to report panel for analysis summary
-			# The loader has a .panel attribute which is the actual ReportPanel
-			if topology_panel_loader and hasattr(topology_panel_loader, 'panel'):
-				report_panel_loader.panel.set_topology_panel(topology_panel_loader.panel)
+		except Exception as e:
+			print(f"[REPORT_INIT] ❌ Error setting up report panel container: {e}")
+			import traceback
+			traceback.print_exc()
 			
-			# Wire dynamic analyses panel to report panel for real-time data
-			if right_panel_loader and hasattr(right_panel_loader, 'dynamic_analyses_panel'):
-				report_panel_loader.panel.set_dynamic_analyses_panel(right_panel_loader.dynamic_analyses_panel)
-			
-			# Wire pathway operations panel to report panel for pathway data
-			if pathway_panel_loader and hasattr(pathway_panel_loader, 'panel'):
-				report_panel_loader.panel.set_pathway_operations_panel(pathway_panel_loader.panel)
-			
-			# ===================================================================
-			# WIRE SIMULATION CONTROLLER TO REPORT PANEL (Phase 2 Integration)
-			# This enables automatic simulation results display in Dynamic Analyses
-			# ===================================================================
-			# Get controller from current (default) canvas
-			drawing_area = model_canvas_loader.get_current_document()
-			print(f"[STARTUP_WIRE] drawing_area = {drawing_area}")
-			if drawing_area:
-				controller = model_canvas_loader.get_canvas_controller(drawing_area)
-				print(f"[STARTUP_WIRE] controller = {controller}")
-				if controller:
-					print(f"[STARTUP_WIRE] Wiring controller to Report Panel at startup")
-					report_panel_loader.panel.set_controller(controller)
-					print(f"[STARTUP_WIRE] Report Panel wiring complete")
-					
-					# CRITICAL FIX: Also update palette's controller reference
-					# The palette creates its own controller at init, but we need it
-					# to use the canvas manager's controller (same one wired to Report Panel)
-					overlay_manager = model_canvas_loader.overlay_managers.get(drawing_area)
-					if overlay_manager:
-						swissknife = getattr(overlay_manager, 'swissknife_palette', None)
-						if swissknife and hasattr(swissknife, 'registry'):
-							simulate_palette = swissknife.registry.get_widget_palette_instance('simulate')
-							if simulate_palette:
-								print(f"[STARTUP_WIRE] Updating palette controller reference")
-								print(f"[STARTUP_WIRE] Old palette controller ID: {id(simulate_palette.simulation) if simulate_palette.simulation else 'None'}")
-								simulate_palette.simulation = controller
-								print(f"[STARTUP_WIRE] New palette controller ID: {id(controller)}")
-								# Re-register step listeners
-								if hasattr(simulate_palette, '_on_simulation_step'):
-									controller.add_step_listener(simulate_palette._on_simulation_step)
-								if hasattr(simulate_palette, 'data_collector'):
-									controller.add_step_listener(simulate_palette.data_collector.on_simulation_step)
-								print(f"[STARTUP_WIRE] Palette controller update complete")
-							else:
-								print(f"[STARTUP_WIRE] ⚠️  Simulate palette not found")
-					else:
-						print(f"[STARTUP_WIRE] ⚠️  Overlay manager not found")
-			else:
-				print(f"[STARTUP_WIRE] ⚠️  No drawing_area found at startup")
-			
-			report_panel_container.pack_start(report_panel_loader.panel, True, True, 0)
-			report_panel_loader.parent_container = report_panel_container
-			report_panel_loader.panel.show_all()
-			
-			# ===================================================================
-			# WIRE REPORT PANEL TO MODEL LIFECYCLE EVENTS
-			# This ensures Report automatically updates when model changes
-			# ===================================================================
-			
+		# ===================================================================
+		# WIRE REPORT PANEL TO MODEL LIFECYCLE EVENTS  
+		# Multi-document: Switch visible Report Panel when tab changes
+		# ===================================================================
+		try:
 			# Event 1: Tab Switching (user switches between models)
 			def on_canvas_tab_switched_report(notebook, page, page_num):
-				"""Notify report panel when user switches model tabs.
-				
-				Also updates the controller reference so simulation results from
-				the new tab's controller are displayed correctly.
-				"""
+				"""Switch to the appropriate per-document Report Panel when tab changes."""
 				print(f"\n[TAB_REPORT] ========================================")
 				print(f"[TAB_REPORT] Tab switched to page {page_num}")
 				
-				drawing_area = model_canvas_loader.get_current_document()
-				print(f"[TAB_REPORT] drawing_area: {drawing_area} (id={id(drawing_area) if drawing_area else 'None'})")
+				# CRITICAL: Extract drawing_area from the page widget hierarchy
+				# Page structure: Gtk.Overlay -> [ScrolledWindow, ...other widgets...]
+				#   ScrolledWindow -> Viewport -> DrawingArea
+				drawing_area = None
 				
-				if drawing_area and report_panel_loader.panel:
-					# First, wire up the new tab's controller to Report Panel
-					controller = model_canvas_loader.get_canvas_controller(drawing_area)
-					print(f"[TAB_REPORT] controller: {controller} (id={id(controller) if controller else 'None'})")
-					
-					if controller:
-						print(f"[TAB_REPORT] Controller has data_collector: {hasattr(controller, 'data_collector')}")
-						if hasattr(controller, 'data_collector') and controller.data_collector:
-							print(f"[TAB_REPORT] data_collector id: {id(controller.data_collector)}")
-							print(f"[TAB_REPORT] data_collector has_data: {controller.data_collector.has_data()}")
+				if page and hasattr(page, 'get_children'):
+					# page is Gtk.Overlay, first child is ScrolledWindow
+					children = page.get_children()
+					if children and len(children) > 0:
+						scrolled_window = children[0]
+						print(f"[TAB_REPORT] Found ScrolledWindow: {type(scrolled_window)}")
 						
-						report_panel_loader.panel.set_controller(controller)
-						print(f"[TAB_REPORT] set_controller completed")
+						# Navigate: ScrolledWindow -> Viewport -> DrawingArea
+						if hasattr(scrolled_window, 'get_child'):
+							viewport = scrolled_window.get_child()
+							print(f"[TAB_REPORT] Found Viewport: {type(viewport)}")
+							
+							if viewport and hasattr(viewport, 'get_child'):
+								drawing_area = viewport.get_child()
+								print(f"[TAB_REPORT] ✅ Found DrawingArea: {type(drawing_area)}, id={id(drawing_area)}")
+				
+				if not drawing_area:
+					print(f"[TAB_REPORT] ⚠️  Could not extract drawing_area from page widget hierarchy")
+					print(f"[TAB_REPORT] ========================================\n")
+					return
+				
+				if hasattr(model_canvas_loader, 'report_panel_container'):
+					# Get this document's Report Panel using the correct drawing_area
+					overlay_manager = model_canvas_loader.overlay_managers.get(drawing_area)
+					print(f"[TAB_REPORT] overlay_manager lookup result: {overlay_manager is not None}")
 					
-					# Then notify about tab switch (this will refresh with the new controller)
-					report_panel_loader.panel.on_tab_switched(drawing_area)
-					print(f"[TAB_REPORT] on_tab_switched completed")
+					if overlay_manager and hasattr(overlay_manager, 'report_panel_loader'):
+						# Clear container
+						for child in model_canvas_loader.report_panel_container.get_children():
+							model_canvas_loader.report_panel_container.remove(child)
+						
+						# Show this document's panel
+						report_loader = overlay_manager.report_panel_loader
+						if report_loader and report_loader.panel:
+							model_canvas_loader.report_panel_container.pack_start(report_loader.panel, True, True, 0)
+							report_loader.panel.show_all()
+							print(f"[TAB_REPORT] ✅ SUCCESS! Switched to CORRECT document's Report Panel")
+							print(f"[TAB_REPORT]    drawing_area id: {id(drawing_area)}")
+							print(f"[TAB_REPORT]    report_loader id: {id(report_loader)}")
+						else:
+							print(f"[TAB_REPORT] ⚠️  No report panel for this document")
+					else:
+						print(f"[TAB_REPORT] ⚠️  No report panel loader in overlay_manager for drawing_area {id(drawing_area)}")
+						print(f"[TAB_REPORT]    Available drawing_areas in overlay_managers: {[id(da) for da in model_canvas_loader.overlay_managers.keys()]}")
 				
 				print(f"[TAB_REPORT] ========================================\n")
 			
 			if model_canvas_loader.notebook:
 				model_canvas_loader.notebook.connect('switch-page', on_canvas_tab_switched_report)
 			
-			# Event 2: File Open (user opens a .shy file)
-			if file_explorer:
-				original_on_file_open_report = file_explorer.on_file_open_requested
-				
-				def on_file_open_with_report_notify(filepath):
-					"""Notify report panel after file opens."""
-					if original_on_file_open_report:
-						original_on_file_open_report(filepath)
-					if report_panel_loader.panel:
-						report_panel_loader.panel.on_file_opened(filepath)
-				
-				file_explorer.on_file_open_requested = on_file_open_with_report_notify
-			
-			# Event 3: File New (user creates new model)
-			# Wire to menu action if available
-			if hasattr(menu_actions, 'on_file_new'):
-				original_file_new = menu_actions.on_file_new
-				
-				def on_file_new_with_report_notify(action, param):
-					"""Notify report panel after new file is created."""
-					result = original_file_new(action, param)
-					if report_panel_loader.panel:
-						report_panel_loader.panel.on_file_new()
-						# IMPORTANT: Wire up the new controller for the new model
-						drawing_area = model_canvas_loader.get_current_document()
-						if drawing_area:
-							controller = model_canvas_loader.get_canvas_controller(drawing_area)
-							if controller:
-								print("[REPORT_WIRE] Wiring controller after File→New")
-								report_panel_loader.panel.set_controller(controller)
-					return result
-				
-				menu_actions.on_file_new = on_file_new_with_report_notify
-			
-			# Note: Events 4-6 (Project Open, KEGG/SBML imports, BRENDA enrichments)
-			# Project Open: Will be wired when project manager is implemented
-			# KEGG/SBML imports: Already wired via PathwayOperationsPanel.set_report_refresh_callback()
+			print("[REPORT_INIT] Report panel switching wired to tab changes")
 			
 		except Exception as e:
-			print(f"[SHYPN ERROR] Failed to load Report Panel: {e}", file=sys.stderr)
+			print(f"[REPORT_INIT] ❌ Error wiring report panel: {e}")
+			import traceback
+			traceback.print_exc()
+		
+		# Note: report_panel_container is already in the UI stack, no need to add it again
+		
+		# ====================================================================
+		# Show initial document's Report Panel
+		# ====================================================================
+		try:
+			drawing_area = model_canvas_loader.get_current_document()
+			if drawing_area:
+				overlay_manager = model_canvas_loader.overlay_managers.get(drawing_area)
+				if overlay_manager and hasattr(overlay_manager, 'report_panel_loader'):
+					report_loader = overlay_manager.report_panel_loader
+					if report_loader and report_loader.panel:
+						model_canvas_loader.report_panel_container.pack_start(report_loader.panel, True, True, 0)
+						report_loader.panel.show_all()
+						print(f"[REPORT_INIT] Initial Report Panel shown for drawing_area {id(drawing_area)}")
+		except Exception as e:
+			print(f"[REPORT_INIT] ❌ Error showing initial panel: {e}")
+			import traceback
+			traceback.print_exc()
+			
+		# ===================================================================
+		# Legacy event handlers (kept for compatibility, may need updating)
+		# ===================================================================
+		try:
+			# Event 2: File Open (user opens a .shy file)
+			# Note: May need updating to work with per-document panels
+			pass
+			# Event 3: File New (user creates new model)
+			# Note: New models will get their Report Panel created automatically in model_canvas_loader
+			
+		except Exception as e:
+			print(f"[REPORT_INIT] ❌ Error in legacy handlers: {e}")
 			import traceback
 			traceback.print_exc()
 
