@@ -1219,12 +1219,21 @@ class ModelCanvasLoader:
         # Each document gets its own Report Panel instance to maintain independent state
         if not hasattr(self.overlay_managers[drawing_area], 'report_panel_loader'):
             from shypn.helpers.report_panel_loader import ReportPanelLoader
-            report_panel_loader = ReportPanelLoader(project=None, model_canvas=self)
+            
+            # Pass the ModelCanvasLoader (self) so Report Panel can access get_current_model()
+            report_panel_loader = ReportPanelLoader(project=None, model_canvas_loader=self)
             report_panel_loader.load()
             
             # Wire controller to this document's Report Panel
             if hasattr(report_panel_loader, 'panel') and report_panel_loader.panel:
                 report_panel_loader.panel.set_controller(simulation_controller)
+                
+                # CRITICAL: Set the actual model manager for ModelsCategory
+                # Get the model manager for this specific drawing_area
+                model_manager = self.overlay_managers[drawing_area].canvas_manager
+                if model_manager:
+                    report_panel_loader.panel.set_model_canvas(model_manager)
+                    print(f"[MODEL_CANVAS_LOADER] Set model_manager for Report Panel: {len(model_manager.places)} places, {len(model_manager.transitions)} transitions")
             
             self.overlay_managers[drawing_area].report_panel_loader = report_panel_loader
             print(f"[MODEL_CANVAS_LOADER] Created per-document Report Panel for drawing_area {id(drawing_area)}")

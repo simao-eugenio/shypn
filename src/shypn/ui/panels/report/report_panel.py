@@ -315,65 +315,57 @@ class ReportPanel(Gtk.Box):
         for category in self.categories:
             category.set_project(project)
     
-    def set_model_canvas(self, model_canvas):
-        """Set model canvas for all categories.
+    def set_model_canvas(self, model_manager):
+        """Set model manager for all categories.
         
-        Auto-refreshes to immediately show imported data (green cells).
-        Report displays raw imported data without requiring manual refresh.
+        This is called with the actual ModelCanvasManager (has places, transitions, arcs).
+        Auto-refreshes to immediately show model data.
         
         Args:
-            model_canvas: ModelCanvasLoader instance
+            model_manager: ModelCanvasManager instance with model data
         """
-        self.model_canvas = model_canvas
+        print(f"[REPORT] set_model_canvas called with: {model_manager}")
         
-        # Get the current model manager (ModelCanvasManager with places/transitions)
-        current_manager = None
-        if self.model_canvas_loader and hasattr(self.model_canvas_loader, 'get_current_model'):
-            current_manager = self.model_canvas_loader.get_current_model()
-            print(f"[REPORT] set_model_canvas: Got current_manager: {current_manager}")
-            if current_manager:
-                print(f"[REPORT] Manager has {len(current_manager.places)} places, {len(current_manager.transitions)} transitions")
-        else:
-            print(f"[REPORT] set_model_canvas: No model_canvas_loader! self.model_canvas_loader={self.model_canvas_loader}")
+        if model_manager:
+            print(f"[REPORT] Model manager has {len(model_manager.places)} places, {len(model_manager.transitions)} transitions")
         
-        # Pass the manager (not the loader) to categories
+        # Pass the manager directly to all categories
         for category in self.categories:
-            category.set_model_canvas(current_manager)
+            if hasattr(category, 'set_model_canvas'):
+                category.set_model_canvas(model_manager)
+                print(f"[REPORT] Set model_manager for {category.__class__.__name__}")
         
         # Wire up observer for property changes (real-time refresh)
-        self._setup_model_observer()
+        self._setup_model_observer(model_manager)
         
         # Auto-refresh to show imported data immediately
-        # This displays green-colored raw data (KEGG/SBML imports)
-        # Enrich button will ADD blue-colored BRENDA data later
-        if current_manager and hasattr(current_manager, 'transitions'):
-            if len(current_manager.transitions) > 0 or len(current_manager.places) > 0:
-                print(f"[REPORT] Auto-refreshing to show {len(current_manager.places)} places and {len(current_manager.transitions)} transitions")
+        if model_manager and hasattr(model_manager, 'transitions'):
+            if len(model_manager.transitions) > 0 or len(model_manager.places) > 0:
+                print(f"[REPORT] Auto-refreshing to show {len(model_manager.places)} places and {len(model_manager.transitions)} transitions")
                 self.refresh_all()
             else:
                 print(f"[REPORT] Skipping auto-refresh - model is empty")
         else:
-            print(f"[REPORT] Skipping auto-refresh - no current_manager or no transitions attribute")
+            print(f"[REPORT] Skipping auto-refresh - no model_manager or no transitions attribute")
     
-    def _setup_model_observer(self):
+    def _setup_model_observer(self, model_manager):
         """Setup observer for model changes to enable real-time refresh.
         
         Hooks into the mark_dirty callback from ModelCanvasManager.
         When properties are edited (via property dialogs), document is marked dirty
         and report automatically refreshes to show updated data.
-        """
-        if not self.model_canvas_loader:
-            return
         
-        current_manager = self.model_canvas_loader.get_current_model()
-        if not current_manager:
+        Args:
+            model_manager: ModelCanvasManager instance
+        """
+        if not model_manager:
             return
         
         # Hook into on_dirty_changed callback
         # This is triggered whenever document is modified (via property dialogs, etc.)
-        if hasattr(current_manager, 'on_dirty_changed'):
+        if hasattr(model_manager, 'on_dirty_changed'):
             # Store original callback
-            original_callback = current_manager.on_dirty_changed
+            original_callback = model_manager.on_dirty_changed
             
             # Create wrapper that also refreshes report
             def on_dirty_with_refresh(is_dirty):
@@ -387,7 +379,7 @@ class ReportPanel(Gtk.Box):
                     self.refresh_all()
             
             # Install our wrapped callback
-            current_manager.on_dirty_changed = on_dirty_with_refresh
+            model_manager.on_dirty_changed = on_dirty_with_refresh
     
     def set_topology_panel(self, topology_panel):
         """Set topology panel reference for fetching analysis data.

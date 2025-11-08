@@ -21,15 +21,15 @@ from shypn.ui.panels.report import ReportPanel
 class ReportPanelLoader:
     """Loader for Report panel with float/detach support."""
     
-    def __init__(self, project=None, model_canvas=None):
+    def __init__(self, project=None, model_canvas_loader=None):
         """Initialize the report panel loader.
         
         Args:
             project: Optional Project instance
-            model_canvas: Optional ModelCanvasManager
+            model_canvas_loader: Optional ModelCanvasLoader (for accessing get_current_model())
         """
         self.project = project
-        self.model_canvas = model_canvas
+        self.model_canvas_loader = model_canvas_loader
         self.logger = logging.getLogger(self.__class__.__name__)
         
         # State management
@@ -52,10 +52,10 @@ class ReportPanelLoader:
         Returns:
             Gtk.Window: The report panel window (used for floating).
         """
-        # Create the panel
+        # Create the panel with the model_canvas_loader reference
         self.panel = ReportPanel(
             project=self.project,
-            model_canvas=self.model_canvas
+            model_canvas=self.model_canvas_loader  # Pass loader, not manager
         )
         
         # Set up window for floating
@@ -227,18 +227,18 @@ class ReportPanelLoader:
         
         self.logger.info(f"Project set: {project.name if project else None}")
     
-    def set_model_canvas(self, model_canvas):
-        """Set or update the model canvas.
+    def set_model_canvas(self, model_manager):
+        """Set or update the model canvas manager (the actual model with places/transitions).
+        
+        This is called when the active model changes (e.g., tab switching).
         
         Args:
-            model_canvas: ModelCanvasManager instance
+            model_manager: ModelCanvasManager instance (has places, transitions, arcs)
         """
-        self.model_canvas = model_canvas
-        
         if self.panel and hasattr(self.panel, 'set_model_canvas'):
-            self.panel.set_model_canvas(model_canvas)
+            self.panel.set_model_canvas(model_manager)
         
-        self.logger.info("Model canvas updated")
+        self.logger.info("Model manager updated for Report Panel")
     
     def cleanup(self):
         """Clean up resources."""
@@ -248,16 +248,16 @@ class ReportPanelLoader:
             self.panel.cleanup()
 
 
-def create_report_panel(project=None, model_canvas=None):
+def create_report_panel(project=None, model_canvas_loader=None):
     """Convenience function to create and load the report panel.
     
     Args:
         project: Optional Project instance
-        model_canvas: Optional ModelCanvasManager
+        model_canvas_loader: Optional ModelCanvasLoader
         
     Returns:
         ReportPanelLoader: The loaded report panel loader instance.
     """
-    loader = ReportPanelLoader(project, model_canvas)
+    loader = ReportPanelLoader(project, model_canvas_loader)
     loader.load()
     return loader

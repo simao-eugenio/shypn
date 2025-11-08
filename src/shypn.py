@@ -656,6 +656,12 @@ def main(argv=None):
 						# Show this document's panel
 						report_loader = overlay_manager.report_panel_loader
 						if report_loader and report_loader.panel:
+							# Update the panel with this document's model
+							if hasattr(overlay_manager, 'canvas_manager'):
+								model_manager = overlay_manager.canvas_manager
+								report_loader.set_model_canvas(model_manager)
+								print(f"[TAB_REPORT] Updated Report Panel with model: {len(model_manager.places)} places, {len(model_manager.transitions)} transitions")
+							
 							model_canvas_loader.report_panel_container.pack_start(report_loader.panel, True, True, 0)
 							report_loader.panel.show_all()
 							print(f"[TAB_REPORT] ✅ SUCCESS! Switched to CORRECT document's Report Panel")
