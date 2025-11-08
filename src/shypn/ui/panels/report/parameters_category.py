@@ -280,8 +280,19 @@ class DynamicAnalysesCategory(BaseReportCategory):
             
     def _refresh_simulation_data(self):
         """Refresh simulation data tables."""
-        if not self.controller or not self.controller.data_collector:
-            # No simulation data available
+        print("[DEBUG_TABLES] _refresh_simulation_data called")
+        
+        if not self.controller:
+            print("[DEBUG_TABLES] ❌ No controller")
+            self.simulation_status_label.set_markup(
+                "<i>No simulation data available. Run a simulation to see results.</i>"
+            )
+            self.species_table.clear()
+            self.reaction_table.clear()
+            return
+            
+        if not self.controller.data_collector:
+            print("[DEBUG_TABLES] ❌ No data_collector")
             self.simulation_status_label.set_markup(
                 "<i>No simulation data available. Run a simulation to see results.</i>"
             )
@@ -290,9 +301,14 @@ class DynamicAnalysesCategory(BaseReportCategory):
             return
             
         data_collector = self.controller.data_collector
+        print(f"[DEBUG_TABLES] data_collector = {data_collector}")
         
         # Check if we have collected data
-        if not data_collector.has_data():
+        has_data = data_collector.has_data()
+        print(f"[DEBUG_TABLES] has_data() = {has_data}")
+        
+        if not has_data:
+            print("[DEBUG_TABLES] ❌ No data collected")
             self.simulation_status_label.set_markup(
                 "<i>No simulation data available. Run a simulation to see results.</i>"
             )
@@ -302,18 +318,25 @@ class DynamicAnalysesCategory(BaseReportCategory):
         
         # Get duration
         duration = self.controller.settings.duration or 0.0
+        print(f"[DEBUG_TABLES] duration = {duration}")
         
         # Analyze species
         from shypn.engine.simulation.analysis import SpeciesAnalyzer, ReactionAnalyzer
         
+        print("[DEBUG_TABLES] Analyzing species...")
         species_analyzer = SpeciesAnalyzer(data_collector)
         species_metrics = species_analyzer.analyze_all_species(duration)
+        print(f"[DEBUG_TABLES] Got {len(species_metrics)} species metrics")
         self.species_table.populate(species_metrics)
+        print("[DEBUG_TABLES] Species table populated")
         
         # Analyze reactions
+        print("[DEBUG_TABLES] Analyzing reactions...")
         reaction_analyzer = ReactionAnalyzer(data_collector)
         reaction_metrics = reaction_analyzer.analyze_all_reactions(duration)
+        print(f"[DEBUG_TABLES] Got {len(reaction_metrics)} reaction metrics")
         self.reaction_table.populate(reaction_metrics)
+        print("[DEBUG_TABLES] Reaction table populated")
         
         # Update status
         num_species = len(species_metrics)
