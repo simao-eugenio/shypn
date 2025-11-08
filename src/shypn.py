@@ -622,10 +622,16 @@ def main(argv=None):
 			# ===================================================================
 			# Get controller from current (default) canvas
 			drawing_area = model_canvas_loader.get_current_document()
+			print(f"[STARTUP_WIRE] drawing_area = {drawing_area}")
 			if drawing_area:
 				controller = model_canvas_loader.get_canvas_controller(drawing_area)
+				print(f"[STARTUP_WIRE] controller = {controller}")
 				if controller:
+					print(f"[STARTUP_WIRE] Wiring controller to Report Panel at startup")
 					report_panel_loader.panel.set_controller(controller)
+					print(f"[STARTUP_WIRE] Wiring complete")
+			else:
+				print(f"[STARTUP_WIRE] ⚠️  No drawing_area found at startup")
 			
 			report_panel_container.pack_start(report_panel_loader.panel, True, True, 0)
 			report_panel_loader.parent_container = report_panel_container
