@@ -323,32 +323,16 @@ class DynamicAnalysesCategory(BaseReportCategory):
         Args:
             controller: SimulationController instance
         """
-        print(f"[REPORT_CATEGORY] set_controller() called")
-        print(f"[REPORT_CATEGORY]   controller={controller} (id={id(controller) if controller else 'None'})")
-        print(f"[REPORT_CATEGORY]   has data_collector: {hasattr(controller, 'data_collector') if controller else False}")
-        if controller and hasattr(controller, 'data_collector'):
-            print(f"[REPORT_CATEGORY]   data_collector={controller.data_collector}")
-        
         self.controller = controller
         
         # Register callback for simulation complete
         if controller:
-            print(f"[REPORT_CATEGORY] Registering on_simulation_complete callback")
             controller.on_simulation_complete = lambda: self._refresh_simulation_data()
-        else:
-            print(f"[REPORT_CATEGORY] WARNING: Controller is None, cannot register callback")
             
     def _refresh_simulation_data(self):
         """Refresh simulation data tables."""
-        print(f"[REPORT] ========================================")
-        print(f"[REPORT] _refresh_simulation_data called")
-        print(f"[REPORT] self.controller = {self.controller}")
-        print(f"[REPORT] Controller ID: {id(self.controller) if self.controller else 'None'}")
-        
         if not self.controller or not self.controller.data_collector:
             # No simulation data available
-            print(f"[REPORT] No controller or data collector!")
-            print(f"[REPORT] ========================================")
             self.simulation_status_label.set_markup(
                 "<i>No simulation data available. Run a simulation to see results.</i>"
             )
@@ -357,60 +341,37 @@ class DynamicAnalysesCategory(BaseReportCategory):
             return
             
         data_collector = self.controller.data_collector
-        print(f"[REPORT] data_collector = {data_collector}")
-        print(f"[REPORT] data_collector ID: {id(data_collector)}")
-        print(f"[REPORT] has_data() = {data_collector.has_data()}")
         
         # Check if we have collected data
         if not data_collector.has_data():
-            print(f"[REPORT] No data collected yet")
-            print(f"[REPORT] ========================================")
             self.simulation_status_label.set_markup(
                 "<i>No simulation data available. Run a simulation to see results.</i>"
             )
             self.species_table.clear()
             self.reaction_table.clear()
             return
-            
-        print(f"[REPORT] ✅ Data available! Time points: {len(data_collector.time_points)}")
-        print(f"[REPORT] Starting analysis...")
         
         # Get duration
         duration = self.controller.settings.duration or 0.0
-        print(f"[REPORT] Duration: {duration}")
         
         # Analyze species
         from shypn.engine.simulation.analysis import SpeciesAnalyzer, ReactionAnalyzer
         
-        print(f"[REPORT] Creating SpeciesAnalyzer...")
         species_analyzer = SpeciesAnalyzer(data_collector)
-        print(f"[REPORT] Analyzing species...")
         species_metrics = species_analyzer.analyze_all_species(duration)
-        print(f"[REPORT] Got {len(species_metrics)} species metrics")
-        print(f"[REPORT] Populating species table...")
         self.species_table.populate(species_metrics)
-        print(f"[REPORT] Species table populated")
         
         # Analyze reactions
-        print(f"[REPORT] Creating ReactionAnalyzer...")
         reaction_analyzer = ReactionAnalyzer(data_collector)
-        print(f"[REPORT] Analyzing reactions...")
         reaction_metrics = reaction_analyzer.analyze_all_reactions(duration)
-        print(f"[REPORT] Got {len(reaction_metrics)} reaction metrics")
-        print(f"[REPORT] Populating reaction table...")
         self.reaction_table.populate(reaction_metrics)
-        print(f"[REPORT] Reaction table populated")
         
         # Update status
         num_species = len(species_metrics)
         num_reactions = len(reaction_metrics)
         num_time_points = len(data_collector.time_points)
         
-        status_text = (
+        self.simulation_status_label.set_markup(
             f"<i>Analyzed {num_species} species and {num_reactions} reactions "
             f"over {num_time_points} time points (duration: {duration:.2f}s)</i>"
         )
-        print(f"[REPORT] Setting status: {status_text}")
-        self.simulation_status_label.set_markup(status_text)
-        print(f"[REPORT] ✅ _refresh_simulation_data completed successfully")
-        print(f"[REPORT] ========================================")

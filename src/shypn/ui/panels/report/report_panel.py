@@ -475,18 +475,13 @@ class ReportPanel(Gtk.Box):
         Args:
             controller: SimulationController instance
         """
-        print(f"[REPORT_PANEL] set_controller() called with controller={controller} (id={id(controller) if controller else 'None'})")
         self.controller = controller
         
         # Update dynamic analyses category with controller reference
         for category in self.categories:
             if isinstance(category, DynamicAnalysesCategory):
-                print(f"[REPORT_PANEL] Found DynamicAnalysesCategory, setting controller...")
                 category.set_controller(controller)
-                print(f"[REPORT_PANEL] Controller set on DynamicAnalysesCategory")
                 break
-        else:
-            print(f"[REPORT_PANEL] WARNING: No DynamicAnalysesCategory found in {len(self.categories)} categories")
     
     def on_file_opened(self, filepath):
         """Called when a file is opened (File → Open or double-click).
