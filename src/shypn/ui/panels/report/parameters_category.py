@@ -272,11 +272,16 @@ class DynamicAnalysesCategory(BaseReportCategory):
         Args:
             controller: SimulationController instance
         """
+        print(f"[SET_CONTROLLER] Setting controller: {controller}")
+        print(f"[SET_CONTROLLER] Controller has data_collector: {hasattr(controller, 'data_collector') if controller else False}")
+        
         self.controller = controller
         
         # Register callback for simulation complete
         if controller:
+            print(f"[SET_CONTROLLER] Registering on_simulation_complete callback")
             controller.on_simulation_complete = lambda: self._refresh_simulation_data()
+            print(f"[SET_CONTROLLER] Callback registered successfully")
             
     def _refresh_simulation_data(self):
         """Refresh simulation data tables."""
