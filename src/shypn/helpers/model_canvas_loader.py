@@ -1169,12 +1169,23 @@ class ModelCanvasLoader:
         # ============================================================
         # When a new controller is created (File→New, interactive model, etc.),
         # automatically wire it to the Report Panel so simulation data appears
+        print(f"[CONTROLLER_WIRE] Controller created for canvas")
+        print(f"[CONTROLLER_WIRE] Has report_panel_loader: {hasattr(self, 'report_panel_loader')}")
+        if hasattr(self, 'report_panel_loader'):
+            print(f"[CONTROLLER_WIRE] report_panel_loader = {self.report_panel_loader}")
+            if self.report_panel_loader and hasattr(self.report_panel_loader, 'panel'):
+                print(f"[CONTROLLER_WIRE] report_panel_loader.panel = {self.report_panel_loader.panel}")
+                
         if hasattr(self, 'report_panel_loader') and self.report_panel_loader:
             try:
                 print(f"[CONTROLLER_WIRE] Wiring new controller to Report Panel")
                 self.report_panel_loader.panel.set_controller(simulation_controller)
             except Exception as e:
                 print(f"[CONTROLLER_WIRE] Failed to wire controller: {e}")
+                import traceback
+                traceback.print_exc()
+        else:
+            print(f"[CONTROLLER_WIRE] ⚠️  report_panel_loader not available yet (will wire later)")
         
         # ============================================================
         # GLOBAL-SYNC: Integrate with canvas lifecycle system
