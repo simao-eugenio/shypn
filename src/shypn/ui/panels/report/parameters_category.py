@@ -344,6 +344,17 @@ class DynamicAnalysesCategory(BaseReportCategory):
         print(f"[DEBUG_TABLES] duration (actual simulation time) = {duration}")
         print(f"[DEBUG_TABLES] settings.duration (target) = {self.controller.settings.duration}")
         
+        # Update Summary section with simulation metadata
+        print("[DEBUG_TABLES] About to call _update_summary...")
+        try:
+            self._update_summary(duration, data_collector)
+            print("[DEBUG_TABLES] _update_summary completed successfully")
+        except Exception as e:
+            print(f"[DEBUG_TABLES] ⚠️  Error updating summary: {e}")
+            import traceback
+            traceback.print_exc()
+        print("[DEBUG_TABLES] After _update_summary call")
+        
         # Show first few data points for debugging
         if len(data_collector.time_points) > 0:
             print(f"[DEBUG_TABLES] First 5 time points: {data_collector.time_points[:5]}")
@@ -419,3 +430,110 @@ class DynamicAnalysesCategory(BaseReportCategory):
             f"<i>Analyzed {num_species} species and {num_reactions} reactions "
             f"over {num_time_points} time points (duration: {duration:.2f}s)</i>"
         )
+    
+    def _update_summary(self, duration: float, data_collector):
+        """Update Summary section with simulation metadata.
+        
+        Args:
+            duration: Actual simulation duration in seconds
+            data_collector: DataCollector instance with simulation data
+        """
+        try:
+            from datetime import datetime
+            
+            print("[SUMMARY] Starting summary update...")
+            
+            # Get simulation timestamp
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            print(f"[SUMMARY] Timestamp: {timestamp}")
+            
+            # Get model info
+            model = self.controller.model if self.controller else None
+            print(f"[SUMMARY] Model: {model}")
+            
+            model_name = "Unknown"
+            num_places = 0
+            num_transitions = 0
+            
+            if model:
+                model_name = getattr(model, 'name', getattr(model, 'id', 'Untitled Model'))
+                print(f"[SUMMARY] Model name: {model_name}")
+                
+                num_places = len(getattr(model, 'places', []))
+                num_transitions = len(getattr(model, 'transitions', []))
+                print(f"[SUMMARY] Network size: {num_places} places, {num_transitions} transitions")
+            
+            # Get simulation settings
+            settings = self.controller.settings if self.controller else None
+            print(f"[SUMMARY] Settings: {settings}")
+            
+            time_step = getattr(settings, 'time_step', 0.0) if settings else 0.0
+            target_duration = getattr(settings, 'duration', None) if settings else None
+            time_scale = getattr(settings, 'time_scale', 1.0) if settings else 1.0
+            
+            # Format target duration string (handle None case)
+            if target_duration is None:
+                target_duration_str = "Not set"
+            else:
+                target_duration_str = f"{target_duration:.2f} s"
+            
+            print(f"[SUMMARY] Parameters: dt={time_step}, target={target_duration}, scale={time_scale}")
+            
+            # Get data statistics
+            num_time_points = len(data_collector.time_points)
+            total_steps = num_time_points - 1 if num_time_points > 0 else 0
+            print(f"[SUMMARY] Data points: {num_time_points}, steps: {total_steps}")
+            
+            # Calculate total firings
+            total_firings = 0
+            for firing_series in data_collector.transition_data.values():
+                if firing_series:
+                    total_firings += firing_series[-1]
+            print(f"[SUMMARY] Total firings: {total_firings}")
+            
+            # Build summary text
+            if duration > 0:
+                avg_rate = total_firings / duration
+                summary_text = f"""<b>Simulation Summary</b>
+
+<b>Date/Time:</b> {timestamp}
+<b>Model:</b> {model_name}
+<b>Network Size:</b> {num_places} places, {num_transitions} transitions
+
+<b>Simulation Parameters:</b>
+  • Time Step (dt): {time_step:.4f} s
+  • Target Duration: {target_duration_str}
+  • Actual Duration: {duration:.2f} s
+  • Time Scale: {time_scale:.1f}x
+  • Total Steps: {total_steps}
+  
+<b>Activity Summary:</b>
+  • Time Points Recorded: {num_time_points}
+  • Total Transition Firings: {total_firings}
+  • Average Firing Rate: {avg_rate:.2f} firings/s"""
+            else:
+                summary_text = f"""<b>Simulation Summary</b>
+
+<b>Date/Time:</b> {timestamp}
+<b>Model:</b> {model_name}
+<b>Network Size:</b> {num_places} places, {num_transitions} transitions
+
+<b>Simulation Parameters:</b>
+  • Time Step (dt): {time_step:.4f} s
+  • Target Duration: {target_duration_str}
+  • Total Steps: {total_steps}
+  
+<b>Activity Summary:</b>
+  • Time Points Recorded: {num_time_points}
+  • Total Transition Firings: {total_firings}"""
+            
+            print("[SUMMARY] Setting markup...")
+            self.summary_label.set_markup(summary_text)
+            print("[SUMMARY] Summary updated successfully")
+            
+        except Exception as e:
+            # If summary update fails, don't block table population
+            print(f"[SUMMARY] Error updating summary: {e}")
+            import traceback
+            traceback.print_exc()
+            self.summary_label.set_markup("<i>Error generating summary</i>")
