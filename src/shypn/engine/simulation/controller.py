@@ -147,7 +147,8 @@ class SimulationController:
         self.data_collector = DataCollector(model)
         
         # Callback for simulation complete event
-        self.on_simulation_complete = None
+        # Use private attribute with property to trace all assignments
+        self._on_simulation_complete = None
         
         # Timing configuration (composition pattern)
         from shypn.engine.simulation.settings import SimulationSettings
@@ -169,6 +170,32 @@ class SimulationController:
         # Register to observe model changes (for arc transformations, deletions, etc.)
         if hasattr(model, 'register_observer'):
             model.register_observer(self._on_model_changed)
+    
+    @property
+    def on_simulation_complete(self):
+        """Callback invoked when simulation completes."""
+        return self._on_simulation_complete
+    
+    @on_simulation_complete.setter
+    def on_simulation_complete(self, value):
+        """Set callback with debug logging to trace all assignments."""
+        import traceback
+        import sys
+        
+        # Log the assignment
+        if value is None:
+            print(f"[CALLBACK_TRACE] ⚠️  on_simulation_complete set to None (was: {self._on_simulation_complete is not None})")
+        else:
+            print(f"[CALLBACK_TRACE] ✅ on_simulation_complete set to {value}")
+        
+        # Print stack trace to see WHO is setting it
+        print(f"[CALLBACK_TRACE] Stack trace:")
+        for line in traceback.format_stack()[:-1]:  # Exclude this setter call
+            # Only print relevant lines (skip standard library noise)
+            if '/shypn/' in line and 'traceback' not in line.lower():
+                print(f"[CALLBACK_TRACE]   {line.strip()}")
+        
+        self._on_simulation_complete = value
 
     def _on_model_changed(self, event_type: str, obj, old_value=None, new_value=None):
         """Handle model change notifications.
