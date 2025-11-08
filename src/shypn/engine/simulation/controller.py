@@ -660,6 +660,10 @@ class SimulationController:
             success, details = behavior.integrate_step(dt=time_step, input_arcs=input_arcs, output_arcs=output_arcs)
             if success:
                 continuous_active += 1
+                
+                # Increment firing count for continuous transitions (for statistics/tables)
+                transition.firing_count += 1
+                
                 if self.data_collector is not None and hasattr(self.data_collector, 'on_transition_fired'):
                     self.data_collector.on_transition_fired(transition, self.time, details)
                 
@@ -726,6 +730,7 @@ class SimulationController:
         
         # Check if simulation is complete (duration reached)
         if self.is_simulation_complete():
+            print(f"[SIMULATION] Duration reached: time={self.time}, duration={self.settings.duration}")
             return False  # Simulation complete
         
         if immediate_fired_total > 0 or window_crossing_fired > 0 or discrete_fired or continuous_active > 0:
@@ -1722,8 +1727,32 @@ class SimulationController:
             # Execute one simulation step
             success = self.step(self._time_step)
             if not success:
+                # Simulation completed (duration reached)
+                print(f"[SIMULATION] Simulation completed naturally at time={self.time}")
                 self._running = False
                 self._timeout_id = None
+                
+                # Stop data collection
+                if self.data_collector:
+                    self.data_collector.stop_collection()
+                    print(f"[DEBUG_STOP] Data collector stopped. has_data() = {self.data_collector.has_data()}")
+                
+                # Show final token distribution
+                print(f"[SIMULATION] Final token distribution:")
+                for place in self.model.places:
+                    print(f"[SIMULATION]   {place.id}: {place.tokens} tokens")
+                
+                # Notify completion callback
+                if self.on_simulation_complete:
+                    print(f"[DEBUG_STOP] Calling on_simulation_complete callback...")
+                    try:
+                        self.on_simulation_complete()
+                        print(f"[DEBUG_STOP] Callback completed successfully")
+                    except Exception as e:
+                        print(f"[ERROR] Exception in on_simulation_complete callback: {e}")
+                        import traceback
+                        traceback.print_exc()
+                
                 return False
             self._steps_executed += 1
             
@@ -1746,6 +1775,13 @@ class SimulationController:
             return
         self._stop_requested = True
         
+        print(f"[SIMULATION] Stop requested by user at time={self.time}")
+        
+        # Show final token distribution
+        print(f"[SIMULATION] Final token distribution:")
+        for place in self.model.places:
+            print(f"[SIMULATION]   {place.id}: {place.tokens} tokens")
+        
         # Stop data collection
         if self.data_collector:
             self.data_collector.stop_collection()
@@ -1753,6 +1789,7 @@ class SimulationController:
         
         # Notify completion callback
         print(f"[DEBUG_STOP] Controller ID: {id(self)}")
+        print(f"[DEBUG_STOP] self.time = {self.time}")  # DEBUG: Show time before callback
         print(f"[DEBUG_STOP] Callback value: {self.on_simulation_complete}")
         print(f"[DEBUG_STOP] Private attr: {self._on_simulation_complete}")
         

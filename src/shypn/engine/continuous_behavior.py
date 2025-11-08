@@ -236,6 +236,9 @@ class ContinuousBehavior(TransitionBehavior):
             # Default threshold is 0.0 (strict zero check)
             # Can be set higher (e.g., 1e-6) to prevent numerical precision issues
             if source_place.tokens <= self.min_token_threshold:
+                # Debug: Show when transitions become disabled due to token depletion
+                if source_place.tokens > 0 and source_place.tokens < 1e-6:
+                    print(f"[CONTINUOUS] Transition disabled: {arc.source_id} has {source_place.tokens:.10f} tokens (below threshold {self.min_token_threshold})")
                 return False, f"input-place-below-threshold-P{arc.source_id}"
         
         return True, "enabled-continuous"
@@ -373,6 +376,11 @@ class ContinuousBehavior(TransitionBehavior):
                     
                     # Calculate max flow possible from this arc
                     max_flow_from_arc = source_place.tokens / arc.weight if arc.weight > 0 else float('inf')
+                    
+                    # Debug: Log clamping near zero
+                    if max_flow_from_arc < intended_flow and source_place.tokens < 0.5:
+                        print(f"[CONTINUOUS] Clamping flow for {arc.source_id}: intended={intended_flow:.6f}, max_available={max_flow_from_arc:.6f}, tokens={source_place.tokens:.6f}")
+                    
                     actual_flow = min(actual_flow, max_flow_from_arc)
             
             # Phase 2: Consume tokens continuously from input places (skip if source)

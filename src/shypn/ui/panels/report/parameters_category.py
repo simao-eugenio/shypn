@@ -280,12 +280,15 @@ class DynamicAnalysesCategory(BaseReportCategory):
         # Register callback for simulation complete
         if controller:
             print(f"[SET_CONTROLLER] Registering on_simulation_complete callback")
-            controller.on_simulation_complete = lambda: self._refresh_simulation_data()
-            print(f"[SET_CONTROLLER] Callback registered successfully")
+            # Use GLib.idle_add to ensure UI update happens on main thread
+            from gi.repository import GLib
+            controller.on_simulation_complete = lambda: GLib.idle_add(self._refresh_simulation_data)
+            print(f"[SET_CONTROLLER] Callback registered successfully (with GLib.idle_add wrapper)")
             
     def _refresh_simulation_data(self):
         """Refresh simulation data tables."""
         print("[DEBUG_TABLES] _refresh_simulation_data called")
+        print(f"[DEBUG_TABLES] Controller ID: {id(self.controller) if self.controller else 'None'}")
         
         if not self.controller:
             print("[DEBUG_TABLES] ❌ No controller")
@@ -307,10 +310,23 @@ class DynamicAnalysesCategory(BaseReportCategory):
             
         data_collector = self.controller.data_collector
         print(f"[DEBUG_TABLES] data_collector = {data_collector}")
+        print(f"[DEBUG_TABLES] data_collector ID: {id(data_collector)}")
+        print(f"[DEBUG_TABLES] is_collecting: {data_collector.is_collecting}")
         
         # Check if we have collected data
         has_data = data_collector.has_data()
         print(f"[DEBUG_TABLES] has_data() = {has_data}")
+        print(f"[DEBUG_TABLES] time_points length: {len(data_collector.time_points)}")
+        print(f"[DEBUG_TABLES] place_data keys: {list(data_collector.place_data.keys())}")
+        print(f"[DEBUG_TABLES] transition_data keys: {list(data_collector.transition_data.keys())}")
+        
+        # Check transition firing counts
+        for t_id, firing_series in data_collector.transition_data.items():
+            print(f"[DEBUG_TABLES] Transition {t_id}: firing_series length={len(firing_series)}")
+            if firing_series:
+                print(f"[DEBUG_TABLES]   First 5 values: {firing_series[:5]}")
+                print(f"[DEBUG_TABLES]   Last 5 values: {firing_series[-5:]}")
+                print(f"[DEBUG_TABLES]   Final count: {firing_series[-1]}")
         
         if not has_data:
             print("[DEBUG_TABLES] ❌ No data collected")
@@ -321,27 +337,78 @@ class DynamicAnalysesCategory(BaseReportCategory):
             self.reaction_table.clear()
             return
         
-        # Get duration
-        duration = self.controller.settings.duration or 0.0
-        print(f"[DEBUG_TABLES] duration = {duration}")
+        # Get duration (use actual simulation time, not target duration)
+        # controller.time = actual elapsed simulation time
+        # settings.duration = user's target duration (might not be reached yet if stopped early)
+        duration = self.controller.time
+        print(f"[DEBUG_TABLES] duration (actual simulation time) = {duration}")
+        print(f"[DEBUG_TABLES] settings.duration (target) = {self.controller.settings.duration}")
+        
+        # Show first few data points for debugging
+        if len(data_collector.time_points) > 0:
+            print(f"[DEBUG_TABLES] First 5 time points: {data_collector.time_points[:5]}")
+            print(f"[DEBUG_TABLES] Last 5 time points: {data_collector.time_points[-5:]}")
+            print(f"[DEBUG_TABLES] Total time points: {len(data_collector.time_points)}")
+            
+            # Show place data sample
+            for place_id in list(data_collector.place_data.keys())[:2]:  # First 2 places
+                place_values = data_collector.place_data[place_id]
+                if place_values:
+                    print(f"[DEBUG_TABLES] Place {place_id}: first={place_values[0]}, last={place_values[-1]}, len={len(place_values)}")
+                else:
+                    print(f"[DEBUG_TABLES] Place {place_id}: EMPTY!")
+            
+            # Show transition data sample
+            for trans_id in list(data_collector.transition_data.keys())[:2]:  # First 2 transitions
+                trans_values = data_collector.transition_data[trans_id]
+                if trans_values:
+                    print(f"[DEBUG_TABLES] Transition {trans_id}: first={trans_values[0]}, last={trans_values[-1]}, len={len(trans_values)}")
+                else:
+                    print(f"[DEBUG_TABLES] Transition {trans_id}: EMPTY!")
+        else:
+            print(f"[DEBUG_TABLES] ⚠️  time_points list is EMPTY!")
         
         # Analyze species
         from shypn.engine.simulation.analysis import SpeciesAnalyzer, ReactionAnalyzer
         
         print("[DEBUG_TABLES] Analyzing species...")
-        species_analyzer = SpeciesAnalyzer(data_collector)
-        species_metrics = species_analyzer.analyze_all_species(duration)
-        print(f"[DEBUG_TABLES] Got {len(species_metrics)} species metrics")
-        self.species_table.populate(species_metrics)
-        print("[DEBUG_TABLES] Species table populated")
+        try:
+            species_analyzer = SpeciesAnalyzer(data_collector)
+            species_metrics = species_analyzer.analyze_all_species(duration)
+            print(f"[DEBUG_TABLES] Got {len(species_metrics)} species metrics")
+            
+            # Show first metric sample
+            if species_metrics:
+                sample = species_metrics[0]
+                print(f"[DEBUG_TABLES] Sample species metric: {sample.place_name}, init={sample.initial_tokens}, final={sample.final_tokens}, min={sample.min_tokens}, max={sample.max_tokens}")
+            
+            self.species_table.populate(species_metrics)
+            print("[DEBUG_TABLES] Species table populated")
+        except Exception as e:
+            print(f"[DEBUG_TABLES] ❌ Error analyzing species: {e}")
+            import traceback
+            traceback.print_exc()
+            return
         
         # Analyze reactions
         print("[DEBUG_TABLES] Analyzing reactions...")
-        reaction_analyzer = ReactionAnalyzer(data_collector)
-        reaction_metrics = reaction_analyzer.analyze_all_reactions(duration)
-        print(f"[DEBUG_TABLES] Got {len(reaction_metrics)} reaction metrics")
-        self.reaction_table.populate(reaction_metrics)
-        print("[DEBUG_TABLES] Reaction table populated")
+        try:
+            reaction_analyzer = ReactionAnalyzer(data_collector)
+            reaction_metrics = reaction_analyzer.analyze_all_reactions(duration)
+            print(f"[DEBUG_TABLES] Got {len(reaction_metrics)} reaction metrics")
+            
+            # Show first metric sample
+            if reaction_metrics:
+                sample = reaction_metrics[0]
+                print(f"[DEBUG_TABLES] Sample reaction metric: {sample.transition_name}, firings={sample.firing_count}, rate={sample.average_rate}, status={sample.status}")
+            
+            self.reaction_table.populate(reaction_metrics)
+            print("[DEBUG_TABLES] Reaction table populated")
+        except Exception as e:
+            print(f"[DEBUG_TABLES] ❌ Error analyzing reactions: {e}")
+            import traceback
+            traceback.print_exc()
+            return
         
         # Update status
         num_species = len(species_metrics)
