@@ -133,8 +133,11 @@ class SpeciesConcentrationTable(Gtk.ScrolledWindow):
         Args:
             species_metrics: List of SpeciesMetrics instances
         """
+        print(f"[SPECIES_TABLE] populate() called with {len(species_metrics)} metrics")
         self.store.clear()
+        print(f"[SPECIES_TABLE] Store cleared")
         
+        row_count = 0
         for metrics in species_metrics:
             self.store.append([
                 metrics.place_name,
@@ -147,6 +150,16 @@ class SpeciesConcentrationTable(Gtk.ScrolledWindow):
                 metrics.total_change,
                 metrics.change_rate
             ])
+            row_count += 1
+            if row_count <= 3:  # Show first 3 rows as sample
+                print(f"[SPECIES_TABLE]   Row {row_count}: {metrics.place_name}, init={metrics.initial_tokens}, final={metrics.final_tokens}")
+        
+        print(f"[SPECIES_TABLE] Added {row_count} rows to store")
+        print(f"[SPECIES_TABLE] Store now has {len(self.store)} rows")
+        
+        # Force update
+        self.tree_view.queue_draw()
+        print(f"[SPECIES_TABLE] Table redraw queued")
             
     def clear(self):
         """Clear all table data."""

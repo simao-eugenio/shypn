@@ -40,7 +40,6 @@ class DataCollector:
         self.transition_data = {t.id: [] for t in self.model.transitions}
         
         self.is_collecting = True
-        print(f"[NEW_DC] start_collection() called - initialized for {len(self.place_data)} places, {len(self.transition_data)} transitions")
         
     def record_state(self, current_time: float):
         """Record current state at given time point.
@@ -50,10 +49,6 @@ class DataCollector:
         """
         if not self.is_collecting:
             return
-        
-        step_num = len(self.time_points) + 1
-        if step_num <= 3:
-            print(f"[NEW_DC] record_state() step {step_num} at time {current_time:.4f}")
             
         self.time_points.append(current_time)
         
@@ -70,7 +65,6 @@ class DataCollector:
     def stop_collection(self):
         """Stop collecting data."""
         self.is_collecting = False
-        print(f"[NEW_DC] stop_collection() - collected {len(self.time_points)} time points")
         
     def clear(self):
         """Clear all collected data."""
