@@ -673,14 +673,31 @@ def main(argv=None):
 				Also updates the controller reference so simulation results from
 				the new tab's controller are displayed correctly.
 				"""
+				print(f"\n[TAB_REPORT] ========================================")
+				print(f"[TAB_REPORT] Tab switched to page {page_num}")
+				
 				drawing_area = model_canvas_loader.get_current_document()
+				print(f"[TAB_REPORT] drawing_area: {drawing_area} (id={id(drawing_area) if drawing_area else 'None'})")
+				
 				if drawing_area and report_panel_loader.panel:
 					# First, wire up the new tab's controller to Report Panel
 					controller = model_canvas_loader.get_canvas_controller(drawing_area)
+					print(f"[TAB_REPORT] controller: {controller} (id={id(controller) if controller else 'None'})")
+					
 					if controller:
+						print(f"[TAB_REPORT] Controller has data_collector: {hasattr(controller, 'data_collector')}")
+						if hasattr(controller, 'data_collector') and controller.data_collector:
+							print(f"[TAB_REPORT] data_collector id: {id(controller.data_collector)}")
+							print(f"[TAB_REPORT] data_collector has_data: {controller.data_collector.has_data()}")
+						
 						report_panel_loader.panel.set_controller(controller)
+						print(f"[TAB_REPORT] set_controller completed")
+					
 					# Then notify about tab switch (this will refresh with the new controller)
 					report_panel_loader.panel.on_tab_switched(drawing_area)
+					print(f"[TAB_REPORT] on_tab_switched completed")
+				
+				print(f"[TAB_REPORT] ========================================\n")
 			
 			if model_canvas_loader.notebook:
 				model_canvas_loader.notebook.connect('switch-page', on_canvas_tab_switched_report)
