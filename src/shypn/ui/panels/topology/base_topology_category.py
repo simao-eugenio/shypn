@@ -21,47 +21,144 @@ from shypn.ui.category_frame import CategoryFrame
 # ============================================================================
 # ANALYZER PERFORMANCE CONFIGURATION
 # ============================================================================
-# These analyzers are safe to auto-run when models are loaded.
-# They have polynomial complexity and finish quickly (<2s typically).
-SAFE_FOR_AUTO_RUN = {
-    'p_invariants',   # O(n²m) - matrix operations
-    't_invariants',   # O(nm²) - matrix operations
-    'cycles',         # O((n+e)(c+1)) - efficient algorithm
-    'paths',          # O(n+e) - linear graph traversal
-    'hubs',           # O(n+e) - degree calculation
-    'boundedness',    # O(n) - simple token counting
-    'fairness'        # O(n+e) - graph analysis
-}
 
-# These analyzers have exponential/explosive complexity and should only
-# be run when user explicitly requests (manual expansion).
-# Auto-running these can freeze the system on medium/large models.
-DANGEROUS_ANALYZERS = {
-    'siphons': {
-        'complexity': 'O(2^n) - Exponential',
-        'warning': '⚠️ <b>CAUTION:</b> This analysis can take very long (>60s) or freeze on models with >25 places. Use on small models only.',
-        'risk': 'CRITICAL'
+# Algorithm complexity and execution priority metadata
+# Priority 1 = Fastest (O(n) to O(n²)), run first
+# Priority 2 = Fast (O(n²) to O(n³)), run second
+# Priority 3 = Moderate (O(n³) to exponential with limits), run third
+# Priority 4 = Slow (exponential without limits), run last or manual only
+ANALYZER_METADATA = {
+    # FAST ALGORITHMS - Priority 1 (< 1 second typically)
+    'hubs': {
+        'priority': 1,
+        'complexity': 'O(n+e)',
+        'description': 'Linear - degree calculation',
+        'safe_for_auto_run': True,
+        'typical_time': '<0.5s'
     },
-    'traps': {
-        'complexity': 'O(2^n) - Exponential',
-        'warning': '⚠️ <b>CAUTION:</b> This analysis can take very long (>60s) or freeze on models with >25 places. Use on small models only.',
-        'risk': 'CRITICAL'
+    'paths': {
+        'priority': 1,
+        'complexity': 'O(n+e)',
+        'description': 'Linear - graph traversal',
+        'safe_for_auto_run': True,
+        'typical_time': '<0.5s'
     },
+    'boundedness': {
+        'priority': 1,
+        'complexity': 'O(n)',
+        'description': 'Linear - token counting',
+        'safe_for_auto_run': True,
+        'typical_time': '<0.5s'
+    },
+    'fairness': {
+        'priority': 1,
+        'complexity': 'O(n+e)',
+        'description': 'Linear - conflict analysis',
+        'safe_for_auto_run': True,
+        'typical_time': '<0.5s'
+    },
+    
+    # MODERATE ALGORITHMS - Priority 2 (1-3 seconds typically)
+    'p_invariants': {
+        'priority': 2,
+        'complexity': 'O(n²m)',
+        'description': 'Quadratic - matrix operations',
+        'safe_for_auto_run': True,
+        'typical_time': '1-2s'
+    },
+    't_invariants': {
+        'priority': 2,
+        'complexity': 'O(nm²)',
+        'description': 'Quadratic - matrix operations',
+        'safe_for_auto_run': True,
+        'typical_time': '1-2s'
+    },
+    'cycles': {
+        'priority': 2,
+        'complexity': 'O((n+e)(c+1))',
+        'description': 'Efficient cycle detection',
+        'safe_for_auto_run': True,
+        'typical_time': '1-3s'
+    },
+    'dependency_coupling': {
+        'priority': 2,
+        'complexity': 'O(t²)',
+        'description': 'Quadratic - transition pairs',
+        'safe_for_auto_run': True,
+        'typical_time': '1-3s'
+    },
+    'regulatory_structure': {
+        'priority': 2,
+        'complexity': 'O(a)',
+        'description': 'Linear - arc analysis',
+        'safe_for_auto_run': True,
+        'typical_time': '0.5-1s'
+    },
+    
+    # SLOW ALGORITHMS - Priority 3 (5-30 seconds, limited exploration)
     'reachability': {
-        'complexity': 'O(k^n) - State explosion',
-        'warning': '⚠️ <b>CAUTION:</b> This analysis explores the state space and can take 30-60s on complex models with many transitions and tokens.',
+        'priority': 3,
+        'complexity': 'O(k^n)',
+        'description': 'State explosion (bounded)',
+        'safe_for_auto_run': False,
+        'typical_time': '5-30s',
+        'warning': '⚠️ <b>CAUTION:</b> State space exploration can take 30-60s on complex models.',
         'risk': 'HIGH'
     },
     'liveness': {
-        'complexity': 'Depends on reachability',
-        'warning': '⚠️ <b>CAUTION:</b> This analysis can take 10-30s on complex models as it checks transition firing potential.',
+        'priority': 3,
+        'complexity': 'O(k^n)',
+        'description': 'Depends on reachability',
+        'safe_for_auto_run': False,
+        'typical_time': '5-30s',
+        'warning': '⚠️ <b>CAUTION:</b> Can take 10-30s on complex models.',
         'risk': 'MEDIUM-HIGH'
     },
     'deadlocks': {
-        'complexity': 'Depends on siphon detection',
-        'warning': '⚠️ <b>CAUTION:</b> This analysis can take 10-30s on complex models if siphon checking is enabled.',
+        'priority': 3,
+        'complexity': 'O(2^n)',
+        'description': 'Depends on siphon detection',
+        'safe_for_auto_run': False,
+        'typical_time': '5-30s',
+        'warning': '⚠️ <b>CAUTION:</b> Can take 10-30s if siphon checking enabled.',
         'risk': 'MEDIUM-HIGH'
+    },
+    
+    # VERY SLOW ALGORITHMS - Priority 4 (>60 seconds, exponential)
+    'siphons': {
+        'priority': 4,
+        'complexity': 'O(2^n)',
+        'description': 'Exponential - subset enumeration',
+        'safe_for_auto_run': False,
+        'typical_time': '>60s',
+        'warning': '⚠️ <b>CRITICAL:</b> Can take >60s or freeze on models with >25 places. Use on small models only.',
+        'risk': 'CRITICAL'
+    },
+    'traps': {
+        'priority': 4,
+        'complexity': 'O(2^n)',
+        'description': 'Exponential - subset enumeration',
+        'safe_for_auto_run': False,
+        'typical_time': '>60s',
+        'warning': '⚠️ <b>CRITICAL:</b> Can take >60s or freeze on models with >25 places. Use on small models only.',
+        'risk': 'CRITICAL'
     }
+}
+
+# Quick lookups for backward compatibility
+SAFE_FOR_AUTO_RUN = {
+    name for name, meta in ANALYZER_METADATA.items() 
+    if meta.get('safe_for_auto_run', False)
+}
+
+DANGEROUS_ANALYZERS = {
+    name: {
+        'complexity': meta['complexity'],
+        'warning': meta.get('warning', ''),
+        'risk': meta.get('risk', 'UNKNOWN')
+    }
+    for name, meta in ANALYZER_METADATA.items()
+    if not meta.get('safe_for_auto_run', False)
 }
 
 
@@ -310,6 +407,53 @@ class BaseTopologyCategory:
         # Default: title case with spaces
         return analyzer_name.replace('_', ' ').title()
     
+    def _get_analyzer_metadata_text(self, analyzer_name):
+        """Get human-readable metadata text for an analyzer.
+        
+        Args:
+            analyzer_name: Name of analyzer
+            
+        Returns:
+            str: Formatted metadata (complexity, time, priority)
+        """
+        metadata = ANALYZER_METADATA.get(analyzer_name, {})
+        
+        if not metadata:
+            return "No metadata available"
+        
+        parts = []
+        
+        # Priority
+        priority = metadata.get('priority', '?')
+        priority_label = {
+            1: 'Priority 1 (Fastest)',
+            2: 'Priority 2 (Fast)',
+            3: 'Priority 3 (Moderate)',
+            4: 'Priority 4 (Slow)'
+        }.get(priority, f'Priority {priority}')
+        parts.append(f"🚀 {priority_label}")
+        
+        # Complexity
+        complexity = metadata.get('complexity', 'Unknown')
+        parts.append(f"📊 Complexity: {complexity}")
+        
+        # Description
+        description = metadata.get('description', '')
+        if description:
+            parts.append(f"📝 {description}")
+        
+        # Typical time
+        typical_time = metadata.get('typical_time', '')
+        if typical_time:
+            parts.append(f"⏱️ Typical: {typical_time}")
+        
+        # Warning if exists
+        warning = metadata.get('warning', '')
+        if warning:
+            parts.append(f"\n{warning}")
+        
+        return '\n'.join(parts)
+    
     # ========================================================================
     # GROUPED TABLE MODE METHODS
     # ========================================================================
@@ -358,6 +502,13 @@ class BaseTopologyCategory:
         # Run All button
         self.run_all_button = Gtk.Button(label="Run All Analyzers")
         self.run_all_button.connect('clicked', self._on_run_all_clicked)
+        self.run_all_button.set_tooltip_text(
+            "Run all safe analyzers in priority order:\n"
+            "• Priority 1 (Fastest): O(n) algorithms run first\n"
+            "• Priority 2 (Fast): O(n²) algorithms run second\n"
+            "• Priority 3-4: Slower algorithms skipped (run manually)\n\n"
+            "Fast algorithms display results immediately while slower ones complete."
+        )
         toolbar.pack_start(self.run_all_button, False, False, 0)
         
         # Spinner (hidden initially)
@@ -424,7 +575,10 @@ class BaseTopologyCategory:
         ]
     
     def _on_run_all_clicked(self, button):
-        """Handle Run All button click.
+        """Handle Run All button click with prioritized execution.
+        
+        Fast algorithms run first to provide immediate feedback,
+        slower algorithms run last to prevent blocking.
         
         Args:
             button: Button that was clicked
@@ -442,8 +596,10 @@ class BaseTopologyCategory:
         # Clear table
         self.grouped_table_store.clear()
         
-        # Run all analyzers
+        # Get all analyzers and sort by priority (Priority 1 = fastest)
         analyzers = self._get_analyzers()
+        analyzer_list = []
+        
         for analyzer_name in analyzers.keys():
             # Skip dangerous analyzers unless already analyzed
             if analyzer_name in DANGEROUS_ANALYZERS:
@@ -452,7 +608,25 @@ class BaseTopologyCategory:
                     # Skip dangerous analyzers in "Run All"
                     continue
             
-            GLib.idle_add(self._run_analyzer_for_grouped_table, analyzer_name, drawing_area)
+            # Get priority from metadata (default to 5 if not found)
+            metadata = ANALYZER_METADATA.get(analyzer_name, {})
+            priority = metadata.get('priority', 5)
+            analyzer_list.append((priority, analyzer_name))
+        
+        # Sort by priority (ascending: 1, 2, 3, 4...)
+        analyzer_list.sort(key=lambda x: x[0])
+        
+        # Run analyzers in priority order with staggered delays
+        # This ensures fast algorithms complete and display results first
+        for i, (priority, analyzer_name) in enumerate(analyzer_list):
+            # Stagger execution: Priority 1 runs immediately, Priority 2 after 100ms, etc.
+            delay_ms = i * 50  # 50ms between each analyzer start
+            GLib.timeout_add(
+                delay_ms,
+                self._run_analyzer_for_grouped_table,
+                analyzer_name,
+                drawing_area
+            )
     
     def _run_analyzer_for_grouped_table(self, analyzer_name, drawing_area):
         """Run analyzer and update grouped table with results.
@@ -569,7 +743,7 @@ class BaseTopologyCategory:
         return [(analyzer_name, str(result), '')]
     
     def _check_grouped_analysis_complete(self):
-        """Check if all analyses are complete and update UI.
+        """Check if all analyses are complete and update UI with priority info.
         """
         if not self.analyzing:
             # All done
@@ -579,8 +753,19 @@ class BaseTopologyCategory:
             
             row_count = len(self.grouped_table_store)
             self.grouped_status_label.set_markup(
-                f"<i>Analysis complete: {row_count} results</i>"
+                f"<i>Analysis complete: {row_count} results (prioritized execution)</i>"
             )
+        else:
+            # Update progress - show which analyzers are still running
+            running_names = [name.replace('_', ' ').title() for name in self.analyzing]
+            if len(running_names) == 1:
+                status = f"Running: {running_names[0]}..."
+            elif len(running_names) <= 3:
+                status = f"Running: {', '.join(running_names)}..."
+            else:
+                status = f"Running {len(running_names)} analyses..."
+            
+            self.grouped_status_label.set_markup(f"<i>{status}</i>")
     
     # ========================================================================
     # END GROUPED TABLE MODE METHODS
