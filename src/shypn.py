@@ -312,13 +312,15 @@ def main(argv=None):
 		try:
 			# Topology panel doesn't need model at init - will get it at analysis time
 			topology_panel_loader = TopologyPanelLoader(model=None)
+			
+			# Store topology_panel_loader reference for Report Panel to access
+			# Do this BEFORE the controller check so it's always available
+			model_canvas_loader.topology_panel_loader = topology_panel_loader
+			
 			# Wire model_canvas_loader so topology can access current model
 			if hasattr(topology_panel_loader, 'controller') and topology_panel_loader.controller:
 				# Use the proper method to set model_canvas_loader
 				topology_panel_loader.set_model_canvas_loader(model_canvas_loader)
-				
-				# Store topology_panel_loader reference for Report Panel to access
-				model_canvas_loader.topology_panel_loader = topology_panel_loader
 				
 				# ===================================================================
 				# WIRE TOPOLOGY PANEL TO MODEL LIFECYCLE EVENTS
