@@ -40,6 +40,9 @@ class DynamicAnalysesCategory(BaseReportCategory):
         self._pending_refresh_id = None
         # Generation counter to reject stale updates
         self._refresh_generation = 0
+        # Track selected reaction for auto-refresh after simulation
+        self._selected_transition = None
+        self._selected_locality = None
         
         # Create category frame
         from shypn.ui.category_frame import CategoryFrame
@@ -119,6 +122,54 @@ class DynamicAnalysesCategory(BaseReportCategory):
         self.reaction_table = ReactionActivityTable()
         self.reaction_table.set_size_request(-1, 200)
         sim_box.pack_start(self.reaction_table, True, True, 0)
+        
+        # Reaction Selected Table (NEW - shows SUMMARY locality data for selected reaction)
+        reaction_selected_label = Gtk.Label()
+        reaction_selected_label.set_markup("<b>Reaction Selected</b>")
+        reaction_selected_label.set_xalign(0)
+        sim_box.pack_start(reaction_selected_label, False, False, 6)
+        
+        # Create scrolled window for reaction selected table
+        selected_scroll = Gtk.ScrolledWindow()
+        selected_scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        selected_scroll.set_size_request(-1, 150)  # Smaller - summary data only
+        
+        # Create table with SUMMARY columns: Component, ID, Name, Initial, Final, Min, Max, Avg, Info
+        self.reaction_selected_store = Gtk.ListStore(str, str, str, str, str, str, str, str, str)
+        self.reaction_selected_table = Gtk.TreeView(model=self.reaction_selected_store)
+        self.reaction_selected_table.set_enable_search(True)
+        self.reaction_selected_table.set_search_column(1)  # Search by ID
+        
+        # Add columns for summary view
+        columns = [
+            ("Component", 0, 100),  # "Transition", "Input Place", "Output Place"
+            ("ID", 1, 80),
+            ("Name", 2, 120),
+            ("Initial", 3, 80),
+            ("Final", 4, 80),
+            ("Min", 5, 80),
+            ("Max", 6, 80),
+            ("Average", 7, 80),
+            ("Info", 8, 120)  # Extra info (firings, rates, etc.)
+        ]
+        
+        for title, col_id, min_width in columns:
+            renderer = Gtk.CellRendererText()
+            column = Gtk.TreeViewColumn(title, renderer, text=col_id)
+            column.set_resizable(True)
+            column.set_sort_column_id(col_id)
+            column.set_min_width(min_width)
+            self.reaction_selected_table.append_column(column)
+        
+        selected_scroll.add(self.reaction_selected_table)
+        sim_box.pack_start(selected_scroll, True, True, 0)
+        
+        # Status label for reaction selected (initially shows "awaiting selection")
+        self.reaction_selected_status = Gtk.Label()
+        self.reaction_selected_status.set_xalign(0)
+        self.reaction_selected_status.set_line_wrap(True)
+        self.reaction_selected_status.set_markup("<i>No reaction selected. Select a reaction from Analyses panel to see locality simulation data.</i>")
+        sim_box.pack_start(self.reaction_selected_status, False, False, 0)
         
         self.simulation_expander.add(sim_box)
         box.pack_start(self.simulation_expander, True, True, 0)
@@ -290,14 +341,19 @@ class DynamicAnalysesCategory(BaseReportCategory):
         Args:
             controller: SimulationController instance
         """
-        # print(f"[SET_CONTROLLER] Setting controller: {controller}")
-        # print(f"[SET_CONTROLLER] Controller ID: {id(controller) if controller else 'None'}")
-        # print(f"[SET_CONTROLLER] Controller has data_collector: {hasattr(controller, 'data_collector') if controller else False}")
+        import traceback
+        print(f"\n[SET_CONTROLLER] ========================================")
+        print(f"[SET_CONTROLLER] Setting controller: {controller}")
+        print(f"[SET_CONTROLLER] Controller ID: {id(controller) if controller else 'None'}")
+        print(f"[SET_CONTROLLER] Call stack:")
+        for line in traceback.format_stack()[-5:-1]:
+            print(f"  {line.strip()}")
+        print(f"[SET_CONTROLLER] ========================================\n")
+        print(f"[SET_CONTROLLER] Controller has data_collector: {hasattr(controller, 'data_collector') if controller else False}")
         
         if controller and hasattr(controller, 'data_collector'):
-            pass
-            # print(f"[SET_CONTROLLER] data_collector: {controller.data_collector}")
-            # print(f"[SET_CONTROLLER] data_collector ID: {id(controller.data_collector) if controller.data_collector else 'None'}")
+            print(f"[SET_CONTROLLER] data_collector: {controller.data_collector}")
+            print(f"[SET_CONTROLLER] data_collector ID: {id(controller.data_collector) if controller.data_collector else 'None'}")
         
         # Cancel any pending refresh from previous controller
         if self._pending_refresh_id is not None:
@@ -332,37 +388,41 @@ class DynamicAnalysesCategory(BaseReportCategory):
             # At callback time, check if this specific controller is still the active one
             captured_controller = controller
             def on_complete():
-                pass
-                # print(f"[CALLBACK] Simulation complete for controller {id(captured_controller)}")
+                print(f"[CALLBACK] ===== Simulation complete for controller {id(captured_controller)} =====")
                 
                 # MULTI-DOCUMENT FIX: Capture data to document's report_data
                 # Get the drawing_area for this controller from model_canvas_loader
                 if hasattr(self, 'parent_panel') and self.parent_panel:
                     model_canvas_loader = getattr(self.parent_panel, 'model_canvas_loader', None)
                     if model_canvas_loader and hasattr(model_canvas_loader, 'overlay_managers'):
-                        pass
+                        print(f"[CALLBACK] Searching {len(model_canvas_loader.overlay_managers)} overlay_managers for this controller")
                         # Find which drawing_area has this controller
                         for drawing_area, overlay_manager in model_canvas_loader.overlay_managers.items():
-                            if hasattr(overlay_manager, 'simulation_controller') and overlay_manager.simulation_controller is captured_controller:
-                                pass
-                                # print(f"[CALLBACK] Found drawing_area for controller: {id(drawing_area)}")
-                                # Capture simulation data to document's report_data
-                                if hasattr(overlay_manager, 'report_data'):
-                                    pass
-                                    # print(f"[CALLBACK] Capturing simulation data to document report_data")
-                                    overlay_manager.report_data.capture_simulation_results(captured_controller)
-                                break
+                            if hasattr(overlay_manager, 'simulation_controller'):
+                                print(f"[CALLBACK]   Checking overlay_manager {id(drawing_area)}: controller={id(overlay_manager.simulation_controller)}")
+                                if overlay_manager.simulation_controller is captured_controller:
+                                    print(f"[CALLBACK] ✅ Found drawing_area for this controller: {id(drawing_area)}")
+                                    # Capture simulation data to document's report_data
+                                    if hasattr(overlay_manager, 'report_data'):
+                                        print(f"[CALLBACK] ✅ Capturing simulation data to document report_data")
+                                        overlay_manager.report_data.capture_simulation_results(captured_controller)
+                                        print(f"[CALLBACK] ✅ Data captured, has_data={overlay_manager.report_data.has_simulation_data()}")
+                                    else:
+                                        print(f"[CALLBACK] ❌ overlay_manager has no report_data!")
+                                    break
+                            else:
+                                print(f"[CALLBACK]   overlay_manager {id(drawing_area)} has no simulation_controller attribute")
+                        else:
+                            print(f"[CALLBACK] ❌ Controller not found in any overlay_manager!")
                 
                 # Only refresh UI if this captured controller is still the active one
                 if self.controller is captured_controller:
-                    pass
-                    # print(f"[CALLBACK] Controller {id(captured_controller)} matches active controller, refreshing UI")
+                    print(f"[CALLBACK] ✅ Controller matches active, will refresh UI")
                     # Capture the current generation when callback fires
                     callback_generation = self._refresh_generation
                     self._pending_refresh_id = GLib.idle_add(lambda: self._refresh_and_clear_pending(callback_generation))
                 else:
-                    pass
-                    # print(f"[CALLBACK] Controller {id(captured_controller)} no longer active (current: {id(self.controller) if self.controller else 'None'}), data captured but not refreshing UI")
+                    print(f"[CALLBACK] ⚠️  Controller no longer active, data captured but not refreshing UI")
             
             # Set the callback on this controller
             controller.on_simulation_complete = on_complete
@@ -397,24 +457,13 @@ class DynamicAnalysesCategory(BaseReportCategory):
         """
         # Check generation if provided
         if generation is not None and generation != self._refresh_generation:
-            pass
-            # print(f"[DEBUG_TABLES] Refresh generation {generation} is stale (current: {self._refresh_generation}), aborting")
             return
-        
-        # print("[DEBUG_TABLES] _refresh_simulation_data called")
-        if generation is not None:
-            pass
-            # print(f"[DEBUG_TABLES] Refresh generation: {generation}")
-        # print(f"[DEBUG_TABLES] self.controller: {self.controller}")
-        # print(f"[DEBUG_TABLES] Controller ID: {id(self.controller) if self.controller else 'None'}")
         
         # Store the controller we're about to use
         refresh_controller = self.controller
         refresh_controller_id = id(refresh_controller) if refresh_controller else None
         
         if not self.controller:
-            pass
-            # print("[DEBUG_TABLES] ❌ No controller")
             self.simulation_status_label.set_markup(
                 "<i>No simulation data available. Run a simulation to see results.</i>"
             )
@@ -428,21 +477,15 @@ class DynamicAnalysesCategory(BaseReportCategory):
         if hasattr(self, 'parent_panel') and self.parent_panel:
             model_canvas_loader = getattr(self.parent_panel, 'model_canvas_loader', None)
             if model_canvas_loader and hasattr(model_canvas_loader, 'overlay_managers'):
-                pass
                 # Find which drawing_area has this controller
                 for drawing_area, overlay_manager in model_canvas_loader.overlay_managers.items():
                     if hasattr(overlay_manager, 'simulation_controller') and overlay_manager.simulation_controller is refresh_controller:
-                        pass
-                        # print(f"[DEBUG_TABLES] Found drawing_area for controller: {id(drawing_area)}")
                         if hasattr(overlay_manager, 'report_data'):
                             report_data = overlay_manager.report_data
-                            # print(f"[DEBUG_TABLES] Using document's report_data: {id(report_data)}")
                         break
         
         # Check if we have stored simulation data for this document
         if not report_data or not report_data.has_simulation_data():
-            pass
-            # print("[DEBUG_TABLES] ❌ No stored simulation data for this document")
             self.simulation_status_label.set_markup(
                 "<i>No simulation data available. Run a simulation to see results.</i>"
             )
@@ -627,6 +670,12 @@ class DynamicAnalysesCategory(BaseReportCategory):
         self.reaction_table.show_all()
         self.simulation_expander.show_all()
         
+        # CRITICAL: Always refresh Reaction Selected table after simulation completes
+        # This table queries TransitionRatePanel.selected_objects directly, so we don't 
+        # need to check _selected_transition/_selected_locality (which are deprecated)
+        print("[DEBUG_TABLES] Refreshing Reaction Selected table after simulation complete")
+        self._populate_reaction_selected_table()
+        
         # Force a redraw of the parent widget to ensure visibility
         if hasattr(self, 'category_frame') and self.category_frame:
             self.category_frame.queue_draw()
@@ -770,3 +819,268 @@ class DynamicAnalysesCategory(BaseReportCategory):
             model_canvas: ModelCanvas instance
         """
         self.model_canvas = model_canvas
+    
+    def set_selected_reaction(self, transition, locality):
+        """Set the selected reaction and populate the locality simulation data table.
+        
+        Called from Analyses panel when a transition is selected for analysis.
+        Shows time-series data for the selected locality (input places → transition → output places).
+        
+        Args:
+            transition: The selected transition object
+            locality: LocalityData object with input_places and output_places lists
+        """
+        print(f"[REACTION_SELECTED] set_selected_reaction called")
+        print(f"[REACTION_SELECTED]   transition: {transition.id if transition else None}")
+        print(f"[REACTION_SELECTED]   locality: {locality}")
+        
+        # Store selection in BOTH instance variables (for immediate use) AND document's report_data (for persistence)
+        self._selected_transition = transition
+        self._selected_locality = locality
+        
+        # Store in document's report_data for persistence across tab switches
+        if hasattr(self, 'parent_panel') and self.parent_panel:
+            model_canvas_loader = getattr(self.parent_panel, 'model_canvas_loader', None)
+            if model_canvas_loader and hasattr(model_canvas_loader, 'overlay_managers'):
+                for drawing_area, overlay_manager in model_canvas_loader.overlay_managers.items():
+                    if hasattr(overlay_manager, 'report_data'):
+                        overlay_manager.report_data.selected_transition = transition
+                        overlay_manager.report_data.selected_locality = locality
+                        print(f"[REACTION_SELECTED] Stored selection in document report_data")
+                        break
+        
+        if not transition or not locality:
+            # Clear table and show "awaiting selection" message
+            self.reaction_selected_store.clear()
+            self.reaction_selected_status.set_markup(
+                "<i>No reaction selected. Select a reaction from Analyses panel to see locality simulation data.</i>"
+            )
+            self.reaction_selected_status.show()
+            print(f"[REACTION_SELECTED] No transition or locality, showing default message")
+            return
+        
+        # Try to populate with existing data
+        self._populate_reaction_selected_table()
+    
+    def _populate_reaction_selected_table(self):
+        """Populate the Reaction Selected table with transition from Analyses panel.
+        
+        Instead of storing selection separately, we query the TransitionRatePanel
+        (Analyses panel) to get the currently selected transition, just like it
+        does for plotting. This ensures consistency with the Global Canvas State Lifecycle.
+        
+        This method can be called:
+        1. When transition is selected (via set_selected_reaction callback)
+        2. When simulation completes (via _refresh_simulation_data)
+        3. When switching tabs (via refresh) - will check Analyses panel state
+        """
+        print(f"[POPULATE_REACTION] Starting...")
+        
+        # Get the TransitionRatePanel from the right panel (Analyses panel)
+        transition_panel = None
+        if hasattr(self, 'parent_panel') and self.parent_panel:
+            model_canvas_loader = getattr(self.parent_panel, 'model_canvas_loader', None)
+            print(f"[POPULATE_REACTION] model_canvas_loader exists: {model_canvas_loader is not None}")
+            if model_canvas_loader:
+                print(f"[POPULATE_REACTION] overlay_managers count: {len(model_canvas_loader.overlay_managers) if hasattr(model_canvas_loader, 'overlay_managers') else 'N/A'}")
+            if model_canvas_loader and hasattr(model_canvas_loader, 'right_panel_loader'):
+                right_panel = model_canvas_loader.right_panel_loader
+                print(f"[POPULATE_REACTION] right_panel exists: {right_panel is not None}")
+                if right_panel and hasattr(right_panel, 'transition_panel'):
+                    transition_panel = right_panel.transition_panel
+                    print(f"[POPULATE_REACTION] Found transition_panel with {len(transition_panel.selected_objects) if hasattr(transition_panel, 'selected_objects') else 0} selected objects")
+        
+        if not transition_panel:
+            print(f"[POPULATE_REACTION] ❌ No transition panel found")
+            # DON'T clear the table! Just show message
+            self.reaction_selected_status.set_markup(
+                "<i>No reaction selected. Select a reaction from Analyses panel to see locality simulation data.</i>"
+            )
+            self.reaction_selected_status.show()
+            return
+        
+        # Check if there are any selected transitions in the Analyses panel
+        if not hasattr(transition_panel, 'selected_objects') or not transition_panel.selected_objects:
+            print(f"[POPULATE_REACTION] No transitions selected in Analyses panel")
+            # DON'T clear the table! Just show message
+            self.reaction_selected_status.set_markup(
+                "<i>No reaction selected. Select a reaction from Analyses panel to see locality simulation data.</i>"
+            )
+            self.reaction_selected_status.show()
+            return
+        
+        # Use the first selected transition
+        transition = list(transition_panel.selected_objects)[0]
+        print(f"[POPULATE_REACTION] Found selected transition: {transition.id}")
+        
+        # Detect locality for this transition
+        from shypn.diagnostic import LocalityDetector
+        locality = None
+        if hasattr(transition_panel, '_model_manager') and transition_panel._model_manager:
+            detector = LocalityDetector(transition_panel._model_manager)
+            locality = detector.get_locality_for_transition(transition)
+            print(f"[POPULATE_REACTION] Locality valid: {locality.is_valid if locality else False}")
+        
+        if not locality or not locality.is_valid:
+            print(f"[POPULATE_REACTION] ❌ No valid locality for transition")
+            # DON'T clear the table! Just show message
+            # This preserves data when switching tabs or when new tab has no locality
+            self.reaction_selected_status.set_markup(
+                f"<i>Transition <b>{transition.id}</b> does not have a valid locality (need input → transition → output).</i>"
+            )
+            self.reaction_selected_status.show()
+            return
+        
+        print(f"[POPULATE_REACTION] Starting for transition {transition.id}")
+        
+        # Get simulation data from THIS document's report_data
+        # Use controller's drawing_area to find the correct document
+        report_data = None
+        if self.controller and hasattr(self.controller, '_drawing_area'):
+            drawing_area = self.controller._drawing_area
+            print(f"[REACTION_SELECTED] Using controller's drawing_area: {id(drawing_area)}")
+            
+            if hasattr(self, 'parent_panel') and self.parent_panel:
+                model_canvas_loader = getattr(self.parent_panel, 'model_canvas_loader', None)
+                if model_canvas_loader and hasattr(model_canvas_loader, 'overlay_managers'):
+                    if drawing_area in model_canvas_loader.overlay_managers:
+                        overlay_manager = model_canvas_loader.overlay_managers[drawing_area]
+                        if hasattr(overlay_manager, 'report_data'):
+                            report_data = overlay_manager.report_data
+                            print(f"[REACTION_SELECTED] ✅ Found report_data for THIS document")
+                            print(f"[REACTION_SELECTED] Has simulation data: {report_data.has_simulation_data()}")
+                        else:
+                            print(f"[REACTION_SELECTED] ❌ overlay_manager has no report_data")
+                    else:
+                        print(f"[REACTION_SELECTED] ❌ drawing_area not in overlay_managers")
+                else:
+                    print(f"[REACTION_SELECTED] ❌ No overlay_managers in model_canvas_loader")
+            else:
+                print(f"[REACTION_SELECTED] ❌ No parent_panel or model_canvas_loader")
+        else:
+            print(f"[REACTION_SELECTED] ❌ No controller or controller has no _drawing_area")
+        
+        if not report_data:
+            print(f"[REACTION_SELECTED] ❌ No report_data found!")
+            self.reaction_selected_store.clear()
+            self.reaction_selected_status.set_markup(
+                "<i>No simulation data available.</i>"
+            )
+            self.reaction_selected_status.show()
+            return
+        
+        if not report_data or not report_data.has_simulation_data():
+            self.reaction_selected_store.clear()
+            self.reaction_selected_status.set_markup(
+                f"<i>No simulation data for reaction <b>{transition.id}</b>. Run a simulation first.</i>"
+            )
+            self.reaction_selected_status.show()
+            print(f"[REACTION_SELECTED] No simulation data available")
+            return
+        
+        print(f"[REACTION_SELECTED] Has simulation data, proceeding to populate")
+        
+        # Get stored simulation data
+        sim_data = report_data.last_simulation_data
+        time_points = sim_data['time_points']
+        place_data = sim_data['place_data']
+        transition_data = sim_data['transition_data']
+        
+        print(f"[REACTION_SELECTED] Time points: {len(time_points)}")
+        print(f"[REACTION_SELECTED] Input places: {len(locality.input_places)}")
+        print(f"[REACTION_SELECTED] Output places: {len(locality.output_places)}")
+        
+        # Clear and populate table with SUMMARY statistics
+        self.reaction_selected_store.clear()
+        
+        # Helper function to calculate statistics
+        def calc_stats(data_series):
+            """Calculate min, max, average from a data series."""
+            if not data_series:
+                return 0, 0, 0
+            return min(data_series), max(data_series), sum(data_series) / len(data_series)
+        
+        # Add TRANSITION row
+        trans_id = transition.id
+        trans_name = getattr(transition, 'name', trans_id) or trans_id
+        if trans_id in transition_data and transition_data[trans_id]:
+            firings_series = transition_data[trans_id]
+            total_firings = sum(firings_series)
+            min_firings, max_firings, avg_firings = calc_stats(firings_series)
+            duration = time_points[-1] - time_points[0] if len(time_points) > 1 else 1
+            avg_rate = total_firings / duration if duration > 0 else 0
+            
+            self.reaction_selected_store.append([
+                "Transition",
+                trans_id,
+                trans_name,
+                "-",  # Initial (N/A for transitions)
+                "-",  # Final (N/A for transitions)
+                f"{min_firings:.0f}",
+                f"{max_firings:.0f}",
+                f"{avg_firings:.2f}",
+                f"{total_firings:.0f} firings ({avg_rate:.2f}/s)"
+            ])
+        
+        # Add INPUT PLACE rows
+        for place in locality.input_places:
+            place_id = place.id
+            place_name = getattr(place, 'name', place_id) or place_id
+            if place_id in place_data and place_data[place_id]:
+                tokens_series = place_data[place_id]
+                initial = tokens_series[0] if tokens_series else 0
+                final = tokens_series[-1] if tokens_series else 0
+                min_tokens, max_tokens, avg_tokens = calc_stats(tokens_series)
+                consumed = initial - final
+                duration = time_points[-1] - time_points[0] if len(time_points) > 1 else 1
+                consumption_rate = consumed / duration if duration > 0 else 0
+                
+                self.reaction_selected_store.append([
+                    "Input Place",
+                    place_id,
+                    place_name,
+                    f"{initial:.2f}",
+                    f"{final:.2f}",
+                    f"{min_tokens:.2f}",
+                    f"{max_tokens:.2f}",
+                    f"{avg_tokens:.2f}",
+                    f"Consumed: {consumed:.2f} ({consumption_rate:.2f}/s)"
+                ])
+        
+        # Add OUTPUT PLACE rows
+        for place in locality.output_places:
+            place_id = place.id
+            place_name = getattr(place, 'name', place_id) or place_id
+            if place_id in place_data and place_data[place_id]:
+                tokens_series = place_data[place_id]
+                initial = tokens_series[0] if tokens_series else 0
+                final = tokens_series[-1] if tokens_series else 0
+                min_tokens, max_tokens, avg_tokens = calc_stats(tokens_series)
+                produced = final - initial
+                duration = time_points[-1] - time_points[0] if len(time_points) > 1 else 1
+                production_rate = produced / duration if duration > 0 else 0
+                
+                self.reaction_selected_store.append([
+                    "Output Place",
+                    place_id,
+                    place_name,
+                    f"{initial:.2f}",
+                    f"{final:.2f}",
+                    f"{min_tokens:.2f}",
+                    f"{max_tokens:.2f}",
+                    f"{avg_tokens:.2f}",
+                    f"Produced: {produced:.2f} ({production_rate:.2f}/s)"
+                ])
+        
+        # Update status
+        num_inputs = len(locality.input_places)
+        num_outputs = len(locality.output_places)
+        total_rows = len(self.reaction_selected_store)
+        
+        self.reaction_selected_status.set_markup(
+            f"<i>Summary for <b>{transition.id}</b>: "
+            f"1 transition, {num_inputs} input place(s), {num_outputs} output place(s)</i>"
+        )
+        self.reaction_selected_status.show()
+        
+        print(f"[REACTION_SELECTED] ✅ Table populated with {total_rows} summary rows")

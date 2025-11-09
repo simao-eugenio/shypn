@@ -302,8 +302,11 @@ class ReportPanel(Gtk.Box):
         
         Called when significant events occur (e.g., model loaded, analysis completed).
         """
+        print(f"[REPORT_PANEL] refresh_all() called, {len(self.categories)} categories")
         for category in self.categories:
+            print(f"[REPORT_PANEL] Refreshing category: {type(category).__name__}")
             category.refresh()
+        print("[REPORT_PANEL] refresh_all() completed")
     
     def set_project(self, project):
         """Set project for all categories.

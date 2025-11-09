@@ -30,6 +30,10 @@ class DocumentReportData:
         self.last_simulation_time = None  # When simulation completed
         self.simulation_count = 0  # Number of simulations run on this document
         
+        # Selected locality for "Reaction Selected" table
+        self.selected_transition = None
+        self.selected_locality = None
+        
         # Model metadata
         self.model_name = None
         self.model_id = None
