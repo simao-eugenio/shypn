@@ -82,6 +82,9 @@ class TransitionRatePanel(AnalysisPlotPanel):
         # Locality plotting support
         self._locality_places = {}  # Maps transition_id -> {input_places, output_places}
         self._place_panel = place_panel  # Reference to PlaceRatePanel for adding locality places
+        
+        # Callback for selection changes (for Report panel sync)
+        self.on_selection_changed_callback = None
     
     def set_place_panel(self, place_panel):
         """Set the PlaceRatePanel reference for locality plotting.
@@ -130,6 +133,23 @@ class TransitionRatePanel(AnalysisPlotPanel):
         # Trigger canvas redraw to show the new colors
         if self._model_manager:
             self._model_manager.mark_needs_redraw()
+        
+        # Notify Report panel of selection change (if callback is set)
+        if self.on_selection_changed_callback:
+            # Detect locality for this transition
+            from shypn.diagnostic import LocalityDetector
+            if self._model_manager:
+                detector = LocalityDetector(self._model_manager)
+                locality = detector.get_locality_for_transition(obj)
+                print(f"[LOCALITY_SYNC] Transition {obj.name} added, locality valid: {locality.is_valid if locality else False}")
+                print(f"[LOCALITY_SYNC] Calling callback with transition {obj.id} and locality")
+                # Notify callback with transition and its locality
+                self.on_selection_changed_callback(obj, locality)
+                print(f"[LOCALITY_SYNC] Callback completed")
+            else:
+                print(f"[LOCALITY_SYNC] No model_manager, cannot detect locality")
+        else:
+            print(f"[LOCALITY_SYNC] No callback set for transition selection")
     
     def _get_rate_data(self, transition_id: Any) -> List[Tuple[float, float]]:
         """Get behavior-specific data for a transition.

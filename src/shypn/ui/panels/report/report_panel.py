@@ -63,6 +63,9 @@ class ReportPanel(Gtk.Box):
         
         # Build UI
         self._build_ui()
+        
+        # Initial refresh to show placeholder text for empty model
+        self.refresh_all()
     
     def _build_ui(self):
         """Build the report panel UI."""
@@ -339,18 +342,9 @@ class ReportPanel(Gtk.Box):
         # Wire up observer for property changes (real-time refresh)
         self._setup_model_observer(model_manager)
         
-        # Auto-refresh to show imported data immediately
-        if model_manager and hasattr(model_manager, 'transitions'):
-            if len(model_manager.transitions) > 0 or len(model_manager.places) > 0:
-                pass
-                # print(f"[REPORT] Auto-refreshing to show {len(model_manager.places)} places and {len(model_manager.transitions)} transitions")
-                self.refresh_all()
-            else:
-                pass
-                # print(f"[REPORT] Skipping auto-refresh - model is empty")
-        else:
-            pass
-            # print(f"[REPORT] Skipping auto-refresh - no model_manager or no transitions attribute")
+        # Always refresh to show current model state (even if empty)
+        # This ensures "No model loaded" or actual model data is displayed
+        self.refresh_all()
     
     def _setup_model_observer(self, model_manager):
         """Setup observer for model changes to enable real-time refresh.

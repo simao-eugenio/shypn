@@ -37,14 +37,25 @@ class ModelsCategory(BaseReportCategory):
     
     def __init__(self, project=None, model_canvas=None):
         """Initialize models category."""
+        # Initialize instance variables BEFORE super().__init__
+        # because super will call _build_content() which calls refresh()
+        
+        # Selected locality tracking
+        self.selected_transition = None
+        self.selected_locality = None
+        self.locality_store = None
+        self.locality_treeview = None
+        self.locality_expander = None
+        
+        # KEGG EC fetcher
+        self.kegg_ec_fetcher = KEGGECFetcher()
+        
         super().__init__(
             title="MODELS",
             project=project,
             model_canvas=model_canvas,
             expanded=False
         )
-        # Initialize KEGG EC fetcher for populating EC numbers
-        self.kegg_ec_fetcher = KEGGECFetcher()
     
     def _build_content(self):
         """Build models content with comprehensive scientific information."""
@@ -148,6 +159,14 @@ class ModelsCategory(BaseReportCategory):
         scrolled_reactions, self.reactions_treeview, self.reactions_store = self._create_reactions_table()
         self.reactions_expander.add(scrolled_reactions)
         box.pack_start(self.reactions_expander, False, False, 0)
+        
+        # === SELECTED LOCALITY TABLE ===
+        self.locality_expander = Gtk.Expander(label="Show Selected Locality (sortable)")
+        self.locality_expander.set_expanded(False)
+        self.locality_expander.set_visible(False)  # Initially hidden until selection
+        scrolled_locality, self.locality_treeview, self.locality_store = self._create_locality_table()
+        self.locality_expander.add(scrolled_locality)
+        box.pack_start(self.locality_expander, False, False, 0)
         
         # Initial populate
         self.refresh()
@@ -313,6 +332,62 @@ class ModelsCategory(BaseReportCategory):
         
         return scrolled, treeview, store
     
+    def _create_locality_table(self):
+        """Create TreeView for selected transition locality.
+        
+        Shows transition + input places + output places in unified table.
+        
+        Returns:
+            tuple: (ScrolledWindow, TreeView, ListStore)
+        """
+        # Create ListStore
+        # Columns:
+        #   0: index (int)
+        #   1: Type (str) - "Place" or "Transition"
+        #   2: Direction (str) - "", "← Input", "→ Output"
+        #   3: Petri Net ID (str) - P1, T1, etc.
+        #   4: Biological Name (str)
+        #   5: Info (str) - Type for transition, token count str for place
+        #   6: Value (float) - Rate for transition, tokens for place
+        #   7: Units (str)
+        #   8: Parameters (str) - EC/Vmax/Km for transition, Mass for place
+        store = Gtk.ListStore(
+            int,    # 0: index
+            str,    # 1: Type
+            str,    # 2: Direction
+            str,    # 3: Petri Net ID
+            str,    # 4: Biological Name
+            str,    # 5: Info
+            float,  # 6: Value
+            str,    # 7: Units
+            str     # 8: Parameters
+        )
+        
+        # Create TreeView
+        treeview = Gtk.TreeView(model=store)
+        treeview.set_grid_lines(Gtk.TreeViewGridLines.BOTH)
+        treeview.set_enable_search(True)
+        treeview.set_search_column(4)  # Search by biological name
+        
+        # Add columns
+        self._add_column(treeview, "#", 0, width=40, sortable=False)
+        self._add_column(treeview, "Type", 1, sortable=True, width=100)
+        self._add_column(treeview, "Direction", 2, sortable=True, width=100)
+        self._add_column(treeview, "ID", 3, sortable=True, width=100)
+        self._add_column(treeview, "Name", 4, sortable=True, width=250)
+        self._add_column(treeview, "Info", 5, sortable=True, width=120)
+        self._add_column(treeview, "Value", 6, sortable=True, numeric=True, width=100)
+        self._add_column(treeview, "Units", 7, sortable=True, width=80)
+        self._add_column(treeview, "Parameters", 8, sortable=True, width=200)
+        
+        # Create scrolled window
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        scrolled.set_min_content_height(200)
+        scrolled.add(treeview)
+        
+        return scrolled, treeview, store
+    
     def _add_column(self, treeview, title, column_id, sortable=False, 
                     width=None, numeric=False):
         """Helper to add a column to TreeView.
@@ -432,8 +507,13 @@ class ModelsCategory(BaseReportCategory):
     
     def refresh(self):
         """Refresh tables when model changes or tab switches."""
-        # If no model, clear everything
+        # If no model, show empty state
         if not self.model_canvas:
+            self.overview_label.set_text("No model loaded")
+            self.structure_label.set_text("No data")
+            self.provenance_label.set_text("No import data")
+            # Hide provenance frame when no data
+            self.provenance_frame.hide()
             return
         
         # The model_canvas IS the model (ModelCanvasManager with places/transitions/arcs)
@@ -582,6 +662,10 @@ class ModelsCategory(BaseReportCategory):
         # === BUILD DETAILED TABLES ===
         self._populate_species_table(model)
         self._populate_reactions_table(model)
+        
+        # === REFRESH LOCALITY TABLE IF SELECTION EXISTS ===
+        if self.selected_transition and self.selected_locality:
+            self._populate_locality_table()
     
     def _find_linked_pathway_document(self, model):
         """Find the PathwayDocument linked to this model.
@@ -917,6 +1001,150 @@ class ModelsCategory(BaseReportCategory):
                 reversible        # 14: Reversible
             ])
     
+    def _populate_locality_table(self):
+        """Populate locality table with selected transition + locality places.
+        
+        Called when user selects transition in Analyses panel.
+        Shows: Input Places → Transition → Output Places in unified table.
+        """
+        print(f"[POPULATE_LOCALITY] Starting...")
+        print(f"[POPULATE_LOCALITY]   selected_transition: {self.selected_transition}")
+        print(f"[POPULATE_LOCALITY]   selected_locality: {self.selected_locality}")
+        
+        self.locality_store.clear()
+        
+        if not self.selected_transition or not self.selected_locality:
+            # Hide expander when no selection
+            print(f"[POPULATE_LOCALITY] No transition or locality, hiding expander")
+            self.locality_expander.set_visible(False)
+            return
+        
+        # Show expander
+        print(f"[POPULATE_LOCALITY] Showing expander")
+        self.locality_expander.set_visible(True)
+        
+        transition = self.selected_transition
+        locality = self.selected_locality
+        
+        print(f"[POPULATE_LOCALITY] Transition: {transition.name if hasattr(transition, 'name') else transition.id}")
+        print(f"[POPULATE_LOCALITY] Input places: {len(locality.input_places)}")
+        print(f"[POPULATE_LOCALITY] Output places: {len(locality.output_places)}")
+        
+        index = 0
+        
+        # === ADD INPUT PLACES ===
+        for place in locality.input_places:
+            index += 1
+            
+            # Extract place data
+            place_id = f"P{place.id}"
+            bio_name = getattr(place, 'biological_name', getattr(place, 'name', f'Place_{place.id}'))
+            tokens = getattr(place, 'tokens', 0.0)
+            units = getattr(place, 'token_units', 'tokens')
+            
+            # Mass parameter
+            mass = getattr(place, 'mass', 0.0)
+            mass_source = getattr(place, 'mass_source', 'unknown')
+            params = f"Mass: {mass:.2f} g/mol ({mass_source})" if mass > 0 else "Mass: N/A"
+            
+            self.locality_store.append([
+                index,
+                "Place",
+                "← Input",
+                place_id,
+                bio_name,
+                f"{tokens:.3f}",
+                tokens,
+                units,
+                params
+            ])
+        
+        # === ADD TRANSITION ===
+        index += 1
+        
+        trans_id = f"T{transition.id}"
+        trans_name = getattr(transition, 'biological_name', getattr(transition, 'name', f'T{transition.id}'))
+        trans_type = getattr(transition, 'transition_type', 'continuous')
+        
+        # Type abbreviation
+        type_abbrev = {
+            'immediate': 'IMM',
+            'timed': 'TIM',
+            'stochastic': 'STO',
+            'continuous': 'CON'
+        }.get(trans_type, trans_type[:3].upper())
+        
+        # Check source/sink status
+        is_source = getattr(transition, 'is_source', False)
+        is_sink = getattr(transition, 'is_sink', False)
+        if is_source:
+            type_abbrev += '+SRC'
+        elif is_sink:
+            type_abbrev += '+SNK'
+        
+        # Extract rate and parameters
+        rate = getattr(transition, 'rate', 0.0)
+        units = getattr(transition, 'rate_units', '1/s')
+        
+        # Build parameters string
+        params_list = []
+        if hasattr(transition, 'ec_number') and transition.ec_number:
+            params_list.append(f"EC:{transition.ec_number}")
+        if hasattr(transition, 'vmax') and transition.vmax and transition.vmax > 0:
+            params_list.append(f"Vmax:{transition.vmax:.3g}")
+        if hasattr(transition, 'km') and transition.km and transition.km > 0:
+            params_list.append(f"Km:{transition.km:.3g}")
+        if hasattr(transition, 'kcat') and transition.kcat and transition.kcat > 0:
+            params_list.append(f"Kcat:{transition.kcat:.3g}")
+        params = " ".join(params_list) if params_list else "N/A"
+        
+        self.locality_store.append([
+            index,
+            "Transition",
+            "",  # No direction for transition
+            trans_id,
+            trans_name,
+            type_abbrev,
+            rate,
+            units,
+            params
+        ])
+        
+        # === ADD OUTPUT PLACES ===
+        for place in locality.output_places:
+            index += 1
+            
+            # Extract place data
+            place_id = f"P{place.id}"
+            bio_name = getattr(place, 'biological_name', getattr(place, 'name', f'Place_{place.id}'))
+            tokens = getattr(place, 'tokens', 0.0)
+            units = getattr(place, 'token_units', 'tokens')
+            
+            # Mass parameter
+            mass = getattr(place, 'mass', 0.0)
+            mass_source = getattr(place, 'mass_source', 'unknown')
+            params = f"Mass: {mass:.2f} g/mol ({mass_source})" if mass > 0 else "Mass: N/A"
+            
+            self.locality_store.append([
+                index,
+                "Place",
+                "→ Output",
+                place_id,
+                bio_name,
+                f"{tokens:.3f}",
+                tokens,
+                units,
+                params
+            ])
+        
+        # Update expander label with count
+        n_inputs = len(locality.input_places)
+        n_outputs = len(locality.output_places)
+        total = n_inputs + 1 + n_outputs
+        self.locality_expander.set_label(
+            f"Show Selected Locality: {trans_name} ({n_inputs}→T→{n_outputs}, {total} rows)"
+        )
+    
     def _build_species_list(self, model):
         """DEPRECATED: Old text-based species list builder.
         
@@ -1182,3 +1410,24 @@ class ModelsCategory(BaseReportCategory):
             )
         
         return "\n".join(lines)
+    
+    def set_selected_locality(self, transition, locality):
+        """Set the selected transition and its locality for display.
+        
+        Called from Analyses panel when user selects a transition.
+        
+        Args:
+            transition: Transition object
+            locality: Locality object from LocalityDetector
+        """
+        print(f"[MODELS_CATEGORY] set_selected_locality() called")
+        print(f"[MODELS_CATEGORY]   transition: {transition.name if hasattr(transition, 'name') else transition.id}")
+        print(f"[MODELS_CATEGORY]   locality: {locality}")
+        print(f"[MODELS_CATEGORY]   locality.is_valid: {locality.is_valid if locality else 'None'}")
+        
+        self.selected_transition = transition
+        self.selected_locality = locality
+        
+        print(f"[MODELS_CATEGORY] Calling _populate_locality_table()")
+        self._populate_locality_table()
+        print(f"[MODELS_CATEGORY] _populate_locality_table() completed")
