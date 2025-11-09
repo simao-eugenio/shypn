@@ -1,19 +1,26 @@
 #!/usr/bin/env python3
 """Behavioral Topology Analysis Category.
 
-Manages behavioral property analyzers:
-1. Reachability - What markings are reachable
-2. Boundedness - Whether places have bounded tokens
-3. Liveness - Whether transitions can always fire
-4. Deadlocks - Detection of deadlock states
-5. Fairness - Fair firing of transitions
+Manages behavioral property analyzers with prioritized execution:
+
+PRIORITY ORDER (fast to slow):
+1. Boundedness (Priority 1) - O(n) - Simple token counting (<0.5s)
+2. Fairness (Priority 1) - O(n+e) - Conflict analysis (<0.5s)
+3. Deadlocks (Priority 3) - O(2^n) - Siphon detection (5-30s)
+4. Liveness (Priority 3) - O(k^n) - Depends on reachability (5-30s)
+5. Reachability (Priority 3) - O(k^n) - State explosion (5-30s)
+
+Fast analyzers (Boundedness, Fairness) run first to provide instant feedback,
+while expensive analyzers (Reachability, Liveness, Deadlocks) run last.
 
 Author: Simão Eugénio
 Date: 2025-10-29
+Updated: 2025-11-09 - Added algorithm prioritization
 """
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk
+from collections import OrderedDict
 
 from shypn.ui.panels.topology.base_topology_category import BaseTopologyCategory
 from shypn.topology.behavioral.reachability import ReachabilityAnalyzer
@@ -58,18 +65,31 @@ class BehavioralCategory(BaseTopologyCategory):
         )
     
     def _get_analyzers(self):
-        """Get dict of analyzer name -> AnalyzerClass.
+        """Get dict of analyzer name -> AnalyzerClass in PRIORITY ORDER.
+        
+        Analyzers are returned in execution priority order (fast to slow):
+        1. Boundedness (Priority 1) - O(n) - Instant results (<0.5s)
+        2. Fairness (Priority 1) - O(n+e) - Fast conflict check (<0.5s)
+        3. Deadlocks (Priority 3) - O(2^n) - Moderate, siphon-based (5-30s)
+        4. Liveness (Priority 3) - O(k^n) - Slow, depends on reachability (5-30s)
+        5. Reachability (Priority 3) - O(k^n) - Slowest, state explosion (5-30s)
+        
+        Using OrderedDict ensures execution follows this priority when iterating.
         
         Returns:
-            dict: {analyzer_name: AnalyzerClass}
+            OrderedDict: {analyzer_name: AnalyzerClass} in priority order
         """
-        return {
-            'reachability': ReachabilityAnalyzer,
-            'boundedness': BoundednessAnalyzer,
-            'liveness': LivenessAnalyzer,
-            'deadlocks': DeadlockAnalyzer,
-            'fairness': FairnessAnalyzer,
-        }
+        # Return in PRIORITY ORDER (fastest first)
+        return OrderedDict([
+            # FAST - Priority 1 (< 0.5s)
+            ('boundedness', BoundednessAnalyzer),  # O(n) - token counting
+            ('fairness', FairnessAnalyzer),         # O(n+e) - conflict analysis
+            
+            # MODERATE/SLOW - Priority 3 (5-30s)
+            ('deadlocks', DeadlockAnalyzer),        # O(2^n) - siphon detection
+            ('liveness', LivenessAnalyzer),         # O(k^n) - depends on reachability
+            ('reachability', ReachabilityAnalyzer), # O(k^n) - state space exploration
+        ])
     
     def _build_content(self):
         """Build and return the content widget.
@@ -152,28 +172,43 @@ class BehavioralCategory(BaseTopologyCategory):
         return main_box
     
     def _create_properties_matrix(self):
-        """Create single-row properties matrix table.
+        """Create single-row properties matrix table with columns in priority order.
+        
+        Columns are ordered by algorithm execution priority:
+        1. Boundedness (fastest)
+        2. Fairness (fast)
+        3. Deadlocks (moderate)
+        4. Liveness (slow)
+        5. Reachability (slowest)
+        
+        This matches the execution order, so results populate left-to-right.
         
         Returns:
             Gtk.TreeView: Properties matrix
         """
-        # 5 columns for the 5 properties
+        # 5 columns for the 5 properties (IN PRIORITY ORDER)
         self.properties_table_store = Gtk.ListStore(str, str, str, str, str)
         
         # Add initial placeholder row
         self.properties_table_store.append([
-            'Not analyzed',
-            'Not analyzed',
-            'Not analyzed',
-            'Not analyzed',
-            'Not analyzed'
+            'Not analyzed',  # Boundedness
+            'Not analyzed',  # Fairness
+            'Not analyzed',  # Deadlocks
+            'Not analyzed',  # Liveness
+            'Not analyzed'   # Reachability
         ])
         
         treeview = Gtk.TreeView(model=self.properties_table_store)
         treeview.set_grid_lines(Gtk.TreeViewGridLines.BOTH)
         
-        # Column names
-        column_names = ['Reachability', 'Boundedness', 'Liveness', 'Deadlocks', 'Fairness']
+        # Column names (IN PRIORITY ORDER - matches execution sequence)
+        column_names = [
+            'Boundedness',   # ⚡ Priority 1 - Results appear first
+            'Fairness',      # ⚡ Priority 1 - Results appear second
+            'Deadlocks',     # ⚠️ Priority 3 - Results appear third
+            'Liveness',      # ⚠️ Priority 3 - Results appear fourth
+            'Reachability'   # ⚠️ Priority 3 - Results appear last
+        ]
         
         for i, col_name in enumerate(column_names):
             renderer = Gtk.CellRendererText()
@@ -236,30 +271,50 @@ class BehavioralCategory(BaseTopologyCategory):
         if analyzer_name == 'deadlocks' and result_data:
             self._update_deadlocks_table(result_data)
     
+    def _on_analyzer_start(self, analyzer_name):
+        """Called when an analyzer starts running.
+        
+        Updates the properties matrix to show "Analyzing..." for the active analyzer.
+        
+        Args:
+            analyzer_name: Name of analyzer that started
+        """
+        # Update matrix to show "Analyzing..." status
+        self._update_properties_matrix()
+    
     def _update_properties_matrix(self):
-        """Update the properties matrix based on cached results."""
+        """Update the properties matrix based on cached results.
+        
+        Columns are in PRIORITY ORDER (Boundedness, Fairness, Deadlocks, Liveness, Reachability)
+        so results populate left-to-right as fast algorithms complete first.
+        
+        Shows "Analyzing..." for algorithms currently running, "Not analyzed" for pending.
+        """
         drawing_area = self._get_current_drawing_area()
         if not drawing_area:
             return
         
         results = self.results_cache.get(drawing_area, {})
         
-        # Build properties row
-        reachability_text = self._format_reachability(results.get('reachability'))
-        boundedness_text = self._format_boundedness(results.get('boundedness'))
-        liveness_text = self._format_liveness(results.get('liveness'))
-        deadlocks_text = self._format_deadlocks(results.get('deadlocks'))
-        fairness_text = self._format_fairness(results.get('fairness'))
+        # Check which analyzers are currently running (in priority order)
+        analyzers_list = ['boundedness', 'fairness', 'deadlocks', 'liveness', 'reachability']
+        
+        texts = []
+        for analyzer_name in analyzers_list:
+            if analyzer_name in self.analyzing:
+                # Currently running - show spinner text
+                texts.append('⏳ Analyzing...')
+            elif analyzer_name in results:
+                # Completed - show formatted result
+                format_method = getattr(self, f'_format_{analyzer_name}')
+                texts.append(format_method(results[analyzer_name]))
+            else:
+                # Not started yet
+                texts.append('Not analyzed')
         
         # Update table (clear and add new row)
         self.properties_table_store.clear()
-        self.properties_table_store.append([
-            reachability_text,
-            boundedness_text,
-            liveness_text,
-            deadlocks_text,
-            fairness_text
-        ])
+        self.properties_table_store.append(texts)
     
     def _format_reachability(self, result):
         """Format reachability result for matrix cell."""
