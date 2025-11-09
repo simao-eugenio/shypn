@@ -1813,7 +1813,7 @@ class FileExplorerPanel:
                     is_clean = not manager.is_dirty()
                     
                     # DEBUG: Print tab reuse decision
-                    print(f"  Empty: {is_empty} (places={len(manager.places)}, trans={len(manager.transitions)}, arcs={len(manager.arcs)})")
+                    # print(f"  Empty: {is_empty} (places={len(manager.places)}, trans={len(manager.transitions)}, arcs={len(manager.arcs)})")
                     print(f"  Default name: {is_default_name} (filename='{manager.filename}')")
                     print(f"  Clean: {is_clean} (is_dirty={manager.is_dirty()})")
                     

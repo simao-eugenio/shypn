@@ -7,7 +7,8 @@ from shypn.netobjs import Place, Transition
 from shypn.netobjs.test_arc import TestArc
 from .converter_base import ConversionStrategy, ConversionOptions
 from .models import KEGGPathway, KEGGEntry
-from shypn.heuristic import KineticsAssigner
+from shypn.crossfetch.inference import HeuristicInferenceEngine
+from shypn.crossfetch.models import TransitionType
 from shypn.data.kegg_ec_fetcher import fetch_ec_numbers_parallel
 
 # Set up logging
@@ -444,13 +445,19 @@ class StandardConversionStrategy(ConversionStrategy):
         """
         logger.info(f"Enhancing kinetics for {len(document.transitions)} transitions")
         
-        assigner = KineticsAssigner()
+        # Use new heuristic inference engine (advanced pattern matching + stoichiometry)
+        engine = HeuristicInferenceEngine(use_background_fetch=False)
         enhancement_stats = {
             'total': 0,
             'enhanced': 0,
             'skipped': 0,
             'failed': 0,
-            'by_confidence': {'high': 0, 'medium': 0, 'low': 0}
+            'by_type': {
+                'continuous': 0,
+                'stochastic': 0,
+                'timed': 0,
+                'immediate': 0
+            }
         }
         
         for transition in document.transitions:
@@ -464,41 +471,82 @@ class StandardConversionStrategy(ConversionStrategy):
             
             enhancement_stats['total'] += 1
             
-            # Get corresponding reaction
+            # Get corresponding reaction (for metadata like EC numbers, reaction_id)
             reaction = reaction_transition_map.get(transition)
             
-            # Get substrate and product places from arcs
-            substrate_places = []
-            product_places = []
+            # Enrich transition with reaction metadata before inference
+            if reaction:
+                # Set EC numbers if available
+                if hasattr(reaction, 'ec_numbers') and reaction.ec_numbers:
+                    if not hasattr(transition, 'metadata'):
+                        transition.metadata = {}
+                    transition.metadata['ec_numbers'] = reaction.ec_numbers
+                    # Also set as direct attribute for new inference engine
+                    transition.ec_number = reaction.ec_numbers[0] if reaction.ec_numbers else None
+                
+                # Set reaction ID for KEGG reactions
+                if hasattr(reaction, 'id'):
+                    transition.reaction_id = reaction.id
             
-            for arc in document.arcs:
-                if arc.target == transition:
-                    # Input arc: Place → Transition
-                    substrate_places.append(arc.source)
-                elif arc.source == transition:
-                    # Output arc: Transition → Place
-                    product_places.append(arc.target)
-            
-            # Assign kinetics
+            # Infer parameters using new engine
             try:
-                result = assigner.assign(
+                result = engine.infer_parameters(
                     transition=transition,
-                    reaction=reaction,
-                    substrate_places=substrate_places,
-                    product_places=product_places,
-                    source='kegg'
+                    organism=pathway.org if hasattr(pathway, 'org') else "Homo sapiens",
+                    use_cache=False  # Don't use cache for import (fresh inference)
                 )
                 
-                if result.success:
-                    enhancement_stats['enhanced'] += 1
-                    enhancement_stats['by_confidence'][result.confidence.value] += 1
-                    logger.debug(
-                        f"Enhanced {transition.name}: {result.confidence.value} "
-                        f"confidence, rule={result.rule}"
-                    )
-                else:
-                    enhancement_stats['skipped'] += 1
-                    logger.debug(f"Skipped {transition.name}: {result.message}")
+                # Apply inferred parameters to transition
+                params = result.parameters
+                
+                # Set transition type
+                if params.transition_type == TransitionType.CONTINUOUS:
+                    transition.transition_type = "continuous"
+                    # Set continuous parameters
+                    if hasattr(params, 'vmax') and params.vmax:
+                        if not hasattr(transition, 'properties'):
+                            transition.properties = {}
+                        transition.properties['vmax'] = params.vmax
+                        transition.properties['km'] = params.km
+                        # Build rate function string
+                        substrate_places = [arc.source for arc in document.arcs if arc.target == transition]
+                        if substrate_places:
+                            s_id = substrate_places[0].id
+                            rate_func = f"({params.vmax} * {s_id}) / ({params.km} + {s_id})"
+                            transition.properties['rate_function'] = rate_func
+                    enhancement_stats['by_type']['continuous'] += 1
+                    
+                elif params.transition_type == TransitionType.STOCHASTIC:
+                    transition.transition_type = "stochastic"
+                    if hasattr(params, 'rate') and params.rate:
+                        transition.rate = params.rate
+                    enhancement_stats['by_type']['stochastic'] += 1
+                    
+                elif params.transition_type == TransitionType.TIMED:
+                    transition.transition_type = "timed"
+                    if hasattr(params, 'delay') and params.delay:
+                        transition.delay = params.delay
+                    enhancement_stats['by_type']['timed'] += 1
+                    
+                elif params.transition_type == TransitionType.IMMEDIATE:
+                    transition.transition_type = "immediate"
+                    if hasattr(params, 'priority') and params.priority:
+                        transition.priority = params.priority
+                    enhancement_stats['by_type']['immediate'] += 1
+                
+                # Store metadata about inference
+                if not hasattr(transition, 'metadata'):
+                    transition.metadata = {}
+                transition.metadata['kinetics_source'] = 'heuristic_import'
+                transition.metadata['kinetics_confidence'] = params.confidence_score
+                if hasattr(params, 'notes') and params.notes:
+                    transition.metadata['kinetics_notes'] = params.notes
+                
+                enhancement_stats['enhanced'] += 1
+                logger.debug(
+                    f"Enhanced {transition.name}: {params.transition_type.value} "
+                    f"(confidence={params.confidence_score:.2f})"
+                )
                     
             except Exception as e:
                 enhancement_stats['failed'] += 1
@@ -510,10 +558,11 @@ class StandardConversionStrategy(ConversionStrategy):
         # Log summary
         logger.info(
             f"Kinetics enhancement complete: "
-            f"{enhancement_stats['enhanced']}/{enhancement_stats['total']} enhanced "
-            f"(High: {enhancement_stats['by_confidence']['high']}, "
-            f"Medium: {enhancement_stats['by_confidence']['medium']}, "
-            f"Low: {enhancement_stats['by_confidence']['low']}), "
+            f"{enhancement_stats['enhanced']}/{enhancement_stats['total']} enhanced, "
+            f"continuous={enhancement_stats['by_type']['continuous']}, "
+            f"stochastic={enhancement_stats['by_type']['stochastic']}, "
+            f"timed={enhancement_stats['by_type']['timed']}, "
+            f"immediate={enhancement_stats['by_type']['immediate']}, "
             f"{enhancement_stats['skipped']} skipped, "
             f"{enhancement_stats['failed']} failed"
         )

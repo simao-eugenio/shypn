@@ -84,6 +84,7 @@ class ModelAdapter:
         Returns a dict for API compatibility, but keyed by object id() to ensure uniqueness.
         """
         if self._arcs_dict is None:
+            pass
             # Use Python object ID as key to avoid duplicate arc ID issues
             # This ensures all arcs are accessible even if they have duplicate IDs
             self._arcs_dict = {id(a): a for a in self.canvas_manager.arcs}
@@ -171,6 +172,59 @@ class SimulationController:
         if hasattr(model, 'register_observer'):
             model.register_observer(self._on_model_changed)
     
+    def reset(self):
+        """Reset controller to initial state for new model load.
+        
+        Called when loading a new model into an existing canvas tab (File → Open,
+        KEGG Import, SBML Import, etc.). Clears all cached state and reinitializes
+        adapters to prevent stale references from previous model.
+        
+        CRITICAL FIX: This prevents simulation failures when importing models
+        because the controller maintains state from the previous model:
+        - behavior_cache with old transition IDs
+        - transition_states with deleted transitions
+        - data_collector with wrong model reference
+        - time/running flags from previous simulation
+        
+        Without this reset, imported models fail to simulate until user manually
+        creates new objects (which triggers cache invalidation as side effect).
+        
+        See: doc/CRITICAL_SIMULATION_INIT_IMPORT_BUG.md
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Resetting SimulationController for new model load")
+        
+        # Reset simulation state
+        self.time = 0.0
+        self._running = False
+        self._stop_requested = False
+        if self._timeout_id:
+            import gi
+            gi.require_version('GLib', '2.0')
+            from gi.repository import GLib
+            GLib.source_remove(self._timeout_id)
+            self._timeout_id = None
+        
+        # Clear caches
+        self.behavior_cache.clear()
+        self.transition_states.clear()
+        self._round_robin_index = 0
+        
+        # Reinitialize model adapter with current model
+        from shypn.engine.simulation.model_adapter import ModelAdapter
+        self.model_adapter = ModelAdapter(self.model, controller=self)
+        
+        # Reinitialize data collector with current model
+        from shypn.engine.simulation.data_collector import DataCollector
+        self.data_collector = DataCollector(self.model)
+        
+        # Reset buffered settings (discard any uncommitted changes from previous model)
+        if hasattr(self, 'buffered_settings'):
+            self.buffered_settings.rollback()
+        
+        logger.info(f"SimulationController reset complete - ready for new model")
+    
     @property
     def on_simulation_complete(self):
         """Callback invoked when simulation completes."""
@@ -185,16 +239,19 @@ class SimulationController:
         # Log the assignment with controller ID
         controller_id = id(self)
         if value is None:
-            print(f"[CALLBACK_TRACE] ⚠️  Controller {controller_id}: on_simulation_complete set to None (was: {self._on_simulation_complete is not None})")
+            pass
+            # print(f"[CALLBACK_TRACE] ⚠️  Controller {controller_id}: on_simulation_complete set to None (was: {self._on_simulation_complete is not None})")
         else:
-            print(f"[CALLBACK_TRACE] ✅ Controller {controller_id}: on_simulation_complete set to {value}")
+            pass
+            # print(f"[CALLBACK_TRACE] ✅ Controller {controller_id}: on_simulation_complete set to {value}")
         
         # Print stack trace to see WHO is setting it
-        print(f"[CALLBACK_TRACE] Stack trace:")
+        # print(f"[CALLBACK_TRACE] Stack trace:")
         for line in traceback.format_stack()[:-1]:  # Exclude this setter call
             # Only print relevant lines (skip standard library noise)
             if '/shypn/' in line and 'traceback' not in line.lower():
-                print(f"[CALLBACK_TRACE]   {line.strip()}")
+                pass
+                # print(f"[CALLBACK_TRACE]   {line.strip()}")
         
         self._on_simulation_complete = value
 
@@ -216,6 +273,7 @@ class SimulationController:
         from shypn.netobjs.arc import Arc
         
         if event_type == 'deleted':
+            pass
             # If a transition was deleted, remove it from our caches
             if isinstance(obj, Transition):
                 if obj.id in self.behavior_cache:
@@ -228,8 +286,10 @@ class SimulationController:
                 self.model_adapter.invalidate_caches()
         
         elif event_type == 'transformed':
+            pass
             # If an arc was transformed, rebuild behaviors for affected transitions
             if isinstance(obj, Arc):
+                pass
                 # Invalidate model adapter caches (arc dicts changed)
                 self.model_adapter.invalidate_caches()
                 
@@ -246,6 +306,7 @@ class SimulationController:
                 pass  # Behaviors rebuilt for affected transitions
         
         elif event_type == 'created':
+            print(f"[OBSERVER] Controller received 'created' event for {type(obj).__name__}")
             # New object created (place, transition, or arc)
             # Invalidate model adapter caches to include the new object
             from shypn.netobjs.place import Place
@@ -254,6 +315,7 @@ class SimulationController:
             
             # If a new transition was created, initialize its state and enablement
             if isinstance(obj, Transition):
+                print(f"[OBSERVER] New transition created: {obj.id}, is_source={getattr(obj, 'is_source', False)}")
                 if obj.id not in self.transition_states:
                     self.transition_states[obj.id] = TransitionState()
                 
@@ -263,12 +325,14 @@ class SimulationController:
                 is_source = getattr(obj, 'is_source', False)
                 
                 if is_source:
+                    print(f"[OBSERVER] ✅ Enabling source transition {obj.id} at t={self.time}")
                     # Source transitions are always enabled
                     state = self.transition_states[obj.id]
                     state.enablement_time = self.time
                     if hasattr(behavior, 'set_enablement_time'):
                         behavior.set_enablement_time(self.time)
                 else:
+                    pass
                     # Check if transition is structurally enabled (has enough input tokens)
                     input_arcs = behavior.get_input_arcs()
                     locally_enabled = True
@@ -283,6 +347,26 @@ class SimulationController:
                         state.enablement_time = self.time
                         if hasattr(behavior, 'set_enablement_time'):
                             behavior.set_enablement_time(self.time)
+        
+        elif event_type == 'modified':
+            print(f"[OBSERVER] Controller received 'modified' event for {type(obj).__name__}")
+            # Object properties were modified
+            if isinstance(obj, Transition):
+                print(f"[OBSERVER] Transition modified: {obj.id}, is_source={getattr(obj, 'is_source', False)}")
+                # Invalidate behavior cache (type or properties may have changed)
+                if obj.id in self.behavior_cache:
+                    del self.behavior_cache[obj.id]
+                
+                # Check if it's now a source transition and enable if needed
+                is_source = getattr(obj, 'is_source', False)
+                if is_source:
+                    state = self._get_or_create_state(obj)
+                    if state.enablement_time is None:
+                        state.enablement_time = self.time
+                        behavior = self._get_behavior(obj)
+                        if hasattr(behavior, 'set_enablement_time'):
+                            behavior.set_enablement_time(self.time)
+                        print(f"[OBSERVER] ✅ Enabled source transition {obj.id} at t={self.time}")
 
     def _get_behavior(self, transition):
         """Get or create behavior instance for a transition.
@@ -318,6 +402,7 @@ class SimulationController:
                 if transition.id in self.transition_states:
                     del self.transition_states[transition.id]
         if transition.id not in self.behavior_cache:
+            pass
             # Create behavior instance
             # IMPORTANT: This method ONLY creates behaviors, it does NOT initialize
             # their enablement state. Initialization is handled EXCLUSIVELY by 
@@ -362,24 +447,38 @@ class SimulationController:
         - If still enabled: keep existing enablement_time
         - If disabled: clear enablement_time
         """
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        # Debug: Log source transitions
+        source_transitions = [t for t in self.model.transitions if getattr(t, 'is_source', False)]
+        if source_transitions and not hasattr(self, '_logged_source_transitions'):
+            self._logged_source_transitions = True
+            logger.info(f"Found {len(source_transitions)} source transition(s):")
+            for t in source_transitions:
+                logger.info(f"  - {t.id}: type={t.transition_type}, is_source={getattr(t, 'is_source', False)}")
+        
         for transition in self.model.transitions:
             behavior = self._get_behavior(transition)
             
             # Special handling for source transitions (no input places)
             is_source = getattr(transition, 'is_source', False)
             if is_source:
+                pass
                 # Source transitions are always structurally enabled
                 state = self._get_or_create_state(transition)
                 if state.enablement_time is None:
                     state.enablement_time = self.time
                     if hasattr(behavior, 'set_enablement_time'):
                         behavior.set_enablement_time(self.time)
+                    logger.debug(f"Source transition {transition.id} enabled at t={self.time}")
                 # Source transitions stay enabled continuously
                 continue
             
             input_arcs = behavior.get_input_arcs()
             locally_enabled = True
             for arc in input_arcs:
+                pass
                 # Check ALL arc types for enablement (normal, test, inhibitor)
                 # Test arcs check presence but don't consume (catalysts)
                 # Inhibitor arcs check surplus and do consume (cooperation)
@@ -481,6 +580,15 @@ class SimulationController:
 
     def _notify_step_listeners(self):
         """Notify all registered step listeners."""
+        # Debug: Log listener count once
+        if not hasattr(self, '_logged_listeners'):
+            self._logged_listeners = True
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"[STEP_LISTENERS] Controller has {len(self.step_listeners)} step listeners registered")
+            for i, callback in enumerate(self.step_listeners):
+                logger.info(f"  [{i}] {callback}")
+        
         for callback in self.step_listeners:
             try:
                 callback(self, self.time)
@@ -533,7 +641,14 @@ class SimulationController:
             for t in self.model.transitions:
                 ttype = t.transition_type
                 type_counts[ttype] = type_counts.get(ttype, 0) + 1
-            print(f"[STEP_DEBUG] Model has {len(self.model.transitions)} transitions: {type_counts}")
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"Model has {len(self.model.transitions)} transitions: {type_counts}")
+            
+            # Also log source transitions
+            source_count = len([t for t in self.model.transitions if getattr(t, 'is_source', False)])
+            if source_count > 0:
+                logger.info(f"  - {source_count} source transition(s)")
         
         self._update_enablement_states()
         
@@ -570,6 +685,7 @@ class SimulationController:
                              elapsed_after > behavior.latest)
                 
                 if will_cross:
+                    pass
                     # Check structural enablement (tokens only, ignore timing)
                     # For sources, always structurally enabled
                     is_source = hasattr(transition, 'properties') and \
@@ -579,6 +695,7 @@ class SimulationController:
                     if not is_source:
                         input_arcs = behavior.get_input_arcs()
                         for arc in input_arcs:
+                            pass
                             # Check ALL arc types (normal, test, inhibitor) for token availability
                             source_place = self.model_adapter.places.get(arc.source_id)
                             if source_place is None or source_place.tokens < arc.weight:
@@ -586,6 +703,7 @@ class SimulationController:
                                 break
                     
                     if has_tokens:
+                        pass
                         # Manual token transfer for window crossing (bypass timing checks in fire())
                         # This is necessary because fire() checks timing, but we KNOW the window is crossed
                         consumed_map = {}
@@ -594,6 +712,7 @@ class SimulationController:
                         # Consume tokens from input places
                         if not is_source:
                             for arc in behavior.get_input_arcs():
+                                pass
                                 # Skip test arcs - they check enablement but don't consume tokens
                                 if hasattr(arc, 'consumes_tokens') and not arc.consumes_tokens():
                                     continue
@@ -629,12 +748,14 @@ class SimulationController:
                             self.data_collector.on_transition_fired(transition, self.time, details)
                         
                         # PHASE 1-2 FIX: Also notify step listeners if they have on_transition_fired
-                        print(f"[FIRE_NOTIFY] Window crossing: {transition.id}, notifying {len(self.step_listeners)} listeners")
+                        # print(f"[FIRE_NOTIFY] Window crossing: {transition.id}, notifying {len(self.step_listeners)} listeners")
                         for listener in self.step_listeners:
+                            pass
                             # Check if listener is a bound method with __self__
                             listener_obj = listener.__self__ if hasattr(listener, '__self__') else listener
                             if hasattr(listener_obj, 'on_transition_fired'):
-                                print(f"[FIRE_NOTIFY]   Notifying {type(listener_obj).__name__}")
+                                pass
+                                # print(f"[FIRE_NOTIFY]   Notifying {type(listener_obj).__name__}")
                                 details = {
                                     'consumed': consumed_map,
                                     'produced': produced_map,
@@ -670,17 +791,20 @@ class SimulationController:
                 # PHASE 1-2 FIX: Also notify step listeners if they have on_transition_fired
                 if not hasattr(self, '_debug_continuous_printed'):
                     self._debug_continuous_printed = True
-                    print(f"[FIRE_NOTIFY] Continuous: {transition.id}, notifying {len(self.step_listeners)} listeners")
+                    # print(f"[FIRE_NOTIFY] Continuous: {transition.id}, notifying {len(self.step_listeners)} listeners")
                     for i, listener in enumerate(self.step_listeners):
+                        pass
                         # Check if listener is a bound method with __self__
                         listener_obj = listener.__self__ if hasattr(listener, '__self__') else listener
-                        print(f"[FIRE_NOTIFY]   Listener {i}: {type(listener).__name__} -> {type(listener_obj).__name__} (id={id(listener_obj)})")
+                        # print(f"[FIRE_NOTIFY]   Listener {i}: {type(listener).__name__} -> {type(listener_obj).__name__} (id={id(listener_obj)})")
                         print(f"[FIRE_NOTIFY]     has 'on_transition_fired': {hasattr(listener_obj, 'on_transition_fired')}")
                         if hasattr(listener_obj, 'on_transition_fired'):
-                            print(f"[FIRE_NOTIFY]     ✅ Calling on_transition_fired()")
+                            pass
+                            # print(f"[FIRE_NOTIFY]     ✅ Calling on_transition_fired()")
                             listener_obj.on_transition_fired(transition, self.time, details)
                         else:
-                            print(f"[FIRE_NOTIFY]     ❌ Skipping (no method)")
+                            pass
+                            # print(f"[FIRE_NOTIFY]     ❌ Skipping (no method)")
                 else:
                     for listener in self.step_listeners:
                         listener_obj = listener.__self__ if hasattr(listener, '__self__') else listener
@@ -709,6 +833,7 @@ class SimulationController:
         enabled_timed = [t for t in timed_transitions if self._is_transition_enabled(t)]
         
         if enabled_timed:
+            pass
             # Select and fire one timed transition (may have conflicts among timed)
             transition = self._select_transition(enabled_timed)
             self._fire_transition(transition)
@@ -721,6 +846,7 @@ class SimulationController:
             stochastic_transitions = [t for t in self.model.transitions if t.transition_type == 'stochastic']
             enabled_stochastic = [t for t in stochastic_transitions if self._is_transition_enabled(t)]
             if enabled_stochastic:
+                pass
                 # Select and fire one stochastic transition (may have conflicts among stochastic)
                 transition = self._select_transition(enabled_stochastic)
                 self._fire_transition(transition)
@@ -800,6 +926,7 @@ class SimulationController:
         output_arcs = behavior.get_output_arcs()
         success, details = behavior.fire(input_arcs, output_arcs)
         if success:
+            pass
             # Increment firing count for statistics
             transition.firing_count += 1
             
@@ -812,17 +939,20 @@ class SimulationController:
         # PHASE 1-2 FIX: Also notify step listeners if they have on_transition_fired
         if not hasattr(self, '_debug_listeners_printed'):
             self._debug_listeners_printed = True
-            print(f"[FIRE_NOTIFY] Discrete: {transition.id}, notifying {len(self.step_listeners)} listeners")
+            # print(f"[FIRE_NOTIFY] Discrete: {transition.id}, notifying {len(self.step_listeners)} listeners")
             for i, listener in enumerate(self.step_listeners):
+                pass
                 # Check if listener is a bound method with __self__
                 listener_obj = listener.__self__ if hasattr(listener, '__self__') else listener
-                print(f"[FIRE_NOTIFY]   Listener {i}: {type(listener).__name__} -> {type(listener_obj).__name__} (id={id(listener_obj)})")
+                # print(f"[FIRE_NOTIFY]   Listener {i}: {type(listener).__name__} -> {type(listener_obj).__name__} (id={id(listener_obj)})")
                 print(f"[FIRE_NOTIFY]     has 'on_transition_fired': {hasattr(listener_obj, 'on_transition_fired')}")
                 if hasattr(listener_obj, 'on_transition_fired'):
-                    print(f"[FIRE_NOTIFY]     ✅ Calling on_transition_fired()")
+                    pass
+                    # print(f"[FIRE_NOTIFY]     ✅ Calling on_transition_fired()")
                     listener_obj.on_transition_fired(transition, self.time, details)
                 else:
-                    print(f"[FIRE_NOTIFY]     ❌ Skipping (no method)")
+                    pass
+                    # print(f"[FIRE_NOTIFY]     ❌ Skipping (no method)")
         else:
             for listener in self.step_listeners:
                 listener_obj = listener.__self__ if hasattr(listener, '__self__') else listener
@@ -965,8 +1095,10 @@ class SimulationController:
         # Compare each pair of transitions
         for i, t1 in enumerate(transitions):
             for t2 in transitions[i+1:]:
+                pass
                 # Check if they share places
                 if not self._are_independent(t1, t2):
+                    pass
                     # They share places → Conflict!
                     conflict_sets[t1.id].add(t2.id)
                     conflict_sets[t2.id].add(t1.id)
@@ -1009,6 +1141,7 @@ class SimulationController:
         transitions_by_id = {t.id: t for t in transitions}
         
         while remaining:
+            pass
             # Start new group with first remaining transition
             current_id = next(iter(remaining))
             current_group = [transitions_by_id[current_id]]
@@ -1017,6 +1150,7 @@ class SimulationController:
             # Try to add non-conflicting transitions to this group
             to_check = list(remaining)
             for tid in to_check:
+                pass
                 # Check if this transition is independent of ALL in current group
                 independent_of_all = True
                 for group_transition in current_group:
@@ -1181,10 +1315,12 @@ class SimulationController:
         
         # Try to add each remaining transition
         for t in ordered[1:]:
+            pass
             # Check if t is independent of ALL transitions in current set
             can_add = True
             for tid in maximal_set_ids:
                 if t.id in conflict_sets[tid]:
+                    pass
                     # Conflict found - cannot add
                     can_add = False
                     break
@@ -1262,11 +1398,13 @@ class SimulationController:
             can_add = True
             for tid in set_ids:
                 if t.id in conflict_sets[tid]:
+                    pass
                     # Conflict found - cannot add this transition
                     can_add = False
                     break
             
             if can_add:
+                pass
                 # Found a transition we can add - not maximal!
                 return False
         
@@ -1309,24 +1447,29 @@ class SimulationController:
             return []
         
         if strategy == 'largest':
+            pass
             # Maximize parallelism - choose set with most transitions
             return max(maximal_sets, key=len)
         
         elif strategy == 'priority':
+            pass
             # Maximize sum of priorities
             def total_priority(tset):
                 return sum(getattr(t, 'priority', 0) for t in tset)
             return max(maximal_sets, key=total_priority)
         
         elif strategy == 'random':
+            pass
             # Random for exploration
             return random.choice(maximal_sets)
         
         elif strategy == 'first':
+            pass
             # Deterministic (natural order from Phase 2)
             return maximal_sets[0]
         
         else:
+            pass
             # Unknown strategy - fall back to first
             return maximal_sets[0]
 
@@ -1355,9 +1498,11 @@ class SimulationController:
             validate([T1]) → True (P1 has 2 >= 1 tokens)
         """
         for transition in transition_set:
+            pass
             # Find input arcs for this transition
             for arc in self.model.arcs:
                 if arc.target == transition:
+                    pass
                     # This is an input arc (place → transition)
                     place = arc.source
                     
@@ -1470,6 +1615,7 @@ class SimulationController:
         snapshot = self._snapshot_marking()
         
         try:
+            pass
             # PHASE 3: COMMIT (execute atomically)
             fired = []
             
@@ -1481,9 +1627,11 @@ class SimulationController:
             )
             
             for transition in sorted_transitions:
+                pass
                 # Remove input tokens
                 for arc in self.model.arcs:
                     if arc.target == transition:
+                        pass
                         # Input arc (place → transition)
                         place = arc.source
                         
@@ -1513,6 +1661,7 @@ class SimulationController:
                 # Add output tokens
                 for arc in self.model.arcs:
                     if arc.source == transition:
+                        pass
                         # Output arc (transition → place)
                         place = arc.target
                         tokens_produced = getattr(arc, 'weight', 1)
@@ -1524,6 +1673,7 @@ class SimulationController:
             return (True, fired, "")
             
         except Exception as e:
+            pass
             # ROLLBACK: Restore snapshot
             self._restore_marking(snapshot)
             return (False, [], f"Execution failed: {e}, rolled back")
@@ -1564,26 +1714,31 @@ class SimulationController:
         
         # Per-transition firing policies
         if policy == 'earliest':
+            pass
             # Fire transition that was enabled earliest (smallest enablement time)
             return min(enabled_transitions, 
                       key=lambda t: self.transition_states[t.id].enablement_time if t.id in self.transition_states and self.transition_states[t.id].enablement_time is not None else float('inf'))
         
         elif policy == 'latest':
+            pass
             # Fire transition that was enabled most recently (largest enablement time)
             return max(enabled_transitions,
                       key=lambda t: self.transition_states[t.id].enablement_time if t.id in self.transition_states and self.transition_states[t.id].enablement_time is not None else 0)
         
         elif policy == 'priority':
+            pass
             # Fire highest priority transition
             return max(enabled_transitions, key=lambda t: getattr(t, 'priority', 0))
         
         elif policy == 'race':
+            pass
             # Mass action kinetics - exponential race condition
             # Sample exponential delay for each, select minimum
             import numpy as np
             min_delay = float('inf')
             selected = None
             for t in enabled_transitions:
+                pass
                 # Use transition rate if available, otherwise default to 1.0
                 rate = float(getattr(t, 'rate', 1.0)) if hasattr(t, 'rate') and t.rate else 1.0
                 if rate > 0:
@@ -1594,20 +1749,24 @@ class SimulationController:
             return selected if selected else random.choice(enabled_transitions)
         
         elif policy == 'age':
+            pass
             # FIFO - transition enabled longest fires first
             return min(enabled_transitions,
                       key=lambda t: self.transition_states[t.id].enablement_time if t.id in self.transition_states and self.transition_states[t.id].enablement_time is not None else float('inf'))
         
         elif policy == 'random':
+            pass
             # Uniform random selection
             return random.choice(enabled_transitions)
         
         elif policy == 'preemptive-priority':
+            pass
             # For now, treat same as priority (full preemption requires interrupt mechanism)
             # TODO: Implement preemption of running lower-priority transitions
             return max(enabled_transitions, key=lambda t: getattr(t, 'priority', 0))
         
         else:
+            pass
             # Unknown policy - default to random
             return random.choice(enabled_transitions)
 
@@ -1712,6 +1871,7 @@ class SimulationController:
         
         # Execute a batch of simulation steps for smooth animation
         for _ in range(self._steps_per_callback):
+            pass
             # Check stop conditions before each step in the batch
             if self._stop_requested:
                 self._running = False
@@ -1727,6 +1887,7 @@ class SimulationController:
             # Execute one simulation step
             success = self.step(self._time_step)
             if not success:
+                pass
                 # Simulation completed (duration reached)
                 print(f"[SIMULATION] Simulation completed naturally at time={self.time}")
                 self._running = False
@@ -1803,7 +1964,8 @@ class SimulationController:
                 import traceback
                 traceback.print_exc()
         else:
-            print(f"[DEBUG_STOP] ⚠️  No on_simulation_complete callback registered")
+            pass
+            # print(f"[DEBUG_STOP] ⚠️  No on_simulation_complete callback registered")
         
         for state in self.transition_states.values():
             state.enablement_time = None
@@ -1904,7 +2066,8 @@ class SimulationController:
         # PHASE 1-2 FIX: Restore callback after recreating data collector
         self.on_simulation_complete = saved_callback
         if saved_callback:
-            print(f"[RESET_MODEL] ✅ Preserved on_simulation_complete callback")
+            pass
+            # print(f"[RESET_MODEL] ✅ Preserved on_simulation_complete callback")
         
         # Reset data collector if exists (legacy compatibility)
         if self.data_collector is not None:

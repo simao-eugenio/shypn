@@ -133,14 +133,14 @@ class SpeciesConcentrationTable(Gtk.ScrolledWindow):
         Args:
             species_metrics: List of SpeciesMetrics instances
         """
-        print(f"[SPECIES_TABLE] populate() called with {len(species_metrics)} metrics")
+        # print(f"[SPECIES_TABLE] populate() called with {len(species_metrics)} metrics")
         
         # CRITICAL: Clear BEFORE populating to prevent mixing old and new data
         self.store.clear()
         print(f"[SPECIES_TABLE] Store cleared")
         
         if not species_metrics:
-            print(f"[SPECIES_TABLE] ⚠️  No metrics to populate")
+            # print(f"[SPECIES_TABLE] ⚠️  No metrics to populate")
             return
         
         row_count = 0
@@ -161,7 +161,7 @@ class SpeciesConcentrationTable(Gtk.ScrolledWindow):
                 print(f"[SPECIES_TABLE]   Row {row_count}: {metrics.place_name}, init={metrics.initial_tokens}, final={metrics.final_tokens}")
         
         print(f"[SPECIES_TABLE] Added {row_count} rows to store")
-        print(f"[SPECIES_TABLE] Store now has {len(self.store)} rows")
+        # print(f"[SPECIES_TABLE] Store now has {len(self.store)} rows")
         
         # Force update
         self.tree_view.queue_draw()

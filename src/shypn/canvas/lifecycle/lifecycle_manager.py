@@ -170,7 +170,18 @@ class CanvasLifecycleManager:
             controller: SimulationController instance
         """
         # Get simulate tools palette from SwissKnifePalette widget instances
-        simulate_tools = palette.widget_palette_instances.get('simulate')
+        # Try multiple access patterns for compatibility
+        simulate_tools = None
+        
+        if hasattr(palette, 'widget_palette_instances'):
+            simulate_tools = palette.widget_palette_instances.get('simulate')
+        elif hasattr(palette, 'registry') and hasattr(palette.registry, 'widget_palette_instances'):
+            simulate_tools = palette.registry.widget_palette_instances.get('simulate')
+        elif hasattr(palette, 'registry') and hasattr(palette.registry, 'get_widget_palette_instance'):
+            try:
+                simulate_tools = palette.registry.get_widget_palette_instance('simulate')
+            except:
+                pass
         
         if simulate_tools:
             # Update controller reference
@@ -313,12 +324,26 @@ class CanvasLifecycleManager:
         
         # 3. Ensure controller has TransitionState for all transitions
         logger.debug("  Initializing transition states...")
-        from shypn.engine.simulation.state.transition_state import TransitionState
+        print(f"[LIFECYCLE] Initializing transition states for {len(context.document_model.transitions)} transitions")
+        from shypn.engine.simulation.controller import TransitionState
         
+        source_count = 0
         for transition in context.document_model.transitions:
             if transition.id not in context.controller.transition_states:
                 context.controller.transition_states[transition.id] = TransitionState()
                 logger.debug(f"    Created TransitionState for {transition.id}")
+                
+                # CRITICAL: Initialize source transitions at t=0
+                # Source transitions must be enabled from the start to allow simulation
+                is_source = getattr(transition, 'is_source', False)
+                if is_source:
+                    source_count += 1
+                    state = context.controller.transition_states[transition.id]
+                    state.enablement_time = context.controller.time  # Enable at current time (usually 0)
+                    print(f"[LIFECYCLE] ✅ Enabled source transition {transition.id} at t={context.controller.time}")
+                    logger.debug(f"    Enabled source transition {transition.id} at t={context.controller.time}")
+        
+        print(f"[LIFECYCLE] ✅ Initialized {len(context.document_model.transitions)} transitions, {source_count} source transitions enabled")
         
         # 4. Update context metadata
         context.file_path = file_path

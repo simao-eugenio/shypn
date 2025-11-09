@@ -154,6 +154,7 @@ class BRENDAAPIClient:
         self.credentials = BRENDACredentials(email=email, password=password)
         
         try:
+            pass
             # Initialize SOAP client (simple version like commit 0d76f45)
             self.logger.info(f"Connecting to BRENDA API at {self.WSDL_URL}")
             self.client = Client(self.WSDL_URL)
@@ -224,6 +225,7 @@ class BRENDAAPIClient:
             raise RuntimeError("Not authenticated. Call authenticate() first.")
         
         try:
+            pass
             # Use SHA256 hash of password (BRENDA API requirement)
             password_hash = self.credentials.get_password_hash()
             
@@ -292,6 +294,7 @@ class BRENDAAPIClient:
             raise RuntimeError("Not authenticated. Call authenticate() first.")
         
         try:
+            pass
             # Use SHA256 hash of password (BRENDA API requirement)
             password_hash = self.credentials.get_password_hash()
             
@@ -335,6 +338,7 @@ class BRENDAAPIClient:
             raise RuntimeError("Not authenticated. Call authenticate() first.")
         
         try:
+            pass
             # Use SHA256 hash of password (BRENDA API requirement)
             password_hash = self.credentials.get_password_hash()
             
@@ -383,9 +387,11 @@ class BRENDAAPIClient:
         
         # Handle zeep object (modern BRENDA SOAP API)
         try:
+            pass
             # zeep returns an iterable of kmValueObject items
             for item in response:
                 try:
+                    pass
                     # Each item has attributes we can access
                     km_value = getattr(item, 'kmValue', None)
                     if km_value is not None:
@@ -403,6 +409,7 @@ class BRENDAAPIClient:
                     continue
             return results
         except TypeError:
+            pass
             # Fallback: might be a string (old API format)
             pass
         
@@ -583,6 +590,7 @@ def get_brenda_client() -> Optional[BRENDAAPIClient]:
 
 
 if __name__ == "__main__":
+    pass
     # Test script
     logging.basicConfig(level=logging.INFO)
     
@@ -591,7 +599,8 @@ if __name__ == "__main__":
     print("=" * 70)
     
     if not ZEEP_AVAILABLE:
-        print("\n❌ ERROR: zeep library not installed")
+        pass
+        # print("\n❌ ERROR: zeep library not installed")
         print("Install with: pip install zeep")
         exit(1)
     
@@ -600,7 +609,8 @@ if __name__ == "__main__":
     password = os.getenv('BRENDA_PASSWORD')
     
     if not email or not password:
-        print("\n❌ ERROR: BRENDA credentials not found")
+        pass
+        # print("\n❌ ERROR: BRENDA credentials not found")
         print("\nSet environment variables:")
         print("  export BRENDA_EMAIL='your-email@example.com'")
         print("  export BRENDA_PASSWORD='your-password'")
@@ -620,25 +630,30 @@ if __name__ == "__main__":
         km_values = client.get_km_values("2.7.1.1", organism="Homo sapiens")
         
         if km_values:
-            print(f"✓ Found {len(km_values)} Km values:")
+            pass
+            # print(f"✓ Found {len(km_values)} Km values:")
             for i, km in enumerate(km_values[:5], 1):  # Show first 5
                 print(f"  {i}. Substrate: {km['substrate']}, Km: {km['value']} {km['unit']}")
         else:
-            print("❌ No Km values found")
+            pass
+            # print("❌ No Km values found")
         
         # Test kcat query
         print("\n--- Testing kcat Query ---")
         kcat_values = client.get_kcat_values("2.7.1.1", organism="Homo sapiens")
         
         if kcat_values:
-            print(f"✓ Found {len(kcat_values)} kcat values:")
+            pass
+            # print(f"✓ Found {len(kcat_values)} kcat values:")
             for i, kcat in enumerate(kcat_values[:5], 1):
                 print(f"  {i}. Substrate: {kcat['substrate']}, kcat: {kcat['value']} {kcat['unit']}")
         else:
-            print("❌ No kcat values found")
+            pass
+            # print("❌ No kcat values found")
         
         print("\n✓ All tests passed!")
         
     else:
-        print("❌ Authentication failed")
+        pass
+        # print("❌ Authentication failed")
         exit(1)

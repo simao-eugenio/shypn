@@ -112,10 +112,11 @@ class BRENDAEnrichmentController:
         
         print(f"[BRENDA_SCAN] Scanning model: {self.model_canvas.get_display_name() if hasattr(self.model_canvas, 'get_display_name') else 'Unknown'}")
         print(f"[BRENDA_SCAN] Model ID: {id(self.model_canvas)}")
-        print(f"[BRENDA_SCAN] Model type: {type(self.model_canvas)}")
+        # print(f"[BRENDA_SCAN] Model type: {type(self.model_canvas)}")
         print(f"[BRENDA_SCAN] Has 'transitions' attr: {hasattr(self.model_canvas, 'transitions')}")
         if hasattr(self.model_canvas, 'transitions'):
-            print(f"[BRENDA_SCAN] Transitions type: {type(self.model_canvas.transitions)}")
+            pass
+            # print(f"[BRENDA_SCAN] Transitions type: {type(self.model_canvas.transitions)}")
         
         # Debug: list all attributes
         print(f"[BRENDA_SCAN] Model attributes: {[a for a in dir(self.model_canvas) if not a.startswith('_')][:20]}")
@@ -124,7 +125,8 @@ class BRENDAEnrichmentController:
         
         # Access transitions from ModelCanvasManager
         if hasattr(self.model_canvas, 'transitions'):
-            print(f"[BRENDA_SCAN] Found {len(self.model_canvas.transitions)} transitions in model")
+            pass
+            # print(f"[BRENDA_SCAN] Found {len(self.model_canvas.transitions)} transitions in model")
             
             for transition in self.model_canvas.transitions:
                 if not transition:
@@ -143,12 +145,13 @@ class BRENDAEnrichmentController:
                 
                 # Get EC number and data source from metadata
                 if hasattr(transition, 'metadata') and transition.metadata:
+                    pass
                     # Extract data source
                     transition_info['data_source'] = transition.metadata.get('data_source', 'unknown')
                     ec_val = transition.metadata.get('ec_number',
                              transition.metadata.get('ec_numbers', []))
                     
-                    print(f"[BRENDA_SCAN] Transition {transition_info['name']}: ec_val={ec_val}, type={type(ec_val)}")
+                    # print(f"[BRENDA_SCAN] Transition {transition_info['name']}: ec_val={ec_val}, type={type(ec_val)}")
                     
                     if isinstance(ec_val, list) and len(ec_val) > 0:
                         transition_info['ec_number'] = ec_val[0]
@@ -183,9 +186,11 @@ class BRENDAEnrichmentController:
                 
                 # If no EC number found in metadata, try to extract from KEGG reaction ID
                 if not transition_info['ec_number']:
+                    pass
                     # Check if transition has a label with KEGG reaction ID (e.g., "R00710")
                     label = getattr(transition, 'label', None) or transition_info['name']
                     if label and re.match(r'^R\d{5}$', label):
+                        pass
                         # This is a KEGG reaction ID - fetch EC numbers from KEGG API
                         print(f"[BRENDA_SCAN] Fetching EC numbers for KEGG reaction {label}...")
                         try:
@@ -273,6 +278,7 @@ class BRENDAEnrichmentController:
         print(f"[QUERY_BRENDA] Querying BRENDA API for EC {ec_number}, organism={organism or 'all'}")
         
         try:
+            pass
             # Query Km values
             km_values = self.brenda_api.get_km_values(ec_number, organism)
             
@@ -330,6 +336,7 @@ class BRENDAEnrichmentController:
                     data = json.load(f)
                 return data
             elif file_path.endswith('.csv'):
+                pass
                 # TODO: Implement CSV parsing
                 return None
             else:
@@ -391,6 +398,7 @@ class BRENDAEnrichmentController:
             
             # Add/update kinetic parameters with source tracking
             for param_name, param_value in parameters.items():
+                pass
                 # Skip internal flags
                 if param_name.startswith('_'):
                     continue
@@ -398,17 +406,20 @@ class BRENDAEnrichmentController:
                 param_exists = param_name in transition_obj.metadata
                 
                 if not param_exists:
+                    pass
                     # New parameter - always add
                     transition_obj.metadata[param_name] = param_value
                     transition_obj.metadata[f'{param_name}_source'] = 'brenda_enriched'
                     print(f"[BRENDA]   Added {param_name}={param_value}, source=brenda_enriched")
                 elif override_mode:
+                    pass
                     # Parameter exists but override is enabled - replace it
                     old_value = transition_obj.metadata[param_name]
                     transition_obj.metadata[param_name] = param_value
                     transition_obj.metadata[f'{param_name}_source'] = 'brenda_enriched'
                     print(f"[BRENDA]   Overrode {param_name}: {old_value} → {param_value}, source=brenda_enriched")
                 else:
+                    pass
                     # Parameter exists and override disabled - skip
                     print(f"[BRENDA]   Skipped {param_name} (already exists: {transition_obj.metadata[param_name]})")
             
@@ -427,7 +438,8 @@ class BRENDAEnrichmentController:
                 self._generate_rate_function_from_parameters(transition_obj, parameters, override=override)
                 print(f"[BRENDA] >>> Finished _generate_rate_function_from_parameters for T{transition_obj.id}")
             except Exception as e:
-                print(f"[BRENDA] ⚠️ ERROR in rate function generation for T{transition_obj.id}: {e}")
+                pass
+                # print(f"[BRENDA] ⚠️ ERROR in rate function generation for T{transition_obj.id}: {e}")
                 import traceback
                 traceback.print_exc()
 
@@ -446,7 +458,7 @@ class BRENDAEnrichmentController:
         """
         print(f"\n[BRENDA_MM] ========== RATE FUNCTION GENERATOR CALLED ==========")
         print(f"[BRENDA_MM] Transition object: {transition}")
-        print(f"[BRENDA_MM] Transition type: {type(transition)}")
+        # print(f"[BRENDA_MM] Transition type: {type(transition)}")
         print(f"[BRENDA_MM] Parameters: {parameters}")
         print(f"[BRENDA_MM] Override mode: {override}")
         
@@ -479,6 +491,7 @@ class BRENDAEnrichmentController:
         
         # Calculate Vmax if only kcat provided
         if not vmax and kcat:
+            pass
             # Vmax = kcat * [E]total
             # For now, use kcat directly (assumes [E]=1 or normalized)
             vmax = kcat
@@ -486,6 +499,7 @@ class BRENDAEnrichmentController:
         
         # If no Vmax/Kcat provided, try to preserve existing Vmax from transition
         if not vmax:
+            pass
             # Check if transition already has Vmax in metadata or properties
             existing_vmax = None
             
@@ -493,6 +507,7 @@ class BRENDAEnrichmentController:
                 existing_vmax = transition.metadata.get('vmax') or transition.metadata.get('Vmax')
             
             if not existing_vmax and hasattr(transition, 'properties') and transition.properties:
+                pass
                 # Try to parse existing rate_function for Vmax value
                 existing_func = transition.properties.get('rate_function', '')
                 if 'vmax=' in existing_func:
@@ -504,10 +519,11 @@ class BRENDAEnrichmentController:
             
             if existing_vmax:
                 vmax = existing_vmax
-                print(f"[BRENDA_MM] ⚠️ No Kcat provided, reusing existing Vmax={vmax} with new Km={km}")
+                # print(f"[BRENDA_MM] ⚠️ No Kcat provided, reusing existing Vmax={vmax} with new Km={km}")
                 print(f"[BRENDA_MM] Note: For accurate kinetics, select both Km and Kcat parameters from BRENDA")
             else:
-                print(f"[BRENDA_MM] ❌ Missing Vmax/Kcat for T{transition.id}, cannot generate rate function")
+                pass
+                # print(f"[BRENDA_MM] ❌ Missing Vmax/Kcat for T{transition.id}, cannot generate rate function")
                 print(f"[BRENDA_MM] ℹ️  TIP: Select BOTH a Km and a Kcat parameter from BRENDA results to generate complete rate function")
                 return
         
@@ -519,9 +535,11 @@ class BRENDAEnrichmentController:
         if self.model_canvas and hasattr(self.model_canvas, 'arcs'):
             input_places = []
             for arc in self.model_canvas.arcs:
+                pass
                 # Check if arc points to this transition (Place → Transition)
                 if hasattr(arc, 'target') and hasattr(arc.target, 'id'):
                     if str(arc.target.id) == str(transition.id):
+                        pass
                         # This arc feeds into our transition
                         if hasattr(arc, 'source') and hasattr(arc.source, 'label'):
                             place_name = arc.source.label if arc.source.label else arc.source.name
@@ -547,6 +565,7 @@ class BRENDAEnrichmentController:
         
         # Build rate function with NAMED PARAMETERS (self-documenting)
         if ki and ki > 0 and inhibitor_place:
+            pass
             # Competitive inhibition form with actual inhibitor place
             # v = (Vmax * [S]) / (Km * (1 + [I]/Ki) + [S])
             # Expanded: michaelis_menten(S, Vmax, Km * (1 + I/Ki))
@@ -556,11 +575,13 @@ class BRENDAEnrichmentController:
             print(f"[BRENDA_MM]   Inhibitor: {inhibitor_place}, Ki={ki}")
             print(f"[BRENDA_MM]   Rate function: {rate_function}")
         elif ki and ki > 0:
+            pass
             # Ki available but no inhibitor place detected
             rate_function = f"michaelis_menten({substrate_place}, vmax={vmax}, km={km})"
             print(f"[BRENDA_MM] Generated simple MM (Ki={ki} available but no inhibitor place found)")
             print(f"[BRENDA_MM] Rate function: {rate_function}")
         else:
+            pass
             # Simple Michaelis-Menten with named parameters
             rate_function = f"michaelis_menten({substrate_place}, vmax={vmax}, km={km})"
             print(f"[BRENDA_MM] Generated simple MM: {rate_function}")
@@ -576,7 +597,7 @@ class BRENDAEnrichmentController:
         if not hasattr(transition, 'transition_type') or transition.transition_type != 'continuous':
             transition.transition_type = 'continuous'
         
-        print(f"[BRENDA_MM] ✅ Successfully set rate_function on transition T{transition.id}")
+        # print(f"[BRENDA_MM] ✅ Successfully set rate_function on transition T{transition.id}")
         print(f"[BRENDA_MM]    transition.properties['rate_function'] = '{rate_function}'")
         print(f"[BRENDA_MM]    transition.transition_type = '{transition.transition_type}'")
         
@@ -645,6 +666,7 @@ class BRENDAEnrichmentController:
             return False
         
         try:
+            pass
             # 1. Save BRENDA data file if provided
             if brenda_data:
                 enrichments_dir = self.project.get_enrichments_dir()
@@ -668,6 +690,7 @@ class BRENDAEnrichmentController:
             
             # 3. Register enrichment with project
             if current_pathway:
+                pass
                 # Link enrichment to pathway
                 current_pathway.enrichments.append(self.current_enrichment.id)
             
@@ -703,6 +726,7 @@ class BRENDAEnrichmentController:
         
         pathways = self.project.pathways.list_pathways()
         if pathways:
+            pass
             # Return most recent pathway with a model
             for pathway in reversed(pathways):
                 if pathway.model_id:
@@ -759,7 +783,7 @@ class BRENDAEnrichmentController:
         transitions = self.scan_canvas_transitions()
         
         print(f"[BRENDA] === ENRICHMENT DEBUG ===")
-        print(f"[BRENDA] Scanned {len(transitions)} transitions")
+        # print(f"[BRENDA] Scanned {len(transitions)} transitions")
         print(f"[BRENDA] EC numbers to query: {ec_numbers}")
         print(f"[BRENDA] Override existing: {override_existing}")
         
@@ -773,7 +797,7 @@ class BRENDAEnrichmentController:
             else:
                 print(f"[BRENDA] No BRENDA data for EC {ec_number}")
         
-        print(f"[BRENDA] Total BRENDA entries found: {len(brenda_data)}")
+        # print(f"[BRENDA] Total BRENDA entries found: {len(brenda_data)}")
         
         # Match and apply enrichments
         enriched_count = 0
@@ -787,27 +811,33 @@ class BRENDAEnrichmentController:
             print(f"[BRENDA] Transition {trans_id}: EC={ec}, has_kinetics={has_kin}, data_source={data_source}")
             
             if ec in brenda_data:
+                pass
                 # Determine if we should enrich based on override mode and data source
                 should_enrich = False
                 
                 if not has_kin:
+                    pass
                     # No kinetics at all - always enrich
                     should_enrich = True
                     print(f"[BRENDA]   → No kinetics, will enrich")
                 elif data_source == 'kegg_import':
+                    pass
                     # KEGG import - always override (all kinetics are heuristics)
                     should_enrich = True
                     print(f"[BRENDA]   → KEGG import detected, will override heuristics with BRENDA data")
                 elif override_existing:
+                    pass
                     # User explicitly requested override for all sources
                     should_enrich = True
                     print(f"[BRENDA]   → Override mode enabled, will replace existing kinetics")
                 else:
+                    pass
                     # Has kinetics from curated source (SBML/BioPAX) and override disabled
                     should_enrich = False
                     print(f"[BRENDA]   → Curated kinetics from {data_source}, respecting existing data")
                 
                 if should_enrich:
+                    pass
                     # Apply enrichment
                     params = self._extract_parameters(brenda_data[ec])
                     # Add override flag for rate function regeneration
@@ -877,26 +907,32 @@ class BRENDAEnrichmentController:
             trans_id = transition.get('id')
             
             if ec and ec in brenda_data:
+                pass
                 # Determine if we should enrich based on override mode and data source
                 should_enrich = False
                 
                 if not has_kin:
+                    pass
                     # No kinetics at all - always enrich
                     should_enrich = True
                 elif data_source == 'kegg_import':
+                    pass
                     # KEGG import - always override (all kinetics are heuristics)
                     should_enrich = True
                     print(f"[BRENDA] Transition {trans_id}: KEGG import, overriding heuristics")
                 elif override_existing:
+                    pass
                     # User explicitly requested override for all sources
                     should_enrich = True
                     print(f"[BRENDA] Transition {trans_id}: Override mode, replacing curated kinetics")
                 else:
+                    pass
                     # Has kinetics from curated source and override disabled
                     should_enrich = False
                     print(f"[BRENDA] Transition {trans_id}: Curated kinetics from {data_source}, skipping")
                 
                 if should_enrich:
+                    pass
                     # Apply enrichment
                     params = self._extract_parameters(brenda_data[ec])
                     # Add override flag for rate function regeneration
@@ -953,6 +989,7 @@ class BRENDAEnrichmentController:
         if vmax_values and isinstance(vmax_values, list) and len(vmax_values) > 0:
             params['vmax'] = vmax_values[0].get('value', 0.0)
         elif 'kcat' in params and params['kcat'] > 0:
+            pass
             # If kcat available but not Vmax, we could calculate it if we had [E]total
             # For now, just note that Vmax = kcat * [E]total
             # We'll leave it to the user to provide enzyme concentration

@@ -487,7 +487,7 @@ class HeuristicParametersCategory(BasePathwayCategory):
                         # and we need to rebuild the entire simulation state
                         controller.reset_for_new_model(canvas_manager)
                         
-                        print(f"[RESET] Transition IDs in controller.model: {[t.id for t in controller.model.transitions[:5]]}")  # First 5
+                        # print(f"[RESET] Transition IDs in controller.model: {[t.id for t in controller.model.transitions[:5]]}")  # First 5
                         self.logger.info("[RESET] ✅ SUCCESS: Simulation fully reset (model adapter recreated)")
                         
                         # DO NOT auto-start simulation after reset

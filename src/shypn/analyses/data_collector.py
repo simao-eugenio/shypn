@@ -67,8 +67,9 @@ class SimulationDataCollector:
         """
         self.step_count += 1
         if self.step_count <= 3:
-            print(f"[OLD_DC] Step {self.step_count} at time {time:.4f} (collector id={id(self)})")
-            print(f"[OLD_DC]   Collecting data for {len(controller.model.places)} places")
+            pass
+            # print(f"[OLD_DC] Step {self.step_count} at time {time:.4f} (collector id={id(self)})")
+            # print(f"[OLD_DC]   Collecting data for {len(controller.model.places)} places")
         
         for place in controller.model.places:
             data = self.place_data[place.id]

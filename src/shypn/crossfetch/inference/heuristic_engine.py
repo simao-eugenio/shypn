@@ -21,6 +21,72 @@ from ..fetchers.sabio_rk_kinetics_fetcher import SabioRKKineticsFetcher
 from ..database.heuristic_db import HeuristicDatabase
 
 
+# Reaction mechanism patterns (learned from KEGG, applicable to any source)
+# These map reaction semantics to transition types based on biological understanding
+REACTION_MECHANISM_PATTERNS = {
+    # Oxidoreductases (EC 1.x.x.x) - electron transfer reactions
+    'oxidation': TransitionType.CONTINUOUS,
+    'reduction': TransitionType.CONTINUOUS,
+    'dehydrogenase': TransitionType.CONTINUOUS,
+    'oxidase': TransitionType.CONTINUOUS,
+    'reductase': TransitionType.CONTINUOUS,
+    'peroxidase': TransitionType.CONTINUOUS,
+    
+    # Transferases (EC 2.x.x.x) - group transfer reactions
+    'phosphorylation': TransitionType.CONTINUOUS,
+    'kinase': TransitionType.CONTINUOUS,
+    'transferase': TransitionType.CONTINUOUS,
+    'methylation': TransitionType.CONTINUOUS,
+    'acetylation': TransitionType.CONTINUOUS,
+    'glycosylation': TransitionType.CONTINUOUS,
+    
+    # Hydrolases (EC 3.x.x.x) - bond cleavage by water
+    'hydrolysis': TransitionType.CONTINUOUS,
+    'phosphatase': TransitionType.CONTINUOUS,
+    'protease': TransitionType.CONTINUOUS,
+    'peptidase': TransitionType.CONTINUOUS,
+    'lipase': TransitionType.CONTINUOUS,
+    'esterase': TransitionType.CONTINUOUS,
+    
+    # Lyases (EC 4.x.x.x) - bond cleavage without water
+    'cleavage': TransitionType.CONTINUOUS,
+    'aldolase': TransitionType.CONTINUOUS,
+    'decarboxylase': TransitionType.CONTINUOUS,
+    'lyase': TransitionType.CONTINUOUS,
+    
+    # Isomerases (EC 5.x.x.x) - intramolecular rearrangement
+    'isomerization': TransitionType.CONTINUOUS,
+    'isomerase': TransitionType.CONTINUOUS,
+    'mutase': TransitionType.CONTINUOUS,
+    'epimerase': TransitionType.CONTINUOUS,
+    
+    # Ligases (EC 6.x.x.x) - bond formation with ATP
+    'ligation': TransitionType.CONTINUOUS,
+    'ligase': TransitionType.CONTINUOUS,
+    'synthetase': TransitionType.CONTINUOUS,
+    'carboxylase': TransitionType.CONTINUOUS,
+    
+    # Gene expression and regulation (typically stochastic or immediate)
+    'transcription': TransitionType.STOCHASTIC,
+    'translation': TransitionType.STOCHASTIC,
+    'expression': TransitionType.STOCHASTIC,
+    'degradation': TransitionType.STOCHASTIC,
+    'decay': TransitionType.STOCHASTIC,
+    
+    # Binding and signaling (typically stochastic)
+    'binding': TransitionType.STOCHASTIC,
+    'association': TransitionType.STOCHASTIC,
+    'dissociation': TransitionType.STOCHASTIC,
+    'unbinding': TransitionType.STOCHASTIC,
+    
+    # Regulatory events (typically immediate)
+    'activation': TransitionType.IMMEDIATE,
+    'inhibition': TransitionType.IMMEDIATE,
+    'regulation': TransitionType.IMMEDIATE,
+    'signal': TransitionType.IMMEDIATE,
+}
+
+
 class TransitionTypeDetector:
     """Detects transition type from model properties."""
     
@@ -28,39 +94,138 @@ class TransitionTypeDetector:
     def detect_type(transition: Any) -> TransitionType:
         """Detect transition type from transition object.
         
+        Multi-stage detection (generic, works for any model source):
+        1. Check for existing rate_function/delay (explicit kinetics)
+        2. Analyze label/name for mechanism keywords
+        3. Check reaction_id if available (KEGG-specific, optional)
+        4. Fall back to transition_type attribute (often incorrect from imports)
+        
+        CRITICAL: Respects high-confidence existing data from old heuristic system
+        to avoid bias. Only overwrites low-confidence or import defaults.
+        
         Args:
             transition: Transition object from model
             
         Returns:
             TransitionType enum
         """
-        # Check if transition has transition_type attribute
+        logger = logging.getLogger(__name__)
+        
+        # ============================================================
+        # BIAS PREVENTION: Check if we should respect existing data
+        # ============================================================
+        # The old heuristic system (import-time) may have already set kinetics.
+        # We need to distinguish between:
+        # - User-provided explicit data (MUST respect)
+        # - High-confidence database data (SHOULD respect)
+        # - Low-confidence heuristic data (CAN overwrite with better heuristics)
+        # - Import defaults (SHOULD overwrite - often wrong)
+        
+        should_respect_existing = False
+        existing_source = None
+        
+        # Check if old metadata system marked this as high-confidence
+        if hasattr(transition, 'metadata') and isinstance(transition.metadata, dict):
+            existing_source = transition.metadata.get('kinetics_source')
+            existing_confidence = transition.metadata.get('kinetics_confidence')
+            
+            # RESPECT: User/explicit data (never overwrite)
+            if existing_source in ('user', 'explicit', 'sbml'):
+                should_respect_existing = True
+                logger.debug(
+                    f"{transition.id}: Respecting existing {existing_source} data "
+                    f"(source={existing_source})"
+                )
+            
+            # RESPECT: High-confidence database data
+            elif existing_source == 'database' and existing_confidence == 'high':
+                should_respect_existing = True
+                logger.debug(
+                    f"{transition.id}: Respecting high-confidence database data"
+                )
+        
+        # If we should respect existing data, return current type without modification
+        if should_respect_existing:
+            if hasattr(transition, 'transition_type'):
+                type_str = str(transition.transition_type).lower()
+                if 'continuous' in type_str:
+                    return TransitionType.CONTINUOUS
+                elif 'stochastic' in type_str:
+                    return TransitionType.STOCHASTIC
+                elif 'timed' in type_str:
+                    return TransitionType.TIMED
+                elif 'immediate' in type_str:
+                    return TransitionType.IMMEDIATE
+            # If no valid type set, fall through to detection
+            logger.debug(f"{transition.id}: No valid type to respect, proceeding with detection")
+        
+        # ============================================================
+        # Stage 1: Check for explicit kinetic properties
+        # ============================================================
+        # NOTE: rate_function might be from old heuristic (low confidence)
+        # We allow overwriting these with better pattern-based detection
+        # unless marked as high-confidence above
+        if hasattr(transition, 'rate_function') and transition.rate_function:
+            # Only respect rate_function if it's from high-confidence source
+            if should_respect_existing:
+                logger.debug(f"{transition.id}: Has rate_function (high-confidence) → CONTINUOUS")
+                return TransitionType.CONTINUOUS
+            else:
+                # Has rate_function but from low-confidence source
+                # Continue to pattern detection to potentially improve the type
+                logger.debug(
+                    f"{transition.id}: Has rate_function from {existing_source or 'unknown'} "
+                    f"(low confidence) - will check patterns for better type"
+                )
+        
+        if hasattr(transition, 'delay') and transition.delay is not None:
+            logger.debug(f"{transition.id}: Has delay → TIMED")
+            return TransitionType.TIMED
+        
+        # ============================================================
+        # Stage 2: Analyze label/name for mechanism patterns (universal)
+        # ============================================================
+        label = getattr(transition, 'label', '').lower()
+        name = getattr(transition, 'name', '').lower()
+        combined_text = f"{label} {name}"
+        
+        # Check mechanism patterns (learned from biology, not KEGG-specific)
+        for pattern, detected_type in REACTION_MECHANISM_PATTERNS.items():
+            if pattern in combined_text:
+                logger.debug(f"{transition.id}: Label '{label}' matches '{pattern}' → {detected_type.value}")
+                return detected_type
+        
+        # Stage 3: Check reaction_id if available (KEGG/SBML-specific, optional)
+        reaction_id = getattr(transition, 'reaction_id', None)
+        if reaction_id:
+            # Generic rule: reactions with IDs (R00xxx, etc.) are likely metabolic
+            if isinstance(reaction_id, str) and len(reaction_id) > 0:
+                # Most metabolic reactions are continuous enzyme kinetics
+                logger.debug(f"{transition.id}: Has reaction_id '{reaction_id}' → Likely CONTINUOUS")
+                return TransitionType.CONTINUOUS
+        
+        # Stage 4: Check EC number if available (universal enzyme classification)
+        ec_number = getattr(transition, 'ec_number', None)
+        if ec_number:
+            # EC numbers indicate enzymatic reactions → continuous
+            logger.debug(f"{transition.id}: Has EC number '{ec_number}' → CONTINUOUS")
+            return TransitionType.CONTINUOUS
+        
+        # Stage 5: Fall back to transition_type attribute (often wrong from KEGG/SBML imports)
         if hasattr(transition, 'transition_type'):
             type_str = str(transition.transition_type).lower()
             
-            if 'immediate' in type_str:
-                return TransitionType.IMMEDIATE
+            # Only trust if it's NOT 'immediate' (KEGG default)
+            if 'continuous' in type_str:
+                return TransitionType.CONTINUOUS
             elif 'timed' in type_str:
                 return TransitionType.TIMED
             elif 'stochastic' in type_str:
                 return TransitionType.STOCHASTIC
-            elif 'continuous' in type_str:
-                return TransitionType.CONTINUOUS
+            # Don't trust 'immediate' - it's often a default import value
         
-        # Fallback: infer from other properties
-        # Check for rate function (continuous)
-        if hasattr(transition, 'rate_function') and transition.rate_function:
-            return TransitionType.CONTINUOUS
-        
-        # Check for delay (timed)
-        if hasattr(transition, 'delay') and transition.delay is not None:
-            return TransitionType.TIMED
-        
-        # Check for priority (immediate)
-        if hasattr(transition, 'priority'):
-            return TransitionType.IMMEDIATE
-        
-        # Default to unknown
+        # Default to unknown (will be refined by stoichiometry later)
+        logger.debug(f"{transition.id}: No clear type signals → UNKNOWN")
         return TransitionType.UNKNOWN
     
     @staticmethod
@@ -540,6 +705,7 @@ class HeuristicInferenceEngine:
         reaction_id = getattr(transition, 'reaction_id', None)
         enzyme_name = getattr(transition, 'enzyme_name', None)
         label = getattr(transition, 'label', '').lower()
+        name = getattr(transition, 'name', '').lower()
         
         # Check cache first
         cache_key = (ec_number or reaction_id or 'generic', organism)
@@ -562,6 +728,23 @@ class HeuristicInferenceEngine:
         else:
             confidence = 0.50  # Generic
             notes = "Generic enzyme kinetics (to be refined with data)"
+        
+        # Bonus: Check if label/name matched a mechanism pattern (+0.15 confidence)
+        combined_text = f"{label} {name}"
+        mechanism_match = None
+        for pattern in REACTION_MECHANISM_PATTERNS:
+            if pattern in combined_text:
+                mechanism_match = pattern
+                break
+        
+        if mechanism_match:
+            confidence = min(confidence + 0.15, 0.85)
+            notes += f" | Mechanism pattern '{mechanism_match}' detected (+15% confidence)"
+        
+        # Bonus: Check if reaction_id present (+0.05 confidence)
+        if reaction_id:
+            confidence = min(confidence + 0.05, 0.85)
+            notes += f" | Reaction ID '{reaction_id}' provides additional context (+5% confidence)"
         
         return ContinuousParameters(
             biological_semantics=semantics,
@@ -690,12 +873,15 @@ class HeuristicInferenceEngine:
         Uses local balance (input/output stoichiometry) and global balance
         (overall network conservation) to adjust parameter values.
         
+        CRITICAL: Can override transition type if stoichiometry strongly contradicts
+        the initial type assignment. This corrects bad imports (e.g., KEGG default "immediate").
+        
         Args:
             transition: Transition object with arc information
             base_params: Base parameters from label/type heuristics
             
         Returns:
-            Refined parameters based on stoichiometry
+            Refined parameters based on stoichiometry (may have different type!)
         """
         # Extract stoichiometry information
         stoich_info = self._analyze_stoichiometry(transition)
@@ -704,13 +890,132 @@ class HeuristicInferenceEngine:
             # No stoichiometry info available, return base params
             return base_params
         
-        # Apply stoichiometry-based adjustments
-        if isinstance(base_params, ContinuousParameters):
-            return self._adjust_continuous_by_stoichiometry(base_params, stoich_info)
-        elif isinstance(base_params, StochasticParameters):
-            return self._adjust_stochastic_by_stoichiometry(base_params, stoich_info)
+        # CRITICAL: Validate type using stoichiometry patterns
+        validated_params = self._validate_type_by_stoichiometry(transition, base_params, stoich_info)
         
+        # Apply stoichiometry-based adjustments
+        if isinstance(validated_params, ContinuousParameters):
+            return self._adjust_continuous_by_stoichiometry(validated_params, stoich_info)
+        elif isinstance(validated_params, StochasticParameters):
+            return self._adjust_stochastic_by_stoichiometry(validated_params, stoich_info)
+        
+        return validated_params
+    
+    def _validate_type_by_stoichiometry(self,
+                                       transition: Any,
+                                       base_params: TransitionParameters,
+                                       stoich: Dict[str, Any]) -> TransitionParameters:
+        """Validate and potentially override transition type based on stoichiometry.
+        
+        Stoichiometry patterns strongly indicate transition type:
+        - Balanced reactions (1:1 substrate:product) → CONTINUOUS (enzymatic)
+        - Burst reactions (1→many) → STOCHASTIC (gene expression, burst)
+        - Absorption reactions (many→1) → CONTINUOUS (complex formation) or IMMEDIATE (regulation)
+        - Isolated transitions (no inputs/outputs) → IMMEDIATE (control)
+        
+        This OVERRIDES bad type assignments from model imports (e.g., KEGG "immediate" defaults).
+        
+        Args:
+            transition: Transition object
+            base_params: Current parameters (potentially wrong type)
+            stoich: Stoichiometry information
+            
+        Returns:
+            Parameters with validated type (may be completely new parameters!)
+        """
+        balance_ratio = stoich['balance_ratio']
+        num_inputs = stoich['num_substrates']
+        num_outputs = stoich['num_products']
+        total_input_weight = stoich['total_input_weight']
+        total_output_weight = stoich['total_output_weight']
+        
+        current_type = base_params.transition_type
+        suggested_type = None
+        override_reason = ""
+        
+        # Pattern 1: Balanced reactions (0.8 < ratio < 1.2) → CONTINUOUS
+        # Typical for metabolic enzymes: A → B, 2A → 2B, A+B → C+D
+        if 0.8 <= balance_ratio <= 1.2 and num_inputs >= 1 and num_outputs >= 1:
+            if current_type == TransitionType.IMMEDIATE or current_type == TransitionType.UNKNOWN:
+                suggested_type = TransitionType.CONTINUOUS
+                override_reason = f"Balanced stoichiometry ({num_inputs}:{num_outputs}, ratio={balance_ratio:.2f}) indicates metabolic enzyme"
+        
+        # Pattern 2: Burst reactions (1 input → many outputs) → STOCHASTIC
+        # Typical for transcription: DNA → mRNA + mRNA + ... (burst)
+        elif num_inputs <= 2 and num_outputs >= 3 and total_output_weight >= 3 * total_input_weight:
+            if current_type != TransitionType.STOCHASTIC:
+                suggested_type = TransitionType.STOCHASTIC
+                override_reason = f"Burst stoichiometry (1→{num_outputs}, output={total_output_weight}×) indicates stochastic process"
+        
+        # Pattern 3: Complex formation (many → 1 or 2) → CONTINUOUS
+        # Typical for protein complexes: A + B + C → Complex
+        elif num_inputs >= 3 and num_outputs <= 2:
+            if current_type == TransitionType.IMMEDIATE or current_type == TransitionType.UNKNOWN:
+                suggested_type = TransitionType.CONTINUOUS
+                override_reason = f"Multi-substrate ({num_inputs}→{num_outputs}) indicates complex formation or multi-step enzyme"
+        
+        # Pattern 4: No inputs or outputs → IMMEDIATE
+        # Isolated transitions are control/regulatory events
+        elif num_inputs == 0 or num_outputs == 0:
+            if current_type == TransitionType.CONTINUOUS or current_type == TransitionType.STOCHASTIC:
+                suggested_type = TransitionType.IMMEDIATE
+                override_reason = "Isolated transition (no inputs or outputs) indicates control event"
+        
+        # If type override is suggested, create new parameters
+        if suggested_type and suggested_type != current_type:
+            self.logger.info(f"{transition.id}: Type override {current_type.value}→{suggested_type.value}: {override_reason}")
+            
+            # Generate new parameters for suggested type
+            semantics = base_params.biological_semantics
+            organism = base_params.organism
+            
+            if suggested_type == TransitionType.CONTINUOUS:
+                new_params = self._infer_continuous_from_type_override(transition, semantics, organism, override_reason)
+            elif suggested_type == TransitionType.STOCHASTIC:
+                new_params = self._infer_stochastic_from_type_override(transition, semantics, organism, override_reason)
+            elif suggested_type == TransitionType.IMMEDIATE:
+                new_params = self._infer_immediate_from_type_override(transition, semantics, organism, override_reason)
+            else:
+                new_params = base_params  # Fallback
+            
+            # Boost confidence (+0.10 for stoichiometry validation)
+            new_params.confidence_score = min(new_params.confidence_score + 0.10, 0.85)
+            
+            return new_params
+        
+        # No override needed
         return base_params
+    
+    def _infer_continuous_from_type_override(self,
+                                            transition: Any,
+                                            semantics: BiologicalSemantics,
+                                            organism: str,
+                                            reason: str) -> ContinuousParameters:
+        """Create continuous parameters after type override."""
+        # Use standard heuristics but note the override
+        params = self._infer_continuous(transition, semantics, organism)
+        params.notes = f"Type override (stoichiometry): {reason} | {params.notes or ''}"
+        return params
+    
+    def _infer_stochastic_from_type_override(self,
+                                            transition: Any,
+                                            semantics: BiologicalSemantics,
+                                            organism: str,
+                                            reason: str) -> StochasticParameters:
+        """Create stochastic parameters after type override."""
+        params = self._infer_stochastic(transition, semantics, organism)
+        params.notes = f"Type override (stoichiometry): {reason} | {params.notes or ''}"
+        return params
+    
+    def _infer_immediate_from_type_override(self,
+                                           transition: Any,
+                                           semantics: BiologicalSemantics,
+                                           organism: str,
+                                           reason: str) -> ImmediateParameters:
+        """Create immediate parameters after type override."""
+        params = self._infer_immediate(transition, semantics, organism)
+        params.notes = f"Type override (stoichiometry): {reason} | {params.notes or ''}"
+        return params
     
     def _analyze_stoichiometry(self, transition: Any) -> Optional[Dict[str, Any]]:
         """Analyze stoichiometry from transition arcs.

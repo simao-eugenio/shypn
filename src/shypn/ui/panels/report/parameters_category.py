@@ -181,6 +181,7 @@ class DynamicAnalysesCategory(BaseReportCategory):
         if self.project and hasattr(self.project, 'pathways'):
             pathways = self.project.pathways.list_pathways()
             if pathways:
+                pass
                 # Get unique organisms
                 organisms = set()
                 for pathway in pathways:
@@ -289,25 +290,26 @@ class DynamicAnalysesCategory(BaseReportCategory):
         Args:
             controller: SimulationController instance
         """
-        print(f"[SET_CONTROLLER] Setting controller: {controller}")
-        print(f"[SET_CONTROLLER] Controller ID: {id(controller) if controller else 'None'}")
-        print(f"[SET_CONTROLLER] Controller has data_collector: {hasattr(controller, 'data_collector') if controller else False}")
+        # print(f"[SET_CONTROLLER] Setting controller: {controller}")
+        # print(f"[SET_CONTROLLER] Controller ID: {id(controller) if controller else 'None'}")
+        # print(f"[SET_CONTROLLER] Controller has data_collector: {hasattr(controller, 'data_collector') if controller else False}")
         
         if controller and hasattr(controller, 'data_collector'):
-            print(f"[SET_CONTROLLER] data_collector: {controller.data_collector}")
-            print(f"[SET_CONTROLLER] data_collector ID: {id(controller.data_collector) if controller.data_collector else 'None'}")
+            pass
+            # print(f"[SET_CONTROLLER] data_collector: {controller.data_collector}")
+            # print(f"[SET_CONTROLLER] data_collector ID: {id(controller.data_collector) if controller.data_collector else 'None'}")
         
         # Cancel any pending refresh from previous controller
         if self._pending_refresh_id is not None:
             from gi.repository import GLib
-            print(f"[SET_CONTROLLER] Cancelling pending refresh {self._pending_refresh_id}")
+            # print(f"[SET_CONTROLLER] Cancelling pending refresh {self._pending_refresh_id}")
             GLib.source_remove(self._pending_refresh_id)
             self._pending_refresh_id = None
         
         # Increment generation to invalidate any in-flight refreshes
         self._refresh_generation += 1
         current_generation = self._refresh_generation
-        print(f"[SET_CONTROLLER] New refresh generation: {current_generation}")
+        # print(f"[SET_CONTROLLER] New refresh generation: {current_generation}")
         
         # Store the old controller before updating
         old_controller = self.controller
@@ -315,52 +317,60 @@ class DynamicAnalysesCategory(BaseReportCategory):
         
         # Immediately refresh to show this document's data
         # This reads from the document's stored data, not from the controller's live data_collector
-        print(f"[SET_CONTROLLER] Refreshing to show document data")
+        # print(f"[SET_CONTROLLER] Refreshing to show document data")
         self._refresh_simulation_data(generation=current_generation)
         
         # Register callback for simulation complete
         # IMPORTANT: Only register the callback ONCE per controller to avoid overwriting
         # Check if this controller already has our callback registered
         if controller and id(controller) not in self._registered_controllers:
-            print(f"[SET_CONTROLLER] Registering NEW on_simulation_complete callback for controller {id(controller)}")
+            pass
+            # print(f"[SET_CONTROLLER] Registering NEW on_simulation_complete callback for controller {id(controller)}")
             # Use GLib.idle_add to ensure UI update happens on main thread
             from gi.repository import GLib
             # CRITICAL: Capture controller by value (not self.controller which changes)
             # At callback time, check if this specific controller is still the active one
             captured_controller = controller
             def on_complete():
-                print(f"[CALLBACK] Simulation complete for controller {id(captured_controller)}")
+                pass
+                # print(f"[CALLBACK] Simulation complete for controller {id(captured_controller)}")
                 
                 # MULTI-DOCUMENT FIX: Capture data to document's report_data
                 # Get the drawing_area for this controller from model_canvas_loader
                 if hasattr(self, 'parent_panel') and self.parent_panel:
                     model_canvas_loader = getattr(self.parent_panel, 'model_canvas_loader', None)
                     if model_canvas_loader and hasattr(model_canvas_loader, 'overlay_managers'):
+                        pass
                         # Find which drawing_area has this controller
                         for drawing_area, overlay_manager in model_canvas_loader.overlay_managers.items():
                             if hasattr(overlay_manager, 'simulation_controller') and overlay_manager.simulation_controller is captured_controller:
-                                print(f"[CALLBACK] Found drawing_area for controller: {id(drawing_area)}")
+                                pass
+                                # print(f"[CALLBACK] Found drawing_area for controller: {id(drawing_area)}")
                                 # Capture simulation data to document's report_data
                                 if hasattr(overlay_manager, 'report_data'):
-                                    print(f"[CALLBACK] Capturing simulation data to document report_data")
+                                    pass
+                                    # print(f"[CALLBACK] Capturing simulation data to document report_data")
                                     overlay_manager.report_data.capture_simulation_results(captured_controller)
                                 break
                 
                 # Only refresh UI if this captured controller is still the active one
                 if self.controller is captured_controller:
-                    print(f"[CALLBACK] Controller {id(captured_controller)} matches active controller, refreshing UI")
+                    pass
+                    # print(f"[CALLBACK] Controller {id(captured_controller)} matches active controller, refreshing UI")
                     # Capture the current generation when callback fires
                     callback_generation = self._refresh_generation
                     self._pending_refresh_id = GLib.idle_add(lambda: self._refresh_and_clear_pending(callback_generation))
                 else:
-                    print(f"[CALLBACK] Controller {id(captured_controller)} no longer active (current: {id(self.controller) if self.controller else 'None'}), data captured but not refreshing UI")
+                    pass
+                    # print(f"[CALLBACK] Controller {id(captured_controller)} no longer active (current: {id(self.controller) if self.controller else 'None'}), data captured but not refreshing UI")
             
             # Set the callback on this controller
             controller.on_simulation_complete = on_complete
             self._registered_controllers.add(id(controller))
-            print(f"[SET_CONTROLLER] Callback registered successfully")
+            # print(f"[SET_CONTROLLER] Callback registered successfully")
         elif controller:
-            print(f"[SET_CONTROLLER] Controller {id(controller)} already has callback registered, skipping")
+            pass
+            # print(f"[SET_CONTROLLER] Controller {id(controller)} already has callback registered, skipping")
     
     def _refresh_and_clear_pending(self, generation):
         """Helper to refresh and clear pending ID. Returns False to remove from idle.
@@ -387,21 +397,24 @@ class DynamicAnalysesCategory(BaseReportCategory):
         """
         # Check generation if provided
         if generation is not None and generation != self._refresh_generation:
-            print(f"[DEBUG_TABLES] Refresh generation {generation} is stale (current: {self._refresh_generation}), aborting")
+            pass
+            # print(f"[DEBUG_TABLES] Refresh generation {generation} is stale (current: {self._refresh_generation}), aborting")
             return
         
-        print("[DEBUG_TABLES] _refresh_simulation_data called")
+        # print("[DEBUG_TABLES] _refresh_simulation_data called")
         if generation is not None:
-            print(f"[DEBUG_TABLES] Refresh generation: {generation}")
-        print(f"[DEBUG_TABLES] self.controller: {self.controller}")
-        print(f"[DEBUG_TABLES] Controller ID: {id(self.controller) if self.controller else 'None'}")
+            pass
+            # print(f"[DEBUG_TABLES] Refresh generation: {generation}")
+        # print(f"[DEBUG_TABLES] self.controller: {self.controller}")
+        # print(f"[DEBUG_TABLES] Controller ID: {id(self.controller) if self.controller else 'None'}")
         
         # Store the controller we're about to use
         refresh_controller = self.controller
         refresh_controller_id = id(refresh_controller) if refresh_controller else None
         
         if not self.controller:
-            print("[DEBUG_TABLES] ❌ No controller")
+            pass
+            # print("[DEBUG_TABLES] ❌ No controller")
             self.simulation_status_label.set_markup(
                 "<i>No simulation data available. Run a simulation to see results.</i>"
             )
@@ -415,18 +428,21 @@ class DynamicAnalysesCategory(BaseReportCategory):
         if hasattr(self, 'parent_panel') and self.parent_panel:
             model_canvas_loader = getattr(self.parent_panel, 'model_canvas_loader', None)
             if model_canvas_loader and hasattr(model_canvas_loader, 'overlay_managers'):
+                pass
                 # Find which drawing_area has this controller
                 for drawing_area, overlay_manager in model_canvas_loader.overlay_managers.items():
                     if hasattr(overlay_manager, 'simulation_controller') and overlay_manager.simulation_controller is refresh_controller:
-                        print(f"[DEBUG_TABLES] Found drawing_area for controller: {id(drawing_area)}")
+                        pass
+                        # print(f"[DEBUG_TABLES] Found drawing_area for controller: {id(drawing_area)}")
                         if hasattr(overlay_manager, 'report_data'):
                             report_data = overlay_manager.report_data
-                            print(f"[DEBUG_TABLES] Using document's report_data: {id(report_data)}")
+                            # print(f"[DEBUG_TABLES] Using document's report_data: {id(report_data)}")
                         break
         
         # Check if we have stored simulation data for this document
         if not report_data or not report_data.has_simulation_data():
-            print("[DEBUG_TABLES] ❌ No stored simulation data for this document")
+            pass
+            # print("[DEBUG_TABLES] ❌ No stored simulation data for this document")
             self.simulation_status_label.set_markup(
                 "<i>No simulation data available. Run a simulation to see results.</i>"
             )
@@ -436,75 +452,86 @@ class DynamicAnalysesCategory(BaseReportCategory):
         
         # Get the stored simulation data (snapshot, not live)
         sim_data = report_data.last_simulation_data
-        print(f"[DEBUG_TABLES] Retrieved stored simulation data")
-        print(f"[DEBUG_TABLES] time_points length: {len(sim_data['time_points'])}")
-        print(f"[DEBUG_TABLES] place_data keys: {list(sim_data['place_data'].keys())}")
-        print(f"[DEBUG_TABLES] transition_data keys: {list(sim_data['transition_data'].keys())}")
+        # print(f"[DEBUG_TABLES] Retrieved stored simulation data")
+        # print(f"[DEBUG_TABLES] time_points length: {len(sim_data['time_points'])}")
+        # print(f"[DEBUG_TABLES] place_data keys: {list(sim_data['place_data'].keys())}")
+        # print(f"[DEBUG_TABLES] transition_data keys: {list(sim_data['transition_data'].keys())}")
         
         # Get model name for verification
         model_name = "Unknown"
         if hasattr(self.controller, 'model') and self.controller.model:
             model_name = getattr(self.controller.model, 'name', 
                                getattr(self.controller.model, 'id', 'Untitled'))
-        print(f"[DEBUG_TABLES] ⚡ REFRESHING DATA FOR MODEL: {model_name}")
+        # print(f"[DEBUG_TABLES] ⚡ REFRESHING DATA FOR MODEL: {model_name}")
         
         # Check transition firing counts from stored data
         for t_id, firing_series in sim_data['transition_data'].items():
-            print(f"[DEBUG_TABLES] Transition {t_id}: firing_series length={len(firing_series)}")
+            pass
+            # print(f"[DEBUG_TABLES] Transition {t_id}: firing_series length={len(firing_series)}")
             if firing_series:
-                print(f"[DEBUG_TABLES]   First 5 values: {firing_series[:5]}")
-                print(f"[DEBUG_TABLES]   Last 5 values: {firing_series[-5:]}")
-                print(f"[DEBUG_TABLES]   Final count: {firing_series[-1]}")
+                pass
+                # print(f"[DEBUG_TABLES]   First 5 values: {firing_series[:5]}")
+                # print(f"[DEBUG_TABLES]   Last 5 values: {firing_series[-5:]}")
+                # print(f"[DEBUG_TABLES]   Final count: {firing_series[-1]}")
         
         # Get duration from stored metadata
         duration = sim_data['metadata'].get('duration', 0)
-        print(f"[DEBUG_TABLES] duration (from stored metadata) = {duration}")
+        # print(f"[DEBUG_TABLES] duration (from stored metadata) = {duration}")
         
         # Update Summary section with simulation metadata from stored data
-        print("[DEBUG_TABLES] About to call _update_summary...")
+        # print("[DEBUG_TABLES] About to call _update_summary...")
         try:
             self._update_summary(duration, sim_data)
-            print("[DEBUG_TABLES] _update_summary completed successfully")
+            # print("[DEBUG_TABLES] _update_summary completed successfully")
         except Exception as e:
-            print(f"[DEBUG_TABLES] ⚠️  Error updating summary: {e}")
+            pass
+            # print(f"[DEBUG_TABLES] ⚠️  Error updating summary: {e}")
             import traceback
             traceback.print_exc()
-        print("[DEBUG_TABLES] After _update_summary call")
+        # print("[DEBUG_TABLES] After _update_summary call")
         
         # Show first few data points for debugging
         if len(sim_data['time_points']) > 0:
-            print(f"[DEBUG_TABLES] First 5 time points: {sim_data['time_points'][:5]}")
-            print(f"[DEBUG_TABLES] Last 5 time points: {sim_data['time_points'][-5:]}")
-            print(f"[DEBUG_TABLES] Total time points: {len(sim_data['time_points'])}")
+            pass
+            # print(f"[DEBUG_TABLES] First 5 time points: {sim_data['time_points'][:5]}")
+            # print(f"[DEBUG_TABLES] Last 5 time points: {sim_data['time_points'][-5:]}")
+            # print(f"[DEBUG_TABLES] Total time points: {len(sim_data['time_points'])}")
             
             # Show place data sample
             for place_id in list(sim_data['place_data'].keys())[:2]:  # First 2 places
                 place_values = sim_data['place_data'][place_id]
                 if place_values:
-                    print(f"[DEBUG_TABLES] Place {place_id}: first={place_values[0]}, last={place_values[-1]}, len={len(place_values)}")
+                    pass
+                    # print(f"[DEBUG_TABLES] Place {place_id}: first={place_values[0]}, last={place_values[-1]}, len={len(place_values)}")
                 else:
-                    print(f"[DEBUG_TABLES] Place {place_id}: EMPTY!")
+                    pass
+                    # print(f"[DEBUG_TABLES] Place {place_id}: EMPTY!")
             
             # Show transition data sample
             for trans_id in list(sim_data['transition_data'].keys())[:2]:  # First 2 transitions
                 trans_values = sim_data['transition_data'][trans_id]
                 if trans_values:
-                    print(f"[DEBUG_TABLES] Transition {trans_id}: first={trans_values[0]}, last={trans_values[-1]}, len={len(trans_values)}")
+                    pass
+                    # print(f"[DEBUG_TABLES] Transition {trans_id}: first={trans_values[0]}, last={trans_values[-1]}, len={len(trans_values)}")
                 else:
-                    print(f"[DEBUG_TABLES] Transition {trans_id}: EMPTY!")
+                    pass
+                    # print(f"[DEBUG_TABLES] Transition {trans_id}: EMPTY!")
         else:
-            print(f"[DEBUG_TABLES] ⚠️  time_points list is EMPTY!")
+            pass
+            # print(f"[DEBUG_TABLES] ⚠️  time_points list is EMPTY!")
         
         # Analyze species
         from shypn.engine.simulation.analysis import SpeciesAnalyzer, ReactionAnalyzer
         
         # CRITICAL: Check if controller changed during analysis
         if self.controller is not refresh_controller:
-            print(f"[DEBUG_TABLES] ⚠️  Controller changed during analysis (was {refresh_controller_id}, now {id(self.controller)}), aborting")
+            pass
+            # print(f"[DEBUG_TABLES] ⚠️  Controller changed during analysis (was {refresh_controller_id}, now {id(self.controller)}), aborting")
             return
         
-        print("[DEBUG_TABLES] Analyzing species...")
+        # print("[DEBUG_TABLES] Analyzing species...")
         try:
+            pass
             # Create a temporary data collector wrapper that provides stored data
             # but still has access to the model for analyzers
             class DataCollectorSnapshot:
@@ -527,42 +554,45 @@ class DynamicAnalysesCategory(BaseReportCategory):
             
             species_analyzer = SpeciesAnalyzer(data_snapshot)
             species_metrics = species_analyzer.analyze_all_species(duration)
-            print(f"[DEBUG_TABLES] Got {len(species_metrics)} species metrics")
+            # print(f"[DEBUG_TABLES] Got {len(species_metrics)} species metrics")
             
             # Show first metric sample
             if species_metrics:
                 sample = species_metrics[0]
-                print(f"[DEBUG_TABLES] Sample species metric: {sample.place_name}, init={sample.initial_tokens}, final={sample.final_tokens}, min={sample.min_tokens}, max={sample.max_tokens}")
+                # print(f"[DEBUG_TABLES] Sample species metric: {sample.place_name}, init={sample.initial_tokens}, final={sample.final_tokens}, min={sample.min_tokens}, max={sample.max_tokens}")
             
             self.species_table.populate(species_metrics)
-            print("[DEBUG_TABLES] Species table populated")
+            # print("[DEBUG_TABLES] Species table populated")
             
             # Check again before continuing
             if self.controller is not refresh_controller:
-                print(f"[DEBUG_TABLES] ⚠️  Controller changed after species analysis, aborting")
+                pass
+                # print(f"[DEBUG_TABLES] ⚠️  Controller changed after species analysis, aborting")
                 return
         except Exception as e:
-            print(f"[DEBUG_TABLES] ❌ Error analyzing species: {e}")
+            pass
+            # print(f"[DEBUG_TABLES] ❌ Error analyzing species: {e}")
             import traceback
             traceback.print_exc()
             return
         
         # Analyze reactions
-        print("[DEBUG_TABLES] Analyzing reactions...")
+        # print("[DEBUG_TABLES] Analyzing reactions...")
         try:
             reaction_analyzer = ReactionAnalyzer(data_snapshot)
             reaction_metrics = reaction_analyzer.analyze_all_reactions(duration)
-            print(f"[DEBUG_TABLES] Got {len(reaction_metrics)} reaction metrics")
+            # print(f"[DEBUG_TABLES] Got {len(reaction_metrics)} reaction metrics")
             
             # Show first metric sample
             if reaction_metrics:
                 sample = reaction_metrics[0]
-                print(f"[DEBUG_TABLES] Sample reaction metric: {sample.transition_name}, firings={sample.firing_count}, rate={sample.average_rate}, status={sample.status}")
+                # print(f"[DEBUG_TABLES] Sample reaction metric: {sample.transition_name}, firings={sample.firing_count}, rate={sample.average_rate}, status={sample.status}")
             
             self.reaction_table.populate(reaction_metrics)
-            print("[DEBUG_TABLES] Reaction table populated")
+            # print("[DEBUG_TABLES] Reaction table populated")
         except Exception as e:
-            print(f"[DEBUG_TABLES] ❌ Error analyzing reactions: {e}")
+            pass
+            # print(f"[DEBUG_TABLES] ❌ Error analyzing reactions: {e}")
             import traceback
             traceback.print_exc()
             return
@@ -579,13 +609,15 @@ class DynamicAnalysesCategory(BaseReportCategory):
         
         # Auto-expand the simulation data expander when data is available
         if not self.simulation_expander.get_expanded():
-            print("[DEBUG_TABLES] Auto-expanding simulation data section")
+            pass
+            # print("[DEBUG_TABLES] Auto-expanding simulation data section")
             self.simulation_expander.set_expanded(True)
         
         # Auto-expand the category itself when data arrives
         if hasattr(self, 'category_frame') and self.category_frame:
             if not self.category_frame.expanded:
-                print("[DEBUG_TABLES] Auto-expanding Dynamic Analyses category")
+                pass
+                # print("[DEBUG_TABLES] Auto-expanding Dynamic Analyses category")
                 self.category_frame.set_expanded(True)
         
         # Ensure all widgets are visible and properly rendered
@@ -599,7 +631,7 @@ class DynamicAnalysesCategory(BaseReportCategory):
         if hasattr(self, 'category_frame') and self.category_frame:
             self.category_frame.queue_draw()
         
-        print("[DEBUG_TABLES] All widgets shown and expanders expanded")
+        # print("[DEBUG_TABLES] All widgets shown and expanders expanded")
     
     def _update_summary(self, duration: float, sim_data: dict):
         """Update Summary section with simulation metadata.
@@ -707,6 +739,7 @@ class DynamicAnalysesCategory(BaseReportCategory):
             print("[SUMMARY] Summary updated successfully")
             
         except Exception as e:
+            pass
             # If summary update fails, don't block table population
             print(f"[SUMMARY] Error updating summary: {e}")
             import traceback

@@ -63,7 +63,7 @@ class HierarchicalLayout(LayoutAlgorithm):
         ]
         if isolated_nodes:
             connected_graph.remove_nodes_from(isolated_nodes)
-            print(f"🔍 Hierarchical layout: Filtered {len(isolated_nodes)} isolated nodes (no arcs)")
+            # print(f"🔍 Hierarchical layout: Filtered {len(isolated_nodes)} isolated nodes (no arcs)")
         
         # NOTE: Catalysts (is_catalyst=True) are now treated as NORMAL places
         # They participate in the layout algorithm like any other place

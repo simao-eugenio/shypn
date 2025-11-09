@@ -151,20 +151,23 @@ class BaseDynamicCategory:
         Args:
             data_collector: SimulationDataCollector instance
         """
-        print(f"[CATEGORY] {self.__class__.__name__}.set_data_collector() called")
-        print(f"[CATEGORY]   data_collector={data_collector} (id={id(data_collector)})")
+        # print(f"[CATEGORY] {self.__class__.__name__}.set_data_collector() called")
+        # print(f"[CATEGORY]   data_collector={data_collector} (id={id(data_collector)})")
         self.data_collector = data_collector
         
         # Update panel's data collector if applicable
         if self.panel and hasattr(self.panel, 'set_data_collector'):
-            print(f"[CATEGORY]   Setting panel.data_collector (panel={self.panel.__class__.__name__})")
+            pass
+            # print(f"[CATEGORY]   Setting panel.data_collector (panel={self.panel.__class__.__name__})")
             self.panel.set_data_collector(data_collector)
         elif self.panel:
-            print(f"[CATEGORY]   Panel {self.panel.__class__.__name__} has no set_data_collector method")
-            print(f"[CATEGORY]   Setting panel.data_collector directly")
+            pass
+            # print(f"[CATEGORY]   Panel {self.panel.__class__.__name__} has no set_data_collector method")
+            # print(f"[CATEGORY]   Setting panel.data_collector directly")
             self.panel.data_collector = data_collector
         else:
-            print(f"[CATEGORY]   WARNING: No panel to update!")
+            pass
+            # print(f"[CATEGORY]   WARNING: No panel to update!")
     
     def refresh(self):
         """Refresh the category content.
@@ -184,7 +187,8 @@ class BaseDynamicCategory:
             try:
                 self.panel.clear_plot()
             except Exception as e:
-                print(f"Warning: Could not clear plot in {self.panel.__class__.__name__}: {e}")
+                pass
+                # print(f"Warning: Could not clear plot in {self.panel.__class__.__name__}: {e}")
     
     def _get_current_drawing_area(self):
         """Get the current drawing area from model.

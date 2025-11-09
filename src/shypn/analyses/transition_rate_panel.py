@@ -148,7 +148,7 @@ class TransitionRatePanel(AnalysisPlotPanel):
         
         if DEBUG_PLOT_DATA:
             print(f"[PLOT] _get_rate_data() called for transition {transition_id}")
-            print(f"[PLOT]   self.data_collector={self.data_collector} (id={id(self.data_collector) if self.data_collector else 'None'})")
+            # print(f"[PLOT]   self.data_collector={self.data_collector} (id={id(self.data_collector) if self.data_collector else 'None'})")
         
         # Safety check: return empty if no data collector
         if not self.data_collector:
@@ -160,7 +160,8 @@ class TransitionRatePanel(AnalysisPlotPanel):
         raw_events = self.data_collector.get_transition_data(transition_id)
         
         if DEBUG_PLOT_DATA:
-            print(f"[PLOT]   raw_events count: {len(raw_events) if raw_events else 0}")
+            pass
+            # print(f"[PLOT]   raw_events count: {len(raw_events) if raw_events else 0}")
         
         if not raw_events:
             if DEBUG_PLOT_DATA:
@@ -176,6 +177,7 @@ class TransitionRatePanel(AnalysisPlotPanel):
                 has_rate_data = True
         
         if has_rate_data:
+            pass
             # CONTINUOUS TRANSITION: Always use time on X-axis
             rate_series = []
             for time, event_type, details in raw_events:
@@ -185,6 +187,7 @@ class TransitionRatePanel(AnalysisPlotPanel):
             
             return rate_series
         else:
+            pass
             # DISCRETE TRANSITION: Plot cumulative firing count
             if DEBUG_PLOT_DATA:
                 pass
@@ -241,6 +244,7 @@ class TransitionRatePanel(AnalysisPlotPanel):
                     has_discrete = True
         
         if has_continuous and not has_discrete:
+            pass
             # Simple, consistent label for all rate functions
             return 'Rate'
         elif has_discrete and not has_continuous:
@@ -336,24 +340,28 @@ class TransitionRatePanel(AnalysisPlotPanel):
         
         # Apply appropriate margins based on transition types
         if has_source and not has_sink:
+            pass
             # SOURCE: Generous upper margin for token generation
             new_lower = max(0, ylim[0] - y_range * 0.1)  # Small lower margin
             new_upper = ylim[1] + y_range * 0.5  # 50% upper margin
             self.axes.set_ylim(new_lower, new_upper)
             
         elif has_sink and not has_source:
+            pass
             # SINK: Bottom at zero, modest upper margin
             new_lower = 0  # Sinks converge to zero
             new_upper = ylim[1] + y_range * 0.2  # 20% upper margin
             self.axes.set_ylim(new_lower, new_upper)
             
         elif has_source and has_sink:
+            pass
             # MIXED: Balanced margins
             new_lower = max(0, ylim[0] - y_range * 0.2)
             new_upper = ylim[1] + y_range * 0.3
             self.axes.set_ylim(new_lower, new_upper)
             
         else:
+            pass
             # NORMAL: Standard margins
             new_lower = ylim[0] - y_range * 0.1
             new_upper = ylim[1] + y_range * 0.1
@@ -382,6 +390,7 @@ class TransitionRatePanel(AnalysisPlotPanel):
                 rate_func = obj.properties.get('rate_function') or obj.properties.get('rate_function_display')
             
             if not rate_func:
+                pass
                 # Try the rate attribute as fallback
                 rate_func = str(getattr(obj, 'rate', ''))
             
@@ -694,6 +703,7 @@ class TransitionRatePanel(AnalysisPlotPanel):
         
         # Actually add the locality places to the PlaceRatePanel for plotting
         if self._place_panel is not None:
+            pass
             # Add input places
             for place in locality.input_places:
                 self._place_panel.add_object(place)
@@ -726,6 +736,7 @@ class TransitionRatePanel(AnalysisPlotPanel):
         
         # Add rows for each selected object
         if not self.selected_objects:
+            pass
             # Show empty message
             row = Gtk.ListBoxRow()
             label = Gtk.Label(label="No objects selected")
@@ -803,6 +814,7 @@ class TransitionRatePanel(AnalysisPlotPanel):
                             )
                     # For normal: Show both input and output places
                     else:
+                        pass
                         # Add input places
                         for place in locality_data['input_places']:
                             self._add_locality_place_row_to_list(
@@ -843,9 +855,11 @@ class TransitionRatePanel(AnalysisPlotPanel):
         rgb = mcolors.hex2color(color)
         
         if is_output:
+            pass
             # Darker color for output places
             modified_rgb = tuple(max(0.0, c - 0.2) for c in rgb)
         else:
+            pass
             # Lighter color for input places
             modified_rgb = tuple(min(1.0, c + 0.2) for c in rgb)
         
@@ -1014,10 +1028,12 @@ class TransitionRatePanel(AnalysisPlotPanel):
         
         # Plot input places (dashed lines, slightly lighter) on secondary axis
         for i, place in enumerate(locality_data['input_places']):
+            pass
             # Get place token data from data collector
             place_data = self.data_collector.get_place_data(place.id)
             
             if place_data:
+                pass
                 # Place data format: (time, tokens) - only 2 values
                 times = [t for t, tokens in place_data]
                 tokens = [tok for t, tok in place_data]
@@ -1040,10 +1056,12 @@ class TransitionRatePanel(AnalysisPlotPanel):
                     pass
         # Plot output places (dotted lines, slightly darker) on secondary axis
         for i, place in enumerate(locality_data['output_places']):
+            pass
             # Get place token data from data collector
             place_data = self.data_collector.get_place_data(place.id)
             
             if place_data:
+                pass
                 # Place data format: (time, tokens) - only 2 values
                 times = [t for t, tokens in place_data]
                 tokens = [tok for t, tok in place_data]
@@ -1074,12 +1092,14 @@ class TransitionRatePanel(AnalysisPlotPanel):
         
         # If we have a secondary axis for places, combine legends
         if hasattr(self, '_places_axes') and self.show_legend and self.selected_objects:
+            pass
             # Get handles and labels from both axes
             handles1, labels1 = self.axes.get_legend_handles_labels()
             handles2, labels2 = self._places_axes.get_legend_handles_labels()
             
             # Combine them
             if handles1 or handles2:
+                pass
                 # Remove any existing legends first
                 if self.axes.get_legend():
                     self.axes.get_legend().remove()

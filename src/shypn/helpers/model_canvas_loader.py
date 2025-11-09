@@ -187,6 +187,7 @@ class ModelCanvasLoader:
                 if drawing_area and isinstance(drawing_area, Gtk.DrawingArea):
                     self._setup_canvas_manager(drawing_area)
             if drawing_area:
+                pass
                 # Create tab label with file icon - show "default.shy" on startup
                 tab_box, tab_label, close_button = self._create_tab_label('default.shy', False)
                 close_button.connect('clicked', self._on_tab_close_clicked, page)
@@ -214,7 +215,7 @@ class ModelCanvasLoader:
         Args:
             page: Notebook page widget (Gtk.Overlay or Gtk.ScrolledWindow)
         """
-        print(f"\n[WIRE] _wire_data_collector_for_page() called")
+        # print(f"\n[WIRE] _wire_data_collector_for_page() called")
         drawing_area = None
         if isinstance(page, Gtk.Overlay):
             scrolled = page.get_child()
@@ -223,47 +224,55 @@ class ModelCanvasLoader:
                 if hasattr(drawing_area, 'get_child'):
                     drawing_area = drawing_area.get_child()
         
-        print(f"[WIRE]   drawing_area={drawing_area} (id={id(drawing_area) if drawing_area else 'None'})")
+        # print(f"[WIRE]   drawing_area={drawing_area} (id={id(drawing_area) if drawing_area else 'None'})")
         
         if self.right_panel_loader and drawing_area:
+            pass
             # Get simulate_tools_palette from SwissKnife registry
             if drawing_area in self.overlay_managers:
                 overlay_manager = self.overlay_managers[drawing_area]
-                print(f"[WIRE]   Found overlay_manager")
+                # print(f"[WIRE]   Found overlay_manager")
                 
                 # SwissKnifePalette stores SimulateToolsPaletteLoader in widget_palette_instances
                 if hasattr(overlay_manager, 'swissknife_palette'):
                     swissknife = overlay_manager.swissknife_palette
-                    print(f"[WIRE]   Found swissknife_palette")
+                    # print(f"[WIRE]   Found swissknife_palette")
                     
                     # NEW architecture: widget_palette_instances is in swissknife.registry
                     # OLD architecture: widget_palette_instances is directly on swissknife
                     simulate_tools_palette = None
                     
                     if hasattr(swissknife, 'registry') and hasattr(swissknife.registry, 'widget_palette_instances'):
-                        print(f"[WIRE]   Using NEW architecture (registry.widget_palette_instances)")
+                        pass
+                        # print(f"[WIRE]   Using NEW architecture (registry.widget_palette_instances)")
                         simulate_tools_palette = swissknife.registry.widget_palette_instances.get('simulate')
                     elif hasattr(swissknife, 'widget_palette_instances'):
-                        print(f"[WIRE]   Using OLD architecture (widget_palette_instances)")
+                        pass
+                        # print(f"[WIRE]   Using OLD architecture (widget_palette_instances)")
                         simulate_tools_palette = swissknife.widget_palette_instances.get('simulate')
                     else:
-                        print(f"[WIRE]   ❌ FAIL: No widget_palette_instances found in registry or swissknife")
+                        pass
+                        # print(f"[WIRE]   ❌ FAIL: No widget_palette_instances found in registry or swissknife")
                     
-                    print(f"[WIRE]   simulate_tools_palette={simulate_tools_palette}")
+                    # print(f"[WIRE]   simulate_tools_palette={simulate_tools_palette}")
                     if simulate_tools_palette and hasattr(simulate_tools_palette, 'data_collector'):
                         data_collector = simulate_tools_palette.data_collector
-                        print(f"[WIRE]   ✅ SUCCESS: Wiring data_collector to right panel")
-                        print(f"[WIRE]      data_collector={data_collector} (id={id(data_collector)})")
+                        # print(f"[WIRE]   ✅ SUCCESS: Wiring data_collector to right panel")
+                        # print(f"[WIRE]      data_collector={data_collector} (id={id(data_collector)})")
                         self.right_panel_loader.set_data_collector(data_collector)
                         return True
                     else:
-                        print(f"[WIRE]   ❌ FAIL: No simulate_tools_palette or data_collector found")
+                        pass
+                        # print(f"[WIRE]   ❌ FAIL: No simulate_tools_palette or data_collector found")
                 else:
-                    print(f"[WIRE]   ❌ FAIL: No swissknife_palette")
+                    pass
+                    # print(f"[WIRE]   ❌ FAIL: No swissknife_palette")
             else:
-                print(f"[WIRE]   ❌ FAIL: drawing_area not in overlay_managers")
+                pass
+                # print(f"[WIRE]   ❌ FAIL: drawing_area not in overlay_managers")
         else:
-            print(f"[WIRE]   ❌ FAIL: No right_panel_loader or drawing_area")
+            pass
+            # print(f"[WIRE]   ❌ FAIL: No right_panel_loader or drawing_area")
         return False
 
     def _on_notebook_page_changed(self, notebook, page, page_num):
@@ -274,9 +283,9 @@ class ModelCanvasLoader:
             page: The new page widget.
             page_num: The index of the new page.
         """
-        print(f"\n[TAB_SWITCH] ==========================================")
-        print(f"[TAB_SWITCH] Page changed to index {page_num}")
-        print(f"[TAB_SWITCH] ==========================================")
+        # print(f"\n[TAB_SWITCH] ==========================================")
+        # print(f"[TAB_SWITCH] Page changed to index {page_num}")
+        # print(f"[TAB_SWITCH] ==========================================")
         
         # Update active tab styling - remove 'active' class from all tabs, add to current
         for i in range(notebook.get_n_pages()):
@@ -297,7 +306,7 @@ class ModelCanvasLoader:
                 if hasattr(drawing_area, 'get_child'):
                     drawing_area = drawing_area.get_child()
         
-        print(f"[TAB_SWITCH] Extracted drawing_area: {drawing_area} (id={id(drawing_area) if drawing_area else 'None'})")
+        # print(f"[TAB_SWITCH] Extracted drawing_area: {drawing_area} (id={id(drawing_area) if drawing_area else 'None'})")
         
         # ============================================================
         # GLOBAL-SYNC: Switch canvas context when tab changes
@@ -318,9 +327,9 @@ class ModelCanvasLoader:
                     pass
         
         # Wire data collector for the switched-to page
-        print(f"[TAB_SWITCH] Calling _wire_data_collector_for_page()...")
+        # print(f"[TAB_SWITCH] Calling _wire_data_collector_for_page()...")
         wired = self._wire_data_collector_for_page(page)
-        print(f"[TAB_SWITCH] Wiring result: {wired}")
+        # print(f"[TAB_SWITCH] Wiring result: {wired}")
         
         if self.right_panel_loader and drawing_area:
             if drawing_area in self.canvas_managers:
@@ -513,6 +522,7 @@ class ModelCanvasLoader:
         if drawing_area and drawing_area in self.simulation_controllers:
             del self.simulation_controllers[drawing_area]
         if drawing_area and drawing_area in self.overlay_managers:
+            pass
             # Cleanup overlay manager and all its palettes
             overlay_manager = self.overlay_managers[drawing_area]
             overlay_manager.cleanup_overlays()
@@ -634,6 +644,10 @@ class ModelCanvasLoader:
         manager = ModelCanvasManager(canvas_width=2000, canvas_height=2000, filename=filename)
         self.canvas_managers[drawing_area] = manager
         
+        # Store references back to loader and drawing area for simulation reset
+        manager._canvas_loader = self
+        manager._drawing_area = drawing_area
+        
         # Set redraw callback so manager can trigger widget redraws
         manager.set_redraw_callback(lambda: drawing_area.queue_draw())
         
@@ -653,22 +667,26 @@ class ModelCanvasLoader:
                 return
             
             try:
+                pass
                 # Find the page widget for this drawing area
                 # Navigation: drawing_area -> GtkScrolledWindow -> GtkOverlay (page widget)
                 parent = drawing_area.get_parent()  # Should be GtkScrolledWindow
                 if not parent:
+                    pass
                     # Widget hierarchy not yet established - this is normal during initial setup
                     # Callback will be triggered again later when changes occur
                     return
                 
                 page_widget = parent.get_parent()  # Should be GtkOverlay
                 if not page_widget:
+                    pass
                     # Still setting up widget hierarchy
                     return
                     
                 # Verify page_widget is actually in the notebook
                 page_num = self.notebook.page_num(page_widget)
                 if page_num < 0:
+                    pass
                     # Not yet added to notebook
                     return
                 
@@ -677,6 +695,7 @@ class ModelCanvasLoader:
                 # Update tab label using existing method
                 self._update_tab_label(page_widget, display_name, is_modified=is_dirty)
             except Exception as e:
+                pass
                 # Silently ignore errors during widget setup
                 # (e.g., if called before widget hierarchy is complete)
                 pass
@@ -738,6 +757,7 @@ class ModelCanvasLoader:
             # Canvas setup complete - enable callbacks now that state is properly initialized
             manager._suppress_callbacks = False
         else:
+            pass
             # CRITICAL FIX: Even without overlay_box, MUST enable callbacks
             # Otherwise canvas becomes non-interactive
             manager._suppress_callbacks = False
@@ -813,6 +833,7 @@ class ModelCanvasLoader:
                     break
         
         if drawing_area:
+            pass
             # Ensure event masks and focus are set (critical for interaction)
             drawing_area.set_events(
                 Gdk.EventMask.BUTTON_PRESS_MASK | 
@@ -877,7 +898,7 @@ class ModelCanvasLoader:
             # not here when the manager is still empty. The reset happens in
             # _ensure_simulation_reset() which is called after load_objects().
             # This ensures the controller sees the full loaded model.
-            print(f"[LOAD] Skipping controller reset here (will reset after objects loaded)")
+            # print(f"[LOAD] Skipping controller reset here (will reset after objects loaded)")
             
             # ============================================================
             # CRITICAL: Reset Swiss Knife Palette to default state
@@ -935,66 +956,72 @@ class ModelCanvasLoader:
             if drawing_area in self.simulation_controllers:
                 controller = self.simulation_controllers[drawing_area]
                 manager = self.canvas_managers.get(drawing_area)
-                print(f"[RESET] _ensure_simulation_reset called for canvas")
-                print(f"[RESET] Controller ID: {id(controller)}")
+                # print(f"[RESET] _ensure_simulation_reset called for canvas")
+                # print(f"[RESET] Controller ID: {id(controller)}")
                 if manager:
-                    print(f"[RESET] Manager has {len(manager.places)} places, {len(manager.transitions)} transitions")
+                    pass
+                    # print(f"[RESET] Manager has {len(manager.places)} places, {len(manager.transitions)} transitions")
                     # CRITICAL: Use reset_for_new_model() instead of reset()
                     # This recreates the model adapter and ensures the controller
                     # references the correct manager with the loaded objects
                     controller.reset_for_new_model(manager)
-                    print(f"[RESET] Full reset complete (model adapter recreated)")
+                    # print(f"[RESET] Full reset complete (model adapter recreated)")
                     
                     # CRITICAL: Update SimulateToolsPaletteLoader's controller reference
                     # The palette has its own simulation controller reference that needs
                     # to be updated when we reset/recreate the controller for a loaded model
-                    print(f"[RESET] Looking for overlay_manager...")
+                    # print(f"[RESET] Looking for overlay_manager...")
                     overlay_manager = self.overlay_managers.get(drawing_area)
                     if overlay_manager:
-                        print(f"[RESET] Found overlay_manager: {type(overlay_manager).__name__}")
+                        pass
+                        # print(f"[RESET] Found overlay_manager: {type(overlay_manager).__name__}")
                         swissknife = getattr(overlay_manager, 'swissknife_palette', None)
-                        print(f"[RESET] swissknife_palette: {swissknife}")
+                        # print(f"[RESET] swissknife_palette: {swissknife}")
                         if swissknife:
+                            pass
                             # Use registry.get_widget_palette_instance() instead
                             if hasattr(swissknife, 'registry'):
-                                print(f"[RESET] Has registry attribute")
+                                pass
+                                # print(f"[RESET] Has registry attribute")
                                 simulate_tools_palette = swissknife.registry.get_widget_palette_instance('simulate')
-                                print(f"[RESET] simulate_tools_palette: {simulate_tools_palette}")
+                                # print(f"[RESET] simulate_tools_palette: {simulate_tools_palette}")
                                 if simulate_tools_palette:
-                                    print(f"[RESET] ✅ Updating SimulateToolsPaletteLoader.simulation reference")
-                                    print(f"[RESET] Old controller ID: {id(simulate_tools_palette.simulation) if simulate_tools_palette.simulation else 'None'}")
+                                    pass
+                                    # print(f"[RESET] ✅ Updating SimulateToolsPaletteLoader.simulation reference")
+                                    # print(f"[RESET] Old controller ID: {id(simulate_tools_palette.simulation) if simulate_tools_palette.simulation else 'None'}")
                                     
                                     # CRITICAL: Preserve step listeners from old controller
                                     # When we replace the controller reference, we need to re-register
                                     # the step listeners on the new controller, otherwise the UI won't update!
                                     old_controller = simulate_tools_palette.simulation
                                     if old_controller and hasattr(old_controller, 'step_listeners'):
-                                        print(f"[RESET] Old controller had {len(old_controller.step_listeners)} step listeners")
+                                        pass
+                                        # print(f"[RESET] Old controller had {len(old_controller.step_listeners)} step listeners")
                                     
                                     simulate_tools_palette.simulation = controller
-                                    print(f"[RESET] New controller ID: {id(simulate_tools_palette.simulation)}")
+                                    # print(f"[RESET] New controller ID: {id(simulate_tools_palette.simulation)}")
                                     
                                     # Re-register step listeners on new controller
                                     # The palette's _on_simulation_step callback updates progress and triggers redraws
                                     if hasattr(simulate_tools_palette, '_on_simulation_step'):
                                         controller.add_step_listener(simulate_tools_palette._on_simulation_step)
-                                        print(f"[RESET] Re-registered palette step listener")
+                                        # print(f"[RESET] Re-registered palette step listener")
                                     if hasattr(simulate_tools_palette, 'data_collector'):
                                         controller.add_step_listener(simulate_tools_palette.data_collector.on_simulation_step)
-                                        print(f"[RESET] Re-registered data collector step listener")
+                                        # print(f"[RESET] Re-registered data collector step listener")
                                     
                                     # PHASE 1-2 FIX: Do NOT overwrite controller.data_collector
                                     # The controller has its own DataCollector (for Report Panel)
                                     # The simulate_tools_palette has its own (for real-time plots)
                                     # Both should coexist
                                     # DO NOT OVERWRITE: controller.data_collector = simulate_tools_palette.data_collector
-                                    print(f"[RESET] ✅ Preserved both data collectors (controller + palette)")
+                                    # print(f"[RESET] ✅ Preserved both data collectors (controller + palette)")
                                     
                                     # CRITICAL: Re-apply UI defaults to new controller
                                     # This ensures progress bar works globally after controller reset
                                     # (for File → Open, File → Reset, KEGG/SBML imports, parameter changes)
                                     simulate_tools_palette._apply_ui_defaults_to_settings()
-                                    print(f"[RESET] ✅ Re-applied UI defaults (duration, units) to new controller")
+                                    # print(f"[RESET] ✅ Re-applied UI defaults (duration, units) to new controller")
                                     
                                     # PHASE 1-2 FIX: Wire controller to Report Panel for table population
                                     # The Report Panel needs the controller reference to access simulation results
@@ -1002,27 +1029,35 @@ class ModelCanvasLoader:
                                         report_panel = self.report_panel_loader.panel
                                         if report_panel and hasattr(report_panel, 'set_controller'):
                                             report_panel.set_controller(controller)
-                                            print(f"[RESET] ✅ Wired controller to Report Panel for simulation tables")
+                                            # print(f"[RESET] ✅ Wired controller to Report Panel for simulation tables")
                                         else:
-                                            print(f"[RESET] ⚠️  Report panel not found or no set_controller method")
+                                            pass
+                                            # print(f"[RESET] ⚠️  Report panel not found or no set_controller method")
                                     else:
-                                        print(f"[RESET] ⚠️  report_panel_loader not found in model_canvas_loader")
+                                        pass
+                                        # print(f"[RESET] ⚠️  report_panel_loader not found in model_canvas_loader")
                                 else:
-                                    print(f"[RESET] ❌ simulate_tools_palette not found in registry")
+                                    pass
+                                    # print(f"[RESET] ❌ simulate_tools_palette not found in registry")
                             else:
-                                print(f"[RESET] ❌ No registry attribute on swissknife")
+                                pass
+                                # print(f"[RESET] ❌ No registry attribute on swissknife")
                         else:
-                            print(f"[RESET] ❌ No swissknife_palette")
+                            pass
+                            # print(f"[RESET] ❌ No swissknife_palette")
                     else:
-                        print(f"[RESET] ❌ overlay_manager not found for drawing_area")
+                        pass
+                        # print(f"[RESET] ❌ overlay_manager not found for drawing_area")
                 else:
+                    pass
                     # Fallback to basic reset if we can't get the manager
                     controller.reset()
-                    print(f"[RESET] Basic reset complete (no manager reference)")
-                print(f"[RESET] Simulation reset for canvas: {drawing_area}")
+                    # print(f"[RESET] Basic reset complete (no manager reference)")
+                # print(f"[RESET] Simulation reset for canvas: {drawing_area}")
                 if manager:
-                    print(f"[RESET] Controller.model has {len(controller.model.places)} places, {len(controller.model.transitions)} transitions")
-                    print(f"[RESET] Controller.transition_states has {len(controller.transition_states)} entries")
+                    pass
+                    # print(f"[RESET] Controller.model has {len(controller.model.places)} places, {len(controller.model.transitions)} transitions")
+                    # print(f"[RESET] Controller.transition_states has {len(controller.transition_states)} entries")
                     
                     # CRITICAL LIFECYCLE FIX: Verify all transitions are registered
                     # After import/load, controller.transition_states should have entries for ALL transitions
@@ -1031,22 +1066,25 @@ class ModelCanvasLoader:
                     for transition in manager.transitions:
                         if transition.id not in controller.transition_states:
                             missing_count += 1
-                            print(f"[RESET] ⚠️ Missing transition_state for {transition.id} - forcing registration")
+                            # print(f"[RESET] ⚠️ Missing transition_state for {transition.id} - forcing registration")
                             # Force create state for this transition
                             state = controller._get_or_create_state(transition)
                             # Initialize enablement state for this transition
                             behavior = controller._get_behavior(transition)
                             is_source = getattr(transition, 'is_source', False)
                             if is_source:
+                                pass
                                 # Source transitions are always enabled
                                 state.enablement_time = controller.time
                                 if hasattr(behavior, 'set_enablement_time'):
                                     behavior.set_enablement_time(controller.time)
                     
                     if missing_count > 0:
-                        print(f"[RESET] ✅ Registered {missing_count} missing transitions")
+                        pass
+                        # print(f"[RESET] ✅ Registered {missing_count} missing transitions")
                     else:
-                        print(f"[RESET] ✅ All {len(manager.transitions)} transitions properly registered")
+                        pass
+                        # print(f"[RESET] ✅ All {len(manager.transitions)} transitions properly registered")
                     
                     # CRITICAL LIFECYCLE FIX #2: Invalidate model adapter caches
                     # After load, the model adapter may have stale arc/place/transition caches
@@ -1054,9 +1092,10 @@ class ModelCanvasLoader:
                     # We must explicitly invalidate here to ensure proper simulation state
                     if hasattr(controller, 'model_adapter') and controller.model_adapter:
                         controller.model_adapter.invalidate_caches()
-                        print(f"[RESET] ✅ Model adapter caches invalidated")
+                        # print(f"[RESET] ✅ Model adapter caches invalidated")
         except Exception as e:
-            print(f"[RESET] Error resetting simulation: {e}")
+            pass
+            # print(f"[RESET] Error resetting simulation: {e}")
             import traceback
             traceback.print_exc()
         
@@ -1169,23 +1208,28 @@ class ModelCanvasLoader:
         # ============================================================
         # When a new controller is created (File→New, interactive model, etc.),
         # automatically wire it to the Report Panel so simulation data appears
-        print(f"[CONTROLLER_WIRE] Controller created for canvas")
-        print(f"[CONTROLLER_WIRE] Has report_panel_loader: {hasattr(self, 'report_panel_loader')}")
+        # print(f"[CONTROLLER_WIRE] Controller created for canvas")
+        # print(f"[CONTROLLER_WIRE] Has report_panel_loader: {hasattr(self, 'report_panel_loader')}")
         if hasattr(self, 'report_panel_loader'):
-            print(f"[CONTROLLER_WIRE] report_panel_loader = {self.report_panel_loader}")
+            pass
+            # print(f"[CONTROLLER_WIRE] report_panel_loader = {self.report_panel_loader}")
             if self.report_panel_loader and hasattr(self.report_panel_loader, 'panel'):
-                print(f"[CONTROLLER_WIRE] report_panel_loader.panel = {self.report_panel_loader.panel}")
+                pass
+                # print(f"[CONTROLLER_WIRE] report_panel_loader.panel = {self.report_panel_loader.panel}")
                 
         if hasattr(self, 'report_panel_loader') and self.report_panel_loader:
             try:
-                print(f"[CONTROLLER_WIRE] Wiring new controller to Report Panel")
+                pass
+                # print(f"[CONTROLLER_WIRE] Wiring new controller to Report Panel")
                 self.report_panel_loader.panel.set_controller(simulation_controller)
             except Exception as e:
-                print(f"[CONTROLLER_WIRE] Failed to wire controller: {e}")
+                pass
+                # print(f"[CONTROLLER_WIRE] Failed to wire controller: {e}")
                 import traceback
                 traceback.print_exc()
         else:
-            print(f"[CONTROLLER_WIRE] ⚠️  report_panel_loader not available yet (will wire later)")
+            pass
+            # print(f"[CONTROLLER_WIRE] ⚠️  report_panel_loader not available yet (will wire later)")
         
         # ============================================================
         # GLOBAL-SYNC: Integrate with canvas lifecycle system
@@ -1194,6 +1238,7 @@ class ModelCanvasLoader:
         # This provides coordinated management of all canvas components.
         if self.lifecycle_adapter:
             try:
+                pass
                 # Register canvas with adapter (maintains legacy dict compatibility)
                 self.lifecycle_adapter.register_canvas(
                     drawing_area,
@@ -1233,10 +1278,10 @@ class ModelCanvasLoader:
                 model_manager = self.overlay_managers[drawing_area].canvas_manager
                 if model_manager:
                     report_panel_loader.panel.set_model_canvas(model_manager)
-                    print(f"[MODEL_CANVAS_LOADER] Set model_manager for Report Panel: {len(model_manager.places)} places, {len(model_manager.transitions)} transitions")
+                    # print(f"[MODEL_CANVAS_LOADER] Set model_manager for Report Panel: {len(model_manager.places)} places, {len(model_manager.transitions)} transitions")
             
             self.overlay_managers[drawing_area].report_panel_loader = report_panel_loader
-            print(f"[MODEL_CANVAS_LOADER] Created per-document Report Panel for drawing_area {id(drawing_area)}")
+            # print(f"[MODEL_CANVAS_LOADER] Created per-document Report Panel for drawing_area {id(drawing_area)}")
         
         # ============================================================
         # OLD PALETTE CODE - Keeping temporarily for reference
@@ -1343,6 +1388,7 @@ class ModelCanvasLoader:
             canvas_manager.clear_tool()
             drawing_area.queue_draw()
         elif operation == 'lasso':
+            pass
             # Import LassoSelector
             from shypn.edit.lasso_selector import LassoSelector
             
@@ -1420,6 +1466,7 @@ class ModelCanvasLoader:
         
         # Drawing tools (place, transition, arc)
         if tool_id in ('place', 'transition', 'arc'):
+            pass
             # PHASE 4: Check permission before activating structural tools
             # This uses canvas-centric access pattern that survives SwissPalette refactoring
             controller = self.get_canvas_controller(drawing_area)
@@ -1438,6 +1485,7 @@ class ModelCanvasLoader:
             drawing_area.queue_draw()
         
         elif tool_id == 'lasso':
+            pass
             # Lasso selection logic (copied from old _on_palette_operation_triggered)
             from shypn.edit.lasso_selector import LassoSelector
             
@@ -1471,6 +1519,7 @@ class ModelCanvasLoader:
             self._on_layout_force_clicked(None, drawing_area, canvas_manager)
         
         elif tool_id == 'layout_settings':
+            pass
             # Toggle layout parameter panel
             palette.parameter_manager.toggle_panel('layout')
     
@@ -1506,6 +1555,7 @@ class ModelCanvasLoader:
             drawing_area: GtkDrawingArea for canvas reference (unused now)
         """
         if is_floating:
+            pass
             # Floating mode: use START alignment for absolute positioning via margins
             # Combined with hexpand/vexpand=False to maintain natural size
             widget.set_halign(Gtk.Align.START)
@@ -1518,6 +1568,7 @@ class ModelCanvasLoader:
             
             # Keep current position (margins stay as they are)
         else:
+            pass
             # Attached mode: move to bottom center
             widget.set_halign(Gtk.Align.CENTER)
             widget.set_valign(Gtk.Align.END)
@@ -1531,6 +1582,7 @@ class ModelCanvasLoader:
             # Navigation: widget (palette) -> overlay (viewport container)
             overlay_widget = widget.get_parent()
             if overlay_widget:
+                pass
                 # Ensure margin keeps palette visible in viewport
                 viewport_height = overlay_widget.get_allocated_height()
                 palette_height = widget.get_allocated_height()
@@ -1542,6 +1594,7 @@ class ModelCanvasLoader:
                 
                 widget.set_margin_bottom(margin)
             else:
+                pass
                 # Fallback if parent not available
                 widget.set_margin_bottom(20)
             
@@ -1609,6 +1662,15 @@ class ModelCanvasLoader:
             time: Current simulation time
             drawing_area: GtkDrawingArea widget to redraw
         """
+        # Debug: Log redraw requests (only log every 100 steps to avoid spam)
+        if not hasattr(self, '_step_count'):
+            self._step_count = 0
+        self._step_count += 1
+        if self._step_count % 100 == 0:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"[CANVAS_REDRAW] Step {self._step_count}, time={time:.3f}, requesting queue_draw()")
+        
         drawing_area.queue_draw()
 
     def _on_simulation_reset(self, palette, drawing_area):
@@ -1623,6 +1685,7 @@ class ModelCanvasLoader:
             drawing_area: GtkDrawingArea widget for the canvas
         """
         if self.right_panel_loader:
+            pass
             # Place panel - force immediate update
             if hasattr(self.right_panel_loader, 'place_panel') and self.right_panel_loader.place_panel:
                 panel = self.right_panel_loader.place_panel
@@ -1687,6 +1750,7 @@ class ModelCanvasLoader:
             drawing_area: GtkDrawingArea widget.
         """
         if tool_name:
+            pass
             # PHASE 4: Check permission before activating tools
             # Canvas-centric access ensures this survives SwissPalette refactoring
             controller = self.get_canvas_controller(drawing_area)
@@ -1776,6 +1840,7 @@ class ModelCanvasLoader:
                     arc = manager.add_arc(source, target)
                     widget.queue_draw()
                 except ValueError as e:
+                    pass
                     # Show error dialog instead of silent failure
                     # Defensive check for parent window (Wayland compatibility)
                     parent = self.parent_window if self.parent_window else None
@@ -1821,6 +1886,7 @@ class ModelCanvasLoader:
                     )
                     
                     if handle:
+                        pass
                         # Start transformation instead of normal drag
                         if manager.editing_transforms.start_transformation(
                             edit_target, handle, world_x, world_y
@@ -1849,6 +1915,7 @@ class ModelCanvasLoader:
                     click_state['pending_timeout'] = None
                     click_state['pending_click_data'] = None
                 if clicked_obj.selected and (not is_double_click):
+                    pass
                     # Ctrl+Click on selected object → Deselect (remove from multi-selection)
                     if is_ctrl:
                         manager.selection_manager.deselect(clicked_obj)
@@ -1870,6 +1937,7 @@ class ModelCanvasLoader:
                     click_state['last_click_time'] = current_time
                     click_state['last_click_obj'] = clicked_obj
                 elif not is_double_click:
+                    pass
                     # Not selected yet - select immediately and start drag
                     # This makes dragging feel more responsive
                     if not is_ctrl:
@@ -1889,6 +1957,7 @@ class ModelCanvasLoader:
                     click_state['last_click_obj'] = clicked_obj
                     return True
                 if is_double_click:
+                    pass
                     # Double-click behavior: enter edit mode
                     # Note: Legacy block that prevented edit mode for parallel arcs has been removed
                     # Users now have full manual control over curved arc transformations
@@ -1903,6 +1972,7 @@ class ModelCanvasLoader:
                     widget.queue_draw()
                     return True
             else:
+                pass
                 # Clicked on empty space
                 # If in edit mode, just exit edit mode (keep selection)
                 if manager.selection_manager.is_edit_mode():
@@ -1942,6 +2012,7 @@ class ModelCanvasLoader:
         # Complete lasso selection if active
         if lasso_state.get('active', False) and lasso_state.get('selector'):
             if lasso_state['selector'].is_active and event.button == 1:
+                pass
                 # Use Ctrl state from button press (not release) for consistent behavior
                 is_ctrl = lasso_state.get('is_ctrl', False)
                 lasso_state['selector'].finish_lasso(multi=is_ctrl)
@@ -1956,6 +2027,7 @@ class ModelCanvasLoader:
         # End transformation if active
         if state.get('is_transforming', False):
             if manager.editing_transforms.end_transformation():
+                pass
                 # Transformation was committed successfully
                 widget.queue_draw()
             state['is_transforming'] = False
@@ -1970,6 +2042,7 @@ class ModelCanvasLoader:
         
         # End drag
         if manager.selection_manager.end_drag():
+            pass
             # Record move operation for undo if objects moved
             if move_data and hasattr(manager, 'undo_manager'):
                 from shypn.edit.undo_operations import MoveOperation
@@ -2030,6 +2103,7 @@ class ModelCanvasLoader:
         
         # FIX: Update arc preview with target validation
         if manager.is_tool_active() and manager.get_tool() == 'arc' and (arc_state['source'] is not None):
+            pass
             # Check hovered object for target validation
             hovered = manager.find_object_at_position(world_x, world_y)
             if hovered and hovered != arc_state['source']:
@@ -2045,6 +2119,7 @@ class ModelCanvasLoader:
             
             widget.queue_draw()
         if state['active'] and state['button'] > 0:
+            pass
             # Handle transformation drag
             if state.get('is_transforming', False):
                 manager.editing_transforms.update_transformation(world_x, world_y)
@@ -2126,6 +2201,7 @@ class ModelCanvasLoader:
         if event.keyval == Gdk.KEY_Delete or event.keyval == Gdk.KEY_KP_Delete:
             selected = manager.selection_manager.get_selected_objects(manager)
             if selected:
+                pass
                 # TODO: Implement undo support for delete
                 # from shypn.edit.undo_operations import DeleteOperation
                 # Store delete data for undo
@@ -2161,6 +2237,7 @@ class ModelCanvasLoader:
         # Paste (Ctrl+V) - check both lowercase and uppercase
         if is_ctrl and not is_shift and (event.keyval == Gdk.KEY_v or event.keyval == Gdk.KEY_V):
             if hasattr(self, '_clipboard') and self._clipboard:
+                pass
                 # Paste at last known pointer position
                 self._paste_selection(
                     manager, 
@@ -2172,6 +2249,7 @@ class ModelCanvasLoader:
         
         # Save (Ctrl+S) - check both lowercase and uppercase
         if is_ctrl and not is_shift and (event.keyval == Gdk.KEY_s or event.keyval == Gdk.KEY_S):
+            pass
             # Trigger save for current document
             if hasattr(self, 'file_explorer_panel') and self.file_explorer_panel:
                 self.file_explorer_panel.save_current_document()
@@ -2179,6 +2257,7 @@ class ModelCanvasLoader:
         
         # Save As (Ctrl+Shift+S) - check both lowercase and uppercase
         if is_ctrl and is_shift and (event.keyval == Gdk.KEY_s or event.keyval == Gdk.KEY_S):
+            pass
             # Trigger save as for current document
             if hasattr(self, 'file_explorer_panel') and self.file_explorer_panel:
                 self.file_explorer_panel.save_current_document_as()
@@ -2186,6 +2265,7 @@ class ModelCanvasLoader:
         
         # Open (Ctrl+O) - check both lowercase and uppercase
         if is_ctrl and not is_shift and (event.keyval == Gdk.KEY_o or event.keyval == Gdk.KEY_O):
+            pass
             # Trigger open file dialog (FileChooser, not system file explorer)
             if hasattr(self, 'file_explorer_panel') and self.file_explorer_panel:
                 self.file_explorer_panel.open_document()
@@ -2193,6 +2273,7 @@ class ModelCanvasLoader:
         
         # Undo (Ctrl+Z) - check both lowercase and uppercase
         if is_ctrl and not is_shift and (event.keyval == Gdk.KEY_z or event.keyval == Gdk.KEY_Z):
+            pass
             # TODO: Implement undo/redo functionality
             # Undo/redo system not yet implemented
             # For now, just consume the event silently
@@ -2207,6 +2288,7 @@ class ModelCanvasLoader:
             return True
         
         if event.keyval == Gdk.KEY_Escape:
+            pass
             # Cancel lasso if active
             lasso_state = self._lasso_state.get(widget, {})
             if lasso_state.get('active', False) and lasso_state.get('selector'):
@@ -2330,6 +2412,7 @@ class ModelCanvasLoader:
             source = arc_state.get('source')
             
             if source is not None:
+                pass
                 # Green glow for source
                 cr.set_source_rgba(0.2, 0.9, 0.2, 0.6)
                 cr.set_line_width(4.0 / manager.zoom)
@@ -2348,6 +2431,7 @@ class ModelCanvasLoader:
             target_valid = arc_state.get('target_valid')
             
             if hovered is not None and target_valid is not None:
+                pass
                 # Green for valid, red for invalid
                 if target_valid:
                     cr.set_source_rgba(0.2, 0.9, 0.2, 0.5)
@@ -2411,12 +2495,14 @@ class ModelCanvasLoader:
         # Detect parallel arc and calculate offset
         parallel_offset = 0.0
         if hovered_target and hovered_target != source:
+            pass
             # Check if this would create a parallel arc
             existing_arcs = [arc for arc in manager.arcs 
                            if (arc.source == source and arc.target == hovered_target) or
                               (arc.source == hovered_target and arc.target == source)]
             
             if existing_arcs:
+                pass
                 # Calculate offset direction based on arc direction
                 # Same direction as existing arc: small offset (±15px)
                 # Opposite direction: large offset (±50px)
@@ -2425,9 +2511,11 @@ class ModelCanvasLoader:
                 opposite_direction = (existing_arc.source == hovered_target and existing_arc.target == source)
                 
                 if opposite_direction:
+                    pass
                     # Opposite direction: offset to opposite sides
                     parallel_offset = -50.0  # New arc gets negative offset
                 elif same_direction:
+                    pass
                     # Same direction: both offset to same side (shouldn't happen for new arc, but handle it)
                     parallel_offset = 15.0
             
@@ -2457,6 +2545,7 @@ class ModelCanvasLoader:
         
         # Apply parallel offset perpendicular to arc direction
         if abs(parallel_offset) > 1e-6:
+            pass
             # Calculate perpendicular direction (rotate 90 degrees)
             perp_x = -uy
             perp_y = ux
@@ -2502,6 +2591,7 @@ class ModelCanvasLoader:
         if hasattr(self, 'canvas_context_menus'):
             menu = self.canvas_context_menus.get(drawing_area)
             if menu:
+                pass
                 # Use popup_at_pointer() instead of deprecated popup() for Wayland compatibility
                 menu.popup_at_pointer(None)
 
@@ -2540,9 +2630,11 @@ class ModelCanvasLoader:
         
         # Build menu items list
         if is_parallel_arc:
+            pass
             # For parallel arcs, don't include "Edit Mode" option
             menu_items = [('Edit Properties...', lambda: self._on_object_properties(obj, manager, drawing_area)), None, ('Delete', lambda: self._on_object_delete(obj, manager, drawing_area))]
         else:
+            pass
             # For normal objects, include "Edit Mode" option
             menu_items = [('Edit Properties...', lambda: self._on_object_properties(obj, manager, drawing_area)), ('Edit Mode (Double-click)', lambda: self._on_object_edit_mode(obj, manager, drawing_area)), None, ('Delete', lambda: self._on_object_delete(obj, manager, drawing_area))]
         if isinstance(obj, Transition):
@@ -2563,6 +2655,7 @@ class ModelCanvasLoader:
             type_submenu_item.show()
             menu_items.insert(2, ('__SUBMENU__', type_submenu_item))
         if isinstance(obj, Arc):
+            pass
             # Add arc transformation submenu
             from shypn.utils.arc_transform import is_straight, is_curved, is_inhibitor, is_normal
             from shypn.netobjs.place import Place
@@ -2582,12 +2675,14 @@ class ModelCanvasLoader:
             
             # Curve/Straight transformation options
             if is_curved(obj):
+                pass
                 # Curved arc can be made straight
                 straight_item = Gtk.MenuItem(label='Transform to Straight')
                 straight_item.connect('activate', lambda w: self._on_arc_make_straight(obj, manager, drawing_area))
                 straight_item.show()
                 transform_submenu.append(straight_item)
             elif is_straight(obj):
+                pass
                 # Straight arc can be made curved
                 curved_item = Gtk.MenuItem(label='Transform to Curved')
                 curved_item.connect('activate', lambda w: self._on_arc_make_curved(obj, manager, drawing_area))
@@ -2602,6 +2697,7 @@ class ModelCanvasLoader:
             
             # Arc Type Conversion Options (Normal ↔ Test ↔ Inhibitor)
             if can_be_test or can_be_inhibitor:
+                pass
                 # Show checkmark for current type
                 type_label = "Arc Type ►"
                 type_submenu_item = Gtk.MenuItem(label=type_label)
@@ -2784,25 +2880,28 @@ class ModelCanvasLoader:
         """
         drawing_area = self.get_current_document()
         if drawing_area is None:
-            print("[RESET] No active canvas to reset")
+            pass
+            # print("[RESET] No active canvas to reset")
             return False
         
         # PHASE 4: Use lifecycle system if available
         if self.lifecycle_manager:
             try:
                 self.lifecycle_manager.reset_canvas(drawing_area)
-                print(f"[RESET] ✓ Canvas reset via lifecycle system")
+                # print(f"[RESET] ✓ Canvas reset via lifecycle system")
                 # Trigger redraw
                 drawing_area.queue_draw()
                 return True
             except Exception as e:
-                print(f"[RESET] ⚠️  Lifecycle reset failed: {e}")
-                print("[RESET] Falling back to legacy reset")
+                pass
+                # print(f"[RESET] ⚠️  Lifecycle reset failed: {e}")
+                # print("[RESET] Falling back to legacy reset")
         
         # Legacy fallback: Manual cleanup
         try:
             manager = self.get_canvas_manager(drawing_area)
             if manager:
+                pass
                 # Clear objects
                 manager.places.clear()
                 manager.transitions.clear()
@@ -2816,10 +2915,11 @@ class ModelCanvasLoader:
                 
                 # Trigger redraw
                 drawing_area.queue_draw()
-                print("[RESET] ✓ Canvas reset via legacy method")
+                # print("[RESET] ✓ Canvas reset via legacy method")
                 return True
         except Exception as e:
-            print(f"[RESET] ✗ Reset failed: {e}")
+            pass
+            # print(f"[RESET] ✗ Reset failed: {e}")
             return False
         
         return False
@@ -2978,12 +3078,13 @@ class ModelCanvasLoader:
             filepath: Full path to the saved/loaded file
             is_save: True if save operation, False if load operation
         """
-        print(f"\n[FILE_OP] ========================================")
-        print(f"[FILE_OP] File operation: {'SAVE' if is_save else 'LOAD'}")
-        print(f"[FILE_OP] filepath: {filepath}")
+        # print(f"\n[FILE_OP] ========================================")
+        # print(f"[FILE_OP] File operation: {'SAVE' if is_save else 'LOAD'}")
+        # print(f"[FILE_OP] filepath: {filepath}")
         
         if not filepath:
-            print(f"[FILE_OP] No filepath, returning")
+            pass
+            # print(f"[FILE_OP] No filepath, returning")
             return
         
         # Extract filename with .shy extension
@@ -2993,38 +3094,39 @@ class ModelCanvasLoader:
             base = os.path.splitext(filename)[0]
             filename = f"{base}.shy"
         
-        print(f"[FILE_OP] Extracted filename: {filename}")
+        # print(f"[FILE_OP] Extracted filename: {filename}")
         
         # Get current page
         current_page_num = self.notebook.get_current_page()
         if current_page_num < 0:
-            print(f"[FILE_OP] No current page, returning")
+            pass
+            # print(f"[FILE_OP] No current page, returning")
             return
         
         current_page = self.notebook.get_nth_page(current_page_num)
-        print(f"[FILE_OP] Current page num: {current_page_num}")
+        # print(f"[FILE_OP] Current page num: {current_page_num}")
         
         # Update tab label with new filename (no asterisk after save/load)
         self._update_tab_label(current_page, filename, is_modified=False)
-        print(f"[FILE_OP] Tab label updated to: {filename}")
+        # print(f"[FILE_OP] Tab label updated to: {filename}")
         
         # Also update the canvas manager's filename (without extension for internal use)
         drawing_area = self._get_drawing_area_from_page(current_page)
-        print(f"[FILE_OP] drawing_area: {drawing_area} (id={id(drawing_area) if drawing_area else 'None'})")
+        # print(f"[FILE_OP] drawing_area: {drawing_area} (id={id(drawing_area) if drawing_area else 'None'})")
         
         if drawing_area and drawing_area in self.canvas_managers:
             manager = self.canvas_managers[drawing_area]
             # Store filename without extension in manager
             base_filename = os.path.splitext(filename)[0]
             manager.filename = base_filename
-            print(f"[FILE_OP] Manager filename updated to: {base_filename}")
+            # print(f"[FILE_OP] Manager filename updated to: {base_filename}")
             
             # If this was a save operation, mark as saved (clears imported flag)
             if is_save:
                 manager.mark_as_saved()
-                print(f"[FILE_OP] Manager marked as saved")
+                # print(f"[FILE_OP] Manager marked as saved")
         
-        print(f"[FILE_OP] ========================================\n")
+        # print(f"[FILE_OP] ========================================\n")
 
     def _on_dirty_state_changed(self, is_dirty):
         """Handle dirty state change to update tab label modification indicator.
@@ -3280,6 +3382,7 @@ class ModelCanvasLoader:
                 center_x = sum(obj.x for obj in all_objs) / len(all_objs)
                 center_y = sum(obj.y for obj in all_objs) / len(all_objs)
             else:
+                pass
                 # Default to canvas center
                 center_x = manager.canvas_width / 2
                 center_y = manager.canvas_height / 2
@@ -3292,6 +3395,7 @@ class ModelCanvasLoader:
             # back to the original center or canvas center
             all_objs = list(manager.places) + list(manager.transitions)
             if all_objs:
+                pass
                 # Calculate new center after layout
                 new_center_x = sum(obj.x for obj in all_objs) / len(all_objs)
                 new_center_y = sum(obj.y for obj in all_objs) / len(all_objs)
@@ -3355,6 +3459,7 @@ class ModelCanvasLoader:
             
             # Update object positions
             for obj_id, (x, y) in positions.items():
+                pass
                 # Find object by ID
                 obj = None
                 for place in manager.places:
@@ -3419,6 +3524,7 @@ class ModelCanvasLoader:
                 center_x = sum(obj.x for obj in all_objs) / len(all_objs)
                 center_y = sum(obj.y for obj in all_objs) / len(all_objs)
             else:
+                pass
                 # Default to canvas center
                 center_x = manager.canvas_width / 2
                 center_y = manager.canvas_height / 2
@@ -3426,6 +3532,7 @@ class ModelCanvasLoader:
             # Try to get layout parameters from SBML Import panel (if available)
             layout_params = {}
             try:
+                pass
                 # Check if sbml_panel is available (set during initialization)
                 if hasattr(self, 'sbml_panel') and self.sbml_panel:
                     layout_params = self.sbml_panel.get_layout_parameters_for_algorithm(algorithm)
@@ -3442,6 +3549,7 @@ class ModelCanvasLoader:
             # back to the original center or canvas center
             all_objs = list(manager.places) + list(manager.transitions)
             if all_objs:
+                pass
                 # Calculate new center after layout
                 new_center_x = sum(obj.x for obj in all_objs) / len(all_objs)
                 new_center_y = sum(obj.y for obj in all_objs) / len(all_objs)
@@ -3632,6 +3740,7 @@ class ModelCanvasLoader:
                 is_current = (self.notebook.page_num(page_widget) == self.notebook.get_current_page()) if page_widget else False
                 
                 if page_ready and drawing_ready and is_current:
+                    pass
                     # Call this function again now that widgets are mapped
                     self._on_object_properties(obj, manager, drawing_area)
                     return False  # Don't repeat
@@ -3701,14 +3810,28 @@ class ModelCanvasLoader:
             if isinstance(obj, Transition):
                 controller = self.get_canvas_controller(drawing_area)
                 if controller:
+                    pass
                     # Clear behavior cache when transition type/properties change
                     # This forces behavior algorithm recompilation on next simulation step
                     if obj.id in controller.behavior_cache:
                         del controller.behavior_cache[obj.id]
                     
+                    # CRITICAL: If transition became a source transition, enable it immediately
+                    # This allows simulation to run without needing to press Reset
+                    if getattr(obj, 'is_source', False):
+                        if obj.id in controller.transition_states:
+                            state = controller.transition_states[obj.id]
+                            if state.enablement_time is None:
+                                state.enablement_time = controller.time
+                                print(f"[PROPERTIES_CHANGED] Enabled source transition {obj.id} at t={controller.time}")
+                    
                     # Clear historical data so plot shows new rate function immediately
                     if hasattr(controller, 'data_collector') and controller.data_collector:
                         controller.data_collector.clear_transition(obj.id)
+                
+                # CRITICAL: Notify manager observers so controller gets 'modified' event
+                # This ensures the observer pattern properly handles property changes
+                manager._notify_observers('modified', obj)
             
             if isinstance(obj, (Place, Transition)) and self.right_panel_loader:
                 if hasattr(self.right_panel_loader, 'place_panel') and self.right_panel_loader.place_panel:
@@ -3734,6 +3857,7 @@ class ModelCanvasLoader:
             manager: The canvas manager
         """
         try:
+            pass
             # The dialog_loader already has parent_window set during creation
             # We don't need to set transient_for again - it's already configured
             
@@ -3753,6 +3877,7 @@ class ModelCanvasLoader:
             import traceback
             traceback.print_exc()
         finally:
+            pass
             # CRITICAL: Always destroy dialog to prevent orphaned widgets
             # Orphaned widgets cause Wayland focus issues and app crashes
             dialog_loader.destroy()
@@ -3871,6 +3996,7 @@ class ModelCanvasLoader:
             manager.replace_arc(arc, new_arc)
             drawing_area.queue_draw()
         except ValueError as e:
+            pass
             # Invalid transformation (e.g., Transition → Place)
             self._show_error_dialog(str(e))
             return
@@ -3904,6 +4030,7 @@ class ModelCanvasLoader:
             manager.replace_arc(arc, new_arc)
             drawing_area.queue_draw()
         except ValueError as e:
+            pass
             # Invalid transformation (e.g., Transition → Place)
             self._show_error_dialog(str(e))
             return
@@ -3921,6 +4048,7 @@ class ModelCanvasLoader:
         # Delete selected objects
         selected = manager.selection_manager.get_selected_objects(manager)
         if selected:
+            pass
             # TODO: Implement undo support for cut
             # from shypn.edit.undo_operations import DeleteOperation
             # Store delete data for undo
@@ -4051,6 +4179,7 @@ class ModelCanvasLoader:
         
         # Get paste position
         if pointer_x is None or pointer_y is None:
+            pass
             # Use canvas center if no pointer position provided
             screen_center_x = manager.viewport_width / 2
             screen_center_y = manager.viewport_height / 2
@@ -4123,6 +4252,7 @@ class ModelCanvasLoader:
                             arc.handle_x = item['handle_x'] + offset_x
                             arc.handle_y = item['handle_y'] + offset_y
                     except ValueError:
+                        pass
                         # Skip invalid arcs
                         pass
         

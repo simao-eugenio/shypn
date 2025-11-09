@@ -182,6 +182,11 @@ class HeuristicParametersController:
         Returns:
             True if successful
         """
+        print(f"\n{'='*80}")
+        print(f"[APPLY_PARAMETERS] Starting for transition {transition_id}")
+        print(f"{'='*80}")
+        print(f"[APPLY_PARAMETERS] Parameters received: {parameters}")
+        
         try:
             # Get canvas manager
             drawing_area = self.model_canvas_loader.get_current_document()
@@ -204,11 +209,48 @@ class HeuristicParametersController:
             
             if not transition:
                 self.logger.error(f"Transition {transition_id} not found in canvas")
+                print(f"[APPLY_PARAMETERS] ❌ Transition {transition_id} NOT FOUND in canvas")
+                print(f"[APPLY_PARAMETERS] Available transitions: {[t.id for t in canvas_manager.transitions]}")
                 return False
+            
+            print(f"[APPLY_PARAMETERS] ✅ Found transition: {transition.id}")
+            print(f"[APPLY_PARAMETERS]    Type: {type(transition).__name__}")
+            print(f"[APPLY_PARAMETERS]    Has properties attr: {hasattr(transition, 'properties')}")
+            if hasattr(transition, 'properties'):
+                print(f"[APPLY_PARAMETERS]    Properties type: {type(transition.properties)}")
+                print(f"[APPLY_PARAMETERS]    Current properties: {transition.properties}")
+            
+            # CRITICAL: Populate input_arcs and output_arcs for rate_function generation
+            # The canvas transition objects don't have these by default, but we need them
+            # to get substrate place names when auto-generating rate_function strings
+            # This matches the pattern used in analyze_model() and infer_single()
+            from shypn.data.model_canvas_manager import Arc
+            transition.input_arcs = []
+            transition.output_arcs = []
+            
+            print(f"[APPLY_PARAMETERS] Populating input/output arcs...")
+            print(f"[APPLY_PARAMETERS] Total arcs in canvas: {len(canvas_manager.arcs)}")
+            
+            for arc in canvas_manager.arcs:
+                if isinstance(arc, Arc):
+                    # Input arc: Place → Transition
+                    if hasattr(arc, 'target') and arc.target == transition:
+                        transition.input_arcs.append(arc)
+                        print(f"[APPLY_PARAMETERS]   Found input arc from {arc.source.name if hasattr(arc.source, 'name') else arc.source}")
+                    # Output arc: Transition → Place
+                    elif hasattr(arc, 'source') and arc.source == transition:
+                        transition.output_arcs.append(arc)
+                        print(f"[APPLY_PARAMETERS]   Found output arc to {arc.target.name if hasattr(arc.target, 'name') else arc.target}")
+            
+            print(f"[APPLY_PARAMETERS] Total input arcs: {len(transition.input_arcs)}")
+            print(f"[APPLY_PARAMETERS] Total output arcs: {len(transition.output_arcs)}")
             
             # Apply parameters based on type
             transition_type = parameters.get('transition_type')
             params = parameters.get('parameters', {})
+            
+            print(f"[APPLY_PARAMETERS] Transition type: {transition_type}")
+            print(f"[APPLY_PARAMETERS] Parameters to apply: {params}")
             
             self.logger.info(f"Applying {transition_type} parameters to {transition_id}: {params}")
             
@@ -258,15 +300,18 @@ class HeuristicParametersController:
                         sub2_name = substrate_places[1].name if hasattr(substrate_places[1], 'name') else f"P{substrate_places[1].id}"
                         rate_function = f"mass_action({sub1_name}, {sub2_name}, rate_constant={k})"
                         transition.properties['rate_function'] = rate_function
-                        self.logger.info(f"Generated bimolecular rate_function: {rate_function}")
+                        self.logger.info(f"✅ Generated bimolecular rate_function: {rate_function}")
+                        print(f"[HEURISTIC] ✅ Stored rate_function in {transition_id}.properties['rate_function']: {rate_function}")
                     elif len(substrate_places) == 1:
                         # Unimolecular: mass_action(A, reactant2=1.0, rate_constant=k)
                         sub_name = substrate_places[0].name if hasattr(substrate_places[0], 'name') else f"P{substrate_places[0].id}"
                         rate_function = f"mass_action({sub_name}, reactant2=1.0, rate_constant={k})"
                         transition.properties['rate_function'] = rate_function
-                        self.logger.info(f"Generated unimolecular rate_function: {rate_function}")
+                        self.logger.info(f"✅ Generated unimolecular rate_function: {rate_function}")
+                        print(f"[HEURISTIC] ✅ Stored rate_function in {transition_id}.properties['rate_function']: {rate_function}")
                     else:
                         self.logger.warning(f"No substrate places found for {transition_id}, using constant rate")
+                        print(f"[HEURISTIC] ⚠️  No substrate places for {transition_id}, using constant rate")
                         # No rate_function needed, just use transition.rate
                     
             elif transition_type == 'continuous':
@@ -274,10 +319,14 @@ class HeuristicParametersController:
                 if not hasattr(transition, 'properties'):
                     transition.properties = {}
                 
+                print(f"[APPLY_PARAMETERS] Applying continuous parameters...")
+                
                 if 'vmax' in params and params['vmax'] is not None:
                     transition.properties['vmax'] = params['vmax']
+                    print(f"[APPLY_PARAMETERS]   Set vmax = {params['vmax']}")
                 if 'km' in params and params['km'] is not None:
                     transition.properties['km'] = params['km']
+                    print(f"[APPLY_PARAMETERS]   Set km = {params['km']}")
                 if 'kcat' in params and params['kcat'] is not None:
                     transition.properties['kcat'] = params['kcat']
                 if 'ki' in params and params['ki'] is not None:
@@ -298,10 +347,13 @@ class HeuristicParametersController:
                         substrate_name = substrate_places[0].name if hasattr(substrate_places[0], 'name') else f"P{substrate_places[0].id}"
                         rate_function = f"michaelis_menten({substrate_name}, vmax={params['vmax']}, km={params['km']})"
                         transition.properties['rate_function'] = rate_function
-                        self.logger.info(f"Generated rate_function: {rate_function}")
+                        self.logger.info(f"✅ Generated rate_function: {rate_function}")
+                        print(f"[HEURISTIC] ✅ Stored rate_function in {transition_id}.properties['rate_function']: {rate_function}")
+                        print(f"[HEURISTIC]    Substrate: {substrate_name}, vmax={params['vmax']}, km={params['km']}")
                     else:
                         self.logger.warning(f"No substrate place found for {transition_id}, using constant rate")
                         transition.rate = params['vmax']
+                        print(f"[HEURISTIC] ⚠️  No substrate places for {transition_id}, set rate={params['vmax']}")
             
             # Mark document as dirty (manager has mark_dirty directly)
             canvas_manager.mark_dirty()
