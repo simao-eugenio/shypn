@@ -721,6 +721,9 @@ class TransitionRatePanel(AnalysisPlotPanel):
             'transition': transition
         }
         
+        # Get transition's plot color (should already be set from add_object)
+        transition_color = getattr(transition, 'border_color', None)
+        
         # Actually add the locality places to the PlaceRatePanel for plotting
         if self._place_panel is not None:
             pass
@@ -732,11 +735,64 @@ class TransitionRatePanel(AnalysisPlotPanel):
             for place in locality.output_places:
                 self._place_panel.add_object(place)
         
+        # Color the arcs that belong to this locality with transition's plot color
+        if transition_color and self._model_manager:
+            print(f"[ARC_COLOR] Coloring locality arcs for transition {transition.id} with color {transition_color}")
+            
+            # Find and color arcs from input places to transition
+            for place in locality.input_places:
+                for arc in self._model_manager.arcs:
+                    if arc.source.id == place.id and arc.target.id == transition.id:
+                        arc.color = transition_color
+                        print(f"[ARC_COLOR] ✅ Colored input arc {arc.id}: {place.name} → {transition.name}")
+            
+            # Find and color arcs from transition to output places
+            for place in locality.output_places:
+                for arc in self._model_manager.arcs:
+                    if arc.source.id == transition.id and arc.target.id == place.id:
+                        arc.color = transition_color
+                        print(f"[ARC_COLOR] ✅ Colored output arc {arc.id}: {transition.name} → {place.name}")
+        
         # Update the UI list to show locality places under the transition
         self._update_objects_list()
         
         # Trigger plot update
         self.needs_update = True
+    
+    def remove_object(self, obj):
+        """Remove a transition and reset its locality arc colors.
+        
+        Overrides parent to also reset arc colors when removing a transition.
+        
+        Args:
+            obj: Transition object to remove
+        """
+        # If this transition has locality, reset arc colors first
+        if obj.id in self._locality_places and self._model_manager:
+            locality_data = self._locality_places[obj.id]
+            print(f"[ARC_COLOR] Resetting locality arc colors for transition {obj.id}")
+            
+            # Reset colors of arcs from input places to transition
+            for place in locality_data['input_places']:
+                for arc in self._model_manager.arcs:
+                    if arc.source.id == place.id and arc.target.id == obj.id:
+                        from shypn.netobjs.arc import Arc
+                        arc.color = Arc.DEFAULT_COLOR
+                        print(f"[ARC_COLOR] ✅ Reset input arc {arc.id} to default")
+            
+            # Reset colors of arcs from transition to output places
+            for place in locality_data['output_places']:
+                for arc in self._model_manager.arcs:
+                    if arc.source.id == obj.id and arc.target.id == place.id:
+                        from shypn.netobjs.arc import Arc
+                        arc.color = Arc.DEFAULT_COLOR
+                        print(f"[ARC_COLOR] ✅ Reset output arc {arc.id} to default")
+            
+            # Remove locality data
+            del self._locality_places[obj.id]
+        
+        # Call parent remove_object to handle transition color reset and removal
+        super().remove_object(obj)
     
     def _update_objects_list(self):
         """Update the UI list of selected objects with locality information.
