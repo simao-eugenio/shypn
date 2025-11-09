@@ -81,17 +81,19 @@ class BaseTopologyCategory:
     - refresh(): Update analysis results when model changes
     """
     
-    def __init__(self, title, model_canvas=None, expanded=False):
+    def __init__(self, title, model_canvas=None, expanded=False, use_grouped_table=False):
         """Initialize base topology category.
         
         Args:
             title: Category title displayed in expander
             model_canvas: ModelCanvas instance (optional)
             expanded: Whether category starts expanded
+            use_grouped_table: If True, use single grouped table instead of expanders
         """
         self.title = title
         self.model_canvas = model_canvas
         self.expanded = expanded
+        self.use_grouped_table = use_grouped_table
         self.parent_panel = None  # Will be set by TopologyPanel
         
         # Analyzer instances (lazy initialized)
@@ -114,6 +116,12 @@ class BaseTopologyCategory:
         self.analyzer_labels = {}     # {analyzer_name: Gtk.Label}
         self.analyzer_containers = {} # {analyzer_name: Gtk.Box} - container for label or table
         self.spinner_boxes = {}       # {analyzer_name: Gtk.Box with spinner}
+        
+        # Grouped table widgets (when use_grouped_table=True)
+        self.grouped_table_store = None  # Gtk.ListStore
+        self.grouped_table_view = None   # Gtk.TreeView
+        self.run_all_button = None       # Gtk.Button
+        self.grouped_spinner = None      # Gtk.Spinner for "Run All"
         
         # Create category frame
         self.category_frame = CategoryFrame(
@@ -301,6 +309,282 @@ class BaseTopologyCategory:
         
         # Default: title case with spaces
         return analyzer_name.replace('_', ' ').title()
+    
+    # ========================================================================
+    # GROUPED TABLE MODE METHODS
+    # ========================================================================
+    
+    def _build_grouped_table(self):
+        """Build single table combining all analyzers in category.
+        
+        This is an alternative to individual expanders - shows all results
+        in one sortable table with a Type column.
+        
+        Returns:
+            Gtk.Box: Box with toolbar, table, and "Run All" button
+        """
+        main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        main_box.set_margin_start(12)
+        main_box.set_margin_end(12)
+        main_box.set_margin_top(12)
+        main_box.set_margin_bottom(12)
+        
+        # Toolbar with Run All button and spinner
+        toolbar = self._build_grouped_toolbar()
+        main_box.pack_start(toolbar, False, False, 0)
+        
+        # Scrolled window with table
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        scrolled.set_min_content_height(200)
+        scrolled.set_vexpand(True)
+        
+        # Create table
+        table = self._create_grouped_table()
+        scrolled.add(table)
+        
+        main_box.pack_start(scrolled, True, True, 0)
+        
+        return main_box
+    
+    def _build_grouped_toolbar(self):
+        """Build toolbar for grouped table mode.
+        
+        Returns:
+            Gtk.Box: Toolbar with buttons
+        """
+        toolbar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        
+        # Run All button
+        self.run_all_button = Gtk.Button(label="Run All Analyzers")
+        self.run_all_button.connect('clicked', self._on_run_all_clicked)
+        toolbar.pack_start(self.run_all_button, False, False, 0)
+        
+        # Spinner (hidden initially)
+        self.grouped_spinner = Gtk.Spinner()
+        self.grouped_spinner.set_size_request(16, 16)
+        self.grouped_spinner.set_no_show_all(True)
+        self.grouped_spinner.hide()
+        toolbar.pack_start(self.grouped_spinner, False, False, 0)
+        
+        # Status label
+        self.grouped_status_label = Gtk.Label()
+        self.grouped_status_label.set_xalign(0)
+        self.grouped_status_label.set_markup("<i>No analyses run yet</i>")
+        toolbar.pack_start(self.grouped_status_label, False, False, 6)
+        
+        return toolbar
+    
+    def _create_grouped_table(self):
+        """Create TreeView table for grouped results.
+        
+        Returns:
+            Gtk.TreeView: Table widget
+        """
+        # Get column definitions from subclass
+        columns = self._define_table_columns()
+        
+        # Create ListStore with column types
+        column_types = [col_type for _, col_type in columns]
+        self.grouped_table_store = Gtk.ListStore(*column_types)
+        
+        # Create TreeView
+        self.grouped_table_view = Gtk.TreeView(model=self.grouped_table_store)
+        self.grouped_table_view.set_grid_lines(Gtk.TreeViewGridLines.BOTH)
+        
+        # Add columns
+        for i, (col_name, col_type) in enumerate(columns):
+            renderer = Gtk.CellRendererText()
+            column = Gtk.TreeViewColumn(col_name, renderer, text=i)
+            column.set_resizable(True)
+            column.set_sort_column_id(i)
+            
+            # Set alignment based on type
+            if col_type in (int, float):
+                renderer.set_property('xalign', 1.0)  # Right-align numbers
+            
+            self.grouped_table_view.append_column(column)
+        
+        return self.grouped_table_view
+    
+    def _define_table_columns(self):
+        """Define columns for grouped table.
+        
+        Must be implemented by subclasses that use grouped tables.
+        
+        Returns:
+            list: List of (column_name, column_type) tuples
+                  Example: [('Type', str), ('Name', str), ('Size', int)]
+        """
+        # Default implementation - subclasses should override
+        return [
+            ('Type', str),
+            ('Name', str),
+            ('Value', str),
+        ]
+    
+    def _on_run_all_clicked(self, button):
+        """Handle Run All button click.
+        
+        Args:
+            button: Button that was clicked
+        """
+        drawing_area = self._get_current_drawing_area()
+        if not drawing_area:
+            return
+        
+        # Disable button and show spinner
+        self.run_all_button.set_sensitive(False)
+        self.grouped_spinner.show()
+        self.grouped_spinner.start()
+        self.grouped_status_label.set_markup("<i>Running analyses...</i>")
+        
+        # Clear table
+        self.grouped_table_store.clear()
+        
+        # Run all analyzers
+        analyzers = self._get_analyzers()
+        for analyzer_name in analyzers.keys():
+            # Skip dangerous analyzers unless already analyzed
+            if analyzer_name in DANGEROUS_ANALYZERS:
+                analyzed_set = self.analyzed.get(drawing_area, set())
+                if analyzer_name not in analyzed_set:
+                    # Skip dangerous analyzers in "Run All"
+                    continue
+            
+            GLib.idle_add(self._run_analyzer_for_grouped_table, analyzer_name, drawing_area)
+    
+    def _run_analyzer_for_grouped_table(self, analyzer_name, drawing_area):
+        """Run analyzer and update grouped table with results.
+        
+        Args:
+            analyzer_name: Name of analyzer to run
+            drawing_area: Current drawing area
+        """
+        if analyzer_name in self.analyzing:
+            return  # Already analyzing
+        
+        self.analyzing.add(analyzer_name)
+        
+        # Extract model on main thread
+        try:
+            manager = None
+            if self.model_canvas:
+                if hasattr(self.model_canvas, 'get_canvas_manager'):
+                    manager = self.model_canvas.get_canvas_manager(drawing_area)
+                elif hasattr(self.model_canvas, 'canvas_managers'):
+                    manager = self.model_canvas.canvas_managers.get(drawing_area)
+            
+            if not manager:
+                self.analyzing.discard(analyzer_name)
+                return
+            
+            if hasattr(manager, 'to_document_model'):
+                model = manager.to_document_model()
+            else:
+                self.analyzing.discard(analyzer_name)
+                return
+            
+            if not model or model.is_empty():
+                self.analyzing.discard(analyzer_name)
+                return
+            
+            analyzers = self._get_analyzers()
+            analyzer_class = analyzers.get(analyzer_name)
+            if not analyzer_class:
+                self.analyzing.discard(analyzer_name)
+                return
+                
+        except Exception as e:
+            self.analyzing.discard(analyzer_name)
+            return
+        
+        # Run analysis in background thread
+        def analyze_thread():
+            try:
+                analyzer = analyzer_class(model)
+                result = analyzer.analyze()
+                
+                # Cache result
+                if drawing_area not in self.results_cache:
+                    self.results_cache[drawing_area] = {}
+                self.results_cache[drawing_area][analyzer_name] = result
+                
+                # Mark as analyzed
+                if drawing_area not in self.analyzed:
+                    self.analyzed[drawing_area] = set()
+                self.analyzed[drawing_area].add(analyzer_name)
+                
+                # Update table (on GTK main thread)
+                GLib.idle_add(self._add_result_to_grouped_table, analyzer_name, result)
+                
+            except Exception as e:
+                print(f"Error analyzing {analyzer_name}: {e}")
+            finally:
+                self.analyzing.discard(analyzer_name)
+                # Check if all done
+                GLib.idle_add(self._check_grouped_analysis_complete)
+        
+        import threading
+        thread = threading.Thread(target=analyze_thread, daemon=True)
+        thread.start()
+    
+    def _add_result_to_grouped_table(self, analyzer_name, result):
+        """Add analyzer result to grouped table.
+        
+        Args:
+            analyzer_name: Name of analyzer
+            result: Analysis result
+        """
+        # Handle AnalysisResult objects
+        if hasattr(result, 'success'):
+            if not result.success:
+                return  # Skip failed analyses
+            result_data = result.data if hasattr(result, 'data') else {}
+        else:
+            result_data = result
+        
+        # Format result as table row(s) - subclass implements this
+        rows = self._format_analyzer_row(analyzer_name, result_data)
+        
+        # Add rows to table
+        if rows:
+            for row in rows:
+                self.grouped_table_store.append(row)
+    
+    def _format_analyzer_row(self, analyzer_name, result):
+        """Format analyzer result as table row(s).
+        
+        Must be implemented by subclasses that use grouped tables.
+        
+        Args:
+            analyzer_name: Name of analyzer
+            result: Analysis result data (dict or structured data)
+        
+        Returns:
+            list: List of row tuples matching table columns
+                  Example: [('P-Invariant', 'P_Inv_1', 5), ...]
+        """
+        # Default implementation - subclasses should override
+        return [(analyzer_name, str(result), '')]
+    
+    def _check_grouped_analysis_complete(self):
+        """Check if all analyses are complete and update UI.
+        """
+        if not self.analyzing:
+            # All done
+            self.grouped_spinner.stop()
+            self.grouped_spinner.hide()
+            self.run_all_button.set_sensitive(True)
+            
+            row_count = len(self.grouped_table_store)
+            self.grouped_status_label.set_markup(
+                f"<i>Analysis complete: {row_count} results</i>"
+            )
+    
+    # ========================================================================
+    # END GROUPED TABLE MODE METHODS
+    # ========================================================================
     
     def _on_analyzer_expand(self, analyzer_name):
         """Handle analyzer expander expansion.
