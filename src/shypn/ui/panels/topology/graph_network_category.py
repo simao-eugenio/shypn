@@ -106,17 +106,19 @@ class GraphNetworkCategory(BaseTopologyCategory):
         rows = []
         
         if analyzer_name == 'cycles':
-            # Result format: {'cycles': [{nodes: [...], properties: {...}}]}
+            # Result format: {'cycles': [{nodes: [...], names: [...], length: int, type: str}]}
             cycles = result.get('cycles', [])
             for i, cycle in enumerate(cycles, 1):
                 nodes = cycle.get('nodes', [])
-                props = cycle.get('properties', {})
+                names = cycle.get('names', [])
+                cycle_type = cycle.get('type', 'unknown')
+                place_count = cycle.get('place_count', 0)
+                transition_count = cycle.get('transition_count', 0)
                 
-                prop_list = []
-                if props.get('simple', False):
-                    prop_list.append('Simple')
-                if props.get('elementary', False):
-                    prop_list.append('Elementary')
+                # Use names if available
+                nodes_str = '→'.join(names) if names else '→'.join(map(str, nodes))
+                
+                properties = f'{cycle_type}, P:{place_count} T:{transition_count}'
                 
                 # Determine significance based on length
                 sig = 'High' if len(nodes) > 6 else 'Medium' if len(nodes) > 3 else 'Low'
@@ -125,53 +127,55 @@ class GraphNetworkCategory(BaseTopologyCategory):
                     'Cycle',
                     f'Cycle_{i}',
                     len(nodes),
-                    '→'.join(nodes),
-                    ', '.join(prop_list) if prop_list else '-',
+                    nodes_str,
+                    properties,
                     sig
                 ))
         
         elif analyzer_name == 'paths':
-            # Result format: {'paths': [{nodes: [...], properties: {...}}]}
+            # Result format: {'paths': [{nodes: [...], names: [...], length: int, type: str}]}
             paths = result.get('paths', [])
             for i, path in enumerate(paths, 1):
                 nodes = path.get('nodes', [])
-                props = path.get('properties', {})
+                names = path.get('names', [])
+                path_type = path.get('type', 'path')
                 
-                prop_list = []
-                if props.get('longest', False):
-                    prop_list.append('Longest')
-                if props.get('critical', False):
-                    prop_list.append('Critical')
+                # Use names if available
+                nodes_str = '→'.join(names) if names else '→'.join(map(str, nodes))
                 
-                sig = 'High' if props.get('critical') else 'Medium' if len(nodes) > 5 else 'Low'
+                properties = path_type.replace('_', ' ').title()
+                
+                # Longest paths have higher significance
+                sig = 'High' if 'longest' in path_type.lower() else 'Medium' if len(nodes) > 5 else 'Low'
                 
                 rows.append((
                     'Path',
                     f'Path_{i}',
                     len(nodes),
-                    '→'.join(nodes),
-                    ', '.join(prop_list) if prop_list else '-',
+                    nodes_str,
+                    properties,
                     sig
                 ))
         
         elif analyzer_name == 'hubs':
-            # Result format: {'hubs': [{node: str, degree: int, in_degree: int, out_degree: int, type: str}]}
+            # Result format: {'hubs': [{id: int, name: str, type: str, degree: int, in_degree: int, out_degree: int}]}
             hubs = result.get('hubs', [])
             for hub in hubs:
-                node = hub.get('node', '')
+                node_id = hub.get('id', '')
+                name = hub.get('name', str(node_id))
+                node_type = hub.get('type', 'unknown')
                 degree = hub.get('degree', 0)
                 in_deg = hub.get('in_degree', 0)
                 out_deg = hub.get('out_degree', 0)
-                node_type = hub.get('type', 'unknown')
                 
                 properties = f"{node_type.title()}, In/Out={in_deg}/{out_deg}"
                 sig = 'High' if degree > 10 else 'Medium' if degree > 5 else 'Low'
                 
                 rows.append((
                     'Hub',
-                    f'Hub_{node}',
+                    f'Hub_{name}',
                     degree,
-                    node,
+                    name,
                     properties,
                     sig
                 ))
