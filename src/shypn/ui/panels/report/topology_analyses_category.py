@@ -143,21 +143,29 @@ class TopologyAnalysesCategory(BaseReportCategory):
         Args:
             topology_panel: TopologyPanel instance
         """
+        print(f"[TOPOLOGY_CATEGORY] set_topology_panel() called with {topology_panel}")
         self.topology_panel = topology_panel
         # Refresh to show new data
         self.refresh()
     
     def refresh(self):
         """Refresh topology analyses data from Topology Panel."""
+        print(f"[TOPOLOGY_CATEGORY] refresh() called, topology_panel={self.topology_panel is not None}")
+        
         # If topology panel is available, fetch real summary data
         if self.topology_panel:
             try:
                 summary = self.topology_panel.generate_summary_for_report_panel()
+                print(f"[TOPOLOGY_CATEGORY] Got summary: status={summary.get('status')}, stats_keys={list(summary.get('statistics', {}).keys())}")
                 self._update_display(summary)
                 return
             except Exception as e:
-                print(f"Warning: Could not fetch topology summary: {e}", file=sys.__stderr__)
+                print(f"[TOPOLOGY_CATEGORY] ERROR: Could not fetch topology summary: {e}", file=sys.__stderr__)
+                import traceback
+                traceback.print_exc()
                 # Fall through to placeholder display
+        else:
+            print(f"[TOPOLOGY_CATEGORY] No topology_panel reference - showing placeholder")
         
         # Otherwise show placeholder (topology panel not yet connected)
         self._show_placeholder()
