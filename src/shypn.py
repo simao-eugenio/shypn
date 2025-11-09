@@ -317,6 +317,9 @@ def main(argv=None):
 				# Use the proper method to set model_canvas_loader
 				topology_panel_loader.set_model_canvas_loader(model_canvas_loader)
 				
+				# Store topology_panel_loader reference for Report Panel to access
+				model_canvas_loader.topology_panel_loader = topology_panel_loader
+				
 				# ===================================================================
 				# WIRE TOPOLOGY PANEL TO MODEL LIFECYCLE EVENTS
 				# This ensures cache is invalidated when models change/switch

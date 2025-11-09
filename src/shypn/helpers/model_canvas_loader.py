@@ -1291,6 +1291,12 @@ class ModelCanvasLoader:
                     report_panel_loader.panel.set_model_canvas(model_manager)
                     print(f"[CONTROLLER_WIRE] ✅ Set model_manager: {len(model_manager.places)} places, {len(model_manager.transitions)} transitions")
                 
+                # Connect Topology Panel to Report Panel for analysis data
+                if hasattr(self, 'topology_panel_loader') and self.topology_panel_loader:
+                    if hasattr(self.topology_panel_loader, 'panel') and self.topology_panel_loader.panel:
+                        report_panel_loader.panel.set_topology_panel(self.topology_panel_loader.panel)
+                        print(f"[CONTROLLER_WIRE] ✅ Connected Topology Panel to Report Panel")
+                
                 # NOTE: Locality sync callback will be wired later in set_right_panel_loader()
                 # when the transition panel is guaranteed to exist
             
