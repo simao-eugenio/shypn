@@ -603,9 +603,13 @@ class BaseTopologyCategory:
         Args:
             button: Button that was clicked
         """
+        print(f"[{self.__class__.__name__}] Run All clicked")
         drawing_area = self._get_current_drawing_area()
         if not drawing_area:
+            print(f"[{self.__class__.__name__}] No drawing area!")
             return
+        
+        print(f"[{self.__class__.__name__}] Drawing area: {drawing_area}")
         
         # Disable button and show spinner
         self.run_all_button.set_sensitive(False)
@@ -614,10 +618,12 @@ class BaseTopologyCategory:
         self.grouped_status_label.set_markup("<i>Running analyses...</i>")
         
         # Clear table
-        self.grouped_table_store.clear()
+        if hasattr(self, 'grouped_table_store') and self.grouped_table_store:
+            self.grouped_table_store.clear()
         
         # Get all analyzers and sort by priority (Priority 1 = fastest)
         analyzers = self._get_analyzers()
+        print(f"[{self.__class__.__name__}] Got {len(analyzers)} analyzers: {list(analyzers.keys())}")
         analyzer_list = []
         
         for analyzer_name in analyzers.keys():
@@ -635,6 +641,10 @@ class BaseTopologyCategory:
         
         # Sort by priority (ascending: 1, 2, 3, 4...)
         analyzer_list.sort(key=lambda x: x[0])
+        
+        print(f"[{self.__class__.__name__}] Sorted analyzer list ({len(analyzer_list)} to run):")
+        for priority, name in analyzer_list:
+            print(f"  Priority {priority}: {name}")
         
         # Run analyzers in priority order with staggered delays
         # This ensures fast algorithms complete and display results first
@@ -655,10 +665,14 @@ class BaseTopologyCategory:
             analyzer_name: Name of analyzer to run
             drawing_area: Current drawing area
         """
+        print(f"[{self.__class__.__name__}] Running analyzer: {analyzer_name}")
+        
         if analyzer_name in self.analyzing:
-            return  # Already analyzing
+            print(f"[{self.__class__.__name__}] {analyzer_name} already analyzing, skipping")
+            return False  # Already analyzing, stop GLib.timeout_add from repeating
         
         self.analyzing.add(analyzer_name)
+        print(f"[{self.__class__.__name__}] Added {analyzer_name} to analyzing set")
         
         # Record start time
         import time
@@ -700,27 +714,27 @@ class BaseTopologyCategory:
             
             if not manager:
                 self.analyzing.discard(analyzer_name)
-                return
+                return False  # Stop GLib.timeout_add from repeating
             
             if hasattr(manager, 'to_document_model'):
                 model = manager.to_document_model()
             else:
                 self.analyzing.discard(analyzer_name)
-                return
+                return False  # Stop GLib.timeout_add from repeating
             
             if not model or model.is_empty():
                 self.analyzing.discard(analyzer_name)
-                return
+                return False  # Stop GLib.timeout_add from repeating
             
             analyzers = self._get_analyzers()
             analyzer_class = analyzers.get(analyzer_name)
             if not analyzer_class:
                 self.analyzing.discard(analyzer_name)
-                return
+                return False  # Stop GLib.timeout_add from repeating
                 
         except Exception as e:
             self.analyzing.discard(analyzer_name)
-            return
+            return False  # Stop GLib.timeout_add from repeating
         
         # Run analysis in background thread
         def analyze_thread():
@@ -758,6 +772,9 @@ class BaseTopologyCategory:
         import threading
         thread = threading.Thread(target=analyze_thread, daemon=True)
         thread.start()
+        
+        # Return False to prevent GLib.timeout_add from calling this again
+        return False
     
     def _add_result_to_grouped_table(self, analyzer_name, result):
         """Add analyzer result to grouped table.
@@ -893,6 +910,9 @@ class BaseTopologyCategory:
                 status = f"Running {len(running_names)} analyses..."
             
             self.grouped_status_label.set_markup(f"<i>{status}</i>")
+        
+        # Return False to prevent GLib.idle_add from calling again
+        return False
     
     # ========================================================================
     # END GROUPED TABLE MODE METHODS
