@@ -251,7 +251,7 @@ class BehavioralCategory(BaseTopologyCategory):
         # Handle AnalysisResult objects
         if hasattr(result, 'success'):
             if not result.success:
-                return
+                return False  # Stop GLib.idle_add from repeating
             result_data = result.data if hasattr(result, 'data') else {}
         else:
             result_data = result
@@ -259,7 +259,7 @@ class BehavioralCategory(BaseTopologyCategory):
         # Get current drawing area to track all results
         drawing_area = self._get_current_drawing_area()
         if not drawing_area:
-            return
+            return False  # Stop GLib.idle_add from repeating
         
         # Wait until all analyzers have run, then update properties matrix
         analyzed_set = self.analyzed.get(drawing_area, set())
@@ -270,6 +270,9 @@ class BehavioralCategory(BaseTopologyCategory):
         # If deadlocks analyzer, populate deadlocks table
         if analyzer_name == 'deadlocks' and result_data:
             self._update_deadlocks_table(result_data)
+        
+        # Return False to stop GLib.idle_add from repeating
+        return False
     
     def _on_analyzer_start(self, analyzer_name):
         """Called when an analyzer starts running.
@@ -281,6 +284,9 @@ class BehavioralCategory(BaseTopologyCategory):
         """
         # Update matrix to show "Analyzing..." status
         self._update_properties_matrix()
+        
+        # Return False to stop GLib.idle_add from repeating
+        return False
     
     def _show_timeout_message(self, analyzer_name, timeout_seconds):
         """Override to show timeout in properties matrix.
@@ -308,6 +314,9 @@ class BehavioralCategory(BaseTopologyCategory):
         
         # Update properties matrix to show timeout
         self._update_properties_matrix()
+        
+        # Return False to stop GLib.idle_add from repeating
+        return False
     
     def _show_error_message(self, analyzer_name, error_message):
         """Override to show error in properties matrix.
@@ -335,6 +344,9 @@ class BehavioralCategory(BaseTopologyCategory):
         
         # Update properties matrix to show error
         self._update_properties_matrix()
+        
+        # Return False to stop GLib.idle_add from repeating
+        return False
     
     def _update_properties_matrix(self):
         """Update the properties matrix based on cached results.
