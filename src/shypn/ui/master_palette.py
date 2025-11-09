@@ -258,10 +258,8 @@ class MasterPalette:
                 separator.set_size_request(-1, 8)
                 self.container.pack_start(separator, False, False, 0)
 
-        # Disable topology button by default (not implemented yet)
-        if 'topology' in self.buttons:
-            self.buttons['topology'].set_sensitive(False)
-
+        # All buttons are now implemented and enabled by default
+        
         # Add expanding spacer to push buttons to top
         spacer = Gtk.Box()
         spacer.set_vexpand(True)
