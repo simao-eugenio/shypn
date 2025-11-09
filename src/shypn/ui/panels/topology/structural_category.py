@@ -110,98 +110,111 @@ class StructuralCategory(BaseTopologyCategory):
         rows = []
         
         if analyzer_name == 'p_invariants':
-            # Result format: {'invariants': [{places: [...], support: [...], properties: {...}}]}
-            invariants = result.get('invariants', [])
+            # Result format: {'p_invariants': [{places: [...], weights: [...], names: [...]}]}
+            invariants = result.get('p_invariants', [])
             for i, inv in enumerate(invariants, 1):
-                places = inv.get('places', [])
-                support = inv.get('support', [])
-                props = inv.get('properties', {})
+                place_ids = inv.get('places', [])
+                weights = inv.get('weights', [])
+                names = inv.get('names', [])
                 
-                # Build properties string
-                prop_list = []
-                if props.get('minimal', False):
-                    prop_list.append('Minimal')
-                if props.get('conservative', False):
-                    prop_list.append('Conservative')
+                # Use names if available, otherwise IDs
+                elements_str = ', '.join(names) if names else ', '.join(map(str, place_ids))
+                
+                # Format weights as support vector
+                support_str = str(weights) if weights else '-'
+                
+                # Properties (minimal is implicit, check for conservation)
+                conserved_value = inv.get('conserved_value', 0)
+                properties = f'Conserved value: {conserved_value}'
                 
                 rows.append((
                     'P-Invariant',
                     f'P_Inv_{i}',
-                    len(places),
-                    ', '.join(places),
-                    str(support),
-                    ', '.join(prop_list) if prop_list else '-'
+                    len(place_ids),
+                    elements_str,
+                    support_str,
+                    properties
                 ))
         
         elif analyzer_name == 't_invariants':
-            # Result format: {'invariants': [{transitions: [...], support: [...], properties: {...}}]}
-            invariants = result.get('invariants', [])
+            # Result format: {'t_invariants': [{transition_ids: [...], transition_names: [...], weights: [...]}]}
+            invariants = result.get('t_invariants', [])
             for i, inv in enumerate(invariants, 1):
-                transitions = inv.get('transitions', [])
-                support = inv.get('support', [])
-                props = inv.get('properties', {})
+                transition_ids = inv.get('transition_ids', [])
+                transition_names = inv.get('transition_names', [])
+                weights = inv.get('weights', [])
+                inv_type = inv.get('type', 'cycle')
                 
-                prop_list = []
-                if props.get('minimal', False):
-                    prop_list.append('Minimal')
-                if props.get('reproducible', False):
-                    prop_list.append('Reproducible')
+                # Use names if available, otherwise IDs
+                elements_str = ', '.join(transition_names) if transition_names else ', '.join(map(str, transition_ids))
+                
+                # Format weights as support vector
+                support_str = str(weights) if weights else '-'
+                
+                # Properties
+                properties = f'Type: {inv_type}, Total firings: {sum(weights) if weights else 0}'
                 
                 rows.append((
                     'T-Invariant',
                     f'T_Inv_{i}',
-                    len(transitions),
-                    ', '.join(transitions),
-                    str(support),
-                    ', '.join(prop_list) if prop_list else '-'
+                    len(transition_ids),
+                    elements_str,
+                    support_str,
+                    properties
                 ))
         
         elif analyzer_name == 'siphons':
-            # Result format: {'siphons': [{places: [...], properties: {...}}]}
+            # Result format: {'siphons': [{place_ids: [...], place_names: [...], is_empty: bool, criticality: str}]}
             siphons = result.get('siphons', [])
             for i, siphon in enumerate(siphons, 1):
-                places = siphon.get('places', [])
-                props = siphon.get('properties', {})
+                place_ids = siphon.get('place_ids', [])
+                place_names = siphon.get('place_names', [])
+                is_empty = siphon.get('is_empty', False)
+                criticality = siphon.get('criticality', 'unknown')
                 
-                prop_list = []
-                if props.get('minimal', False):
-                    prop_list.append('Minimal')
-                if props.get('is_trap', False):
-                    prop_list.append('Also Trap')
-                else:
-                    prop_list.append('Not Trap')
+                # Use names if available, otherwise IDs
+                elements_str = ', '.join(place_names) if place_names else ', '.join(map(str, place_ids))
+                
+                # Properties
+                prop_list = ['Minimal']  # All returned siphons are minimal
+                if is_empty:
+                    prop_list.append('Empty')
+                prop_list.append(f'Criticality: {criticality}')
                 
                 rows.append((
                     'Siphon',
                     f'Siphon_{i}',
-                    len(places),
-                    ', '.join(places),
+                    len(place_ids),
+                    elements_str,
                     '-',
-                    ', '.join(prop_list) if prop_list else '-'
+                    ', '.join(prop_list)
                 ))
         
         elif analyzer_name == 'traps':
-            # Result format: {'traps': [{places: [...], properties: {...}}]}
+            # Result format: {'traps': [{place_ids: [...], place_names: [...], is_marked: bool, criticality: str}]}
             traps = result.get('traps', [])
             for i, trap in enumerate(traps, 1):
-                places = trap.get('places', [])
-                props = trap.get('properties', {})
+                place_ids = trap.get('place_ids', [])
+                place_names = trap.get('place_names', [])
+                is_marked = trap.get('is_marked', False)
+                criticality = trap.get('criticality', 'unknown')
                 
-                prop_list = []
-                if props.get('minimal', False):
-                    prop_list.append('Minimal')
-                if props.get('is_siphon', False):
-                    prop_list.append('Also Siphon')
-                else:
-                    prop_list.append('Not Siphon')
+                # Use names if available, otherwise IDs
+                elements_str = ', '.join(place_names) if place_names else ', '.join(map(str, place_ids))
+                
+                # Properties
+                prop_list = ['Minimal']  # All returned traps are minimal
+                if is_marked:
+                    prop_list.append('Marked')
+                prop_list.append(f'Criticality: {criticality}')
                 
                 rows.append((
                     'Trap',
                     f'Trap_{i}',
-                    len(places),
-                    ', '.join(places),
+                    len(place_ids),
+                    elements_str,
                     '-',
-                    ', '.join(prop_list) if prop_list else '-'
+                    ', '.join(prop_list)
                 ))
         
         return rows
