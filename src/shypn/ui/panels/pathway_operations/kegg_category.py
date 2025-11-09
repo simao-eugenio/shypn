@@ -700,20 +700,26 @@ class KEGGCategory(BasePathwayCategory):
                     self.logger.info("Calling mark_needs_redraw...")
                     canvas_manager.mark_needs_redraw()
                     
-                    # REPORT PANEL: Trigger refresh after KEGG import
-                    # This ensures Report Panel shows current state for this document
+                    # REPORT PANEL: Trigger refresh after KEGG import (deferred)
+                    # Use GLib.idle_add to ensure this happens AFTER tab switch completes
                     if drawing_area in canvas_loader.overlay_managers:
-                        overlay_manager = canvas_loader.overlay_managers[drawing_area]
-                        if hasattr(overlay_manager, 'report_panel_loader'):
-                            report_panel_loader = overlay_manager.report_panel_loader
-                            if report_panel_loader and hasattr(report_panel_loader, 'panel'):
-                                self.logger.info("Triggering Report Panel refresh after KEGG import")
-                                # Get the simulation controller for this document
-                                simulation_controller = getattr(overlay_manager, 'simulation_controller', None)
-                                if simulation_controller and hasattr(report_panel_loader.panel, 'set_controller'):
-                                    # Re-set controller to trigger refresh
-                                    report_panel_loader.panel.set_controller(simulation_controller)
-                                    self.logger.info("✅ Report Panel refreshed")
+                        from gi.repository import GLib
+                        
+                        def refresh_report_panel():
+                            """Deferred refresh to ensure tab switch completes first."""
+                            overlay_manager = canvas_loader.overlay_managers.get(drawing_area)
+                            if overlay_manager and hasattr(overlay_manager, 'report_panel_loader'):
+                                report_panel_loader = overlay_manager.report_panel_loader
+                                if report_panel_loader and hasattr(report_panel_loader, 'panel'):
+                                    self.logger.info("Triggering Report Panel refresh after KEGG import (deferred)")
+                                    simulation_controller = getattr(overlay_manager, 'simulation_controller', None)
+                                    if simulation_controller and hasattr(report_panel_loader.panel, 'set_controller'):
+                                        report_panel_loader.panel.set_controller(simulation_controller)
+                                        self.logger.info("✅ Report Panel refreshed")
+                            return False  # Don't repeat
+                        
+                        GLib.idle_add(refresh_report_panel)
+                        self.logger.info("Report Panel refresh scheduled (idle)")
                     
                     self.logger.info(
                         f"Model auto-loaded: {len(document_model.places)} places, "

@@ -1882,23 +1882,33 @@ class FileExplorerPanel:
                 # Use the drawing_area we already have (from new tab creation)
                 self.canvas_loader._ensure_simulation_reset(drawing_area)
             
-            # REPORT PANEL: Trigger refresh after file load
-            # This ensures Report Panel shows current state for this document
-            if drawing_area in self.canvas_loader.overlay_managers:
-                overlay_manager = self.canvas_loader.overlay_managers[drawing_area]
-                if hasattr(overlay_manager, 'report_panel_loader'):
-                    report_panel_loader = overlay_manager.report_panel_loader
-                    if report_panel_loader and hasattr(report_panel_loader, 'panel'):
-                        print(f"[FILE_OPEN] Triggering Report Panel refresh after file load")
-                        # Get the simulation controller for this document
-                        simulation_controller = getattr(overlay_manager, 'simulation_controller', None)
-                        if simulation_controller and hasattr(report_panel_loader.panel, 'set_controller'):
-                            # Re-set controller to trigger refresh
-                            report_panel_loader.panel.set_controller(simulation_controller)
-                            print(f"[FILE_OPEN] ✅ Report Panel refreshed")
-            
             # Force redraw to display loaded objects
             manager.mark_needs_redraw()
+            
+            # REPORT PANEL: Trigger refresh after file load (deferred)
+            # Use GLib.idle_add to ensure this happens AFTER tab switch completes
+            # This prevents race condition with tab switch handler also calling set_controller
+            if drawing_area in self.canvas_loader.overlay_managers:
+                from gi.repository import GLib
+                
+                def refresh_report_panel():
+                    """Deferred refresh to ensure tab switch completes first."""
+                    overlay_manager = self.canvas_loader.overlay_managers.get(drawing_area)
+                    if overlay_manager and hasattr(overlay_manager, 'report_panel_loader'):
+                        report_panel_loader = overlay_manager.report_panel_loader
+                        if report_panel_loader and hasattr(report_panel_loader, 'panel'):
+                            print(f"[FILE_OPEN] Triggering Report Panel refresh after file load (deferred)")
+                            # Get the simulation controller for this document
+                            simulation_controller = getattr(overlay_manager, 'simulation_controller', None)
+                            if simulation_controller and hasattr(report_panel_loader.panel, 'set_controller'):
+                                # Re-set controller to trigger refresh
+                                report_panel_loader.panel.set_controller(simulation_controller)
+                                print(f"[FILE_OPEN] ✅ Report Panel refreshed")
+                    return False  # Don't repeat
+                
+                # Schedule refresh to happen after current events complete
+                GLib.idle_add(refresh_report_panel)
+                print(f"[FILE_OPEN] Report Panel refresh scheduled (idle)")
 
     def new_document(self):
         """Create a new document.
