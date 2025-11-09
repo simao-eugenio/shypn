@@ -1784,6 +1784,10 @@ class FileExplorerPanel:
         
         Helper method shared by open_document() and _open_file_from_path().
         
+        CRITICAL: Always creates a fresh canvas via add_document() to ensure
+        consistent initialization path. This guarantees proper controller wiring,
+        Report Panel setup, and callback registration.
+        
         Args:
             document: DocumentModel instance
             filepath: Full path to the file
@@ -1794,45 +1798,17 @@ class FileExplorerPanel:
         filename = os.path.basename(filepath)
         base_name = os.path.splitext(filename)[0]
         
-        # Check if current tab is empty/default and can be reused
-        current_page = self.canvas_loader.notebook.get_current_page()
-        can_reuse_tab = False
-        
-        if current_page >= 0:
-            page_widget = self.canvas_loader.notebook.get_nth_page(current_page)
-            drawing_area = self.canvas_loader._get_drawing_area_from_page(page_widget)
-            if drawing_area:
-                manager = self.canvas_loader.get_canvas_manager(drawing_area)
-                # Only reuse tab if it's empty (no objects) AND not dirty
-                if manager:
-                    is_empty = (len(manager.places) == 0 and 
-                               len(manager.transitions) == 0 and 
-                               len(manager.arcs) == 0)
-                    is_default_name = (manager.filename == 'default' or 
-                                      manager.get_display_name() == 'default')
-                    is_clean = not manager.is_dirty()
-                    
-                    # DEBUG: Print tab reuse decision
-                    # print(f"  Empty: {is_empty} (places={len(manager.places)}, trans={len(manager.transitions)}, arcs={len(manager.arcs)})")
-                    print(f"  Default name: {is_default_name} (filename='{manager.filename}')")
-                    print(f"  Clean: {is_clean} (is_dirty={manager.is_dirty()})")
-                    
-                    # CRITICAL FIX: Only reuse if ALL conditions are met
-                    # If tab has ANY content or is dirty, create new tab
-                    can_reuse_tab = is_empty and is_default_name and is_clean
-                    
-                    print(f"  Decision: {'REUSE tab' if can_reuse_tab else 'CREATE new tab'}")
-        
-        # Either reuse current empty tab or create new one
-        if can_reuse_tab:
-            # Reuse the current empty default tab
-            # CRITICAL: Reset manager state before loading to avoid stale state bugs
-            # This ensures callbacks are enabled and all flags are reset
-            self.canvas_loader._reset_manager_for_load(manager, base_name)
-        else:
-            # Create a new tab for this document
-            page_index, drawing_area = self.canvas_loader.add_document(filename=base_name)
-            manager = self.canvas_loader.get_canvas_manager(drawing_area)
+        # UNIFIED APPROACH: Always create new canvas via add_document()
+        # This ensures IDENTICAL initialization to File→New:
+        # - Fresh ModelCanvasManager
+        # - Proper controller wiring
+        # - Report Panel creation and registration
+        # - Callback setup
+        # Benefits: No reuse logic complexity, consistent behavior, no stale state
+        print(f"[FILE_OPEN] Creating fresh canvas for file: {base_name}")
+        page_index, drawing_area = self.canvas_loader.add_document(filename=base_name)
+        manager = self.canvas_loader.get_canvas_manager(drawing_area)
+        print(f"[FILE_OPEN] Fresh canvas created: page_index={page_index}, drawing_area={drawing_area}")
         
         if manager:
             # ===== UNIFIED OBJECT LOADING =====
@@ -1903,8 +1879,23 @@ class FileExplorerPanel:
             # CRITICAL: Ensure simulation is reset after loading file
             # This guarantees clean initial state for the loaded model
             if hasattr(self.canvas_loader, '_ensure_simulation_reset'):
-                drawing_area = self.canvas_loader.get_current_document()
+                # Use the drawing_area we already have (from new tab creation)
                 self.canvas_loader._ensure_simulation_reset(drawing_area)
+            
+            # REPORT PANEL: Trigger refresh after file load
+            # This ensures Report Panel shows current state for this document
+            if drawing_area in self.canvas_loader.overlay_managers:
+                overlay_manager = self.canvas_loader.overlay_managers[drawing_area]
+                if hasattr(overlay_manager, 'report_panel_loader'):
+                    report_panel_loader = overlay_manager.report_panel_loader
+                    if report_panel_loader and hasattr(report_panel_loader, 'panel'):
+                        print(f"[FILE_OPEN] Triggering Report Panel refresh after file load")
+                        # Get the simulation controller for this document
+                        simulation_controller = getattr(overlay_manager, 'simulation_controller', None)
+                        if simulation_controller and hasattr(report_panel_loader.panel, 'set_controller'):
+                            # Re-set controller to trigger refresh
+                            report_panel_loader.panel.set_controller(simulation_controller)
+                            print(f"[FILE_OPEN] ✅ Report Panel refreshed")
             
             # Force redraw to display loaded objects
             manager.mark_needs_redraw()

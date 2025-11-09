@@ -552,37 +552,16 @@ class SBMLCategory(BasePathwayCategory):
                     base_name = os.path.splitext(os.path.basename(saved_filepath))[0]
                     self.logger.info(f"Loading model: {base_name}")
                     
-                    # Check if current tab can be reused (empty + default name)
-                    can_reuse_tab = False
-                    current_page = canvas_loader.notebook.get_current_page()
-                    
-                    if current_page >= 0:
-                        page_widget = canvas_loader.notebook.get_nth_page(current_page)
-                        drawing_area = canvas_loader._get_drawing_area_from_page(page_widget)
-                        if drawing_area:
-                            manager = canvas_loader.get_canvas_manager(drawing_area)
-                            if manager:
-                                is_empty = (len(manager.places) == 0 and 
-                                           len(manager.transitions) == 0 and 
-                                           len(manager.arcs) == 0)
-                                is_default_name = (manager.filename == 'default' or 
-                                                  manager.get_display_name() == 'default')
-                                is_clean = not manager.is_dirty()
-                                can_reuse_tab = is_empty and is_default_name and is_clean
-                                self.logger.info(f"Current tab check: empty={is_empty}, default={is_default_name}, clean={is_clean}, reuse={can_reuse_tab}")
-                    
-                    # Either reuse current empty tab or create new one
-                    if can_reuse_tab:
-                        # Reuse the current empty default tab
-                        self.logger.info("Reusing current empty tab")
-                        canvas_manager = manager  # Already set from check above
-                        # CRITICAL: Reset manager state before loading
-                        canvas_loader._reset_manager_for_load(canvas_manager, base_name)
-                    else:
-                        # Create a new tab for this document (like File → Open does)
-                        self.logger.info(f"Creating new tab for: {base_name}")
-                        page_index, drawing_area = canvas_loader.add_document(filename=base_name)
-                        canvas_manager = canvas_loader.get_canvas_manager(drawing_area)
+                    # UNIFIED APPROACH: Always create fresh canvas via add_document()
+                    # This ensures IDENTICAL initialization to File→New and File→Open:
+                    # - Fresh ModelCanvasManager
+                    # - Proper controller wiring
+                    # - Report Panel creation and registration
+                    # - Callback setup
+                    # Benefits: No reuse logic complexity, consistent behavior, no stale state
+                    self.logger.info(f"Creating fresh canvas for SBML import: {base_name}")
+                    page_index, drawing_area = canvas_loader.add_document(filename=base_name)
+                    canvas_manager = canvas_loader.get_canvas_manager(drawing_area)
                     
                     if not canvas_manager:
                         raise ValueError("Failed to get canvas manager after tab creation")
@@ -621,7 +600,22 @@ class SBMLCategory(BasePathwayCategory):
                     # CRITICAL: Ensure simulation is reset after loading objects
                     # This guarantees clean initial state for the imported model
                     if canvas_loader and hasattr(canvas_loader, '_ensure_simulation_reset'):
-                        canvas_loader._ensure_simulation_reset(drawing_area if not can_reuse_tab else canvas_loader.get_current_document())
+                        canvas_loader._ensure_simulation_reset(drawing_area)
+                    
+                    # REPORT PANEL: Trigger refresh after SBML import
+                    # This ensures Report Panel shows current state for this document
+                    if drawing_area in canvas_loader.overlay_managers:
+                        overlay_manager = canvas_loader.overlay_managers[drawing_area]
+                        if hasattr(overlay_manager, 'report_panel_loader'):
+                            report_panel_loader = overlay_manager.report_panel_loader
+                            if report_panel_loader and hasattr(report_panel_loader, 'panel'):
+                                self.logger.info("Triggering Report Panel refresh after SBML import")
+                                # Get the simulation controller for this document
+                                simulation_controller = getattr(overlay_manager, 'simulation_controller', None)
+                                if simulation_controller and hasattr(report_panel_loader.panel, 'set_controller'):
+                                    # Re-set controller to trigger refresh
+                                    report_panel_loader.panel.set_controller(simulation_controller)
+                                    self.logger.info("✅ Report Panel refreshed")
                     
                     self.logger.info("=== SBML canvas auto-load COMPLETED ===")
                     self._show_status(

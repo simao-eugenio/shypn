@@ -164,39 +164,29 @@ class ModelCanvasLoader:
         style_context = self.notebook.get_style_context()
         style_context.add_provider(css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION + 1)
         
+        # CRITICAL FIX: Remove default tab from UI file and create fresh one programmatically
+        # The UI file contains a pre-baked tab that has timing issues with controller wiring
+        # Solution: Delete the UI tab and create a new one using add_document() for consistency
         self.document_count = self.notebook.get_n_pages()
         if self.document_count > 0:
-            page = self.notebook.get_nth_page(0)
-            drawing_area = None
-            overlay_box = None
-            overlay_widget = None
-            if isinstance(page, Gtk.Overlay):
-                overlay_widget = page
-                scrolled = overlay_widget.get_child()
-                if isinstance(scrolled, Gtk.ScrolledWindow):
-                    drawing_area = scrolled.get_child()
-                    if hasattr(drawing_area, 'get_child'):
-                        drawing_area = drawing_area.get_child()
-                    if drawing_area and isinstance(drawing_area, Gtk.DrawingArea):
-                        overlay_box = self.builder.get_object('canvas_overlay_box_1')
-                        self._setup_canvas_manager(drawing_area, overlay_box, overlay_widget)
-            elif isinstance(page, Gtk.ScrolledWindow):
-                drawing_area = page.get_child()
-                if hasattr(drawing_area, 'get_child'):
-                    drawing_area = drawing_area.get_child()
-                if drawing_area and isinstance(drawing_area, Gtk.DrawingArea):
-                    self._setup_canvas_manager(drawing_area)
-            if drawing_area:
-                pass
-                # Create tab label with file icon - show "default.shy" on startup
-                tab_box, tab_label, close_button = self._create_tab_label('default.shy', False)
-                close_button.connect('clicked', self._on_tab_close_clicked, page)
-                # Mark first tab as active
-                tab_box.get_style_context().add_class('active')
-                # Show all widgets before setting as tab label
-                tab_box.show_all()
-                self.notebook.set_tab_label(page, tab_box)
+            print(f"\n[DEFAULT_TAB_INIT] ==========================================")
+            print(f"[DEFAULT_TAB_INIT] Found {self.document_count} tab(s) from UI file")
+            print(f"[DEFAULT_TAB_INIT] Removing UI tab and creating fresh programmatic tab")
+            
+            # Remove all pages from the UI file
+            while self.notebook.get_n_pages() > 0:
+                self.notebook.remove_page(0)
+            
+            print(f"[DEFAULT_TAB_INIT] Removed UI tabs, notebook now has {self.notebook.get_n_pages()} pages")
+            print(f"[DEFAULT_TAB_INIT] ==========================================\n")
+        
         self.notebook.connect('switch-page', self._on_notebook_page_changed)
+        
+        # Create fresh default tab using add_document() for consistent initialization
+        # This ensures the default tab follows the SAME path as File→New
+        print(f"[DEFAULT_TAB_INIT] Creating fresh default tab via add_document()")
+        page_index, drawing_area = self.add_document(filename='default')
+        print(f"[DEFAULT_TAB_INIT] ✅ Default tab created at index {page_index}")
         
         # Wire data collector for the initial default tab
         # The switch-page signal doesn't fire for the initially displayed page,
@@ -725,7 +715,9 @@ class ModelCanvasLoader:
         manager.mark_needs_redraw()
         
         # Setup overlay manager to handle all palettes
+        print(f"[SETUP_CANVAS] overlay_box={overlay_box is not None}, overlay_widget={overlay_widget is not None}")
         if overlay_box and overlay_widget:
+            print(f"[SETUP_CANVAS] ✅ Creating CanvasOverlayManager")
             overlay_manager = CanvasOverlayManager(
                 overlay_widget=overlay_widget,
                 overlay_box=overlay_box,
@@ -736,6 +728,7 @@ class ModelCanvasLoader:
             
             # Store overlay manager for later access
             self.overlay_managers[drawing_area] = overlay_manager
+            print(f"[SETUP_CANVAS] ✅ Stored overlay_manager in self.overlay_managers (id={id(drawing_area)})")
             
             # Connect signals from palettes
             overlay_manager.connect_tool_changed_signal(
@@ -757,7 +750,8 @@ class ModelCanvasLoader:
             # Canvas setup complete - enable callbacks now that state is properly initialized
             manager._suppress_callbacks = False
         else:
-            pass
+            print(f"[SETUP_CANVAS] ❌ NO overlay_box or overlay_widget - CanvasOverlayManager NOT created!")
+            print(f"[SETUP_CANVAS] ❌ This canvas will NOT have TransitionRatePanel or right_panel_loader!")
             # CRITICAL FIX: Even without overlay_box, MUST enable callbacks
             # Otherwise canvas becomes non-interactive
             manager._suppress_callbacks = False
@@ -1201,6 +1195,8 @@ class ModelCanvasLoader:
         #   - Signal handler names may change (easy to find and update)
         #   - Controller access pattern stays the same (drawing_area → controller)
         simulation_controller = SimulationController(canvas_manager)
+        # CRITICAL: Store drawing_area reference in controller so Report Panel can find its document
+        simulation_controller._drawing_area = drawing_area
         self.simulation_controllers[drawing_area] = simulation_controller
         
         # ============================================================
@@ -1219,17 +1215,15 @@ class ModelCanvasLoader:
                 
         if hasattr(self, 'report_panel_loader') and self.report_panel_loader:
             try:
-                pass
-                # print(f"[CONTROLLER_WIRE] Wiring new controller to Report Panel")
+                print(f"[CONTROLLER_WIRE] ❌ Using GLOBAL report_panel_loader (WRONG for multi-document!)")
+                print(f"[CONTROLLER_WIRE] This should use per-document report_panel_loader instead")
                 self.report_panel_loader.panel.set_controller(simulation_controller)
             except Exception as e:
-                pass
-                # print(f"[CONTROLLER_WIRE] Failed to wire controller: {e}")
+                print(f"[CONTROLLER_WIRE] Failed to wire controller: {e}")
                 import traceback
                 traceback.print_exc()
         else:
-            pass
-            # print(f"[CONTROLLER_WIRE] ⚠️  report_panel_loader not available yet (will wire later)")
+            print(f"[CONTROLLER_WIRE] ⚠️  GLOBAL report_panel_loader not available (expected for multi-doc)")
         
         # ============================================================
         # GLOBAL-SYNC: Integrate with canvas lifecycle system
@@ -1262,12 +1256,15 @@ class ModelCanvasLoader:
         
         # MULTI-DOCUMENT: Create per-document Report Panel
         # Each document gets its own Report Panel instance to maintain independent state
+        print(f"[PER_DOC_REPORT] Checking if report_panel_loader exists for drawing_area {id(drawing_area)}")
         if not hasattr(self.overlay_managers[drawing_area], 'report_panel_loader'):
+            print(f"[PER_DOC_REPORT] Creating NEW per-document Report Panel")
             from shypn.helpers.report_panel_loader import ReportPanelLoader
             
             # Pass the ModelCanvasLoader (self) so Report Panel can access get_current_model()
             report_panel_loader = ReportPanelLoader(project=None, model_canvas_loader=self)
             report_panel_loader.load()
+            print(f"[PER_DOC_REPORT] ReportPanelLoader created and loaded")
             
             # Wire float/attach callbacks from main app (stored in model_canvas_loader)
             if hasattr(self, 'on_report_float') and hasattr(self, 'on_report_attach'):
@@ -1283,14 +1280,16 @@ class ModelCanvasLoader:
             
             # Wire controller to this document's Report Panel
             if hasattr(report_panel_loader, 'panel') and report_panel_loader.panel:
+                print(f"[CONTROLLER_WIRE] ✅ Wiring controller to PER-DOCUMENT Report Panel (drawing_area {id(drawing_area)})")
                 report_panel_loader.panel.set_controller(simulation_controller)
+                print(f"[CONTROLLER_WIRE] ✅ Controller set successfully")
                 
                 # CRITICAL: Set the actual model manager for ModelsCategory
                 # Get the model manager for this specific drawing_area
                 model_manager = self.overlay_managers[drawing_area].canvas_manager
                 if model_manager:
                     report_panel_loader.panel.set_model_canvas(model_manager)
-                    # print(f"[MODEL_CANVAS_LOADER] Set model_manager for Report Panel: {len(model_manager.places)} places, {len(model_manager.transitions)} transitions")
+                    print(f"[CONTROLLER_WIRE] ✅ Set model_manager: {len(model_manager.places)} places, {len(model_manager.transitions)} transitions")
                 
                 # NOTE: Locality sync callback will be wired later in set_right_panel_loader()
                 # when the transition panel is guaranteed to exist
@@ -3240,7 +3239,7 @@ class ModelCanvasLoader:
                     print(f"[LOCALITY_CALLBACK] Locality valid: {locality.is_valid if locality else False}")
                     print(f"[LOCALITY_CALLBACK] Report panel categories: {len(rp.categories)}")
                     
-                    # Find Models category in Report panel
+                    # Find ModelsCategory in Report panel (for "Show Selected Locality")
                     from shypn.ui.panels.report.model_structure_category import ModelsCategory
                     for category in rp.categories:
                         print(f"[LOCALITY_CALLBACK] Checking category: {type(category).__name__}")
@@ -3251,6 +3250,17 @@ class ModelCanvasLoader:
                             break
                     else:
                         print(f"[LOCALITY_CALLBACK] ⚠️ ModelsCategory not found in report panel!")
+                    
+                    # Find DynamicAnalysesCategory in Report panel (for "Reaction Selected" simulation data)
+                    from shypn.ui.panels.report.parameters_category import DynamicAnalysesCategory
+                    for category in rp.categories:
+                        if isinstance(category, DynamicAnalysesCategory):
+                            print(f"[LOCALITY_CALLBACK] Found DynamicAnalysesCategory, calling set_selected_reaction()")
+                            category.set_selected_reaction(transition, locality)
+                            print(f"[LOCALITY_CALLBACK] set_selected_reaction() completed")
+                            break
+                    else:
+                        print(f"[LOCALITY_CALLBACK] ⚠️ DynamicAnalysesCategory not found in report panel!")
                 return on_transition_selected
             
             # Set the callback
