@@ -14,12 +14,17 @@ from .base_category import BaseReportCategory
 class TopologyAnalysesCategory(BaseReportCategory):
     """Topology Analyses report category.
     
-    Displays:
-    - Topology analysis results (degree, components, cycles)
-    - Locality analysis results (regions)
-    - Source-Sink analysis results (flows)
-    - Structural invariants (T-inv, P-inv)
-    - Sub-expanders for detailed metrics
+    Displays summary of topology analysis results for Report Panel.
+    Provides structured data for export functions (PDF/Excel/SVG).
+    
+    Shows:
+    - Status indicator (✓/⚠️/❌/ℹ️)
+    - Key findings (3-5 bullet points)
+    - Brief summaries of 4 analysis categories:
+      * Structural Analysis (P/T-Invariants, Siphons, Traps)
+      * Graph & Network Analysis (Cycles, Paths, Hubs)
+      * Behavioral Analysis (Boundedness, Liveness, Deadlocks, etc.)
+      * Biological Analysis (Dependency, Regulatory patterns)
     """
     
     def __init__(self, project=None, model_canvas=None):
@@ -29,179 +34,106 @@ class TopologyAnalysesCategory(BaseReportCategory):
         self.topology_panel = None
         
         super().__init__(
-            title="TOPOLOGY ANALYSES",
+            title="TOPOLOGICAL ANALYSES",
             project=project,
             model_canvas=model_canvas,
             expanded=True  # Expand by default so users see content
         )
     
     def _build_content(self):
-        """Build topology analyses content: Summary first, then sub-expanders."""
+        """Build topology analyses content: Status + Key Findings + Brief Summaries."""
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         box.set_margin_start(12)
         box.set_margin_end(12)
         box.set_margin_top(12)
         box.set_margin_bottom(12)
         
-        # === SUMMARY SECTION (Always visible when category is open) ===
-        summary_frame = Gtk.Frame()
-        summary_frame.set_label("Analysis Summary")
-        summary_frame.set_shadow_type(Gtk.ShadowType.ETCHED_IN)
+        # === STATUS BAR ===
+        self.status_label = Gtk.Label()
+        self.status_label.set_xalign(0)
+        self.status_label.set_markup("<b>ℹ️ Status:</b> No analyses performed yet")
+        box.pack_start(self.status_label, False, False, 0)
         
-        summary_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        summary_box.set_margin_start(12)
-        summary_box.set_margin_end(12)
-        summary_box.set_margin_top(6)
-        summary_box.set_margin_bottom(6)
+        # === KEY FINDINGS ===
+        findings_frame = Gtk.Frame()
+        findings_frame.set_label("Key Findings")
+        findings_frame.set_shadow_type(Gtk.ShadowType.ETCHED_IN)
         
-        self.overall_summary_label = Gtk.Label()
-        self.overall_summary_label.set_xalign(0)
-        self.overall_summary_label.set_line_wrap(True)
-        self.overall_summary_label.set_markup(
-            "<b>Topology Analyses:</b> No analyses performed yet\n"
-            "Expand sections below to see details when available."
-        )
-        summary_box.pack_start(self.overall_summary_label, False, False, 0)
+        findings_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        findings_box.set_margin_start(12)
+        findings_box.set_margin_end(12)
+        findings_box.set_margin_top(6)
+        findings_box.set_margin_bottom(6)
         
-        summary_frame.add(summary_box)
-        box.pack_start(summary_frame, False, False, 0)
+        self.findings_label = Gtk.Label()
+        self.findings_label.set_xalign(0)
+        self.findings_label.set_line_wrap(True)
+        self.findings_label.set_text("No findings yet - perform analyses in Topology Panel")
+        findings_box.pack_start(self.findings_label, False, False, 0)
         
-        # === SUB-EXPANDERS (Collapsed by default) ===
+        findings_frame.add(findings_box)
+        box.pack_start(findings_frame, False, False, 0)
         
-        # Sub-expander: Topology Analysis
-        self.topology_expander = Gtk.Expander(label="Topology Analysis")
-        self.topology_expander.set_expanded(False)
-        topology_content = self._create_topology_content()
-        self.topology_expander.add(topology_content)
-        box.pack_start(self.topology_expander, False, False, 0)
+        # === ANALYSIS CATEGORIES (Brief Summaries) ===
         
-        # Sub-expander: Locality Analysis
-        self.locality_expander = Gtk.Expander(label="Locality Analysis")
-        self.locality_expander.set_expanded(False)
-        locality_content = self._create_locality_content()
-        self.locality_expander.add(locality_content)
-        box.pack_start(self.locality_expander, False, False, 0)
+        # Structural Analysis
+        self.structural_expander = Gtk.Expander(label="Structural Analysis")
+        self.structural_expander.set_expanded(False)
+        self.structural_summary_label = Gtk.Label()
+        self.structural_summary_label.set_xalign(0)
+        self.structural_summary_label.set_line_wrap(True)
+        self.structural_summary_label.set_margin_start(12)
+        self.structural_summary_label.set_margin_end(12)
+        self.structural_summary_label.set_margin_top(6)
+        self.structural_summary_label.set_margin_bottom(6)
+        self.structural_summary_label.set_text("No structural analysis performed")
+        self.structural_expander.add(self.structural_summary_label)
+        box.pack_start(self.structural_expander, False, False, 0)
         
-        # Sub-expander: Source-Sink Analysis
-        self.sourcesink_expander = Gtk.Expander(label="Source-Sink Analysis")
-        self.sourcesink_expander.set_expanded(False)
-        sourcesink_content = self._create_sourcesink_content()
-        self.sourcesink_expander.add(sourcesink_content)
-        box.pack_start(self.sourcesink_expander, False, False, 0)
+        # Graph & Network Analysis
+        self.graph_expander = Gtk.Expander(label="Graph & Network Analysis")
+        self.graph_expander.set_expanded(False)
+        self.graph_summary_label = Gtk.Label()
+        self.graph_summary_label.set_xalign(0)
+        self.graph_summary_label.set_line_wrap(True)
+        self.graph_summary_label.set_margin_start(12)
+        self.graph_summary_label.set_margin_end(12)
+        self.graph_summary_label.set_margin_top(6)
+        self.graph_summary_label.set_margin_bottom(6)
+        self.graph_summary_label.set_text("No graph analysis performed")
+        self.graph_expander.add(self.graph_summary_label)
+        box.pack_start(self.graph_expander, False, False, 0)
         
-        # Sub-expander: Structural Invariants
-        self.invariants_expander = Gtk.Expander(label="Structural Invariants")
-        self.invariants_expander.set_expanded(False)
-        invariants_content = self._create_invariants_content()
-        self.invariants_expander.add(invariants_content)
-        box.pack_start(self.invariants_expander, False, False, 0)
+        # Behavioral Analysis
+        self.behavioral_expander = Gtk.Expander(label="Behavioral Analysis")
+        self.behavioral_expander.set_expanded(False)
+        self.behavioral_summary_label = Gtk.Label()
+        self.behavioral_summary_label.set_xalign(0)
+        self.behavioral_summary_label.set_line_wrap(True)
+        self.behavioral_summary_label.set_margin_start(12)
+        self.behavioral_summary_label.set_margin_end(12)
+        self.behavioral_summary_label.set_margin_top(6)
+        self.behavioral_summary_label.set_margin_bottom(6)
+        self.behavioral_summary_label.set_text("No behavioral analysis performed")
+        self.behavioral_expander.add(self.behavioral_summary_label)
+        box.pack_start(self.behavioral_expander, False, False, 0)
+        
+        # Biological Analysis
+        self.biological_expander = Gtk.Expander(label="Biological Analysis")
+        self.biological_expander.set_expanded(False)
+        self.biological_summary_label = Gtk.Label()
+        self.biological_summary_label.set_xalign(0)
+        self.biological_summary_label.set_line_wrap(True)
+        self.biological_summary_label.set_margin_start(12)
+        self.biological_summary_label.set_margin_end(12)
+        self.biological_summary_label.set_margin_top(6)
+        self.biological_summary_label.set_margin_bottom(6)
+        self.biological_summary_label.set_text("No biological analysis performed")
+        self.biological_expander.add(self.biological_summary_label)
+        box.pack_start(self.biological_expander, False, False, 0)
         
         # Initial populate
         self.refresh()
-        
-        return box
-    
-    def _create_topology_content(self):
-        """Create topology analysis content."""
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        box.set_margin_start(12)
-        box.set_margin_end(12)
-        box.set_margin_top(6)
-        box.set_margin_bottom(6)
-        
-        # Summary
-        self.topology_summary_label = Gtk.Label()
-        self.topology_summary_label.set_xalign(0)
-        self.topology_summary_label.set_line_wrap(True)
-        self.topology_summary_label.set_text("No topology analysis performed")
-        box.pack_start(self.topology_summary_label, False, False, 0)
-        
-        # Detailed metrics expander
-        details_expander = Gtk.Expander(label="Detailed Metrics")
-        details_expander.set_expanded(False)
-        scrolled, self.topology_textview, self.topology_buffer = self._create_scrolled_textview(
-            "No detailed data available"
-        )
-        details_expander.add(scrolled)
-        box.pack_start(details_expander, False, False, 6)
-        
-        return box
-    
-    def _create_locality_content(self):
-        """Create locality analysis content."""
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        box.set_margin_start(12)
-        box.set_margin_end(12)
-        box.set_margin_top(6)
-        box.set_margin_bottom(6)
-        
-        # Summary
-        self.locality_summary_label = Gtk.Label()
-        self.locality_summary_label.set_xalign(0)
-        self.locality_summary_label.set_line_wrap(True)
-        self.locality_summary_label.set_text("No locality analysis performed")
-        box.pack_start(self.locality_summary_label, False, False, 0)
-        
-        # Region details expander
-        details_expander = Gtk.Expander(label="Region Details")
-        details_expander.set_expanded(False)
-        scrolled, self.locality_textview, self.locality_buffer = self._create_scrolled_textview(
-            "No region data available"
-        )
-        details_expander.add(scrolled)
-        box.pack_start(details_expander, False, False, 6)
-        
-        return box
-    
-    def _create_sourcesink_content(self):
-        """Create source-sink analysis content."""
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        box.set_margin_start(12)
-        box.set_margin_end(12)
-        box.set_margin_top(6)
-        box.set_margin_bottom(6)
-        
-        # Summary
-        self.sourcesink_summary_label = Gtk.Label()
-        self.sourcesink_summary_label.set_xalign(0)
-        self.sourcesink_summary_label.set_line_wrap(True)
-        self.sourcesink_summary_label.set_text("No source-sink analysis performed")
-        box.pack_start(self.sourcesink_summary_label, False, False, 0)
-        
-        # Flow details expander
-        details_expander = Gtk.Expander(label="Flow Details")
-        details_expander.set_expanded(False)
-        scrolled, self.sourcesink_textview, self.sourcesink_buffer = self._create_scrolled_textview(
-            "No flow data available"
-        )
-        details_expander.add(scrolled)
-        box.pack_start(details_expander, False, False, 6)
-        
-        return box
-    
-    def _create_invariants_content(self):
-        """Create structural invariants content."""
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        box.set_margin_start(12)
-        box.set_margin_end(12)
-        box.set_margin_top(6)
-        box.set_margin_bottom(6)
-        
-        # Summary
-        self.invariants_summary_label = Gtk.Label()
-        self.invariants_summary_label.set_xalign(0)
-        self.invariants_summary_label.set_line_wrap(True)
-        self.invariants_summary_label.set_text("No invariant analysis performed")
-        box.pack_start(self.invariants_summary_label, False, False, 0)
-        
-        # Invariant vectors expander
-        details_expander = Gtk.Expander(label="Invariant Vectors")
-        details_expander.set_expanded(False)
-        scrolled, self.invariants_textview, self.invariants_buffer = self._create_scrolled_textview(
-            "No invariant data available"
-        )
-        details_expander.add(scrolled)
-        box.pack_start(details_expander, False, False, 6)
         
         return box
     
@@ -221,241 +153,439 @@ class TopologyAnalysesCategory(BaseReportCategory):
         if self.topology_panel:
             try:
                 summary = self.topology_panel.generate_summary_for_report_panel()
-                self._update_with_summary(summary)
+                self._update_display(summary)
                 return
             except Exception as e:
                 print(f"Warning: Could not fetch topology summary: {e}", file=sys.__stderr__)
                 # Fall through to placeholder display
         
         # Otherwise show placeholder (topology panel not yet connected)
-        self._show_placeholder_summary()
+        self._show_placeholder()
     
-    def _update_with_summary(self, summary):
-        """Update UI with real topology summary data.
+    def _update_display(self, summary):
+        """Update UI with topology summary (brief preview for user).
         
         Args:
             summary: Dict from TopologyPanel.generate_summary_for_report_panel()
         """
-        # Update OVERALL SUMMARY at the top
         status = summary.get('status', 'unknown')
-        summary_lines = summary.get('summary_lines', [])
-        statistics = summary.get('statistics', {})
+        stats = summary.get('statistics', {})
         warnings = summary.get('warnings', [])
         
-        # Build summary text with status indicator
-        status_emoji = {
+        # === UPDATE STATUS BAR ===
+        status_icons = {
             'complete': '✓',
             'partial': '⚠️',
             'error': '❌',
             'not_analyzed': 'ℹ️'
-        }.get(status, '○')
+        }
+        icon = status_icons.get(status, '○')
         
-        summary_text = [f"<b>{status_emoji} Topology Analyses Status:</b>\n"]
+        status_text = {
+            'complete': 'All analyses complete',
+            'partial': 'Partial results (some timeouts)',
+            'error': 'Analysis errors occurred',
+            'not_analyzed': 'No analysis performed'
+        }
         
-        # Add summary lines
-        for line in summary_lines:
-            summary_text.append(f"  {line}")
+        status_msg = status_text.get(status, 'Unknown status')
         
-        # Add warnings if any
         if warnings:
-            summary_text.append("\n<b>Warnings:</b>")
-            for warning in warnings:
-                summary_text.append(f"  {warning}")
+            status_msg += f" - {len(warnings)} warning(s)"
         
-        self.overall_summary_label.set_markup("\n".join(summary_text))
+        self.status_label.set_markup(f"<b>{icon} Status:</b> {status_msg}")
         
-        # Update individual sub-sections with detailed data
-        self._update_structural_section(statistics)
-        self._update_graph_section(statistics)
-        self._update_behavioral_section(statistics)
+        # === UPDATE KEY FINDINGS ===
+        findings = self._extract_key_findings(summary)
+        if findings:
+            findings_text = "• " + "\n• ".join(findings)
+            self.findings_label.set_text(findings_text)
+        else:
+            self.findings_label.set_text("No significant findings")
+        
+        # === UPDATE SECTION SUMMARIES ===
+        self._update_structural_preview(stats)
+        self._update_graph_preview(stats)
+        self._update_behavioral_preview(stats)
+        self._update_biological_preview(stats)
     
-    def _update_structural_section(self, statistics):
-        """Update structural analysis section with real data."""
-        p_inv_count = statistics.get('p_invariants', 0)
-        t_inv_count = statistics.get('t_invariants', 0)
-        p_inv_coverage = statistics.get('p_invariant_coverage', 0)
-        t_inv_coverage = statistics.get('t_invariant_coverage', 0)
+    def _extract_key_findings(self, summary):
+        """Extract 3-5 key findings for bullet list.
         
-        if p_inv_count > 0 or t_inv_count > 0:
-            summary_text = f"Structural Analysis: ✓ Completed\n"
-            summary_text += f"  • {p_inv_count} P-invariants ({p_inv_coverage:.0%} coverage)\n"
-            summary_text += f"  • {t_inv_count} T-invariants ({t_inv_coverage:.0%} coverage)"
-            self.topology_summary_label.set_text(summary_text)
+        Args:
+            summary: Dict from TopologyPanel.generate_summary_for_report_panel()
             
-            # Detailed metrics
-            details = f"P-Invariants: {p_inv_count}\n"
-            details += f"Coverage: {p_inv_coverage:.1%}\n\n"
-            details += f"T-Invariants: {t_inv_count}\n"
-            details += f"Coverage: {t_inv_coverage:.1%}"
-            self.topology_buffer.set_text(details)
-        else:
-            self.topology_summary_label.set_text("Structural Analysis: Not computed")
-            self.topology_buffer.set_text("No structural invariants computed yet")
+        Returns:
+            List of 3-5 key finding strings
+        """
+        findings = []
+        stats = summary.get('statistics', {})
+        
+        # Structural findings
+        p_inv = stats.get('p_invariants', 0)
+        if p_inv > 0:
+            p_cov = stats.get('p_invariant_coverage', 0)
+            findings.append(f"{p_inv} P-invariants ({p_cov:.0%} coverage)")
+        
+        t_inv = stats.get('t_invariants', 0)
+        if t_inv > 0:
+            t_cov = stats.get('t_invariant_coverage', 0)
+            findings.append(f"{t_inv} T-invariants ({t_cov:.0%} coverage)")
+        
+        # Graph findings
+        cycles = stats.get('cycles', 0)
+        if cycles > 0:
+            findings.append(f"{cycles} feedback cycle(s) detected")
+        
+        hubs = stats.get('hubs', 0)
+        if hubs > 0:
+            findings.append(f"{hubs} hub node(s) identified")
+        
+        # Behavioral findings
+        if stats.get('is_bounded') is True:
+            findings.append("System is bounded")
+        
+        if stats.get('is_deadlock_free') is False:
+            findings.append("Deadlock states exist")
+        elif stats.get('is_deadlock_free') is True:
+            findings.append("No deadlocks detected")
+        
+        # Biological findings
+        dep_score = stats.get('dependency_score')
+        if dep_score is not None:
+            findings.append(f"Dependency score: {dep_score:.2f}")
+        
+        # Return max 5 findings
+        return findings[:5]
     
-    def _update_graph_section(self, statistics):
-        """Update graph/network analysis section with real data."""
-        cycles = statistics.get('cycles', 0)
-        hubs = statistics.get('hubs', 0)
-        paths = statistics.get('paths', 0)
+    def _update_structural_preview(self, stats):
+        """Update structural analysis preview (brief summary).
         
-        if cycles > 0 or hubs > 0:
-            summary_text = f"Graph Analysis: ✓ Completed\n"
-            summary_text += f"  • {cycles} cycles detected\n"
-            summary_text += f"  • {hubs} hub nodes\n"
-            summary_text += f"  • {paths} critical paths"
-            self.locality_summary_label.set_text(summary_text)
+        Args:
+            stats: statistics dict from summary
+        """
+        p_inv = stats.get('p_invariants', 0)
+        t_inv = stats.get('t_invariants', 0)
+        siphons = stats.get('siphons', 0)
+        traps = stats.get('traps', 0)
+        
+        if p_inv > 0 or t_inv > 0 or siphons > 0 or traps > 0:
+            lines = []
             
-            # Detailed metrics
-            details = f"Cycles: {cycles}\n"
-            details += f"Hub nodes: {hubs}\n"
-            details += f"Critical paths: {paths}"
-            self.locality_buffer.set_text(details)
+            if p_inv > 0:
+                p_cov = stats.get('p_invariant_coverage', 0)
+                lines.append(f"✓ {p_inv} P-invariants ({p_cov:.0%} coverage)")
+            
+            if t_inv > 0:
+                t_cov = stats.get('t_invariant_coverage', 0)
+                lines.append(f"✓ {t_inv} T-invariants ({t_cov:.0%} coverage)")
+            
+            if siphons > 0:
+                lines.append(f"✓ {siphons} siphon(s)")
+            
+            if traps > 0:
+                lines.append(f"✓ {traps} trap(s)")
+            
+            self.structural_summary_label.set_text("\n".join(lines))
         else:
-            self.locality_summary_label.set_text("Graph Analysis: Not computed")
-            self.locality_buffer.set_text("No graph analysis performed yet")
+            self.structural_summary_label.set_text("○ No structural analysis performed")
     
-    def _update_behavioral_section(self, statistics):
-        """Update behavioral analysis section with real data."""
-        is_live = statistics.get('is_live')
-        is_bounded = statistics.get('is_bounded')
-        is_deadlock_free = statistics.get('is_deadlock_free')
+    def _update_graph_preview(self, stats):
+        """Update graph & network analysis preview (brief summary).
         
-        if is_live is not None or is_bounded is not None:
-            summary_text = "Behavioral Analysis: ✓ Completed\n"
+        Args:
+            stats: statistics dict from summary
+        """
+        cycles = stats.get('cycles', 0)
+        hubs = stats.get('hubs', 0)
+        paths = stats.get('paths', 0)
+        
+        if cycles > 0 or hubs > 0 or paths > 0:
+            lines = []
             
-            properties = []
-            if is_live is True:
-                properties.append("✓ Live")
-            elif is_live is False:
-                properties.append("✗ Not live")
+            if cycles > 0:
+                lines.append(f"✓ {cycles} feedback cycle(s)")
             
-            if is_bounded is True:
-                properties.append("✓ Bounded")
-            elif is_bounded is False:
-                properties.append("✗ Unbounded")
+            if hubs > 0:
+                lines.append(f"✓ {hubs} hub node(s)")
             
-            if is_deadlock_free is True:
-                properties.append("✓ Deadlock-free")
-            elif is_deadlock_free is False:
-                properties.append("✗ Has deadlocks")
+            if paths > 0:
+                lines.append(f"✓ {paths} critical path(s)")
             
-            if properties:
-                summary_text += "  • " + ", ".join(properties)
-            
-            self.sourcesink_summary_label.set_text(summary_text)
-            self.invariants_summary_label.set_text(summary_text)
-            
-            # Detailed metrics
-            details = ""
-            if is_live is not None:
-                details += f"Liveness: {'Yes' if is_live else 'No'}\n"
-            if is_bounded is not None:
-                details += f"Boundedness: {'Yes' if is_bounded else 'No'}\n"
-            if is_deadlock_free is not None:
-                details += f"Deadlock-free: {'Yes' if is_deadlock_free else 'No'}"
-            
-            self.sourcesink_buffer.set_text(details)
-            self.invariants_buffer.set_text(details)
+            self.graph_summary_label.set_text("\n".join(lines))
         else:
-            self.sourcesink_summary_label.set_text("Behavioral Analysis: Not computed")
-            self.invariants_summary_label.set_text("Behavioral Analysis: Not computed")
-            self.sourcesink_buffer.set_text("No behavioral analysis performed yet")
-            self.invariants_buffer.set_text("No behavioral analysis performed yet")
+            self.graph_summary_label.set_text("○ No graph analysis performed")
     
-    def _show_placeholder_summary(self):
-        """Show placeholder text when topology panel not connected."""
-    def _show_placeholder_summary(self):
-        """Show placeholder text when topology panel not connected."""
-        # TODO: Integrate with actual analysis results from Analyses Panel
-        # For now, show placeholder summaries
+    def _update_behavioral_preview(self, stats):
+        """Update behavioral analysis preview (brief summary).
         
-        # Update OVERALL SUMMARY (visible at top when category opens)
-        analyses_performed = 0
-        summary_lines = ["<b>Topology Analyses Status:</b>"]
+        Args:
+            stats: statistics dict from summary
+        """
+        properties = []
         
-        # Check each analysis (placeholder - will be real data later)
-        topology_done = False  # TODO: Check if topology analysis exists
-        locality_done = False  # TODO: Check if locality analysis exists
-        sourcesink_done = False  # TODO: Check if source-sink analysis exists
-        invariants_done = False  # TODO: Check if invariants computed
+        # Check each behavioral property
+        is_bounded = stats.get('is_bounded')
+        if is_bounded is True:
+            properties.append("✓ Bounded")
+        elif is_bounded is False:
+            properties.append("✗ Unbounded")
+        elif is_bounded == 'timeout':
+            properties.append("⏱️ Boundedness (timeout)")
         
-        if topology_done:
-            analyses_performed += 1
-            summary_lines.append("  ✓ Topology Analysis")
+        is_live = stats.get('is_live')
+        if is_live is True:
+            properties.append("✓ Live")
+        elif is_live is False:
+            properties.append("✗ Not live")
+        elif is_live == 'timeout':
+            properties.append("⏱️ Liveness (timeout)")
+        
+        is_deadlock_free = stats.get('is_deadlock_free')
+        if is_deadlock_free is True:
+            properties.append("✓ Deadlock-free")
+        elif is_deadlock_free is False:
+            properties.append("✗ Has deadlocks")
+        elif is_deadlock_free == 'timeout':
+            properties.append("⏱️ Deadlocks (timeout)")
+        
+        is_fair = stats.get('is_fair')
+        if is_fair is True:
+            properties.append("✓ Fair")
+        elif is_fair is False:
+            properties.append("✗ Not fair")
+        elif is_fair == 'timeout':
+            properties.append("⏱️ Fairness (timeout)")
+        
+        is_reachable = stats.get('is_reachable')
+        if is_reachable is True:
+            properties.append("✓ Reachable")
+        elif is_reachable is False:
+            properties.append("✗ Not reachable")
+        elif is_reachable == 'timeout':
+            properties.append("⏱️ Reachability (timeout)")
+        
+        if properties:
+            self.behavioral_summary_label.set_text("\n".join(properties))
         else:
-            summary_lines.append("  ○ Topology Analysis (not computed)")
+            self.behavioral_summary_label.set_text("○ No behavioral analysis performed")
+    
+    def _update_biological_preview(self, stats):
+        """Update biological analysis preview (brief summary).
         
-        if locality_done:
-            analyses_performed += 1
-            summary_lines.append("  ✓ Locality Analysis")
+        Args:
+            stats: statistics dict from summary
+        """
+        dep_score = stats.get('dependency_score')
+        reg_patterns = stats.get('regulatory_patterns', 0)
+        
+        if dep_score is not None or reg_patterns > 0:
+            lines = []
+            
+            if dep_score is not None:
+                # Interpret dependency score
+                if dep_score < 0.3:
+                    interp = "low coupling"
+                elif dep_score < 0.6:
+                    interp = "moderate coupling"
+                else:
+                    interp = "high coupling"
+                lines.append(f"✓ Dependency score: {dep_score:.2f} ({interp})")
+            
+            if reg_patterns > 0:
+                lines.append(f"✓ {reg_patterns} regulatory pattern(s)")
+            
+            self.biological_summary_label.set_text("\n".join(lines))
         else:
-            summary_lines.append("  ○ Locality Analysis (not computed)")
+            self.biological_summary_label.set_text("○ No biological analysis performed")
+    
+    def _show_placeholder(self):
+        """Show placeholder when topology panel not connected."""
+        self.status_label.set_markup("<b>ℹ️ Status:</b> No analyses performed yet")
+        self.findings_label.set_text("Perform analyses in Topology Panel to see results here")
         
-        if sourcesink_done:
-            analyses_performed += 1
-            summary_lines.append("  ✓ Source-Sink Analysis")
-        else:
-            summary_lines.append("  ○ Source-Sink Analysis (not computed)")
-        
-        if invariants_done:
-            analyses_performed += 1
-            summary_lines.append("  ✓ Structural Invariants")
-        else:
-            summary_lines.append("  ○ Structural Invariants (not computed)")
-        
-        summary_lines.insert(1, f"\n<b>Completed:</b> {analyses_performed} of 4 analyses\n")
-        
-        self.overall_summary_label.set_markup("\n".join(summary_lines))
-        
-        # Update individual sub-section summaries
-        self.topology_summary_label.set_text(
-            "Topology Analysis: (Not yet computed)\n"
-            "Will show: Degree distribution, connected components, cycles, hubs"
+        self.structural_summary_label.set_text(
+            "○ P-Invariants, T-Invariants, Siphons, Traps\n"
+            "(Not computed)"
         )
         
-        self.locality_summary_label.set_text(
-            "Locality Analysis: (Not yet computed)\n"
-            "Will show: Metabolite clustering, region identification"
+        self.graph_summary_label.set_text(
+            "○ Cycles, Paths, Hubs\n"
+            "(Not computed)"
         )
         
-        self.sourcesink_summary_label.set_text(
-            "Source-Sink Analysis: (Not yet computed)\n"
-            "Will show: Source nodes, sink nodes, flow patterns"
+        self.behavioral_summary_label.set_text(
+            "○ Boundedness, Liveness, Deadlocks, Fairness, Reachability\n"
+            "(Not computed)"
         )
         
-        self.invariants_summary_label.set_text(
-            "Structural Invariants: (Not yet computed)\n"
-            "Will show: T-invariants, P-invariants"
+        self.biological_summary_label.set_text(
+            "○ Dependency & Coupling, Regulatory Structure\n"
+            "(Not computed)"
         )
+    
+    def get_export_data(self):
+        """Provide structured data for export functions (PDF/Excel/SVG).
         
-        # Detailed data (placeholder)
-        self.topology_buffer.set_text(
-            "Detailed topology metrics will appear here when analysis is performed:\n"
-            "- Node degree distribution\n"
-            "- Connected components list\n"
-            "- Detected cycles\n"
-            "- Hub nodes identification"
-        )
+        Called by Report Panel's export buttons at bottom.
         
-        self.locality_buffer.set_text(
-            "Detailed locality data will appear here when analysis is performed:\n"
-            "- Region membership\n"
-            "- Region sizes\n"
-            "- Inter-region connections"
-        )
+        Returns:
+            Dict with structured data ready for document generation:
+            {
+                'category': 'Topological Analysis',
+                'status': 'complete'/'partial'/'error'/'not_analyzed',
+                'key_findings': ['finding 1', 'finding 2', ...],
+                'sections': {
+                    'structural': {'title': ..., 'data': {...}},
+                    'graph_network': {'title': ..., 'data': {...}},
+                    'behavioral': {'title': ..., 'data': {...}},
+                    'biological': {'title': ..., 'data': {...}}
+                },
+                'metadata': {...}
+            }
+        """
+        if not self.topology_panel:
+            return {
+                'category': 'Topological Analysis',
+                'status': 'not_analyzed',
+                'key_findings': ['No analysis performed yet'],
+                'sections': {},
+                'metadata': {}
+            }
         
-        self.sourcesink_buffer.set_text(
-            "Detailed flow data will appear here when analysis is performed:\n"
-            "- Source nodes list\n"
-            "- Sink nodes list\n"
-            "- Flow paths"
-        )
+        try:
+            summary = self.topology_panel.generate_summary_for_report_panel()
+        except Exception as e:
+            return {
+                'category': 'Topological Analysis',
+                'status': 'error',
+                'key_findings': [f'Error retrieving data: {str(e)}'],
+                'sections': {},
+                'metadata': {}
+            }
         
-        self.invariants_buffer.set_text(
-            "Detailed invariant vectors will appear here when analysis is performed:\n"
-            "- T-invariant vectors\n"
-            "- P-invariant vectors"
-        )
+        stats = summary.get('statistics', {})
+        
+        # Organize data into structured sections
+        export_data = {
+            'category': 'Topological Analysis',
+            'status': summary.get('status', 'unknown'),
+            'key_findings': self._extract_key_findings(summary),
+            'sections': {
+                'structural': {
+                    'title': 'Structural Analysis',
+                    'data': {
+                        'p_invariants': stats.get('p_invariants', 0),
+                        'p_invariant_coverage': stats.get('p_invariant_coverage', 0),
+                        't_invariants': stats.get('t_invariants', 0),
+                        't_invariant_coverage': stats.get('t_invariant_coverage', 0),
+                        'siphons': stats.get('siphons', 0),
+                        'traps': stats.get('traps', 0),
+                    }
+                },
+                'graph_network': {
+                    'title': 'Graph & Network Analysis',
+                    'data': {
+                        'cycles': stats.get('cycles', 0),
+                        'hubs': stats.get('hubs', 0),
+                        'paths': stats.get('paths', 0),
+                    }
+                },
+                'behavioral': {
+                    'title': 'Behavioral Analysis',
+                    'data': {
+                        'is_bounded': stats.get('is_bounded'),
+                        'is_live': stats.get('is_live'),
+                        'is_deadlock_free': stats.get('is_deadlock_free'),
+                        'is_fair': stats.get('is_fair'),
+                        'is_reachable': stats.get('is_reachable'),
+                    }
+                },
+                'biological': {
+                    'title': 'Biological Analysis',
+                    'data': {
+                        'dependency_score': stats.get('dependency_score'),
+                        'regulatory_patterns': stats.get('regulatory_patterns', 0),
+                    }
+                }
+            },
+            'metadata': {
+                'warnings': summary.get('warnings', []),
+                'summary_lines': summary.get('summary_lines', []),
+            }
+        }
+        
+        return export_data
+    def export_to_text(self):
+        """Export as plain text for simple text export.
+        
+        For full document export (PDF/Excel/SVG), use get_export_data() instead.
+        """
+        if not self.topology_panel:
+            return "# TOPOLOGICAL ANALYSES\n\nNo analyses performed yet."
+        
+        try:
+            export_data = self.get_export_data()
+        except Exception as e:
+            return f"# TOPOLOGICAL ANALYSES\n\nError: {str(e)}"
+        
+        lines = ["# TOPOLOGICAL ANALYSES\n"]
+        
+        # Status
+        status = export_data.get('status', 'unknown')
+        lines.append(f"Status: {status}\n")
+        
+        # Key Findings
+        findings = export_data.get('key_findings', [])
+        if findings:
+            lines.append("## Key Findings")
+            for finding in findings:
+                lines.append(f"  • {finding}")
+            lines.append("")
+        
+        # Sections
+        sections = export_data.get('sections', {})
+        
+        if sections.get('structural'):
+            lines.append("## Structural Analysis")
+            data = sections['structural']['data']
+            lines.append(f"  P-Invariants: {data.get('p_invariants', 0)} ({data.get('p_invariant_coverage', 0):.0%} coverage)")
+            lines.append(f"  T-Invariants: {data.get('t_invariants', 0)} ({data.get('t_invariant_coverage', 0):.0%} coverage)")
+            lines.append(f"  Siphons: {data.get('siphons', 0)}")
+            lines.append(f"  Traps: {data.get('traps', 0)}")
+            lines.append("")
+        
+        if sections.get('graph_network'):
+            lines.append("## Graph & Network Analysis")
+            data = sections['graph_network']['data']
+            lines.append(f"  Cycles: {data.get('cycles', 0)}")
+            lines.append(f"  Hubs: {data.get('hubs', 0)}")
+            lines.append(f"  Paths: {data.get('paths', 0)}")
+            lines.append("")
+        
+        if sections.get('behavioral'):
+            lines.append("## Behavioral Analysis")
+            data = sections['behavioral']['data']
+            for prop, value in data.items():
+                prop_name = prop.replace('is_', '').replace('_', ' ').title()
+                if value is True:
+                    lines.append(f"  {prop_name}: Yes")
+                elif value is False:
+                    lines.append(f"  {prop_name}: No")
+                elif value == 'timeout':
+                    lines.append(f"  {prop_name}: Timeout")
+            lines.append("")
+        
+        if sections.get('biological'):
+            lines.append("## Biological Analysis")
+            data = sections['biological']['data']
+            if data.get('dependency_score') is not None:
+                lines.append(f"  Dependency Score: {data['dependency_score']:.2f}")
+            if data.get('regulatory_patterns', 0) > 0:
+                lines.append(f"  Regulatory Patterns: {data['regulatory_patterns']}")
+            lines.append("")
+        
+        return "\n".join(lines)
     
     def export_to_text(self):
         """Export as plain text."""
