@@ -483,7 +483,8 @@ def main(argv=None):
 		report_panel_container = main_builder.get_object('report_panel_container')
 
 		# Get paned widget for curtain resize control
-		left_paned = main_builder.get_object('left_paned')
+		# Note: UI file has 'main_paned', but code refers to it as 'left_paned' for historical reasons
+		left_paned = main_builder.get_object('main_paned')
 
 		# ====================================================================
 		# WAYLAND FIX: Show main window FIRST, then add panels
@@ -595,9 +596,31 @@ def main(argv=None):
 		# Multi-document: Use the existing UI container to switch between
 		# per-document Report Panel instances
 		try:
+			# Define Report panel float/attach callbacks
+			def on_report_float():
+				"""Collapse left paned when Report panel floats."""
+				if left_paned:
+					try:
+						left_paned.set_position(0)
+					except Exception:
+						pass  # Ignore paned errors
+			
+			def on_report_attach():
+				"""Expand left paned when Report panel attaches."""
+				if left_paned:
+					try:
+						left_paned.set_position(320)
+					except Exception:
+						pass  # Ignore paned errors
+			
 			# Store container reference for panel switching
 			# We use the report_panel_container from the UI file directly
 			model_canvas_loader.report_panel_container = report_panel_container
+			model_canvas_loader.left_dock_stack = left_dock_stack
+			
+			# Store Report panel float/attach callbacks for per-document wiring
+			model_canvas_loader.on_report_float = on_report_float
+			model_canvas_loader.on_report_attach = on_report_attach
 			
    # print("[REPORT_INIT] Report panel container ready for per-document panels")
 			
@@ -663,6 +686,8 @@ def main(argv=None):
         # print(f"[TAB_REPORT] Updated Report Panel with model: {len(model_manager.places)} places, {len(model_manager.transitions)} transitions")
 							
 							model_canvas_loader.report_panel_container.pack_start(report_loader.panel, True, True, 0)
+							report_loader.parent_container = model_canvas_loader.report_panel_container
+							# Always show all widgets when switching tabs (even if panel was hidden)
 							report_loader.panel.show_all()
 							# print(f"[TAB_REPORT] ✅ SUCCESS! Switched to CORRECT document's Report Panel")
 							# print(f"[TAB_REPORT]    drawing_area id: {id(drawing_area)}")
@@ -682,6 +707,38 @@ def main(argv=None):
 			
 			# print("[REPORT_INIT] Report panel switching wired to tab changes")
 			
+			# ====================================================================
+			# CRITICAL: Pack initial document's Report Panel into container
+			# ====================================================================
+			# Tab switching only occurs when user switches between documents.
+			# For the first/initial document opened on startup, there's no tab
+			# switch event, so we must manually pack its Report panel here.
+			drawing_area = model_canvas_loader.get_current_document()
+			if drawing_area:
+				overlay_manager = model_canvas_loader.overlay_managers.get(drawing_area)
+				if overlay_manager and hasattr(overlay_manager, 'report_panel_loader'):
+					report_loader = overlay_manager.report_panel_loader
+					if report_loader and report_loader.panel:
+						# Update panel with model
+						if hasattr(overlay_manager, 'canvas_manager'):
+							model_manager = overlay_manager.canvas_manager
+							report_loader.set_model_canvas(model_manager)
+						
+						# Clear container first (in case panel already packed elsewhere)
+						panel_parent = report_loader.panel.get_parent()
+						if panel_parent:
+							panel_parent.remove(report_loader.panel)
+						
+						# Clear any existing children in container
+						for child in model_canvas_loader.report_panel_container.get_children():
+							model_canvas_loader.report_panel_container.remove(child)
+						
+						# Pack into container
+						model_canvas_loader.report_panel_container.pack_start(report_loader.panel, True, True, 0)
+						report_loader.parent_container = model_canvas_loader.report_panel_container
+						# Note: Don't show_all() yet - let user click Report button to show it
+						print("[REPORT_INIT] ✅ Packed initial document's Report Panel into container")
+			
 		except Exception as e:
    # print(f"[REPORT_INIT] ❌ Error wiring report panel: {e}")
 			import traceback
@@ -690,22 +747,11 @@ def main(argv=None):
 		# Note: report_panel_container is already in the UI stack, no need to add it again
 		
 		# ====================================================================
-		# Show initial document's Report Panel
+		# Show initial document's Report Panel on demand
 		# ====================================================================
-		try:
-			drawing_area = model_canvas_loader.get_current_document()
-			if drawing_area:
-				overlay_manager = model_canvas_loader.overlay_managers.get(drawing_area)
-				if overlay_manager and hasattr(overlay_manager, 'report_panel_loader'):
-					report_loader = overlay_manager.report_panel_loader
-					if report_loader and report_loader.panel:
-						model_canvas_loader.report_panel_container.pack_start(report_loader.panel, True, True, 0)
-						report_loader.panel.show_all()
-      # print(f"[REPORT_INIT] Initial Report Panel shown for drawing_area {id(drawing_area)}")
-		except Exception as e:
-   # print(f"[REPORT_INIT] ❌ Error showing initial panel: {e}")
-			import traceback
-			traceback.print_exc()
+		# NOTE: Don't show Report panel automatically on startup
+		# Let user click Master Palette button to show it when needed
+		# This avoids issues with panel initialization timing
 			
 		# ===================================================================
 		# Legacy event handlers (kept for compatibility, may need updating)
@@ -754,6 +800,10 @@ def main(argv=None):
 		
 		if topology_panel_loader:
 			topology_panel_loader.parent_window = window
+		
+		# Store main window reference in model_canvas_loader for per-document Report panels
+		if model_canvas_loader:
+			model_canvas_loader.main_window = window
 
 		# Define toggle handlers (show/hide panel windows as transient windows)
 		# ====================================================================
@@ -927,9 +977,17 @@ def main(argv=None):
 						left_paned.set_position(320)
 					except Exception:
 						pass
-				# Show report container
+				# Show report container and panel content
 				if report_panel_container:
 					report_panel_container.set_visible(True)
+					# Show the actual Report panel content for current document
+					drawing_area = model_canvas_loader.get_current_document()
+					if drawing_area:
+						overlay_manager = model_canvas_loader.overlay_managers.get(drawing_area)
+						if overlay_manager and hasattr(overlay_manager, 'report_panel_loader'):
+							report_loader = overlay_manager.report_panel_loader
+							if report_loader and report_loader.panel:
+								report_loader.panel.show_all()
 			else:
 				# Hide report panel
 				if report_panel_container:

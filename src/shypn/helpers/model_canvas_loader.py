@@ -1269,6 +1269,18 @@ class ModelCanvasLoader:
             report_panel_loader = ReportPanelLoader(project=None, model_canvas_loader=self)
             report_panel_loader.load()
             
+            # Wire float/attach callbacks from main app (stored in model_canvas_loader)
+            if hasattr(self, 'on_report_float') and hasattr(self, 'on_report_attach'):
+                report_panel_loader.on_float_callback = self.on_report_float
+                report_panel_loader.on_attach_callback = self.on_report_attach
+            
+            # Set parent window for Wayland transient relationship
+            if hasattr(self, 'main_window') and self.main_window:
+                report_panel_loader.parent_window = self.main_window
+            
+            # DON'T call add_to_stack() - Report panel is manually managed per-document
+            # Each tab switch will manually pack_start() the appropriate panel
+            
             # Wire controller to this document's Report Panel
             if hasattr(report_panel_loader, 'panel') and report_panel_loader.panel:
                 report_panel_loader.panel.set_controller(simulation_controller)
@@ -1279,6 +1291,9 @@ class ModelCanvasLoader:
                 if model_manager:
                     report_panel_loader.panel.set_model_canvas(model_manager)
                     # print(f"[MODEL_CANVAS_LOADER] Set model_manager for Report Panel: {len(model_manager.places)} places, {len(model_manager.transitions)} transitions")
+                
+                # NOTE: Locality sync callback will be wired later in set_right_panel_loader()
+                # when the transition panel is guaranteed to exist
             
             self.overlay_managers[drawing_area].report_panel_loader = report_panel_loader
             # print(f"[MODEL_CANVAS_LOADER] Created per-document Report Panel for drawing_area {id(drawing_area)}")
@@ -3178,11 +3193,69 @@ class ModelCanvasLoader:
         Args:
             right_panel_loader: RightPanelLoader instance from main application
         """
+        print(f"[MODEL_CANVAS_LOADER] set_right_panel_loader() called")
         self.right_panel_loader = right_panel_loader
         if self.notebook and self.notebook.get_n_pages() > 0:
             current_page_num = self.notebook.get_current_page()
             current_page = self.notebook.get_nth_page(current_page_num)
             self._on_notebook_page_changed(self.notebook, current_page, current_page_num)
+        
+        # Wire locality sync callback for all existing Report panels
+        print(f"[MODEL_CANVAS_LOADER] About to call _wire_locality_sync_for_existing_panels()")
+        self._wire_locality_sync_for_existing_panels()
+        print(f"[MODEL_CANVAS_LOADER] Completed _wire_locality_sync_for_existing_panels()")
+    
+    def _wire_locality_sync_for_existing_panels(self):
+        """Wire transition→report locality sync callbacks for all existing panels.
+        
+        Called when right_panel_loader is set, to retroactively wire callbacks
+        for Report panels that were created before the transition panel existed.
+        """
+        if not self.right_panel_loader:
+            return
+        
+        if not hasattr(self.right_panel_loader, 'transition_panel') or not self.right_panel_loader.transition_panel:
+            print(f"[LOCALITY_WIRE] No transition_panel in right_panel_loader yet")
+            return
+        
+        transition_panel = self.right_panel_loader.transition_panel
+        print(f"[LOCALITY_WIRE] Wiring locality sync for {len(self.overlay_managers)} existing documents")
+        
+        # Wire callback for each existing Report panel
+        for drawing_area, overlay_manager in self.overlay_managers.items():
+            if not hasattr(overlay_manager, 'report_panel_loader'):
+                continue
+            
+            report_panel_loader = overlay_manager.report_panel_loader
+            if not report_panel_loader or not hasattr(report_panel_loader, 'panel'):
+                continue
+            
+            report_panel = report_panel_loader.panel
+            
+            # Create closure to capture report_panel for this document
+            def make_callback(rp):
+                def on_transition_selected(transition, locality):
+                    """Called when user selects transition in Analyses panel."""
+                    print(f"[LOCALITY_CALLBACK] Received transition {transition.name if hasattr(transition, 'name') else transition.id}")
+                    print(f"[LOCALITY_CALLBACK] Locality valid: {locality.is_valid if locality else False}")
+                    print(f"[LOCALITY_CALLBACK] Report panel categories: {len(rp.categories)}")
+                    
+                    # Find Models category in Report panel
+                    from shypn.ui.panels.report.model_structure_category import ModelsCategory
+                    for category in rp.categories:
+                        print(f"[LOCALITY_CALLBACK] Checking category: {type(category).__name__}")
+                        if isinstance(category, ModelsCategory):
+                            print(f"[LOCALITY_CALLBACK] Found ModelsCategory, calling set_selected_locality()")
+                            category.set_selected_locality(transition, locality)
+                            print(f"[LOCALITY_CALLBACK] set_selected_locality() completed")
+                            break
+                    else:
+                        print(f"[LOCALITY_CALLBACK] ⚠️ ModelsCategory not found in report panel!")
+                return on_transition_selected
+            
+            # Set the callback
+            transition_panel.on_selection_changed_callback = make_callback(report_panel)
+            print(f"[LOCALITY_WIRE] ✓ Wired callback for drawing_area {id(drawing_area)}")
     
     def wire_existing_canvases_to_right_panel(self):
         """Wire data_collector to right_panel for all existing canvases.
