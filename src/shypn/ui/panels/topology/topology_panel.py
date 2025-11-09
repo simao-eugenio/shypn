@@ -88,25 +88,29 @@ class TopologyPanel(Gtk.Box):
         self.categories_box.set_margin_top(5)
         self.categories_box.set_margin_bottom(5)
         
-        # Create 4 categories
+        # Create 4 categories with grouped tables enabled
         self.structural_category = StructuralCategory(
             model_canvas=model_canvas,
-            expanded=False
+            expanded=False,
+            use_grouped_table=True  # Enable grouped table mode
         )
         
         self.graph_network_category = GraphNetworkCategory(
             model_canvas=model_canvas,
-            expanded=False
+            expanded=False,
+            use_grouped_table=True  # Enable grouped table mode
         )
         
         self.behavioral_category = BehavioralCategory(
             model_canvas=model_canvas,
-            expanded=False
+            expanded=False,
+            use_grouped_table=True  # Enable grouped table mode
         )
         
         self.biological_category = BiologicalCategory(
             model_canvas=model_canvas,
-            expanded=False
+            expanded=False,
+            use_grouped_table=True  # Enable grouped table mode
         )
         
         # Store categories in list for easy iteration
