@@ -922,7 +922,7 @@ def main(argv=None):
 						left_paned.set_position(0)
 					except Exception:
 						pass
-
+		
 		def on_topology_toggle(is_active):
 			"""Handle Topology panel toggle from Master Palette.
 			

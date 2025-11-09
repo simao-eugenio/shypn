@@ -483,15 +483,6 @@ class BehavioralCategory(BaseTopologyCategory):
             return f'⚠ {fairness_level}'
         return '✗ No'
     
-    def _create_deadlocks_table(self):
-        """Create deadlocks detail table.
-        
-        Returns:
-            Gtk.TreeView: Deadlocks table
-        """
-        # 4 columns for deadlock details
-        self.deadlocks_table_store = Gtk.ListStore(str, str, str, str)
-    
     def _update_deadlocks_table(self, result_data):
         """Update deadlocks table with detected deadlocks.
         
