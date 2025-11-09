@@ -1296,6 +1296,10 @@ class ModelCanvasLoader:
                     if hasattr(self.topology_panel_loader, 'panel') and self.topology_panel_loader.panel:
                         report_panel_loader.panel.set_topology_panel(self.topology_panel_loader.panel)
                         print(f"[CONTROLLER_WIRE] ✅ Connected Topology Panel to Report Panel")
+                        
+                        # Trigger immediate refresh to show any existing analysis data
+                        report_panel_loader.panel.refresh_all()
+                        print(f"[CONTROLLER_WIRE] ✅ Refreshed Report Panel to load topology data")
                 
                 # NOTE: Locality sync callback will be wired later in set_right_panel_loader()
                 # when the transition panel is guaranteed to exist
