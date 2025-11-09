@@ -115,51 +115,86 @@ class BiologicalCategory(BaseTopologyCategory):
         rows = []
         
         if analyzer_name == 'dependency_coupling':
-            # Result format: {'dependencies': [{t1: str, t2: str, type: str, shared: [...], score: float, classification: str}]}
-            dependencies = result.get('dependencies', [])
-            for dep in dependencies:
-                t1 = dep.get('t1', '')
-                t2 = dep.get('t2', '')
-                dep_type = dep.get('type', 'Unknown')
-                shared = dep.get('shared_places', [])
-                score = dep.get('conflict_score', 0.0)
-                classification = dep.get('classification', '')
+            # Result format: {'classifications': {'competitive': [...], 'convergent': [...], ...}}
+            classifications = result.get('classifications', {})
+            
+            # Process competitive pairs (conflicts)
+            for t1_id, t2_id, details in classifications.get('competitive', []):
+                shared_inputs = details.get('shared_inputs', [])
+                shared_outputs = details.get('shared_outputs', [])
+                shared_reg = details.get('shared_regulatory', [])
                 
-                # Build notes based on type
-                notes = ''
-                if dep_type == 'Competitive':
-                    notes = 'Mutually exclusive firing'
-                elif dep_type == 'Convergent':
-                    notes = 'Both produce same metabolite'
-                elif dep_type == 'Regulatory':
-                    notes = 'Share enzyme, no conflict'
-                elif dep_type == 'Independent':
-                    notes = 'No shared places'
+                all_shared = shared_inputs + shared_outputs + shared_reg
                 
                 rows.append((
-                    dep_type,
-                    f'({t1}, {t2})',
-                    ', '.join(shared) if shared else '-',
-                    round(score, 2),
-                    classification,
-                    notes
+                    'Competitive',
+                    f'({t1_id}, {t2_id})',
+                    ', '.join(map(str, all_shared)) if all_shared else '-',
+                    1.0,  # High conflict score
+                    'True Conflict',
+                    'Mutually exclusive firing (input competition)'
                 ))
+            
+            # Process convergent pairs (valid coupling)
+            for t1_id, t2_id, details in classifications.get('convergent', []):
+                shared_outputs = details.get('shared_outputs', [])
+                
+                rows.append((
+                    'Convergent',
+                    f'({t1_id}, {t2_id})',
+                    ', '.join(map(str, shared_outputs)) if shared_outputs else '-',
+                    0.0,  # No conflict
+                    'Valid Coupling',
+                    'Both produce same metabolite'
+                ))
+            
+            # Process regulatory pairs (valid coupling)
+            for t1_id, t2_id, details in classifications.get('regulatory', []):
+                shared_reg = details.get('shared_regulatory', [])
+                
+                rows.append((
+                    'Regulatory',
+                    f'({t1_id}, {t2_id})',
+                    ', '.join(map(str, shared_reg)) if shared_reg else '-',
+                    0.0,  # No conflict
+                    'Valid Coupling',
+                    'Share enzyme, no conflict'
+                ))
+            
+            # Process strongly independent pairs (optional - may create too many rows)
+            # Uncomment if you want to see independent pairs
+            # for t1_id, t2_id, details in classifications.get('strongly_independent', []):
+            #     rows.append((
+            #         'Independent',
+            #         f'({t1_id}, {t2_id})',
+            #         '-',
+            #         0.0,
+            #         'No Coupling',
+            #         'No shared places'
+            #     ))
         
         elif analyzer_name == 'regulatory_structure':
-            # Result format: {'catalysts': [{transition: str, catalyst_place: str, regulated_reactions: [...]}]}
-            catalysts = result.get('catalysts', [])
-            for cat in catalysts:
-                transition = cat.get('transition', '')
-                catalyst_place = cat.get('catalyst_place', '')
-                regulated = cat.get('regulated_reactions', [])
+            # Result format: {'test_arcs': [...], 'catalyst_map': {...}, 'shared_catalysts': [...]}
+            test_arcs = result.get('test_arcs', [])
+            catalyst_map = result.get('catalyst_map', {})
+            
+            # Show each test arc (catalyst)
+            for arc_info in test_arcs:
+                catalyst_place_id = arc_info.get('catalyst_place_id', '')
+                catalyst_place_name = arc_info.get('catalyst_place_name', str(catalyst_place_id))
+                transition_id = arc_info.get('transition_id', '')
+                transition_name = arc_info.get('transition_name', str(transition_id))
+                
+                # Get how many transitions use this catalyst
+                catalyst_usage = len(catalyst_map.get(catalyst_place_id, []))
                 
                 rows.append((
                     'Catalyst',
-                    transition,
-                    catalyst_place + ' (test arc)',
+                    transition_name,
+                    f'{catalyst_place_name} (test arc)',
                     0.0,
                     'Enzymatic',
-                    f'Enzyme for {len(regulated)} reaction(s)'
+                    f'Enzyme used by {catalyst_usage} transition(s)'
                 ))
         
         return rows
