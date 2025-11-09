@@ -640,6 +640,10 @@ class BaseTopologyCategory:
         
         self.analyzing.add(analyzer_name)
         
+        # Notify subclasses that analyzer is starting (hook for UI updates)
+        if hasattr(self, '_on_analyzer_start'):
+            GLib.idle_add(self._on_analyzer_start, analyzer_name)
+        
         # Extract model on main thread
         try:
             manager = None
