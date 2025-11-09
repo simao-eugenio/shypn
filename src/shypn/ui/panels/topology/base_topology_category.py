@@ -27,6 +27,8 @@ from shypn.ui.category_frame import CategoryFrame
 # Priority 2 = Fast (O(n²) to O(n³)), run second
 # Priority 3 = Moderate (O(n³) to exponential with limits), run third
 # Priority 4 = Slow (exponential without limits), run last or manual only
+#
+# Timeout values prevent UI hanging when algorithms get stuck on complex models
 ANALYZER_METADATA = {
     # FAST ALGORITHMS - Priority 1 (< 1 second typically)
     'hubs': {
@@ -34,28 +36,32 @@ ANALYZER_METADATA = {
         'complexity': 'O(n+e)',
         'description': 'Linear - degree calculation',
         'safe_for_auto_run': True,
-        'typical_time': '<0.5s'
+        'typical_time': '<0.5s',
+        'timeout_seconds': 30  # Liberal timeout for safety
     },
     'paths': {
         'priority': 1,
         'complexity': 'O(n+e)',
         'description': 'Linear - graph traversal',
         'safe_for_auto_run': True,
-        'typical_time': '<0.5s'
+        'typical_time': '<0.5s',
+        'timeout_seconds': 30
     },
     'boundedness': {
         'priority': 1,
         'complexity': 'O(n)',
         'description': 'Linear - token counting',
         'safe_for_auto_run': True,
-        'typical_time': '<0.5s'
+        'typical_time': '<0.5s',
+        'timeout_seconds': 30
     },
     'fairness': {
         'priority': 1,
         'complexity': 'O(n+e)',
         'description': 'Linear - conflict analysis',
         'safe_for_auto_run': True,
-        'typical_time': '<0.5s'
+        'typical_time': '<0.5s',
+        'timeout_seconds': 30
     },
     
     # MODERATE ALGORITHMS - Priority 2 (1-3 seconds typically)
@@ -64,35 +70,40 @@ ANALYZER_METADATA = {
         'complexity': 'O(n²m)',
         'description': 'Quadratic - matrix operations',
         'safe_for_auto_run': True,
-        'typical_time': '1-2s'
+        'typical_time': '1-2s',
+        'timeout_seconds': 60
     },
     't_invariants': {
         'priority': 2,
         'complexity': 'O(nm²)',
         'description': 'Quadratic - matrix operations',
         'safe_for_auto_run': True,
-        'typical_time': '1-2s'
+        'typical_time': '1-2s',
+        'timeout_seconds': 60
     },
     'cycles': {
         'priority': 2,
         'complexity': 'O((n+e)(c+1))',
         'description': 'Efficient cycle detection',
         'safe_for_auto_run': True,
-        'typical_time': '1-3s'
+        'typical_time': '1-3s',
+        'timeout_seconds': 60
     },
     'dependency_coupling': {
         'priority': 2,
         'complexity': 'O(t²)',
         'description': 'Quadratic - transition pairs',
         'safe_for_auto_run': True,
-        'typical_time': '1-3s'
+        'typical_time': '1-3s',
+        'timeout_seconds': 60
     },
     'regulatory_structure': {
         'priority': 2,
         'complexity': 'O(a)',
         'description': 'Linear - arc analysis',
         'safe_for_auto_run': True,
-        'typical_time': '0.5-1s'
+        'typical_time': '0.5-1s',
+        'timeout_seconds': 30
     },
     
     # SLOW ALGORITHMS - Priority 3 (5-30 seconds, limited exploration)
@@ -102,7 +113,8 @@ ANALYZER_METADATA = {
         'description': 'State explosion (bounded)',
         'safe_for_auto_run': False,
         'typical_time': '5-30s',
-        'warning': '⚠️ <b>CAUTION:</b> State space exploration can take 30-60s on complex models.',
+        'timeout_seconds': 90,  # 90s timeout
+        'warning': '⚠️ <b>CAUTION:</b> State space exploration can take 30-90s on complex models.',
         'risk': 'HIGH'
     },
     'liveness': {
@@ -111,7 +123,8 @@ ANALYZER_METADATA = {
         'description': 'Depends on reachability',
         'safe_for_auto_run': False,
         'typical_time': '5-30s',
-        'warning': '⚠️ <b>CAUTION:</b> Can take 10-30s on complex models.',
+        'timeout_seconds': 90,
+        'warning': '⚠️ <b>CAUTION:</b> Can take 10-90s on complex models.',
         'risk': 'MEDIUM-HIGH'
     },
     'deadlocks': {
@@ -120,7 +133,8 @@ ANALYZER_METADATA = {
         'description': 'Depends on siphon detection',
         'safe_for_auto_run': False,
         'typical_time': '5-30s',
-        'warning': '⚠️ <b>CAUTION:</b> Can take 10-30s if siphon checking enabled.',
+        'timeout_seconds': 90,
+        'warning': '⚠️ <b>CAUTION:</b> Can take 10-90s if siphon checking enabled.',
         'risk': 'MEDIUM-HIGH'
     },
     
@@ -131,6 +145,7 @@ ANALYZER_METADATA = {
         'description': 'Exponential - subset enumeration',
         'safe_for_auto_run': False,
         'typical_time': '>60s',
+        'timeout_seconds': 120,  # 2 minutes max
         'warning': '⚠️ <b>CRITICAL:</b> Can take >60s or freeze on models with >25 places. Use on small models only.',
         'risk': 'CRITICAL'
     },
@@ -140,6 +155,7 @@ ANALYZER_METADATA = {
         'description': 'Exponential - subset enumeration',
         'safe_for_auto_run': False,
         'typical_time': '>60s',
+        'timeout_seconds': 120,
         'warning': '⚠️ <b>CRITICAL:</b> Can take >60s or freeze on models with >25 places. Use on small models only.',
         'risk': 'CRITICAL'
     }
@@ -202,6 +218,10 @@ class BaseTopologyCategory:
         
         # Track which analyzers are currently running
         self.analyzing = set()
+        
+        # Track analyzer execution times and timeouts
+        self.analyzer_start_times = {}  # {analyzer_name: timestamp}
+        self.analyzer_timeouts = {}     # {analyzer_name: GLib timeout_id}
         
         # Track which expanders have been analyzed (per drawing area)
         # Format: {drawing_area: set(analyzer_names)}
@@ -640,6 +660,31 @@ class BaseTopologyCategory:
         
         self.analyzing.add(analyzer_name)
         
+        # Record start time
+        import time
+        self.analyzer_start_times[analyzer_name] = time.time()
+        
+        # Setup timeout watchdog
+        metadata = ANALYZER_METADATA.get(analyzer_name, {})
+        timeout_seconds = metadata.get('timeout_seconds', 60)  # Default 60s
+        
+        def on_timeout():
+            """Called when analyzer exceeds timeout."""
+            if analyzer_name in self.analyzing:
+                # Analyzer still running after timeout
+                self.analyzing.discard(analyzer_name)
+                
+                # Show timeout message in UI
+                GLib.idle_add(self._show_timeout_message, analyzer_name, timeout_seconds)
+                GLib.idle_add(self._check_grouped_analysis_complete)
+            
+            # Return False to stop timeout from repeating
+            return False
+        
+        # Start timeout watchdog (runs on GTK main thread)
+        timeout_id = GLib.timeout_add_seconds(timeout_seconds, on_timeout)
+        self.analyzer_timeouts[analyzer_name] = timeout_id
+        
         # Notify subclasses that analyzer is starting (hook for UI updates)
         if hasattr(self, '_on_analyzer_start'):
             GLib.idle_add(self._on_analyzer_start, analyzer_name)
@@ -698,7 +743,14 @@ class BaseTopologyCategory:
                 
             except Exception as e:
                 print(f"Error analyzing {analyzer_name}: {e}")
+                # Show error in UI
+                GLib.idle_add(self._show_error_message, analyzer_name, str(e))
             finally:
+                # Cancel timeout if analyzer completed
+                if analyzer_name in self.analyzer_timeouts:
+                    GLib.source_remove(self.analyzer_timeouts[analyzer_name])
+                    del self.analyzer_timeouts[analyzer_name]
+                
                 self.analyzing.discard(analyzer_name)
                 # Check if all done
                 GLib.idle_add(self._check_grouped_analysis_complete)
@@ -729,6 +781,77 @@ class BaseTopologyCategory:
         if rows:
             for row in rows:
                 self.grouped_table_store.append(row)
+    
+    def _show_timeout_message(self, analyzer_name, timeout_seconds):
+        """Show timeout message for an analyzer that exceeded time limit.
+        
+        Args:
+            analyzer_name: Name of analyzer that timed out
+            timeout_seconds: Timeout value that was exceeded
+        """
+        metadata = ANALYZER_METADATA.get(analyzer_name, {})
+        complexity = metadata.get('complexity', 'Unknown')
+        
+        # Format timeout message
+        timeout_row = self._format_timeout_row(analyzer_name, timeout_seconds, complexity)
+        
+        if timeout_row:
+            if isinstance(timeout_row, list):
+                for row in timeout_row:
+                    self.grouped_table_store.append(row)
+            else:
+                self.grouped_table_store.append(timeout_row)
+    
+    def _show_error_message(self, analyzer_name, error_message):
+        """Show error message for an analyzer that failed.
+        
+        Args:
+            analyzer_name: Name of analyzer that failed
+            error_message: Error message
+        """
+        error_row = self._format_error_row(analyzer_name, error_message)
+        
+        if error_row:
+            if isinstance(error_row, list):
+                for row in error_row:
+                    self.grouped_table_store.append(row)
+            else:
+                self.grouped_table_store.append(error_row)
+    
+    def _format_timeout_row(self, analyzer_name, timeout_seconds, complexity):
+        """Format timeout message as table row.
+        
+        Subclasses can override for custom timeout display.
+        
+        Args:
+            analyzer_name: Name of analyzer
+            timeout_seconds: Timeout value
+            complexity: Algorithm complexity
+            
+        Returns:
+            tuple or list: Row(s) for table
+        """
+        # Default implementation
+        title = self._format_analyzer_title(analyzer_name)
+        message = f"⏱️ Timeout ({timeout_seconds}s) - Model too complex for {complexity} algorithm"
+        return (title, message, '⚠️ TIMEOUT')
+    
+    def _format_error_row(self, analyzer_name, error_message):
+        """Format error message as table row.
+        
+        Subclasses can override for custom error display.
+        
+        Args:
+            analyzer_name: Name of analyzer
+            error_message: Error message
+            
+        Returns:
+            tuple or list: Row(s) for table
+        """
+        # Default implementation
+        title = self._format_analyzer_title(analyzer_name)
+        message = f"❌ Error: {error_message[:100]}"
+        return (title, message, '⚠️ ERROR')
     
     def _format_analyzer_row(self, analyzer_name, result):
         """Format analyzer result as table row(s).

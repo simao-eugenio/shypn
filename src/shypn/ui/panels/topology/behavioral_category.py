@@ -282,6 +282,60 @@ class BehavioralCategory(BaseTopologyCategory):
         # Update matrix to show "Analyzing..." status
         self._update_properties_matrix()
     
+    def _show_timeout_message(self, analyzer_name, timeout_seconds):
+        """Override to show timeout in properties matrix.
+        
+        Args:
+            analyzer_name: Name of analyzer that timed out
+            timeout_seconds: Timeout value that was exceeded
+        """
+        # Mark as analyzed (so we don't show "Not analyzed")
+        drawing_area = self._get_current_drawing_area()
+        if drawing_area:
+            if drawing_area not in self.analyzed:
+                self.analyzed[drawing_area] = set()
+            self.analyzed[drawing_area].add(analyzer_name)
+            
+            # Cache timeout result
+            if drawing_area not in self.results_cache:
+                self.results_cache[drawing_area] = {}
+            
+            # Create timeout marker
+            self.results_cache[drawing_area][analyzer_name] = {
+                'timeout': True,
+                'timeout_seconds': timeout_seconds
+            }
+        
+        # Update properties matrix to show timeout
+        self._update_properties_matrix()
+    
+    def _show_error_message(self, analyzer_name, error_message):
+        """Override to show error in properties matrix.
+        
+        Args:
+            analyzer_name: Name of analyzer that failed
+            error_message: Error message
+        """
+        # Mark as analyzed (so we don't show "Not analyzed")
+        drawing_area = self._get_current_drawing_area()
+        if drawing_area:
+            if drawing_area not in self.analyzed:
+                self.analyzed[drawing_area] = set()
+            self.analyzed[drawing_area].add(analyzer_name)
+            
+            # Cache error result
+            if drawing_area not in self.results_cache:
+                self.results_cache[drawing_area] = {}
+            
+            # Create error marker
+            self.results_cache[drawing_area][analyzer_name] = {
+                'error': True,
+                'error_message': error_message
+            }
+        
+        # Update properties matrix to show error
+        self._update_properties_matrix()
+    
     def _update_properties_matrix(self):
         """Update the properties matrix based on cached results.
         
@@ -321,6 +375,15 @@ class BehavioralCategory(BaseTopologyCategory):
         if not result:
             return 'Not analyzed'
         
+        # Check for timeout
+        if isinstance(result, dict) and result.get('timeout'):
+            timeout = result.get('timeout_seconds', '?')
+            return f'⏱️ Timeout\n({timeout}s)'
+        
+        # Check for error
+        if isinstance(result, dict) and result.get('error'):
+            return '❌ Error\n(see logs)'
+        
         data = result.data if hasattr(result, 'data') else result
         state_count = data.get('state_count', 0)
         
@@ -332,6 +395,15 @@ class BehavioralCategory(BaseTopologyCategory):
         """Format boundedness result for matrix cell."""
         if not result:
             return 'Not analyzed'
+        
+        # Check for timeout
+        if isinstance(result, dict) and result.get('timeout'):
+            timeout = result.get('timeout_seconds', '?')
+            return f'⏱️ Timeout\n({timeout}s)'
+        
+        # Check for error
+        if isinstance(result, dict) and result.get('error'):
+            return '❌ Error\n(see logs)'
         
         data = result.data if hasattr(result, 'data') else result
         is_bounded = data.get('bounded', False)
@@ -345,6 +417,15 @@ class BehavioralCategory(BaseTopologyCategory):
         """Format liveness result for matrix cell."""
         if not result:
             return 'Not analyzed'
+        
+        # Check for timeout
+        if isinstance(result, dict) and result.get('timeout'):
+            timeout = result.get('timeout_seconds', '?')
+            return f'⏱️ Timeout\n({timeout}s)'
+        
+        # Check for error
+        if isinstance(result, dict) and result.get('error'):
+            return '❌ Error\n(see logs)'
         
         data = result.data if hasattr(result, 'data') else result
         is_live = data.get('live', False)
@@ -361,11 +442,21 @@ class BehavioralCategory(BaseTopologyCategory):
         if not result:
             return 'Not analyzed'
         
-        data = result.data if hasattr(result, 'data') else result
-        deadlocks = data.get('deadlocks', [])
+        # Check for timeout
+        if isinstance(result, dict) and result.get('timeout'):
+            timeout = result.get('timeout_seconds', '?')
+            return f'⏱️ Timeout\n({timeout}s)'
         
-        if deadlocks:
-            return f'✗ Yes\n{len(deadlocks)} found'
+        # Check for error
+        if isinstance(result, dict) and result.get('error'):
+            return '❌ Error\n(see logs)'
+        
+        data = result.data if hasattr(result, 'data') else result
+        has_deadlock = data.get('has_deadlock', False)
+        deadlock_type = data.get('deadlock_type', 'unknown')
+        
+        if has_deadlock:
+            return f'✗ Yes\n{deadlock_type}'
         return '✓ No'
     
     def _format_fairness(self, result):
@@ -373,12 +464,33 @@ class BehavioralCategory(BaseTopologyCategory):
         if not result:
             return 'Not analyzed'
         
+        # Check for timeout
+        if isinstance(result, dict) and result.get('timeout'):
+            timeout = result.get('timeout_seconds', '?')
+            return f'⏱️ Timeout\n({timeout}s)'
+        
+        # Check for error
+        if isinstance(result, dict) and result.get('error'):
+            return '❌ Error\n(see logs)'
+        
         data = result.data if hasattr(result, 'data') else result
-        is_fair = data.get('fair', False)
+        is_fair = data.get('is_fair', False)
+        fairness_level = data.get('fairness_level', 'unknown')
         
         if is_fair:
             return '✓ Yes'
+        elif fairness_level != 'unknown':
+            return f'⚠ {fairness_level}'
         return '✗ No'
+    
+    def _create_deadlocks_table(self):
+        """Create deadlocks detail table.
+        
+        Returns:
+            Gtk.TreeView: Deadlocks table
+        """
+        # 4 columns for deadlock details
+        self.deadlocks_table_store = Gtk.ListStore(str, str, str, str)
     
     def _update_deadlocks_table(self, result_data):
         """Update deadlocks table with detected deadlocks.
