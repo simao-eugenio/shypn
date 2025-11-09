@@ -229,7 +229,7 @@ class PlacePropDialogLoader(GObject.GObject):
             print(f"Topology tab not available: {e}")
         except Exception as e:
             # Any other error - log but don't crash the dialog
-            print(f"Error setting up topology tab: {type(e).__name__}: {e}")
+            # print(f"Error setting up topology tab: {type(e).__name__}: {e}")
             import traceback
             traceback.print_exc()
 

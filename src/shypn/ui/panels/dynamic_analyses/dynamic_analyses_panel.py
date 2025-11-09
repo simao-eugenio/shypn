@@ -164,6 +164,7 @@ class DynamicAnalysesPanel(Gtk.Box):
         if self.context_menu_handler:
             self.context_menu_handler.set_model(model)
         else:
+            pass
             # Context menu handler doesn't exist yet, create it
             self._setup_context_menu()
     
@@ -230,6 +231,7 @@ class DynamicAnalysesPanel(Gtk.Box):
             summary_lines = ['No simulation data collector initialized']
             status = 'not_initialized'
         else:
+            pass
             # Check if simulation is running
             # TODO: Add proper status checking when data collector exposes state
             status = 'idle'
@@ -239,10 +241,12 @@ class DynamicAnalysesPanel(Gtk.Box):
             places_count = 0
             
             if self.transitions_category.panel:
+                pass
                 # Get number of plotted transitions
                 transitions_count = len(getattr(self.transitions_category.panel, 'selected_transitions', []))
             
             if self.places_category.panel:
+                pass
                 # Get number of plotted places
                 places_count = len(getattr(self.places_category.panel, 'selected_places', []))
             
@@ -293,5 +297,6 @@ class DynamicAnalysesPanel(Gtk.Box):
                 try:
                     category_panel.clear_plot()
                 except Exception as e:
-                    print(f"Warning: Could not clear plot in {category_panel.__class__.__name__}: {e}")
+                    pass
+                    # print(f"Warning: Could not clear plot in {category_panel.__class__.__name__}: {e}")
 

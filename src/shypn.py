@@ -599,10 +599,10 @@ def main(argv=None):
 			# We use the report_panel_container from the UI file directly
 			model_canvas_loader.report_panel_container = report_panel_container
 			
-			print("[REPORT_INIT] Report panel container ready for per-document panels")
+   # print("[REPORT_INIT] Report panel container ready for per-document panels")
 			
 		except Exception as e:
-			print(f"[REPORT_INIT] ❌ Error setting up report panel container: {e}")
+   # print(f"[REPORT_INIT] ❌ Error setting up report panel container: {e}")
 			import traceback
 			traceback.print_exc()
 			
@@ -614,8 +614,8 @@ def main(argv=None):
 			# Event 1: Tab Switching (user switches between models)
 			def on_canvas_tab_switched_report(notebook, page, page_num):
 				"""Switch to the appropriate per-document Report Panel when tab changes."""
-				print(f"\n[TAB_REPORT] ========================================")
-				print(f"[TAB_REPORT] Tab switched to page {page_num}")
+    # print(f"\n[TAB_REPORT] ========================================")
+    # print(f"[TAB_REPORT] Tab switched to page {page_num}")
 				
 				# CRITICAL: Extract drawing_area from the page widget hierarchy
 				# Page structure: Gtk.Overlay -> [ScrolledWindow, ...other widgets...]
@@ -627,26 +627,26 @@ def main(argv=None):
 					children = page.get_children()
 					if children and len(children) > 0:
 						scrolled_window = children[0]
-						print(f"[TAB_REPORT] Found ScrolledWindow: {type(scrolled_window)}")
+      # print(f"[TAB_REPORT] Found ScrolledWindow: {type(scrolled_window)}")
 						
 						# Navigate: ScrolledWindow -> Viewport -> DrawingArea
 						if hasattr(scrolled_window, 'get_child'):
 							viewport = scrolled_window.get_child()
-							print(f"[TAB_REPORT] Found Viewport: {type(viewport)}")
+       # print(f"[TAB_REPORT] Found Viewport: {type(viewport)}")
 							
 							if viewport and hasattr(viewport, 'get_child'):
 								drawing_area = viewport.get_child()
-								print(f"[TAB_REPORT] ✅ Found DrawingArea: {type(drawing_area)}, id={id(drawing_area)}")
+        # print(f"[TAB_REPORT] ✅ Found DrawingArea: {type(drawing_area)}, id={id(drawing_area)}")
 				
 				if not drawing_area:
-					print(f"[TAB_REPORT] ⚠️  Could not extract drawing_area from page widget hierarchy")
-					print(f"[TAB_REPORT] ========================================\n")
+     # print(f"[TAB_REPORT] ⚠️  Could not extract drawing_area from page widget hierarchy")
+     # print(f"[TAB_REPORT] ========================================\n")
 					return
 				
 				if hasattr(model_canvas_loader, 'report_panel_container'):
 					# Get this document's Report Panel using the correct drawing_area
 					overlay_manager = model_canvas_loader.overlay_managers.get(drawing_area)
-					print(f"[TAB_REPORT] overlay_manager lookup result: {overlay_manager is not None}")
+     # print(f"[TAB_REPORT] overlay_manager lookup result: {overlay_manager is not None}")
 					
 					if overlay_manager and hasattr(overlay_manager, 'report_panel_loader'):
 						# Clear container
@@ -660,28 +660,30 @@ def main(argv=None):
 							if hasattr(overlay_manager, 'canvas_manager'):
 								model_manager = overlay_manager.canvas_manager
 								report_loader.set_model_canvas(model_manager)
-								print(f"[TAB_REPORT] Updated Report Panel with model: {len(model_manager.places)} places, {len(model_manager.transitions)} transitions")
+        # print(f"[TAB_REPORT] Updated Report Panel with model: {len(model_manager.places)} places, {len(model_manager.transitions)} transitions")
 							
 							model_canvas_loader.report_panel_container.pack_start(report_loader.panel, True, True, 0)
 							report_loader.panel.show_all()
-							print(f"[TAB_REPORT] ✅ SUCCESS! Switched to CORRECT document's Report Panel")
-							print(f"[TAB_REPORT]    drawing_area id: {id(drawing_area)}")
-							print(f"[TAB_REPORT]    report_loader id: {id(report_loader)}")
+							# print(f"[TAB_REPORT] ✅ SUCCESS! Switched to CORRECT document's Report Panel")
+							# print(f"[TAB_REPORT]    drawing_area id: {id(drawing_area)}")
+							# print(f"[TAB_REPORT]    report_loader id: {id(report_loader)}")
 						else:
-							print(f"[TAB_REPORT] ⚠️  No report panel for this document")
+							pass
+							# print(f"[TAB_REPORT] ⚠️  No report panel for this document")
 					else:
-						print(f"[TAB_REPORT] ⚠️  No report panel loader in overlay_manager for drawing_area {id(drawing_area)}")
-						print(f"[TAB_REPORT]    Available drawing_areas in overlay_managers: {[id(da) for da in model_canvas_loader.overlay_managers.keys()]}")
+						pass
+						# print(f"[TAB_REPORT] ⚠️  No report panel loader in overlay_manager for drawing_area {id(drawing_area)}")
+						# print(f"[TAB_REPORT]    Available drawing_areas in overlay_managers: {[id(da) for da in model_canvas_loader.overlay_managers.keys()]}")
 				
-				print(f"[TAB_REPORT] ========================================\n")
+				# print(f"[TAB_REPORT] ========================================\n")
 			
 			if model_canvas_loader.notebook:
 				model_canvas_loader.notebook.connect('switch-page', on_canvas_tab_switched_report)
 			
-			print("[REPORT_INIT] Report panel switching wired to tab changes")
+			# print("[REPORT_INIT] Report panel switching wired to tab changes")
 			
 		except Exception as e:
-			print(f"[REPORT_INIT] ❌ Error wiring report panel: {e}")
+   # print(f"[REPORT_INIT] ❌ Error wiring report panel: {e}")
 			import traceback
 			traceback.print_exc()
 		
@@ -699,9 +701,9 @@ def main(argv=None):
 					if report_loader and report_loader.panel:
 						model_canvas_loader.report_panel_container.pack_start(report_loader.panel, True, True, 0)
 						report_loader.panel.show_all()
-						print(f"[REPORT_INIT] Initial Report Panel shown for drawing_area {id(drawing_area)}")
+      # print(f"[REPORT_INIT] Initial Report Panel shown for drawing_area {id(drawing_area)}")
 		except Exception as e:
-			print(f"[REPORT_INIT] ❌ Error showing initial panel: {e}")
+   # print(f"[REPORT_INIT] ❌ Error showing initial panel: {e}")
 			import traceback
 			traceback.print_exc()
 			
@@ -716,7 +718,7 @@ def main(argv=None):
 			# Note: New models will get their Report Panel created automatically in model_canvas_loader
 			
 		except Exception as e:
-			print(f"[REPORT_INIT] ❌ Error in legacy handlers: {e}")
+   # print(f"[REPORT_INIT] ❌ Error in legacy handlers: {e}")
 			import traceback
 			traceback.print_exc()
 

@@ -89,6 +89,10 @@ class ModelCanvasManager:
         self.canvas_width = canvas_width
         self.canvas_height = canvas_height
         
+        # Reference to the canvas loader (set by loader after creation)
+        self._canvas_loader = None
+        self._drawing_area = None
+        
         # DPI detection (defaults to 96.0, updated from widget)
         self.screen_dpi = 96.0
         
@@ -569,6 +573,11 @@ class ModelCanvasManager:
                 arcs=document_model.arcs
             )
         """
+        import logging
+        logger = logging.getLogger(__name__)
+        print(f"[LOAD_OBJECTS] Called with {len(places or [])} places, {len(transitions or [])} transitions, {len(arcs or [])} arcs")
+        logger.info(f"[LOAD_OBJECTS] Called with {len(places or [])} places, {len(transitions or [])} transitions, {len(arcs or [])} arcs")
+        
         if places is None:
             places = []
         if transitions is None:
@@ -622,9 +631,280 @@ class ModelCanvasManager:
             if hasattr(place, 'initial_marking'):
                 place.tokens = place.initial_marking
         
+        # CRITICAL FIX: Trigger simulation controller reset after loading objects
+        # When a model is imported (KEGG, SBML) or loaded (File → Open), the
+        # simulation controller must be reset to clear stale state from any
+        # previous model. This is especially critical for auto-loaded imports.
+        # 
+        # Without this reset:
+        # - behavior_cache has old transition IDs → simulation fails
+        # - transition_states has deleted transitions → crashes
+        # - data_collector references wrong model → wrong data
+        # 
+        # ARCHITECTURE: Use Global Canvas State Lifecycle system for proper initialization
+        # The lifecycle_manager.sync_after_file_load() method properly initializes:
+        # - ID registration for all objects
+        # - TransitionState for all transitions (including source transitions)
+        # - Controller behavior cache
+        # - Step listeners for canvas redraw
+        #
+        # See: doc/CANVAS_LIFECYCLE_IMPLEMENTATION.md
+        print("[LOAD_OBJECTS] Requesting simulation reset via lifecycle_manager")
+        logger.info("[LOAD_OBJECTS] Requesting simulation reset via lifecycle_manager")
+        
+        # Try to use lifecycle manager first (proper architecture)
+        if self._canvas_loader and hasattr(self._canvas_loader, 'lifecycle_manager'):
+            lifecycle_mgr = self._canvas_loader.lifecycle_manager
+            if lifecycle_mgr and self._drawing_area:
+                try:
+                    print("[LOAD_OBJECTS] Using lifecycle_manager.sync_after_file_load()")
+                    logger.info("[LOAD_OBJECTS] Using lifecycle_manager.sync_after_file_load()")
+                    # sync_after_file_load expects file_path but works for imports too
+                    lifecycle_mgr.sync_after_file_load(self._drawing_area, file_path=None)
+                    logger.info("[LOAD_OBJECTS] ✅ Lifecycle manager sync complete")
+                except Exception as e:
+                    print(f"[LOAD_OBJECTS] Lifecycle manager sync failed: {e}, falling back")
+                    print("[LOAD_OBJECTS] Calling _request_simulation_reset_direct() as fallback")
+                    logger.warning(f"[LOAD_OBJECTS] Lifecycle manager sync failed: {e}, falling back")
+                    logger.info("[LOAD_OBJECTS] Calling _request_simulation_reset_direct() as fallback")
+                    self._request_simulation_reset_direct()
+                    print("[LOAD_OBJECTS] Fallback reset complete")
+                    logger.info("[LOAD_OBJECTS] Fallback reset complete")
+            else:
+                logger.info("[LOAD_OBJECTS] No lifecycle_manager available, using direct reset")
+                self._request_simulation_reset_direct()
+        else:
+            logger.info("[LOAD_OBJECTS] No canvas_loader reference, using direct reset")
+            self._request_simulation_reset_direct()
+        
         # Mark document as dirty (unsaved changes) and trigger redraw
         self.mark_dirty()  # Document dirty tracking for save state
         self.mark_needs_redraw()  # Canvas redraw for rendering
+    
+    def _request_simulation_reset_direct(self):
+        """Request simulation controller reset DIRECTLY (not via idle callback).
+        
+        This is the new approach that ensures the reset completes before
+        simulation starts, and step listeners are properly re-registered.
+        """
+        try:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info("[RESET_DIRECT] Starting direct simulation reset")
+            
+            # Use stored references (set by loader during manager creation)
+            canvas_loader = self._canvas_loader
+            drawing_area = self._drawing_area
+            
+            if not canvas_loader:
+                logger.warning("[RESET_DIRECT] ⚠️  No canvas_loader reference stored")
+                return
+            
+            if not drawing_area:
+                logger.warning("[RESET_DIRECT] ⚠️  No drawing_area reference stored")
+                return
+            
+            logger.info("[RESET_DIRECT] Found canvas_loader and drawing_area via stored references")
+            
+            # Call _ensure_simulation_reset directly (synchronous)
+            if hasattr(canvas_loader, '_ensure_simulation_reset'):
+                logger.info("[RESET_DIRECT] Calling _ensure_simulation_reset()")
+                canvas_loader._ensure_simulation_reset(drawing_area)
+                
+                # After reset, initialize transition states
+                controller = canvas_loader.simulation_controllers.get(drawing_area)
+                if controller:
+                    logger.info(f"[RESET_DIRECT] Initializing transition states for {len(self.transitions)} transitions")
+                    self._initialize_transition_states(controller)
+                    logger.info(f"[RESET_DIRECT] ✅ Controller has {len(controller.step_listeners)} step listeners")
+                else:
+                    logger.warning("[RESET_DIRECT] ⚠️  Could not get controller")
+                    
+                logger.info("[RESET_DIRECT] ✅ Simulation controller reset and initialized")
+            else:
+                logger.warning("[RESET_DIRECT] ⚠️  _ensure_simulation_reset not found on canvas_loader")
+                
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"[RESET_DIRECT] ❌ Exception: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _request_simulation_reset(self):
+        """Request simulation controller reset for this canvas.
+        
+        Called after load_objects() to ensure simulation controller is in clean
+        state for the newly loaded model. This is critical for imports (KEGG, SBML)
+        that auto-load models into canvas.
+        
+        Implementation uses GLib.idle_add to:
+        1. Avoid circular dependency (manager → canvas_loader → controller → manager)
+        2. Ensure reset happens after GTK main loop processes the object additions
+        3. Give canvas time to stabilize before resetting controller
+        """
+        try:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info("[REQUEST_RESET] _request_simulation_reset() called")
+            
+            # Find the canvas_loader by traversing up from manager
+            # This is safe because manager is always created by canvas_loader
+            import gi
+            gi.require_version('GLib', '2.0')
+            from gi.repository import GLib
+            
+            logger.info("[REQUEST_RESET] About to schedule idle callback with GLib.idle_add()")
+            
+            def reset_on_idle():
+                """Reset controller on GTK idle (after canvas updates)."""
+                try:
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.info("[IDLE_RESET] Idle callback triggered - starting reset")
+                    
+                    # Import here to avoid circular dependency at module load time
+                    from shypn.helpers import model_canvas_loader
+                    
+                    # Find the canvas_loader instance that owns this manager
+                    # The canvas_loader is the singleton that created all managers
+                    if hasattr(model_canvas_loader, '_instance'):
+                        canvas_loader = model_canvas_loader._instance
+                        logger.info("[IDLE_RESET] Found canvas_loader via _instance")
+                    else:
+                        # Fallback: try to find via canvas_managers dict
+                        # This works because managers are stored globally
+                        canvas_loader = None
+                        for loader_attr in ['canvas_loader', '_canvas_loader']:
+                            if hasattr(self, loader_attr):
+                                canvas_loader = getattr(self, loader_attr)
+                                logger.info(f"[IDLE_RESET] Found canvas_loader via {loader_attr}")
+                                break
+                    
+                    if canvas_loader:
+                        # Find the drawing_area for this manager
+                        drawing_area = None
+                        if hasattr(canvas_loader, 'canvas_managers'):
+                            for da, mgr in canvas_loader.canvas_managers.items():
+                                if mgr == self:
+                                    drawing_area = da
+                                    logger.info("[IDLE_RESET] Found matching drawing_area")
+                                    break
+                        
+                        if not drawing_area:
+                            logger.warning("[IDLE_RESET] ⚠️  Could not find drawing_area for this manager")
+                        
+                        if drawing_area and hasattr(canvas_loader, '_ensure_simulation_reset'):
+                            # Call the reset method (handles controller reset + listener re-registration)
+                            canvas_loader._ensure_simulation_reset(drawing_area)
+                            
+                            # CRITICAL: After reset, initialize transition states for all transitions
+                            # This ensures source transitions and other transitions are immediately
+                            # ready to fire without needing a manual "wakeup" action
+                            controller = canvas_loader.simulation_controllers.get(drawing_area)
+                            if controller:
+                                self._initialize_transition_states(controller)
+                                
+                                # Debug: Verify listeners are registered
+                                import logging
+                                logger = logging.getLogger(__name__)
+                                logger.info(f"✅ Simulation controller reset and initialized after load_objects()")
+                                logger.info(f"   Controller has {len(controller.step_listeners)} step listeners")
+                            
+                        else:
+                            import logging
+                            logger = logging.getLogger(__name__)
+                            logger.warning("⚠️  Could not find drawing_area or _ensure_simulation_reset for simulation reset")
+                    
+                except Exception as e:
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.error(f"❌ Failed to reset simulation after load: {e}")
+                    import traceback
+                    traceback.print_exc()
+                
+                return False  # Don't repeat
+            
+            # Schedule reset on idle (after GTK processes current events)
+            result = GLib.idle_add(reset_on_idle)
+            logger.info(f"[REQUEST_RESET] GLib.idle_add() returned: {result}")
+            
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"[REQUEST_RESET] ❌ Exception in _request_simulation_reset: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _initialize_transition_states(self, controller):
+        """Initialize transition states for all transitions in the model.
+        
+        Called after simulation controller reset to ensure all transitions
+        (especially source transitions) are immediately ready to fire without
+        needing a manual "wakeup" action (like drawing on canvas).
+        
+        Args:
+            controller: SimulationController instance to initialize
+        """
+        try:
+            import logging
+            logger = logging.getLogger(__name__)
+            
+            from shypn.engine.simulation.controller import TransitionState
+            
+            print(f"[INIT_STATES] Initializing transition states for {len(self.transitions)} transitions")
+            logger.info(f"[INIT_STATES] Initializing transition states for {len(self.transitions)} transitions")
+            
+            source_count = 0
+            for transition in self.transitions:
+                # Create transition state if not exists
+                if transition.id not in controller.transition_states:
+                    controller.transition_states[transition.id] = TransitionState()
+                
+                # Get behavior for this transition
+                behavior = controller._get_behavior(transition)
+                
+                # Check if this is a source transition
+                is_source = getattr(transition, 'is_source', False)
+                
+                if is_source:
+                    source_count += 1
+                    # Source transitions are always enabled from the start
+                    state = controller.transition_states[transition.id]
+                    state.enablement_time = controller.time  # Enable at time 0
+                    if hasattr(behavior, 'set_enablement_time'):
+                        behavior.set_enablement_time(controller.time)
+                    print(f"[INIT_STATES] ✅ {transition.id}: Source transition enabled at t={controller.time}")
+                    logger.info(f"[INIT_STATES] ✅ {transition.id}: Source transition enabled at t={controller.time}")
+                else:
+                    # Check if non-source transition is structurally enabled
+                    # (has enough input tokens to fire)
+                    input_arcs = behavior.get_input_arcs()
+                    locally_enabled = True
+                    
+                    for arc in input_arcs:
+                        source_place = behavior._get_place(arc.source_id)
+                        if source_place is None or source_place.tokens < arc.weight:
+                            locally_enabled = False
+                            break
+                    
+                    if locally_enabled:
+                        state = controller.transition_states[transition.id]
+                        state.enablement_time = controller.time
+                        if hasattr(behavior, 'set_enablement_time'):
+                            behavior.set_enablement_time(controller.time)
+                        logger.debug(f"  {transition.id}: Enabled at t=0 (has sufficient tokens)")
+                    else:
+                        logger.debug(f"  {transition.id}: Not enabled (insufficient tokens)")
+            
+            logger.info(f"[INIT_STATES] ✅ Complete: {len(controller.transition_states)} transitions, {source_count} sources enabled")
+            
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to initialize transition states: {e}")
+            import traceback
+            traceback.print_exc()
     
     def detect_parallel_arcs(self, arc):
         """Find arcs parallel to the given arc (same source/target or reversed).

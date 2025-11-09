@@ -322,7 +322,7 @@ class CycleAnalyzer(TopologyAnalyzer):
         Example:
             # Find cycles containing place with ID 5
             place_cycles = analyzer.find_cycles_containing_node(5)
-            print(f"Place 5 is in {len(place_cycles)} cycle(s)")
+            # print(f"Place 5 is in {len(place_cycles)} cycle(s)")
         """
         result = self.analyze(max_cycles=max_cycles)
         

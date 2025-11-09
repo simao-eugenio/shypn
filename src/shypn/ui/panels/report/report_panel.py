@@ -66,7 +66,7 @@ class ReportPanel(Gtk.Box):
     
     def _build_ui(self):
         """Build the report panel UI."""
-        print("[REPORT_PANEL] Building UI...")
+        # print("[REPORT_PANEL] Building UI...")
         
         # ===== PANEL HEADER =====
         header_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
@@ -100,7 +100,7 @@ class ReportPanel(Gtk.Box):
         # Main container with scrolling
         scrolled = Gtk.ScrolledWindow()
         scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-        print(f"[REPORT_PANEL] Created ScrolledWindow: {scrolled}")
+        # print(f"[REPORT_PANEL] Created ScrolledWindow: {scrolled}")
         
         # Content box for categories
         content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
@@ -108,29 +108,29 @@ class ReportPanel(Gtk.Box):
         content_box.set_margin_end(12)
         content_box.set_margin_top(12)
         content_box.set_margin_bottom(12)
-        print(f"[REPORT_PANEL] Created content_box: {content_box}")
+        # print(f"[REPORT_PANEL] Created content_box: {content_box}")
         
         # Create all categories
         self._create_categories(content_box)
         
-        print(f"[REPORT_PANEL] content_box children: {content_box.get_children()}")
+        # print(f"[REPORT_PANEL] content_box children: {content_box.get_children()}")
         
         scrolled.add(content_box)
         self.pack_start(scrolled, True, True, 0)
         
-        print(f"[REPORT_PANEL] self.get_children(): {self.get_children()}")
-        print(f"[REPORT_PANEL] scrolled.get_child(): {scrolled.get_child()}")
+        # print(f"[REPORT_PANEL] self.get_children(): {self.get_children()}")
+        # print(f"[REPORT_PANEL] scrolled.get_child(): {scrolled.get_child()}")
         
         # Make everything visible
-        print("[REPORT_PANEL] Calling show_all()...")
+        # print("[REPORT_PANEL] Calling show_all()...")
         content_box.show_all()
         scrolled.show_all()
         self.show_all()
         
-        print(f"[REPORT_PANEL] After show_all() - self.get_visible(): {self.get_visible()}")
-        print(f"[REPORT_PANEL] After show_all() - scrolled.get_visible(): {scrolled.get_visible()}")
-        print(f"[REPORT_PANEL] After show_all() - content_box.get_visible(): {content_box.get_visible()}")
-        print("[REPORT_PANEL] UI build complete")
+        # print(f"[REPORT_PANEL] After show_all() - self.get_visible(): {self.get_visible()}")
+        # print(f"[REPORT_PANEL] After show_all() - scrolled.get_visible(): {scrolled.get_visible()}")
+        # print(f"[REPORT_PANEL] After show_all() - content_box.get_visible(): {content_box.get_visible()}")
+        # print("[REPORT_PANEL] UI build complete")
     
     def _create_categories(self, container):
         """Create all report categories aligned with panels.
@@ -138,7 +138,7 @@ class ReportPanel(Gtk.Box):
         Args:
             container: Container to add categories to
         """
-        print("[REPORT_PANEL] Creating categories...")
+        # print("[REPORT_PANEL] Creating categories...")
         
         # Get current model manager if available
         # Initially model_canvas_loader may not have a loaded model
@@ -146,62 +146,62 @@ class ReportPanel(Gtk.Box):
         if self.model_canvas_loader and hasattr(self.model_canvas_loader, 'get_current_model'):
             current_manager = self.model_canvas_loader.get_current_model()
         
-        print(f"[REPORT_PANEL] Current model manager: {current_manager}")
+        # print(f"[REPORT_PANEL] Current model manager: {current_manager}")
         
         # MODELS (from Model Canvas Panel)
         # Pass the specific manager if available, otherwise None
-        print("[REPORT_PANEL] Creating ModelsCategory...")
+        # print("[REPORT_PANEL] Creating ModelsCategory...")
         models = ModelsCategory(
             project=self.project,
             model_canvas=current_manager
         )
         self.categories.append(models)
         widget = models.get_widget()
-        print(f"[REPORT_PANEL] ModelsCategory widget: {widget}, visible={widget.get_visible()}")
+        # print(f"[REPORT_PANEL] ModelsCategory widget: {widget}, visible={widget.get_visible()}")
         widget.show_all()
         container.pack_start(widget, False, False, 0)
-        print("[REPORT_PANEL] ModelsCategory added to container")
+        # print("[REPORT_PANEL] ModelsCategory added to container")
         
         # DYNAMIC ANALYSES (from Pathway Operations Panel - enrichments)
-        print("[REPORT_PANEL] Creating DynamicAnalysesCategory...")
+        # print("[REPORT_PANEL] Creating DynamicAnalysesCategory...")
         dynamic = DynamicAnalysesCategory(
             name='Dynamic Analyses',
             parent_panel=self
         )
         self.categories.append(dynamic)
         widget = dynamic.get_widget()
-        print(f"[REPORT_PANEL] DynamicAnalysesCategory widget: {widget}, visible={widget.get_visible()}")
+        # print(f"[REPORT_PANEL] DynamicAnalysesCategory widget: {widget}, visible={widget.get_visible()}")
         widget.show_all()
         container.pack_start(widget, False, False, 0)
-        print("[REPORT_PANEL] DynamicAnalysesCategory added to container")
+        # print("[REPORT_PANEL] DynamicAnalysesCategory added to container")
         
         # TOPOLOGY ANALYSES (from Analyses Panel)
-        print("[REPORT_PANEL] Creating TopologyAnalysesCategory...")
+        # print("[REPORT_PANEL] Creating TopologyAnalysesCategory...")
         topology = TopologyAnalysesCategory(
             project=self.project,
             model_canvas=current_manager
         )
         self.categories.append(topology)
         widget = topology.get_widget()
-        print(f"[REPORT_PANEL] TopologyAnalysesCategory widget: {widget}, visible={widget.get_visible()}")
+        # print(f"[REPORT_PANEL] TopologyAnalysesCategory widget: {widget}, visible={widget.get_visible()}")
         widget.show_all()
         container.pack_start(widget, False, False, 0)
-        print("[REPORT_PANEL] TopologyAnalysesCategory added to container")
+        # print("[REPORT_PANEL] TopologyAnalysesCategory added to container")
         
         # PROVENANCE & LINEAGE (from all panels)
-        print("[REPORT_PANEL] Creating ProvenanceCategory...")
+        # print("[REPORT_PANEL] Creating ProvenanceCategory...")
         provenance = ProvenanceCategory(
             project=self.project,
             model_canvas=current_manager
         )
         self.categories.append(provenance)
         widget = provenance.get_widget()
-        print(f"[REPORT_PANEL] ProvenanceCategory widget: {widget}, visible={widget.get_visible()}")
+        # print(f"[REPORT_PANEL] ProvenanceCategory widget: {widget}, visible={widget.get_visible()}")
         widget.show_all()
         container.pack_start(widget, False, False, 0)
-        print("[REPORT_PANEL] ProvenanceCategory added to container")
+        # print("[REPORT_PANEL] ProvenanceCategory added to container")
         
-        print(f"[REPORT_PANEL] All {len(self.categories)} categories created")
+        # print(f"[REPORT_PANEL] All {len(self.categories)} categories created")
     
     def _create_export_buttons(self):
         """Create export buttons bar.
@@ -324,16 +324,17 @@ class ReportPanel(Gtk.Box):
         Args:
             model_manager: ModelCanvasManager instance with model data
         """
-        print(f"[REPORT] set_model_canvas called with: {model_manager}")
+        # print(f"[REPORT] set_model_canvas called with: {model_manager}")
         
         if model_manager:
-            print(f"[REPORT] Model manager has {len(model_manager.places)} places, {len(model_manager.transitions)} transitions")
+            pass
+            # print(f"[REPORT] Model manager has {len(model_manager.places)} places, {len(model_manager.transitions)} transitions")
         
         # Pass the manager directly to all categories
         for category in self.categories:
             if hasattr(category, 'set_model_canvas'):
                 category.set_model_canvas(model_manager)
-                print(f"[REPORT] Set model_manager for {category.__class__.__name__}")
+                # print(f"[REPORT] Set model_manager for {category.__class__.__name__}")
         
         # Wire up observer for property changes (real-time refresh)
         self._setup_model_observer(model_manager)
@@ -341,12 +342,15 @@ class ReportPanel(Gtk.Box):
         # Auto-refresh to show imported data immediately
         if model_manager and hasattr(model_manager, 'transitions'):
             if len(model_manager.transitions) > 0 or len(model_manager.places) > 0:
-                print(f"[REPORT] Auto-refreshing to show {len(model_manager.places)} places and {len(model_manager.transitions)} transitions")
+                pass
+                # print(f"[REPORT] Auto-refreshing to show {len(model_manager.places)} places and {len(model_manager.transitions)} transitions")
                 self.refresh_all()
             else:
-                print(f"[REPORT] Skipping auto-refresh - model is empty")
+                pass
+                # print(f"[REPORT] Skipping auto-refresh - model is empty")
         else:
-            print(f"[REPORT] Skipping auto-refresh - no model_manager or no transitions attribute")
+            pass
+            # print(f"[REPORT] Skipping auto-refresh - no model_manager or no transitions attribute")
     
     def _setup_model_observer(self, model_manager):
         """Setup observer for model changes to enable real-time refresh.
@@ -364,11 +368,13 @@ class ReportPanel(Gtk.Box):
         # Hook into on_dirty_changed callback
         # This is triggered whenever document is modified (via property dialogs, etc.)
         if hasattr(model_manager, 'on_dirty_changed'):
+            pass
             # Store original callback
             original_callback = model_manager.on_dirty_changed
             
             # Create wrapper that also refreshes report
             def on_dirty_with_refresh(is_dirty):
+                pass
                 # Call original callback first (updates tab labels, etc.)
                 if original_callback:
                     original_callback(is_dirty)
@@ -454,33 +460,39 @@ class ReportPanel(Gtk.Box):
     
     def _on_pathway_imported(self):
         """Called by pathway operations panel when new pathway is imported."""
-        print("[REPORT] _on_pathway_imported() called")
+        # print("[REPORT] _on_pathway_imported() called")
         
         # Get current model canvas manager
         if hasattr(self.model_canvas_loader, 'get_current_model'):
             current_manager = self.model_canvas_loader.get_current_model()
-            print(f"[REPORT] Current model canvas manager: {current_manager}")
+            # print(f"[REPORT] Current model canvas manager: {current_manager}")
             
             if current_manager:
+                pass
                 # Check if current_manager has the model data
                 if hasattr(current_manager, 'places'):
-                    print(f"[REPORT] Current manager has {len(current_manager.places)} places, {len(current_manager.transitions)} transitions")
+                    pass
+                    # print(f"[REPORT] Current manager has {len(current_manager.places)} places, {len(current_manager.transitions)} transitions")
                 else:
-                    print(f"[REPORT] WARNING: Current manager has no places/transitions attributes!")
+                    pass
+                    # print(f"[REPORT] WARNING: Current manager has no places/transitions attributes!")
                 
                 # Update all categories with the current model canvas
                 for category in self.categories:
                     if hasattr(category, 'set_model_canvas'):
-                        print(f"[REPORT] Setting model_canvas for {category.__class__.__name__}")
+                        pass
+                        # print(f"[REPORT] Setting model_canvas for {category.__class__.__name__}")
                         category.set_model_canvas(current_manager)
                 
                 # Refresh all categories to show imported data
-                print("[REPORT] Calling refresh_all()")
+                # print("[REPORT] Calling refresh_all()")
                 self.refresh_all()
             else:
-                print("[REPORT] ERROR: get_current_model() returned None!")
+                pass
+                # print("[REPORT] ERROR: get_current_model() returned None!")
         else:
-            print("[REPORT] ERROR: model_canvas_loader has no get_current_model() method!")
+            pass
+            # print("[REPORT] ERROR: model_canvas_loader has no get_current_model() method!")
     
     def set_controller(self, controller):
         """Set simulation controller reference for dynamic analyses.
@@ -522,7 +534,7 @@ class ReportPanel(Gtk.Box):
         Args:
             drawing_area: The newly active drawing area
         """
-        print(f"[REPORT_PANEL] on_tab_switched called, drawing_area={drawing_area}")
+        # print(f"[REPORT_PANEL] on_tab_switched called, drawing_area={drawing_area}")
         
         # Refresh Models category to show current tab's model
         for category in self.categories:
@@ -530,11 +542,11 @@ class ReportPanel(Gtk.Box):
                 category.refresh()
             # Also refresh Dynamic Analyses to show current tab's simulation data
             elif hasattr(category, '_refresh_simulation_data'):
-                print(f"[REPORT_PANEL] Refreshing Dynamic Analyses for tab switch")
+                # print(f"[REPORT_PANEL] Refreshing Dynamic Analyses for tab switch")
                 from gi.repository import GLib
                 GLib.idle_add(category._refresh_simulation_data)
         
-        print(f"[REPORT_PANEL] on_tab_switched completed")
+        # print(f"[REPORT_PANEL] on_tab_switched completed")
     
     def on_project_opened(self, project):
         """Called when a project is opened.
@@ -689,6 +701,7 @@ class ReportPanel(Gtk.Box):
         if hasattr(self.model_canvas_loader, 'get_canvas_manager'):
             current_manager = self.model_canvas_loader.get_canvas_manager(drawing_area)
             if current_manager:
+                pass
                 # Update the reference for all categories
                 for category in self.categories:
                     if hasattr(category, 'set_model_canvas'):
@@ -705,23 +718,25 @@ class ReportPanel(Gtk.Box):
         Args:
             filepath: Path to the opened file
         """
-        print(f"[REPORT] on_file_opened: {filepath}")
+        # print(f"[REPORT] on_file_opened: {filepath}")
         
         # Add a small delay to ensure model is fully loaded
         from gi.repository import GLib
         
         def delayed_refresh():
+            pass
             # Get current model canvas after file load
             if hasattr(self.model_canvas_loader, 'get_current_model'):
                 current_manager = self.model_canvas_loader.get_current_model()
-                print(f"[REPORT] on_file_opened delayed: Got manager: {current_manager}")
+                # print(f"[REPORT] on_file_opened delayed: Got manager: {current_manager}")
                 if current_manager:
-                    print(f"[REPORT] Manager has {len(current_manager.places)} places, {len(current_manager.transitions)} transitions")
+                    pass
+                    # print(f"[REPORT] Manager has {len(current_manager.places)} places, {len(current_manager.transitions)} transitions")
                     for category in self.categories:
                         if hasattr(category, 'set_model_canvas'):
                             category.set_model_canvas(current_manager)
                     # Auto-refresh on file open (major event)
-                    print(f"[REPORT] Calling refresh_all()")
+                    # print(f"[REPORT] Calling refresh_all()")
                     self.refresh_all()
             return False  # Don't repeat
         
