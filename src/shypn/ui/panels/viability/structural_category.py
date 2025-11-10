@@ -39,6 +39,48 @@ class StructuralCategory(BaseViabilityCategory):
         """
         return "STRUCTURAL INFERENCE"
     
+    def _get_dead_from_simulation(self):
+        """Get transitions that never fired during simulation.
+        
+        Returns:
+            List[str]: Transition IDs that never fired
+        """
+        kb = self.get_knowledge_base()
+        if not kb:
+            return []
+        
+        # Get simulation data from model_canvas
+        if not self.model_canvas:
+            return []
+        
+        try:
+            # Check if we have simulation data
+            model_manager = getattr(self.model_canvas, 'model_manager', None)
+            if not model_manager:
+                return []
+            
+            controller = getattr(model_manager, 'controller', None)
+            if not controller:
+                return []
+            
+            data_collector = getattr(controller, 'data_collector', None)
+            if not data_collector or not data_collector.has_data():
+                return []
+            
+            # Get transitions that never fired
+            dead_transitions = []
+            for trans_id in kb.transitions.keys():
+                firings = data_collector.get_total_firings(trans_id)
+                if firings == 0:
+                    dead_transitions.append(trans_id)
+            
+            print(f"[Structural] Simulation data: {len(dead_transitions)} transitions never fired")
+            return dead_transitions
+            
+        except Exception as e:
+            print(f"[Structural] Error getting simulation data: {e}")
+            return []
+    
     def _build_content(self):
         """Build structural category content."""
         # Status section
@@ -74,7 +116,13 @@ class StructuralCategory(BaseViabilityCategory):
         self.content_box.pack_start(issues_frame, True, True, 0)
     
     def _scan_issues(self):
-        """Scan for structural issues.
+        """Scan for structural issues using multiple data sources.
+        
+        Intelligent multi-source analysis:
+        1. Liveness analyzer (if available)
+        2. Simulation data (transitions that never fired)
+        3. Siphon analysis (if available)
+        4. P-invariants coverage
         
         Returns:
             List[Issue]: Detected structural issues
@@ -86,18 +134,27 @@ class StructuralCategory(BaseViabilityCategory):
         
         issues = []
         
+        # SOURCE 1: Liveness analyzer (may be disabled for large models)
+        dead_from_liveness = kb.get_dead_transitions()
+        
+        # SOURCE 2: Simulation data (transitions that never fired)
+        dead_from_simulation = self._get_dead_from_simulation()
+        
+        # Combine sources (union of both)
+        all_dead = set(dead_from_liveness) | set(dead_from_simulation)
+        
         # Update status
         self.status_label.set_markup(
-            f"<b>KB Status:</b>\n"
+            f"<b>Data Sources:</b>\n"
+            f"  • Liveness analyzer: {len(dead_from_liveness)} dead (may be disabled)\n"
+            f"  • Simulation data: {len(dead_from_simulation)} never fired\n"
+            f"  • Combined: {len(all_dead)} transitions\n"
             f"  • P-invariants: {len(kb.p_invariants)}\n"
-            f"  • T-invariants: {len(kb.t_invariants)}\n"
-            f"  • Siphons: {len(kb.siphons)}\n"
-            f"  • Dead transitions: {len(kb.get_dead_transitions())}"
+            f"  • Siphons: {len(kb.siphons)}"
         )
         
-        # Scan for dead transitions
-        dead_transitions = kb.get_dead_transitions()
-        for trans_id in dead_transitions[:10]:  # Limit to 10
+        # Scan for dead transitions (using combined sources)
+        for trans_id in list(all_dead)[:10]:  # Limit to 10
             trans = kb.transitions.get(trans_id)
             if trans:
                 # Create Issue dataclass

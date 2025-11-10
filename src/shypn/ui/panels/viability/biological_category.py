@@ -39,6 +39,62 @@ class BiologicalCategory(BaseViabilityCategory):
         """
         return "BIOLOGICAL INFERENCE"
     
+    def _get_place_activity_statistics(self):
+        """Get place activity statistics from simulation data.
+        
+        Returns:
+            dict: Statistics with keys:
+                - active_places: Number of places that changed
+                - inactive_places: List of places that never changed
+        """
+        kb = self.get_knowledge_base()
+        stats = {
+            'active_places': 0,
+            'inactive_places': []
+        }
+        
+        if not kb or not self.model_canvas:
+            return stats
+        
+        try:
+            # Get simulation data
+            model_manager = getattr(self.model_canvas, 'model_manager', None)
+            if not model_manager:
+                return stats
+            
+            controller = getattr(model_manager, 'controller', None)
+            if not controller:
+                return stats
+            
+            data_collector = getattr(controller, 'data_collector', None)
+            if not data_collector or not data_collector.has_data():
+                return stats
+            
+            # Check each place for activity
+            for place_id in kb.places.keys():
+                try:
+                    # Get token history
+                    times, tokens = data_collector.get_place_data(place_id)
+                    if len(tokens) > 0:
+                        # Check if tokens changed
+                        initial = tokens[0]
+                        changed = any(t != initial for t in tokens)
+                        
+                        if changed:
+                            stats['active_places'] += 1
+                        else:
+                            stats['inactive_places'].append(place_id)
+                except:
+                    pass
+            
+            print(f"[Biological] Place activity: {stats['active_places']} active, "
+                  f"{len(stats['inactive_places'])} inactive")
+            return stats
+            
+        except Exception as e:
+            print(f"[Biological] Error getting place activity: {e}")
+            return stats
+    
     def _build_content(self):
         """Build biological category content."""
         # Status section
@@ -76,7 +132,12 @@ class BiologicalCategory(BaseViabilityCategory):
         self.content_box.pack_start(issues_frame, True, True, 0)
     
     def _scan_issues(self):
-        """Scan for biological/semantic issues.
+        """Scan for biological/semantic issues using multiple data sources.
+        
+        Intelligent multi-source analysis:
+        1. KB compounds and reactions (KEGG metadata)
+        2. Simulation data (places that never changed)
+        3. Stoichiometry validation
         
         Returns:
             List[Issue]: Detected biological issues
@@ -88,15 +149,19 @@ class BiologicalCategory(BaseViabilityCategory):
         
         issues = []
         
+        # Get simulation data
+        sim_stats = self._get_place_activity_statistics()
+        
         # Update status
         self.status_label.set_markup(
-            f"<b>KB Status:</b>\n"
-            f"  • Compounds: {len(kb.compounds)}\n"
-            f"  • Reactions: {len(kb.reactions)}\n"
+            f"<b>Data Sources:</b>\n"
+            f"  • KB compounds: {len(kb.compounds)}\n"
+            f"  • KB reactions: {len(kb.reactions)}\n"
+            f"  • Simulation: {sim_stats['active_places']} / {len(kb.places)} active places\n"
             f"  • Pathway: {kb.pathway_info.name if kb.pathway_info else 'None'}"
         )
         
-        # Scan for unmapped compounds
+        # ISSUE 1: Unmapped compounds (KB-based)
         unmapped_places = [p_id for p_id, p in kb.places.items() if p.compound_id is None]
         if unmapped_places:
             issue = Issue(
@@ -111,7 +176,21 @@ class BiologicalCategory(BaseViabilityCategory):
             )
             issues.append(issue)
         
-        # Scan for stoichiometry mismatches
+        # ISSUE 2: Inactive places (simulation-based)
+        if sim_stats['inactive_places']:
+            issue = Issue(
+                id="inactive_places",
+                category="biological",
+                severity="info",
+                title=f"{len(sim_stats['inactive_places'])} compounds never changed in simulation",
+                description="These places maintained constant token count (may be isolated)",
+                element_id="inactive_places",
+                element_type="place",
+                locality_id=self.selected_locality_id
+            )
+            issues.append(issue)
+        
+        # ISSUE 3: Stoichiometry mismatches (KB-based)
         for arc_id, arc in list(kb.arcs.items())[:10]:  # Limit to 10
             if arc.stoichiometry and arc.current_weight != arc.stoichiometry:
                 issue = Issue(
