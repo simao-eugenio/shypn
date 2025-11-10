@@ -46,6 +46,9 @@ class ViabilityPanel(Gtk.Box):
         """
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         
+        print(f"[ViabilityPanel] __init__() called")
+        print(f"  model_canvas: {model_canvas}")
+        
         self.model = model
         self.model_canvas = model_canvas
         self.topology_panel = None  # Will be set via set_topology_panel()
@@ -218,6 +221,25 @@ class ViabilityPanel(Gtk.Box):
         for category in self.categories:
             if hasattr(category, 'set_model'):
                 category.set_model(model)
+    
+    def set_model_canvas(self, model_canvas):
+        """Update model_canvas reference.
+        
+        This is called after __init__ when the loader wires the model_canvas.
+        We need to propagate it to all categories.
+        
+        Args:
+            model_canvas: ModelCanvasLoader instance
+        """
+        print(f"[ViabilityPanel] set_model_canvas() called")
+        print(f"  model_canvas: {model_canvas}")
+        
+        self.model_canvas = model_canvas
+        
+        # Propagate to all categories (CRITICAL!)
+        for category in self.categories:
+            category.model_canvas = model_canvas
+            print(f"  ✓ Updated {category.__class__.__name__}.model_canvas")
     
     def refresh_all(self):
         """Refresh all categories.
