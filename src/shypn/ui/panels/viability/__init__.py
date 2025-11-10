@@ -1,12 +1,15 @@
 """Viability Panel - Intelligent Model Repair Assistant.
 
 This package provides the UI components for the Viability Panel,
-which diagnoses model issues and suggests fixes.
+which diagnoses model issues and suggests fixes across multiple domains:
+- Structural (topology-based)
+- Biological (semantic/biochemical)
+- Kinetic (BRENDA-based)
+- Diagnosis (multi-domain + locality-aware)
 
-Phase 1: Diagnosis display only
-Future phases: Fix suggestions, application, validation
+Architecture follows Shypn panel pattern with category-based organization.
 """
 
-from .viability_panel import ViabilityPanel
+from .viability_panel_new import ViabilityPanel
 
 __all__ = ['ViabilityPanel']
