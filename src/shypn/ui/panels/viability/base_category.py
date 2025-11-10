@@ -167,7 +167,7 @@ class BaseViabilityCategory:
         button_box.set_halign(Gtk.Align.START)
         
         # Scan button
-        self.scan_button = Gtk.Button(label="🔍 Scan for Issues")
+        self.scan_button = Gtk.Button(label="Scan for Issues")
         self.scan_button.connect('clicked', self._on_scan_clicked)
         button_box.pack_start(self.scan_button, False, False, 0)
         
