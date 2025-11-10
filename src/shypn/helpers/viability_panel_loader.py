@@ -111,102 +111,126 @@ class ViabilityPanelLoader:
             self.panel.refresh()
     
     def add_to_stack(self, stack, container, panel_name='viability'):
-        """Add panel to GtkStack for Master Palette control.
+        """Add panel content to a GtkStack container.
         
         Args:
-            stack: GtkStack to add panel to
-            container: Container widget for the panel
-            panel_name: Name for stack child (default: 'viability')
+            stack: GtkStack widget that will contain all panels
+            container: GtkBox container within the stack for this panel
+            panel_name: Name identifier for this panel in the stack ('viability')
         """
-        self.parent_container = container
-        self.parent_window = stack.get_toplevel()
+        # Add panel widget directly to container
+        if self.widget.get_parent() != container:
+            current_parent = self.widget.get_parent()
+            if current_parent:
+                current_parent.remove(self.widget)
+            container.pack_start(self.widget, True, True, 0)
         
-        # Add to stack
-        stack.add_named(self.panel, panel_name)
+        # Don't call show_all() here - let show_in_stack() handle visibility
+        
+        # Store references for compatibility
+        self.is_hanged = True
+        self.parent_container = container
+        self._stack = stack
+        self._stack_panel_name = panel_name
         
         print(f"[VIABILITY_LOADER] Added to stack as '{panel_name}'")
     
     def show_in_stack(self):
         """Show this panel in the GtkStack (Master Palette control)."""
-        def _do_show():
-            if self.parent_container:
-                # Panel is already in stack, just make sure it's attached
-                if not self.is_hanged:
-                    self.hang_on(self.parent_container)
-            self.panel.show_all()
+        if not hasattr(self, '_stack') or not self._stack:
+            return
         
-        GLib.idle_add(_do_show)
+        # Make stack visible
+        if not self._stack.get_visible():
+            self._stack.set_visible(True)
+        
+        # Set this panel as active child
+        self._stack.set_visible_child_name(self._stack_panel_name)
+        
+        # Show the container
+        if self.parent_container:
+            self.parent_container.set_visible(True)
+        
+        # Show the widget and all children
+        if self.widget:
+            self.widget.set_no_show_all(False)
+            self.widget.show_all()  # Ensure all children are shown
     
     def hide_in_stack(self):
         """Hide this panel in the GtkStack (Master Palette control)."""
-        def _do_hide():
-            # Don't actually remove, just let stack handle visibility
-            pass
-        
-        GLib.idle_add(_do_hide)
+        # Just hide container - don't use no_show_all as it breaks other panels
+        if self.parent_container:
+            self.parent_container.set_visible(False)
     
     def hang_on(self, container):
-        """Attach panel to container (Wayland-safe).
+        """Hang this panel on a container (attach).
         
         Args:
-            container: GtkContainer to attach panel to
+            container: Gtk.Box or other container to embed content into.
         """
-        def _do_hang():
-            if self.is_hanged:
-                return
-            
-            self.parent_container = container
-            
-            # Remove from window if floating
-            if self.window.get_child() == self.panel:
-                self.window.remove(self.panel)
-            
-            # Add to container (already in stack, just ensure visibility)
-            self.panel.show_all()
-            
-            # Hide floating window
-            self.window.hide()
-            
-            self.is_hanged = True
-            
-            # Update float button state
-            self._updating_button = True
-            if hasattr(self.panel, 'float_button'):
-                self.panel.float_button.set_active(False)
-            self._updating_button = False
+        if self.is_hanged:
+            if not self.content.get_visible():
+                self.content.show_all()
+            # Make sure container is visible when re-showing
+            if not container.get_visible():
+                container.set_visible(True)
+            return
         
-        GLib.idle_add(_do_hang)
+        # Hide independent window
+        self.window.hide()
+        
+        # Remove content from window
+        self.window.remove(self.content)
+        
+        # Hang content on container
+        container.pack_start(self.content, True, True, 0)
+        self.content.show_all()
+        
+        # Make container visible (it was hidden when detached)
+        container.set_visible(True)
+        
+        self.is_hanged = True
+        self.parent_container = container
+        
+        # Update float button state
+        if hasattr(self.panel, 'float_button') and self.panel.float_button.get_active():
+            self._updating_button = True
+            self.panel.float_button.set_active(False)
+            self._updating_button = False
     
     def detach(self):
-        """Detach panel to floating window (Wayland-safe)."""
-        def _do_detach():
-            if not self.is_hanged:
-                return
-            
-            # Panel stays in stack, but window shows copy
-            # Actually, for proper float we need to temporarily remove from stack
-            # But since we're using stack, just hide and show in window
-            
-            # Add to window
-            if self.window.get_child() != self.panel:
-                # Can't move widget between containers directly in GTK3
-                # Need to keep in stack for now, just show window as overlay
-                pass
-            
-            # Show window
-            if self.parent_window:
-                self.window.set_transient_for(self.parent_window)
-            self.window.show_all()
-            
-            self.is_hanged = False
-            
-            # Update button state
+        """Detach from container and restore as independent window."""
+        if not self.is_hanged:
+            return
+        
+        # Remove from container
+        if self.parent_container:
+            self.parent_container.remove(self.content)
+            # Hide the container after unattaching
+            self.parent_container.set_visible(False)
+        
+        # Hide the stack if this was the active panel
+        if hasattr(self, '_stack') and self._stack:
+            self._stack.set_visible(False)
+        
+        # Return content to independent window
+        self.window.add(self.content)
+        
+        # Set transient for main window if available
+        if self.parent_window:
+            self.window.set_transient_for(self.parent_window)
+        
+        # Update state
+        self.is_hanged = False
+        
+        # Update float button state
+        if hasattr(self.panel, 'float_button') and not self.panel.float_button.get_active():
             self._updating_button = True
-            if hasattr(self.panel, 'float_button'):
-                self.panel.float_button.set_active(True)
+            self.panel.float_button.set_active(True)
             self._updating_button = False
         
-        GLib.idle_add(_do_detach)
+        # Show window
+        self.window.show_all()
     
     def _on_float_toggled(self, button):
         """Internal callback when float toggle button is clicked."""
@@ -222,10 +246,48 @@ class ViabilityPanelLoader:
     
     def _on_delete_event(self, window, event):
         """Handle window close (X button clicked)."""
-        # Re-attach instead of closing
+        # Hide the window
+        self.hide()
+        
+        # Update float button to inactive state
+        if hasattr(self.panel, 'float_button') and self.panel.float_button.get_active():
+            self._updating_button = True
+            self.panel.float_button.set_active(False)
+            self._updating_button = False
+        
+        # Dock back if we have a container
         if self.parent_container:
             self.hang_on(self.parent_container)
-        return True  # Prevent window destruction
+        
+        # Return True to prevent window destruction
+        return True
+    
+    def hide(self):
+        """Hide the panel (window or docked)."""
+        if self.is_hanged:
+            if self.parent_container:
+                self.parent_container.set_visible(False)
+        else:
+            self.window.hide()
+    
+    def show(self):
+        """Show the panel (window or docked)."""
+        if self.is_hanged:
+            if self.parent_container:
+                self.parent_container.set_visible(True)
+            self.content.show_all()
+        else:
+            self.window.show_all()
+    
+    def set_parent_window(self, parent_window):
+        """Set parent window for modal dialog behavior.
+        
+        Args:
+            parent_window: Parent GtkWindow
+        """
+        self.parent_window = parent_window
+        if not self.is_hanged:
+            self.window.set_transient_for(parent_window)
 
 
 __all__ = ['ViabilityPanelLoader']

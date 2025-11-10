@@ -647,8 +647,11 @@ def main(argv=None):
 		if topology_panel_loader:
 			topology_panel_loader.add_to_stack(left_dock_stack, topology_panel_container, 'topology')
 		
-		# Add Viability panel to stack
-		if viability_panel_loader:
+		# Add Viability panel to stack (container created programmatically, add to stack first)
+		if viability_panel_loader and viability_panel_container:
+			# Add container to stack
+			left_dock_stack.add_named(viability_panel_container, 'viability')
+			# Now add panel content to container
 			viability_panel_loader.add_to_stack(left_dock_stack, viability_panel_container, 'viability')
 			# Connect viability panel to topology panel (needed for diagnosis)
 			if topology_panel_loader and hasattr(topology_panel_loader, 'panel'):
