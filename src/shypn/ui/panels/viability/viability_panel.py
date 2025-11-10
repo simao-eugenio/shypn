@@ -170,6 +170,28 @@ class ViabilityPanel(Gtk.Box):
             self.status_label.set_markup("<b>⚠️ Warning:</b> Topology Panel not connected")
             return
         
+        # TEST: Check Knowledge Base status
+        kb = self.get_knowledge_base()
+        if kb:
+            print(f"\n[VIABILITY TEST] ✓ Knowledge Base accessible!")
+            print(f"  P-invariants: {len(kb.p_invariants)}")
+            print(f"  T-invariants: {len(kb.t_invariants)}")
+            print(f"  Liveness tracked: {len(kb.liveness_status)} transitions")
+            print(f"  Siphons: {len(kb.siphons)}")
+            print(f"  Dead transitions: {len(kb.get_dead_transitions())}")
+            self.status_label.set_markup(
+                f"<b>📊 Knowledge Base Status:</b>\n"
+                f"  • P-invariants: {len(kb.p_invariants)}\n"
+                f"  • T-invariants: {len(kb.t_invariants)}\n"
+                f"  • Liveness: {len(kb.liveness_status)} transitions\n"
+                f"  • Siphons: {len(kb.siphons)}\n"
+                f"  • Dead transitions: {len(kb.get_dead_transitions())}"
+            )
+        else:
+            print(f"[VIABILITY TEST] ✗ Knowledge Base NOT accessible")
+            self.status_label.set_markup("<b>⚠️ Knowledge Base not available</b>")
+            return
+        
         # Get topology analysis results
         try:
             summary = self.topology_panel.generate_summary_for_report_panel()
