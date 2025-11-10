@@ -376,11 +376,6 @@ class ContinuousBehavior(TransitionBehavior):
                     
                     # Calculate max flow possible from this arc
                     max_flow_from_arc = source_place.tokens / arc.weight if arc.weight > 0 else float('inf')
-                    
-                    # Debug: Log clamping near zero
-                    if max_flow_from_arc < intended_flow and source_place.tokens < 0.5:
-                        print(f"[CONTINUOUS] Clamping flow for {arc.source_id}: intended={intended_flow:.6f}, max_available={max_flow_from_arc:.6f}, tokens={source_place.tokens:.6f}")
-                    
                     actual_flow = min(actual_flow, max_flow_from_arc)
             
             # Phase 2: Consume tokens continuously from input places (skip if source)

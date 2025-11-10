@@ -66,16 +66,16 @@ class SimulationDataCollector:
             time: Current simulation time
         """
         self.step_count += 1
-        if self.step_count <= 3:
-            pass
-            # print(f"[OLD_DC] Step {self.step_count} at time {time:.4f} (collector id={id(self)})")
-            # print(f"[OLD_DC]   Collecting data for {len(controller.model.places)} places")
+        # Debug output disabled to reduce console spam
+        # if self.step_count <= 3:
+        #     print(f"[OLD_DC] Step {self.step_count} at time {time:.4f}")
+        #     print(f"[OLD_DC]   Collecting data for {len(controller.model.places)} places")
         
         for place in controller.model.places:
             data = self.place_data[place.id]
             data.append((time, place.tokens))
-            if self.step_count <= 3:
-                print(f"[OLD_DC]     Place {place.id} ({place.name}): {place.tokens} tokens")
+            # if self.step_count <= 3:
+            #     print(f"[OLD_DC]     Place {place.id} ({place.name}): {place.tokens} tokens")
             if len(data) > self.downsample_threshold:
                 self._downsample_place_data(place.id)
 
@@ -90,11 +90,12 @@ class SimulationDataCollector:
             details: Optional additional details about the firing
         """
         self.total_firings += 1
-        if self.total_firings <= 5:
-            print(f"[OLD_DC] Transition fired: {transition.id} ({transition.name}) at time {time:.4f}")
-            print(f"[OLD_DC]   Total firings so far: {self.total_firings}")
-            if details:
-                print(f"[OLD_DC]   Details: {details}")
+        # Debug output disabled to reduce console spam
+        # if self.total_firings <= 5:
+        #     print(f"[OLD_DC] Transition fired: {transition.id} ({transition.name}) at time {time:.4f}")
+        #     print(f"[OLD_DC]   Total firings so far: {self.total_firings}")
+        #     if details:
+        #         print(f"[OLD_DC]   Details: {details}")
         
         data = self.transition_data[transition.id]
         data.append((time, 'fired', details))

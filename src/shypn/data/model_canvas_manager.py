@@ -2216,21 +2216,17 @@ class ModelCanvasManager:
         for transition in self.transitions:
             transition.border_color = Transition.DEFAULT_BORDER_COLOR
             transition.fill_color = Transition.DEFAULT_COLOR
-            print(f"[SAVE] Reset transition {transition.id} colors to default")
         
         # Reset place colors
         for place in self.places:
             place.border_color = Place.DEFAULT_BORDER_COLOR
-            print(f"[SAVE] Reset place {place.id} border color to default")
         
         # Reset arc colors
         for arc in self.arcs:
             arc.color = Arc.DEFAULT_COLOR
-            print(f"[SAVE] Reset arc {arc.id} color to default")
         
         # Trigger redraw to show the reset colors
         self.mark_needs_redraw()
-        print(f"[SAVE] ✅ All analysis colors reset to defaults")
     
     def to_document_model(self):
         """Convert canvas manager's Petri net objects to a DocumentModel.
@@ -2250,7 +2246,6 @@ class ModelCanvasManager:
         # When transitions/places are selected in Analyses panel, they get colored
         # with plot colors for visualization. These are temporary and should NOT
         # be saved to the file.
-        print(f"[SAVE] Resetting analysis colors before saving...")
         self._reset_analysis_colors()
         
         document = DocumentModel()

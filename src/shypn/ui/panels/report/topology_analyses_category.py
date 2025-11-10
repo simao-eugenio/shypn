@@ -272,10 +272,10 @@ class TopologyAnalysesCategory(BaseReportCategory):
         Args:
             stats: statistics dict from summary
         """
-        p_inv = stats.get('p_invariants', 0)
-        t_inv = stats.get('t_invariants', 0)
-        siphons = stats.get('siphons', 0)
-        traps = stats.get('traps', 0)
+        p_inv = stats.get('p_invariants', 0) or 0
+        t_inv = stats.get('t_invariants', 0) or 0
+        siphons = stats.get('siphons', 0) or 0
+        traps = stats.get('traps', 0) or 0
         
         if p_inv > 0 or t_inv > 0 or siphons > 0 or traps > 0:
             lines = []
