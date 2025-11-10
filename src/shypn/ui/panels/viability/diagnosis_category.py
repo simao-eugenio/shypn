@@ -46,9 +46,9 @@ class DiagnosisCategory(BaseViabilityCategory):
         """Get category display name.
         
         Returns:
-            str: Category name with emoji
+            str: Category name
         """
-        return "🔍 Diagnosis & Repair"
+        return "Diagnosis & Repair"
     
     def _build_content(self):
         """Build diagnosis category content."""
@@ -112,10 +112,10 @@ class DiagnosisCategory(BaseViabilityCategory):
         # Action buttons
         button_box = self._create_action_buttons()
         # Customize scan button label
-        self.scan_button.set_label("🔍 Run Full Diagnosis")
+        self.scan_button.set_label("Run Full Diagnosis")
         
         # Add batch operation button
-        batch_button = Gtk.Button(label="⚡ Apply All Fixes")
+        batch_button = Gtk.Button(label="Apply All Fixes")
         batch_button.set_tooltip_text("Apply all high-confidence suggestions (>70%)")
         batch_button.connect('clicked', self._on_apply_all_clicked)
         button_box.pack_start(batch_button, False, False, 0)
@@ -386,7 +386,7 @@ class DiagnosisCategory(BaseViabilityCategory):
         box.pack_start(label, False, False, 0)
         
         # Show placeholders for now
-        for domain in ['🏗️ Structural', '🧬 Biological', '⚡ Kinetic']:
+        for domain in ['Structural', 'Biological', 'Kinetic']:
             domain_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
             domain_box.set_margin_start(12)
             

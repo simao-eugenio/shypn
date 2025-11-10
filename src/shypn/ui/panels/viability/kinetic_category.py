@@ -34,9 +34,9 @@ class KineticCategory(BaseViabilityCategory):
         """Get category display name.
         
         Returns:
-            str: Category name with emoji
+            str: Category name
         """
-        return "⚡ Kinetic Inference"
+        return "Kinetic Inference"
     
     def _build_content(self):
         """Build kinetic category content."""
@@ -58,11 +58,11 @@ class KineticCategory(BaseViabilityCategory):
         # Action buttons
         button_box = self._create_action_buttons()
         # Customize scan button label
-        self.scan_button.set_label("🔍 Scan Kinetics")
+        self.scan_button.set_label("Scan Kinetics")
         self.content_box.pack_start(button_box, False, False, 0)
         
         # Issues list
-        issues_frame = Gtk.Frame(label="🔍 Issues Detected")
+        issues_frame = Gtk.Frame(label="Issues Detected")
         scrolled = Gtk.ScrolledWindow()
         scrolled.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
         scrolled.set_min_content_height(200)

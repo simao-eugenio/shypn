@@ -10,6 +10,6 @@ which diagnoses model issues and suggests fixes across multiple domains:
 Architecture follows Shypn panel pattern with category-based organization.
 """
 
-from .viability_panel_new import ViabilityPanel
+from .viability_panel import ViabilityPanel
 
 __all__ = ['ViabilityPanel']
