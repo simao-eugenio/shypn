@@ -387,13 +387,123 @@ class BaseViabilityCategory:
     def _on_preview_suggestion(self, button, suggestion: Suggestion):
         """Handle Preview button click for a suggestion.
         
+        Temporarily highlights the elements affected by this suggestion on the canvas.
+        
         Args:
             button: Button that was clicked
             suggestion: Suggestion to preview
         """
-        # TODO: Implement canvas highlighting
         print(f"[{self.get_category_name()}] Preview suggestion: {suggestion.action}")
         print(f"  Highlight elements: {suggestion.preview_elements}")
+        
+        # Get canvas manager for highlighting
+        if not self.model_canvas:
+            print(f"  ⚠️ No model_canvas available for preview")
+            return
+        
+        drawing_area = self.model_canvas.get_current_document()
+        if not drawing_area:
+            print(f"  ⚠️ No active drawing area")
+            return
+        
+        manager = self.model_canvas.get_canvas_manager(drawing_area)
+        if not manager:
+            print(f"  ⚠️ No canvas manager available")
+            return
+        
+        # Temporarily highlight preview elements (yellow glow)
+        self._highlight_preview_elements(manager, drawing_area, suggestion.preview_elements)
+        
+        # Auto-clear after 3 seconds
+        GLib.timeout_add(3000, lambda: self._clear_preview_highlights(manager, drawing_area))
+    
+    def _highlight_preview_elements(self, manager, drawing_area, element_ids):
+        """Highlight elements on canvas for preview.
+        
+        Args:
+            manager: Canvas manager
+            drawing_area: Drawing area widget
+            element_ids: List of element IDs to highlight
+        """
+        if not element_ids:
+            return
+        
+        # Store old selection state
+        if not hasattr(self, '_preview_old_selection'):
+            self._preview_old_selection = {}
+        
+        # Clear existing selection
+        manager.selection_manager.clear_selection()
+        
+        # Highlight preview elements (yellow) by temporarily selecting them
+        for element_id in element_ids:
+            # Find element
+            element = None
+            for p in manager.places:
+                if p.id == element_id:
+                    element = p
+                    break
+            if not element:
+                for t in manager.transitions:
+                    if t.id == element_id:
+                        element = t
+                        break
+            if not element:
+                for a in manager.arcs:
+                    if a.id == element_id:
+                        element = a
+                        break
+            
+            if element:
+                # Store old selection state
+                self._preview_old_selection[element_id] = getattr(element, 'selected', False)
+                # Mark as selected (will be rendered with selection color)
+                element.selected = True
+                print(f"  Highlighted: {element_id}")
+        
+        # Trigger redraw
+        drawing_area.queue_draw()
+    
+    def _clear_preview_highlights(self, manager, drawing_area):
+        """Clear preview highlights.
+        
+        Args:
+            manager: Canvas manager
+            drawing_area: Drawing area widget
+        """
+        if not hasattr(self, '_preview_old_selection'):
+            return False
+        
+        # Restore old selection state
+        for element_id, was_selected in self._preview_old_selection.items():
+            # Find element
+            element = None
+            for p in manager.places:
+                if p.id == element_id:
+                    element = p
+                    break
+            if not element:
+                for t in manager.transitions:
+                    if t.id == element_id:
+                        element = t
+                        break
+            if not element:
+                for a in manager.arcs:
+                    if a.id == element_id:
+                        element = a
+                        break
+            
+            if element:
+                element.selected = was_selected
+        
+        # Clear stored state
+        self._preview_old_selection = {}
+        
+        # Trigger redraw
+        drawing_area.queue_draw()
+        print(f"[{self.get_category_name()}] Preview highlights cleared")
+        
+        return False  # Don't repeat timeout
     
     # ============================================================================
     # Suggestion Application Methods
