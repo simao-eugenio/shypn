@@ -1056,7 +1056,8 @@ class BaseTopologyCategory:
             self.grouped_spinner.hide()
             self.run_all_button.set_sensitive(True)
             
-            row_count = len(self.grouped_table_store)
+            # Count results only if table store exists
+            row_count = len(self.grouped_table_store) if self.grouped_table_store else 0
             self.grouped_status_label.set_markup(
                 f"<i>Analysis complete: {row_count} results (prioritized execution)</i>"
             )
