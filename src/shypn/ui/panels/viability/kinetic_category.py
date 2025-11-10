@@ -39,6 +39,60 @@ class KineticCategory(BaseViabilityCategory):
         """
         return "KINETIC INFERENCE"
     
+    def _get_simulation_statistics(self):
+        """Get firing statistics from simulation data.
+        
+        Returns:
+            dict: Statistics with keys:
+                - total_firings: Total number of firings
+                - zero_firing: List of transitions that never fired
+                - low_rate: List of transitions with < 1 firing per time unit
+        """
+        kb = self.get_knowledge_base()
+        stats = {
+            'total_firings': 0,
+            'zero_firing': [],
+            'low_rate': []
+        }
+        
+        if not kb or not self.model_canvas:
+            return stats
+        
+        try:
+            # Get simulation data
+            model_manager = getattr(self.model_canvas, 'model_manager', None)
+            if not model_manager:
+                return stats
+            
+            controller = getattr(model_manager, 'controller', None)
+            if not controller:
+                return stats
+            
+            data_collector = getattr(controller, 'data_collector', None)
+            if not data_collector or not data_collector.has_data():
+                return stats
+            
+            # Get duration
+            duration = getattr(controller, 'time', 60.0)  # Default 60s
+            
+            # Analyze each transition
+            for trans_id in kb.transitions.keys():
+                firings = data_collector.get_total_firings(trans_id)
+                stats['total_firings'] += firings
+                
+                if firings == 0:
+                    stats['zero_firing'].append(trans_id)
+                elif firings / duration < 1.0:
+                    stats['low_rate'].append(trans_id)
+            
+            print(f"[Kinetic] Simulation stats: {stats['total_firings']} firings, "
+                  f"{len(stats['zero_firing'])} never fired, {len(stats['low_rate'])} low rate")
+            return stats
+            
+        except Exception as e:
+            print(f"[Kinetic] Error getting simulation stats: {e}")
+            return stats
+    
     def _build_content(self):
         """Build kinetic category content."""
         # Status section
@@ -76,7 +130,12 @@ class KineticCategory(BaseViabilityCategory):
         self.content_box.pack_start(issues_frame, True, True, 0)
     
     def _scan_issues(self):
-        """Scan for kinetic parameter issues.
+        """Scan for kinetic parameter issues using multiple data sources.
+        
+        Intelligent multi-source analysis:
+        1. KB kinetic_parameters (BRENDA/database)
+        2. Simulation data (actual firing rates)
+        3. Zero-firing transitions (may need rate adjustments)
         
         Returns:
             List[Issue]: Detected kinetic issues
@@ -93,15 +152,19 @@ class KineticCategory(BaseViabilityCategory):
         transitions_with_kinetics = len(kb.kinetic_parameters)
         coverage_pct = (transitions_with_kinetics / total_transitions * 100) if total_transitions > 0 else 0
         
+        # Get simulation data
+        sim_stats = self._get_simulation_statistics()
+        
         # Update status
         self.status_label.set_markup(
-            f"<b>KB Status:</b>\n"
-            f"  • Transitions with kinetics: {transitions_with_kinetics} / {total_transitions}\n"
-            f"  • Coverage: {coverage_pct:.0f}%\n"
+            f"<b>Data Sources:</b>\n"
+            f"  • KB kinetics: {transitions_with_kinetics} / {total_transitions} ({coverage_pct:.0f}%)\n"
+            f"  • Simulation: {sim_stats['total_firings']} firings recorded\n"
+            f"  • Zero-firing: {len(sim_stats['zero_firing'])} transitions\n"
             f"  • Database: HeuristicDatabase (offline)"
         )
         
-        # Scan for transitions without rates
+        # ISSUE 1: Transitions without rates (KB-based)
         missing_rate_trans = []
         for trans_id, trans in kb.transitions.items():
             if trans.current_rate is None and trans_id not in kb.kinetic_parameters:
@@ -133,7 +196,35 @@ class KineticCategory(BaseViabilityCategory):
             
             issues.append(issue)
         
-        # Scan for low confidence parameters
+        # ISSUE 2: Transitions that never fired in simulation (simulation-based)
+        if sim_stats['zero_firing']:
+            issue = Issue(
+                id="zero_firing_transitions",
+                category="kinetic",
+                severity="warning",
+                title=f"{len(sim_stats['zero_firing'])} transitions never fired in simulation",
+                description="May need rate increase, input tokens, or structural fixes",
+                element_id="zero_firing",
+                element_type="transition",
+                locality_id=self.selected_locality_id
+            )
+            
+            # Suggest rate increase for first zero-firing transition
+            if sim_stats['zero_firing']:
+                first_trans = sim_stats['zero_firing'][0]
+                suggestion = Suggestion(
+                    action="add_firing_rate",
+                    category="kinetic",
+                    parameters={'rate': 10.0},
+                    confidence=0.4,
+                    reasoning=f"Increase rate to enable firing (verify structural connectivity first)",
+                    preview_elements=[first_trans]
+                )
+                issue.suggestions = [suggestion]
+            
+            issues.append(issue)
+        
+        # ISSUE 3: Low confidence parameters
         low_confidence_trans = []
         for trans_id, params in kb.kinetic_parameters.items():
             if params.confidence < 0.5:

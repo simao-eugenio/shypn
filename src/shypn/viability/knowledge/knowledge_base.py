@@ -509,8 +509,32 @@ class ModelKnowledgeBase:
         return self.transitions.get(transition_id)
     
     def get_dead_transitions(self) -> List[str]:
-        """Get all dead transitions."""
+        """Get all dead transitions from topology analysis."""
         return [tid for tid, level in self.liveness_status.items() if level == "dead"]
+    
+    def get_inactive_transitions(self) -> List[str]:
+        """Get transitions that never fired during simulation.
+        
+        This is more reliable than topology-based liveness for large models
+        where Liveness analyzer is disabled (>50 objects).
+        
+        Returns:
+            List of transition IDs that have 0 total firings
+        """
+        if not self.simulation_traces:
+            return []
+        
+        # Use the most recent simulation trace
+        latest_trace = self.simulation_traces[-1]
+        inactive = []
+        
+        # Check all transitions in the model
+        for trans_id in self.transitions.keys():
+            firings = latest_trace.total_firings.get(trans_id, 0)
+            if firings == 0:
+                inactive.append(trans_id)
+        
+        return inactive
     
     def get_unbounded_places(self) -> List[str]:
         """Get all unbounded places."""
