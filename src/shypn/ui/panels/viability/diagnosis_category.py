@@ -166,7 +166,6 @@ class DiagnosisCategory(BaseViabilityCategory):
         if combo.get_active() >= 0:
             # TODO: Get actual locality ID from combo
             self.selected_locality_id = "locality_example"
-            print(f"[Diagnosis] Selected locality: {self.selected_locality_id}")
     
     def set_analyses_panel(self, analyses_panel):
         """Set reference to analyses panel for locality access.
@@ -192,13 +191,11 @@ class DiagnosisCategory(BaseViabilityCategory):
         """
         kb = self.get_knowledge_base()
         if not kb:
-            print("[Diagnosis] Cannot set locality: No knowledge base")
             return
         
         # Get locality for this transition
         locality = self._get_locality_for_transition(kb, transition_id)
         if not locality:
-            print(f"[Diagnosis] No locality found for transition: {transition_id}")
             return
         
         # Switch to locality mode
@@ -211,7 +208,6 @@ class DiagnosisCategory(BaseViabilityCategory):
         # Store the selection
         self.selected_locality_id = locality['id']
         
-        print(f"[Diagnosis] Locality set from context menu: {locality['name']} (ID: {locality['id']})")
         
         # Auto-scan if requested
         if auto_scan:
@@ -266,19 +262,9 @@ class DiagnosisCategory(BaseViabilityCategory):
         """
         kb = self.get_knowledge_base()
         if not kb:
-            print("[Diagnosis] No knowledge base available")
             return []
         
         # DEBUG: Check KB state
-        print(f"[Diagnosis] KB State:")
-        print(f"  Places: {len(kb.places)}")
-        print(f"  Transitions: {len(kb.transitions)}")
-        print(f"  Arcs: {len(kb.arcs)}")
-        print(f"  Liveness status: {len(kb.liveness_status)} entries")
-        print(f"  P-invariants: {len(kb.p_invariants)}")
-        print(f"  T-invariants: {len(kb.t_invariants)}")
-        print(f"  Siphons: {len(kb.siphons)}")
-        print(f"  Dead transitions: {len(kb.get_dead_transitions())}")
         
         # Update multi-domain engine with current KB
         self.multi_domain_engine.kb = kb
@@ -301,11 +287,8 @@ class DiagnosisCategory(BaseViabilityCategory):
         
         # Collect issues from all categories (using dataclasses now)
         issues.extend(self._scan_structural_issues(kb))
-        print(f"[Diagnosis] After structural scan: {len(issues)} issues")
         issues.extend(self._scan_biological_issues(kb))
-        print(f"[Diagnosis] After biological scan: {len(issues)} issues")
         issues.extend(self._scan_kinetic_issues(kb))
-        print(f"[Diagnosis] After kinetic scan: {len(issues)} issues")
         
         # Generate multi-domain suggestions (KEY INNOVATION!)
         if issues:
@@ -314,7 +297,6 @@ class DiagnosisCategory(BaseViabilityCategory):
                 locality_id=self.selected_locality_id
             )
             
-            print(f"[Diagnosis] Found {len(issues)} issues, {len(multi_domain_suggestions)} multi-domain")
             
             # Add multi-domain suggestions to issues
             for mds in multi_domain_suggestions:
@@ -589,7 +571,6 @@ class DiagnosisCategory(BaseViabilityCategory):
         Args:
             button: Button that was clicked
         """
-        print("[Diagnosis] Apply All clicked - not implemented yet")
     
     def _refresh(self):
         """Refresh diagnosis category content.

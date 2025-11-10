@@ -109,17 +109,11 @@ class BaseViabilityCategory:
         Returns:
             ModelKnowledgeBase: The knowledge base, or None
         """
-        print(f"[BaseCategory] get_knowledge_base() called")
-        print(f"  model_canvas: {self.model_canvas}")
-        print(f"  has get_current_knowledge_base: {hasattr(self.model_canvas, 'get_current_knowledge_base') if self.model_canvas else False}")
         
         if self.model_canvas and hasattr(self.model_canvas, 'get_current_knowledge_base'):
             kb = self.model_canvas.get_current_knowledge_base()
-            print(f"  KB returned: {kb}")
             if kb:
-                print(f"  KB has {len(kb.places)} places, {len(kb.transitions)} transitions")
                 return kb
-        print(f"  Returning None")
         return None
     
     def _build_content(self):
@@ -140,7 +134,6 @@ class BaseViabilityCategory:
         """
         if expander.get_expanded():
             # Category was expanded - automatically scan
-            print(f"[{self.get_category_name()}] Category expanded, auto-scanning...")
             GLib.idle_add(self._on_scan_clicked, None)
     
     def _refresh(self):
@@ -205,10 +198,8 @@ class BaseViabilityCategory:
         if issues:
             self.current_issues = issues
             self._display_issues(issues)
-            print(f"[{self.get_category_name()}] Found {len(issues)} issues")
         else:
             self._show_no_issues_message()
-            print(f"[{self.get_category_name()}] No issues found")
     
     def _on_undo_clicked(self, button):
         """Handle undo button click.
@@ -224,7 +215,6 @@ class BaseViabilityCategory:
             if not self.change_history:
                 self.undo_button.set_sensitive(False)
             
-            print(f"[{self.get_category_name()}] Undid change: {change}")
     
     def _on_clear_clicked(self, button):
         """Handle clear button click.
@@ -358,11 +348,8 @@ class BaseViabilityCategory:
         """
         kb = self.get_knowledge_base()
         if not kb:
-            print(f"[{self.get_category_name()}] ⚠️ Cannot apply: No KB available")
             return
         
-        print(f"[{self.get_category_name()}] Applying suggestion: {suggestion.action}")
-        print(f"  Category: {suggestion.category}, Element: {issue.element_id}")
         
         # Get the model for direct updates
         manager = None
@@ -382,15 +369,12 @@ class BaseViabilityCategory:
             elif suggestion.action == "add_arc_weight":
                 self._apply_add_arc_weight(suggestion, issue, kb, manager)
             else:
-                print(f"  ⚠️ Unknown action: {suggestion.action}")
                 return
             
             # Refresh display after successful application
             GLib.idle_add(self._refresh)
-            print(f"  ✅ Applied successfully")
             
         except Exception as e:
-            print(f"  ❌ Error applying suggestion: {e}")
             import traceback
             traceback.print_exc()
     
@@ -403,22 +387,17 @@ class BaseViabilityCategory:
             button: Button that was clicked
             suggestion: Suggestion to preview
         """
-        print(f"[{self.get_category_name()}] Preview suggestion: {suggestion.action}")
-        print(f"  Highlight elements: {suggestion.preview_elements}")
         
         # Get canvas manager for highlighting
         if not self.model_canvas:
-            print(f"  ⚠️ No model_canvas available for preview")
             return
         
         drawing_area = self.model_canvas.get_current_document()
         if not drawing_area:
-            print(f"  ⚠️ No active drawing area")
             return
         
         manager = self.model_canvas.get_canvas_manager(drawing_area)
         if not manager:
-            print(f"  ⚠️ No canvas manager available")
             return
         
         # Temporarily highlight preview elements (yellow glow)
@@ -469,7 +448,6 @@ class BaseViabilityCategory:
                 self._preview_old_selection[element_id] = getattr(element, 'selected', False)
                 # Mark as selected (will be rendered with selection color)
                 element.selected = True
-                print(f"  Highlighted: {element_id}")
         
         # Trigger redraw
         drawing_area.queue_draw()
@@ -511,7 +489,6 @@ class BaseViabilityCategory:
         
         # Trigger redraw
         drawing_area.queue_draw()
-        print(f"[{self.get_category_name()}] Preview highlights cleared")
         
         return False  # Don't repeat timeout
     
@@ -531,12 +508,10 @@ class BaseViabilityCategory:
         place_id = issue.element_id
         tokens = suggestion.parameters.get('tokens', 0)
         
-        print(f"  Setting initial marking: {place_id} = {tokens} tokens")
         
         # Get current marking for undo
         place = kb.places.get(place_id)
         if not place:
-            print(f"  ⚠️ Place {place_id} not found in KB")
             return
         
         old_marking = place.current_marking
@@ -549,7 +524,6 @@ class BaseViabilityCategory:
             for p in manager.places:
                 if p.id == place_id:
                     p.tokens = tokens
-                    print(f"  Updated model place {place_id}: {old_marking} → {tokens} tokens")
                     break
         
         # Record change for undo
@@ -577,12 +551,9 @@ class BaseViabilityCategory:
         place_id = issue.element_id
         tokens = suggestion.parameters.get('tokens', 5)
         
-        print(f"  Adding source transition for {place_id} with {tokens} tokens/firing")
         
         # For now, just suggest using initial marking instead
         # (Creating new elements requires more complex canvas integration)
-        print(f"  ⚠️ Creating new transitions not yet implemented")
-        print(f"  💡 Consider using 'add_initial_marking' instead")
     
     def _apply_add_firing_rate(self, suggestion, issue, kb, manager):
         """Apply 'add_firing_rate' suggestion.
@@ -596,12 +567,10 @@ class BaseViabilityCategory:
         transition_id = issue.element_id
         rate = suggestion.parameters.get('rate', 1.0)
         
-        print(f"  Setting firing rate: {transition_id} = {rate}")
         
         # Get current rate for undo
         transition = kb.transitions.get(transition_id)
         if not transition:
-            print(f"  ⚠️ Transition {transition_id} not found in KB")
             return
         
         old_rate = transition.firing_rate
@@ -617,7 +586,6 @@ class BaseViabilityCategory:
                     if not hasattr(t, 'metadata'):
                         t.metadata = {}
                     t.metadata['firing_rate'] = rate
-                    print(f"  Updated model transition {transition_id}: {old_rate} → {rate}")
                     break
         
         # Record change for undo
@@ -643,12 +611,10 @@ class BaseViabilityCategory:
         arc_id = issue.element_id
         weight = suggestion.parameters.get('weight', 1)
         
-        print(f"  Setting arc weight: {arc_id} = {weight}")
         
         # Get current weight for undo
         arc = kb.arcs.get(arc_id)
         if not arc:
-            print(f"  ⚠️ Arc {arc_id} not found in KB")
             return
         
         old_weight = arc.weight
@@ -661,7 +627,6 @@ class BaseViabilityCategory:
             for a in manager.arcs:
                 if a.id == arc_id:
                     a.weight = weight
-                    print(f"  Updated model arc {arc_id}: {old_weight} → {weight}")
                     break
         
         # Record change for undo
@@ -703,11 +668,8 @@ class BaseViabilityCategory:
         """
         kb = self.get_knowledge_base()
         if not kb:
-            print(f"[{self.get_category_name()}] ⚠️ Cannot undo: No KB available")
             return
         
-        print(f"[{self.get_category_name()}] Undo: {change.element_id}.{change.property}")
-        print(f"  Reverting: {change.new_value} → {change.old_value}")
         
         # Get the model for direct updates
         manager = None
@@ -762,10 +724,8 @@ class BaseViabilityCategory:
             
             # Refresh display
             GLib.idle_add(self._refresh)
-            print(f"  ✅ Undo successful")
             
         except Exception as e:
-            print(f"  ❌ Error during undo: {e}")
             import traceback
             traceback.print_exc()
     
@@ -777,7 +737,6 @@ class BaseViabilityCategory:
         """
         self.change_history.append(change)
         self.undo_button.set_sensitive(True)
-        print(f"[{self.get_category_name()}] Recorded change: {change}")
     
     def set_locality(self, locality_id):
         """Set the locality filter for this category.
@@ -800,7 +759,6 @@ class BaseViabilityCategory:
         Args:
             issues: List of Issue dataclasses from the observer
         """
-        print(f"[{self.get_category_name()}] Observer update: {len(issues)} issues")
         
         # Update the category with new issues
         self.current_issues = issues

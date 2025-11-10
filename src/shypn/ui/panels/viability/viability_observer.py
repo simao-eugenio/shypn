@@ -91,7 +91,6 @@ class ViabilityObserver:
             'diagnosis': []
         }
         self._register_default_rules()
-        print("[OBSERVER] Viability Observer initialized")
     
     def _register_default_rules(self):
         """Register default observation rules."""
@@ -177,7 +176,6 @@ class ViabilityObserver:
             rule: Rule to add
         """
         self.rules[rule.rule_id] = rule
-        print(f"[OBSERVER] Registered rule: {rule.rule_id} ({rule.category})")
     
     def remove_rule(self, rule_id: str):
         """Remove observation rule.
@@ -187,7 +185,6 @@ class ViabilityObserver:
         """
         if rule_id in self.rules:
             del self.rules[rule_id]
-            print(f"[OBSERVER] Removed rule: {rule_id}")
     
     def record_event(self, event_type: str, data: Dict[str, Any], source: str = "unknown"):
         """Record an observation event.
@@ -261,7 +258,6 @@ class ViabilityObserver:
                     issues = rule.action(self.knowledge)
                     if issues:
                         suggestions_by_category[rule.category].extend(issues)
-                        print(f"[OBSERVER] Rule {rule.rule_id}: {len(issues)} issues")
             except Exception as e:
                 print(f"[OBSERVER] Error evaluating rule {rule.rule_id}: {e}")
                 # Continue to next rule (never stop!)
@@ -296,7 +292,6 @@ class ViabilityObserver:
         if category not in self.subscribers:
             self.subscribers[category] = []
         self.subscribers[category].append(callback)
-        print(f"[OBSERVER] Subscriber added for {category}")
     
     def get_current_suggestions(self, category: str) -> List[Any]:
         """Get current suggestions for a category.

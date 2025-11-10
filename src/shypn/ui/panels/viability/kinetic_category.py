@@ -85,7 +85,6 @@ class KineticCategory(BaseViabilityCategory):
                 elif firings / duration < 1.0:
                     stats['low_rate'].append(trans_id)
             
-            print(f"[Kinetic] Simulation stats: {stats['total_firings']} firings, "
                   f"{len(stats['zero_firing'])} never fired, {len(stats['low_rate'])} low rate")
             return stats
             
@@ -142,7 +141,6 @@ class KineticCategory(BaseViabilityCategory):
         """
         kb = self.get_knowledge_base()
         if not kb:
-            print("[Kinetic] No knowledge base available")
             return []
         
         issues = []
@@ -243,7 +241,6 @@ class KineticCategory(BaseViabilityCategory):
             )
             issues.append(issue)
         
-        print(f"[Kinetic] Found {len(issues)} issues")
         return issues
     
     def _refresh(self):
