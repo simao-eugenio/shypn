@@ -657,10 +657,16 @@ class ModelKnowledgeBase:
                     suggestions.append((tokens, confidence, reasoning))
         
         # STRATEGY 3: Check if downstream transitions are dead
-        if place.output_transition_ids:
+        # Find transitions that this place feeds (output arcs from place to transition)
+        output_transition_ids = []
+        for arc_id, arc in self.arcs.items():
+            if arc.source_id == place_id and arc.arc_type == "place_to_transition":
+                output_transition_ids.append(arc.target_id)
+        
+        if output_transition_ids:
             dead_transitions = self.get_dead_transitions()
-            has_dead_output = any(tid in dead_transitions for tid in place.output_transition_ids)
-            if has_dead_output and place.initial_marking == 0:
+            has_dead_output = any(tid in dead_transitions for tid in output_transition_ids)
+            if has_dead_output and place.current_marking == 0:
                 tokens = 3
                 confidence = 0.6
                 reasoning = f"Feeds dead transitions, may need substrate"
@@ -806,10 +812,16 @@ class ModelKnowledgeBase:
         dead_transitions = self.get_dead_transitions()
         for trans_id in dead_transitions:
             transition = self.transitions.get(trans_id)
-            if transition and transition.input_place_ids:
-                for place_id in transition.input_place_ids:
+            if transition:
+                # Find input places for this transition (arcs from place to transition)
+                input_place_ids = []
+                for arc_id, arc in self.arcs.items():
+                    if arc.target_id == trans_id and arc.arc_type == "place_to_transition":
+                        input_place_ids.append(arc.source_id)
+                
+                for place_id in input_place_ids:
                     place = self.places.get(place_id)
-                    if place and place.initial_marking == 0:
+                    if place and place.current_marking == 0:
                         # This place has no tokens and feeds a dead transition
                         compound = None
                         if place.compound_id:
