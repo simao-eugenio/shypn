@@ -339,25 +339,23 @@ def main(argv=None):
 				if model_canvas_loader.notebook:
 					model_canvas_loader.notebook.connect('switch-page', on_canvas_tab_switched)
 				
-				# Event 2: File Operations (user opens .shy file)
-				# Wire to file explorer's open callback
-				if file_explorer:
-					original_on_file_open = file_explorer.on_file_open_requested
+			# Event 2: File Operations (user opens .shy file)
+			# Wire to file explorer's open callback
+			# Store the original handler before any wrapping
+			topology_original_on_file_open = getattr(file_explorer, 'on_file_open_requested', None) if file_explorer else None
+			
+			if file_explorer and topology_original_on_file_open:
+				def on_file_open_with_topology_notify(filepath):
+					"""Wrapper that notifies topology panel after file opens."""
+					# Call original file open handler
+					topology_original_on_file_open(filepath)
 					
-					def on_file_open_with_topology_notify(filepath):
-						"""Wrapper that notifies topology panel after file opens."""
-						# Call original file open handler
-						if original_on_file_open:
-							original_on_file_open(filepath)
-						
-						# Notify topology panel that model changed
-						drawing_area = model_canvas_loader.get_current_document()
-						if drawing_area and topology_panel_loader.controller:
-							topology_panel_loader.controller.on_file_opened(drawing_area)
-					
-					file_explorer.on_file_open_requested = on_file_open_with_topology_notify
+					# Notify topology panel that model changed
+					drawing_area = model_canvas_loader.get_current_document()
+					if drawing_area and topology_panel_loader.controller:
+						topology_panel_loader.controller.on_file_opened(drawing_area)
 				
-				# Event 3: Pathway Import (KEGG/SBML import)
+				file_explorer.on_file_open_requested = on_file_open_with_topology_notify				# Event 3: Pathway Import (KEGG/SBML import)
 				# Will be wired after pathway_panel_loader is created (see below)
 				
 		except Exception as e:
@@ -457,21 +455,23 @@ def main(argv=None):
 				if model_canvas_loader.notebook:
 					model_canvas_loader.notebook.connect('switch-page', on_viability_tab_switched)
 				
-				# File operations
-				if file_explorer:
-					original_on_file_open = file_explorer.on_file_open_requested
-					
-					def on_file_open_with_viability_notify(filepath):
-						"""Wrapper that notifies viability panel after file opens."""
-						if original_on_file_open:
-							original_on_file_open(filepath)
-						
-						drawing_area = model_canvas_loader.get_current_document()
-						if drawing_area and viability_panel_loader.controller:
-							viability_panel_loader.controller.on_file_opened(drawing_area)
-					
-					file_explorer.on_file_open_requested = on_file_open_with_viability_notify
+			# File operations - chain with topology's wrapper
+			if file_explorer:
+				# Get the current handler (which is topology's wrapper)
+				viability_previous_handler = getattr(file_explorer, 'on_file_open_requested', None)
 				
+				def on_file_open_with_viability_notify(filepath):
+					"""Wrapper that notifies viability panel after file opens."""
+					# Call previous handler (topology's wrapper, which calls original)
+					if viability_previous_handler:
+						viability_previous_handler(filepath)
+					
+					# Notify viability panel
+					drawing_area = model_canvas_loader.get_current_document()
+					if drawing_area and viability_panel_loader.controller:
+						viability_panel_loader.controller.on_file_opened(drawing_area)
+				
+				file_explorer.on_file_open_requested = on_file_open_with_viability_notify
 		except Exception as e:
 			print(f'WARNING: Failed to load viability panel: {e}', file=sys.stderr)
 			viability_panel_loader = None
