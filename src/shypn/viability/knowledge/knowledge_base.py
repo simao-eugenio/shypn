@@ -606,44 +606,225 @@ class ModelKnowledgeBase:
         return [issue for issue in self.issues if element_id in issue.affected_elements]
     
     # ========================================================================
-    # INFERENCE METHODS (To be implemented in Phase 4)
+    # INFERENCE METHODS - Intelligent Model Repair Suggestions
     # ========================================================================
     
-    def infer_initial_marking(self, place_id: str) -> Optional[int]:
-        """Infer appropriate initial marking (STUB - Phase 4)."""
-        # TODO: Implement inference logic
+    def infer_initial_marking(self, place_id: str) -> Optional[Tuple[int, float, str]]:
+        """Infer appropriate initial marking for a place.
+        
+        Uses multi-domain reasoning:
+        1. Compound knowledge: basal concentration from KEGG
+        2. Siphon analysis: empty siphons need initial tokens
+        3. Liveness: dead transitions may need upstream tokens
+        
+        Args:
+            place_id: ID of the place
+            
+        Returns:
+            Tuple of (suggested_tokens, confidence, reasoning) or None
+        """
         place = self.places.get(place_id)
-        if place and place.basal_concentration:
-            # Simple heuristic: 1 token per 1 mM
-            return int(place.basal_concentration)
-        return None
-    
-    def infer_arc_weight(self, arc_id: str) -> Optional[int]:
-        """Infer appropriate arc weight (STUB - Phase 4)."""
-        # TODO: Implement inference logic
-        arc = self.arcs.get(arc_id)
-        if arc and arc.stoichiometry:
-            return arc.stoichiometry
-        return None
-    
-    def infer_firing_rate(self, transition_id: str) -> Optional[float]:
-        """Infer appropriate firing rate (STUB - Phase 4)."""
-        # TODO: Implement inference logic
-        params = self.kinetic_parameters.get(transition_id)
-        if params and params.vmax:
-            return params.vmax
-        return None
-    
-    def suggest_source_placement(self) -> List[Tuple[str, float]]:
-        """Suggest where to add sources (STUB - Phase 4)."""
-        # TODO: Implement inference logic
+        if not place:
+            return None
+        
         suggestions = []
+        
+        # STRATEGY 1: Use basal concentration from compound data
+        compound_id = place.compound_id
+        if compound_id and compound_id in self.compounds:
+            compound = self.compounds[compound_id]
+            # Typical cellular concentrations in mM:
+            # - ATP: ~5 mM
+            # - NADH: ~0.1 mM
+            # - Glucose: ~5 mM
+            # Simple heuristic: 1 token per mM (can be refined)
+            if compound.molecular_weight:
+                # More sophisticated: scale by molecular weight
+                # Smaller molecules → more tokens (higher molar concentration)
+                tokens = max(1, int(10000 / compound.molecular_weight))
+                confidence = 0.7
+                reasoning = f"Based on typical {compound.name} concentration (~{tokens} mM)"
+                suggestions.append((tokens, confidence, reasoning))
+        
+        # STRATEGY 2: Check if place is in empty siphon
+        if place.in_siphons:
+            for siphon in self.siphons:
+                if place_id in siphon.place_ids and not siphon.is_properly_marked:
+                    # Empty siphon needs tokens to prevent deadlock
+                    tokens = 5  # Conservative initial value
+                    confidence = 0.8
+                    reasoning = f"Place in empty siphon (deadlock risk)"
+                    suggestions.append((tokens, confidence, reasoning))
+        
+        # STRATEGY 3: Check if downstream transitions are dead
+        if place.output_transition_ids:
+            dead_transitions = self.get_dead_transitions()
+            has_dead_output = any(tid in dead_transitions for tid in place.output_transition_ids)
+            if has_dead_output and place.initial_marking == 0:
+                tokens = 3
+                confidence = 0.6
+                reasoning = f"Feeds dead transitions, may need substrate"
+                suggestions.append((tokens, confidence, reasoning))
+        
+        # Return highest confidence suggestion
+        if suggestions:
+            suggestions.sort(key=lambda x: x[1], reverse=True)
+            return suggestions[0]
+        
+        return None
+    
+    def infer_arc_weight(self, arc_id: str) -> Optional[Tuple[int, float, str]]:
+        """Infer appropriate arc weight from stoichiometry.
+        
+        Uses reaction stoichiometry from KEGG/SBML metadata.
+        
+        Args:
+            arc_id: ID of the arc
+            
+        Returns:
+            Tuple of (suggested_weight, confidence, reasoning) or None
+        """
+        arc = self.arcs.get(arc_id)
+        if not arc:
+            return None
+        
+        # Check if we have stoichiometry from reaction data
+        if arc.stoichiometry and arc.stoichiometry > 0:
+            confidence = 0.9  # High confidence from explicit data
+            reasoning = f"From reaction stoichiometry"
+            return (arc.stoichiometry, confidence, reasoning)
+        
+        # Check reaction data for stoichiometry
+        transition = self.transitions.get(arc.target_id if arc.is_input else arc.source_id)
+        if transition and transition.reaction_id:
+            reaction = self.reactions.get(transition.reaction_id)
+            if reaction:
+                # Look for compound in reaction substrates/products
+                place_id = arc.source_id if arc.is_input else arc.target_id
+                place = self.places.get(place_id)
+                if place and place.compound_id:
+                    # Search in substrates
+                    for compound_id, coeff in reaction.substrates:
+                        if compound_id == place.compound_id:
+                            confidence = 0.8
+                            reasoning = f"From KEGG reaction stoichiometry"
+                            return (coeff, confidence, reasoning)
+                    
+                    # Search in products
+                    for compound_id, coeff in reaction.products:
+                        if compound_id == place.compound_id:
+                            confidence = 0.8
+                            reasoning = f"From KEGG reaction stoichiometry"
+                            return (coeff, confidence, reasoning)
+        
+        # Default: assume weight = 1
+        return (1, 0.3, "Default stoichiometry (no data available)")
+    
+    def infer_firing_rate(self, transition_id: str) -> Optional[Tuple[float, float, str]]:
+        """Infer appropriate firing rate from kinetic parameters.
+        
+        Uses Km, Vmax, Kcat from BRENDA/SABIO-RK data.
+        
+        Args:
+            transition_id: ID of the transition
+            
+        Returns:
+            Tuple of (suggested_rate, confidence, reasoning) or None
+        """
+        transition = self.transitions.get(transition_id)
+        if not transition:
+            return None
+        
+        # Check for kinetic parameters
+        params = self.kinetic_parameters.get(transition_id)
+        if params:
+            # Use Vmax if available
+            if params.vmax:
+                confidence = params.confidence
+                reasoning = f"From {params.source} Vmax={params.vmax}"
+                return (params.vmax, confidence, reasoning)
+            
+            # Calculate from Kcat if available
+            # Vmax = kcat * [E]total
+            # Assume [E]total = 0.01 mM (typical enzyme concentration)
+            if params.kcat:
+                enzyme_conc = 0.01  # mM
+                vmax_estimate = params.kcat * enzyme_conc
+                confidence = params.confidence * 0.8  # Slightly lower (estimation)
+                reasoning = f"Estimated from {params.source} Kcat={params.kcat} (assuming [E]=0.01 mM)"
+                return (vmax_estimate, confidence, reasoning)
+        
+        # Fallback: check if transition is enzymatic (has EC number)
+        if transition.ec_number:
+            # Enzymatic reactions typically have rates 0.1-10 mM/s
+            rate = 1.0  # Conservative middle ground
+            confidence = 0.3
+            reasoning = f"Default enzymatic rate (EC {transition.ec_number})"
+            return (rate, confidence, reasoning)
+        
+        # Non-enzymatic reactions (mass action)
+        rate = 0.1
+        confidence = 0.2
+        reasoning = "Default mass action rate"
+        return (rate, confidence, reasoning)
+    
+    def suggest_source_placement(self) -> List[Tuple[str, float, float, str]]:
+        """Suggest where to add source transitions.
+        
+        Uses siphon analysis and compound knowledge to identify
+        places that need continuous supply (ATP, NADH, etc.).
+        
+        Returns:
+            List of (place_id, suggested_rate, confidence, reasoning)
+        """
+        suggestions = []
+        
+        # STRATEGY 1: Empty siphons need sources
         for siphon in self.siphons:
             if not siphon.is_properly_marked and siphon.place_ids:
-                # Suggest source at first place in siphon
-                place_id = siphon.place_ids[0]
-                rate = 0.1  # Default rate
-                suggestions.append((place_id, rate))
+                # Prioritize places with known compounds
+                for place_id in siphon.place_ids:
+                    place = self.places.get(place_id)
+                    if place and place.compound_id:
+                        compound = self.compounds.get(place.compound_id)
+                        if compound:
+                            # Energy carriers get higher rates
+                            energy_carriers = ['ATP', 'GTP', 'NADH', 'NADPH', 'FADH']
+                            if any(carrier in compound.name.upper() for carrier in energy_carriers):
+                                rate = 1.0  # Fast replenishment for energy
+                                confidence = 0.8
+                                reasoning = f"Empty siphon: {compound.name} (energy carrier)"
+                            else:
+                                rate = 0.5  # Moderate for metabolites
+                                confidence = 0.7
+                                reasoning = f"Empty siphon: {compound.name}"
+                            
+                            suggestions.append((place_id, rate, confidence, reasoning))
+                            break  # One source per siphon
+        
+        # STRATEGY 2: Dead transitions without input tokens
+        dead_transitions = self.get_dead_transitions()
+        for trans_id in dead_transitions:
+            transition = self.transitions.get(trans_id)
+            if transition and transition.input_place_ids:
+                for place_id in transition.input_place_ids:
+                    place = self.places.get(place_id)
+                    if place and place.initial_marking == 0:
+                        # This place has no tokens and feeds a dead transition
+                        compound = None
+                        if place.compound_id:
+                            compound = self.compounds.get(place.compound_id)
+                        
+                        rate = 0.3  # Low rate for dead transition substrate
+                        confidence = 0.6
+                        reasoning = f"Feeds dead transition {trans_id}"
+                        if compound:
+                            reasoning += f" ({compound.name})"
+                        
+                        # Avoid duplicates
+                        if not any(s[0] == place_id for s in suggestions):
+                            suggestions.append((place_id, rate, confidence, reasoning))
+        
         return suggestions
     
     # ========================================================================

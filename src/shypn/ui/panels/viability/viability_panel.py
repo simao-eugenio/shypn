@@ -182,6 +182,35 @@ class ViabilityPanel(Gtk.Box):
             print(f"  Compounds: {len(kb.compounds)}")
             print(f"  Reactions: {len(kb.reactions)}")
             print(f"  Kinetic parameters: {len(kb.kinetic_parameters)} transitions")
+            
+            # TEST INFERENCE ENGINES
+            print(f"\n[VIABILITY TEST] Testing inference engines...")
+            
+            # Test initial marking inference
+            if kb.places:
+                test_place_id = list(kb.places.keys())[0]
+                marking_result = kb.infer_initial_marking(test_place_id)
+                if marking_result:
+                    tokens, confidence, reasoning = marking_result
+                    print(f"  Initial marking inference: {test_place_id} → {tokens} tokens ({confidence:.1%} confidence)")
+                    print(f"    Reasoning: {reasoning}")
+            
+            # Test firing rate inference
+            if kb.transitions:
+                test_trans_id = list(kb.transitions.keys())[0]
+                rate_result = kb.infer_firing_rate(test_trans_id)
+                if rate_result:
+                    rate, confidence, reasoning = rate_result
+                    print(f"  Firing rate inference: {test_trans_id} → {rate:.3f} ({confidence:.1%} confidence)")
+                    print(f"    Reasoning: {reasoning}")
+            
+            # Test source placement suggestions
+            source_suggestions = kb.suggest_source_placement()
+            if source_suggestions:
+                print(f"  Source placement: {len(source_suggestions)} suggestions")
+                for place_id, rate, confidence, reasoning in source_suggestions[:3]:  # Show first 3
+                    print(f"    {place_id}: rate={rate:.2f} ({confidence:.1%}) - {reasoning}")
+            
             self.status_label.set_markup(
                 f"<b>📊 Knowledge Base Status:</b>\n"
                 f"  • P-invariants: {len(kb.p_invariants)}\n"
