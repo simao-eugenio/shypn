@@ -158,6 +158,7 @@ class ReportPanel(Gtk.Box):
             project=self.project,
             model_canvas=current_manager
         )
+        models.parent_panel = self  # Set parent for KB access
         self.categories.append(models)
         widget = models.get_widget()
         # print(f"[REPORT_PANEL] ModelsCategory widget: {widget}, visible={widget.get_visible()}")
