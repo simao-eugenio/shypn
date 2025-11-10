@@ -171,6 +171,87 @@ class DiagnosisCategory(BaseViabilityCategory):
         self.analyses_panel = analyses_panel
         # TODO: Populate locality dropdown from analyses_panel
     
+    def set_selected_locality(self, transition_id, auto_scan=True):
+        """Set locality from canvas context menu (right-click on transition).
+        
+        This is called when user right-clicks a transition and selects
+        "Analyze Locality" from the context menu. It automatically:
+        1. Switches to "Selected Locality" mode
+        2. Populates the dropdown with the transition's locality
+        3. Optionally triggers diagnosis scan
+        
+        Args:
+            transition_id: ID of the selected transition
+            auto_scan: Whether to automatically run diagnosis (default: True)
+        """
+        kb = self.get_knowledge_base()
+        if not kb:
+            print("[Diagnosis] Cannot set locality: No knowledge base")
+            return
+        
+        # Get locality for this transition
+        locality = self._get_locality_for_transition(kb, transition_id)
+        if not locality:
+            print(f"[Diagnosis] No locality found for transition: {transition_id}")
+            return
+        
+        # Switch to locality mode
+        self.locality_radio.set_active(True)
+        
+        # Update dropdown selection
+        self._populate_locality_dropdown([locality])
+        self.locality_combo.set_active(0)  # Select the first (only) item
+        
+        # Store the selection
+        self.selected_locality_id = locality['id']
+        
+        print(f"[Diagnosis] Locality set from context menu: {locality['name']} (ID: {locality['id']})")
+        
+        # Auto-scan if requested
+        if auto_scan:
+            self._on_scan_clicked(None)
+    
+    def _get_locality_for_transition(self, kb, transition_id):
+        """Get locality information for a specific transition.
+        
+        Args:
+            kb: Knowledge base
+            transition_id: Transition ID
+            
+        Returns:
+            dict: Locality info {'id': ..., 'name': ..., 'transitions': [...]}
+            or None if not found
+        """
+        # TODO: Query KB for localities containing this transition
+        # For now, return a placeholder
+        return {
+            'id': f'locality_{transition_id}',
+            'name': f'Locality around {transition_id}',
+            'transitions': [transition_id]
+        }
+    
+    def _populate_locality_dropdown(self, localities):
+        """Populate locality dropdown with available localities.
+        
+        Args:
+            localities: List of locality dicts
+        """
+        # Clear existing entries
+        self.locality_combo.remove_all()
+        
+        if not localities:
+            self.locality_combo.append_text("(No localities available)")
+            self.locality_combo.set_active(0)
+            self.locality_combo.set_sensitive(False)
+            return
+        
+        # Add localities
+        for locality in localities:
+            display_name = locality.get('name', locality.get('id', 'Unknown'))
+            self.locality_combo.append_text(display_name)
+        
+        self.locality_combo.set_sensitive(True)
+    
     def _scan_issues(self):
         """Scan for issues across all domains.
         
