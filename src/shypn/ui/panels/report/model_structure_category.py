@@ -662,6 +662,101 @@ class ModelsCategory(BaseReportCategory):
             print(f"[PATHWAY→KB] ⚠️ Failed to update pathway knowledge: {e}")
             traceback.print_exc()
     
+    def _update_knowledge_base_kinetics(self, model):
+        """Extract BRENDA kinetic parameters from transitions and update Knowledge Base.
+        
+        Args:
+            model: ModelCanvasManager with transitions containing BRENDA enrichment data
+        """
+        try:
+            # Get Knowledge Base instance
+            kb = None
+            if hasattr(self, 'parent_panel') and self.parent_panel:
+                # Through parent panel -> model_canvas_loader
+                if hasattr(self.parent_panel, 'model_canvas_loader'):
+                    loader = self.parent_panel.model_canvas_loader
+                    if hasattr(loader, 'get_current_knowledge_base'):
+                        kb = loader.get_current_knowledge_base()
+            
+            if not kb:
+                return  # KB not available
+            
+            print(f"[BRENDA→KB] Updating kinetic knowledge...")
+            
+            # Track stats
+            transitions_with_kinetics = 0
+            
+            # Extract kinetic parameters from transitions
+            for transition in model.transitions:
+                if not transition or not hasattr(transition, 'metadata'):
+                    continue
+                
+                metadata = transition.metadata
+                
+                # Check if transition has BRENDA enrichment
+                enrichment_source = metadata.get('enrichment_source')
+                if enrichment_source != 'brenda':
+                    # No BRENDA enrichment, skip
+                    continue
+                
+                # Extract kinetic parameters
+                km = metadata.get('km')
+                kcat = metadata.get('kcat')
+                vmax = metadata.get('vmax')
+                ki = metadata.get('ki')
+                
+                # Skip if no kinetic parameters found
+                if not any([km, kcat, vmax, ki]):
+                    continue
+                
+                # Get EC number (for KineticParams dataclass)
+                ec_number = None
+                ec_numbers = metadata.get('ec_numbers', [])
+                if ec_numbers and isinstance(ec_numbers, list):
+                    ec_number = ec_numbers[0]
+                elif 'ec_number' in metadata:
+                    ec_number = metadata['ec_number']
+                
+                # Get organism if available
+                organism = metadata.get('organism')
+                
+                # Create KineticParams object
+                from shypn.viability.knowledge.data_structures import KineticParams
+                
+                kinetic_params = KineticParams(
+                    transition_id=transition.id,
+                    ec_number=ec_number,
+                    vmax=vmax,
+                    kcat=kcat,
+                    source='brenda',
+                    organism=organism,
+                    confidence=0.8  # High confidence for BRENDA data
+                )
+                
+                # Add Km values (substrate -> Km mapping)
+                if km is not None:
+                    # Try to get substrate name from metadata
+                    substrate_name = metadata.get('substrate', 'default')
+                    kinetic_params.km_values[substrate_name] = km
+                
+                # Add Ki values (inhibitor -> Ki mapping)
+                if ki is not None:
+                    # Try to get inhibitor name from metadata
+                    inhibitor_name = metadata.get('inhibitor', 'default')
+                    kinetic_params.ki_values[inhibitor_name] = ki
+                
+                # Update Knowledge Base
+                kb.update_kinetic_parameters(transition.id, kinetic_params)
+                transitions_with_kinetics += 1
+            
+            if transitions_with_kinetics > 0:
+                print(f"[BRENDA→KB] ✓ Updated: {transitions_with_kinetics} transitions with kinetic parameters")
+            
+        except Exception as e:
+            import traceback
+            print(f"[BRENDA→KB] ⚠️ Failed to update kinetic knowledge: {e}")
+            traceback.print_exc()
+    
     def refresh(self):
         """Refresh tables when model changes or tab switches."""
         # If no model, show empty state
@@ -681,6 +776,9 @@ class ModelsCategory(BaseReportCategory):
         
         # UPDATE KNOWLEDGE BASE with pathway metadata
         self._update_knowledge_base_pathway(model)
+        
+        # UPDATE KNOWLEDGE BASE with kinetic parameters (BRENDA)
+        self._update_knowledge_base_kinetics(model)
         
         # === BUILD MODEL OVERVIEW ===
         overview_lines = []
