@@ -13,6 +13,8 @@ gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, GLib
 from typing import Optional, List, Dict, Any
 
+from shypn.ui.category_frame import CategoryFrame
+
 
 class BaseViabilityCategory:
     """Base class for viability analysis categories.
@@ -48,33 +50,26 @@ class BaseViabilityCategory:
         self.change_history = []
         
         # UI Components
-        self.frame = None
-        self.expander = None
+        self.category_frame = None
         self.content_box = None
         self.issues_listbox = None
         self.scan_button = None
         self.undo_button = None
         
-        # Build UI
+        # Build UI using CategoryFrame
         self._build_frame(expanded)
     
     def _build_frame(self, expanded):
-        """Build category frame with expander.
+        """Build category frame using CategoryFrame widget.
         
         Args:
             expanded: Whether to start expanded
         """
-        # Main frame
-        self.frame = Gtk.Frame()
-        self.frame.set_shadow_type(Gtk.ShadowType.IN)
-        self.frame.set_margin_top(6)
-        self.frame.set_margin_bottom(6)
-        
-        # Expander with category title
-        self.expander = Gtk.Expander()
-        self.expander.set_expanded(expanded)
-        self.expander.set_label(self.get_category_name())
-        self.expander.connect('notify::expanded', self._on_expansion_changed)
+        # Use CategoryFrame for consistent styling with other panels
+        self.category_frame = CategoryFrame(
+            title=self.get_category_name(),
+            expanded=expanded
+        )
         
         # Main content box
         self.content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
@@ -86,16 +81,16 @@ class BaseViabilityCategory:
         # Build category-specific content
         self._build_content()
         
-        self.expander.add(self.content_box)
-        self.frame.add(self.expander)
+        # Set content in CategoryFrame
+        self.category_frame.set_content(self.content_box)
     
     def get_widget(self):
         """Get the main widget for this category.
         
         Returns:
-            Gtk.Frame: The category frame
+            CategoryFrame: The category frame
         """
-        return self.frame
+        return self.category_frame
     
     def get_category_name(self):
         """Get category display name.
@@ -285,5 +280,5 @@ class BaseViabilityCategory:
         """
         self.selected_locality_id = locality_id
         # Refresh if category is expanded
-        if self.expander and self.expander.get_expanded():
+        if self.category_frame and self.category_frame.is_expanded():
             GLib.idle_add(self._refresh)

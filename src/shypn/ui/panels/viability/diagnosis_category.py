@@ -53,7 +53,7 @@ class DiagnosisCategory(BaseViabilityCategory):
     def _build_content(self):
         """Build diagnosis category content."""
         # Locality selection
-        locality_frame = Gtk.Frame(label="🎯 Diagnosis Scope")
+        locality_frame = Gtk.Frame(label="DIAGNOSIS SCOPE")
         locality_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         locality_box.set_margin_start(12)
         locality_box.set_margin_end(12)
@@ -92,7 +92,7 @@ class DiagnosisCategory(BaseViabilityCategory):
         locality_box.pack_start(locality_dropdown_box, False, False, 0)
         
         locality_frame.add(locality_box)
-        self.content_box.pack_start(locality_section, False, False, 0)
+        self.content_box.pack_start(locality_frame, False, False, 0)
         
         # Health score section
         health_frame = Gtk.Frame(label="HEALTH SCORE")
@@ -122,8 +122,8 @@ class DiagnosisCategory(BaseViabilityCategory):
         
         self.content_box.pack_start(button_box, False, False, 0)
         
-        # Issues list
-        issues_frame = Gtk.Frame(label="🚨 Issues Detected")
+        # Issues list with multi-domain view
+        issues_frame = Gtk.Frame(label="ISSUES DETECTED")
         scrolled = Gtk.ScrolledWindow()
         scrolled.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
         scrolled.set_min_content_height(300)
