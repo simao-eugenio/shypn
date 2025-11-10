@@ -180,6 +180,32 @@ class ViabilityPanel(Gtk.Box):
         if hasattr(self.diagnosis_category, 'set_analyses_panel'):
             self.diagnosis_category.set_analyses_panel(analyses_panel)
     
+    def analyze_locality_for_transition(self, transition_id):
+        """Analyze locality for a specific transition (called from context menu).
+        
+        This is the entry point for the canvas context menu action:
+        "Analyze Locality". It switches the Viability panel to show the
+        Diagnosis & Repair category focused on the selected transition's locality.
+        
+        Args:
+            transition_id: ID of the transition to analyze
+        """
+        if not self.diagnosis_category:
+            print("[Viability] Cannot analyze locality: Diagnosis category not initialized")
+            return
+        
+        # Expand diagnosis category if collapsed
+        if not self.diagnosis_category.category_frame.is_expanded():
+            self.diagnosis_category.category_frame.set_expanded(True)
+        
+        # Set the locality and trigger scan
+        self.diagnosis_category.set_selected_locality(
+            transition_id=transition_id,
+            auto_scan=True
+        )
+        
+        print(f"[Viability] Analyzing locality for transition: {transition_id}")
+    
     def set_model(self, model):
         """Update model reference.
         
