@@ -829,8 +829,8 @@ class BaseTopologyCategory:
             
             # Route to appropriate KB update method based on analyzer type
             if analyzer_name == 'p_invariants':
-                # Result format: {'invariants': [{'vector': [1, 0, 1], 'places': ['P1', 'P3'], ...}]}
-                invariants_raw = result_data.get('invariants', [])
+                # Result format: {'p_invariants': [{'vector': [1, 0, 1], 'places': ['P1', 'P3'], ...}]}
+                invariants_raw = result_data.get('p_invariants', [])
                 if invariants_raw:
                     # Convert to PInvariant objects
                     invariants = []
@@ -846,8 +846,8 @@ class BaseTopologyCategory:
                     print(f"✓ Knowledge Base updated: {len(invariants)} P-invariants")
             
             elif analyzer_name == 't_invariants':
-                # Result format: {'invariants': [{'vector': [1, 2], 'transitions': ['T1', 'T2'], ...}]}
-                invariants_raw = result_data.get('invariants', [])
+                # Result format: {'t_invariants': [{'vector': [1, 2], 'transitions': ['T1', 'T2'], ...}]}
+                invariants_raw = result_data.get('t_invariants', [])
                 if invariants_raw:
                     # Convert to TInvariant objects
                     invariants = []
@@ -862,22 +862,12 @@ class BaseTopologyCategory:
                     print(f"✓ Knowledge Base updated: {len(invariants)} T-invariants")
             
             elif analyzer_name == 'liveness':
-                # Result format: {'transitions': {tid: {'level': int, 'name': str}, ...}}
-                transitions_data = result_data.get('transitions', {})
-                if transitions_data:
-                    # Convert to simple dict mapping tid -> level string
-                    liveness_map = {}
-                    for tid, tdata in transitions_data.items():
-                        if isinstance(tdata, dict):
-                            level = tdata.get('level', 0)
-                            # Map numeric level to string
-                            level_str = {0: 'dead', 1: 'L1-live', 2: 'L2-live', 
-                                       3: 'L3-live', 4: 'L4-live'}.get(level, 'dead')
-                            liveness_map[tid] = level_str
-                        else:
-                            liveness_map[tid] = str(tdata)
-                    kb.update_liveness(liveness_map)
-                    print(f"✓ Knowledge Base updated: Liveness for {len(liveness_map)} transitions")
+                # Result format: {'liveness_levels': {tid: 'L1', tid2: 'L2', ...}}
+                liveness_levels = result_data.get('liveness_levels', {})
+                if liveness_levels:
+                    # Already in correct format: dict mapping tid -> level string
+                    kb.update_liveness(liveness_levels)
+                    print(f"✓ Knowledge Base updated: Liveness for {len(liveness_levels)} transitions")
             
             elif analyzer_name == 'siphons':
                 # Result format: {'siphons': [{place_ids: [...], is_minimal: bool, ...}]}
