@@ -47,24 +47,35 @@ class StructuralCategory(BaseViabilityCategory):
         """
         kb = self.get_knowledge_base()
         if not kb:
+            print("[Structural] _get_dead_from_simulation: No KB")
             return []
         
         # Get simulation data from model_canvas
         if not self.model_canvas:
+            print("[Structural] _get_dead_from_simulation: No model_canvas")
             return []
         
         try:
             # Check if we have simulation data
             model_manager = getattr(self.model_canvas, 'model_manager', None)
             if not model_manager:
+                print("[Structural] _get_dead_from_simulation: No model_manager")
                 return []
             
             controller = getattr(model_manager, 'controller', None)
             if not controller:
+                print("[Structural] _get_dead_from_simulation: No controller")
                 return []
             
             data_collector = getattr(controller, 'data_collector', None)
-            if not data_collector or not data_collector.has_data():
+            if not data_collector:
+                print("[Structural] _get_dead_from_simulation: No data_collector")
+                return []
+                
+            has_data = data_collector.has_data()
+            print(f"[Structural] _get_dead_from_simulation: data_collector.has_data() = {has_data}")
+            
+            if not has_data:
                 return []
             
             # Get transitions that never fired
@@ -74,11 +85,13 @@ class StructuralCategory(BaseViabilityCategory):
                 if firings == 0:
                     dead_transitions.append(trans_id)
             
-            print(f"[Structural] Simulation data: {len(dead_transitions)} transitions never fired")
+            print(f"[Structural] Simulation data: {len(dead_transitions)} transitions never fired out of {len(kb.transitions)}")
             return dead_transitions
             
         except Exception as e:
             print(f"[Structural] Error getting simulation data: {e}")
+            import traceback
+            traceback.print_exc()
             return []
     
     def _build_content(self):
