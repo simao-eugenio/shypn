@@ -181,6 +181,7 @@ class ViabilityPanel(Gtk.Box):
             print(f"  Dead transitions: {len(kb.get_dead_transitions())}")
             print(f"  Compounds: {len(kb.compounds)}")
             print(f"  Reactions: {len(kb.reactions)}")
+            print(f"  Kinetic parameters: {len(kb.kinetic_parameters)} transitions")
             self.status_label.set_markup(
                 f"<b>📊 Knowledge Base Status:</b>\n"
                 f"  • P-invariants: {len(kb.p_invariants)}\n"
@@ -189,7 +190,8 @@ class ViabilityPanel(Gtk.Box):
                 f"  • Siphons: {len(kb.siphons)}\n"
                 f"  • Dead transitions: {len(kb.get_dead_transitions())}\n"
                 f"  • Compounds: {len(kb.compounds)}\n"
-                f"  • Reactions: {len(kb.reactions)}"
+                f"  • Reactions: {len(kb.reactions)}\n"
+                f"  • Kinetics: {len(kb.kinetic_parameters)} transitions"
             )
         else:
             print(f"[VIABILITY TEST] ✗ Knowledge Base NOT accessible")
