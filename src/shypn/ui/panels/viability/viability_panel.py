@@ -1,30 +1,40 @@
 #!/usr/bin/env python3
-"""Viability Panel - Main panel UI.
+"""Viability Panel - Intelligent Model Repair Assistant.
 
-Displays model viability issues and (future) fix suggestions.
-Follows the same architecture as Topology and Report panels.
+Organizes inference suggestions into 4 categories:
+1. Structural Inference (topology-based: siphons, liveness, P-invariants)
+2. Biological Inference (semantic: stoichiometry, compounds, conservation)
+3. Kinetic Inference (BRENDA-based: firing rates, Km/Vmax/Kcat)
+4. Diagnosis & Repair (multi-domain + locality-aware analysis)
+
+Follows the same architecture as Topology and Report panels:
+- Each category is an expandable frame
+- Categories can expand/collapse independently
+- Supports locality filtering for focused analysis
+- Multi-domain suggestions combine all knowledge layers
 
 Author: Simão Eugénio
-Date: November 9, 2025
+Date: November 10, 2025
 """
 
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk, GLib
+from gi.repository import Gtk
 
-from .diagnosis_view import DiagnosisView
+from .structural_category import StructuralCategory
+from .biological_category import BiologicalCategory
+from .kinetic_category import KineticCategory
+from .diagnosis_category import DiagnosisCategory
 
 
 class ViabilityPanel(Gtk.Box):
-    """Viability Panel - Intelligent Model Repair Assistant.
-    
-    Phase 1: Displays model issues (structural, semantic, behavioral)
-    Future: Suggests and applies fixes
+    """Viability analysis panel with 4 inference categories.
     
     Architecture:
-    - Follows Topology/Report panel patterns
-    - Minimal logic here (business logic in src/shypn/viability/)
-    - Wayland-safe operations
+    - Each category is a collapsible frame (like Topology panel)
+    - Categories scan for issues and suggest fixes
+    - Diagnosis category integrates all domains
+    - Supports locality filtering from Analyses panel
     """
     
     def __init__(self, model=None, model_canvas=None):
@@ -32,28 +42,23 @@ class ViabilityPanel(Gtk.Box):
         
         Args:
             model: ShypnModel instance (optional, can be set later)
-            model_canvas: ModelCanvas instance for accessing current model
+            model_canvas: ModelCanvas instance for accessing current model and KB
         """
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         
         self.model = model
         self.model_canvas = model_canvas
         self.topology_panel = None  # Will be set via set_topology_panel()
-        self.knowledge_base = None  # Will be accessed from model_canvas
+        self.analyses_panel = None  # For locality access
         
-        # Build UI
+        # Build panel header
         self._build_header()
-        self._build_content()
-    
-    def get_knowledge_base(self):
-        """Get the knowledge base for the current model.
         
-        Returns:
-            ModelKnowledgeBase: The knowledge base, or None if not available
-        """
-        if self.model_canvas and hasattr(self.model_canvas, 'get_current_knowledge_base'):
-            return self.model_canvas.get_current_knowledge_base()
-        return None
+        # Build main content with categories
+        self._build_content()
+        
+        # Show all widgets
+        self.show_all()
     
     def _build_header(self):
         """Build panel header (matches REPORT, TOPOLOGY, etc.)."""
@@ -71,281 +76,138 @@ class ViabilityPanel(Gtk.Box):
         
         # Float button (right)
         self.float_button = Gtk.ToggleButton()
-        float_icon = Gtk.Image.new_from_icon_name('window-new', Gtk.IconSize.BUTTON)
-        self.float_button.set_image(float_icon)
-        self.float_button.set_tooltip_text('Float panel in separate window')
+        self.float_button.set_label("⬈")
+        self.float_button.set_tooltip_text("Detach panel to floating window")
+        self.float_button.set_relief(Gtk.ReliefStyle.NONE)
         self.float_button.set_valign(Gtk.Align.CENTER)
         header_box.pack_end(self.float_button, False, False, 0)
         
         self.pack_start(header_box, False, False, 0)
+        
+        # Separator
+        separator = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
+        self.pack_start(separator, False, False, 0)
     
     def _build_content(self):
-        """Build main content area."""
-        # Scrollable content
-        scrolled = Gtk.ScrolledWindow()
-        scrolled.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        """Build main content area with categories."""
+        # Create scrolled window for all categories
+        self.scrolled_window = Gtk.ScrolledWindow()
+        self.scrolled_window.set_policy(
+            Gtk.PolicyType.AUTOMATIC,
+            Gtk.PolicyType.AUTOMATIC
+        )
+        self.scrolled_window.set_hexpand(True)
+        self.scrolled_window.set_vexpand(True)
         
-        # Main content box
-        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
-        content_box.set_margin_start(12)
-        content_box.set_margin_end(12)
-        content_box.set_margin_top(12)
-        content_box.set_margin_bottom(12)
+        # Main container for categories
+        self.categories_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        self.categories_box.set_margin_start(5)
+        self.categories_box.set_margin_end(5)
+        self.categories_box.set_margin_top(5)
+        self.categories_box.set_margin_bottom(5)
         
-        # === DIAGNOSIS SECTION ===
-        diagnosis_expander = Gtk.Expander(label="🔍 Diagnosis")
-        diagnosis_expander.set_expanded(True)
+        # Create 4 inference categories
+        self.structural_category = StructuralCategory(
+            model_canvas=self.model_canvas,
+            expanded=False
+        )
         
-        diagnosis_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        diagnosis_box.set_margin_start(12)
-        diagnosis_box.set_margin_end(12)
-        diagnosis_box.set_margin_top(6)
-        diagnosis_box.set_margin_bottom(6)
+        self.biological_category = BiologicalCategory(
+            model_canvas=self.model_canvas,
+            expanded=False
+        )
         
-        # Scan button
-        scan_button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
-        self.scan_button = Gtk.Button(label="🔄 Scan for Issues")
-        self.scan_button.connect('clicked', self._on_scan_clicked)
-        scan_button_box.pack_start(self.scan_button, False, False, 0)
-        diagnosis_box.pack_start(scan_button_box, False, False, 0)
+        self.kinetic_category = KineticCategory(
+            model_canvas=self.model_canvas,
+            expanded=False
+        )
         
-        # Status label
-        self.status_label = Gtk.Label()
-        self.status_label.set_xalign(0)
-        self.status_label.set_markup("<i>Click 'Scan' to analyze model</i>")
-        diagnosis_box.pack_start(self.status_label, False, False, 0)
+        # Diagnosis category starts expanded (it's the main one)
+        self.diagnosis_category = DiagnosisCategory(
+            model_canvas=self.model_canvas,
+            expanded=True
+        )
         
-        # Diagnosis view (tree of issues)
-        self.diagnosis_view = DiagnosisView()
-        diagnosis_box.pack_start(self.diagnosis_view, True, True, 0)
+        # Store categories in list for easy iteration
+        self.categories = [
+            self.diagnosis_category,     # Main category first
+            self.structural_category,
+            self.biological_category,
+            self.kinetic_category,
+        ]
         
-        diagnosis_expander.add(diagnosis_box)
-        content_box.pack_start(diagnosis_expander, True, True, 0)
+        # Set parent panel reference for all categories
+        for category in self.categories:
+            category.parent_panel = self
         
-        # === SUGGESTIONS SECTION (Future - Phase 2) ===
-        suggestions_expander = Gtk.Expander(label="💡 Suggested Fixes")
-        suggestions_expander.set_expanded(False)
-        suggestions_expander.set_sensitive(False)  # Disabled for Phase 1
+        # Add categories to container
+        for category in self.categories:
+            self.categories_box.pack_start(
+                category.get_widget(),
+                False,  # Don't expand to fill
+                False,  # Don't fill
+                0
+            )
         
-        suggestions_placeholder = Gtk.Label()
-        suggestions_placeholder.set_text("Fix suggestions will appear here (Phase 2)")
-        suggestions_placeholder.set_margin_start(12)
-        suggestions_placeholder.set_margin_end(12)
-        suggestions_placeholder.set_margin_top(6)
-        suggestions_placeholder.set_margin_bottom(6)
-        suggestions_expander.add(suggestions_placeholder)
+        # Add container to scrolled window
+        self.scrolled_window.add(self.categories_box)
         
-        content_box.pack_start(suggestions_expander, False, False, 0)
-        
-        # === OPTIONS SECTION (Future - Phase 5) ===
-        options_expander = Gtk.Expander(label="⚙️ Options")
-        options_expander.set_expanded(False)
-        options_expander.set_sensitive(False)  # Disabled for Phase 1
-        
-        options_placeholder = Gtk.Label()
-        options_placeholder.set_text("Repair options will appear here (Phase 5)")
-        options_placeholder.set_margin_start(12)
-        options_placeholder.set_margin_end(12)
-        options_placeholder.set_margin_top(6)
-        options_placeholder.set_margin_bottom(6)
-        options_expander.add(options_placeholder)
-        
-        content_box.pack_start(options_expander, False, False, 0)
-        
-        scrolled.add(content_box)
-        self.pack_start(scrolled, True, True, 0)
+        # Add scrolled window to panel
+        self.pack_start(self.scrolled_window, True, True, 0)
     
     def set_topology_panel(self, topology_panel):
-        """Set topology panel reference for reading analysis results.
+        """Set reference to topology panel.
         
         Args:
             topology_panel: TopologyPanel instance
         """
         self.topology_panel = topology_panel
-        print(f"[VIABILITY] Connected to Topology Panel")
-    
-    def _on_scan_clicked(self, button):
-        """Handle scan button click - analyze model for issues."""
-        if not self.topology_panel:
-            self.status_label.set_markup("<b>⚠️ Warning:</b> Topology Panel not connected")
-            return
         
-        # TEST: Check Knowledge Base status
-        kb = self.get_knowledge_base()
-        if kb:
-            print(f"\n[VIABILITY TEST] ✓ Knowledge Base accessible!")
-            print(f"  P-invariants: {len(kb.p_invariants)}")
-            print(f"  T-invariants: {len(kb.t_invariants)}")
-            print(f"  Liveness tracked: {len(kb.liveness_status)} transitions")
-            print(f"  Siphons: {len(kb.siphons)}")
-            print(f"  Dead transitions: {len(kb.get_dead_transitions())}")
-            print(f"  Compounds: {len(kb.compounds)}")
-            print(f"  Reactions: {len(kb.reactions)}")
-            print(f"  Kinetic parameters: {len(kb.kinetic_parameters)} transitions")
-            
-            # TEST INFERENCE ENGINES
-            print(f"\n[VIABILITY TEST] Testing inference engines...")
-            
-            # Test initial marking inference
-            if kb.places:
-                test_place_id = list(kb.places.keys())[0]
-                marking_result = kb.infer_initial_marking(test_place_id)
-                if marking_result:
-                    tokens, confidence, reasoning = marking_result
-                    print(f"  Initial marking inference: {test_place_id} → {tokens} tokens ({confidence:.1%} confidence)")
-                    print(f"    Reasoning: {reasoning}")
-            
-            # Test firing rate inference
-            if kb.transitions:
-                test_trans_id = list(kb.transitions.keys())[0]
-                rate_result = kb.infer_firing_rate(test_trans_id)
-                if rate_result:
-                    rate, confidence, reasoning = rate_result
-                    print(f"  Firing rate inference: {test_trans_id} → {rate:.3f} ({confidence:.1%} confidence)")
-                    print(f"    Reasoning: {reasoning}")
-            
-            # Test source placement suggestions
-            source_suggestions = kb.suggest_source_placement()
-            if source_suggestions:
-                print(f"  Source placement: {len(source_suggestions)} suggestions")
-                for place_id, rate, confidence, reasoning in source_suggestions[:3]:  # Show first 3
-                    print(f"    {place_id}: rate={rate:.2f} ({confidence:.1%}) - {reasoning}")
-            
-            self.status_label.set_markup(
-                f"<b>📊 Knowledge Base Status:</b>\n"
-                f"  • P-invariants: {len(kb.p_invariants)}\n"
-                f"  • T-invariants: {len(kb.t_invariants)}\n"
-                f"  • Liveness: {len(kb.liveness_status)} transitions\n"
-                f"  • Siphons: {len(kb.siphons)}\n"
-                f"  • Dead transitions: {len(kb.get_dead_transitions())}\n"
-                f"  • Compounds: {len(kb.compounds)}\n"
-                f"  • Reactions: {len(kb.reactions)}\n"
-                f"  • Kinetics: {len(kb.kinetic_parameters)} transitions"
-            )
-        else:
-            print(f"[VIABILITY TEST] ✗ Knowledge Base NOT accessible")
-            self.status_label.set_markup("<b>⚠️ Knowledge Base not available</b>")
-            return
-        
-        # Get topology analysis results
-        try:
-            summary = self.topology_panel.generate_summary_for_report_panel()
-            issues = self._parse_topology_summary(summary)
-            
-            # Display issues
-            self.diagnosis_view.display_issues(issues)
-            
-            # Update status
-            critical_count = sum(1 for i in issues if i['severity'] == 'critical')
-            warning_count = sum(1 for i in issues if i['severity'] == 'warning')
-            
-            if critical_count > 0:
-                status_icon = '🔴'
-                status_text = f"<b>{status_icon} Found {critical_count} critical issue(s), {warning_count} warning(s)</b>"
-            elif warning_count > 0:
-                status_icon = '🟡'
-                status_text = f"<b>{status_icon} Found {warning_count} warning(s)</b>"
-            else:
-                status_icon = '✓'
-                status_text = f"<b>{status_icon} Model is viable - no issues detected</b>"
-            
-            self.status_label.set_markup(status_text)
-            
-        except Exception as e:
-            self.status_label.set_markup(f"<b>❌ Error:</b> {str(e)}")
-            print(f"[VIABILITY ERROR] Failed to scan: {e}")
-            import traceback
-            traceback.print_exc()
+        # Propagate to categories if needed
+        for category in self.categories:
+            if hasattr(category, 'set_topology_panel'):
+                category.set_topology_panel(topology_panel)
     
-    def _parse_topology_summary(self, summary):
-        """Parse topology summary into list of issues.
+    def set_analyses_panel(self, analyses_panel):
+        """Set reference to analyses panel (for locality access).
         
         Args:
-            summary: Dict from TopologyPanel.generate_summary_for_report_panel()
+            analyses_panel: AnalysesPanel instance
+        """
+        self.analyses_panel = analyses_panel
+        
+        # Propagate to diagnosis category (it uses localities)
+        if hasattr(self.diagnosis_category, 'set_analyses_panel'):
+            self.diagnosis_category.set_analyses_panel(analyses_panel)
+    
+    def set_model(self, model):
+        """Update model reference.
+        
+        Args:
+            model: ShypnModel instance
+        """
+        self.model = model
+        
+        # Propagate to categories
+        for category in self.categories:
+            if hasattr(category, 'set_model'):
+                category.set_model(model)
+    
+    def refresh_all(self):
+        """Refresh all categories.
+        
+        Called when model changes or KB updates.
+        """
+        for category in self.categories:
+            if hasattr(category, 'refresh') and category.expander.get_expanded():
+                category.refresh()
+    
+    def get_knowledge_base(self):
+        """Get the knowledge base for the current model.
         
         Returns:
-            List of issue dicts with keys: severity, type, description, id
+            ModelKnowledgeBase: The knowledge base, or None
         """
-        issues = []
-        status = summary.get('status', 'unknown')
-        stats = summary.get('statistics', {})
-        warnings = summary.get('warnings', [])
-        
-        # Status-based issues
-        if status == 'not_analyzed':
-            issues.append({
-                'severity': 'info',
-                'type': 'not_analyzed',
-                'description': 'No topology analysis performed yet',
-                'id': 'status'
-            })
-            return issues
-        
-        # Check for dead transitions
-        # (This is a simplified parser - Phase 2 will have full engine)
-        
-        # Behavioral issues
-        is_live = stats.get('is_live')
-        if is_live is False:
-            issues.append({
-                'severity': 'critical',
-                'type': 'not_live',
-                'description': 'Model is not live - some transitions may never fire',
-                'id': 'liveness'
-            })
-        
-        has_deadlock = stats.get('has_deadlock')
-        if has_deadlock is True:
-            issues.append({
-                'severity': 'critical',
-                'type': 'deadlock',
-                'description': 'Model can reach deadlock state',
-                'id': 'deadlock'
-            })
-        
-        is_bounded = stats.get('is_bounded')
-        if is_bounded is False:
-            issues.append({
-                'severity': 'warning',
-                'type': 'unbounded',
-                'description': 'Model is unbounded - some places may grow indefinitely',
-                'id': 'boundedness'
-            })
-        
-        # Structural issues
-        siphons = stats.get('siphons', {})
-        if isinstance(siphons, dict):
-            blocked = siphons.get('blocked', [])
-            if blocked:
-                issues.append({
-                    'severity': 'warning',
-                    'type': 'blocked_siphon',
-                    'description': f'Blocked siphons detected: {len(blocked)}',
-                    'id': 'siphons'
-                })
-        
-        # Add warnings from summary
-        for warning in warnings:
-            issues.append({
-                'severity': 'warning',
-                'type': 'topology_warning',
-                'description': warning,
-                'id': f'warn_{len(issues)}'
-            })
-        
-        # If no issues found and analysis was complete
-        if not issues and status == 'complete':
-            issues.append({
-                'severity': 'info',
-                'type': 'viable',
-                'description': '✓ Model appears viable - all basic checks passed',
-                'id': 'viable'
-            })
-        
-        return issues
-    
-    def refresh(self):
-        """Refresh panel (can be called when model changes)."""
-        # Clear current display
-        self.diagnosis_view.clear()
-        self.status_label.set_markup("<i>Click 'Scan' to analyze model</i>")
+        if self.model_canvas and hasattr(self.model_canvas, 'get_current_knowledge_base'):
+            return self.model_canvas.get_current_knowledge_base()
+        return None
