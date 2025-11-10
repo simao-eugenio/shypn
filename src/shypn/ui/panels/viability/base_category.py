@@ -789,3 +789,22 @@ class BaseViabilityCategory:
         # Refresh if category is expanded
         if self.category_frame and self.category_frame.is_expanded():
             GLib.idle_add(self._refresh)
+    
+    def _on_observer_update(self, issues):
+        """Callback for observer updates.
+        
+        This is called by the ViabilityObserver when new suggestions are
+        available. The observer continuously monitors events and calls this
+        method dynamically.
+        
+        Args:
+            issues: List of Issue dataclasses from the observer
+        """
+        print(f"[{self.get_category_name()}] Observer update: {len(issues)} issues")
+        
+        # Update the category with new issues
+        self.current_issues = issues
+        
+        # Update UI if category is expanded
+        if self.category_frame and self.category_frame.is_expanded():
+            GLib.idle_add(self._display_issues, issues)

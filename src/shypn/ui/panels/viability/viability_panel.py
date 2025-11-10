@@ -25,6 +25,7 @@ from .structural_category import StructuralCategory
 from .biological_category import BiologicalCategory
 from .kinetic_category import KineticCategory
 from .diagnosis_category import DiagnosisCategory
+from .viability_observer import ViabilityObserver
 
 
 class ViabilityPanel(Gtk.Box):
@@ -53,6 +54,10 @@ class ViabilityPanel(Gtk.Box):
         self.model_canvas = model_canvas
         self.topology_panel = None  # Will be set via set_topology_panel()
         self.analyses_panel = None  # For locality access
+        
+        # Create intelligent observer (watches ALL application events)
+        self.observer = ViabilityObserver()
+        print("[ViabilityPanel] Observer created and ready to monitor events")
         
         # Build panel header
         self._build_header()
@@ -142,6 +147,13 @@ class ViabilityPanel(Gtk.Box):
         # Set parent panel reference for all categories
         for category in self.categories:
             category.parent_panel = self
+            
+        # Subscribe categories to observer updates
+        self.observer.subscribe('structural', self.structural_category._on_observer_update)
+        self.observer.subscribe('biological', self.biological_category._on_observer_update)
+        self.observer.subscribe('kinetic', self.kinetic_category._on_observer_update)
+        self.observer.subscribe('diagnosis', self.diagnosis_category._on_observer_update)
+        print("[ViabilityPanel] Categories subscribed to observer")
         
         # Add categories to container
         for category in self.categories:
@@ -240,6 +252,44 @@ class ViabilityPanel(Gtk.Box):
         for category in self.categories:
             category.model_canvas = model_canvas
             print(f"  ✓ Updated {category.__class__.__name__}.model_canvas")
+        
+        # Feed initial KB data to observer
+        self._feed_observer_with_kb_data()
+    
+    def _feed_observer_with_kb_data(self):
+        """Feed observer with current Knowledge Base data.
+        
+        This allows the observer to evaluate rules immediately instead of
+        waiting for events to occur.
+        """
+        if not self.model_canvas:
+            return
+        
+        try:
+            kb = self.model_canvas.get_current_knowledge_base()
+            if not kb:
+                return
+            
+            # Record KB update event
+            self.observer.record_event(
+                event_type='kb_updated',
+                data={
+                    'places': kb.places,
+                    'transitions': kb.transitions,
+                    'arcs': kb.arcs,
+                    'compounds': kb.compounds,
+                    'reactions': kb.reactions,
+                    'kinetic_parameters': kb.kinetic_parameters,
+                    'p_invariants': kb.p_invariants,
+                    't_invariants': kb.t_invariants,
+                    'siphons': kb.siphons,
+                    'liveness_status': kb.liveness_status
+                },
+                source='viability_panel'
+            )
+            print("[ViabilityPanel] Fed initial KB data to observer")
+        except Exception as e:
+            print(f"[ViabilityPanel] Error feeding KB data to observer: {e}")
     
     def refresh_all(self):
         """Refresh all categories.
