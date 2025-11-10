@@ -36,12 +36,12 @@ class StructuralCategory(BaseViabilityCategory):
         Returns:
             str: Category name
         """
-        return "Structural Inference"
+        return "STRUCTURAL INFERENCE"
     
     def _build_content(self):
         """Build structural category content."""
         # Status section
-        status_frame = Gtk.Frame(label="📊 Current Status")
+        status_frame = Gtk.Frame(label="CURRENT STATUS")
         status_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         status_box.set_margin_start(12)
         status_box.set_margin_end(12)
@@ -60,7 +60,7 @@ class StructuralCategory(BaseViabilityCategory):
         self.content_box.pack_start(button_box, False, False, 0)
         
         # Issues list
-        issues_frame = Gtk.Frame(label="Issues Detected")
+        issues_frame = Gtk.Frame(label="ISSUES DETECTED")
         scrolled = Gtk.ScrolledWindow()
         scrolled.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
         scrolled.set_min_content_height(200)

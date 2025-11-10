@@ -36,12 +36,12 @@ class BiologicalCategory(BaseViabilityCategory):
         Returns:
             str: Category name
         """
-        return "Biological Inference"
+        return "BIOLOGICAL INFERENCE"
     
     def _build_content(self):
         """Build biological category content."""
         # Status section
-        status_frame = Gtk.Frame(label="📊 Current Knowledge")
+        status_frame = Gtk.Frame(label="CURRENT KNOWLEDGE")
         status_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         status_box.set_margin_start(12)
         status_box.set_margin_end(12)
@@ -58,11 +58,11 @@ class BiologicalCategory(BaseViabilityCategory):
         # Action buttons
         button_box = self._create_action_buttons()
         # Customize scan button label
-        self.scan_button.set_label("Scan Semantics")
+        self.scan_button.set_label("SCAN SEMANTICS")
         self.content_box.pack_start(button_box, False, False, 0)
         
         # Issues list
-        issues_frame = Gtk.Frame(label="Issues Detected")
+        issues_frame = Gtk.Frame(label="ISSUES DETECTED")
         scrolled = Gtk.ScrolledWindow()
         scrolled.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
         scrolled.set_min_content_height(200)
