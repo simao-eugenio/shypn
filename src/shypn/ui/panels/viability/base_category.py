@@ -338,18 +338,51 @@ class BaseViabilityCategory:
     def _on_apply_suggestion(self, button, suggestion: Suggestion, issue: Issue):
         """Handle Apply button click for a suggestion.
         
+        Uses KB inference methods to apply the suggestion and records
+        the change for undo.
+        
         Args:
             button: Button that was clicked
             suggestion: Suggestion to apply
             issue: Parent issue
         """
-        # TODO: Implement actual application logic
-        print(f"[{self.get_category_name()}] Apply suggestion: {suggestion.action}")
-        print(f"  Parameters: {suggestion.parameters}")
+        kb = self.get_knowledge_base()
+        if not kb:
+            print(f"[{self.get_category_name()}] ⚠️ Cannot apply: No KB available")
+            return
         
-        # Record change for undo
-        # change = Change(...)
-        # self._record_change(change)
+        print(f"[{self.get_category_name()}] Applying suggestion: {suggestion.action}")
+        print(f"  Category: {suggestion.category}, Element: {issue.element_id}")
+        
+        # Get the model for direct updates
+        manager = None
+        if self.model_canvas:
+            drawing_area = self.model_canvas.get_current_document()
+            if drawing_area:
+                manager = self.model_canvas.get_canvas_manager(drawing_area)
+        
+        # Apply based on action type
+        try:
+            if suggestion.action == "add_initial_marking":
+                self._apply_add_initial_marking(suggestion, issue, kb, manager)
+            elif suggestion.action == "add_source_transition":
+                self._apply_add_source_transition(suggestion, issue, kb, manager)
+            elif suggestion.action == "add_firing_rate":
+                self._apply_add_firing_rate(suggestion, issue, kb, manager)
+            elif suggestion.action == "add_arc_weight":
+                self._apply_add_arc_weight(suggestion, issue, kb, manager)
+            else:
+                print(f"  ⚠️ Unknown action: {suggestion.action}")
+                return
+            
+            # Refresh display after successful application
+            GLib.idle_add(self._refresh)
+            print(f"  ✅ Applied successfully")
+            
+        except Exception as e:
+            print(f"  ❌ Error applying suggestion: {e}")
+            import traceback
+            traceback.print_exc()
     
     def _on_preview_suggestion(self, button, suggestion: Suggestion):
         """Handle Preview button click for a suggestion.
@@ -361,6 +394,166 @@ class BaseViabilityCategory:
         # TODO: Implement canvas highlighting
         print(f"[{self.get_category_name()}] Preview suggestion: {suggestion.action}")
         print(f"  Highlight elements: {suggestion.preview_elements}")
+    
+    # ============================================================================
+    # Suggestion Application Methods
+    # ============================================================================
+    
+    def _apply_add_initial_marking(self, suggestion, issue, kb, manager):
+        """Apply 'add_initial_marking' suggestion.
+        
+        Args:
+            suggestion: Suggestion with parameters
+            issue: Parent issue
+            kb: Knowledge base
+            manager: Canvas manager
+        """
+        place_id = issue.element_id
+        tokens = suggestion.parameters.get('tokens', 0)
+        
+        print(f"  Setting initial marking: {place_id} = {tokens} tokens")
+        
+        # Get current marking for undo
+        place = kb.places.get(place_id)
+        if not place:
+            print(f"  ⚠️ Place {place_id} not found in KB")
+            return
+        
+        old_marking = place.current_marking
+        
+        # Update KB
+        place.current_marking = tokens
+        
+        # Update model if manager is available
+        if manager:
+            for p in manager.places:
+                if p.id == place_id:
+                    p.tokens = tokens
+                    print(f"  Updated model place {place_id}: {old_marking} → {tokens} tokens")
+                    break
+        
+        # Record change for undo
+        change = Change(
+            element_id=place_id,
+            property="current_marking",
+            old_value=old_marking,
+            new_value=tokens,
+            category=suggestion.category,
+            locality_id=self.selected_locality_id
+        )
+        self._record_change(change)
+    
+    def _apply_add_source_transition(self, suggestion, issue, kb, manager):
+        """Apply 'add_source_transition' suggestion.
+        
+        This creates a new transition and arc to add tokens to a place.
+        
+        Args:
+            suggestion: Suggestion with parameters
+            issue: Parent issue
+            kb: Knowledge base
+            manager: Canvas manager
+        """
+        place_id = issue.element_id
+        tokens = suggestion.parameters.get('tokens', 5)
+        
+        print(f"  Adding source transition for {place_id} with {tokens} tokens/firing")
+        
+        # For now, just suggest using initial marking instead
+        # (Creating new elements requires more complex canvas integration)
+        print(f"  ⚠️ Creating new transitions not yet implemented")
+        print(f"  💡 Consider using 'add_initial_marking' instead")
+    
+    def _apply_add_firing_rate(self, suggestion, issue, kb, manager):
+        """Apply 'add_firing_rate' suggestion.
+        
+        Args:
+            suggestion: Suggestion with parameters
+            issue: Parent issue
+            kb: Knowledge base
+            manager: Canvas manager
+        """
+        transition_id = issue.element_id
+        rate = suggestion.parameters.get('rate', 1.0)
+        
+        print(f"  Setting firing rate: {transition_id} = {rate}")
+        
+        # Get current rate for undo
+        transition = kb.transitions.get(transition_id)
+        if not transition:
+            print(f"  ⚠️ Transition {transition_id} not found in KB")
+            return
+        
+        old_rate = transition.firing_rate
+        
+        # Update KB
+        transition.firing_rate = rate
+        
+        # Update model if manager is available
+        if manager:
+            for t in manager.transitions:
+                if t.id == transition_id:
+                    # Store rate in transition metadata
+                    if not hasattr(t, 'metadata'):
+                        t.metadata = {}
+                    t.metadata['firing_rate'] = rate
+                    print(f"  Updated model transition {transition_id}: {old_rate} → {rate}")
+                    break
+        
+        # Record change for undo
+        change = Change(
+            element_id=transition_id,
+            property="firing_rate",
+            old_value=old_rate,
+            new_value=rate,
+            category=suggestion.category,
+            locality_id=self.selected_locality_id
+        )
+        self._record_change(change)
+    
+    def _apply_add_arc_weight(self, suggestion, issue, kb, manager):
+        """Apply 'add_arc_weight' suggestion.
+        
+        Args:
+            suggestion: Suggestion with parameters
+            issue: Parent issue
+            kb: Knowledge base
+            manager: Canvas manager
+        """
+        arc_id = issue.element_id
+        weight = suggestion.parameters.get('weight', 1)
+        
+        print(f"  Setting arc weight: {arc_id} = {weight}")
+        
+        # Get current weight for undo
+        arc = kb.arcs.get(arc_id)
+        if not arc:
+            print(f"  ⚠️ Arc {arc_id} not found in KB")
+            return
+        
+        old_weight = arc.weight
+        
+        # Update KB
+        arc.weight = weight
+        
+        # Update model if manager is available
+        if manager:
+            for a in manager.arcs:
+                if a.id == arc_id:
+                    a.weight = weight
+                    print(f"  Updated model arc {arc_id}: {old_weight} → {weight}")
+                    break
+        
+        # Record change for undo
+        change = Change(
+            element_id=arc_id,
+            property="weight",
+            old_value=old_weight,
+            new_value=weight,
+            category=suggestion.category,
+            locality_id=self.selected_locality_id
+        )
+        self._record_change(change)
     
     def _show_no_issues_message(self):
         """Show message when no issues are found."""
@@ -383,12 +576,78 @@ class BaseViabilityCategory:
     def _apply_undo(self, change: Change):
         """Apply an undo operation.
         
+        Reverts the change to its old value and updates both KB and model.
+        
         Args:
             change: Change dataclass instance to undo
         """
-        # TODO: Implement actual undo logic
-        print(f"[{self.get_category_name()}] Undo: {change}")
-        print(f"  Reverting {change.element_id}.{change.property}: {change.new_value} → {change.old_value}")
+        kb = self.get_knowledge_base()
+        if not kb:
+            print(f"[{self.get_category_name()}] ⚠️ Cannot undo: No KB available")
+            return
+        
+        print(f"[{self.get_category_name()}] Undo: {change.element_id}.{change.property}")
+        print(f"  Reverting: {change.new_value} → {change.old_value}")
+        
+        # Get the model for direct updates
+        manager = None
+        if self.model_canvas:
+            drawing_area = self.model_canvas.get_current_document()
+            if drawing_area:
+                manager = self.model_canvas.get_canvas_manager(drawing_area)
+        
+        try:
+            # Update based on property type
+            if change.property == "current_marking":
+                place = kb.places.get(change.element_id)
+                if place:
+                    place.current_marking = change.old_value
+                    # Update model
+                    if manager:
+                        for p in manager.places:
+                            if p.id == change.element_id:
+                                p.tokens = change.old_value
+                                break
+                                
+            elif change.property == "firing_rate":
+                transition = kb.transitions.get(change.element_id)
+                if transition:
+                    transition.firing_rate = change.old_value
+                    # Update model
+                    if manager:
+                        for t in manager.transitions:
+                            if t.id == change.element_id:
+                                if hasattr(t, 'metadata'):
+                                    t.metadata['firing_rate'] = change.old_value
+                                break
+                                
+            elif change.property == "weight":
+                arc = kb.arcs.get(change.element_id)
+                if arc:
+                    arc.weight = change.old_value
+                    # Update model
+                    if manager:
+                        for a in manager.arcs:
+                            if a.id == change.element_id:
+                                a.weight = change.old_value
+                                break
+            
+            # Remove from history
+            if change in self.change_history:
+                self.change_history.remove(change)
+            
+            # Disable undo button if no more changes
+            if not self.change_history:
+                self.undo_button.set_sensitive(False)
+            
+            # Refresh display
+            GLib.idle_add(self._refresh)
+            print(f"  ✅ Undo successful")
+            
+        except Exception as e:
+            print(f"  ❌ Error during undo: {e}")
+            import traceback
+            traceback.print_exc()
     
     def _record_change(self, change: Change):
         """Record a change to the undo history.

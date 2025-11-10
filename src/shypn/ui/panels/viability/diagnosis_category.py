@@ -17,6 +17,7 @@ Date: November 10, 2025
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk
+from typing import List
 
 from .base_category import BaseViabilityCategory
 from .multi_domain_engine import MultiDomainEngine
