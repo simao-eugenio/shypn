@@ -663,10 +663,14 @@ class ModelsCategory(BaseReportCategory):
             traceback.print_exc()
     
     def _update_knowledge_base_kinetics(self, model):
-        """Extract BRENDA kinetic parameters from transitions and update Knowledge Base.
+        """Extract kinetic parameters from transitions and update Knowledge Base.
+        
+        Extracts from two sources:
+        1. BRENDA enrichment (stored in transition metadata)
+        2. Heuristic database (local SQLite with BRENDA/SABIO-RK/BioModels data)
         
         Args:
-            model: ModelCanvasManager with transitions containing BRENDA enrichment data
+            model: ModelCanvasManager with transitions
         """
         try:
             # Get Knowledge Base instance
@@ -681,10 +685,20 @@ class ModelsCategory(BaseReportCategory):
             if not kb:
                 return  # KB not available
             
-            print(f"[BRENDA→KB] Updating kinetic knowledge...")
+            print(f"[KINETICS→KB] Updating kinetic knowledge...")
+            
+            # Try to get heuristic database
+            heuristic_db = None
+            try:
+                from shypn.crossfetch.database.heuristic_db import HeuristicDatabase
+                heuristic_db = HeuristicDatabase()
+            except Exception as e:
+                print(f"[KINETICS→KB] ⚠️ Heuristic database not available: {e}")
             
             # Track stats
             transitions_with_kinetics = 0
+            from_enrichment = 0
+            from_database = 0
             
             # Extract kinetic parameters from transitions
             for transition in model.transitions:
@@ -692,69 +706,123 @@ class ModelsCategory(BaseReportCategory):
                     continue
                 
                 metadata = transition.metadata
+                kinetic_params = None
                 
-                # Check if transition has BRENDA enrichment
+                # SOURCE 1: Check for BRENDA enrichment in metadata
                 enrichment_source = metadata.get('enrichment_source')
-                if enrichment_source != 'brenda':
-                    # No BRENDA enrichment, skip
-                    continue
+                if enrichment_source == 'brenda':
+                    km = metadata.get('km')
+                    kcat = metadata.get('kcat')
+                    vmax = metadata.get('vmax')
+                    ki = metadata.get('ki')
+                    
+                    if any([km, kcat, vmax, ki]):
+                        # Get EC number
+                        ec_number = None
+                        ec_numbers = metadata.get('ec_numbers', [])
+                        if ec_numbers and isinstance(ec_numbers, list):
+                            ec_number = ec_numbers[0]
+                        elif 'ec_number' in metadata:
+                            ec_number = metadata['ec_number']
+                        
+                        # Get organism
+                        organism = metadata.get('organism')
+                        
+                        # Create KineticParams object
+                        from shypn.viability.knowledge.data_structures import KineticParams
+                        
+                        kinetic_params = KineticParams(
+                            transition_id=transition.id,
+                            ec_number=ec_number,
+                            vmax=vmax,
+                            kcat=kcat,
+                            source='brenda_enrichment',
+                            organism=organism,
+                            confidence=0.8  # High confidence for BRENDA enrichment
+                        )
+                        
+                        # Add Km values (substrate -> Km mapping)
+                        if km is not None:
+                            substrate_name = metadata.get('substrate', 'default')
+                            kinetic_params.km_values[substrate_name] = km
+                        
+                        # Add Ki values (inhibitor -> Ki mapping)
+                        if ki is not None:
+                            inhibitor_name = metadata.get('inhibitor', 'default')
+                            kinetic_params.ki_values[inhibitor_name] = ki
+                        
+                        from_enrichment += 1
                 
-                # Extract kinetic parameters
-                km = metadata.get('km')
-                kcat = metadata.get('kcat')
-                vmax = metadata.get('vmax')
-                ki = metadata.get('ki')
+                # SOURCE 2: Query heuristic database for EC number
+                if not kinetic_params and heuristic_db:
+                    # Get EC number from metadata
+                    ec_numbers = metadata.get('ec_numbers', [])
+                    ec_number = None
+                    if ec_numbers and isinstance(ec_numbers, list) and len(ec_numbers) > 0:
+                        ec_number = ec_numbers[0]
+                    elif 'ec_number' in metadata:
+                        ec_number = metadata['ec_number']
+                    
+                    if ec_number:
+                        # Query database for kinetic parameters
+                        try:
+                            # Get Km values
+                            km_results = heuristic_db.query_brenda_data(
+                                ec_number=ec_number,
+                                parameter_type='Km',
+                                min_quality=0.7,
+                                limit=1  # Just get the best one
+                            )
+                            
+                            # Get Kcat values
+                            kcat_results = heuristic_db.query_brenda_data(
+                                ec_number=ec_number,
+                                parameter_type='Kcat',
+                                min_quality=0.7,
+                                limit=1
+                            )
+                            
+                            if km_results or kcat_results:
+                                from shypn.viability.knowledge.data_structures import KineticParams
+                                
+                                kinetic_params = KineticParams(
+                                    transition_id=transition.id,
+                                    ec_number=ec_number,
+                                    source='heuristic_db',
+                                    confidence=0.6  # Medium confidence for database lookup
+                                )
+                                
+                                # Add Km from database
+                                if km_results:
+                                    km_data = km_results[0]
+                                    substrate = km_data.get('substrate', 'default')
+                                    kinetic_params.km_values[substrate] = km_data['value']
+                                    if km_data.get('organism'):
+                                        kinetic_params.organism = km_data['organism']
+                                
+                                # Add Kcat from database
+                                if kcat_results:
+                                    kcat_data = kcat_results[0]
+                                    kinetic_params.kcat = kcat_data['value']
+                                
+                                from_database += 1
+                        
+                        except Exception as e:
+                            # Database query failed, skip
+                            pass
                 
-                # Skip if no kinetic parameters found
-                if not any([km, kcat, vmax, ki]):
-                    continue
-                
-                # Get EC number (for KineticParams dataclass)
-                ec_number = None
-                ec_numbers = metadata.get('ec_numbers', [])
-                if ec_numbers and isinstance(ec_numbers, list):
-                    ec_number = ec_numbers[0]
-                elif 'ec_number' in metadata:
-                    ec_number = metadata['ec_number']
-                
-                # Get organism if available
-                organism = metadata.get('organism')
-                
-                # Create KineticParams object
-                from shypn.viability.knowledge.data_structures import KineticParams
-                
-                kinetic_params = KineticParams(
-                    transition_id=transition.id,
-                    ec_number=ec_number,
-                    vmax=vmax,
-                    kcat=kcat,
-                    source='brenda',
-                    organism=organism,
-                    confidence=0.8  # High confidence for BRENDA data
-                )
-                
-                # Add Km values (substrate -> Km mapping)
-                if km is not None:
-                    # Try to get substrate name from metadata
-                    substrate_name = metadata.get('substrate', 'default')
-                    kinetic_params.km_values[substrate_name] = km
-                
-                # Add Ki values (inhibitor -> Ki mapping)
-                if ki is not None:
-                    # Try to get inhibitor name from metadata
-                    inhibitor_name = metadata.get('inhibitor', 'default')
-                    kinetic_params.ki_values[inhibitor_name] = ki
-                
-                # Update Knowledge Base
-                kb.update_kinetic_parameters(transition.id, kinetic_params)
-                transitions_with_kinetics += 1
+                # Update Knowledge Base if we found kinetic parameters
+                if kinetic_params:
+                    kb.update_kinetic_parameters(transition.id, kinetic_params)
+                    transitions_with_kinetics += 1
             
             if transitions_with_kinetics > 0:
-                print(f"[BRENDA→KB] ✓ Updated: {transitions_with_kinetics} transitions with kinetic parameters")
+                print(f"[KINETICS→KB] ✓ Updated: {transitions_with_kinetics} transitions "
+                      f"({from_enrichment} enriched, {from_database} from database)")
             
         except Exception as e:
             import traceback
-            print(f"[BRENDA→KB] ⚠️ Failed to update kinetic knowledge: {e}")
+            print(f"[KINETICS→KB] ⚠️ Failed to update kinetic knowledge: {e}")
             traceback.print_exc()
     
     def refresh(self):
