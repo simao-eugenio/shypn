@@ -19,6 +19,8 @@ gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk
 
 from .base_category import BaseViabilityCategory
+from .multi_domain_engine import MultiDomainEngine
+from .viability_dataclasses import Issue, Suggestion, MultiDomainSuggestion
 
 
 class DiagnosisCategory(BaseViabilityCategory):
@@ -41,6 +43,9 @@ class DiagnosisCategory(BaseViabilityCategory):
         """
         super().__init__(model_canvas, expanded)
         self.analyses_panel = None  # For locality access
+        
+        # Multi-domain engine (the key innovation!)
+        self.multi_domain_engine = MultiDomainEngine()
     
     def get_category_name(self):
         """Get category display name.
@@ -263,6 +268,9 @@ class DiagnosisCategory(BaseViabilityCategory):
             print("[Diagnosis] No knowledge base available")
             return []
         
+        # Update multi-domain engine with current KB
+        self.multi_domain_engine.kb = kb
+        
         issues = []
         
         # Calculate health scores
@@ -274,40 +282,121 @@ class DiagnosisCategory(BaseViabilityCategory):
         # Update health display
         self.health_label.set_markup(
             f"<b>Overall Health: {overall_health:.0f}%</b>\n\n"
-            f"  Structural:  {self._health_bar(structural_health)} {structural_health:.0f}%\n"
-            f"  Biological:  {self._health_bar(biological_health)} {biological_health:.0f}%\n"
-            f"  Kinetic:     {self._health_bar(kinetic_health)} {kinetic_health:.0f}%"
+            f"  STRUCTURAL:  {self._health_bar(structural_health)} {structural_health:.0f}%\n"
+            f"  BIOLOGICAL:  {self._health_bar(biological_health)} {biological_health:.0f}%\n"
+            f"  KINETIC:     {self._health_bar(kinetic_health)} {kinetic_health:.0f}%"
         )
         
-        # Scan for critical issues (multi-domain)
-        dead_transitions = kb.get_dead_transitions()
-        if dead_transitions:
-            issues.append({
-                'severity': 'critical',
-                'title': f'{len(dead_transitions)} transitions are DEAD',
-                'description': 'Blocks pathway execution',
-                'element_id': 'dead_transitions',
-                'multi_domain': True,
-                'suggestions': {
-                    'structural': [],
-                    'biological': [],
-                    'kinetic': []
-                }
-            })
+        # Collect issues from all categories (using dataclasses now)
+        issues.extend(self._scan_structural_issues(kb))
+        issues.extend(self._scan_biological_issues(kb))
+        issues.extend(self._scan_kinetic_issues(kb))
         
-        # Scan for kinetic coverage issues
-        total_trans = len(kb.transitions)
-        trans_with_kinetics = len(kb.kinetic_parameters)
-        if trans_with_kinetics < total_trans * 0.5:  # Less than 50%
-            issues.append({
-                'severity': 'critical' if trans_with_kinetics < total_trans * 0.25 else 'warning',
-                'title': 'Missing kinetic parameters',
-                'description': f'{total_trans - trans_with_kinetics}/{total_trans} transitions have no rates',
-                'element_id': 'missing_kinetics',
-                'multi_domain': False
-            })
+        # Generate multi-domain suggestions (KEY INNOVATION!)
+        if issues:
+            multi_domain_suggestions = self.multi_domain_engine.get_multi_domain_suggestions(
+                issues=issues,
+                locality_id=self.selected_locality_id
+            )
+            
+            print(f"[Diagnosis] Found {len(issues)} issues, {len(multi_domain_suggestions)} multi-domain")
+            
+            # Add multi-domain suggestions to issues
+            for mds in multi_domain_suggestions:
+                # Create a special issue to display the multi-domain suggestion
+                multi_issue = Issue(
+                    id=f"multi_{mds.element_id}",
+                    category="multi-domain",
+                    severity="info",
+                    title=f"Multi-Domain Analysis: {mds.element_id}",
+                    description=mds.combined_reasoning,
+                    element_id=mds.element_id,
+                    element_type="place",  # TODO: detect from element_id
+                    locality_id=self.selected_locality_id
+                )
+                
+                # Add combined suggestion
+                combined_suggestion = Suggestion(
+                    action="apply_multi_domain",
+                    category="multi-domain",
+                    parameters={
+                        "structural": mds.structural_suggestion.parameters if mds.structural_suggestion else {},
+                        "biological": mds.biological_suggestion.parameters if mds.biological_suggestion else {},
+                        "kinetic": mds.kinetic_suggestion.parameters if mds.kinetic_suggestion else {}
+                    },
+                    confidence=mds.combined_confidence,
+                    reasoning=mds.combined_reasoning,
+                    preview_elements=[mds.element_id]
+                )
+                
+                multi_issue.suggestions = [combined_suggestion]
+                issues.append(multi_issue)
         
         return issues
+    
+    def _scan_structural_issues(self, kb) -> List[Issue]:
+        """Scan for structural issues.
+        
+        Args:
+            kb: Knowledge base
+            
+        Returns:
+            List[Issue]: Structural issues with suggestions
+        """
+        issues = []
+        
+        # Check for dead transitions
+        dead_transitions = kb.get_dead_transitions() if hasattr(kb, 'get_dead_transitions') else []
+        if dead_transitions:
+            for trans_id in dead_transitions[:5]:  # Limit to first 5
+                issue = Issue(
+                    id=f"dead_{trans_id}",
+                    category="structural",
+                    severity="critical",
+                    title=f"Transition {trans_id} is DEAD",
+                    description="This transition can never fire, blocking pathway execution",
+                    element_id=trans_id,
+                    element_type="transition",
+                    locality_id=self.selected_locality_id
+                )
+                
+                # Add suggestion to fix initial marking
+                suggestion = Suggestion(
+                    action="add_source",
+                    category="structural",
+                    parameters={"transition_id": trans_id, "rate": 1.0},
+                    confidence=0.80,
+                    reasoning="Add source transition to enable firing",
+                    preview_elements=[trans_id]
+                )
+                issue.suggestions.append(suggestion)
+                issues.append(issue)
+        
+        return issues
+    
+    def _scan_biological_issues(self, kb) -> List[Issue]:
+        """Scan for biological issues.
+        
+        Args:
+            kb: Knowledge base
+            
+        Returns:
+            List[Issue]: Biological issues with suggestions
+        """
+        # TODO: Query KB for unmapped compounds, stoichiometry mismatches
+        return []
+    
+    def _scan_kinetic_issues(self, kb) -> List[Issue]:
+        """Scan for kinetic issues.
+        
+        Args:
+            kb: Knowledge base
+            
+        Returns:
+            List[Issue]: Kinetic issues with suggestions
+        """
+        # TODO: Query KB for missing rates, low confidence parameters
+        return []
     
     def _calculate_structural_health(self, kb):
         """Calculate structural health score.
