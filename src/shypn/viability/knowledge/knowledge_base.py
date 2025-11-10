@@ -282,6 +282,81 @@ class ModelKnowledgeBase:
         self.reactions.update(reactions)
         self.last_updated['reactions'] = datetime.now()
     
+    def update_compound_info(self, compound_id: str, compound_data: dict):
+        """Update compound information from pathway metadata.
+        
+        Args:
+            compound_id: KEGG compound ID (e.g., "cpd:C00031")
+            compound_data: Dict with keys: name, formula, molecular_weight, place_ids
+        """
+        from .data_structures import CompoundInfo
+        
+        if compound_id not in self.compounds:
+            # Create new CompoundInfo
+            self.compounds[compound_id] = CompoundInfo(
+                compound_id=compound_id,
+                name=compound_data.get('name', ''),
+                formula=compound_data.get('formula'),
+                molecular_weight=compound_data.get('molecular_weight')
+            )
+        else:
+            # Update existing
+            if compound_data.get('name'):
+                self.compounds[compound_id].name = compound_data['name']
+            if compound_data.get('formula'):
+                self.compounds[compound_id].formula = compound_data['formula']
+            if compound_data.get('molecular_weight'):
+                self.compounds[compound_id].molecular_weight = compound_data['molecular_weight']
+        
+        # Link to places
+        place_ids = compound_data.get('place_ids', [])
+        for place_id in place_ids:
+            if place_id in self.places:
+                self.places[place_id].compound_id = compound_id
+                self.places[place_id].compound_name = self.compounds[compound_id].name
+        
+        self.last_updated['compounds'] = datetime.now()
+    
+    def update_reaction_info(self, reaction_id: str, reaction_data: dict):
+        """Update reaction information from pathway metadata.
+        
+        Args:
+            reaction_id: KEGG reaction ID (e.g., "R00200")
+            reaction_data: Dict with keys: name, ec_number, ec_numbers, reversible, transition_id
+        """
+        from .data_structures import ReactionInfo
+        
+        if reaction_id not in self.reactions:
+            # Create new ReactionInfo
+            self.reactions[reaction_id] = ReactionInfo(
+                reaction_id=reaction_id,
+                name=reaction_data.get('name', ''),
+                ec_number=reaction_data.get('ec_number'),
+                reversible=reaction_data.get('reversible', False)
+            )
+        else:
+            # Update existing
+            if reaction_data.get('name'):
+                self.reactions[reaction_id].name = reaction_data['name']
+            if reaction_data.get('ec_number'):
+                self.reactions[reaction_id].ec_number = reaction_data['ec_number']
+            if 'reversible' in reaction_data:
+                self.reactions[reaction_id].reversible = reaction_data['reversible']
+        
+        # Link to transition
+        transition_id = reaction_data.get('transition_id')
+        if transition_id and transition_id in self.transitions:
+            self.transitions[transition_id].reaction_id = reaction_id
+            self.transitions[transition_id].reaction_name = self.reactions[reaction_id].name
+            # Handle both single ec_number and list of ec_numbers
+            ec_numbers = reaction_data.get('ec_numbers', [])
+            if ec_numbers:
+                self.transitions[transition_id].ec_number = ec_numbers[0]
+            elif reaction_data.get('ec_number'):
+                self.transitions[transition_id].ec_number = reaction_data['ec_number']
+        
+        self.last_updated['reactions'] = datetime.now()
+    
     def link_place_to_compound(self, place_id: str, compound_id: str):
         """Link a place to a KEGG compound.
         

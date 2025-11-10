@@ -573,6 +573,90 @@ class ModelsCategory(BaseReportCategory):
             print(f"[REPORT→KB] ⚠️ Failed to update structural knowledge: {e}")
             traceback.print_exc()
     
+    def _update_knowledge_base_pathway(self, model):
+        """Extract pathway metadata from model and update Knowledge Base.
+        
+        Args:
+            model: ModelCanvasManager with places/transitions/arcs and their metadata
+        """
+        try:
+            # Get Knowledge Base instance
+            kb = None
+            if hasattr(self, 'parent_panel') and self.parent_panel:
+                # Through parent panel -> model_canvas_loader
+                if hasattr(self.parent_panel, 'model_canvas_loader'):
+                    loader = self.parent_panel.model_canvas_loader
+                    if hasattr(loader, 'get_current_knowledge_base'):
+                        kb = loader.get_current_knowledge_base()
+            
+            if not kb:
+                return  # KB not available
+            
+            print(f"[PATHWAY→KB] Updating pathway knowledge...")
+            
+            # Track stats
+            compounds_added = 0
+            reactions_added = 0
+            
+            # Extract compound info from places
+            for place in model.places:
+                if not place or not hasattr(place, 'metadata'):
+                    continue
+                
+                metadata = place.metadata
+                
+                # Extract KEGG compound data
+                kegg_ids = metadata.get('kegg_compound_ids', [])
+                compound_name = metadata.get('compound_name', '')
+                
+                if kegg_ids:
+                    for kegg_id in kegg_ids:
+                        # Create compound info dict
+                        compound_data = {
+                            'compound_id': kegg_id,  # e.g., "cpd:C00031"
+                            'name': compound_name,
+                            'formula': None,  # Not in KEGG KGML
+                            'molecular_weight': None,  # Not in KEGG KGML
+                            'place_ids': [place.id]  # Link to place
+                        }
+                        
+                        kb.update_compound_info(kegg_id, compound_data)
+                        compounds_added += 1
+            
+            # Extract reaction info from transitions
+            for transition in model.transitions:
+                if not transition or not hasattr(transition, 'metadata'):
+                    continue
+                
+                metadata = transition.metadata
+                
+                # Extract KEGG reaction data
+                kegg_reaction_id = metadata.get('kegg_reaction_id')
+                ec_numbers = metadata.get('ec_numbers', [])
+                reversible = metadata.get('reversible', False)
+                
+                if kegg_reaction_id:
+                    # Create reaction info dict
+                    reaction_data = {
+                        'reaction_id': kegg_reaction_id,  # e.g., "R00200"
+                        'name': transition.label or transition.name,
+                        'ec_number': ec_numbers[0] if ec_numbers else None,
+                        'ec_numbers': ec_numbers,  # All EC numbers
+                        'reversible': reversible,
+                        'transition_id': transition.id  # Link to transition
+                    }
+                    
+                    kb.update_reaction_info(kegg_reaction_id, reaction_data)
+                    reactions_added += 1
+            
+            if compounds_added > 0 or reactions_added > 0:
+                print(f"[PATHWAY→KB] ✓ Updated: {compounds_added} compounds, {reactions_added} reactions")
+            
+        except Exception as e:
+            import traceback
+            print(f"[PATHWAY→KB] ⚠️ Failed to update pathway knowledge: {e}")
+            traceback.print_exc()
+    
     def refresh(self):
         """Refresh tables when model changes or tab switches."""
         # If no model, show empty state
@@ -589,6 +673,9 @@ class ModelsCategory(BaseReportCategory):
         
         # UPDATE KNOWLEDGE BASE with structural data
         self._update_knowledge_base_structural(model)
+        
+        # UPDATE KNOWLEDGE BASE with pathway metadata
+        self._update_knowledge_base_pathway(model)
         
         # === BUILD MODEL OVERVIEW ===
         overview_lines = []
