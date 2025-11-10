@@ -804,11 +804,19 @@ class BaseTopologyCategory:
         try:
             kb = self.get_knowledge_base()
             if not kb:
+                print(f"[KB UPDATE] ⚠️ No KB available for {analyzer_name} - get_knowledge_base() returned None")
+                print(f"  - self.parent_panel: {self.parent_panel}")
+                print(f"  - self.model_canvas: {self.model_canvas}")
+                if self.model_canvas:
+                    print(f"  - has get_current_knowledge_base: {hasattr(self.model_canvas, 'get_current_knowledge_base')}")
                 return False  # No KB available
+            
+            print(f"[KB UPDATE] Processing {analyzer_name}...")
             
             # Handle AnalysisResult objects
             if hasattr(result, 'success'):
                 if not result.success:
+                    print(f"[KB UPDATE] ⚠️ {analyzer_name} analysis failed, skipping KB update")
                     return False  # Skip failed analyses
                 result_data = result.data if hasattr(result, 'data') else {}
             else:
