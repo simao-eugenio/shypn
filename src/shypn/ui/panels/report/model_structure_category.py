@@ -631,14 +631,19 @@ class ModelsCategory(BaseReportCategory):
                 metadata = transition.metadata
                 
                 # Extract KEGG reaction data
-                kegg_reaction_id = metadata.get('kegg_reaction_id')
+                # Note: 'kegg_reaction_name' contains the KEGG API ID (e.g., "rn:R00710")
+                # while 'kegg_reaction_id' is the internal pathway entry ID (e.g., "61")
+                kegg_reaction_name = metadata.get('kegg_reaction_name')
                 ec_numbers = metadata.get('ec_numbers', [])
                 reversible = metadata.get('reversible', False)
                 
-                if kegg_reaction_id:
+                if kegg_reaction_name:
+                    # Strip "rn:" prefix if present (e.g., "rn:R00710" → "R00710")
+                    reaction_id = kegg_reaction_name.replace('rn:', '')
+                    
                     # Create reaction info dict
                     reaction_data = {
-                        'reaction_id': kegg_reaction_id,  # e.g., "R00200"
+                        'reaction_id': reaction_id,  # e.g., "R00710"
                         'name': transition.label or transition.name,
                         'ec_number': ec_numbers[0] if ec_numbers else None,
                         'ec_numbers': ec_numbers,  # All EC numbers
@@ -646,7 +651,7 @@ class ModelsCategory(BaseReportCategory):
                         'transition_id': transition.id  # Link to transition
                     }
                     
-                    kb.update_reaction_info(kegg_reaction_id, reaction_data)
+                    kb.update_reaction_info(reaction_id, reaction_data)
                     reactions_added += 1
             
             if compounds_added > 0 or reactions_added > 0:
