@@ -505,6 +505,74 @@ class ModelsCategory(BaseReportCategory):
             renderer.set_property('weight', 400)  # Normal weight
             renderer.set_property('style', 0)  # Normal style
     
+    def _update_knowledge_base_structural(self, model):
+        """Update Knowledge Base with structural model data.
+        
+        Args:
+            model: ModelCanvasManager with places, transitions, arcs
+        """
+        try:
+            # Get KB from model_canvas_loader (the actual loader, not the manager)
+            kb = None
+            if hasattr(self, 'parent_panel') and self.parent_panel:
+                if hasattr(self.parent_panel, 'model_canvas_loader'):
+                    loader = self.parent_panel.model_canvas_loader
+                    if hasattr(loader, 'get_current_knowledge_base'):
+                        kb = loader.get_current_knowledge_base()
+            
+            if not kb:
+                print(f"[REPORT→KB] ⚠️ No KB available for structural update")
+                return
+            
+            print(f"[REPORT→KB] Updating structural knowledge...")
+            
+            # Extract structural data
+            places_data = []
+            transitions_data = []
+            arcs_data = []
+            
+            # Places
+            if hasattr(model, 'places') and model.places:
+                for place in model.places:
+                    if place:
+                        place_info = {
+                            'place_id': place.id if hasattr(place, 'id') else str(id(place)),
+                            'label': place.label if hasattr(place, 'label') else '',
+                            'initial_marking': place.tokens if hasattr(place, 'tokens') else 0,
+                        }
+                        places_data.append(place_info)
+            
+            # Transitions
+            if hasattr(model, 'transitions') and model.transitions:
+                for transition in model.transitions:
+                    if transition:
+                        trans_info = {
+                            'transition_id': transition.id if hasattr(transition, 'id') else str(id(transition)),
+                            'label': transition.label if hasattr(transition, 'label') else '',
+                        }
+                        transitions_data.append(trans_info)
+            
+            # Arcs
+            if hasattr(model, 'arcs') and model.arcs:
+                for arc in model.arcs:
+                    if arc:
+                        arc_info = {
+                            'arc_id': arc.id if hasattr(arc, 'id') else str(id(arc)),
+                            'source_id': arc.source.id if hasattr(arc, 'source') and hasattr(arc.source, 'id') else None,
+                            'target_id': arc.target.id if hasattr(arc, 'target') and hasattr(arc.target, 'id') else None,
+                            'weight': arc.weight if hasattr(arc, 'weight') else 1,
+                        }
+                        arcs_data.append(arc_info)
+            
+            # Update KB
+            kb.update_topology_structural(places_data, transitions_data, arcs_data)
+            print(f"[REPORT→KB] ✓ Updated: {len(places_data)} places, {len(transitions_data)} transitions, {len(arcs_data)} arcs")
+            
+        except Exception as e:
+            import traceback
+            print(f"[REPORT→KB] ⚠️ Failed to update structural knowledge: {e}")
+            traceback.print_exc()
+    
     def refresh(self):
         """Refresh tables when model changes or tab switches."""
         # If no model, show empty state
@@ -518,6 +586,9 @@ class ModelsCategory(BaseReportCategory):
         
         # The model_canvas IS the model (ModelCanvasManager with places/transitions/arcs)
         model = self.model_canvas
+        
+        # UPDATE KNOWLEDGE BASE with structural data
+        self._update_knowledge_base_structural(model)
         
         # === BUILD MODEL OVERVIEW ===
         overview_lines = []
