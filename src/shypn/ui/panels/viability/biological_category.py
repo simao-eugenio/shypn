@@ -87,7 +87,6 @@ class BiologicalCategory(BaseViabilityCategory):
                 except:
                     pass
             
-                  f"{len(stats['inactive_places'])} inactive")
             return stats
             
         except Exception as e:
