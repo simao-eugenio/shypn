@@ -42,14 +42,14 @@ class BiologicalCategory(BaseViabilityCategory):
     def _build_content(self):
         """Build biological category content."""
         # Status section
-        status_frame = Gtk.Frame(label="CURRENT KNOWLEDGE")
+        status_frame = Gtk.Frame(label="CURRENT STATUS")
         status_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         status_box.set_margin_start(12)
         status_box.set_margin_end(12)
         status_box.set_margin_top(12)
         status_box.set_margin_bottom(12)
         
-        self.status_label = Gtk.Label(label="Click 'Scan Semantics' to analyze")
+        self.status_label = Gtk.Label(label="Expand category to scan for biological issues...")
         self.status_label.set_halign(Gtk.Align.START)
         status_box.pack_start(self.status_label, False, False, 0)
         
