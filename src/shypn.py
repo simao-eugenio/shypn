@@ -66,6 +66,7 @@ try:
 	from shypn.helpers.right_panel_loader import create_right_panel
 	from shypn.helpers.pathway_panel_loader import create_pathway_panel
 	from shypn.helpers.topology_panel_loader import TopologyPanelLoader
+	from shypn.helpers.viability_panel_loader import ViabilityPanelLoader
 	from shypn.helpers.model_canvas_loader import create_model_canvas
 	from shypn.file import create_persistency_manager
 	from shypn.ui import MasterPalette
@@ -434,6 +435,47 @@ def main(argv=None):
 			pathway_panel_loader = None
 			topology_panel_loader = None
 		
+		# Load viability panel AFTER topology (needs topology reference)
+		try:
+			# Viability panel doesn't need model at init - will get it at analysis time
+			viability_panel_loader = ViabilityPanelLoader(model=None)
+			
+			# Store viability_panel_loader reference for access
+			model_canvas_loader.viability_panel_loader = viability_panel_loader
+			
+			# Wire model_canvas_loader so viability can access current model
+			if hasattr(viability_panel_loader, 'controller') and viability_panel_loader.controller:
+				viability_panel_loader.set_model_canvas_loader(model_canvas_loader)
+				
+				# Wire lifecycle events (same as topology)
+				def on_viability_tab_switched(notebook, page, page_num):
+					"""Called when user switches to different model tab."""
+					drawing_area = model_canvas_loader.get_current_document()
+					if drawing_area and viability_panel_loader.controller:
+						viability_panel_loader.controller.on_tab_switched(drawing_area)
+				
+				if model_canvas_loader.notebook:
+					model_canvas_loader.notebook.connect('switch-page', on_viability_tab_switched)
+				
+				# File operations
+				if file_explorer:
+					original_on_file_open = file_explorer.on_file_open_requested
+					
+					def on_file_open_with_viability_notify(filepath):
+						"""Wrapper that notifies viability panel after file opens."""
+						if original_on_file_open:
+							original_on_file_open(filepath)
+						
+						drawing_area = model_canvas_loader.get_current_document()
+						if drawing_area and viability_panel_loader.controller:
+							viability_panel_loader.controller.on_file_opened(drawing_area)
+					
+					file_explorer.on_file_open_requested = on_file_open_with_viability_notify
+				
+		except Exception as e:
+			print(f'WARNING: Failed to load viability panel: {e}', file=sys.stderr)
+			viability_panel_loader = None
+		
 		# Wire pathway panel loader to file panel for project synchronization
 		# This ensures pathway import controllers get updated when project is opened
 		if pathway_panel_loader and left_panel_loader:
@@ -486,6 +528,10 @@ def main(argv=None):
 		pathways_panel_container = main_builder.get_object('pathways_panel_container')
 		topology_panel_container = main_builder.get_object('topology_panel_container')
 		report_panel_container = main_builder.get_object('report_panel_container')
+		
+		# Viability panel container (not in UI file - create programmatically)
+		viability_panel_container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+		viability_panel_container.set_name('viability_panel_container')
 
 		# Get paned widget for curtain resize control
 		# Note: UI file has 'main_paned', but code refers to it as 'left_paned' for historical reasons
@@ -510,6 +556,12 @@ def main(argv=None):
 		if topology_panel_container:
 			topology_panel_container.set_visible(False)
 			topology_panel_container.set_no_show_all(False)
+		if viability_panel_container:
+			viability_panel_container.set_visible(False)
+			viability_panel_container.set_no_show_all(False)
+		if report_panel_container:
+			report_panel_container.set_visible(False)
+			report_panel_container.set_no_show_all(False)
 		
 		# Collapse left_paned to 0 width
 		if left_paned:
@@ -594,6 +646,14 @@ def main(argv=None):
 		# Add Topology panel to stack
 		if topology_panel_loader:
 			topology_panel_loader.add_to_stack(left_dock_stack, topology_panel_container, 'topology')
+		
+		# Add Viability panel to stack
+		if viability_panel_loader:
+			viability_panel_loader.add_to_stack(left_dock_stack, viability_panel_container, 'viability')
+			# Connect viability panel to topology panel (needed for diagnosis)
+			if topology_panel_loader and hasattr(topology_panel_loader, 'panel'):
+				viability_panel_loader.panel.set_topology_panel(topology_panel_loader.panel)
+				print("[SHYPN] Connected Viability Panel to Topology Panel")
 		
 		# ====================================================================
 		# Report Panel Container (will hold per-document panels)
@@ -837,6 +897,7 @@ def main(argv=None):
 				master_palette.set_active('pathways', False)
 				master_palette.set_active('analyses', False)
 				master_palette.set_active('topology', False)
+				master_palette.set_active('viability', False)
 				master_palette.set_active('report', False)
 				
 				# Show this panel (in stack if hanged, or floating if detached)
@@ -872,6 +933,7 @@ def main(argv=None):
 				master_palette.set_active('files', False)
 				master_palette.set_active('pathways', False)
 				master_palette.set_active('topology', False)
+				master_palette.set_active('viability', False)
 				master_palette.set_active('report', False)
 				
 				# Show this panel (in stack if hanged, or floating if detached)
@@ -907,6 +969,7 @@ def main(argv=None):
 				master_palette.set_active('files', False)
 				master_palette.set_active('analyses', False)
 				master_palette.set_active('topology', False)
+				master_palette.set_active('viability', False)
 				master_palette.set_active('report', False)
 				
 				# Show this panel (in stack if hanged, or floating if detached)
@@ -942,6 +1005,7 @@ def main(argv=None):
 				master_palette.set_active('files', False)
 				master_palette.set_active('pathways', False)
 				master_palette.set_active('analyses', False)
+				master_palette.set_active('viability', False)
 				master_palette.set_active('report', False)
 				
 				# Show this panel (in stack if hanged, or floating if detached)
@@ -978,6 +1042,7 @@ def main(argv=None):
 				master_palette.set_active('pathways', False)
 				master_palette.set_active('analyses', False)
 				master_palette.set_active('topology', False)
+				master_palette.set_active('viability', False)
 				
 				# Show report panel in stack
 				if left_dock_stack:
@@ -1004,6 +1069,42 @@ def main(argv=None):
 				# Hide report panel
 				if report_panel_container:
 					report_panel_container.set_visible(False)
+				# Hide stack when last panel is hidden
+				if left_dock_stack:
+					left_dock_stack.set_visible(False)
+				if left_paned:
+					try:
+						left_paned.set_position(0)
+					except Exception:
+						pass
+
+		def on_viability_toggle(is_active):
+			"""Handle Viability panel toggle from Master Palette.
+			
+			EXCLUSIVE MODE: Only one panel active at a time.
+			When button is activated, deactivate others.
+			"""
+			if not viability_panel_loader:
+				return
+			
+			if is_active:
+				# Deactivate other panels (exclusive mode)
+				master_palette.set_active('files', False)
+				master_palette.set_active('pathways', False)
+				master_palette.set_active('analyses', False)
+				master_palette.set_active('topology', False)
+				master_palette.set_active('report', False)
+				
+				# Show this panel (in stack if hanged, or floating if detached)
+				viability_panel_loader.show_in_stack()
+				# Expand left paned to show stack only if panel is hanged
+				if viability_panel_loader.is_hanged and left_paned:
+					try:
+						left_paned.set_position(320)  # Match Topology/Report panel width
+					except Exception:
+						pass
+			else:
+				viability_panel_loader.hide_in_stack()
 				# Hide stack when last panel is hidden
 				if left_dock_stack:
 					left_dock_stack.set_visible(False)
@@ -1108,6 +1209,7 @@ def main(argv=None):
 		master_palette.connect('pathways', on_pathway_toggle)
 		master_palette.connect('analyses', on_right_toggle)
 		master_palette.connect('topology', on_topology_toggle)
+		master_palette.connect('viability', on_viability_toggle)
 		master_palette.connect('report', on_report_toggle)
 		
 		# Enable topology button if panel loaded successfully
@@ -1116,6 +1218,12 @@ def main(argv=None):
 			# Update tooltip to remove "Coming Soon"
 			if 'topology' in master_palette.buttons:
 				master_palette.buttons['topology'].widget.set_tooltip_text('Topology Analysis')
+		
+		# Enable viability button if panel loaded successfully
+		if viability_panel_loader:
+			master_palette.set_sensitive('viability', True)
+			if 'viability' in master_palette.buttons:
+				master_palette.buttons['viability'].widget.set_tooltip_text('Model Viability & Repair')
 		
 		# Both maximize and minimize buttons removed for Wayland compatibility
 		# Users can:
