@@ -269,6 +269,17 @@ class DiagnosisCategory(BaseViabilityCategory):
             print("[Diagnosis] No knowledge base available")
             return []
         
+        # DEBUG: Check KB state
+        print(f"[Diagnosis] KB State:")
+        print(f"  Places: {len(kb.places)}")
+        print(f"  Transitions: {len(kb.transitions)}")
+        print(f"  Arcs: {len(kb.arcs)}")
+        print(f"  Liveness status: {len(kb.liveness_status)} entries")
+        print(f"  P-invariants: {len(kb.p_invariants)}")
+        print(f"  T-invariants: {len(kb.t_invariants)}")
+        print(f"  Siphons: {len(kb.siphons)}")
+        print(f"  Dead transitions: {len(kb.get_dead_transitions())}")
+        
         # Update multi-domain engine with current KB
         self.multi_domain_engine.kb = kb
         
@@ -290,8 +301,11 @@ class DiagnosisCategory(BaseViabilityCategory):
         
         # Collect issues from all categories (using dataclasses now)
         issues.extend(self._scan_structural_issues(kb))
+        print(f"[Diagnosis] After structural scan: {len(issues)} issues")
         issues.extend(self._scan_biological_issues(kb))
+        print(f"[Diagnosis] After biological scan: {len(issues)} issues")
         issues.extend(self._scan_kinetic_issues(kb))
+        print(f"[Diagnosis] After kinetic scan: {len(issues)} issues")
         
         # Generate multi-domain suggestions (KEY INNOVATION!)
         if issues:

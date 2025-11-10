@@ -21,6 +21,7 @@ gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk
 
 from .base_category import BaseViabilityCategory
+from .viability_dataclasses import Issue, Suggestion
 
 
 class StructuralCategory(BaseViabilityCategory):
@@ -96,141 +97,66 @@ class StructuralCategory(BaseViabilityCategory):
         
         # Scan for dead transitions
         dead_transitions = kb.get_dead_transitions()
-        for trans_id in dead_transitions:
+        for trans_id in dead_transitions[:10]:  # Limit to 10
             trans = kb.transitions.get(trans_id)
             if trans:
-                # Create issue (simplified for now)
-                issues.append({
-                    'severity': 'critical',
-                    'title': f'Transition {trans_id} is DEAD',
-                    'description': f'Cannot fire due to missing input tokens',
-                    'element_id': trans_id,
-                    'suggestions': []  # Will be populated by inference methods
-                })
+                # Create Issue dataclass
+                issue = Issue(
+                    id=f"dead_{trans_id}",
+                    category="structural",
+                    severity="critical",
+                    title=f"Transition {trans_id} is DEAD",
+                    description="Cannot fire due to missing input tokens or structural issues",
+                    element_id=trans_id,
+                    element_type="transition",
+                    locality_id=self.selected_locality_id
+                )
+                
+                # Add suggestion to add tokens to input places
+                input_places = [arc.source_id for arc in kb.arcs.values() 
+                               if arc.target_id == trans_id and arc.arc_type == "place_to_transition"]
+                
+                if input_places:
+                    suggestion = Suggestion(
+                        action="add_initial_marking",
+                        category="structural",
+                        parameters={'tokens': 5, 'place_id': input_places[0]},
+                        confidence=0.7,
+                        reasoning=f"Add tokens to input place {input_places[0]} to enable firing",
+                        preview_elements=[input_places[0], trans_id]
+                    )
+                    issue.suggestions = [suggestion]
+                
+                issues.append(issue)
         
         # Scan for empty siphons
-        for idx, siphon in enumerate(kb.siphons):
+        for idx, siphon in enumerate(kb.siphons[:5]):  # Limit to 5
             if not siphon.is_properly_marked:
-                issues.append({
-                    'severity': 'warning',
-                    'title': f'Empty siphon detected',
-                    'description': f'Siphon {idx} with {len(siphon.place_ids)} places',
-                    'element_id': f'siphon_{idx}',
-                    'suggestions': []
-                })
+                issue = Issue(
+                    id=f"siphon_{idx}",
+                    category="structural",
+                    severity="warning",
+                    title=f"Empty siphon detected (#{idx})",
+                    description=f"Siphon with {len(siphon.place_ids)} places lacks initial marking",
+                    element_id=f"siphon_{idx}",
+                    element_type="siphon",
+                    locality_id=self.selected_locality_id
+                )
+                
+                # Suggest adding tokens to one of the siphon places
+                if siphon.place_ids:
+                    place_id = list(siphon.place_ids)[0]
+                    suggestion = Suggestion(
+                        action="add_initial_marking",
+                        category="structural",
+                        parameters={'tokens': 3, 'place_id': place_id},
+                        confidence=0.8,
+                        reasoning=f"Add tokens to {place_id} to prevent deadlock",
+                        preview_elements=list(siphon.place_ids)
+                    )
+                    issue.suggestions = [suggestion]
+                
+                issues.append(issue)
         
+        print(f"[Structural] Found {len(issues)} issues")
         return issues
-    
-    def _display_issues(self, issues):
-        """Display structural issues in the UI.
-        
-        Args:
-            issues: List of issue dictionaries
-        """
-        # Clear existing issues
-        for child in self.issues_listbox.get_children():
-            self.issues_listbox.remove(child)
-        
-        if not issues:
-            self._show_no_issues_message()
-            return
-        
-        # Add each issue as a row
-        for issue in issues:
-            row = self._create_issue_row(issue)
-            self.issues_listbox.add(row)
-        
-        self.issues_listbox.show_all()
-    
-    def _create_issue_row(self, issue):
-        """Create a row widget for an issue.
-        
-        Args:
-            issue: Issue dictionary
-            
-        Returns:
-            Gtk.ListBoxRow: Row widget
-        """
-        row = Gtk.ListBoxRow()
-        row.set_selectable(False)
-        
-        # Main box
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        box.set_margin_start(12)
-        box.set_margin_end(12)
-        box.set_margin_top(12)
-        box.set_margin_bottom(12)
-        
-        # Title with severity icon
-        severity_icons = {
-            'critical': '🔴',
-            'warning': '⚠️',
-            'suggestion': '💡'
-        }
-        icon = severity_icons.get(issue['severity'], '•')
-        
-        title_label = Gtk.Label()
-        title_label.set_markup(f"<b>{icon} {issue['title']}</b>")
-        title_label.set_halign(Gtk.Align.START)
-        box.pack_start(title_label, False, False, 0)
-        
-        # Description
-        desc_label = Gtk.Label(label=issue['description'])
-        desc_label.set_halign(Gtk.Align.START)
-        desc_label.set_line_wrap(True)
-        box.pack_start(desc_label, False, False, 0)
-        
-        # Suggestions (if any)
-        if issue.get('suggestions'):
-            for suggestion in issue['suggestions']:
-                suggestion_box = self._create_suggestion_widget(suggestion)
-                box.pack_start(suggestion_box, False, False, 0)
-        
-        row.add(box)
-        return row
-    
-    def _create_suggestion_widget(self, suggestion):
-        """Create a widget for a suggestion.
-        
-        Args:
-            suggestion: Suggestion dictionary
-            
-        Returns:
-            Gtk.Box: Suggestion widget
-        """
-        box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        box.set_margin_start(24)
-        
-        # Suggestion text
-        label = Gtk.Label(label=f"→ {suggestion.get('reasoning', 'No details')}")
-        label.set_halign(Gtk.Align.START)
-        label.set_hexpand(True)
-        box.pack_start(label, True, True, 0)
-        
-        # Apply button
-        apply_button = Gtk.Button(label="Apply")
-        apply_button.connect('clicked', self._on_apply_suggestion, suggestion)
-        box.pack_start(apply_button, False, False, 0)
-        
-        return box
-    
-    def _on_apply_suggestion(self, button, suggestion):
-        """Handle applying a suggestion.
-        
-        Args:
-            button: Button that was clicked
-            suggestion: Suggestion dictionary
-        """
-        print(f"[Structural] Applying suggestion: {suggestion}")
-        # TODO: Implement actual application logic
-    
-    def _refresh(self):
-        """Refresh structural category content.
-        
-        Returns:
-            False: To stop GLib.idle_add from repeating
-        """
-        # Re-scan issues if category is expanded
-        if self.expander.get_expanded():
-            self._on_scan_clicked(None)
-        return False

@@ -22,6 +22,7 @@ gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk
 
 from .base_category import BaseViabilityCategory
+from .viability_dataclasses import Issue, Suggestion
 
 
 class BiologicalCategory(BaseViabilityCategory):
@@ -96,90 +97,48 @@ class BiologicalCategory(BaseViabilityCategory):
         )
         
         # Scan for unmapped compounds
-        unmapped_count = sum(1 for p in kb.places.values() if p.compound_id is None)
-        if unmapped_count > 0:
-            issues.append({
-                'severity': 'warning',
-                'title': f'{unmapped_count} places without compound mapping',
-                'description': 'Places not linked to KEGG compounds',
-                'element_id': 'unmapped_compounds',
-                'suggestions': []
-            })
+        unmapped_places = [p_id for p_id, p in kb.places.items() if p.compound_id is None]
+        if unmapped_places:
+            issue = Issue(
+                id="unmapped_compounds",
+                category="biological",
+                severity="info",
+                title=f"{len(unmapped_places)} places without compound mapping",
+                description="These places are not linked to biological compounds (KEGG)",
+                element_id="unmapped_compounds",
+                element_type="place",
+                locality_id=self.selected_locality_id
+            )
+            issues.append(issue)
         
-        # Scan for stoichiometry mismatches (simplified)
-        for arc_id, arc in kb.arcs.items():
+        # Scan for stoichiometry mismatches
+        for arc_id, arc in list(kb.arcs.items())[:10]:  # Limit to 10
             if arc.stoichiometry and arc.current_weight != arc.stoichiometry:
-                issues.append({
-                    'severity': 'warning',
-                    'title': f'Stoichiometry mismatch in arc {arc_id}',
-                    'description': f'Current: {arc.current_weight}, Expected: {arc.stoichiometry}',
-                    'element_id': arc_id,
-                    'suggestions': []
-                })
+                issue = Issue(
+                    id=f"stoich_{arc_id}",
+                    category="biological",
+                    severity="warning",
+                    title=f"Stoichiometry mismatch: {arc_id}",
+                    description=f"Arc weight ({arc.current_weight}) differs from reaction stoichiometry ({arc.stoichiometry})",
+                    element_id=arc_id,
+                    element_type="arc",
+                    locality_id=self.selected_locality_id
+                )
+                
+                # Suggest fixing the arc weight
+                suggestion = Suggestion(
+                    action="add_arc_weight",
+                    category="biological",
+                    parameters={'weight': arc.stoichiometry},
+                    confidence=0.9,
+                    reasoning=f"Update arc weight to match stoichiometry: {arc.stoichiometry}",
+                    preview_elements=[arc_id]
+                )
+                issue.suggestions = [suggestion]
+                issues.append(issue)
         
+        print(f"[Biological] Found {len(issues)} issues")
         return issues
-    
-    def _display_issues(self, issues):
-        """Display biological issues in the UI.
-        
-        Args:
-            issues: List of issue dictionaries
-        """
-        # Clear existing issues
-        for child in self.issues_listbox.get_children():
-            self.issues_listbox.remove(child)
-        
-        if not issues:
-            self._show_no_issues_message()
-            return
-        
-        # Add each issue as a row
-        for issue in issues:
-            row = self._create_issue_row(issue)
-            self.issues_listbox.add(row)
-        
-        self.issues_listbox.show_all()
-    
-    def _create_issue_row(self, issue):
-        """Create a row widget for an issue.
-        
-        Args:
-            issue: Issue dictionary
-            
-        Returns:
-            Gtk.ListBoxRow: Row widget
-        """
-        row = Gtk.ListBoxRow()
-        row.set_selectable(False)
-        
-        # Main box
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        box.set_margin_start(12)
-        box.set_margin_end(12)
-        box.set_margin_top(12)
-        box.set_margin_bottom(12)
-        
-        # Title with severity icon
-        severity_icons = {
-            'critical': '🔴',
-            'warning': '⚠️',
-            'suggestion': '💡'
-        }
-        icon = severity_icons.get(issue['severity'], '•')
-        
-        title_label = Gtk.Label()
-        title_label.set_markup(f"<b>{icon} {issue['title']}</b>")
-        title_label.set_halign(Gtk.Align.START)
-        box.pack_start(title_label, False, False, 0)
-        
-        # Description
-        desc_label = Gtk.Label(label=issue['description'])
-        desc_label.set_halign(Gtk.Align.START)
-        desc_label.set_line_wrap(True)
-        box.pack_start(desc_label, False, False, 0)
-        
-        row.add(box)
-        return row
     
     def _refresh(self):
         """Refresh biological category content.

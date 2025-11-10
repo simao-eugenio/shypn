@@ -109,10 +109,17 @@ class BaseViabilityCategory:
         Returns:
             ModelKnowledgeBase: The knowledge base, or None
         """
+        print(f"[BaseCategory] get_knowledge_base() called")
+        print(f"  model_canvas: {self.model_canvas}")
+        print(f"  has get_current_knowledge_base: {hasattr(self.model_canvas, 'get_current_knowledge_base') if self.model_canvas else False}")
+        
         if self.model_canvas and hasattr(self.model_canvas, 'get_current_knowledge_base'):
             kb = self.model_canvas.get_current_knowledge_base()
+            print(f"  KB returned: {kb}")
             if kb:
+                print(f"  KB has {len(kb.places)} places, {len(kb.transitions)} transitions")
                 return kb
+        print(f"  Returning None")
         return None
     
     def _build_content(self):

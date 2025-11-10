@@ -2,16 +2,16 @@
 """Kinetic Inference Category.
 
 Provides kinetic parameter inference using:
-- BRENDA database (Km, Vmax, Kcat)
-- EC numbers
-- HeuristicDatabase (local SQLite)
-- SABIO-RK data
+- BRENDA database (Km, Kcat, Vmax)
+- SABIO-RK database (rate laws)
+- EC numbers from KEGG
+- Enzyme kinetics literature
 
 Suggests:
-- Firing rates for transitions
-- Rate estimation from Kcat
-- Default mass action rates
-- BRENDA query suggestions
+- Firing rates (based on Vmax, Kcat)
+- Km values for substrates
+- Inhibition parameters
+- Rate law equations
 
 Author: Simão Eugénio
 Date: November 10, 2025
@@ -22,6 +22,7 @@ gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk
 
 from .base_category import BaseViabilityCategory
+from .viability_dataclasses import Issue, Suggestion
 
 
 class KineticCategory(BaseViabilityCategory):
@@ -101,98 +102,58 @@ class KineticCategory(BaseViabilityCategory):
         )
         
         # Scan for transitions without rates
-        missing_rate_count = 0
+        missing_rate_trans = []
         for trans_id, trans in kb.transitions.items():
             if trans.current_rate is None and trans_id not in kb.kinetic_parameters:
-                missing_rate_count += 1
+                missing_rate_trans.append(trans_id)
         
-        if missing_rate_count > 0:
-            issues.append({
-                'severity': 'warning' if coverage_pct > 50 else 'critical',
-                'title': f'{missing_rate_count} transitions without firing rates',
-                'description': f'Cannot run quantitative simulation (coverage: {coverage_pct:.0f}%)',
-                'element_id': 'missing_rates',
-                'suggestions': []
-            })
+        if missing_rate_trans:
+            issue = Issue(
+                id="missing_rates",
+                category="kinetic",
+                severity='warning' if coverage_pct > 50 else 'critical',
+                title=f"{len(missing_rate_trans)} transitions without firing rates",
+                description=f"Cannot run quantitative simulation (coverage: {coverage_pct:.0f}%)",
+                element_id="missing_rates",
+                element_type="transition",
+                locality_id=self.selected_locality_id
+            )
+            
+            # Add suggestion to use default rate for first transition
+            if missing_rate_trans:
+                suggestion = Suggestion(
+                    action="add_firing_rate",
+                    category="kinetic",
+                    parameters={'rate': 1.0},
+                    confidence=0.3,
+                    reasoning="Use default firing rate of 1.0 (requires BRENDA query for accuracy)",
+                    preview_elements=missing_rate_trans[:5]  # Preview first 5
+                )
+                issue.suggestions = [suggestion]
+            
+            issues.append(issue)
         
         # Scan for low confidence parameters
-        low_confidence_count = 0
+        low_confidence_trans = []
         for trans_id, params in kb.kinetic_parameters.items():
             if params.confidence < 0.5:
-                low_confidence_count += 1
+                low_confidence_trans.append(trans_id)
         
-        if low_confidence_count > 0:
-            issues.append({
-                'severity': 'suggestion',
-                'title': f'{low_confidence_count} transitions have low confidence rates',
-                'description': 'Consider querying BRENDA for better parameters',
-                'element_id': 'low_confidence_rates',
-                'suggestions': []
-            })
+        if low_confidence_trans:
+            issue = Issue(
+                id="low_confidence_rates",
+                category="kinetic",
+                severity="info",
+                title=f"{len(low_confidence_trans)} transitions have low confidence rates",
+                description="Consider querying BRENDA/SABIO-RK for better parameters",
+                element_id="low_confidence_rates",
+                element_type="transition",
+                locality_id=self.selected_locality_id
+            )
+            issues.append(issue)
         
+        print(f"[Kinetic] Found {len(issues)} issues")
         return issues
-    
-    def _display_issues(self, issues):
-        """Display kinetic issues in the UI.
-        
-        Args:
-            issues: List of issue dictionaries
-        """
-        # Clear existing issues
-        for child in self.issues_listbox.get_children():
-            self.issues_listbox.remove(child)
-        
-        if not issues:
-            self._show_no_issues_message()
-            return
-        
-        # Add each issue as a row
-        for issue in issues:
-            row = self._create_issue_row(issue)
-            self.issues_listbox.add(row)
-        
-        self.issues_listbox.show_all()
-    
-    def _create_issue_row(self, issue):
-        """Create a row widget for an issue.
-        
-        Args:
-            issue: Issue dictionary
-            
-        Returns:
-            Gtk.ListBoxRow: Row widget
-        """
-        row = Gtk.ListBoxRow()
-        row.set_selectable(False)
-        
-        # Main box
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        box.set_margin_start(12)
-        box.set_margin_end(12)
-        box.set_margin_top(12)
-        box.set_margin_bottom(12)
-        
-        # Title with severity icon
-        severity_icons = {
-            'critical': '🔴',
-            'warning': '⚠️',
-            'suggestion': '💡'
-        }
-        icon = severity_icons.get(issue['severity'], '•')
-        
-        title_label = Gtk.Label()
-        title_label.set_markup(f"<b>{icon} {issue['title']}</b>")
-        title_label.set_halign(Gtk.Align.START)
-        box.pack_start(title_label, False, False, 0)
-        
-        # Description
-        desc_label = Gtk.Label(label=issue['description'])
-        desc_label.set_halign(Gtk.Align.START)
-        desc_label.set_line_wrap(True)
-        box.pack_start(desc_label, False, False, 0)
-        
-        row.add(box)
-        return row
     
     def _refresh(self):
         """Refresh kinetic category content.

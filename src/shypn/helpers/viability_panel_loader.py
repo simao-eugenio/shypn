@@ -71,9 +71,21 @@ class ViabilityPanelLoader:
         Args:
             model_canvas_loader: ModelCanvasLoader instance
         """
+        print(f"[ViabilityPanelLoader] set_model_canvas_loader() called")
+        print(f"  model_canvas_loader: {model_canvas_loader}")
+        print(f"  self.panel: {self.panel}")
+        
         self.model_canvas_loader = model_canvas_loader
         if self.panel:
-            self.panel.model_canvas = model_canvas_loader
+            # Use the panel's method to update categories too
+            if hasattr(self.panel, 'set_model_canvas'):
+                self.panel.set_model_canvas(model_canvas_loader)
+            else:
+                # Fallback for backward compatibility
+                self.panel.model_canvas = model_canvas_loader
+            print(f"  ✓ Set panel.model_canvas = {model_canvas_loader}")
+        else:
+            print(f"  ⚠️ self.panel is None!")
     
     def on_tab_switched(self, drawing_area):
         """Called when user switches model tabs.
