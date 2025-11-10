@@ -167,18 +167,18 @@ class BaseViabilityCategory:
         button_box.set_halign(Gtk.Align.START)
         
         # Scan button
-        self.scan_button = Gtk.Button(label="Scan for Issues")
+        self.scan_button = Gtk.Button(label="SCAN FOR ISSUES")
         self.scan_button.connect('clicked', self._on_scan_clicked)
         button_box.pack_start(self.scan_button, False, False, 0)
         
         # Undo button
-        self.undo_button = Gtk.Button(label="↶ Undo Last")
+        self.undo_button = Gtk.Button(label="UNDO LAST")
         self.undo_button.set_sensitive(False)  # Initially disabled
         self.undo_button.connect('clicked', self._on_undo_clicked)
         button_box.pack_start(self.undo_button, False, False, 0)
         
         # Clear button
-        clear_button = Gtk.Button(label="🗑 Clear All")
+        clear_button = Gtk.Button(label="CLEAR ALL")
         clear_button.connect('clicked', self._on_clear_clicked)
         button_box.pack_start(clear_button, False, False, 0)
         
@@ -250,7 +250,7 @@ class BaseViabilityCategory:
             
             # Add "no issues" message
             row = Gtk.ListBoxRow()
-            label = Gtk.Label(label="✓ No issues detected")
+            label = Gtk.Label(label="NO ISSUES DETECTED")
             label.set_margin_start(12)
             label.set_margin_end(12)
             label.set_margin_top(12)

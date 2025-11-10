@@ -48,7 +48,7 @@ class DiagnosisCategory(BaseViabilityCategory):
         Returns:
             str: Category name
         """
-        return "Diagnosis & Repair"
+        return "DIAGNOSIS & REPAIR"
     
     def _build_content(self):
         """Build diagnosis category content."""
@@ -92,10 +92,10 @@ class DiagnosisCategory(BaseViabilityCategory):
         locality_box.pack_start(locality_dropdown_box, False, False, 0)
         
         locality_frame.add(locality_box)
-        self.content_box.pack_start(locality_frame, False, False, 0)
+        self.content_box.pack_start(locality_section, False, False, 0)
         
-        # Health scores
-        health_frame = Gtk.Frame(label="📊 Health Score")
+        # Health score section
+        health_frame = Gtk.Frame(label="HEALTH SCORE")
         health_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         health_box.set_margin_start(12)
         health_box.set_margin_end(12)
@@ -112,10 +112,10 @@ class DiagnosisCategory(BaseViabilityCategory):
         # Action buttons
         button_box = self._create_action_buttons()
         # Customize scan button label
-        self.scan_button.set_label("Run Full Diagnosis")
+        self.scan_button.set_label("RUN FULL DIAGNOSIS")
         
         # Add batch operation button
-        batch_button = Gtk.Button(label="Apply All Fixes")
+        batch_button = Gtk.Button(label="APPLY ALL FIXES")
         batch_button.set_tooltip_text("Apply all high-confidence suggestions (>70%)")
         batch_button.connect('clicked', self._on_apply_all_clicked)
         button_box.pack_start(batch_button, False, False, 0)
@@ -386,7 +386,7 @@ class DiagnosisCategory(BaseViabilityCategory):
         box.pack_start(label, False, False, 0)
         
         # Show placeholders for now
-        for domain in ['Structural', 'Biological', 'Kinetic']:
+        for domain in ['STRUCTURAL', 'BIOLOGICAL', 'KINETIC']:
             domain_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
             domain_box.set_margin_start(12)
             
