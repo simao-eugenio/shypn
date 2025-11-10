@@ -252,6 +252,18 @@ class BaseTopologyCategory:
             content_widget.show_all()
             self.category_frame.set_content(content_widget)
     
+    def get_knowledge_base(self):
+        """Get the knowledge base for the current model.
+        
+        Returns:
+            ModelKnowledgeBase or None: Knowledge base instance
+        """
+        if self.parent_panel and hasattr(self.parent_panel, 'get_knowledge_base'):
+            return self.parent_panel.get_knowledge_base()
+        elif self.model_canvas and hasattr(self.model_canvas, 'get_current_knowledge_base'):
+            return self.model_canvas.get_current_knowledge_base()
+        return None
+    
     def _build_content(self):
         """Build and return the content widget.
         
@@ -752,6 +764,9 @@ class BaseTopologyCategory:
                     self.analyzed[drawing_area] = set()
                 self.analyzed[drawing_area].add(analyzer_name)
                 
+                # Update Knowledge Base (on GTK main thread to ensure thread safety)
+                GLib.idle_add(self._update_knowledge_base, analyzer_name, result)
+                
                 # Update table (on GTK main thread)
                 GLib.idle_add(self._add_result_to_grouped_table, analyzer_name, result)
                 
@@ -775,6 +790,144 @@ class BaseTopologyCategory:
         
         # Return False to prevent GLib.timeout_add from calling this again
         return False
+    
+    def _update_knowledge_base(self, analyzer_name, result):
+        """Update knowledge base with analysis results.
+        
+        Args:
+            analyzer_name: Name of analyzer
+            result: Analysis result
+            
+        Returns:
+            False: Prevent GLib.idle_add from repeating
+        """
+        try:
+            kb = self.get_knowledge_base()
+            if not kb:
+                return False  # No KB available
+            
+            # Handle AnalysisResult objects
+            if hasattr(result, 'success'):
+                if not result.success:
+                    return False  # Skip failed analyses
+                result_data = result.data if hasattr(result, 'data') else {}
+            else:
+                result_data = result
+            
+            # Import dataclasses for conversion
+            from shypn.viability.knowledge.data_structures import (
+                PInvariant, TInvariant, Siphon
+            )
+            
+            # Route to appropriate KB update method based on analyzer type
+            if analyzer_name == 'p_invariants':
+                # Result format: {'invariants': [{'vector': [1, 0, 1], 'places': ['P1', 'P3'], ...}]}
+                invariants_raw = result_data.get('invariants', [])
+                if invariants_raw:
+                    # Convert to PInvariant objects
+                    invariants = []
+                    for inv_data in invariants_raw:
+                        inv = PInvariant(
+                            vector=inv_data.get('vector', []),
+                            place_ids=inv_data.get('places', inv_data.get('place_ids', [])),
+                            conserved_value=inv_data.get('conserved_value', 0),
+                            biological_meaning=inv_data.get('meaning', None)
+                        )
+                        invariants.append(inv)
+                    kb.update_p_invariants(invariants)
+                    print(f"✓ Knowledge Base updated: {len(invariants)} P-invariants")
+            
+            elif analyzer_name == 't_invariants':
+                # Result format: {'invariants': [{'vector': [1, 2], 'transitions': ['T1', 'T2'], ...}]}
+                invariants_raw = result_data.get('invariants', [])
+                if invariants_raw:
+                    # Convert to TInvariant objects
+                    invariants = []
+                    for inv_data in invariants_raw:
+                        inv = TInvariant(
+                            vector=inv_data.get('vector', []),
+                            transition_ids=inv_data.get('transitions', inv_data.get('transition_ids', [])),
+                            biological_meaning=inv_data.get('meaning', None)
+                        )
+                        invariants.append(inv)
+                    kb.update_t_invariants(invariants)
+                    print(f"✓ Knowledge Base updated: {len(invariants)} T-invariants")
+            
+            elif analyzer_name == 'liveness':
+                # Result format: {'transitions': {tid: {'level': int, 'name': str}, ...}}
+                transitions_data = result_data.get('transitions', {})
+                if transitions_data:
+                    # Convert to simple dict mapping tid -> level string
+                    liveness_map = {}
+                    for tid, tdata in transitions_data.items():
+                        if isinstance(tdata, dict):
+                            level = tdata.get('level', 0)
+                            # Map numeric level to string
+                            level_str = {0: 'dead', 1: 'L1-live', 2: 'L2-live', 
+                                       3: 'L3-live', 4: 'L4-live'}.get(level, 'dead')
+                            liveness_map[tid] = level_str
+                        else:
+                            liveness_map[tid] = str(tdata)
+                    kb.update_liveness(liveness_map)
+                    print(f"✓ Knowledge Base updated: Liveness for {len(liveness_map)} transitions")
+            
+            elif analyzer_name == 'siphons':
+                # Result format: {'siphons': [{place_ids: [...], is_minimal: bool, ...}]}
+                siphons_raw = result_data.get('siphons', [])
+                if siphons_raw:
+                    # Convert to Siphon objects
+                    siphons = []
+                    for siphon_data in siphons_raw:
+                        siphon = Siphon(
+                            place_ids=siphon_data.get('place_ids', siphon_data.get('places', [])),
+                            is_minimal=siphon_data.get('is_minimal', True),
+                            suggested_source=None,
+                            suggested_rate=None
+                        )
+                        siphons.append(siphon)
+                    kb.update_siphons_traps(siphons, [])  # Only siphons for now
+                    print(f"✓ Knowledge Base updated: {len(siphons)} siphons")
+            
+            elif analyzer_name == 'traps':
+                # Result format: {'traps': [{place_ids: [...], is_minimal: bool, ...}]}
+                traps_raw = result_data.get('traps', [])
+                if traps_raw:
+                    # Convert to Siphon objects (traps use same structure)
+                    traps = []
+                    for trap_data in traps_raw:
+                        trap = Siphon(
+                            place_ids=trap_data.get('place_ids', trap_data.get('places', [])),
+                            is_minimal=trap_data.get('is_minimal', True),
+                            suggested_source=None,
+                            suggested_rate=None
+                        )
+                        traps.append(trap)
+                    kb.update_siphons_traps([], traps)  # Only traps for now
+                    print(f"✓ Knowledge Base updated: {len(traps)} traps")
+            
+            elif analyzer_name == 'deadlocks':
+                # Result format: {'deadlock_states': [...], 'has_deadlocks': bool}
+                deadlock_states = result_data.get('deadlock_states', [])
+                has_deadlocks = result_data.get('has_deadlocks', False)
+                if deadlock_states or has_deadlocks:
+                    kb.update_deadlocks(deadlock_states)
+                    print(f"✓ Knowledge Base updated: Deadlocks ({len(deadlock_states)} states)")
+            
+            elif analyzer_name == 'boundedness':
+                # Result format: {'bounded': bool, 'unbounded_places': [...], 'bounds': {...}}
+                bounds = result_data.get('bounds', {})
+                if not bounds and result_data.get('bounded', True):
+                    # All places bounded to default (e.g., 1)
+                    bounds = {}  # Empty means all bounded
+                kb.update_boundedness(bounds)
+                print(f"✓ Knowledge Base updated: Boundedness")
+            
+        except Exception as e:
+            import traceback
+            print(f"Warning: Failed to update Knowledge Base for {analyzer_name}: {e}")
+            traceback.print_exc()
+        
+        return False  # Don't repeat
     
     def _add_result_to_grouped_table(self, analyzer_name, result):
         """Add analyzer result to grouped table.

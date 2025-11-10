@@ -45,6 +45,7 @@ class TopologyPanel(Gtk.Box):
         
         self.model = model
         self.model_canvas = model_canvas
+        self.knowledge_base = None  # Will be retrieved from model_canvas when needed
         
         # Panel title header (matches other panels: REPORT, EXPLORER, etc.)
         header_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
@@ -215,6 +216,16 @@ class TopologyPanel(Gtk.Box):
         for category in self.categories:
             if hasattr(category, 'auto_run_all_analyzers'):
                 category.auto_run_all_analyzers()
+    
+    def get_knowledge_base(self):
+        """Get the knowledge base for the current model.
+        
+        Returns:
+            ModelKnowledgeBase or None: Knowledge base instance
+        """
+        if self.model_canvas and hasattr(self.model_canvas, 'get_current_knowledge_base'):
+            return self.model_canvas.get_current_knowledge_base()
+        return None
     
     def get_widget(self):
         """Get the panel widget.
