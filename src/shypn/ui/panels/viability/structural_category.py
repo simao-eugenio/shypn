@@ -49,7 +49,7 @@ class StructuralCategory(BaseViabilityCategory):
         status_box.set_margin_top(12)
         status_box.set_margin_bottom(12)
         
-        self.status_label = Gtk.Label(label="Click 'Scan for Issues' to analyze")
+        self.status_label = Gtk.Label(label="Expand category to scan for structural issues...")
         self.status_label.set_halign(Gtk.Align.START)
         status_box.pack_start(self.status_label, False, False, 0)
         

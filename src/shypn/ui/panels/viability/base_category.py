@@ -132,13 +132,16 @@ class BaseViabilityCategory:
     def _on_expansion_changed(self, expander, param):
         """Handle expander state change.
         
+        When a category is expanded, automatically scan for issues.
+        
         Args:
             expander: Gtk.Expander that changed
             param: Parameter spec (not used)
         """
         if expander.get_expanded():
-            # Category was expanded - refresh data
-            GLib.idle_add(self._refresh)
+            # Category was expanded - automatically scan
+            print(f"[{self.get_category_name()}] Category expanded, auto-scanning...")
+            GLib.idle_add(self._on_scan_clicked, None)
     
     def _refresh(self):
         """Refresh category content.
