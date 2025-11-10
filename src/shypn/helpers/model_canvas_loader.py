@@ -114,6 +114,10 @@ class ModelCanvasLoader:
         self.context_menu_handler = None
         self._clipboard = []  # Clipboard for cut/copy/paste operations
         
+        # Knowledge bases for intelligent model repair (Viability Panel)
+        # One ModelKnowledgeBase instance per drawing_area
+        self.knowledge_bases = {}  # drawing_area -> ModelKnowledgeBase
+        
         # Project reference for structured save paths (pathways/, models/, metadata/)
         self.project = None
         
@@ -517,6 +521,10 @@ class ModelCanvasLoader:
             overlay_manager = self.overlay_managers[drawing_area]
             overlay_manager.cleanup_overlays()
             del self.overlay_managers[drawing_area]
+        if drawing_area and drawing_area in self.knowledge_bases:
+            # Cleanup knowledge base
+            del self.knowledge_bases[drawing_area]
+            print(f"[KNOWLEDGE_BASE] Cleaned up KB for canvas {id(drawing_area)}")
         if self.notebook.get_n_pages() == 0:
             self.add_document(filename='default')
         return True
@@ -702,6 +710,17 @@ class ModelCanvasLoader:
             pass
         manager.load_view_state_from_file()
         validation = manager.create_new_document(filename=filename)
+        
+        # Create Knowledge Base for intelligent model repair
+        try:
+            from shypn.viability.knowledge import ModelKnowledgeBase
+            kb = ModelKnowledgeBase(model=None)  # Model will be set when available
+            self.knowledge_bases[drawing_area] = kb
+            # Make KB accessible from canvas manager
+            manager.knowledge_base = kb
+            print(f"[KNOWLEDGE_BASE] Created KB for canvas {id(drawing_area)}")
+        except Exception as e:
+            print(f"[KNOWLEDGE_BASE] ⚠️ Failed to create knowledge base: {e}")
 
         def on_draw_wrapper(widget, cr):
             allocation = widget.get_allocation()
@@ -2886,6 +2905,38 @@ class ModelCanvasLoader:
         if drawing_area is None:
             return None
         return self.get_canvas_manager(drawing_area)
+    
+    def get_current_knowledge_base(self):
+        """Get the knowledge base for the currently active document.
+        
+        The ModelKnowledgeBase aggregates multi-domain knowledge (topology,
+        biology, biochemistry, dynamics) to enable intelligent model repair.
+        
+        Returns:
+            ModelKnowledgeBase: The knowledge base for the active document,
+                               or None if no document is open or KB not created.
+        
+        Example:
+            # From Viability Panel:
+            kb = model_canvas_loader.get_current_knowledge_base()
+            if kb:
+                dead_transitions = kb.get_dead_transitions()
+        """
+        drawing_area = self.get_current_document()
+        if drawing_area is None:
+            return None
+        return self.knowledge_bases.get(drawing_area)
+    
+    def get_knowledge_base(self, drawing_area):
+        """Get the knowledge base for a specific drawing area.
+        
+        Args:
+            drawing_area: The GtkDrawingArea widget
+            
+        Returns:
+            ModelKnowledgeBase: The knowledge base, or None if not found
+        """
+        return self.knowledge_bases.get(drawing_area)
     
     def reset_current_canvas(self):
         """Reset the current canvas to initial state (File → New equivalent).

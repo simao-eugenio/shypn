@@ -39,10 +39,21 @@ class ViabilityPanel(Gtk.Box):
         self.model = model
         self.model_canvas = model_canvas
         self.topology_panel = None  # Will be set via set_topology_panel()
+        self.knowledge_base = None  # Will be accessed from model_canvas
         
         # Build UI
         self._build_header()
         self._build_content()
+    
+    def get_knowledge_base(self):
+        """Get the knowledge base for the current model.
+        
+        Returns:
+            ModelKnowledgeBase: The knowledge base, or None if not available
+        """
+        if self.model_canvas and hasattr(self.model_canvas, 'get_current_knowledge_base'):
+            return self.model_canvas.get_current_knowledge_base()
+        return None
     
     def _build_header(self):
         """Build panel header (matches REPORT, TOPOLOGY, etc.)."""
