@@ -87,7 +87,6 @@ class BiologicalCategory(BaseViabilityCategory):
                 except:
                     pass
             
-            print(f"[Biological] Place activity: {stats['active_places']} active, "
                   f"{len(stats['inactive_places'])} inactive")
             return stats
             
@@ -144,7 +143,6 @@ class BiologicalCategory(BaseViabilityCategory):
         """
         kb = self.get_knowledge_base()
         if not kb:
-            print("[Biological] No knowledge base available")
             return []
         
         issues = []
@@ -216,7 +214,6 @@ class BiologicalCategory(BaseViabilityCategory):
                 issue.suggestions = [suggestion]
                 issues.append(issue)
         
-        print(f"[Biological] Found {len(issues)} issues")
         return issues
     
     def _refresh(self):

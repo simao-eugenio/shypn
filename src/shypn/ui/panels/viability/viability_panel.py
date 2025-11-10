@@ -47,8 +47,6 @@ class ViabilityPanel(Gtk.Box):
         """
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         
-        print(f"[ViabilityPanel] __init__() called")
-        print(f"  model_canvas: {model_canvas}")
         
         self.model = model
         self.model_canvas = model_canvas
@@ -57,7 +55,6 @@ class ViabilityPanel(Gtk.Box):
         
         # Create intelligent observer (watches ALL application events)
         self.observer = ViabilityObserver()
-        print("[ViabilityPanel] Observer created and ready to monitor events")
         
         # Build panel header
         self._build_header()
@@ -153,7 +150,6 @@ class ViabilityPanel(Gtk.Box):
         self.observer.subscribe('biological', self.biological_category._on_observer_update)
         self.observer.subscribe('kinetic', self.kinetic_category._on_observer_update)
         self.observer.subscribe('diagnosis', self.diagnosis_category._on_observer_update)
-        print("[ViabilityPanel] Categories subscribed to observer")
         
         # Add categories to container
         for category in self.categories:
@@ -206,7 +202,6 @@ class ViabilityPanel(Gtk.Box):
             transition_id: ID of the transition to analyze
         """
         if not self.diagnosis_category:
-            print("[Viability] Cannot analyze locality: Diagnosis category not initialized")
             return
         
         # Expand diagnosis category if collapsed
@@ -219,7 +214,6 @@ class ViabilityPanel(Gtk.Box):
             auto_scan=True
         )
         
-        print(f"[Viability] Analyzing locality for transition: {transition_id}")
     
     def set_model(self, model):
         """Update model reference.
@@ -243,15 +237,12 @@ class ViabilityPanel(Gtk.Box):
         Args:
             model_canvas: ModelCanvasLoader instance
         """
-        print(f"[ViabilityPanel] set_model_canvas() called")
-        print(f"  model_canvas: {model_canvas}")
         
         self.model_canvas = model_canvas
         
         # Propagate to all categories (CRITICAL!)
         for category in self.categories:
             category.model_canvas = model_canvas
-            print(f"  ✓ Updated {category.__class__.__name__}.model_canvas")
         
         # Feed initial KB data to observer
         self._feed_observer_with_kb_data()
@@ -287,7 +278,6 @@ class ViabilityPanel(Gtk.Box):
                 },
                 source='viability_panel'
             )
-            print("[ViabilityPanel] Fed initial KB data to observer")
         except Exception as e:
             print(f"[ViabilityPanel] Error feeding KB data to observer: {e}")
     
