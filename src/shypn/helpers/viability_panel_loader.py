@@ -71,10 +71,6 @@ class ViabilityPanelLoader:
         Args:
             model_canvas_loader: ModelCanvasLoader instance
         """
-        print(f"[ViabilityPanelLoader] set_model_canvas_loader() called")
-        print(f"  model_canvas_loader: {model_canvas_loader}")
-        print(f"  self.panel: {self.panel}")
-        
         self.model_canvas_loader = model_canvas_loader
         if self.panel:
             # Use the panel's method to update categories too
@@ -83,9 +79,32 @@ class ViabilityPanelLoader:
             else:
                 # Fallback for backward compatibility
                 self.panel.model_canvas = model_canvas_loader
-            print(f"  ✓ Set panel.model_canvas = {model_canvas_loader}")
-        else:
-            print(f"  ⚠️ self.panel is None!")
+        
+        # Wire simulation complete callback to all controllers
+        self._wire_simulation_callback()
+    
+    def _wire_simulation_callback(self):
+        """Wire simulation complete callback to all existing controllers."""
+        if not self.model_canvas_loader:
+            return
+        
+        # Get all overlay managers and wire callbacks
+        if hasattr(self.model_canvas_loader, 'overlay_managers'):
+            for overlay_manager in self.model_canvas_loader.overlay_managers:
+                controller = getattr(overlay_manager, 'controller', None)
+                if controller and hasattr(controller, 'on_simulation_complete'):
+                    # Add our callback alongside existing ones
+                    existing_callback = controller.on_simulation_complete
+                    
+                    def combined_callback():
+                        # Call existing callback first
+                        if existing_callback and callable(existing_callback):
+                            existing_callback()
+                        # Then call viability panel
+                        if self.panel and hasattr(self.panel, 'on_simulation_complete'):
+                            self.panel.on_simulation_complete()
+                    
+                    controller.on_simulation_complete = combined_callback
     
     def on_tab_switched(self, drawing_area):
         """Called when user switches model tabs.

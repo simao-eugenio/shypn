@@ -29,7 +29,7 @@ class ContextMenuHandler:
         handler.add_analysis_menu_items(menu, obj)
     """
     
-    def __init__(self, place_panel=None, transition_panel=None, model=None, diagnostics_panel=None, pathway_operations_panel=None):
+    def __init__(self, place_panel=None, transition_panel=None, model=None, diagnostics_panel=None, pathway_operations_panel=None, viability_panel=None, model_canvas_loader=None):
         """Initialize the context menu handler.
         
         Args:
@@ -38,11 +38,15 @@ class ContextMenuHandler:
             model: ModelCanvasManager instance for locality detection (optional)
             diagnostics_panel: DiagnosticsPanel instance (optional, can be set later)
             pathway_operations_panel: PathwayOperationsPanel instance for BRENDA enrichment (optional)
+            viability_panel: ViabilityPanel instance for model viability analysis (optional, DEPRECATED - use model_canvas_loader)
+            model_canvas_loader: ModelCanvasLoader instance for accessing per-document viability panels (optional)
         """
         self.place_panel = place_panel
         self.transition_panel = transition_panel
         self.diagnostics_panel = diagnostics_panel
         self.pathway_operations_panel = pathway_operations_panel
+        self.viability_panel = viability_panel  # DEPRECATED: kept for backward compatibility
+        self.model_canvas_loader = model_canvas_loader  # For per-document viability panels
         self.model = model
         self.locality_detector = None
         
@@ -70,6 +74,55 @@ class ContextMenuHandler:
             pathway_operations_panel: PathwayOperationsPanel instance
         """
         self.pathway_operations_panel = pathway_operations_panel
+    
+    def set_viability_panel(self, viability_panel):
+        """Set or update the viability panel for model viability analysis.
+        
+        DEPRECATED: Use set_model_canvas_loader() for per-document viability panels.
+        
+        Args:
+            viability_panel: ViabilityPanel instance
+        """
+        self.viability_panel = viability_panel
+    
+    def set_model_canvas_loader(self, model_canvas_loader):
+        """Set the model canvas loader for accessing per-document viability panels.
+        
+        Args:
+            model_canvas_loader: ModelCanvasLoader instance
+        """
+        self.model_canvas_loader = model_canvas_loader
+    
+    def _get_current_viability_panel(self):
+        """Get the viability panel for the current document.
+        
+        Returns per-document viability panel if available, otherwise returns
+        the global viability panel (for backward compatibility).
+        
+        Returns:
+            ViabilityPanel instance or None
+        """
+        print(f"[ContextMenuHandler] _get_current_viability_panel called")
+        print(f"[ContextMenuHandler] model_canvas_loader: {self.model_canvas_loader}")
+        
+        # Try per-document panel first (new architecture)
+        if self.model_canvas_loader:
+            drawing_area = self.model_canvas_loader.get_current_document()
+            print(f"[ContextMenuHandler] drawing_area: {drawing_area}")
+            if drawing_area and hasattr(self.model_canvas_loader, 'overlay_managers'):
+                overlay_manager = self.model_canvas_loader.overlay_managers.get(drawing_area)
+                print(f"[ContextMenuHandler] overlay_manager: {overlay_manager}")
+                if overlay_manager and hasattr(overlay_manager, 'viability_panel_loader'):
+                    viability_loader = overlay_manager.viability_panel_loader
+                    print(f"[ContextMenuHandler] viability_loader: {viability_loader}")
+                    if viability_loader and hasattr(viability_loader, 'panel'):
+                        panel = viability_loader.panel
+                        print(f"[ContextMenuHandler] Found per-document panel: {panel}")
+                        return panel
+        
+        # Fallback to global panel (old architecture)
+        print(f"[ContextMenuHandler] Fallback to global panel: {self.viability_panel}")
+        return self.viability_panel
     
     def set_model(self, model):
         """Set or update the model for locality detection.
@@ -143,7 +196,51 @@ class ContextMenuHandler:
         if isinstance(obj, Transition) and self.pathway_operations_panel:
             self._add_brenda_enrichment_menu(menu, obj)
             self._add_sabio_rk_enrichment_menu(menu, obj)
+        
+        # Add "Add to Viability" option for places and transitions
+        viability_panel = self._get_current_viability_panel()
+        print(f"[ContextMenuHandler] Context menu for {obj}, viability_panel: {viability_panel}")
+        if viability_panel:
+            self._add_viability_menu_item(menu, obj, viability_panel)
             
+    
+    def _add_viability_menu_item(self, menu, obj, viability_panel):
+        """Add 'Add to Viability' menu item for model viability analysis.
+        
+        Args:
+            menu: Gtk.Menu instance to add items to
+            obj: Place or Transition object
+            viability_panel: ViabilityPanel instance
+        """
+        from shypn.netobjs import Place, Transition
+        
+        # Add separator
+        separator = Gtk.SeparatorMenuItem()
+        separator.show()
+        menu.append(separator)
+        
+        # Determine object type
+        if isinstance(obj, Place):
+            obj_label = f"Place: {obj.id}"
+        elif isinstance(obj, Transition):
+            obj_label = f"Transition: {obj.id}"
+        else:
+            return
+        
+        # Add menu item
+        menu_item = Gtk.MenuItem(label="Add to Viability Analysis")
+        
+        def on_add_to_viability(widget):
+            """Callback when 'Add to Viability' is clicked."""
+            # Add the object to viability panel for focused analysis
+            if hasattr(viability_panel, 'add_object_for_analysis'):
+                viability_panel.add_object_for_analysis(obj)
+            else:
+                print(f"[VIABILITY_MENU] Viability panel doesn't support add_object_for_analysis()")
+        
+        menu_item.connect("activate", on_add_to_viability)
+        menu_item.show()
+        menu.append(menu_item)
     
     def _add_transition_locality_submenu(self, menu, transition, panel):
         """Add menu item for transition - automatically includes locality if valid.

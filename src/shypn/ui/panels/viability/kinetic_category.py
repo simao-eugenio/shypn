@@ -114,17 +114,30 @@ class KineticCategory(BaseViabilityCategory):
         self.scan_button.set_label("SCAN KINETICS")
         self.content_box.pack_start(button_box, False, False, 0)
         
-        # Issues list
+        # Issues table with TreeView
         issues_frame = Gtk.Frame(label="ISSUES DETECTED")
-        scrolled = Gtk.ScrolledWindow()
-        scrolled.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-        scrolled.set_min_content_height(200)
+        issues_vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         
-        self.issues_listbox = Gtk.ListBox()
-        self.issues_listbox.set_selection_mode(Gtk.SelectionMode.NONE)
-        scrolled.add(self.issues_listbox)
+        # Create TreeView table with selection checkboxes
+        scrolled, tree, store = self._create_issues_treeview()
+        issues_vbox.pack_start(scrolled, True, True, 0)
         
-        issues_frame.add(scrolled)
+        # Action buttons at bottom (like Heuristic panel)
+        action_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
+        action_box.set_margin_start(6)
+        action_box.set_margin_end(6)
+        action_box.set_margin_top(6)
+        action_box.set_margin_bottom(6)
+        
+        self.repair_button = Gtk.Button(label="🔧 Repair Selected")
+        self.repair_button.set_tooltip_text("Apply selected suggestions")
+        self.repair_button.set_sensitive(False)
+        self.repair_button.connect('clicked', self._on_repair_clicked)
+        action_box.pack_start(self.repair_button, True, True, 0)
+        
+        issues_vbox.pack_start(action_box, False, False, 0)
+        
+        issues_frame.add(issues_vbox)
         self.content_box.pack_start(issues_frame, True, True, 0)
     
     def _scan_issues(self):
