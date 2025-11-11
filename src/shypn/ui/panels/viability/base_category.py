@@ -47,6 +47,10 @@ class BaseViabilityCategory:
         self.current_issues: List[Issue] = []
         self.selected_locality_id = None  # None = full model
         
+        # Locality scope tracking (for filtered scans)
+        self.scoped_transition = None
+        self.scoped_locality = None
+        
         # Undo stack (using Change dataclass)
         self.change_history: List[Change] = []
         
@@ -81,6 +85,9 @@ class BaseViabilityCategory:
         
         # Build category-specific content
         self._build_content()
+        
+        # Show all widgets
+        self.content_box.show_all()
         
         # Set content in CategoryFrame
         self.category_frame.set_content(self.content_box)
@@ -157,7 +164,7 @@ class BaseViabilityCategory:
         raise NotImplementedError("Subclass must implement _scan_issues()")
     
     def _create_action_buttons(self):
-        """Create common action buttons (Scan, Undo, etc.).
+        """Create common action buttons (Scan, Clear).
         
         Returns:
             Gtk.Box: Button box
@@ -170,18 +177,162 @@ class BaseViabilityCategory:
         self.scan_button.connect('clicked', self._on_scan_clicked)
         button_box.pack_start(self.scan_button, False, False, 0)
         
-        # Undo button
-        self.undo_button = Gtk.Button(label="UNDO LAST")
-        self.undo_button.set_sensitive(False)  # Initially disabled
-        self.undo_button.connect('clicked', self._on_undo_clicked)
-        button_box.pack_start(self.undo_button, False, False, 0)
-        
         # Clear button
         clear_button = Gtk.Button(label="CLEAR ALL")
         clear_button.connect('clicked', self._on_clear_clicked)
         button_box.pack_start(clear_button, False, False, 0)
         
         return button_box
+    
+    def _create_issues_treeview(self):
+        """Create TreeView for displaying issues with selection checkboxes.
+        
+        Creates a table with columns:
+        - [☐] Selection checkbox
+        - Icon (severity indicator)
+        - Title
+        - Description
+        - Confidence
+        
+        Returns:
+            tuple: (scrolled_window, treeview, liststore)
+        """
+        # Create ListStore: Selected, Icon, Title, Description, Confidence, Issue object
+        self.issues_store = Gtk.ListStore(
+            bool,      # 0: Selected
+            str,       # 1: Icon
+            str,       # 2: Title
+            str,       # 3: Description
+            str,       # 4: Confidence
+            object     # 5: Issue object
+        )
+        
+        # Create TreeView
+        self.issues_tree = Gtk.TreeView(model=self.issues_store)
+        self.issues_tree.set_headers_visible(True)
+        self.issues_tree.set_enable_search(False)
+        
+        # Selection column with checkbox
+        renderer_toggle = Gtk.CellRendererToggle()
+        renderer_toggle.set_activatable(True)
+        renderer_toggle.connect('toggled', self._on_issue_selection_toggled)
+        
+        column_select = Gtk.TreeViewColumn("☐", renderer_toggle, active=0)
+        column_select.set_fixed_width(40)
+        column_select.set_clickable(True)
+        column_select.connect('clicked', self._on_header_column_clicked)
+        self.issues_tree.append_column(column_select)
+        
+        # Store reference for updating header label
+        self.select_column = column_select
+        self._all_selected = False
+        
+        # Icon column
+        renderer_icon = Gtk.CellRendererText()
+        column_icon = Gtk.TreeViewColumn("", renderer_icon, text=1)
+        column_icon.set_fixed_width(40)
+        column_icon.set_sizing(Gtk.TreeViewColumnSizing.FIXED)
+        self.issues_tree.append_column(column_icon)
+        
+        # Title column
+        renderer_title = Gtk.CellRendererText()
+        renderer_title.set_property("weight", 600)  # Bold
+        column_title = Gtk.TreeViewColumn("Issue", renderer_title, text=2)
+        column_title.set_resizable(True)
+        column_title.set_fixed_width(200)
+        column_title.set_sizing(Gtk.TreeViewColumnSizing.FIXED)
+        self.issues_tree.append_column(column_title)
+        
+        # Description column
+        renderer_desc = Gtk.CellRendererText()
+        renderer_desc.set_property("wrap-mode", 2)  # Word wrap
+        renderer_desc.set_property("wrap-width", 300)
+        column_desc = Gtk.TreeViewColumn("Description", renderer_desc, text=3)
+        column_desc.set_resizable(True)
+        column_desc.set_expand(True)
+        self.issues_tree.append_column(column_desc)
+        
+        # Confidence column
+        renderer_conf = Gtk.CellRendererText()
+        column_conf = Gtk.TreeViewColumn("Confidence", renderer_conf, text=4)
+        column_conf.set_fixed_width(100)
+        column_conf.set_sizing(Gtk.TreeViewColumnSizing.FIXED)
+        self.issues_tree.append_column(column_conf)
+        
+        # Wrap in ScrolledWindow
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        scrolled.set_min_content_height(200)
+        scrolled.add(self.issues_tree)
+        
+        return scrolled, self.issues_tree, self.issues_store
+    
+    def _on_issue_selection_toggled(self, renderer, path):
+        """Handle selection checkbox toggle for an issue row.
+        
+        Args:
+            renderer: CellRendererToggle
+            path: Tree path string
+        """
+        # Toggle the selected state
+        iter = self.issues_store.get_iter(path)
+        current_value = self.issues_store.get_value(iter, 0)
+        new_value = not current_value
+        self.issues_store.set_value(iter, 0, new_value)
+        
+        # Update button sensitivity and header based on selection
+        has_selection = False
+        all_selected = True
+        total_rows = 0
+        iter = self.issues_store.get_iter_first()
+        while iter:
+            total_rows += 1
+            selected = self.issues_store.get_value(iter, 0)
+            if selected:
+                has_selection = True
+            else:
+                all_selected = False
+            iter = self.issues_store.iter_next(iter)
+        
+        # Update header label based on selection state
+        if all_selected and total_rows > 0:
+            self.select_column.set_title("☑")  # All checked
+            self._all_selected = True
+        elif has_selection:
+            self.select_column.set_title("☒")  # Some checked (indeterminate)
+            self._all_selected = False
+        else:
+            self.select_column.set_title("☐")  # None checked
+            self._all_selected = False
+        
+        # Update repair button sensitivity
+        if hasattr(self, 'repair_button'):
+            self.repair_button.set_sensitive(has_selection)
+    
+    def _on_header_column_clicked(self, column):
+        """Handle header column click (select/deselect all issues).
+        
+        Args:
+            column: The TreeViewColumn that was clicked
+        """
+        # Toggle selection state
+        self._all_selected = not self._all_selected
+        
+        # Update all checkboxes
+        iter = self.issues_store.get_iter_first()
+        while iter:
+            self.issues_store.set_value(iter, 0, self._all_selected)
+            iter = self.issues_store.iter_next(iter)
+        
+        # Update header label
+        if self._all_selected:
+            column.set_title("☑")  # Checked
+        else:
+            column.set_title("☐")  # Unchecked
+        
+        # Update repair button sensitivity
+        if hasattr(self, 'repair_button'):
+            self.repair_button.set_sensitive(self._all_selected)
     
     def _on_scan_clicked(self, button):
         """Handle scan button click.
@@ -195,11 +346,78 @@ class BaseViabilityCategory:
         # Scan for new issues
         issues = self._scan_issues()
         
+        # Diagnostic output
+        category_name = self.get_category_name()
         if issues:
+            print(f"[{category_name}] Found {len(issues)} issues")
             self.current_issues = issues
             self._display_issues(issues)
         else:
+            print(f"[{category_name}] No issues found")
             self._show_no_issues_message()
+    
+    def scan_with_locality(self, transition=None, locality=None):
+        """Scan for issues scoped to a specific locality.
+        
+        This method is called by the diagnosis category when running
+        a locality-scoped diagnosis (RUN SELECTED mode).
+        
+        Args:
+            transition: Transition object for the locality
+            locality: Locality object with input/output places
+        """
+        if not transition or not locality:
+            print(f"[{self.get_category_name()}] No locality provided for scoped scan")
+            return
+        
+        print(f"[{self.get_category_name()}] Scanning with locality: {transition.id}")
+        
+        # Store the locality scope
+        self.selected_locality_id = transition.id
+        self.scoped_transition = transition
+        self.scoped_locality = locality
+        
+        # Run scan (subclass implementation will filter by locality)
+        issues = self._scan_issues()
+        
+        # Filter issues to only those related to this locality
+        filtered_issues = self._filter_issues_by_locality(issues, transition, locality)
+        
+        print(f"[{self.get_category_name()}] Found {len(filtered_issues)} issues in locality")
+        
+        self.current_issues = filtered_issues
+        self._display_issues(filtered_issues)
+    
+    def _filter_issues_by_locality(self, issues, transition, locality):
+        """Filter issues to only those related to the given locality.
+        
+        Args:
+            issues: List of Issue objects
+            transition: Transition object
+            locality: Locality object with input/output places
+            
+        Returns:
+            List[Issue]: Filtered issues
+        """
+        if not issues:
+            return []
+        
+        # Build set of relevant element IDs
+        relevant_ids = {transition.id}
+        if locality:
+            if hasattr(locality, 'input_places'):
+                relevant_ids.update(p.id for p in locality.input_places if hasattr(p, 'id'))
+            if hasattr(locality, 'output_places'):
+                relevant_ids.update(p.id for p in locality.output_places if hasattr(p, 'id'))
+        
+        # Filter issues
+        filtered = []
+        for issue in issues:
+            element_id = getattr(issue, 'element_id', None)
+            if element_id and element_id in relevant_ids:
+                filtered.append(issue)
+        
+        return filtered
     
     def _on_undo_clicked(self, button):
         """Handle undo button click.
@@ -223,18 +441,180 @@ class BaseViabilityCategory:
             button: Button that was clicked
         """
         self.current_issues = []
-        if self.issues_listbox:
-            # Clear all rows
+        
+        # Clear TreeView if using new format
+        if hasattr(self, 'issues_store') and self.issues_store:
+            self.issues_store.clear()
+            if hasattr(self, 'select_column'):
+                self.select_column.set_title("☐")
+                self._all_selected = False
+            if hasattr(self, 'repair_button'):
+                self.repair_button.set_sensitive(False)
+        
+        # Clear ListBox if using old format
+        if hasattr(self, 'issues_listbox') and self.issues_listbox:
             for child in self.issues_listbox.get_children():
                 self.issues_listbox.remove(child)
     
+    def _on_repair_clicked(self, button):
+        """Handle repair button click - applies selected suggestions.
+        
+        Args:
+            button: Button that was clicked
+        """
+        # Get selected issues from TreeView
+        selected_issues = []
+        if hasattr(self, 'issues_store') and self.issues_store:
+            iter = self.issues_store.get_iter_first()
+            while iter:
+                selected = self.issues_store.get_value(iter, 0)
+                if selected:
+                    issue = self.issues_store.get_value(iter, 5)  # Get issue object
+                    selected_issues.append(issue)
+                iter = self.issues_store.iter_next(iter)
+        else:
+            # Fallback to all issues if using old ListBox
+            selected_issues = self.current_issues
+        
+        if not selected_issues:
+            print(f"[{self.get_category_name()}] No issues selected for repair")
+            return
+        
+        # Show confirmation dialog
+        dialog = Gtk.MessageDialog(
+            transient_for=self.get_toplevel(),
+            flags=0,
+            message_type=Gtk.MessageType.QUESTION,
+            buttons=Gtk.ButtonsType.YES_NO,
+            text=f"Apply {len(selected_issues)} selected suggestion(s)?"
+        )
+        dialog.format_secondary_text(
+            f"This will apply the selected suggestions to fix the model.\n"
+            "This action can be undone."
+        )
+        
+        response = dialog.run()
+        dialog.destroy()
+        
+        if response == Gtk.ResponseType.YES:
+            # Apply selected suggestions
+            applied_count = 0
+            for issue in selected_issues:
+                if self._apply_suggestion(issue):
+                    applied_count += 1
+            
+            print(f"[{self.get_category_name()}] Applied {applied_count}/{len(selected_issues)} suggestions")
+            
+            # Show result
+            result_dialog = Gtk.MessageDialog(
+                transient_for=self.get_toplevel(),
+                flags=0,
+                message_type=Gtk.MessageType.INFO,
+                buttons=Gtk.ButtonsType.OK,
+                text=f"Repair Complete"
+            )
+            result_dialog.format_secondary_text(
+                f"Successfully applied {applied_count} suggestion(s)."
+            )
+            result_dialog.run()
+            result_dialog.destroy()
+            
+            # Clear current issues after applying
+            self._on_clear_clicked(None)
+    
+    def _apply_suggestion(self, issue):
+        """Apply a suggestion from an issue.
+        
+        Subclasses should override this to implement specific repair logic.
+        
+        Args:
+            issue: Issue dict or object containing the suggestion
+            
+        Returns:
+            bool: True if successfully applied
+        """
+        print(f"[{self.get_category_name()}] _apply_suggestion not implemented")
+        return False
+    
     def _display_issues(self, issues: List[Issue]):
-        """Display issues in the UI.
+        """Display issues in the TreeView table.
         
         Args:
             issues: List of Issue dataclass instances
         """
-        if not self.issues_listbox:
+        if not hasattr(self, 'issues_store') or not self.issues_store:
+            # Fallback to old ListBox display if TreeView not initialized
+            return self._display_issues_listbox(issues)
+        
+        # Clear existing rows
+        self.issues_store.clear()
+        
+        if not issues:
+            self._show_no_issues_message()
+            # Disable repair button and reset header
+            if hasattr(self, 'repair_button'):
+                self.repair_button.set_sensitive(False)
+            if hasattr(self, 'select_column'):
+                self.select_column.set_title("☐")
+                self._all_selected = False
+            return
+        
+        # Add issue rows to TreeView
+        for issue in issues:
+            # Determine icon based on severity or confidence
+            if isinstance(issue, dict):
+                # New suggestion dict format
+                confidence = issue.get('confidence', 0.5)
+                if confidence > 0.8:
+                    icon = "💡"
+                elif confidence > 0.5:
+                    icon = "⚠️"
+                else:
+                    icon = "🔴"
+                title = issue.get('title', 'No title')
+                description = issue.get('description', '')
+                confidence_str = f"{confidence:.0%}"
+            else:
+                # Issue object format
+                severity_icons = {
+                    "critical": "🔴",
+                    "warning": "⚠️",
+                    "info": "💡"
+                }
+                icon = severity_icons.get(getattr(issue, 'severity', 'info'), "💡")
+                title = getattr(issue, 'title', 'No title')
+                description = getattr(issue, 'description', '')
+                
+                # Get confidence from first suggestion if available
+                confidence_str = ""
+                if hasattr(issue, 'suggestions') and issue.suggestions:
+                    confidence = getattr(issue.suggestions[0], 'confidence', 0)
+                    confidence_str = f"{confidence:.0%}"
+            
+            # Append row: Selected, Icon, Title, Description, Confidence, Issue
+            self.issues_store.append([
+                False,           # Not selected by default
+                icon,
+                title,
+                description,
+                confidence_str,
+                issue            # Store issue object
+            ])
+        
+        # Reset header and button state
+        self._all_selected = False
+        if hasattr(self, 'select_column'):
+            self.select_column.set_title("☐")
+        if hasattr(self, 'repair_button'):
+            self.repair_button.set_sensitive(False)  # No selection yet
+    
+    def _display_issues_listbox(self, issues: List[Issue]):
+        """Fallback method: Display issues in the old ListBox format.
+        
+        Args:
+            issues: List of Issue dataclass instances
+        """
+        if not hasattr(self, 'issues_listbox') or not self.issues_listbox:
             return
         
         # Clear existing rows
@@ -243,7 +623,14 @@ class BaseViabilityCategory:
         
         if not issues:
             self._show_no_issues_message()
+            # Disable repair button
+            if hasattr(self, 'repair_button'):
+                self.repair_button.set_sensitive(False)
             return
+        
+        # Enable repair button if we have issues
+        if hasattr(self, 'repair_button'):
+            self.repair_button.set_sensitive(True)
         
         # Add issue rows
         for issue in issues:
@@ -270,28 +657,45 @@ class BaseViabilityCategory:
         box.set_margin_top(12)
         box.set_margin_bottom(12)
         
-        # Title with severity icon
-        severity_icons = {
-            "critical": "🔴",
-            "warning": "⚠️",
-            "info": "💡"
-        }
-        icon = severity_icons.get(issue.severity, "")
+        # Title with icon based on confidence (if dict) or severity (if Issue object)
+        if isinstance(issue, dict):
+            # New suggestion dict format
+            confidence = issue.get('confidence', 0.5)
+            if confidence > 0.8:
+                icon = "💡"
+            elif confidence > 0.5:
+                icon = "⚠️"
+            else:
+                icon = "🔴"
+            title = issue.get('title', 'No title')
+            description = issue.get('description', '')
+            suggestions = []  # Suggestions are now the issue itself
+        else:
+            # Old Issue object format (for backward compatibility)
+            severity_icons = {
+                "critical": "🔴",
+                "warning": "⚠️",
+                "info": "💡"
+            }
+            icon = severity_icons.get(issue.severity, "")
+            title = issue.title
+            description = issue.description
+            suggestions = issue.suggestions if hasattr(issue, 'suggestions') else []
         
         title_label = Gtk.Label()
-        title_label.set_markup(f"<b>{icon} {issue.title}</b>")
+        title_label.set_markup(f"<b>{icon} {title}</b>")
         title_label.set_xalign(0)
         box.pack_start(title_label, False, False, 0)
         
         # Description
-        desc_label = Gtk.Label(label=issue.description)
+        desc_label = Gtk.Label(label=description)
         desc_label.set_line_wrap(True)
         desc_label.set_xalign(0)
         box.pack_start(desc_label, False, False, 0)
         
-        # Suggestions (if any)
-        if issue.suggestions:
-            for suggestion in issue.suggestions:
+        # Suggestions (if any) - only for old Issue format
+        if suggestions:
+            for suggestion in suggestions:
                 suggestion_widget = self._create_suggestion_widget(suggestion, issue)
                 box.pack_start(suggestion_widget, False, False, 0)
         
@@ -759,10 +1163,17 @@ class BaseViabilityCategory:
         Args:
             issues: List of Issue dataclasses from the observer
         """
+        print(f"[VIABILITY_CATEGORY] ========== _on_observer_update() CALLED ==========")
+        print(f"[VIABILITY_CATEGORY] Category: {self.__class__.__name__}")
+        print(f"[VIABILITY_CATEGORY] Received {len(issues)} issues")
+        print(f"[VIABILITY_CATEGORY] Expanded: {self.category_frame.expanded if self.category_frame else 'N/A'}")
         
         # Update the category with new issues
         self.current_issues = issues
         
         # Update UI if category is expanded
-        if self.category_frame and self.category_frame.is_expanded():
+        if self.category_frame and self.category_frame.expanded:
+            print(f"[VIABILITY_CATEGORY] Scheduling UI update via GLib.idle_add...")
             GLib.idle_add(self._display_issues, issues)
+        else:
+            print(f"[VIABILITY_CATEGORY] Not expanded - UI update skipped")

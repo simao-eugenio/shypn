@@ -47,6 +47,10 @@ class DiagnosisCategory(BaseViabilityCategory):
         
         # Multi-domain engine (the key innovation!)
         self.multi_domain_engine = MultiDomainEngine()
+        
+        # Track selected transition and locality objects
+        self.selected_transition = None
+        self.selected_locality = None
     
     def get_category_name(self):
         """Get category display name.
@@ -80,65 +84,90 @@ class DiagnosisCategory(BaseViabilityCategory):
         self.locality_radio.connect('toggled', self._on_scope_changed)
         locality_box.pack_start(self.locality_radio, False, False, 0)
         
-        # Locality dropdown (indented)
-        locality_dropdown_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        locality_dropdown_box.set_margin_start(24)
+        # Locality list (indented) - replaces combo box
+        locality_list_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        locality_list_box.set_margin_start(24)
         
-        self.locality_combo = Gtk.ComboBoxText()
-        self.locality_combo.append_text("(No localities available)")
-        self.locality_combo.set_active(0)
-        self.locality_combo.set_sensitive(False)
-        self.locality_combo.connect('changed', self._on_locality_selected)
-        locality_dropdown_box.pack_start(self.locality_combo, True, True, 0)
+        # Scrolled window for locality list
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        scrolled.set_min_content_height(150)
+        scrolled.set_max_content_height(300)
         
-        manage_button = Gtk.Button(label="Manage Localities")
-        manage_button.set_sensitive(False)
-        locality_dropdown_box.pack_start(manage_button, False, False, 0)
+        # ListBox to hold transitions with their localities
+        self.locality_listbox = Gtk.ListBox()
+        self.locality_listbox.set_selection_mode(Gtk.SelectionMode.SINGLE)
+        self.locality_listbox.connect('row-selected', self._on_locality_row_selected)
+        self.locality_listbox.set_sensitive(False)
+        scrolled.add(self.locality_listbox)
         
-        locality_box.pack_start(locality_dropdown_box, False, False, 0)
+        locality_list_box.pack_start(scrolled, True, True, 0)
+        
+        # Clear button to clear selection
+        self.clear_selection_button = Gtk.Button(label="CLEAR")
+        self.clear_selection_button.set_tooltip_text("Clear locality selection")
+        self.clear_selection_button.set_sensitive(False)
+        self.clear_selection_button.connect('clicked', self._on_clear_selection_clicked)
+        locality_list_box.pack_start(self.clear_selection_button, False, False, 0)
+        
+        locality_box.pack_start(locality_list_box, True, True, 0)
         
         locality_frame.add(locality_box)
         self.content_box.pack_start(locality_frame, False, False, 0)
         
-        # Health score section
-        health_frame = Gtk.Frame(label="HEALTH SCORE")
-        health_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        health_box.set_margin_start(12)
-        health_box.set_margin_end(12)
-        health_box.set_margin_top(12)
-        health_box.set_margin_bottom(12)
+        # Action buttons - Override to add RUN SELECTED
+        button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        button_box.set_margin_start(12)
+        button_box.set_margin_end(12)
+        button_box.set_margin_top(6)
+        button_box.set_margin_bottom(6)
         
-        self.health_label = Gtk.Label(label="Run diagnosis to calculate health")
-        self.health_label.set_halign(Gtk.Align.START)
-        health_box.pack_start(self.health_label, False, False, 0)
+        # RUN SELECTED button - for locality-scoped diagnosis
+        self.run_selected_button = Gtk.Button(label="RUN SELECTED")
+        self.run_selected_button.set_tooltip_text("Run diagnosis for selected locality")
+        self.run_selected_button.set_sensitive(False)
+        self.run_selected_button.connect('clicked', self._on_run_selected_clicked)
+        button_box.pack_start(self.run_selected_button, True, True, 0)
         
-        health_frame.add(health_box)
-        self.content_box.pack_start(health_frame, False, False, 0)
+        # RUN FULL DIAGNOSE button - for global diagnosis
+        self.scan_button = Gtk.Button(label="RUN FULL DIAGNOSE")
+        self.scan_button.set_tooltip_text("Run complete diagnosis on entire model")
+        self.scan_button.connect('clicked', self._on_run_full_diagnose_clicked)
+        button_box.pack_start(self.scan_button, True, True, 0)
         
-        # Action buttons
-        button_box = self._create_action_buttons()
-        # Customize scan button label
-        self.scan_button.set_label("RUN FULL DIAGNOSIS")
-        
-        # Add batch operation button
-        batch_button = Gtk.Button(label="APPLY ALL FIXES")
-        batch_button.set_tooltip_text("Apply all high-confidence suggestions (>70%)")
-        batch_button.connect('clicked', self._on_apply_all_clicked)
-        button_box.pack_start(batch_button, False, False, 0)
+        # Clear button
+        self.clear_button = Gtk.Button(label="Clear Issues")
+        self.clear_button.set_tooltip_text("Clear all displayed issues")
+        self.clear_button.set_sensitive(False)
+        self.clear_button.connect('clicked', self._on_clear_clicked)
+        button_box.pack_start(self.clear_button, True, True, 0)
         
         self.content_box.pack_start(button_box, False, False, 0)
         
-        # Issues list with multi-domain view
+        # Issues table with TreeView for multi-domain view
         issues_frame = Gtk.Frame(label="ISSUES DETECTED")
-        scrolled = Gtk.ScrolledWindow()
-        scrolled.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-        scrolled.set_min_content_height(300)
+        issues_vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         
-        self.issues_listbox = Gtk.ListBox()
-        self.issues_listbox.set_selection_mode(Gtk.SelectionMode.NONE)
-        scrolled.add(self.issues_listbox)
+        # Create TreeView table with selection checkboxes
+        scrolled, tree, store = self._create_issues_treeview()
+        issues_vbox.pack_start(scrolled, True, True, 0)
         
-        issues_frame.add(scrolled)
+        # Action buttons at bottom (like Heuristic panel)
+        action_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
+        action_box.set_margin_start(6)
+        action_box.set_margin_end(6)
+        action_box.set_margin_top(6)
+        action_box.set_margin_bottom(6)
+        
+        self.repair_button = Gtk.Button(label="🔧 Repair Selected")
+        self.repair_button.set_tooltip_text("Apply selected suggestions")
+        self.repair_button.set_sensitive(False)
+        self.repair_button.connect('clicked', self._on_repair_clicked)
+        action_box.pack_start(self.repair_button, True, True, 0)
+        
+        issues_vbox.pack_start(action_box, False, False, 0)
+        
+        issues_frame.add(issues_vbox)
         self.content_box.pack_start(issues_frame, True, True, 0)
     
     def _on_scope_changed(self, radio_button):
@@ -148,24 +177,161 @@ class DiagnosisCategory(BaseViabilityCategory):
             radio_button: Radio button that was toggled
         """
         if self.locality_radio.get_active():
-            self.locality_combo.set_sensitive(True)
+            self.locality_listbox.set_sensitive(True)
             # Use selected locality
-            if self.locality_combo.get_active() >= 0:
-                # TODO: Get actual locality ID
-                self.selected_locality_id = "locality_example"
+            selected_row = self.locality_listbox.get_selected_row()
+            if selected_row:
+                # Get transition and locality from row data
+                transition = getattr(selected_row, 'transition_obj', None)
+                locality = getattr(selected_row, 'locality_obj', None)
+                if transition:
+                    self.selected_transition = transition
+                    self.selected_locality = locality
+                    self.selected_locality_id = transition.id
+                    self.run_selected_button.set_sensitive(True)
+                    self.clear_selection_button.set_sensitive(True)
+                else:
+                    self.selected_transition = None
+                    self.selected_locality = None
+                    self.selected_locality_id = None
+                    self.run_selected_button.set_sensitive(False)
+                    self.clear_selection_button.set_sensitive(False)
+            else:
+                self.selected_transition = None
+                self.selected_locality = None
+                self.selected_locality_id = None
+                self.run_selected_button.set_sensitive(False)
+                self.clear_selection_button.set_sensitive(False)
         else:
-            self.locality_combo.set_sensitive(False)
+            self.locality_listbox.set_sensitive(False)
+            self.selected_transition = None
+            self.selected_locality = None
             self.selected_locality_id = None
+            self.run_selected_button.set_sensitive(False)
+            self.clear_selection_button.set_sensitive(False)
     
-    def _on_locality_selected(self, combo):
-        """Handle locality selection change.
+    def _on_locality_row_selected(self, listbox, row):
+        """Handle locality list row selection.
         
         Args:
-            combo: ComboBox that changed
+            listbox: ListBox that fired the signal
+            row: Selected ListBoxRow (or None)
         """
-        if combo.get_active() >= 0:
-            # TODO: Get actual locality ID from combo
-            self.selected_locality_id = "locality_example"
+        if row:
+            # Get the transition and locality objects stored in the row
+            transition = getattr(row, 'transition_obj', None)
+            locality = getattr(row, 'locality_obj', None)
+            
+            if transition:
+                self.selected_transition = transition
+                self.selected_locality = locality
+                self.selected_locality_id = transition.id
+                print(f"[DiagnosisCategory] Selected transition: {transition.id}")
+                # Enable RUN SELECTED and CLEAR buttons
+                self.run_selected_button.set_sensitive(True)
+                self.clear_selection_button.set_sensitive(True)
+            else:
+                self.selected_transition = None
+                self.selected_locality = None
+                self.selected_locality_id = None
+                self.run_selected_button.set_sensitive(False)
+                self.clear_selection_button.set_sensitive(False)
+        else:
+            self.selected_transition = None
+            self.selected_locality = None
+            self.selected_locality_id = None
+            self.run_selected_button.set_sensitive(False)
+            self.clear_selection_button.set_sensitive(False)
+    
+    def _on_clear_selection_clicked(self, button):
+        """Handle CLEAR button click - clear locality listbox selection.
+        
+        Args:
+            button: Button that was clicked
+        """
+        print("[DiagnosisCategory] Clearing locality selection")
+        self.locality_listbox.unselect_all()
+        self.selected_transition = None
+        self.selected_locality = None
+        self.selected_locality_id = None
+        self.run_selected_button.set_sensitive(False)
+        self.clear_selection_button.set_sensitive(False)
+    
+    def _on_run_selected_clicked(self, button):
+        """Handle RUN SELECTED button click - run diagnosis for selected locality.
+        
+        Args:
+            button: Button that was clicked
+        """
+        if not self.selected_transition or not self.selected_locality:
+            print("[DiagnosisCategory] No locality selected")
+            return
+        
+        print(f"[DiagnosisCategory] Running diagnosis for locality: {self.selected_transition.id}")
+        self._run_selected_diagnosis()
+    
+    def _on_run_full_diagnose_clicked(self, button):
+        """Handle RUN FULL DIAGNOSE button click - run diagnosis on entire model.
+        
+        This triggers the parent panel's on_analyze_all method which was previously
+        connected to the header button.
+        
+        Args:
+            button: Button that was clicked
+        """
+        print("[DiagnosisCategory] Running full model diagnosis")
+        
+        # Clear any locality scope
+        self.selected_locality_id = None
+        
+        # Trigger parent panel's analyze all (batch mode)
+        if hasattr(self, 'parent_panel') and self.parent_panel:
+            if hasattr(self.parent_panel, 'on_analyze_all'):
+                self.parent_panel.on_analyze_all(button)
+            else:
+                print("[DiagnosisCategory] Warning: parent_panel has no on_analyze_all method")
+        else:
+            print("[DiagnosisCategory] Warning: No parent_panel available")
+    
+    def _run_selected_diagnosis(self):
+        """Run diagnosis scoped to the selected locality.
+        
+        This will:
+        1. Analyze the selected transition and its locality (input/output places)
+        2. Populate all category suggestions filtered to this scope
+        3. Trigger all categories to show suggestions for this locality
+        """
+        if not self.selected_transition or not self.selected_locality:
+            print("[DiagnosisCategory] No locality selected for diagnosis")
+            return
+        
+        print(f"[DiagnosisCategory] Running scoped diagnosis for transition: {self.selected_transition.id}")
+        
+        # Store the scope for this diagnosis
+        kb = self.get_knowledge_base()
+        if not kb:
+            print("[DiagnosisCategory] No knowledge base available")
+            return
+        
+        # Set the locality scope for filtering
+        self.selected_locality_id = self.selected_transition.id
+        
+        # Run diagnosis (will use selected_locality_id for filtering)
+        issues = self._scan_issues()
+        
+        # Display issues
+        self._display_issues(issues)
+        
+        # Notify parent panel to trigger other categories with locality scope
+        if hasattr(self, 'parent_panel') and self.parent_panel:
+            print(f"[DiagnosisCategory] Notifying parent to scan with locality: {self.selected_transition.id}")
+            # Trigger other categories to scan with this locality scope
+            for category in self.parent_panel.categories:
+                if category != self and hasattr(category, 'scan_with_locality'):
+                    category.scan_with_locality(
+                        transition=self.selected_transition,
+                        locality=self.selected_locality
+                    )
     
     def set_analyses_panel(self, analyses_panel):
         """Set reference to analyses panel for locality access.
@@ -174,7 +340,393 @@ class DiagnosisCategory(BaseViabilityCategory):
             analyses_panel: AnalysesPanel instance
         """
         self.analyses_panel = analyses_panel
-        # TODO: Populate locality dropdown from analyses_panel
+        # Populate locality dropdown from analyses_panel
+        self._populate_localities()
+    
+    def add_transition_for_analysis(self, transition):
+        """Add a specific transition with its locality to the analysis list.
+        
+        This is called from the context menu "Add to Viability Analysis".
+        Shows transition with indented places (like plotting system), allowing
+        multiple localities to be selected for sub-network analysis.
+        
+        Args:
+            transition: Transition object from context menu
+        """
+        print(f"[DIAGNOSIS_CATEGORY] add_transition_for_analysis called with: {transition.id}")
+        
+        # Get model
+        model = None
+        if self.model_canvas and hasattr(self.model_canvas, 'get_current_model'):
+            model = self.model_canvas.get_current_model()
+        
+        if not model:
+            print("[DIAGNOSIS_CATEGORY] No model available")
+            return
+        
+        # Use LocalityDetector to get THIS transition's locality (same as plotting)
+        from shypn.diagnostic.locality_detector import LocalityDetector
+        detector = LocalityDetector(model)
+        locality = detector.get_locality_for_transition(transition)
+        
+        if not locality.is_valid:
+            print(f"[DIAGNOSIS_CATEGORY] Transition {transition.id} has no valid locality")
+            return
+        
+        print(f"[DIAGNOSIS_CATEGORY] Locality for {transition.id}: {len(locality.input_places)} inputs, {len(locality.output_places)} outputs")
+        
+        # Check if this transition is already in the list
+        for child in self.locality_listbox.get_children():
+            trans_obj = getattr(child, 'transition_obj', None)
+            if trans_obj and trans_obj.id == transition.id:
+                print(f"[DIAGNOSIS_CATEGORY] Transition {transition.id} already in list")
+                return
+        
+        # Add this transition with its locality places (hierarchical display)
+        self._add_transition_with_locality_to_list(transition, locality)
+        
+        # Switch to locality mode
+        self.locality_radio.set_active(True)
+        self.locality_listbox.set_sensitive(True)
+        
+        print(f"[DIAGNOSIS_CATEGORY] ✓ Added transition {transition.id} with locality to list")
+    
+    def _add_transition_with_locality_to_list(self, transition, locality):
+        """Add a transition and its locality places to the listbox (hierarchical tree view).
+        
+        Creates a display like plotting:
+        🔄 T6: R03270
+           ← Input: P5 (C00118)
+           ← Input: P7 (C00267)  
+           → Output: P10 (C00036)
+        
+        Args:
+            transition: Transition object
+            locality: Locality object with input/output places
+        """
+        trans_id = transition.id
+        trans_label = getattr(transition, 'label', '') or ''
+        is_source = getattr(transition, 'is_source', False)
+        is_sink = getattr(transition, 'is_sink', False)
+        
+        # Add transition row (parent)
+        trans_row = Gtk.ListBoxRow()
+        trans_row.transition_obj = transition
+        trans_row.locality_obj = locality
+        trans_row.is_transition_row = True  # Mark as parent row
+        
+        hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        hbox.set_margin_start(6)
+        hbox.set_margin_end(6)
+        hbox.set_margin_top(3)
+        hbox.set_margin_bottom(3)
+        
+        # Transition icon
+        icon_label = Gtk.Label(label="🔄")
+        hbox.pack_start(icon_label, False, False, 0)
+        
+        # Transition info
+        display_text = trans_id
+        if trans_label:
+            display_text += f": {trans_label}"
+        if is_source:
+            display_text += " [SOURCE]"
+        elif is_sink:
+            display_text += " [SINK]"
+            
+        label = Gtk.Label(label=display_text)
+        label.set_xalign(0)
+        hbox.pack_start(label, True, True, 0)
+        
+        # Remove button
+        remove_btn = Gtk.Button(label="✕")
+        remove_btn.set_relief(Gtk.ReliefStyle.NONE)
+        remove_btn.connect('clicked', self._on_remove_locality_clicked, transition)
+        hbox.pack_start(remove_btn, False, False, 0)
+        
+        trans_row.add(hbox)
+        self.locality_listbox.add(trans_row)
+        
+        # Add indented input places
+        if not is_source:  # Source transitions have no inputs
+            for place in locality.input_places:
+                self._add_place_row_to_list(place, "← Input:", transition)
+        
+        # Add indented output places
+        if not is_sink:  # Sink transitions have no outputs
+            for place in locality.output_places:
+                self._add_place_row_to_list(place, "→ Output:", transition)
+        
+        self.locality_listbox.show_all()
+    
+    def _add_place_row_to_list(self, place, label_prefix, parent_transition):
+        """Add an indented place row under its parent transition.
+        
+        Args:
+            place: Place object
+            label_prefix: "← Input:" or "→ Output:"
+            parent_transition: Parent Transition object
+        """
+        place_row = Gtk.ListBoxRow()
+        place_row.place_obj = place
+        place_row.parent_transition = parent_transition
+        place_row.is_place_row = True  # Mark as child row
+        
+        hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        hbox.set_margin_start(40)  # Indent to show hierarchy
+        hbox.set_margin_end(6)
+        hbox.set_margin_top(1)
+        hbox.set_margin_bottom(1)
+        
+        # Place icon (smaller)
+        icon_label = Gtk.Label(label="●")
+        icon_label.get_style_context().add_class('dim-label')
+        hbox.pack_start(icon_label, False, False, 0)
+        
+        # Place info
+        place_name = getattr(place, 'name', '') or ''
+        place_label = getattr(place, 'label', '') or ''
+        
+        display_text = f"{label_prefix} {place.id}"
+        if place_label:
+            display_text += f" ({place_label})"
+        elif place_name:
+            display_text += f" ({place_name})"
+        
+        label = Gtk.Label(label=display_text)
+        label.set_xalign(0)
+        label.get_style_context().add_class('dim-label')
+        hbox.pack_start(label, True, True, 0)
+        
+        place_row.add(hbox)
+        self.locality_listbox.add(place_row)
+    
+    def _on_remove_locality_clicked(self, button, transition):
+        """Remove a transition and its locality places from the list.
+        
+        Args:
+            button: Button widget (unused)
+            transition: Transition object to remove
+        """
+        print(f"[DIAGNOSIS_CATEGORY] Removing transition {transition.id} and its places")
+        
+        # Remove transition row and all its place rows
+        children = self.locality_listbox.get_children()
+        rows_to_remove = []
+        
+        for row in children:
+            # Remove transition row
+            if getattr(row, 'is_transition_row', False):
+                trans_obj = getattr(row, 'transition_obj', None)
+                if trans_obj and trans_obj.id == transition.id:
+                    rows_to_remove.append(row)
+            # Remove place rows belonging to this transition
+            elif getattr(row, 'is_place_row', False):
+                parent_trans = getattr(row, 'parent_transition', None)
+                if parent_trans and parent_trans.id == transition.id:
+                    rows_to_remove.append(row)
+        
+        for row in rows_to_remove:
+            self.locality_listbox.remove(row)
+        
+        # If list is now empty, add placeholder
+        if not self.locality_listbox.get_children():
+            row = Gtk.ListBoxRow()
+            label = Gtk.Label(label="(No localities selected)")
+            label.get_style_context().add_class('dim-label')
+            label.set_margin_start(6)
+            label.set_margin_end(6)
+            label.set_margin_top(6)
+            label.set_margin_bottom(6)
+            row.add(label)
+            self.locality_listbox.add(row)
+            self.locality_listbox.set_sensitive(False)
+        
+        self.locality_listbox.show_all()
+    
+    def _populate_localities(self):
+        """Populate the locality list using LocalityDetector (same as plotting system)."""
+        print("[DIAGNOSIS_CATEGORY] _populate_localities called")
+        
+        # Clear existing rows
+        for child in self.locality_listbox.get_children():
+            self.locality_listbox.remove(child)
+        
+        # Get model
+        model = None
+        if self.model_canvas and hasattr(self.model_canvas, 'get_current_model'):
+            model = self.model_canvas.get_current_model()
+        
+        if not model or not hasattr(model, 'transitions'):
+            print("[DIAGNOSIS_CATEGORY] No model available")
+            row = Gtk.ListBoxRow()
+            label = Gtk.Label(label="(No model available)")
+            label.get_style_context().add_class('dim-label')
+            label.set_margin_start(6)
+            label.set_margin_end(6)
+            label.set_margin_top(6)
+            label.set_margin_bottom(6)
+            row.add(label)
+            self.locality_listbox.add(row)
+            self.locality_listbox.set_sensitive(False)
+            self.locality_listbox.show_all()
+            return
+        
+        print(f"[DIAGNOSIS_CATEGORY] Model has {len(model.transitions)} transitions")
+        
+        # Use LocalityDetector to get all valid localities (same as plotting)
+        from shypn.diagnostic.locality_detector import LocalityDetector
+        detector = LocalityDetector(model)
+        localities = detector.get_all_localities()
+        
+        print(f"[DIAGNOSIS_CATEGORY] LocalityDetector found {len(localities)} valid localities")
+        
+        if not localities:
+            print("[DIAGNOSIS_CATEGORY] No valid localities found")
+            row = Gtk.ListBoxRow()
+            label = Gtk.Label(label="(No localities available)")
+            label.get_style_context().add_class('dim-label')
+            label.set_margin_start(6)
+            label.set_margin_end(6)
+            label.set_margin_top(6)
+            label.set_margin_bottom(6)
+            row.add(label)
+            self.locality_listbox.add(row)
+            self.locality_listbox.set_sensitive(False)
+        else:
+            # Add each valid locality to the listbox
+            for locality in localities:
+                transition = locality.transition
+                trans_id = getattr(transition, 'id', 'unknown')
+                trans_label = getattr(transition, 'label', '') or ''
+                
+                print(f"[DIAGNOSIS_CATEGORY] Adding {trans_id}: {len(locality.input_places)} inputs, {len(locality.output_places)} outputs")
+                
+                # Create row
+                row = Gtk.ListBoxRow()
+                
+                # Store objects in row for later retrieval
+                row.transition_obj = transition
+                row.locality_obj = locality
+                
+                # Create row content
+                hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+                hbox.set_margin_start(6)
+                hbox.set_margin_end(6)
+                hbox.set_margin_top(3)
+                hbox.set_margin_bottom(3)
+                
+                # Transition icon
+                icon_label = Gtk.Label(label="🔄")
+                hbox.pack_start(icon_label, False, False, 0)
+                
+                # Transition info
+                info_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+                
+                # Main label (ID + label if available)
+                display_text = trans_id
+                if trans_label:
+                    display_text += f": {trans_label}"
+                main_label = Gtk.Label(label=display_text)
+                main_label.set_xalign(0)
+                main_label.set_ellipsize(3)  # Ellipsize at end
+                info_box.pack_start(main_label, False, False, 0)
+                
+                # Locality summary
+                n_inputs = len(locality.input_places)
+                n_outputs = len(locality.output_places)
+                summary_label = Gtk.Label(label=f"   ↓ {n_inputs} inputs, {n_outputs} outputs →")
+                summary_label.set_xalign(0)
+                summary_label.get_style_context().add_class('dim-label')
+                info_box.pack_start(summary_label, False, False, 0)
+                
+                hbox.pack_start(info_box, True, True, 0)
+                row.add(hbox)
+                
+                self.locality_listbox.add(row)
+            
+            self.locality_listbox.set_sensitive(True)
+            print(f"[DIAGNOSIS_CATEGORY] Added {len(localities)} localities to listbox")
+        
+        self.locality_listbox.show_all()
+        print(f"[DIAGNOSIS_CATEGORY] _populate_localities complete")
+    
+    def _get_transition_locality(self, transition):
+        """Get locality object for a transition by scanning model arcs.
+        
+        Args:
+            transition: Transition object (from model)
+            
+        Returns:
+            Locality object or None
+        """
+        try:
+            from shypn.diagnostic.locality_detector import Locality
+            
+            trans_id = transition.id if hasattr(transition, 'id') else str(transition)
+            print(f"[DIAGNOSIS_CATEGORY] Getting locality for transition: {trans_id}")
+            
+            # Get model
+            if not self.model_canvas or not hasattr(self.model_canvas, 'get_current_model'):
+                print(f"[DIAGNOSIS_CATEGORY] No model_canvas available")
+                return None
+            
+            model = self.model_canvas.get_current_model()
+            if not model or not hasattr(model, 'arcs'):
+                print(f"[DIAGNOSIS_CATEGORY] No model or model has no arcs")
+                return None
+            
+            # Scan all arcs to find those connected to this transition
+            input_places = []
+            output_places = []
+            input_arcs = []
+            output_arcs = []
+            
+            print(f"[DIAGNOSIS_CATEGORY] Scanning {len(model.arcs)} arcs...")
+            
+            for arc in model.arcs:
+                # Skip test arcs (catalysts) - they don't define locality
+                if hasattr(arc, 'consumes_tokens') and not arc.consumes_tokens():
+                    continue
+                
+                # Skip arcs involving catalyst places
+                if getattr(arc.source, 'is_catalyst', False) or getattr(arc.target, 'is_catalyst', False):
+                    continue
+                
+                # Input arc: place → transition
+                if arc.target == transition:
+                    input_arcs.append(arc)
+                    if arc.source not in input_places:
+                        input_places.append(arc.source)
+                        place_id = arc.source.id if hasattr(arc.source, 'id') else 'unknown'
+                        print(f"[DIAGNOSIS_CATEGORY]   Input: {place_id} → {trans_id}")
+                
+                # Output arc: transition → place
+                elif arc.source == transition:
+                    output_arcs.append(arc)
+                    if arc.target not in output_places:
+                        output_places.append(arc.target)
+                        place_id = arc.target.id if hasattr(arc.target, 'id') else 'unknown'
+                        print(f"[DIAGNOSIS_CATEGORY]   Output: {trans_id} → {place_id}")
+            
+            print(f"[DIAGNOSIS_CATEGORY] Locality for {trans_id}: {len(input_places)} inputs, {len(output_places)} outputs")
+            
+            if not input_places and not output_places:
+                print(f"[DIAGNOSIS_CATEGORY] WARNING: No places found for transition {trans_id}")
+                return None
+            
+            return Locality(
+                transition=transition,
+                input_places=input_places,
+                output_places=output_places,
+                input_arcs=input_arcs,
+                output_arcs=output_arcs
+            )
+        except Exception as e:
+            print(f"[DIAGNOSIS_CATEGORY] Error getting locality: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
     
     def set_selected_locality(self, transition_id, auto_scan=True):
         """Set locality from canvas context menu (right-click on transition).
@@ -468,110 +1020,6 @@ class DiagnosisCategory(BaseViabilityCategory):
         empty = 10 - filled
         return '█' * filled + '░' * empty
     
-    def _display_issues(self, issues):
-        """Display issues in the UI.
-        
-        Args:
-            issues: List of issue dictionaries
-        """
-        # Clear existing issues
-        for child in self.issues_listbox.get_children():
-            self.issues_listbox.remove(child)
-        
-        if not issues:
-            self._show_no_issues_message()
-            return
-        
-        # Add each issue as a row
-        for issue in issues:
-            row = self._create_issue_row(issue)
-            self.issues_listbox.add(row)
-        
-        self.issues_listbox.show_all()
-    
-    def _create_issue_row(self, issue):
-        """Create a row widget for an issue.
-        
-        Args:
-            issue: Issue dictionary
-            
-        Returns:
-            Gtk.ListBoxRow: Row widget
-        """
-        row = Gtk.ListBoxRow()
-        row.set_selectable(False)
-        
-        # Main box
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        box.set_margin_start(12)
-        box.set_margin_end(12)
-        box.set_margin_top(12)
-        box.set_margin_bottom(12)
-        
-        # Title with severity icon
-        severity_icons = {
-            'critical': '🔴',
-            'warning': '⚠️',
-            'suggestion': '💡'
-        }
-        icon = severity_icons.get(issue['severity'], '•')
-        
-        title_label = Gtk.Label()
-        title_label.set_markup(f"<b>{icon} {issue['title']}</b>")
-        title_label.set_halign(Gtk.Align.START)
-        box.pack_start(title_label, False, False, 0)
-        
-        # Description
-        desc_label = Gtk.Label(label=issue['description'])
-        desc_label.set_halign(Gtk.Align.START)
-        desc_label.set_line_wrap(True)
-        box.pack_start(desc_label, False, False, 0)
-        
-        # Multi-domain suggestions (if available)
-        if issue.get('multi_domain'):
-            box.pack_start(self._create_multi_domain_widget(issue), False, False, 0)
-        
-        row.add(box)
-        return row
-    
-    def _create_multi_domain_widget(self, issue):
-        """Create multi-domain suggestions widget.
-        
-        Args:
-            issue: Issue dictionary
-            
-        Returns:
-            Gtk.Box: Widget showing all domain perspectives
-        """
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        box.set_margin_start(12)
-        box.set_margin_top(6)
-        
-        label = Gtk.Label()
-        label.set_markup("<b>Multi-Domain Suggestions:</b>")
-        label.set_halign(Gtk.Align.START)
-        box.pack_start(label, False, False, 0)
-        
-        # Show placeholders for now
-        for domain in ['STRUCTURAL', 'BIOLOGICAL', 'KINETIC']:
-            domain_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-            domain_box.set_margin_start(12)
-            
-            domain_label = Gtk.Label(label=f"{domain}: (suggestions coming soon)")
-            domain_label.set_halign(Gtk.Align.START)
-            domain_box.pack_start(domain_label, True, True, 0)
-            
-            box.pack_start(domain_box, False, False, 0)
-        
-        return box
-    
-    def _on_apply_all_clicked(self, button):
-        """Handle applying all fixes.
-        
-        Args:
-            button: Button that was clicked
-        """
-    
     def _refresh(self):
         """Refresh diagnosis category content.
         
@@ -579,6 +1027,6 @@ class DiagnosisCategory(BaseViabilityCategory):
             False: To stop GLib.idle_add from repeating
         """
         # Re-scan issues if category is expanded
-        if self.expander.get_expanded():
-            self._on_scan_clicked(None)
+        if self.category_frame.expanded:
+            self._on_run_full_diagnose_clicked(None)
         return False

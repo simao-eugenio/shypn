@@ -441,6 +441,9 @@ def main(argv=None):
 			# Store viability_panel_loader reference for access
 			model_canvas_loader.viability_panel_loader = viability_panel_loader
 			
+			# Wire simulation complete callbacks for all existing controllers
+			model_canvas_loader._wire_viability_callbacks()
+			
 			# Wire model_canvas_loader so viability can access current model
 			if hasattr(viability_panel_loader, 'controller') and viability_panel_loader.controller:
 				viability_panel_loader.set_model_canvas_loader(model_canvas_loader)
@@ -490,6 +493,15 @@ def main(argv=None):
 		# This allows tab switching to update the right panel's data collector
 		model_canvas_loader.set_right_panel_loader(right_panel_loader)
 		
+		# Wire canvas loader to right panel loader (reverse direction)
+		# This allows context menu handler to access per-document viability panels
+		right_panel_loader.model_canvas_loader = model_canvas_loader
+		print(f"[SHYPN] Set model_canvas_loader on right_panel_loader: {model_canvas_loader}")
+		
+		# Recreate context menu handler now that model_canvas_loader is set
+		# This enables "Add to Viability Analysis" context menu option
+		right_panel_loader.recreate_context_menu_handler()
+		
 		# IMPORTANT: Wire data_collector for any EXISTING canvases (e.g., startup default canvas)
 		# The startup canvas is created before right_panel_loader exists, so we need to
 		# wire it retroactively here after both components are initialized
@@ -502,6 +514,7 @@ def main(argv=None):
 		
 		# Wire context menu handler to canvas loader
 		# This allows right-click context menus to include "Add to Analysis" options
+		# MUST happen AFTER recreate_context_menu_handler() so we use the updated handler
 		if hasattr(right_panel_loader, 'context_menu_handler') and right_panel_loader.context_menu_handler:
 			model_canvas_loader.set_context_menu_handler(right_panel_loader.context_menu_handler)
 			
@@ -1086,8 +1099,11 @@ def main(argv=None):
 			
 			EXCLUSIVE MODE: Only one panel active at a time.
 			When button is activated, deactivate others.
+			
+			PER-DOCUMENT ARCHITECTURE: Each model has its own Viability Panel instance.
+			This function swaps the per-document panel into the shared container.
 			"""
-			if not viability_panel_loader:
+			if not viability_panel_container:
 				return
 			
 			if is_active:
@@ -1098,16 +1114,41 @@ def main(argv=None):
 				master_palette.set_active('topology', False)
 				master_palette.set_active('report', False)
 				
-				# Show this panel (in stack if hanged, or floating if detached)
-				viability_panel_loader.show_in_stack()
-				# Expand left paned to show stack only if panel is hanged
-				if viability_panel_loader.is_hanged and left_paned:
+				# Show viability panel in stack
+				if left_dock_stack:
+					left_dock_stack.set_visible_child_name('viability')
+					left_dock_stack.set_visible(True)
+				# Expand left paned to show viability panel
+				if left_paned:
 					try:
 						left_paned.set_position(320)  # Match Topology/Report panel width
 					except Exception:
 						pass
+				# Show viability container and panel content for current document
+				if viability_panel_container:
+					viability_panel_container.set_visible(True)
+					# Show the actual Viability panel content for current document
+					drawing_area = model_canvas_loader.get_current_document()
+					if drawing_area:
+						overlay_manager = model_canvas_loader.overlay_managers.get(drawing_area)
+						if overlay_manager and hasattr(overlay_manager, 'viability_panel_loader'):
+							viability_loader = overlay_manager.viability_panel_loader
+							if viability_loader and viability_loader.panel:
+								# Clear container first
+								for child in viability_panel_container.get_children():
+									viability_panel_container.remove(child)
+								# Add per-document panel
+								if viability_loader.widget.get_parent() != viability_panel_container:
+									current_parent = viability_loader.widget.get_parent()
+									if current_parent:
+										current_parent.remove(viability_loader.widget)
+									viability_panel_container.pack_start(viability_loader.widget, True, True, 0)
+								viability_loader.panel.show_all()
+								print(f"[VIABILITY_TOGGLE] ✓ Showing per-document viability panel for drawing_area {id(drawing_area)}")
 			else:
-				viability_panel_loader.hide_in_stack()
+				# Hide viability panel
+				if viability_panel_container:
+					viability_panel_container.set_visible(False)
 				# Hide stack when last panel is hidden
 				if left_dock_stack:
 					left_dock_stack.set_visible(False)

@@ -133,20 +133,10 @@ class RightPanelLoader:
         self.transition_panel = self.dynamic_analyses_panel.transitions_category.panel
         self.diagnostics_panel = self.dynamic_analyses_panel.diagnostics_category.panel
         
-        # Get context menu handler (created during panel setup)
-        self.context_menu_handler = self.dynamic_analyses_panel.context_menu_handler
-        
-        # If handler was not created yet (shouldn't happen but safety check)
-        if not self.context_menu_handler:
-            from shypn.analyses import ContextMenuHandler
-            self.context_menu_handler = ContextMenuHandler(
-                place_panel=self.place_panel,
-                transition_panel=self.transition_panel,
-                model=self.model,
-                diagnostics_panel=self.diagnostics_panel
-            )
-            # Update the panel's reference too
-            self.dynamic_analyses_panel.context_menu_handler = self.context_menu_handler
+        # Context menu handler will be created later in recreate_context_menu_handler()
+        # after model_canvas_loader is set. This ensures viability panel support.
+        self.context_menu_handler = None
+        print("[RightPanelLoader] Context menu handler will be created after model_canvas_loader is set")
         
         # Register panels with model if available
         if self.model:
@@ -154,6 +144,29 @@ class RightPanelLoader:
                 self.place_panel.register_with_model(self.model)
             if hasattr(self.transition_panel, 'register_with_model'):
                 self.transition_panel.register_with_model(self.model)
+    
+    def recreate_context_menu_handler(self):
+        """Recreate context menu handler with current configuration.
+        
+        Call this after model_canvas_loader is set to enable viability panel support.
+        """
+        if not hasattr(self, 'model_canvas_loader') or not self.model_canvas_loader:
+            print("[RightPanelLoader] Cannot recreate context menu handler - model_canvas_loader not set")
+            return
+        
+        from shypn.analyses import ContextMenuHandler
+        self.context_menu_handler = ContextMenuHandler(
+            place_panel=self.place_panel,
+            transition_panel=self.transition_panel,
+            model=self.model,
+            diagnostics_panel=self.diagnostics_panel,
+            model_canvas_loader=self.model_canvas_loader
+        )
+        print(f"[RightPanelLoader] Recreated context menu handler with model_canvas_loader: {self.model_canvas_loader}")
+        
+        # Update the panel's reference too for consistency
+        if self.dynamic_analyses_panel:
+            self.dynamic_analyses_panel.context_menu_handler = self.context_menu_handler
     
     def set_data_collector(self, data_collector):
         """Set or update the data collector for plotting panels.

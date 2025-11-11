@@ -680,6 +680,32 @@ class ModelCanvasManager:
         # Mark document as dirty (unsaved changes) and trigger redraw
         self.mark_dirty()  # Document dirty tracking for save state
         self.mark_needs_redraw()  # Canvas redraw for rendering
+        
+        # VIABILITY PANEL: Refresh observer with updated KB after objects loaded
+        # The viability panel's observer needs to re-scan the KB now that it has actual data.
+        # At panel creation, the KB was empty (0 places, 0 transitions), so no rules triggered.
+        # Now that objects are loaded, we can detect issues like missing firing rates.
+        if self._canvas_loader and self._drawing_area:
+            print("[LOAD_OBJECTS] Refreshing viability panel with populated KB")
+            logger.info("[LOAD_OBJECTS] Refreshing viability panel with populated KB")
+            try:
+                overlay_mgr = self._canvas_loader.overlay_managers.get(self._drawing_area)
+                if overlay_mgr:
+                    viability_loader = getattr(overlay_mgr, 'viability_panel_loader', None)
+                    if viability_loader:
+                        panel = viability_loader.panel  # Correct attribute name
+                        panel.refresh_all()  # Re-feed observer and refresh categories
+                        print("[LOAD_OBJECTS] ✅ Viability panel refreshed")
+                        logger.info("[LOAD_OBJECTS] ✅ Viability panel refreshed")
+                    else:
+                        print("[LOAD_OBJECTS] No viability_panel_loader found")
+                        logger.info("[LOAD_OBJECTS] No viability_panel_loader found")
+                else:
+                    print("[LOAD_OBJECTS] No overlay_manager found")
+                    logger.info("[LOAD_OBJECTS] No overlay_manager found")
+            except Exception as e:
+                print(f"[LOAD_OBJECTS] Failed to refresh viability panel: {e}")
+                logger.warning(f"[LOAD_OBJECTS] Failed to refresh viability panel: {e}")
     
     def _request_simulation_reset_direct(self):
         """Request simulation controller reset DIRECTLY (not via idle callback).
