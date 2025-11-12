@@ -18,8 +18,9 @@ class StochasticEstimator(KineticEstimator):
     - Pre-fill exponential distribution
     """
     
-    def __init__(self):
-        super().__init__()
+    def __init__(self, add_stochastic_noise: bool = False, noise_amplitude: float = 0.1):
+        super().__init__(add_stochastic_noise=add_stochastic_noise, 
+                        noise_amplitude=noise_amplitude)
         self.default_lambda = 1.0
     
     def estimate_parameters(

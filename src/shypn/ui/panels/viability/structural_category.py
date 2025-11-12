@@ -39,6 +39,57 @@ class StructuralCategory(BaseViabilityCategory):
         """
         return "STRUCTURAL INFERENCE"
     
+    def _get_human_readable_name(self, kb, element_id, element_type="unknown"):
+        """Convert element ID to human-readable name with biological context.
+        
+        Args:
+            kb: Knowledge base
+            element_id: Place or transition ID
+            element_type: "place" or "transition"
+            
+        Returns:
+            str: Human-readable name like "P5 (Glucose / C00031)" or "T3 (Hexokinase / R00200)"
+        """
+        if element_type == "place" or element_id.startswith('P'):
+            place = kb.places.get(element_id)
+            if place:
+                parts = [element_id]
+                
+                # Add compound name if available
+                if place.compound_id:
+                    compound = kb.compounds.get(place.compound_id)
+                    if compound and compound.name:
+                        parts.append(compound.name)
+                    else:
+                        parts.append(place.compound_id)
+                
+                # Add label if available and different from compound
+                if hasattr(place, 'label') and place.label and place.label != place.compound_id:
+                    if not any(place.label in p for p in parts):
+                        parts.append(place.label)
+                
+                return " / ".join(parts) if len(parts) > 1 else element_id
+        
+        elif element_type == "transition" or element_id.startswith('T'):
+            trans = kb.transitions.get(element_id)
+            if trans:
+                parts = [element_id]
+                
+                # Add reaction name if available
+                if trans.reaction_name:
+                    parts.append(trans.reaction_name)
+                elif trans.reaction_id:
+                    parts.append(trans.reaction_id)
+                
+                # Add label if available and different
+                if hasattr(trans, 'label') and trans.label:
+                    if not any(trans.label in p for p in parts):
+                        parts.append(trans.label)
+                
+                return " / ".join(parts) if len(parts) > 1 else element_id
+        
+        return element_id
+    
     def _get_dead_from_simulation(self):
         """Get transitions that never fired during simulation.
         
@@ -179,33 +230,26 @@ class StructuralCategory(BaseViabilityCategory):
         for trans_id in list(all_dead)[:10]:  # Limit to 10
             trans = kb.transitions.get(trans_id)
             if trans:
-                # Create Issue dataclass
+                # Get human-readable name
+                trans_name = self._get_human_readable_name(kb, trans_id, "transition")
+                
+                # Analyze WHY the transition is dead
+                diagnosis = self._diagnose_dead_transition(kb, trans_id)
+                
+                # Create Issue dataclass with specific diagnosis
                 issue = Issue(
                     id=f"dead_{trans_id}",
                     category="structural",
                     severity="critical",
-                    title=f"Transition {trans_id} is DEAD",
-                    description="Cannot fire due to missing input tokens or structural issues",
+                    title=f"{trans_name} is DEAD: {diagnosis['reason']}",
+                    description=diagnosis['description'],
                     element_id=trans_id,
                     element_type="transition",
                     locality_id=self.selected_locality_id
                 )
                 
-                # Add suggestion to add tokens to input places
-                input_places = [arc.source_id for arc in kb.arcs.values() 
-                               if arc.target_id == trans_id and arc.arc_type == "place_to_transition"]
-                
-                if input_places:
-                    suggestion = Suggestion(
-                        action="add_initial_marking",
-                        category="structural",
-                        parameters={'tokens': 5, 'place_id': input_places[0]},
-                        confidence=0.7,
-                        reasoning=f"Add tokens to input place {input_places[0]} to enable firing",
-                        preview_elements=[input_places[0], trans_id]
-                    )
-                    issue.suggestions = [suggestion]
-                
+                # Add multiple specific suggestions based on diagnosis
+                issue.suggestions = diagnosis['suggestions']
                 issues.append(issue)
         
         # Scan for empty siphons
@@ -238,3 +282,261 @@ class StructuralCategory(BaseViabilityCategory):
                 issues.append(issue)
         
         return issues
+    
+    def _diagnose_dead_transition(self, kb, trans_id):
+        """Diagnose WHY a transition is dead and suggest specific fixes.
+        
+        Analyzes:
+        1. Input places - do they have tokens?
+        2. Arc weights - are they too high?
+        3. Priority conflicts - is another transition always firing first?
+        4. Guards/conditions - are they too restrictive?
+        
+        Args:
+            kb: Knowledge base
+            trans_id: Transition ID to diagnose
+            
+        Returns:
+            dict: {
+                'reason': str,
+                'description': str,
+                'suggestions': List[Suggestion]
+            }
+        """
+        suggestions = []
+        
+        # Get input arcs and places
+        input_arcs = [arc for arc in kb.arcs.values() 
+                     if arc.target_id == trans_id and arc.arc_type == "place_to_transition"]
+        
+        if not input_arcs:
+            # SOURCE transition (no inputs) - check if it should be a source
+            trans_name = self._get_human_readable_name(kb, trans_id, "transition")
+            transition = kb.transitions.get(trans_id)
+            has_rate = hasattr(transition, 'rate') and transition.rate > 0
+            
+            if not has_rate:
+                return {
+                    'reason': 'Source transition with no rate',
+                    'description': f'{trans_name} is a source with no input places and no firing rate.',
+                    'suggestions': [
+                        Suggestion(
+                            action="set_rate_or_add_inputs",
+                            category="structural",
+                            parameters={'transition_id': trans_id, 'suggested_rate': 1.0},
+                            confidence=0.85,
+                            reasoning="Source transitions need a firing rate to fire spontaneously, or add input places if not truly a source",
+                            preview_elements=[trans_id]
+                        )
+                    ]
+                }
+            else:
+                return {
+                    'reason': 'Source transition unused',
+                    'description': f'{trans_name} has rate={transition.rate} but never fired during simulation.',
+                    'suggestions': [
+                        Suggestion(
+                            action="check_source_usage",
+                            category="structural",
+                            parameters={'transition_id': trans_id, 'current_rate': transition.rate},
+                            confidence=0.6,
+                            reasoning="Source might be unused boundary condition, or rate too low, or simulation time too short",
+                            preview_elements=[trans_id]
+                        )
+                    ]
+                }
+        
+        # Analyze each input place
+        insufficient_tokens = []
+        high_weight_arcs = []
+        zero_token_places = []
+        
+        for arc in input_arcs:
+            place_id = arc.source_id
+            place = kb.places.get(place_id)
+            arc_weight = arc.current_weight
+            
+            if place:
+                current_tokens = place.current_marking
+                
+                if current_tokens == 0:
+                    zero_token_places.append((place_id, arc_weight))
+                elif current_tokens < arc_weight:
+                    insufficient_tokens.append((place_id, current_tokens, arc_weight))
+                
+                if arc_weight > 1:
+                    high_weight_arcs.append((place_id, arc_weight))
+        
+        # DIAGNOSIS 1: Zero tokens in input places
+        if zero_token_places:
+            place_ids = [p[0] for p in zero_token_places]
+            
+            # Build human-readable place names
+            place_names = [self._get_human_readable_name(kb, pid, "place") for pid in place_ids]
+            
+            # Suggest adding initial marking
+            suggestions.append(Suggestion(
+                action="add_initial_marking",
+                category="structural",
+                parameters={
+                    'place_ids': place_ids,
+                    'tokens': max(w for _, w in zero_token_places)  # At least enough for arc weight
+                },
+                confidence=0.9,
+                reasoning=f"Add {max(w for _, w in zero_token_places)} tokens to: {', '.join(place_names)}",
+                preview_elements=place_ids + [trans_id]
+            ))
+            
+            return {
+                'reason': 'Input places empty',
+                'description': f'{len(zero_token_places)} input place(s) have zero tokens: {", ".join(place_names)}',
+                'suggestions': suggestions
+            }
+        
+        # DIAGNOSIS 2: Insufficient tokens vs arc weights
+        if insufficient_tokens:
+            place_id, tokens, weight = insufficient_tokens[0]
+            place_name = self._get_human_readable_name(kb, place_id, "place")
+            
+            # Option A: Add more tokens
+            suggestions.append(Suggestion(
+                action="add_initial_marking",
+                category="structural",
+                parameters={'place_id': place_id, 'tokens': weight - tokens},
+                confidence=0.7,
+                reasoning=f"{place_name} has {tokens} tokens but needs {weight} — add {weight - tokens} tokens",
+                preview_elements=[place_id, trans_id]
+            ))
+            
+            # Option B: Reduce arc weight
+            suggestions.append(Suggestion(
+                action="reduce_arc_weight",
+                category="structural",
+                parameters={'arc_id': f"{place_id}→{trans_id}", 'from_weight': weight, 'to_weight': tokens},
+                confidence=0.8,
+                reasoning=f"Reduce arc weight from {weight} to {tokens} for {place_name}",
+                preview_elements=[place_id, trans_id]
+            ))
+            
+            return {
+                'reason': 'Insufficient tokens',
+                'description': f'{place_name} has {tokens} tokens but arc requires {weight}',
+                'suggestions': suggestions
+            }
+        
+        # DIAGNOSIS 3: High arc weights (stoichiometry issue)
+        if high_weight_arcs:
+            place_id, weight = high_weight_arcs[0]
+            place_name = self._get_human_readable_name(kb, place_id, "place")
+            
+            suggestions.append(Suggestion(
+                action="reduce_arc_weight",
+                category="structural",
+                parameters={'arc_id': f"{place_id}→{trans_id}", 'from_weight': weight, 'to_weight': 1},
+                confidence=0.6,
+                reasoning=f"Arc from {place_name} has weight {weight} — verify stoichiometry or reduce to 1",
+                preview_elements=[place_id, trans_id]
+            ))
+            
+            return {
+                'reason': 'High arc weights',
+                'description': f'Input arcs have weights > 1 (max: {max(w for _, w in high_weight_arcs)})',
+                'suggestions': suggestions
+            }
+        
+        # DIAGNOSIS 4: Priority conflict (another transition consuming tokens first)
+        # Check if there are competing transitions
+        competing_transitions = self._find_competing_transitions(kb, trans_id, input_arcs)
+        
+        if competing_transitions:
+            comp_trans_id = competing_transitions[0]
+            comp_trans_name = self._get_human_readable_name(kb, comp_trans_id, "transition")
+            target_trans_name = self._get_human_readable_name(kb, trans_id, "transition")
+            
+            suggestions.append(Suggestion(
+                action="adjust_priority",
+                category="structural",
+                parameters={
+                    'transition_id': trans_id,
+                    'from_priority': 0,
+                    'to_priority': 10,
+                    'reason': f'competing_with_{comp_trans_id}'
+                },
+                confidence=0.7,
+                reasoning=f"Increase {target_trans_name} priority to fire before {comp_trans_name}",
+                preview_elements=[trans_id, comp_trans_id]
+            ))
+            
+            # Alternative: Reduce competitor's priority
+            suggestions.append(Suggestion(
+                action="adjust_priority",
+                category="structural",
+                parameters={
+                    'transition_id': comp_trans_id,
+                    'from_priority': 0,
+                    'to_priority': -10,
+                    'reason': f'yield_to_{trans_id}'
+                },
+                confidence=0.6,
+                reasoning=f"Reduce {comp_trans_name} priority to let {target_trans_name} fire first",
+                preview_elements=[trans_id, comp_trans_id]
+            ))
+            
+            comp_names = [self._get_human_readable_name(kb, tid, "transition") for tid in competing_transitions[:3]]
+            
+            return {
+                'reason': 'Priority conflict',
+                'description': f'Competing with {len(competing_transitions)} transition(s): {", ".join(comp_names)}',
+                'suggestions': suggestions
+            }
+        
+        # DIAGNOSIS 5: Unknown cause - generic suggestions
+        first_place_id = input_arcs[0].source_id
+        first_place_name = self._get_human_readable_name(kb, first_place_id, "place")
+        
+        suggestions.append(Suggestion(
+            action="add_initial_marking",
+            category="structural",
+            parameters={'place_id': first_place_id, 'tokens': 5},
+            confidence=0.5,
+            reasoning=f"General suggestion: add 5 tokens to {first_place_name} to enable firing",
+            preview_elements=[first_place_id, trans_id]
+        ))
+        
+        return {
+            'reason': 'Unknown cause',
+            'description': f'Has {len(input_arcs)} input(s) with tokens, but still inactive — check simulation rates',
+            'suggestions': suggestions
+        }
+    
+    def _find_competing_transitions(self, kb, trans_id, input_arcs):
+        """Find transitions competing for same input tokens.
+        
+        Args:
+            kb: Knowledge base
+            trans_id: Target transition ID
+            input_arcs: Input arcs of target transition
+            
+        Returns:
+            List[str]: IDs of competing transitions
+        """
+        competitors = []
+        input_place_ids = {arc.source_id for arc in input_arcs}
+        
+        # Find other transitions that also consume from these places
+        for other_trans_id, other_trans in kb.transitions.items():
+            if other_trans_id == trans_id:
+                continue
+            
+            # Check if this transition has arcs from same input places
+            other_input_arcs = [arc for arc in kb.arcs.values()
+                               if arc.target_id == other_trans_id and arc.arc_type == "place_to_transition"]
+            
+            other_input_places = {arc.source_id for arc in other_input_arcs}
+            
+            # If they share input places, they're competing
+            if input_place_ids & other_input_places:  # Set intersection
+                competitors.append(other_trans_id)
+        
+        return competitors
+

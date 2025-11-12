@@ -102,26 +102,18 @@ class ContextMenuHandler:
         Returns:
             ViabilityPanel instance or None
         """
-        print(f"[ContextMenuHandler] _get_current_viability_panel called")
-        print(f"[ContextMenuHandler] model_canvas_loader: {self.model_canvas_loader}")
-        
         # Try per-document panel first (new architecture)
         if self.model_canvas_loader:
             drawing_area = self.model_canvas_loader.get_current_document()
-            print(f"[ContextMenuHandler] drawing_area: {drawing_area}")
             if drawing_area and hasattr(self.model_canvas_loader, 'overlay_managers'):
                 overlay_manager = self.model_canvas_loader.overlay_managers.get(drawing_area)
-                print(f"[ContextMenuHandler] overlay_manager: {overlay_manager}")
                 if overlay_manager and hasattr(overlay_manager, 'viability_panel_loader'):
                     viability_loader = overlay_manager.viability_panel_loader
-                    print(f"[ContextMenuHandler] viability_loader: {viability_loader}")
                     if viability_loader and hasattr(viability_loader, 'panel'):
                         panel = viability_loader.panel
-                        print(f"[ContextMenuHandler] Found per-document panel: {panel}")
                         return panel
         
         # Fallback to global panel (old architecture)
-        print(f"[ContextMenuHandler] Fallback to global panel: {self.viability_panel}")
         return self.viability_panel
     
     def set_model(self, model):
@@ -199,7 +191,6 @@ class ContextMenuHandler:
         
         # Add "Add to Viability" option for places and transitions
         viability_panel = self._get_current_viability_panel()
-        print(f"[ContextMenuHandler] Context menu for {obj}, viability_panel: {viability_panel}")
         if viability_panel:
             self._add_viability_menu_item(menu, obj, viability_panel)
             
@@ -235,8 +226,6 @@ class ContextMenuHandler:
             # Add the object to viability panel for focused analysis
             if hasattr(viability_panel, 'add_object_for_analysis'):
                 viability_panel.add_object_for_analysis(obj)
-            else:
-                print(f"[VIABILITY_MENU] Viability panel doesn't support add_object_for_analysis()")
         
         menu_item.connect("activate", on_add_to_viability)
         menu_item.show()

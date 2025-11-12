@@ -1,11 +1,42 @@
-"""Model Knowledge Base - Unified Intelligence Repository.
+"""Model Knowledge Base - Central repository for all model knowledge.
 
-The ModelKnowledgeBase aggregates knowledge from all Shypn panels and modules
-to enable intelligent model repair and inference.
+This Knowledge Base integrates information from multiple sources:
+1. Report Panel -> Structural topology
+2. Topology Analyzer -> P/T-invariants, siphons, liveness
+3. BRENDA Database -> Kinetic parameters
+4. Pathway Databases -> Biological context
+5. Simulation Engine -> Dynamic behavior
 
 Author: Simão Eugénio
-Date: November 9, 2025
+Date: November 9, 2025 (Refactored: November 11, 2025)
 """
+
+from typing import Dict, List, Optional, Tuple
+from datetime import datetime
+
+from .data_structures import (
+    PlaceKnowledge,
+    TransitionKnowledge,
+    ArcKnowledge,
+    PInvariant,
+    TInvariant,
+    Siphon,
+    PathwayInfo,
+    CompoundInfo,
+    ReactionInfo,
+    KineticParams,
+    SimulationTrace
+)
+
+from .dto import (
+    PlaceDTO,
+    TransitionDTO,
+    ArcDTO,
+    SimulationResultDTO,
+    normalize_places,
+    normalize_transitions,
+    normalize_arcs
+)
 
 import json
 from datetime import datetime
@@ -109,47 +140,102 @@ class ModelKnowledgeBase:
     
     # === TOPOLOGY PANEL ===
     
-    def update_topology_structural(self, places: List, transitions: List, arcs: List):
+    def update_topology_structural(self, places_data, transitions_data, arcs_data):
         """Update structural knowledge from Petri Net graph.
         
+        This method accepts ANY format (objects, dicts, DTOs) and normalizes to DTOs internally.
+        
         Args:
-            places: List of place objects from model
-            transitions: List of transition objects from model
-            arcs: List of arc objects from model
+            places_data: List of Place objects, dicts, or PlaceDTOs
+            transitions_data: List of Transition objects, dicts, or TransitionDTOs
+            arcs_data: List of Arc objects, dicts, or ArcDTOs
         """
-        # Update places
-        for place in places:
-            place_id = getattr(place, 'id', str(place))
+        # NORMALIZE to DTOs (handles objects, dicts, or DTOs)
+        places = normalize_places(places_data)
+        transitions = normalize_transitions(transitions_data)
+        arcs = normalize_arcs(arcs_data)
+        
+        # Update places using DTOs
+        for place_dto in places:
+            place_id = place_dto.place_id
+            
             if place_id not in self.places:
                 self.places[place_id] = PlaceKnowledge(
                     place_id=place_id,
-                    label=getattr(place, 'label', ''),
-                    current_marking=getattr(place, 'tokens', 0)
+                    label=place_dto.label,
+                    current_marking=place_dto.initial_marking,
+                    compound_id=place_dto.compound_id,
+                    compound_name=place_dto.compound_name
                 )
             else:
                 # Update existing
-                self.places[place_id].current_marking = getattr(place, 'tokens', 0)
+                self.places[place_id].current_marking = place_dto.initial_marking
+                if place_dto.compound_id:
+                    self.places[place_id].compound_id = place_dto.compound_id
+                if place_dto.compound_name:
+                    self.places[place_id].compound_name = place_dto.compound_name
         
-        # Update transitions
-        for transition in transitions:
-            trans_id = getattr(transition, 'id', str(transition))
+        # Update transitions using DTOs
+        for trans_dto in transitions:
+            trans_id = trans_dto.transition_id
+            
             if trans_id not in self.transitions:
                 self.transitions[trans_id] = TransitionKnowledge(
                     transition_id=trans_id,
-                    label=getattr(transition, 'label', '')
+                    label=trans_dto.label,
+                    transition_type=trans_dto.transition_type,
+                    reaction_id=trans_dto.reaction_id,
+                    reaction_name=trans_dto.reaction_name,
+                    ec_number=trans_dto.ec_number,
+                    current_rate=trans_dto.rate,
+                    kinetic_law=trans_dto.kinetic_law
                 )
+            else:
+                # Update existing
+                if trans_dto.transition_type:
+                    self.transitions[trans_id].transition_type = trans_dto.transition_type
+                if trans_dto.reaction_id:
+                    self.transitions[trans_id].reaction_id = trans_dto.reaction_id
+                if trans_dto.reaction_name:
+                    self.transitions[trans_id].reaction_name = trans_dto.reaction_name
+                if trans_dto.ec_number:
+                    self.transitions[trans_id].ec_number = trans_dto.ec_number
+                if trans_dto.rate is not None:
+                    self.transitions[trans_id].current_rate = trans_dto.rate
+                if trans_dto.kinetic_law:
+                    self.transitions[trans_id].kinetic_law = trans_dto.kinetic_law
         
-        # Update arcs
-        for arc in arcs:
-            arc_id = getattr(arc, 'id', str(arc))
+        # Update arcs using DTOs
+        for arc_dto in arcs:
+            arc_id = arc_dto.arc_id
+            
             if arc_id not in self.arcs:
                 self.arcs[arc_id] = ArcKnowledge(
                     arc_id=arc_id,
-                    source_id=getattr(arc, 'source_id', ''),
-                    target_id=getattr(arc, 'target_id', ''),
-                    arc_type=getattr(arc, 'arc_type', 'unknown'),
-                    current_weight=getattr(arc, 'weight', 1)
+                    source_id=arc_dto.source_id,
+                    target_id=arc_dto.target_id,
+                    arc_type=arc_dto.arc_type,
+                    current_weight=arc_dto.weight
                 )
+            else:
+                # Update existing
+                self.arcs[arc_id].current_weight = arc_dto.weight
+        
+        # Debug: Log arc type distribution
+        arc_types = {}
+        for arc in self.arcs.values():
+            arc_types[arc.arc_type] = arc_types.get(arc.arc_type, 0) + 1
+        print(f"[KB] Arc types stored: {arc_types}")
+        
+        # Debug: Check which transitions have NO input arcs
+        transitions_with_no_inputs = []
+        for trans_id in self.transitions.keys():
+            input_arcs = [a for a in self.arcs.values() 
+                         if a.target_id == trans_id and a.arc_type == "place_to_transition"]
+            if len(input_arcs) == 0:
+                transitions_with_no_inputs.append(trans_id)
+        
+        print(f"[KB] Transitions with NO input arcs (sources): {sorted(transitions_with_no_inputs)}")
         
         self.last_updated['structural'] = datetime.now()
     
@@ -450,6 +536,28 @@ class ModelKnowledgeBase:
         
         self.last_updated['simulation'] = datetime.now()
     
+    def add_simulation_from_dto(self, sim_dto: SimulationResultDTO):
+        """Add simulation results from DTO.
+        
+        This is the preferred way to add simulation data as it ensures normalized input.
+        
+        Args:
+            sim_dto: SimulationResultDTO with normalized simulation data
+        """
+        # Convert DTO to SimulationTrace
+        trace = SimulationTrace(
+            timestamp=datetime.now(),
+            initial_marking=sim_dto.initial_marking,
+            time_points=sim_dto.time_points,
+            place_traces=sim_dto.place_traces,
+            transition_firings={},  # Not provided in DTO, use total_firings instead
+            final_marking=sim_dto.final_marking,
+            total_firings=sim_dto.total_firings,
+            reached_steady_state=False  # Could be detected from trace analysis
+        )
+        
+        self.add_simulation_trace(trace)
+    
     def update_current_marking(self, marking: Dict[str, int]):
         """Update current model state.
         
@@ -539,6 +647,85 @@ class ModelKnowledgeBase:
     def get_unbounded_places(self) -> List[str]:
         """Get all unbounded places."""
         return [pid for pid, bound in self.boundedness.items() if bound < 0]
+    
+    def get_input_arcs_for_transition(self, transition_id: str) -> List[ArcKnowledge]:
+        """Get all input arcs (place → transition) for a transition.
+        
+        Args:
+            transition_id: Transition ID
+            
+        Returns:
+            List of ArcKnowledge objects where target_id == transition_id
+        """
+        input_arcs = [
+            arc for arc in self.arcs.values()
+            if arc.target_id == transition_id and arc.arc_type == "place_to_transition"
+        ]
+        
+        # Debug: Show what we found
+        if transition_id in ['T5', 'T6', 'T35', 'T36']:  # Sample transitions
+            print(f"[KB_QUERY] get_input_arcs_for_transition({transition_id}):")
+            print(f"[KB_QUERY]   Total arcs in KB: {len(self.arcs)}")
+            print(f"[KB_QUERY]   Arcs targeting {transition_id}: {len([a for a in self.arcs.values() if a.target_id == transition_id])}")
+            print(f"[KB_QUERY]   Input arcs (place→trans): {len(input_arcs)}")
+            for arc in input_arcs:
+                print(f"[KB_QUERY]     - {arc.arc_id}: {arc.source_id} → {arc.target_id}")
+        
+        return input_arcs
+    
+    def get_output_arcs_for_transition(self, transition_id: str) -> List[ArcKnowledge]:
+        """Get all output arcs (transition → place) for a transition.
+        
+        Args:
+            transition_id: Transition ID
+            
+        Returns:
+            List of ArcKnowledge objects where source_id == transition_id
+        """
+        return [
+            arc for arc in self.arcs.values()
+            if arc.source_id == transition_id and arc.arc_type == "transition_to_place"
+        ]
+    
+    def is_source_transition(self, transition_id: str) -> bool:
+        """Check if transition is a source (has no input arcs).
+        
+        Args:
+            transition_id: Transition ID
+            
+        Returns:
+            True if transition has no input places, False otherwise
+        """
+        input_arcs = self.get_input_arcs_for_transition(transition_id)
+        return len(input_arcs) == 0
+    
+    def get_input_arcs_for_place(self, place_id: str) -> List[ArcKnowledge]:
+        """Get all input arcs (transition → place) for a place.
+        
+        Args:
+            place_id: Place ID
+            
+        Returns:
+            List of ArcKnowledge objects where target_id == place_id
+        """
+        return [
+            arc for arc in self.arcs.values()
+            if arc.target_id == place_id and arc.arc_type == "transition_to_place"
+        ]
+    
+    def get_output_arcs_for_place(self, place_id: str) -> List[ArcKnowledge]:
+        """Get all output arcs (place → transition) for a place.
+        
+        Args:
+            place_id: Place ID
+            
+        Returns:
+            List of ArcKnowledge objects where source_id == place_id
+        """
+        return [
+            arc for arc in self.arcs.values()
+            if arc.source_id == place_id and arc.arc_type == "place_to_transition"
+        ]
     
     # === BIOLOGICAL QUERIES ===
     

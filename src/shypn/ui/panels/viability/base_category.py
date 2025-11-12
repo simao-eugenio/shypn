@@ -340,23 +340,42 @@ class BaseViabilityCategory:
         Args:
             button: Button that was clicked
         """
+        print(f"\n{'='*80}")
+        print(f"[{self.get_category_name()}] _on_scan_clicked CALLED")
+        print(f"{'='*80}")
+        
         # Clear previous issues
         self.current_issues = []
         
+        # Verify TreeView exists before scanning
+        if not hasattr(self, 'issues_store') or self.issues_store is None:
+            print(f"[{self.get_category_name()}] ❌ CRITICAL: TreeView not initialized!")
+            print(f"[{self.get_category_name()}] _create_issues_treeview() was not called in _build_content()!")
+            return
+        
+        print(f"[{self.get_category_name()}] ✓ TreeView verified (issues_store exists)")
+        
         # Scan for new issues
+        print(f"[{self.get_category_name()}] Calling _scan_issues()...")
         issues = self._scan_issues()
+        print(f"[{self.get_category_name()}] _scan_issues() returned {len(issues)} issues")
         
         # Diagnostic output
         category_name = self.get_category_name()
         if issues:
-            print(f"[{category_name}] Found {len(issues)} issues")
+            print(f"[{category_name}] ✓ Found {len(issues)} issues")
             self.current_issues = issues
+            print(f"[{category_name}] Calling _display_issues({len(issues)})...")
             self._display_issues(issues)
+            print(f"[{category_name}] ✓ _display_issues() completed")
         else:
             print(f"[{category_name}] No issues found")
             self._show_no_issues_message()
+        
+        print(f"[{category_name}] _on_scan_clicked COMPLETE")
+        print(f"{'='*80}\n")
     
-    def scan_with_locality(self, transition=None, locality=None):
+    def scan_with_locality(self, transition=None, locality=None, additional_ids=None):
         """Scan for issues scoped to a specific locality.
         
         This method is called by the diagnosis category when running
@@ -365,28 +384,44 @@ class BaseViabilityCategory:
         Args:
             transition: Transition object for the locality
             locality: Locality object with input/output places
+            additional_ids: Optional set of additional element IDs to include in scope (for multiple selection)
         """
         if not transition or not locality:
-            print(f"[{self.get_category_name()}] No locality provided for scoped scan")
+            print(f"[{self.get_category_name()}] ❌ No locality provided for scoped scan")
             return
         
-        print(f"[{self.get_category_name()}] Scanning with locality: {transition.id}")
+        print(f"[{self.get_category_name()}] ========== SCAN WITH LOCALITY ==========")
+        print(f"[{self.get_category_name()}] Transition: {transition.id}")
+        print(f"[{self.get_category_name()}] Input places: {[p.id for p in locality.input_places] if hasattr(locality, 'input_places') else 'none'}")
+        print(f"[{self.get_category_name()}] Output places: {[p.id for p in locality.output_places] if hasattr(locality, 'output_places') else 'none'}")
+        if additional_ids:
+            print(f"[{self.get_category_name()}] Additional IDs from multi-select: {len(additional_ids)} elements")
         
-        # Store the locality scope
+        # IMPORTANT: Clear existing display first
+        print(f"[{self.get_category_name()}] → Clearing existing issues...")
+        if hasattr(self, 'issues_store') and self.issues_store:
+            self.issues_store.clear()
+        
+        # Store the locality scope (including additional IDs)
         self.selected_locality_id = transition.id
         self.scoped_transition = transition
         self.scoped_locality = locality
+        self.additional_scope_ids = additional_ids  # Store for filtering
         
         # Run scan (subclass implementation will filter by locality)
+        print(f"[{self.get_category_name()}] → Calling _scan_issues()...")
         issues = self._scan_issues()
+        print(f"[{self.get_category_name()}] ← _scan_issues() returned {len(issues)} issues")
         
         # Filter issues to only those related to this locality
+        print(f"[{self.get_category_name()}] → Filtering issues to locality...")
         filtered_issues = self._filter_issues_by_locality(issues, transition, locality)
-        
-        print(f"[{self.get_category_name()}] Found {len(filtered_issues)} issues in locality")
+        print(f"[{self.get_category_name()}] ← Filtered to {len(filtered_issues)} issues in locality")
         
         self.current_issues = filtered_issues
+        print(f"[{self.get_category_name()}] → Calling _display_issues({len(filtered_issues)})...")
         self._display_issues(filtered_issues)
+        print(f"[{self.get_category_name()}] ✓ Display complete")
     
     def _filter_issues_by_locality(self, issues, transition, locality):
         """Filter issues to only those related to the given locality.
@@ -400,23 +435,41 @@ class BaseViabilityCategory:
             List[Issue]: Filtered issues
         """
         if not issues:
+            print(f"[{self.get_category_name()}] No issues to filter")
             return []
         
         # Build set of relevant element IDs
         relevant_ids = {transition.id}
         if locality:
             if hasattr(locality, 'input_places'):
-                relevant_ids.update(p.id for p in locality.input_places if hasattr(p, 'id'))
+                input_ids = [p.id for p in locality.input_places if hasattr(p, 'id')]
+                relevant_ids.update(input_ids)
+                print(f"[{self.get_category_name()}] Relevant input places: {input_ids}")
             if hasattr(locality, 'output_places'):
-                relevant_ids.update(p.id for p in locality.output_places if hasattr(p, 'id'))
+                output_ids = [p.id for p in locality.output_places if hasattr(p, 'id')]
+                relevant_ids.update(output_ids)
+                print(f"[{self.get_category_name()}] Relevant output places: {output_ids}")
+        
+        # Add additional IDs if provided (from multiple selection)
+        if hasattr(self, 'additional_scope_ids') and self.additional_scope_ids:
+            relevant_ids.update(self.additional_scope_ids)
+            print(f"[{self.get_category_name()}] Added {len(self.additional_scope_ids)} additional IDs from multi-select")
+        
+        print(f"[{self.get_category_name()}] All relevant IDs: {relevant_ids}")
         
         # Filter issues
         filtered = []
         for issue in issues:
             element_id = getattr(issue, 'element_id', None)
-            if element_id and element_id in relevant_ids:
-                filtered.append(issue)
+            if element_id:
+                is_relevant = element_id in relevant_ids
+                print(f"[{self.get_category_name()}] Issue '{getattr(issue, 'title', 'no title')}' element_id={element_id} relevant={is_relevant}")
+                if is_relevant:
+                    filtered.append(issue)
+            else:
+                print(f"[{self.get_category_name()}] Issue '{getattr(issue, 'title', 'no title')}' has no element_id")
         
+        print(f"[{self.get_category_name()}] Filtered {len(issues)} → {len(filtered)} issues")
         return filtered
     
     def _on_undo_clicked(self, button):
@@ -542,14 +595,23 @@ class BaseViabilityCategory:
         Args:
             issues: List of Issue dataclass instances
         """
-        if not hasattr(self, 'issues_store') or not self.issues_store:
-            # Fallback to old ListBox display if TreeView not initialized
+        print(f"[{self.get_category_name()}] _display_issues called with {len(issues)} issues")
+        print(f"[{self.get_category_name()}] has issues_store: {hasattr(self, 'issues_store')}")
+        print(f"[{self.get_category_name()}] issues_store is not None: {hasattr(self, 'issues_store') and self.issues_store is not None}")
+        
+        if not hasattr(self, 'issues_store') or self.issues_store is None:
+            # TreeView not initialized - this shouldn't happen if _build_content was called
+            print(f"[{self.get_category_name()}] ❌ ERROR: issues_store not found, TreeView was not created!")
+            print(f"[{self.get_category_name()}] This means _create_issues_treeview() was not called in _build_content()")
+            print(f"[{self.get_category_name()}] Falling back to ListBox display (old format)")
             return self._display_issues_listbox(issues)
         
         # Clear existing rows
+        print(f"[{self.get_category_name()}] Clearing issues_store...")
         self.issues_store.clear()
         
         if not issues:
+            print(f"[{self.get_category_name()}] No issues to display")
             self._show_no_issues_message()
             # Disable repair button and reset header
             if hasattr(self, 'repair_button'):
@@ -559,10 +621,13 @@ class BaseViabilityCategory:
                 self._all_selected = False
             return
         
+        print(f"[{self.get_category_name()}] Adding {len(issues)} rows to TreeView...")
+        
         # Add issue rows to TreeView
         for issue in issues:
             # Determine icon based on severity or confidence
             if isinstance(issue, dict):
+                print(f"[{self.get_category_name()}] Processing DICT issue: {list(issue.keys())}")
                 # New suggestion dict format
                 confidence = issue.get('confidence', 0.5)
                 if confidence > 0.8:
@@ -573,8 +638,13 @@ class BaseViabilityCategory:
                     icon = "🔴"
                 title = issue.get('title', 'No title')
                 description = issue.get('description', '')
+                reasoning = issue.get('reasoning', '')
                 confidence_str = f"{confidence:.0%}"
+                print(f"[{self.get_category_name()}]   Title: {title}")
+                print(f"[{self.get_category_name()}]   Desc: {description}")
+                print(f"[{self.get_category_name()}]   Reasoning: {reasoning}")
             else:
+                print(f"[{self.get_category_name()}] Processing OBJECT issue: {type(issue)}")
                 # Issue object format
                 severity_icons = {
                     "critical": "🔴",
@@ -601,12 +671,20 @@ class BaseViabilityCategory:
                 issue            # Store issue object
             ])
         
+        print(f"[{self.get_category_name()}] ✓ Added {len(issues)} rows to TreeView")
+        
         # Reset header and button state
         self._all_selected = False
         if hasattr(self, 'select_column'):
             self.select_column.set_title("☐")
         if hasattr(self, 'repair_button'):
             self.repair_button.set_sensitive(False)  # No selection yet
+        
+        # Force UI update
+        if hasattr(self, 'content_box'):
+            self.content_box.show_all()
+        
+        print(f"[{self.get_category_name()}] ✓ _display_issues complete")
     
     def _display_issues_listbox(self, issues: List[Issue]):
         """Fallback method: Display issues in the old ListBox format.
@@ -614,7 +692,22 @@ class BaseViabilityCategory:
         Args:
             issues: List of Issue dataclass instances
         """
+        print(f"[{self.get_category_name()}] _display_issues_listbox called (FALLBACK)")
+        print(f"[{self.get_category_name()}] has issues_listbox: {hasattr(self, 'issues_listbox')}")
+        print(f"[{self.get_category_name()}] issues_listbox value: {getattr(self, 'issues_listbox', 'NOT_FOUND')}")
+        
         if not hasattr(self, 'issues_listbox') or not self.issues_listbox:
+            # ListBox also not available - print to console as last resort
+            print(f"[{self.get_category_name()}] ❌ ERROR: Neither TreeView nor ListBox available!")
+            print(f"[{self.get_category_name()}] Falling back to console output:")
+            print(f"[{self.get_category_name()}] ========== {len(issues)} ISSUES DETECTED ==========")
+            for i, issue in enumerate(issues, 1):
+                if isinstance(issue, dict):
+                    print(f"[{self.get_category_name()}] {i}. {issue.get('title', 'No title')}")
+                    print(f"[{self.get_category_name()}]    {issue.get('description', 'No description')}")
+                else:
+                    print(f"[{self.get_category_name()}] {i}. {getattr(issue, 'title', 'No title')}")
+                    print(f"[{self.get_category_name()}]    {getattr(issue, 'description', 'No description')}")
             return
         
         # Clear existing rows
@@ -1046,14 +1139,35 @@ class BaseViabilityCategory:
     
     def _show_no_issues_message(self):
         """Show message when no issues are found."""
-        if self.issues_listbox:
+        print(f"[{self.get_category_name()}] _show_no_issues_message called")
+        
+        # Clear TreeView if it exists
+        if hasattr(self, 'issues_store') and self.issues_store:
+            print(f"[{self.get_category_name()}] Clearing TreeView (issues_store)")
+            self.issues_store.clear()
+            
+            # Disable repair button
+            if hasattr(self, 'repair_button'):
+                self.repair_button.set_sensitive(False)
+            
+            # Reset header
+            if hasattr(self, 'select_column'):
+                self.select_column.set_title("☐")
+                self._all_selected = False
+            
+            print(f"[{self.get_category_name()}] ✓ TreeView cleared, showing empty table")
+            return
+        
+        # Fallback to ListBox if TreeView doesn't exist
+        if hasattr(self, 'issues_listbox') and self.issues_listbox:
+            print(f"[{self.get_category_name()}] Using ListBox (fallback)")
             # Clear existing content
             for child in self.issues_listbox.get_children():
                 self.issues_listbox.remove(child)
             
             # Add "no issues" message
             row = Gtk.ListBoxRow()
-            label = Gtk.Label(label="NO ISSUES DETECTED")
+            label = Gtk.Label(label="✓ NO ISSUES DETECTED")
             label.set_margin_start(12)
             label.set_margin_end(12)
             label.set_margin_top(12)
@@ -1061,6 +1175,10 @@ class BaseViabilityCategory:
             row.add(label)
             self.issues_listbox.add(row)
             self.issues_listbox.show_all()
+            return
+        
+        # Neither TreeView nor ListBox available
+        print(f"[{self.get_category_name()}] ✓ NO ISSUES DETECTED (console only)")
     
     def _apply_undo(self, change: Change):
         """Apply an undo operation.

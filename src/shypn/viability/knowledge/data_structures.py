@@ -56,6 +56,9 @@ class TransitionKnowledge:
     transition_id: str
     label: str = ""
     
+    # Transition behavior type
+    transition_type: str = "immediate"     # "immediate", "timed", "stochastic", "continuous"
+    
     # Biological context
     reaction_id: Optional[str] = None      # KEGG reaction ID (e.g., "R00200")
     reaction_name: Optional[str] = None    # e.g., "Hexokinase"
@@ -70,9 +73,10 @@ class TransitionKnowledge:
     km_values: Dict[str, float] = field(default_factory=dict)  # substrate -> Km (mM)
     vmax: Optional[float] = None           # Maximum velocity
     kcat: Optional[float] = None           # Turnover number (1/sec)
+    kinetic_law: Optional[str] = None      # e.g., "michaelis_menten(P1, vmax=10, km=5)"
     
     # Current state
-    current_rate: Optional[float] = None   # tokens/sec
+    current_rate: Optional[float] = None   # tokens/sec (for stochastic/timed transitions)
     is_enabled: bool = False
     
     # Dynamic behavior

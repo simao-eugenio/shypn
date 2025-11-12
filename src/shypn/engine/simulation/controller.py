@@ -653,7 +653,9 @@ class SimulationController:
         self._update_enablement_states()
         
         immediate_fired_total = 0
-        max_immediate_iterations = 1000
+        max_immediate_iterations = 100  # Reduced from 1000 to prevent UI freeze
+        fired_sequence = []  # Track which transitions fire to detect cycles
+        
         for iteration in range(max_immediate_iterations):
             immediate_transitions = [t for t in self.model.transitions if t.transition_type == 'immediate']
             enabled_immediate = [t for t in immediate_transitions if self._is_transition_enabled(t)]
@@ -662,10 +664,34 @@ class SimulationController:
             transition = self._select_transition(enabled_immediate)
             self._fire_transition(transition)
             immediate_fired_total += 1
+            fired_sequence.append(transition.id)
             self._update_enablement_states()
+            
+            # Detect immediate livelock: if we've fired more than 20 times, check for cycles
+            if immediate_fired_total > 20:
+                # Check if we're in a repeating cycle (last 10 match previous 10)
+                if len(fired_sequence) >= 20:
+                    recent = fired_sequence[-10:]
+                    previous = fired_sequence[-20:-10]
+                    if recent == previous:
+                        import logging
+                        logger = logging.getLogger(__name__)
+                        logger.error(
+                            f"LIVELOCK DETECTED: Immediate transitions forming infinite cycle: "
+                            f"{' → '.join(recent)}. "
+                            f"Consider using continuous transitions or adding priorities/guards."
+                        )
+                        # Stop immediate phase to prevent UI freeze
+                        break
         
         if iteration >= max_immediate_iterations - 1:
-            pass  # Max iterations reached, continue to next phase
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(
+                f"Immediate transition limit ({max_immediate_iterations}) reached in single step. "
+                f"Fired sequence: {' → '.join(fired_sequence[-20:])}... "
+                f"This may indicate a livelock. Consider using continuous transitions instead."
+            )
         
         # === PHASE: Handle Timed Window Crossings ===
         # Check for timed transitions whose firing windows will be crossed during this step
