@@ -28,19 +28,34 @@ class EstimatorFactory:
     }
     
     @classmethod
-    def create(cls, kinetic_type: str) -> Optional[KineticEstimator]:
+    def create(cls, kinetic_type: str, add_stochastic_noise: bool = False, 
+               noise_amplitude: float = 0.1) -> Optional[KineticEstimator]:
         """
         Create estimator for given kinetic type.
         
         Args:
             kinetic_type: 'michaelis_menten', 'stochastic', or 'mass_action'
+            add_stochastic_noise: If True, wrap rate functions with wiener() noise
+            noise_amplitude: Stochastic noise amplitude (default 0.1 = ±10%)
             
         Returns:
             Estimator instance or None if type not found
+            
+        Example:
+            # Without noise
+            estimator = EstimatorFactory.create('michaelis_menten')
+            
+            # With ±10% stochastic noise (prevents steady state traps)
+            estimator = EstimatorFactory.create('michaelis_menten', 
+                                               add_stochastic_noise=True, 
+                                               noise_amplitude=0.1)
         """
         estimator_class = cls._estimators.get(kinetic_type)
         if estimator_class:
-            return estimator_class()
+            return estimator_class(
+                add_stochastic_noise=add_stochastic_noise,
+                noise_amplitude=noise_amplitude
+            )
         return None
     
     @classmethod

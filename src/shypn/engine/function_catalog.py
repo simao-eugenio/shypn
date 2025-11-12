@@ -646,6 +646,165 @@ def smooth_threshold(x: float, threshold: float, width: float) -> float:
 
 
 # =============================================================================
+# STOCHASTIC FUNCTIONS (Noise and random processes)
+# =============================================================================
+
+# Global state for Wiener process (maintain continuity between calls)
+_wiener_state = {}
+
+def wiener(t: float, amplitude: float = 1.0, dt: float = 0.1, seed: int = None) -> float:
+    """Wiener process (Brownian motion) - continuous stochastic process.
+    
+    Generates correlated random noise using discrete-time approximation:
+        dW = amplitude * sqrt(dt) * N(0,1)
+    
+    The process maintains continuity between calls, so wiener(t) at t=1.0
+    will be close to wiener(t) at t=0.9 (they differ by one random step).
+    
+    Args:
+        t: Current time (used as key for state lookup)
+        amplitude: Scale factor for noise (default 1.0)
+        dt: Time step for discretization (default 0.1)
+        seed: Random seed for reproducibility (optional)
+    
+    Returns:
+        Current value of Wiener process (cumulative random walk)
+    
+    Note:
+        This is a simplified implementation that assumes regular time steps.
+        For irregular steps, use ornstein_uhlenbeck() instead.
+    
+    Example:
+        # Add 10% Brownian noise to base rate
+        rate = 1.0 * (1 + 0.1 * wiener(time))
+        
+        # Stronger noise
+        rate = 1.0 * (1 + 0.3 * wiener(time, amplitude=1.0))
+    """
+    global _wiener_state
+    
+    # Set random seed if provided (once)
+    if seed is not None and 'seed_set' not in _wiener_state:
+        np.random.seed(seed)
+        _wiener_state['seed_set'] = True
+    
+    # Round time to nearest dt to create discrete steps
+    time_key = round(t / dt) * dt
+    
+    # If this is a new time point, generate next increment
+    if time_key not in _wiener_state:
+        # Get previous value (or start at 0)
+        prev_time = time_key - dt
+        prev_value = _wiener_state.get(prev_time, 0.0)
+        
+        # Wiener increment: dW = amplitude * sqrt(dt) * N(0,1)
+        increment = amplitude * np.sqrt(dt) * np.random.randn()
+        _wiener_state[time_key] = prev_value + increment
+        
+        # Clean up old values to prevent memory leak (keep last 100 steps)
+        if len(_wiener_state) > 100:
+            oldest_key = min(k for k in _wiener_state.keys() if isinstance(k, (int, float)))
+            _wiener_state.pop(oldest_key, None)
+    
+    return _wiener_state[time_key]
+
+
+def reset_wiener() -> None:
+    """Reset the Wiener process state (for new simulations)."""
+    global _wiener_state
+    _wiener_state = {}
+
+
+def gaussian_noise(mean: float = 0.0, std: float = 1.0) -> float:
+    """Independent Gaussian noise (not time-correlated like Wiener).
+    
+    Returns a new random sample from N(mean, std) each time called.
+    Unlike wiener(), each call is independent (no correlation between timesteps).
+    
+    Args:
+        mean: Mean of the distribution (default 0.0)
+        std: Standard deviation (default 1.0)
+    
+    Returns:
+        Random sample from N(mean, std)
+    
+    Example:
+        # Add independent noise to each timestep
+        rate = 1.0 + 0.1 * gaussian_noise(0, 1)
+        
+        # Multiplicative noise
+        rate = 1.0 * (1 + 0.1 * gaussian_noise())
+    """
+    return np.random.normal(mean, std)
+
+
+def uniform_noise(low: float = 0.0, high: float = 1.0) -> float:
+    """Independent uniform noise in [low, high].
+    
+    Args:
+        low: Minimum value (default 0.0)
+        high: Maximum value (default 1.0)
+    
+    Returns:
+        Random sample from Uniform(low, high)
+    
+    Example:
+        # Random rate between 0.5 and 1.5
+        rate = uniform_noise(0.5, 1.5)
+    """
+    return np.random.uniform(low, high)
+
+
+def poisson_noise(lam: float = 1.0) -> float:
+    """Independent Poisson noise (for discrete count events).
+    
+    Args:
+        lam: Rate parameter (mean and variance of distribution)
+    
+    Returns:
+        Random integer from Poisson(lam) as float
+    
+    Example:
+        # Random burst size from Poisson distribution
+        burst_size = poisson_noise(lam=5.0)  # Mean 5 events
+    """
+    return float(np.random.poisson(lam))
+
+
+def ornstein_uhlenbeck(t: float, x_current: float, theta: float = 1.0, 
+                       mu: float = 0.0, sigma: float = 1.0, dt: float = 0.1) -> float:
+    """Ornstein-Uhlenbeck process (mean-reverting noise).
+    
+    Models stochastic process that tends to drift toward mean:
+        dx = theta * (mu - x) * dt + sigma * dW
+    
+    Args:
+        t: Current time (for random seed consistency)
+        x_current: Current value of the process
+        theta: Mean reversion rate (higher = faster return to mean)
+        mu: Long-term mean
+        sigma: Volatility (noise amplitude)
+        dt: Time step
+    
+    Returns:
+        Next value of OU process
+    
+    Example:
+        # Mean-reverting noise around rate=1.0
+        # Initialize: x = 1.0
+        # Update: x = ornstein_uhlenbeck(time, x, theta=0.5, mu=1.0, sigma=0.2)
+        # Use: rate = x
+    """
+    # Mean reversion term
+    drift = theta * (mu - x_current) * dt
+    
+    # Stochastic term
+    diffusion = sigma * np.sqrt(dt) * np.random.randn()
+    
+    return x_current + drift + diffusion
+
+
+# =============================================================================
 # CATALOG DICTIONARY (for easy access)
 # =============================================================================
 
@@ -691,6 +850,14 @@ FUNCTION_CATALOG = {
     # Helper utilities
     'interpolate': interpolate,
     'smooth_threshold': smooth_threshold,
+    
+    # Stochastic functions (for steady state escape, molecular noise modeling)
+    'wiener': wiener,
+    'reset_wiener': reset_wiener,
+    'gaussian_noise': gaussian_noise,
+    'uniform_noise': uniform_noise,
+    'poisson_noise': poisson_noise,
+    'ornstein_uhlenbeck': ornstein_uhlenbeck,
 }
 
 

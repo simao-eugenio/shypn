@@ -179,7 +179,9 @@ class ReactionConverter(BaseConverter):
     """
     
     def __init__(self, pathway: ProcessedPathwayData, document: DocumentModel,
-                 species_to_place: Optional[Dict[str, Place]] = None):
+                 species_to_place: Optional[Dict[str, Place]] = None,
+                 add_stochastic_noise: bool = True,
+                 noise_amplitude: float = 0.1):
         """
         Initialize reaction converter.
         
@@ -187,9 +189,13 @@ class ReactionConverter(BaseConverter):
             pathway: The processed pathway data
             document: The DocumentModel to populate
             species_to_place: Optional mapping from species ID to Place (for rate functions)
+            add_stochastic_noise: If True, wrap heuristic rates with wiener() noise
+            noise_amplitude: Stochastic noise amplitude (default 0.1 = ±10%)
         """
         super().__init__(pathway, document)
         self.species_to_place = species_to_place or {}
+        self.add_stochastic_noise = add_stochastic_noise
+        self.noise_amplitude = noise_amplitude
     
     def convert(self) -> Dict[str, Transition]:
         """
@@ -448,7 +454,12 @@ class ReactionConverter(BaseConverter):
             return
         
         # Create Michaelis-Menten estimator (most common for biochemical reactions)
-        estimator = EstimatorFactory.create('michaelis_menten')
+        # Enable stochastic noise to prevent steady state traps in continuous transitions
+        estimator = EstimatorFactory.create(
+            'michaelis_menten',
+            add_stochastic_noise=self.add_stochastic_noise,
+            noise_amplitude=self.noise_amplitude
+        )
         
         if not estimator:
             # Fallback if factory fails
@@ -723,9 +734,24 @@ class PathwayConverter:
     Minimal coordinator pattern - most logic is in specialized converters.
     """
     
-    def __init__(self):
-        """Initialize pathway converter."""
+    def __init__(self, add_stochastic_noise: bool = True, noise_amplitude: float = 0.1):
+        """Initialize pathway converter.
+        
+        Args:
+            add_stochastic_noise: If True, wrap heuristic rates with wiener() noise (default: True)
+                                 Prevents steady state traps in continuous transitions
+            noise_amplitude: Stochastic noise amplitude (default 0.1 = ±10%)
+                           Represents molecular noise from finite populations
+        """
         self.logger = logging.getLogger(self.__class__.__name__)
+        self.add_stochastic_noise = add_stochastic_noise
+        self.noise_amplitude = noise_amplitude
+        
+        if add_stochastic_noise:
+            self.logger.info(
+                f"Stochastic noise enabled: ±{noise_amplitude*100:.0f}% "
+                f"(prevents steady state traps)"
+            )
     
     def convert(self, pathway: ProcessedPathwayData) -> DocumentModel:
         """
@@ -757,7 +783,11 @@ class PathwayConverter:
         species_to_place = species_converter.convert()
         
         # Convert reactions to transitions (pass species_to_place for rate functions)
-        reaction_converter = ReactionConverter(pathway, document, species_to_place)
+        reaction_converter = ReactionConverter(
+            pathway, document, species_to_place,
+            add_stochastic_noise=self.add_stochastic_noise,
+            noise_amplitude=self.noise_amplitude
+        )
         reaction_to_transition = reaction_converter.convert()
         
         # Convert stoichiometry to arcs

@@ -23,6 +23,19 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Set, Callable, Any, Optional
 from datetime import datetime
 
+# Import pattern recognition engine
+try:
+    from shypn.viability.pattern_recognition import (
+        PatternRecognitionEngine,
+        PatternType,
+        Pattern,
+        RepairSuggestion
+    )
+    PATTERN_ENGINE_AVAILABLE = True
+except ImportError:
+    PATTERN_ENGINE_AVAILABLE = False
+    print("[OBSERVER] Warning: Pattern recognition engine not available")
+
 
 @dataclass
 class ObservationEvent:
@@ -509,7 +522,7 @@ class ViabilityObserver:
             simulation_data: Optional dict with simulation results
             
         Returns:
-            Dict mapping category names to lists of suggestions
+            Dict mapping category names to lists of suggestions (as dicts, NOT Suggestion objects)
         """
         print(f"[OBSERVER] ========== generate_all_suggestions() ==========")
         print(f"[OBSERVER] KB transitions: {len(kb.transitions) if kb else 0}")
@@ -525,28 +538,39 @@ class ViabilityObserver:
         if not kb:
             return all_suggestions
         
-        # STRUCTURAL SUGGESTIONS - for all dead transitions
-        if simulation_data and 'transitions' in simulation_data:
-            for trans_id, trans_data in simulation_data['transitions'].items():
-                if trans_data.get('firings', -1) == 0:
-                    suggestion = {
-                        'category': 'structural',
-                        'title': f'Enable transition {trans_id} to fire',
-                        'description': f'Transition {trans_id} never fired during simulation.',
-                        'reasoning': 'Check input place tokens and arc weights',
-                        'confidence': 0.8,
-                        'action_type': 'fix_dead_transition',
-                        'target_transition': trans_id
-                    }
-                    all_suggestions['structural'].append(suggestion)
+        # Get inactive transitions from KB (using simulation_traces)
+        print(f"[OBSERVER] KB has {len(kb.simulation_traces)} simulation traces")
+        inactive_transitions = kb.get_inactive_transitions()
+        print(f"[OBSERVER] Found {len(inactive_transitions)} inactive transitions")
+        
+        # STRUCTURAL SUGGESTIONS - Use smart diagnosis for dead transitions
+        for trans_id in inactive_transitions:
+            print(f"[OBSERVER] Diagnosing dead transition: {trans_id}")
+            diagnosis = self._diagnose_dead_transition(kb, trans_id)
+            
+            if diagnosis:
+                # Convert diagnosis dict to suggestion dict
+                suggestion = {
+                    'category': 'structural',
+                    'title': diagnosis.get('title', f'Dead transition: {trans_id}'),
+                    'description': diagnosis.get('description', ''),
+                    'reasoning': diagnosis.get('reasoning', ''),
+                    'confidence': diagnosis.get('confidence', 0.7),
+                    'action_type': diagnosis.get('action_type', 'unknown'),
+                    'target_transition': trans_id,
+                    'metadata': diagnosis.get('suggestions', [])
+                }
+                all_suggestions['structural'].append(suggestion)
+                print(f"[OBSERVER]   → {diagnosis['reason']}")
         
         # KINETIC SUGGESTIONS - for transitions without rates
         for trans_id, trans_obj in kb.transitions.items():
             if hasattr(trans_obj, 'rate') and trans_obj.rate == 0:
+                trans_name = self._get_human_readable_name(kb, trans_id, "transition")
                 suggestion = {
                     'category': 'kinetic',
-                    'title': f'Set firing rate for {trans_id}',
-                    'description': f'Transition {trans_id} has rate=0.',
+                    'title': f'Set firing rate for {trans_name}',
+                    'description': f'Transition has rate=0.',
                     'reasoning': f'Query BRENDA for {getattr(trans_obj, "label", "reaction")}',
                     'confidence': 0.7,
                     'action_type': 'query_brenda',
@@ -557,16 +581,64 @@ class ViabilityObserver:
         # BIOLOGICAL SUGGESTIONS - for unmapped places
         for place_id, place_obj in kb.places.items():
             if not hasattr(place_obj, 'compound_id') or not place_obj.compound_id:
+                place_name = self._get_human_readable_name(kb, place_id, "place")
                 suggestion = {
                     'category': 'biological',
-                    'title': f'Map place {place_id} to compound',
-                    'description': f'Place {place_id} lacks compound mapping.',
+                    'title': f'Map {place_name} to compound',
+                    'description': f'Place lacks compound mapping.',
                     'reasoning': 'Enable pathway analysis and validation',
                     'confidence': 0.6,
                     'action_type': 'map_compound',
                     'target_place': place_id
                 }
                 all_suggestions['biological'].append(suggestion)
+        
+        # ============================================================================
+        # ADVANCED PATTERN RECOGNITION ENGINE
+        # ============================================================================
+        if PATTERN_ENGINE_AVAILABLE:
+            print(f"[OBSERVER] Running pattern recognition engine...")
+            try:
+                pattern_engine = PatternRecognitionEngine(kb)
+                analysis = pattern_engine.analyze()
+                
+                patterns = analysis.get('patterns', [])
+                pattern_suggestions = analysis.get('suggestions', [])
+                
+                print(f"[OBSERVER] Pattern engine found {len(patterns)} patterns, {len(pattern_suggestions)} suggestions")
+                
+                # Convert pattern suggestions to our format
+                for sugg in pattern_suggestions:
+                    # Map pattern action to category
+                    if any(keyword in sugg.action.lower() for keyword in ['arc', 'weight', 'topology', 'output', 'input']):
+                        category = 'structural'
+                    elif any(keyword in sugg.action.lower() for keyword in ['cofactor', 'compound', 'stoichiometry']):
+                        category = 'biological'
+                    elif any(keyword in sugg.action.lower() for keyword in ['rate', 'kinetic', 'vmax', 'km']):
+                        category = 'kinetic'
+                    else:
+                        category = 'structural'
+                    
+                    suggestion = {
+                        'category': category,
+                        'title': sugg.description,
+                        'description': f"{sugg.rationale}",
+                        'reasoning': f"Data source: {sugg.data_source or 'pattern analysis'}, Action: {sugg.action}",
+                        'confidence': sugg.confidence,
+                        'action_type': sugg.action,
+                        'target': sugg.target,
+                        'parameters': sugg.parameters,
+                        'pattern_based': True  # Mark as coming from pattern engine
+                    }
+                    all_suggestions[category].append(suggestion)
+                    print(f"[OBSERVER]   Pattern suggestion: {sugg.action} → {sugg.description[:60]}")
+                
+            except Exception as e:
+                print(f"[OBSERVER] Pattern recognition engine error: {e}")
+                import traceback
+                traceback.print_exc()
+        else:
+            print(f"[OBSERVER] Pattern recognition engine not available (skipping advanced analysis)")
         
         # DIAGNOSIS - summary of all issues
         total_suggestions = sum(len(s) for s in all_suggestions.values())
@@ -588,6 +660,294 @@ class ViabilityObserver:
             print(f"[OBSERVER]   {cat}: {len(suggs)}")
         
         return all_suggestions
+    
+    def _get_human_readable_name(self, kb, element_id, element_type):
+        """Convert element ID to human-readable format with biological context.
+        
+        Args:
+            kb: ModelKnowledgeBase instance
+            element_id: Element ID (e.g., "P5", "T3")
+            element_type: "place" or "transition"
+            
+        Returns:
+            Human-readable string like "P5 / Glucose / C00031" or "T3 / Hexokinase / R00200"
+        """
+        if element_type == "place":
+            place = kb.places.get(element_id)
+            if not place:
+                return element_id
+            
+            parts = [element_id]
+            
+            # Add compound info if available
+            if place.compound_id:
+                compound = kb.compounds.get(place.compound_id)
+                if compound:
+                    parts.append(compound.name)
+                    if hasattr(compound, 'kegg_id') and compound.kegg_id:
+                        parts.append(compound.kegg_id)
+                else:
+                    parts.append(place.compound_id)
+            elif hasattr(place, 'label') and place.label:
+                parts.append(place.label)
+            
+            return " / ".join(parts)
+        
+        elif element_type == "transition":
+            transition = kb.transitions.get(element_id)
+            if not transition:
+                return element_id
+            
+            parts = [element_id]
+            
+            # Add reaction info if available
+            if transition.reaction_id:
+                reaction = kb.reactions.get(transition.reaction_id)
+                if reaction:
+                    parts.append(reaction.name)
+                    if hasattr(reaction, 'kegg_id') and reaction.kegg_id:
+                        parts.append(reaction.kegg_id)
+                else:
+                    parts.append(transition.reaction_id)
+            elif hasattr(transition, 'label') and transition.label:
+                parts.append(transition.label)
+            
+            return " / ".join(parts)
+        
+        return element_id
+    
+    def _diagnose_dead_transition(self, kb, trans_id):
+        """Intelligent diagnosis of why a transition is dead.
+        
+        Analyzes 6 potential causes:
+        1. Source transition (no input places) - should fire spontaneously
+        2. Zero tokens in all input places - need initial marking
+        3. Insufficient tokens - need more tokens or reduce arc weights
+        4. High arc weights - reduce arc requirements
+        5. Priority conflicts - adjust priorities
+        6. Unknown cause - generic fallback
+        
+        Args:
+            kb: ModelKnowledgeBase instance
+            trans_id: Transition ID to diagnose
+            
+        Returns:
+            Dict with diagnosis info (title, description, reasoning, confidence, action_type, suggestions)
+        """
+        transition = kb.transitions.get(trans_id)
+        if not transition:
+            return None
+        
+        trans_name = self._get_human_readable_name(kb, trans_id, "transition")
+        
+        # Get input arcs from KB (this is the correct way!)
+        input_arcs = kb.get_input_arcs_for_transition(trans_id)
+        
+        # Debug: Log diagnosis info
+        has_rate = (
+            (hasattr(transition, 'current_rate') and transition.current_rate is not None and transition.current_rate > 0) or
+            (hasattr(transition, 'kinetic_law') and transition.kinetic_law)
+        )
+        rate_str = transition.kinetic_law if hasattr(transition, 'kinetic_law') and transition.kinetic_law else (
+            f"rate={transition.current_rate}" if hasattr(transition, 'current_rate') and transition.current_rate else "NO_RATE"
+        )
+        print(f"[DIAGNOSE] {trans_id}: {len(input_arcs)} input arcs, is_source={len(input_arcs) == 0}, has_rate={has_rate}, rate_info={rate_str}")
+        
+        # TYPE 1: Source transition (no inputs) - check if it should be a source
+        if not input_arcs:
+            # Source transitions that didn't fire might be:
+            # a) Missing a firing rate (stochastic/timed) or kinetic law
+            # b) Actually need input places (modeling error)
+            # c) Intentionally unused boundary conditions
+            
+            # Check if transition has any kind of rate definition
+            has_rate = (
+                (hasattr(transition, 'current_rate') and transition.current_rate is not None and transition.current_rate > 0) or
+                (hasattr(transition, 'kinetic_law') and transition.kinetic_law)
+            )
+            
+            if not has_rate:
+                return {
+                    'reason': 'SOURCE_TRANSITION_NO_RATE',
+                    'title': f'{trans_name} is source with NO rate',
+                    'description': f'Source transition has no input places and no firing rate or kinetic law.',
+                    'reasoning': f'Either set a firing rate/kinetic law (e.g., michaelis_menten) or add input places (if not truly a source).',
+                    'confidence': 0.85,
+                    'action_type': 'set_rate_or_add_inputs',
+                    'suggestions': [
+                        {'type': 'set_kinetic_law', 'target': trans_id, 'description': 'Set kinetic law (e.g., michaelis_menten)'},
+                        {'type': 'set_rate', 'target': trans_id, 'description': 'Set firing rate if this should be a timed source'},
+                        {'type': 'add_input_places', 'target': trans_id, 'description': 'Add input places if this is not truly a source'}
+                    ]
+                }
+            else:
+                # Has rate/kinetic_law but didn't fire - might be intentional or parameters incorrect
+                rate_info = transition.kinetic_law if transition.kinetic_law else f"rate={transition.current_rate}"
+                return {
+                    'reason': 'SOURCE_TRANSITION_UNUSED',
+                    'title': f'{trans_name} source never fired',
+                    'description': f'Source transition has {rate_info} but never fired during simulation.',
+                    'reasoning': f'This might be intentional (boundary condition) or parameters incorrect. Check kinetic parameters or extend simulation time.',
+                    'confidence': 0.6,
+                    'action_type': 'check_source_usage',
+                    'suggestions': [
+                        {'type': 'check_kinetic_params', 'target': trans_id, 'description': 'Verify kinetic parameters (vmax, km)'},
+                        {'type': 'extend_simulation', 'description': 'Run simulation longer to allow firing'}
+                    ]
+                }
+        
+        # Get input place states
+        input_places = []
+        for arc in input_arcs:
+            # ArcKnowledge has source_id, not source
+            place_id = arc.source_id
+            if place_id:
+                place = kb.places.get(place_id)
+                if place:
+                    # ArcKnowledge has current_weight, not weight
+                    arc_weight = arc.current_weight
+                    tokens = place.initial_marking
+                    input_places.append({
+                        'id': place_id,
+                        'name': self._get_human_readable_name(kb, place_id, "place"),
+                        'tokens': tokens,
+                        'arc_weight': arc_weight,
+                        'sufficient': tokens >= arc_weight
+                    })
+        
+        if not input_places:
+            return None
+        
+        # TYPE 2: ALL input places empty (0 tokens)
+        if all(p['tokens'] == 0 for p in input_places):
+            place_names = [p['name'] for p in input_places]
+            return {
+                'reason': 'ZERO_TOKENS',
+                'title': f'{trans_name} DEAD: All inputs empty',
+                'description': f'All {len(input_places)} input places have 0 tokens.',
+                'reasoning': f'Add initial marking to: {", ".join(place_names)}',
+                'confidence': 0.95,
+                'action_type': 'add_initial_marking',
+                'suggestions': [
+                    {'type': 'add_initial_marking', 'place_id': p['id'], 'tokens': p['arc_weight']} 
+                    for p in input_places
+                ]
+            }
+        
+        # TYPE 3: SOME places insufficient (tokens < arc_weight)
+        insufficient_places = [p for p in input_places if not p['sufficient'] and p['tokens'] > 0]
+        if insufficient_places:
+            place_details = [f"{p['name']} ({p['tokens']}/{p['arc_weight']})" for p in insufficient_places]
+            
+            # Decide: add tokens or reduce arc weights?
+            if any(p['arc_weight'] > 3 for p in insufficient_places):
+                # High arc weights - suggest reducing them
+                return {
+                    'reason': 'INSUFFICIENT_TOKENS_HIGH_ARCS',
+                    'title': f'{trans_name} DEAD: High arc weights',
+                    'description': f'{len(insufficient_places)} places have high arc weight requirements.',
+                    'reasoning': f'Reduce arc weights for: {", ".join(place_details)}',
+                    'confidence': 0.85,
+                    'action_type': 'reduce_arc_weight',
+                    'suggestions': [
+                        {'type': 'reduce_arc_weight', 'place_id': p['id'], 'from': p['arc_weight'], 'to': max(1, p['tokens'])}
+                        for p in insufficient_places if p['arc_weight'] > 1
+                    ]
+                }
+            else:
+                # Normal arc weights - add tokens
+                tokens_needed = sum(p['arc_weight'] - p['tokens'] for p in insufficient_places)
+                return {
+                    'reason': 'INSUFFICIENT_TOKENS',
+                    'title': f'{trans_name} DEAD: Need {tokens_needed} more tokens',
+                    'description': f'{len(insufficient_places)} input places need more tokens.',
+                    'reasoning': f'Add tokens to: {", ".join(place_details)}',
+                    'confidence': 0.9,
+                    'action_type': 'add_tokens',
+                    'suggestions': [
+                        {'type': 'add_tokens', 'place_id': p['id'], 'tokens': p['arc_weight'] - p['tokens']}
+                        for p in insufficient_places
+                    ]
+                }
+        
+        # TYPE 4: High arc weights (even if sufficient now)
+        high_weight_places = [p for p in input_places if p['arc_weight'] > 2]
+        if high_weight_places:
+            place_details = [f"{p['name']} (weight={p['arc_weight']})" for p in high_weight_places]
+            return {
+                'reason': 'HIGH_ARC_WEIGHTS',
+                'title': f'{trans_name} has high arc weights',
+                'description': f'{len(high_weight_places)} input arcs require many tokens.',
+                'reasoning': f'Consider reducing arc weights: {", ".join(place_details)}',
+                'confidence': 0.7,
+                'action_type': 'reduce_arc_weight',
+                'suggestions': [
+                    {'type': 'reduce_arc_weight', 'place_id': p['id'], 'from': p['arc_weight'], 'to': 1}
+                    for p in high_weight_places
+                ]
+            }
+        
+        # TYPE 5: Priority conflicts (competing transitions)
+        competing = self._find_competing_transitions(kb, trans_id, input_places)
+        if competing:
+            comp_trans_names = [self._get_human_readable_name(kb, tid, "transition") for tid in competing]
+            return {
+                'reason': 'PRIORITY_CONFLICT',
+                'title': f'{trans_name} DEAD: Priority conflict',
+                'description': f'Competing with {len(competing)} other transitions for tokens.',
+                'reasoning': f'Adjust priorities relative to: {", ".join(comp_trans_names)}',
+                'confidence': 0.75,
+                'action_type': 'adjust_priority',
+                'suggestions': [
+                    {'type': 'adjust_priority', 'transition_id': trans_id, 'description': f'Increase priority above {tid}'}
+                    for tid in competing
+                ]
+            }
+        
+        # TYPE 6: Unknown cause - generic fallback
+        place_names = [p['name'] for p in input_places]
+        return {
+            'reason': 'UNKNOWN',
+            'title': f'{trans_name} DEAD: Unknown cause',
+            'description': f'All inputs seem adequate but transition still dead.',
+            'reasoning': f'Check guards, rates, and timing. Inputs: {", ".join(place_names)}',
+            'confidence': 0.5,
+            'action_type': 'investigate',
+            'suggestions': [
+                {'type': 'check_guards', 'transition_id': trans_id},
+                {'type': 'check_timing', 'transition_id': trans_id}
+            ]
+        }
+    
+    def _find_competing_transitions(self, kb, trans_id, input_places):
+        """Find transitions that compete for the same input places.
+        
+        Args:
+            kb: ModelKnowledgeBase instance
+            trans_id: Current transition ID
+            input_places: List of input place dicts
+            
+        Returns:
+            List of competing transition IDs
+        """
+        if not input_places:
+            return []
+        
+        competing = set()
+        place_ids = {p['id'] for p in input_places}
+        
+        for other_trans_id, other_trans in kb.transitions.items():
+            if other_trans_id == trans_id:
+                continue
+            
+            other_input_arcs = other_trans.input_arcs if hasattr(other_trans, 'input_arcs') else []
+            other_place_ids = {arc.source for arc in other_input_arcs if hasattr(arc, 'source')}
+            
+            # If shares any input place, it's competing
+            if place_ids & other_place_ids:
+                competing.add(other_trans_id)
+        
+        return list(competing)
     
     # Rule action implementations
     def _analyze_dead_transitions_liveness(self, knowledge: Dict) -> List:

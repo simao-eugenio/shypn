@@ -542,29 +542,15 @@ class ModelsCategory(BaseReportCategory):
                         }
                         places_data.append(place_info)
             
-            # Transitions
+            # Transitions - Pass objects directly so DTO can extract metadata (including kinetic_law)
             if hasattr(model, 'transitions') and model.transitions:
-                for transition in model.transitions:
-                    if transition:
-                        trans_info = {
-                            'transition_id': transition.id if hasattr(transition, 'id') else str(id(transition)),
-                            'label': transition.label if hasattr(transition, 'label') else '',
-                        }
-                        transitions_data.append(trans_info)
+                transitions_data = [t for t in model.transitions if t]
             
-            # Arcs
+            # Arcs - Pass objects directly so DTO can infer arc_type
             if hasattr(model, 'arcs') and model.arcs:
-                for arc in model.arcs:
-                    if arc:
-                        arc_info = {
-                            'arc_id': arc.id if hasattr(arc, 'id') else str(id(arc)),
-                            'source_id': arc.source.id if hasattr(arc, 'source') and hasattr(arc.source, 'id') else None,
-                            'target_id': arc.target.id if hasattr(arc, 'target') and hasattr(arc.target, 'id') else None,
-                            'weight': arc.weight if hasattr(arc, 'weight') else 1,
-                        }
-                        arcs_data.append(arc_info)
+                arcs_data = [arc for arc in model.arcs if arc]
             
-            # Update KB
+            # Update KB (DTOs will normalize the data)
             kb.update_topology_structural(places_data, transitions_data, arcs_data)
             print(f"[REPORT→KB] ✓ Updated: {len(places_data)} places, {len(transitions_data)} transitions, {len(arcs_data)} arcs")
             

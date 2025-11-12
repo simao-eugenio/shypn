@@ -59,6 +59,7 @@ class ViabilityPanel(Gtk.Box):
         self.model_canvas = model_canvas
         self.topology_panel = None  # Will be set via set_topology_panel()
         self.analyses_panel = None  # For locality access
+        self._pending_callback_registration = False  # Track if callback needs registration
         
         # Create intelligent observer (learns patterns and generates suggestions)
         self.observer = ViabilityObserver()
@@ -271,6 +272,51 @@ class ViabilityPanel(Gtk.Box):
         """
         self.drawing_area = drawing_area
         print(f"[VIABILITY] Set drawing_area: {id(drawing_area)}")
+        
+        # Register simulation complete callback with controller
+        if self.model_canvas and drawing_area:
+            controller = self.model_canvas.simulation_controllers.get(drawing_area)
+            if controller:
+                print(f"[VIABILITY] ✅ Registering on_simulation_complete callback with controller")
+                controller.on_simulation_complete = self.on_simulation_complete
+            else:
+                print(f"[VIABILITY] ⚠️ No controller found for drawing_area (will register when available)")
+                # Store callback to register later if controller created after this
+                self._pending_callback_registration = True
+    
+    def _ensure_simulation_callback_registered(self):
+        """Ensure simulation complete callback is registered with controller.
+        
+        Call this before analyzing to make sure we'll receive simulation data.
+        Also checks if simulation data already exists and adds it to KB.
+        """
+        if not self.model_canvas or not hasattr(self, 'drawing_area') or not self.drawing_area:
+            return False
+        
+        controller = self.model_canvas.simulation_controllers.get(self.drawing_area)
+        if controller:
+            # Check if callback already set
+            if controller.on_simulation_complete == self.on_simulation_complete:
+                print(f"[VIABILITY] ✓ Callback already registered")
+            else:
+                # Register callback
+                print(f"[VIABILITY] ✅ Registering on_simulation_complete callback")
+                controller.on_simulation_complete = self.on_simulation_complete
+                self._pending_callback_registration = False
+            
+            # Check if simulation data already exists (user ran sim before opening viability)
+            data_collector = getattr(controller, 'data_collector', None)
+            if data_collector and data_collector.has_data():
+                kb = self.model_canvas.get_current_knowledge_base()
+                if kb and len(kb.simulation_traces) == 0:
+                    print(f"[VIABILITY] 🔄 Found existing simulation data, adding to KB...")
+                    self.on_simulation_complete()  # Call manually to populate KB
+            
+            return True
+        else:
+            print(f"[VIABILITY] ⚠️ No controller available yet")
+            self._pending_callback_registration = True
+            return False
     
     def on_transition_selected(self, transition, locality):
         """INTERACTIVE MODE: Analyze specific transition locality.
@@ -283,6 +329,9 @@ class ViabilityPanel(Gtk.Box):
         """
         print(f"[VIABILITY] ========== INTERACTIVE MODE ==========")
         print(f"[VIABILITY] Analyzing locality for transition: {transition.id}")
+        
+        # Ensure simulation callback is registered
+        self._ensure_simulation_callback_registered()
         
         # Store selection
         self.selected_transition = transition
@@ -360,6 +409,9 @@ class ViabilityPanel(Gtk.Box):
         """
         print(f"[VIABILITY] ========== BATCH MODE ==========")
         print(f"[VIABILITY] Analyzing entire model...")
+        
+        # Ensure simulation callback is registered for future simulations
+        self._ensure_simulation_callback_registered()
         
         # Get KB
         kb = self.model_canvas.get_current_knowledge_base() if self.model_canvas else None
@@ -456,10 +508,24 @@ class ViabilityPanel(Gtk.Box):
                 print(f"[VIABILITY] ⚠️ No KB")
                 return
             
-            # Simply record that simulation data is available
-            # Observer will use this when generating suggestions
+            # ====================================================================
+            # UPDATE KNOWLEDGE BASE WITH SIMULATION DATA (USING DTO)
+            # ====================================================================
+            print(f"[VIABILITY] → Updating KB with simulation data...")
+            
+            # Use DTO to normalize simulation data
+            from shypn.viability.knowledge.dto import SimulationResultDTO
+            
+            sim_dto = SimulationResultDTO.from_data_collector(data_collector)
+            
+            # Add to KB using DTO (ensures clean, normalized data)
+            kb.add_simulation_from_dto(sim_dto)
+            
+            print(f"[VIABILITY] ✅ Added simulation trace to KB")
+            print(f"[VIABILITY]   - {len(sim_dto.place_traces)} places tracked")
+            print(f"[VIABILITY]   - {len(sim_dto.total_firings)} transitions with firing data")
             print(f"[VIABILITY] ✅ Simulation data available")
-            print(f"[VIABILITY] Data points: {len(data_collector.time_points) if hasattr(data_collector, 'time_points') else 'unknown'}")
+            print(f"[VIABILITY] Data points: {len(sim_dto.time_points)}")
             print(f"[VIABILITY] → User can now click 'Analyze All' or select a transition for suggestions")
             
         except Exception as e:
