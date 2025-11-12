@@ -3520,52 +3520,72 @@ class ModelCanvasLoader:
         transition_panel = self.right_panel_loader.transition_panel
         print(f"[LOCALITY_WIRE] Wiring locality sync for {len(self.overlay_managers)} existing documents")
         
-        # Wire callback for each existing Report panel
-        for drawing_area, overlay_manager in self.overlay_managers.items():
+        # Create a SINGLE callback that dynamically routes to the current active document's report panel
+        # This fixes the issue where the callback was captured for a specific document
+        def on_transition_selected(transition, locality):
+            """Called when user selects transition in Analyses panel.
+            
+            Routes the selection to the CURRENTLY ACTIVE document's report panel.
+            """
+            print(f"[LOCALITY_CALLBACK] Received transition {transition.name if hasattr(transition, 'name') else transition.id}")
+            print(f"[LOCALITY_CALLBACK] Locality valid: {locality.is_valid if locality else False}")
+            
+            # Get the current active drawing area
+            current_page_num = self.notebook.get_current_page()
+            current_page = self.notebook.get_nth_page(current_page_num)
+            
+            drawing_area = None
+            if isinstance(current_page, Gtk.Overlay):
+                scrolled = current_page.get_child()
+                if isinstance(scrolled, Gtk.ScrolledWindow):
+                    drawing_area = scrolled.get_child()
+                    if hasattr(drawing_area, 'get_child'):
+                        drawing_area = drawing_area.get_child()
+            
+            if not drawing_area or drawing_area not in self.overlay_managers:
+                print(f"[LOCALITY_CALLBACK] ⚠️ No active drawing area found")
+                return
+            
+            # Get the report panel for the current document
+            overlay_manager = self.overlay_managers[drawing_area]
             if not hasattr(overlay_manager, 'report_panel_loader'):
-                continue
+                print(f"[LOCALITY_CALLBACK] ⚠️ No report_panel_loader for active document")
+                return
             
             report_panel_loader = overlay_manager.report_panel_loader
             if not report_panel_loader or not hasattr(report_panel_loader, 'panel'):
-                continue
+                print(f"[LOCALITY_CALLBACK] ⚠️ No report panel for active document")
+                return
             
             report_panel = report_panel_loader.panel
+            print(f"[LOCALITY_CALLBACK] Report panel categories: {len(report_panel.categories)}")
             
-            # Create closure to capture report_panel for this document
-            def make_callback(rp):
-                def on_transition_selected(transition, locality):
-                    """Called when user selects transition in Analyses panel."""
-                    print(f"[LOCALITY_CALLBACK] Received transition {transition.name if hasattr(transition, 'name') else transition.id}")
-                    print(f"[LOCALITY_CALLBACK] Locality valid: {locality.is_valid if locality else False}")
-                    print(f"[LOCALITY_CALLBACK] Report panel categories: {len(rp.categories)}")
-                    
-                    # Find ModelsCategory in Report panel (for "Show Selected Locality")
-                    from shypn.ui.panels.report.model_structure_category import ModelsCategory
-                    for category in rp.categories:
-                        print(f"[LOCALITY_CALLBACK] Checking category: {type(category).__name__}")
-                        if isinstance(category, ModelsCategory):
-                            print(f"[LOCALITY_CALLBACK] Found ModelsCategory, calling set_selected_locality()")
-                            category.set_selected_locality(transition, locality)
-                            print(f"[LOCALITY_CALLBACK] set_selected_locality() completed")
-                            break
-                    else:
-                        print(f"[LOCALITY_CALLBACK] ⚠️ ModelsCategory not found in report panel!")
-                    
-                    # Find DynamicAnalysesCategory in Report panel (for "Reaction Selected" simulation data)
-                    from shypn.ui.panels.report.parameters_category import DynamicAnalysesCategory
-                    for category in rp.categories:
-                        if isinstance(category, DynamicAnalysesCategory):
-                            print(f"[LOCALITY_CALLBACK] Found DynamicAnalysesCategory, calling set_selected_reaction()")
-                            category.set_selected_reaction(transition, locality)
-                            print(f"[LOCALITY_CALLBACK] set_selected_reaction() completed")
-                            break
-                    else:
-                        print(f"[LOCALITY_CALLBACK] ⚠️ DynamicAnalysesCategory not found in report panel!")
-                return on_transition_selected
+            # Find ModelsCategory in Report panel (for "Show Selected Locality")
+            from shypn.ui.panels.report.model_structure_category import ModelsCategory
+            for category in report_panel.categories:
+                print(f"[LOCALITY_CALLBACK] Checking category: {type(category).__name__}")
+                if isinstance(category, ModelsCategory):
+                    print(f"[LOCALITY_CALLBACK] Found ModelsCategory, calling set_selected_locality()")
+                    category.set_selected_locality(transition, locality)
+                    print(f"[LOCALITY_CALLBACK] set_selected_locality() completed")
+                    break
+            else:
+                print(f"[LOCALITY_CALLBACK] ⚠️ ModelsCategory not found in report panel!")
             
-            # Set the callback
-            transition_panel.on_selection_changed_callback = make_callback(report_panel)
-            print(f"[LOCALITY_WIRE] ✓ Wired callback for drawing_area {id(drawing_area)}")
+            # Find DynamicAnalysesCategory in Report panel (for "Reaction Selected" simulation data)
+            from shypn.ui.panels.report.parameters_category import DynamicAnalysesCategory
+            for category in report_panel.categories:
+                if isinstance(category, DynamicAnalysesCategory):
+                    print(f"[LOCALITY_CALLBACK] Found DynamicAnalysesCategory, calling set_selected_reaction()")
+                    category.set_selected_reaction(transition, locality)
+                    print(f"[LOCALITY_CALLBACK] set_selected_reaction() completed")
+                    break
+            else:
+                print(f"[LOCALITY_CALLBACK] ⚠️ DynamicAnalysesCategory not found in report panel!")
+        
+        # Set the single dynamic callback (no loop needed, single global transition panel)
+        transition_panel.on_selection_changed_callback = on_transition_selected
+        print(f"[LOCALITY_WIRE] ✓ Wired dynamic callback for all documents")
     
     def wire_existing_canvases_to_right_panel(self):
         """Wire data_collector to right_panel for all existing canvases.
