@@ -199,7 +199,14 @@ class RightPanelLoader:
             self.dynamic_analyses_panel.set_model(model)
             
             # Update convenience accessor (panel may have recreated handler)
-            self.context_menu_handler = self.dynamic_analyses_panel.context_menu_handler
+            # Also ensure model_canvas_loader is set on the new handler
+            if self.dynamic_analyses_panel.context_menu_handler:
+                self.context_menu_handler = self.dynamic_analyses_panel.context_menu_handler
+                
+                # CRITICAL: Ensure model_canvas_loader is propagated to new handler
+                if hasattr(self, 'model_canvas_loader') and self.model_canvas_loader:
+                    if not hasattr(self.context_menu_handler, 'model_canvas_loader') or not self.context_menu_handler.model_canvas_loader:
+                        self.context_menu_handler.model_canvas_loader = self.model_canvas_loader
         
         # Also update the handler directly if it exists
         if self.context_menu_handler:

@@ -126,6 +126,8 @@ class ContextMenuHandler:
         if model:
             from shypn.diagnostic import LocalityDetector
             self.locality_detector = LocalityDetector(model)
+        else:
+            self.locality_detector = None
     
     def add_analysis_menu_items(self, menu, obj):
         """Add analysis-related menu items to an object's context menu.
@@ -243,6 +245,15 @@ class ContextMenuHandler:
             transition: Transition object
             panel: TransitionRatePanel instance
         """
+        
+        # Check if locality detector exists
+        if not self.locality_detector:
+            menu_item = Gtk.MenuItem(label=f"Add to Transition Analysis")
+            menu_item.connect("activate", 
+                            lambda w: self._on_add_to_analysis_clicked(transition, panel))
+            menu_item.show()
+            menu.append(menu_item)
+            return
         
         # Detect locality
         locality = self.locality_detector.get_locality_for_transition(transition)
