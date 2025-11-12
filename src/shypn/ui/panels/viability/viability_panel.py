@@ -278,7 +278,29 @@ class ViabilityPanel(Gtk.Box):
             controller = self.model_canvas.simulation_controllers.get(drawing_area)
             if controller:
                 print(f"[VIABILITY] ✅ Registering on_simulation_complete callback with controller")
-                controller.on_simulation_complete = self.on_simulation_complete
+                
+                # CRITICAL: Preserve existing callback (e.g., Report Panel)
+                existing_callback = getattr(controller, 'on_simulation_complete', None)
+                is_already_viability = (
+                    existing_callback and 
+                    hasattr(existing_callback, '__self__') and 
+                    existing_callback.__self__.__class__.__name__ == 'ViabilityPanel'
+                )
+                
+                if is_already_viability:
+                    print(f"[VIABILITY] ⚠️ Callback already registered, skipping")
+                else:
+                    if existing_callback and callable(existing_callback):
+                        print(f"[VIABILITY] Preserving existing callback (Report Panel)")
+                        # Create combined callback
+                        viability_callback = self.on_simulation_complete
+                        def combined():
+                            if existing_callback:
+                                existing_callback()
+                            viability_callback()
+                        controller.on_simulation_complete = combined
+                    else:
+                        controller.on_simulation_complete = self.on_simulation_complete
             else:
                 print(f"[VIABILITY] ⚠️ No controller found for drawing_area (will register when available)")
                 # Store callback to register later if controller created after this
@@ -295,13 +317,29 @@ class ViabilityPanel(Gtk.Box):
         
         controller = self.model_canvas.simulation_controllers.get(self.drawing_area)
         if controller:
-            # Check if callback already set
-            if controller.on_simulation_complete == self.on_simulation_complete:
+            # Check if callback already set to avoid overwriting Report Panel callback
+            existing_callback = getattr(controller, 'on_simulation_complete', None)
+            is_already_viability = (
+                existing_callback and 
+                hasattr(existing_callback, '__self__') and 
+                existing_callback.__self__.__class__.__name__ == 'ViabilityPanel'
+            )
+            
+            if is_already_viability or controller.on_simulation_complete == self.on_simulation_complete:
                 print(f"[VIABILITY] ✓ Callback already registered")
             else:
-                # Register callback
+                # Register callback, preserving any existing callback
                 print(f"[VIABILITY] ✅ Registering on_simulation_complete callback")
-                controller.on_simulation_complete = self.on_simulation_complete
+                if existing_callback and callable(existing_callback):
+                    print(f"[VIABILITY] Preserving existing callback (Report Panel)")
+                    viability_callback = self.on_simulation_complete
+                    def combined():
+                        if existing_callback:
+                            existing_callback()
+                        viability_callback()
+                    controller.on_simulation_complete = combined
+                else:
+                    controller.on_simulation_complete = self.on_simulation_complete
                 self._pending_callback_registration = False
             
             # Check if simulation data already exists (user ran sim before opening viability)
