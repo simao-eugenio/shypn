@@ -435,7 +435,27 @@ class AnalysisPlotPanel(Gtk.Box):
     def _on_clear_clicked(self, button):
         """Handle clear button click - clear selection and blank canvas."""
         # Reset both border and fill colors for all selected objects
-        from shypn.netobjs import Transition, Place
+        from shypn.netobjs import Transition, Place, Arc
+        
+        # For transition panels, also reset arc colors for locality
+        if self.object_type == 'transition' and hasattr(self, '_locality_places') and self._model_manager:
+            for transition_id, locality_data in list(self._locality_places.items()):
+                # Reset colors of arcs from input places to transition
+                for place in locality_data.get('input_places', []):
+                    for arc in self._model_manager.arcs:
+                        if arc.source.id == place.id and arc.target.id == transition_id:
+                            arc.color = Arc.DEFAULT_COLOR
+                
+                # Reset colors of arcs from transition to output places
+                for place in locality_data.get('output_places', []):
+                    for arc in self._model_manager.arcs:
+                        if arc.source.id == transition_id and arc.target.id == place.id:
+                            arc.color = Arc.DEFAULT_COLOR
+            
+            # Clear locality data
+            self._locality_places.clear()
+        
+        # Reset border and fill colors for all selected objects
         for obj in self.selected_objects:
             old_callback = obj.on_changed if hasattr(obj, 'on_changed') else None
             obj.on_changed = None
