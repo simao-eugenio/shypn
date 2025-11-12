@@ -386,6 +386,11 @@ class DynamicAnalysesCategory(BaseReportCategory):
             # CRITICAL: Capture controller by value (not self.controller which changes)
             # At callback time, check if this specific controller is still the active one
             captured_controller = controller
+            
+            # CRITICAL: Preserve any existing callback (e.g., from Viability Panel)
+            # Create a combined callback that calls both
+            existing_callback = getattr(controller, 'on_simulation_complete', None)
+            
             def on_complete():
                 print(f"[CALLBACK] ===== Simulation complete for controller {id(captured_controller)} =====")
                 
@@ -422,11 +427,19 @@ class DynamicAnalysesCategory(BaseReportCategory):
                     self._pending_refresh_id = GLib.idle_add(lambda: self._refresh_and_clear_pending(callback_generation))
                 else:
                     print(f"[CALLBACK] ⚠️  Controller no longer active, data captured but not refreshing UI")
+                
+                # Call any existing callback that was registered before us (e.g., Viability Panel)
+                if existing_callback and callable(existing_callback):
+                    print(f"[CALLBACK] ✅ Calling existing callback (e.g., Viability Panel)")
+                    try:
+                        existing_callback()
+                    except Exception as e:
+                        print(f"[CALLBACK] ❌ Error in existing callback: {e}")
             
-            # Set the callback on this controller
+            # Set the combined callback on this controller
             controller.on_simulation_complete = on_complete
             self._registered_controllers.add(id(controller))
-            print(f"[SET_CONTROLLER] Callback registered successfully")
+            print(f"[SET_CONTROLLER] Callback registered successfully (chained with existing)")
         elif controller:
             print(f"[SET_CONTROLLER] Controller {id(controller)} already has callback registered, skipping")
     
