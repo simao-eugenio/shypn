@@ -198,6 +198,21 @@ class ModelCanvasLoader:
         if self.notebook.get_n_pages() > 0:
             initial_page = self.notebook.get_nth_page(0)
             self._wire_data_collector_for_page(initial_page)
+            
+            # ============================================================
+            # CRITICAL: Set model and context menu handler for first tab
+            # This is normally done in _on_notebook_page_changed, but that signal
+            # doesn't fire for the initially displayed tab
+            # ============================================================
+            if self.right_panel_loader and drawing_area:
+                if drawing_area in self.canvas_managers:
+                    manager = self.canvas_managers[drawing_area]
+                    self.right_panel_loader.set_model(manager)
+                    
+                    # CRITICAL: Explicitly ensure context menu handler has the correct model
+                    # This ensures "Add to Transition Analyses" works from app startup
+                    if self.right_panel_loader.context_menu_handler:
+                        self.right_panel_loader.context_menu_handler.set_model(manager)
         
         return self.container
 
@@ -325,10 +340,20 @@ class ModelCanvasLoader:
         wired = self._wire_data_collector_for_page(page)
         # print(f"[TAB_SWITCH] Wiring result: {wired}")
         
+        # ============================================================
+        # CRITICAL: Update right panel loader model and context menu handler
+        # This ensures "Add to Transition Analyses" works consistently
+        # ============================================================
         if self.right_panel_loader and drawing_area:
             if drawing_area in self.canvas_managers:
                 manager = self.canvas_managers[drawing_area]
                 self.right_panel_loader.set_model(manager)
+                
+                # CRITICAL: Explicitly ensure context menu handler has the correct model
+                # This must happen EVERY time we switch tabs to ensure locality detection works
+                if self.right_panel_loader.context_menu_handler:
+                    self.right_panel_loader.context_menu_handler.set_model(manager)
+            
             if self.right_panel_loader.context_menu_handler and (not self.context_menu_handler):
                 self.set_context_menu_handler(self.right_panel_loader.context_menu_handler)
         

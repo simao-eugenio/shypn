@@ -136,12 +136,18 @@ class DynamicAnalysesPanel(Gtk.Box):
             transition_panel = self.transitions_category.panel if self.transitions_category else None
             diagnostics_panel = self.diagnostics_category.panel if self.diagnostics_category else None
             
+            # Preserve model_canvas_loader from existing handler if it exists
+            existing_model_canvas_loader = None
+            if hasattr(self, 'context_menu_handler') and self.context_menu_handler:
+                existing_model_canvas_loader = getattr(self.context_menu_handler, 'model_canvas_loader', None)
+            
             if place_panel and transition_panel:
                 self.context_menu_handler = ContextMenuHandler(
                     place_panel=place_panel,
                     transition_panel=transition_panel,
                     model=self.model,
-                    diagnostics_panel=diagnostics_panel
+                    diagnostics_panel=diagnostics_panel,
+                    model_canvas_loader=existing_model_canvas_loader
                 )
         except Exception as e:
             import traceback
