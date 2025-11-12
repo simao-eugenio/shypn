@@ -1805,10 +1805,8 @@ class FileExplorerPanel:
         # - Report Panel creation and registration
         # - Callback setup
         # Benefits: No reuse logic complexity, consistent behavior, no stale state
-        print(f"[FILE_OPEN] Creating fresh canvas for file: {base_name}")
         page_index, drawing_area = self.canvas_loader.add_document(filename=base_name)
         manager = self.canvas_loader.get_canvas_manager(drawing_area)
-        print(f"[FILE_OPEN] Fresh canvas created: page_index={page_index}, drawing_area={drawing_area}")
         
         if manager:
             # ===== UNIFIED OBJECT LOADING =====
@@ -1897,18 +1895,15 @@ class FileExplorerPanel:
                     if overlay_manager and hasattr(overlay_manager, 'report_panel_loader'):
                         report_panel_loader = overlay_manager.report_panel_loader
                         if report_panel_loader and hasattr(report_panel_loader, 'panel'):
-                            print(f"[FILE_OPEN] Triggering Report Panel refresh after file load (deferred)")
                             # Get the simulation controller for this document
                             simulation_controller = getattr(overlay_manager, 'simulation_controller', None)
                             if simulation_controller and hasattr(report_panel_loader.panel, 'set_controller'):
                                 # Re-set controller to trigger refresh
                                 report_panel_loader.panel.set_controller(simulation_controller)
-                                print(f"[FILE_OPEN] ✅ Report Panel refreshed")
                     return False  # Don't repeat
                 
                 # Schedule refresh to happen after current events complete
                 GLib.idle_add(refresh_report_panel)
-                print(f"[FILE_OPEN] Report Panel refresh scheduled (idle)")
 
     def new_document(self):
         """Create a new document.

@@ -575,7 +575,6 @@ class ModelCanvasManager:
         """
         import logging
         logger = logging.getLogger(__name__)
-        print(f"[LOAD_OBJECTS] Called with {len(places or [])} places, {len(transitions or [])} transitions, {len(arcs or [])} arcs")
         logger.info(f"[LOAD_OBJECTS] Called with {len(places or [])} places, {len(transitions or [])} transitions, {len(arcs or [])} arcs")
         
         if places is None:
@@ -649,7 +648,6 @@ class ModelCanvasManager:
         # - Step listeners for canvas redraw
         #
         # See: doc/CANVAS_LIFECYCLE_IMPLEMENTATION.md
-        print("[LOAD_OBJECTS] Requesting simulation reset via lifecycle_manager")
         logger.info("[LOAD_OBJECTS] Requesting simulation reset via lifecycle_manager")
         
         # Try to use lifecycle manager first (proper architecture)
@@ -657,18 +655,14 @@ class ModelCanvasManager:
             lifecycle_mgr = self._canvas_loader.lifecycle_manager
             if lifecycle_mgr and self._drawing_area:
                 try:
-                    print("[LOAD_OBJECTS] Using lifecycle_manager.sync_after_file_load()")
                     logger.info("[LOAD_OBJECTS] Using lifecycle_manager.sync_after_file_load()")
                     # sync_after_file_load expects file_path but works for imports too
                     lifecycle_mgr.sync_after_file_load(self._drawing_area, file_path=None)
                     logger.info("[LOAD_OBJECTS] ✅ Lifecycle manager sync complete")
                 except Exception as e:
-                    print(f"[LOAD_OBJECTS] Lifecycle manager sync failed: {e}, falling back")
-                    print("[LOAD_OBJECTS] Calling _request_simulation_reset_direct() as fallback")
                     logger.warning(f"[LOAD_OBJECTS] Lifecycle manager sync failed: {e}, falling back")
                     logger.info("[LOAD_OBJECTS] Calling _request_simulation_reset_direct() as fallback")
                     self._request_simulation_reset_direct()
-                    print("[LOAD_OBJECTS] Fallback reset complete")
                     logger.info("[LOAD_OBJECTS] Fallback reset complete")
             else:
                 logger.info("[LOAD_OBJECTS] No lifecycle_manager available, using direct reset")
@@ -686,7 +680,6 @@ class ModelCanvasManager:
         # At panel creation, the KB was empty (0 places, 0 transitions), so no rules triggered.
         # Now that objects are loaded, we can detect issues like missing firing rates.
         if self._canvas_loader and self._drawing_area:
-            print("[LOAD_OBJECTS] Refreshing viability panel with populated KB")
             logger.info("[LOAD_OBJECTS] Refreshing viability panel with populated KB")
             try:
                 overlay_mgr = self._canvas_loader.overlay_managers.get(self._drawing_area)
@@ -695,16 +688,12 @@ class ModelCanvasManager:
                     if viability_loader:
                         panel = viability_loader.panel  # Correct attribute name
                         panel.refresh_all()  # Re-feed observer and refresh categories
-                        print("[LOAD_OBJECTS] ✅ Viability panel refreshed")
                         logger.info("[LOAD_OBJECTS] ✅ Viability panel refreshed")
                     else:
-                        print("[LOAD_OBJECTS] No viability_panel_loader found")
                         logger.info("[LOAD_OBJECTS] No viability_panel_loader found")
                 else:
-                    print("[LOAD_OBJECTS] No overlay_manager found")
                     logger.info("[LOAD_OBJECTS] No overlay_manager found")
             except Exception as e:
-                print(f"[LOAD_OBJECTS] Failed to refresh viability panel: {e}")
                 logger.warning(f"[LOAD_OBJECTS] Failed to refresh viability panel: {e}")
     
     def _request_simulation_reset_direct(self):

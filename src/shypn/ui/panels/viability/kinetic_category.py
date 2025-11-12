@@ -88,7 +88,6 @@ class KineticCategory(BaseViabilityCategory):
             return stats
             
         except Exception as e:
-            print(f"[Kinetic] Error getting simulation stats: {e}")
             return stats
     
     def _build_content(self):

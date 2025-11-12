@@ -635,12 +635,8 @@ class ModelsCategory(BaseReportCategory):
                     kb.update_reaction_info(reaction_id, reaction_data)
                     reactions_added += 1
             
-            if compounds_added > 0 or reactions_added > 0:
-                print(f"[PATHWAY→KB] ✓ Updated: {compounds_added} compounds, {reactions_added} reactions")
-            
         except Exception as e:
             import traceback
-            print(f"[PATHWAY→KB] ⚠️ Failed to update pathway knowledge: {e}")
             traceback.print_exc()
     
     def _update_knowledge_base_kinetics(self, model):
@@ -672,7 +668,7 @@ class ModelsCategory(BaseReportCategory):
                 from shypn.crossfetch.database.heuristic_db import HeuristicDatabase
                 heuristic_db = HeuristicDatabase()
             except Exception as e:
-                print(f"[KINETICS→KB] ⚠️ Heuristic database not available: {e}")
+                pass
             
             # Track stats
             transitions_with_kinetics = 0
@@ -795,13 +791,8 @@ class ModelsCategory(BaseReportCategory):
                     kb.update_kinetic_parameters(transition.id, kinetic_params)
                     transitions_with_kinetics += 1
             
-            if transitions_with_kinetics > 0:
-                print(f"[KINETICS→KB] ✓ Updated: {transitions_with_kinetics} transitions "
-                      f"({from_enrichment} enriched, {from_database} from database)")
-            
         except Exception as e:
             import traceback
-            print(f"[KINETICS→KB] ⚠️ Failed to update kinetic knowledge: {e}")
             traceback.print_exc()
     
     def refresh(self):

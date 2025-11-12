@@ -576,7 +576,6 @@ class DiagnosisCategory(BaseViabilityCategory):
             self.selected_locality_id = selected_transitions[0].id
             
             trans_ids = [t.id for t in selected_transitions]
-            print(f"[DiagnosisCategory] Selected {len(selected_transitions)} transitions: {trans_ids}")
             self.run_selected_button.set_sensitive(True)
             self.clear_selection_button.set_sensitive(True)
         else:
@@ -593,7 +592,6 @@ class DiagnosisCategory(BaseViabilityCategory):
         Args:
             button: Button that was clicked
         """
-        print("[DiagnosisCategory] Clearing locality selection")
         self.locality_listbox.unselect_all()
         self.selected_transition = None
         self.selected_locality = None
@@ -608,10 +606,8 @@ class DiagnosisCategory(BaseViabilityCategory):
             button: Button that was clicked
         """
         if not self.selected_transition or not self.selected_locality:
-            print("[DiagnosisCategory] No locality selected")
             return
         
-        print(f"[DiagnosisCategory] Running diagnosis for locality: {self.selected_transition.id}")
         self._run_selected_diagnosis()
     
     def _on_run_full_diagnose_clicked(self, button):
@@ -623,7 +619,6 @@ class DiagnosisCategory(BaseViabilityCategory):
         Args:
             button: Button that was clicked
         """
-        print("[DiagnosisCategory] Running full model diagnosis")
         
         # Clear any locality scope
         self.selected_locality_id = None
@@ -632,10 +627,6 @@ class DiagnosisCategory(BaseViabilityCategory):
         if hasattr(self, 'parent_panel') and self.parent_panel:
             if hasattr(self.parent_panel, 'on_analyze_all'):
                 self.parent_panel.on_analyze_all(button)
-            else:
-                print("[DiagnosisCategory] Warning: parent_panel has no on_analyze_all method")
-        else:
-            print("[DiagnosisCategory] Warning: No parent_panel available")
     
     def _run_selected_diagnosis(self):
         """Run diagnosis scoped to the selected locality/localities (supports multiple).
@@ -655,16 +646,13 @@ class DiagnosisCategory(BaseViabilityCategory):
             localities = [self.selected_locality]
         
         if not transitions or not localities:
-            print("[DiagnosisCategory] No locality selected for diagnosis")
             return
         
         trans_ids = [t.id for t in transitions]
-        print(f"[DiagnosisCategory] Running scoped diagnosis for {len(transitions)} transitions: {trans_ids}")
         
         # Store the scope for this diagnosis
         kb = self.get_knowledge_base()
         if not kb:
-            print("[DiagnosisCategory] No knowledge base available")
             return
         
         # Build combined locality scope (all selected transitions and their places)
@@ -674,43 +662,28 @@ class DiagnosisCategory(BaseViabilityCategory):
             all_relevant_ids.update(p.id for p in locality.input_places)
             all_relevant_ids.update(p.id for p in locality.output_places)
         
-        print(f"[DiagnosisCategory] Combined scope: {len(all_relevant_ids)} elements")
         
         # Run diagnosis (scan all issues)
-        print(f"[DiagnosisCategory] → Calling _scan_issues()...")
-        print(f"[DiagnosisCategory] KB has {len(kb.transitions)} transitions")
-        print(f"[DiagnosisCategory] KB has {len(kb.simulation_traces)} simulation traces")
         issues = self._scan_issues()
-        print(f"[DiagnosisCategory] ← _scan_issues() returned {len(issues)} issues")
         
         # Filter issues to combined locality scope
-        print(f"[DiagnosisCategory] → Filtering issues to combined localities...")
         filtered_issues = [
             issue for issue in issues 
             if hasattr(issue, 'element_id') and issue.element_id in all_relevant_ids
         ]
-        print(f"[DiagnosisCategory] ← Filtered {len(issues)} → {len(filtered_issues)} issues")
         
         # Display filtered issues
-        print(f"[DiagnosisCategory] → Calling _display_issues({len(filtered_issues)})...")
         self._display_issues(filtered_issues)
-        print(f"[DiagnosisCategory] ← _display_issues() completed")
         
         # Notify parent panel to trigger other categories with locality scope
         if hasattr(self, 'parent_panel') and self.parent_panel:
-            print(f"[DiagnosisCategory] ========== NOTIFYING OTHER CATEGORIES ==========")
-            print(f"[DiagnosisCategory] Localities: {trans_ids}")
-            print(f"[DiagnosisCategory] Parent panel: {self.parent_panel}")
-            print(f"[DiagnosisCategory] Categories: {len(self.parent_panel.categories)}")
             
             # Trigger other categories to scan with each locality scope
             for i, category in enumerate(self.parent_panel.categories):
                 category_name = category.get_category_name() if hasattr(category, 'get_category_name') else str(category)
-                print(f"[DiagnosisCategory] Category {i}: {category_name}, is_self={category == self}, has_scan={hasattr(category, 'scan_with_locality')}")
                 
                 if category != self and hasattr(category, 'scan_with_locality'):
                     # For multiple selections, scan with first transition but filter by all_relevant_ids
-                    print(f"[DiagnosisCategory] → Calling scan_with_locality on {category_name}")
                     
                     # Use first transition as representative, but category will filter by all_relevant_ids
                     category.scan_with_locality(
@@ -718,9 +691,6 @@ class DiagnosisCategory(BaseViabilityCategory):
                         locality=localities[0],
                         additional_ids=all_relevant_ids  # Pass combined scope
                     )
-                    print(f"[DiagnosisCategory] ✓ Completed {category_name}")
-        else:
-            print(f"[DiagnosisCategory] ❌ NO PARENT PANEL! hasattr={hasattr(self, 'parent_panel')}, value={getattr(self, 'parent_panel', None)}")
     
     def set_analyses_panel(self, analyses_panel):
         """Set reference to analyses panel for locality access.
@@ -742,7 +712,6 @@ class DiagnosisCategory(BaseViabilityCategory):
         Args:
             transition: Transition object from context menu
         """
-        print(f"[DIAGNOSIS_CATEGORY] add_transition_for_analysis called with: {transition.id}")
         
         # Get model
         model = None
@@ -750,7 +719,6 @@ class DiagnosisCategory(BaseViabilityCategory):
             model = self.model_canvas.get_current_model()
         
         if not model:
-            print("[DIAGNOSIS_CATEGORY] No model available")
             return
         
         # Use LocalityDetector to get THIS transition's locality (same as plotting)
@@ -759,16 +727,13 @@ class DiagnosisCategory(BaseViabilityCategory):
         locality = detector.get_locality_for_transition(transition)
         
         if not locality.is_valid:
-            print(f"[DIAGNOSIS_CATEGORY] Transition {transition.id} has no valid locality")
             return
         
-        print(f"[DIAGNOSIS_CATEGORY] Locality for {transition.id}: {len(locality.input_places)} inputs, {len(locality.output_places)} outputs")
         
         # Check if this transition is already in the list
         for child in self.locality_listbox.get_children():
             trans_obj = getattr(child, 'transition_obj', None)
             if trans_obj and trans_obj.id == transition.id:
-                print(f"[DIAGNOSIS_CATEGORY] Transition {transition.id} already in list")
                 return
         
         # Add this transition with its locality places (hierarchical display)
@@ -778,7 +743,6 @@ class DiagnosisCategory(BaseViabilityCategory):
         self.locality_radio.set_active(True)
         self.locality_listbox.set_sensitive(True)
         
-        print(f"[DIAGNOSIS_CATEGORY] ✓ Added transition {transition.id} with locality to list")
     
     def _add_transition_with_locality_to_list(self, transition, locality):
         """Add a transition and its locality places to the listbox (hierarchical tree view).
@@ -897,7 +861,6 @@ class DiagnosisCategory(BaseViabilityCategory):
             button: Button widget (unused)
             transition: Transition object to remove
         """
-        print(f"[DIAGNOSIS_CATEGORY] Removing transition {transition.id} and its places")
         
         # Remove transition row and all its place rows
         children = self.locality_listbox.get_children()
@@ -935,7 +898,6 @@ class DiagnosisCategory(BaseViabilityCategory):
     
     def _populate_localities(self):
         """Populate the locality list using LocalityDetector (same as plotting system)."""
-        print("[DIAGNOSIS_CATEGORY] _populate_localities called")
         
         # Clear existing rows
         for child in self.locality_listbox.get_children():
@@ -947,7 +909,6 @@ class DiagnosisCategory(BaseViabilityCategory):
             model = self.model_canvas.get_current_model()
         
         if not model or not hasattr(model, 'transitions'):
-            print("[DIAGNOSIS_CATEGORY] No model available")
             row = Gtk.ListBoxRow()
             label = Gtk.Label(label="(No model available)")
             label.get_style_context().add_class('dim-label')
@@ -961,17 +922,14 @@ class DiagnosisCategory(BaseViabilityCategory):
             self.locality_listbox.show_all()
             return
         
-        print(f"[DIAGNOSIS_CATEGORY] Model has {len(model.transitions)} transitions")
         
         # Use LocalityDetector to get all valid localities (same as plotting)
         from shypn.diagnostic.locality_detector import LocalityDetector
         detector = LocalityDetector(model)
         localities = detector.get_all_localities()
         
-        print(f"[DIAGNOSIS_CATEGORY] LocalityDetector found {len(localities)} valid localities")
         
         if not localities:
-            print("[DIAGNOSIS_CATEGORY] No valid localities found")
             row = Gtk.ListBoxRow()
             label = Gtk.Label(label="(No localities available)")
             label.get_style_context().add_class('dim-label')
@@ -989,7 +947,6 @@ class DiagnosisCategory(BaseViabilityCategory):
                 trans_id = getattr(transition, 'id', 'unknown')
                 trans_label = getattr(transition, 'label', '') or ''
                 
-                print(f"[DIAGNOSIS_CATEGORY] Adding {trans_id}: {len(locality.input_places)} inputs, {len(locality.output_places)} outputs")
                 
                 # Create row
                 row = Gtk.ListBoxRow()
@@ -1035,10 +992,8 @@ class DiagnosisCategory(BaseViabilityCategory):
                 self.locality_listbox.add(row)
             
             self.locality_listbox.set_sensitive(True)
-            print(f"[DIAGNOSIS_CATEGORY] Added {len(localities)} localities to listbox")
         
         self.locality_listbox.show_all()
-        print(f"[DIAGNOSIS_CATEGORY] _populate_localities complete")
     
     def _get_transition_locality(self, transition):
         """Get locality object for a transition by scanning model arcs.
@@ -1053,16 +1008,13 @@ class DiagnosisCategory(BaseViabilityCategory):
             from shypn.diagnostic.locality_detector import Locality
             
             trans_id = transition.id if hasattr(transition, 'id') else str(transition)
-            print(f"[DIAGNOSIS_CATEGORY] Getting locality for transition: {trans_id}")
             
             # Get model
             if not self.model_canvas or not hasattr(self.model_canvas, 'get_current_model'):
-                print(f"[DIAGNOSIS_CATEGORY] No model_canvas available")
                 return None
             
             model = self.model_canvas.get_current_model()
             if not model or not hasattr(model, 'arcs'):
-                print(f"[DIAGNOSIS_CATEGORY] No model or model has no arcs")
                 return None
             
             # Scan all arcs to find those connected to this transition
@@ -1071,7 +1023,6 @@ class DiagnosisCategory(BaseViabilityCategory):
             input_arcs = []
             output_arcs = []
             
-            print(f"[DIAGNOSIS_CATEGORY] Scanning {len(model.arcs)} arcs...")
             
             for arc in model.arcs:
                 # Skip test arcs (catalysts) - they don't define locality
@@ -1088,7 +1039,6 @@ class DiagnosisCategory(BaseViabilityCategory):
                     if arc.source not in input_places:
                         input_places.append(arc.source)
                         place_id = arc.source.id if hasattr(arc.source, 'id') else 'unknown'
-                        print(f"[DIAGNOSIS_CATEGORY]   Input: {place_id} → {trans_id}")
                 
                 # Output arc: transition → place
                 elif arc.source == transition:
@@ -1096,12 +1046,9 @@ class DiagnosisCategory(BaseViabilityCategory):
                     if arc.target not in output_places:
                         output_places.append(arc.target)
                         place_id = arc.target.id if hasattr(arc.target, 'id') else 'unknown'
-                        print(f"[DIAGNOSIS_CATEGORY]   Output: {trans_id} → {place_id}")
             
-            print(f"[DIAGNOSIS_CATEGORY] Locality for {trans_id}: {len(input_places)} inputs, {len(output_places)} outputs")
             
             if not input_places and not output_places:
-                print(f"[DIAGNOSIS_CATEGORY] WARNING: No places found for transition {trans_id}")
                 return None
             
             return Locality(
@@ -1112,7 +1059,6 @@ class DiagnosisCategory(BaseViabilityCategory):
                 output_arcs=output_arcs
             )
         except Exception as e:
-            print(f"[DIAGNOSIS_CATEGORY] Error getting locality: {e}")
             import traceback
             traceback.print_exc()
             return None
@@ -1203,10 +1149,8 @@ class DiagnosisCategory(BaseViabilityCategory):
         """
         kb = self.get_knowledge_base()
         if not kb:
-            print("[DIAGNOSIS] No KB available")
             return []
         
-        print(f"[DIAGNOSIS] KB has {len(kb.transitions)} transitions, {len(kb.places)} places")
         
         # Update multi-domain engine with current KB
         self.multi_domain_engine.kb = kb
@@ -1219,7 +1163,6 @@ class DiagnosisCategory(BaseViabilityCategory):
         kinetic_health = self._calculate_kinetic_health(kb)
         overall_health = (structural_health + biological_health + kinetic_health) / 3
         
-        print(f"[DIAGNOSIS] Health: structural={structural_health:.0f}%, biological={biological_health:.0f}%, kinetic={kinetic_health:.0f}%")
         
         # Update health display (if widget exists)
         if hasattr(self, 'health_label') and self.health_label:
@@ -1289,12 +1232,7 @@ class DiagnosisCategory(BaseViabilityCategory):
         
         # PRIORITY 1: Check transitions that never fired in simulation
         # This is more reliable than topology liveness for complex models
-        print(f"[DIAGNOSIS] Checking for get_inactive_transitions method: {hasattr(kb, 'get_inactive_transitions')}")
-        print(f"[DIAGNOSIS] KB simulation_traces count: {len(kb.simulation_traces) if hasattr(kb, 'simulation_traces') else 'N/A'}")
         inactive_transitions = kb.get_inactive_transitions() if hasattr(kb, 'get_inactive_transitions') else []
-        print(f"[DIAGNOSIS] KB reports {len(inactive_transitions)} inactive transitions from simulation")
-        if inactive_transitions:
-            print(f"[DIAGNOSIS] Inactive transitions: {inactive_transitions[:5]}")
         
         if inactive_transitions:
             for trans_id in inactive_transitions[:10]:  # Limit to first 10
@@ -1331,7 +1269,6 @@ class DiagnosisCategory(BaseViabilityCategory):
         
         # PRIORITY 2: Check for topology-detected dead transitions (if liveness was run)
         dead_transitions = kb.get_dead_transitions() if hasattr(kb, 'get_dead_transitions') else []
-        print(f"[DIAGNOSIS] KB reports {len(dead_transitions)} dead transitions from topology")
         
         if dead_transitions:
             for trans_id in dead_transitions[:5]:  # Limit to first 5
@@ -1365,7 +1302,6 @@ class DiagnosisCategory(BaseViabilityCategory):
                 issue.suggestions.append(suggestion)
                 issues.append(issue)
         
-        print(f"[DIAGNOSIS] Generated {len(issues)} structural issues")
         return issues
     
     def _scan_biological_issues(self, kb) -> List[Issue]:
@@ -1409,7 +1345,6 @@ class DiagnosisCategory(BaseViabilityCategory):
                 issue.suggestions.append(suggestion)
                 issues.append(issue)
         
-        print(f"[DIAGNOSIS] Generated {len(issues)} biological issues")
         return issues
     
     def _scan_kinetic_issues(self, kb) -> List[Issue]:
@@ -1453,7 +1388,6 @@ class DiagnosisCategory(BaseViabilityCategory):
                 issue.suggestions.append(suggestion)
                 issues.append(issue)
         
-        print(f"[DIAGNOSIS] Generated {len(issues)} kinetic issues")
         return issues
         return []
     
