@@ -934,31 +934,30 @@ class DynamicAnalysesCategory(BaseReportCategory):
         print(f"[POPULATE_REACTION] Starting for transition {transition.id}")
         
         # Get simulation data from THIS document's report_data
-        # Use controller's drawing_area to find the correct document
+        # Search through overlay_managers to find which drawing_area has the current controller
         report_data = None
-        if self.controller and hasattr(self.controller, '_drawing_area'):
-            drawing_area = self.controller._drawing_area
-            print(f"[REACTION_SELECTED] Using controller's drawing_area: {id(drawing_area)}")
-            
-            if hasattr(self, 'parent_panel') and self.parent_panel:
-                model_canvas_loader = getattr(self.parent_panel, 'model_canvas_loader', None)
-                if model_canvas_loader and hasattr(model_canvas_loader, 'overlay_managers'):
-                    if drawing_area in model_canvas_loader.overlay_managers:
-                        overlay_manager = model_canvas_loader.overlay_managers[drawing_area]
-                        if hasattr(overlay_manager, 'report_data'):
-                            report_data = overlay_manager.report_data
-                            print(f"[REACTION_SELECTED] ✅ Found report_data for THIS document")
-                            print(f"[REACTION_SELECTED] Has simulation data: {report_data.has_simulation_data()}")
-                        else:
-                            print(f"[REACTION_SELECTED] ❌ overlay_manager has no report_data")
-                    else:
-                        print(f"[REACTION_SELECTED] ❌ drawing_area not in overlay_managers")
+        if self.controller and hasattr(self, 'parent_panel') and self.parent_panel:
+            model_canvas_loader = getattr(self.parent_panel, 'model_canvas_loader', None)
+            if model_canvas_loader and hasattr(model_canvas_loader, 'overlay_managers'):
+                # Find which drawing_area has this controller
+                for drawing_area, overlay_manager in model_canvas_loader.overlay_managers.items():
+                    if hasattr(overlay_manager, 'simulation_controller'):
+                        if overlay_manager.simulation_controller is self.controller:
+                            print(f"[REACTION_SELECTED] ✅ Found drawing_area for this controller: {id(drawing_area)}")
+                            if hasattr(overlay_manager, 'report_data'):
+                                report_data = overlay_manager.report_data
+                                print(f"[REACTION_SELECTED] ✅ Found report_data for THIS document")
+                                print(f"[REACTION_SELECTED] Has simulation data: {report_data.has_simulation_data()}")
+                                break
+                            else:
+                                print(f"[REACTION_SELECTED] ❌ overlay_manager has no report_data")
+                                break
                 else:
-                    print(f"[REACTION_SELECTED] ❌ No overlay_managers in model_canvas_loader")
+                    print(f"[REACTION_SELECTED] ❌ Could not find drawing_area for controller {id(self.controller)}")
             else:
-                print(f"[REACTION_SELECTED] ❌ No parent_panel or model_canvas_loader")
+                print(f"[REACTION_SELECTED] ❌ No overlay_managers in model_canvas_loader")
         else:
-            print(f"[REACTION_SELECTED] ❌ No controller or controller has no _drawing_area")
+            print(f"[REACTION_SELECTED] ❌ No controller or parent_panel")
         
         if not report_data:
             print(f"[REACTION_SELECTED] ❌ No report_data found!")
