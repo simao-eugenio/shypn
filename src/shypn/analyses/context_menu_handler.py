@@ -293,26 +293,13 @@ class ContextMenuHandler:
             locality: Locality object with input/output places
             panel: TransitionRatePanel instance
         """
-        
-        print(f"[CTX_MENU] _add_transition_with_locality() called for transition {transition.id}")
-        print(f"[CTX_MENU]   Locality valid: {locality.is_valid if locality else False}")
-        if locality and locality.is_valid:
-            print(f"[CTX_MENU]   Locality input places: {[p.id for p in locality.input_places]}")
-            print(f"[CTX_MENU]   Locality output places: {[p.id for p in locality.output_places]}")
-        
         # Add transition (border color will be set automatically in panel.add_object)
-        print(f"[CTX_MENU]   Calling panel.add_object()")
         panel.add_object(transition)
-        print(f"[CTX_MENU]   panel.add_object() completed")
         
         # Add locality places if panel supports it
         # (these places will also get their border colors set automatically)
         if hasattr(panel, 'add_locality_places') and locality and locality.is_valid:
-            print(f"[CTX_MENU]   Calling panel.add_locality_places()")
             panel.add_locality_places(transition, locality)
-            print(f"[CTX_MENU]   panel.add_locality_places() completed")
-        else:
-            print(f"[CTX_MENU]   ⚠ Not calling add_locality_places: hasattr={hasattr(panel, 'add_locality_places')}, locality_valid={locality.is_valid if locality else False}")
         
         # Add locality places if panel supports it
         # (these places will also get their border colors set automatically)
