@@ -1566,11 +1566,20 @@ class ModelCanvasLoader:
                 # Wire simulation complete callback
                 if hasattr(viability_panel, 'on_simulation_complete'):
                     existing_callback = getattr(simulation_controller, 'on_simulation_complete', None)
+                    print(f"[CONTROLLER_WIRE] Viability capturing existing callback: {existing_callback}")
+                    print(f"[CONTROLLER_WIRE]   Callable: {callable(existing_callback) if existing_callback else False}")
                     
                     def combined_callback():
+                        print(f"[VIABILITY_COMBINED] Combined callback executing...")
                         if existing_callback and callable(existing_callback):
+                            print(f"[VIABILITY_COMBINED] Calling existing callback (Report Panel)...")
                             existing_callback()
+                            print(f"[VIABILITY_COMBINED] Existing callback completed")
+                        else:
+                            print(f"[VIABILITY_COMBINED] No existing callback to call")
+                        print(f"[VIABILITY_COMBINED] Calling Viability Panel callback...")
                         viability_panel.on_simulation_complete()
+                        print(f"[VIABILITY_COMBINED] Viability Panel callback completed")
                     
                     simulation_controller.on_simulation_complete = combined_callback
                     print(f"[CONTROLLER_WIRE] ✅ Wired simulation_complete → ViabilityPanel")
