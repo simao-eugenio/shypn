@@ -294,13 +294,21 @@ class ContextMenuHandler:
             panel: TransitionRatePanel instance
         """
         
+        print(f"[CTX_MENU] _add_transition_with_locality() called for transition {transition.id}")
+        print(f"[CTX_MENU]   Locality valid: {locality.is_valid if locality else False}")
+        
         # Add transition (border color will be set automatically in panel.add_object)
         panel.add_object(transition)
+        print(f"[CTX_MENU]   panel.add_object() completed")
         
         # Add locality places if panel supports it
         # (these places will also get their border colors set automatically)
         if hasattr(panel, 'add_locality_places'):
+            print(f"[CTX_MENU]   Calling panel.add_locality_places()")
             panel.add_locality_places(transition, locality)
+            print(f"[CTX_MENU]   panel.add_locality_places() completed")
+        else:
+            print(f"[CTX_MENU]   ⚠ Panel doesn't have add_locality_places method")
         
         # Request canvas redraw to show new border colors
         if self.model:
