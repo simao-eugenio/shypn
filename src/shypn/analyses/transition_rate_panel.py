@@ -711,8 +711,12 @@ class TransitionRatePanel(AnalysisPlotPanel):
             locality: Locality object with input/output places
         """
         if not locality.is_valid:
+            print(f"[ADD_LOCALITY] ⚠ Locality for transition {transition.id} is NOT valid, skipping")
             return
         
+        print(f"[ADD_LOCALITY] Adding locality for transition {transition.id}")
+        print(f"[ADD_LOCALITY]   Input places: {[p.id for p in locality.input_places]}")
+        print(f"[ADD_LOCALITY]   Output places: {[p.id for p in locality.output_places]}")
         
         # Store locality information
         self._locality_places[transition.id] = {
@@ -723,17 +727,22 @@ class TransitionRatePanel(AnalysisPlotPanel):
         
         # Get transition's plot color (should already be set from add_object)
         transition_color = getattr(transition, 'border_color', None)
+        print(f"[ADD_LOCALITY]   Transition color: {transition_color}")
         
         # Actually add the locality places to the PlaceRatePanel for plotting
         if self._place_panel is not None:
-            pass
+            print(f"[ADD_LOCALITY]   Adding places to place_panel")
             # Add input places
             for place in locality.input_places:
                 self._place_panel.add_object(place)
+                print(f"[ADD_LOCALITY]     Added input place {place.id}")
             
             # Add output places
             for place in locality.output_places:
                 self._place_panel.add_object(place)
+                print(f"[ADD_LOCALITY]     Added output place {place.id}")
+        else:
+            print(f"[ADD_LOCALITY]   ⚠ No place_panel reference")
         
         # Color the arcs that belong to this locality with transition's plot color
         if transition_color and self._model_manager:
@@ -752,6 +761,8 @@ class TransitionRatePanel(AnalysisPlotPanel):
                     if arc.source.id == transition.id and arc.target.id == place.id:
                         arc.color = transition_color
                         print(f"[ARC_COLOR] ✅ Colored output arc {arc.id}: {transition.name} → {place.name}")
+        else:
+            print(f"[ADD_LOCALITY]   ⚠ No transition_color or model_manager")
         
         # Update the UI list to show locality places under the transition
         self._update_objects_list()
