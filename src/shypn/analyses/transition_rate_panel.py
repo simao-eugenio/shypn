@@ -106,8 +106,15 @@ class TransitionRatePanel(AnalysisPlotPanel):
         Args:
             obj: Transition object to add
         """
-        if any((o.id == obj.id for o in self.selected_objects)):
+        # Check if this transition already exists
+        is_duplicate = any((o.id == obj.id for o in self.selected_objects))
+        
+        if is_duplicate:
+            print(f"[ADD_OBJECT] Transition {obj.id} already in list, skipping add but allowing locality update")
+            # Don't add again, but allow caller to update locality
             return
+        
+        print(f"[ADD_OBJECT] Adding transition {obj.id} to list")
         
         # Get the color that will be assigned to this object
         index = len(self.selected_objects)
@@ -126,8 +133,11 @@ class TransitionRatePanel(AnalysisPlotPanel):
             obj.on_changed()
         
         self.selected_objects.append(obj)
+        print(f"[ADD_OBJECT] Appended transition {obj.id}, list now has {len(self.selected_objects)} items")
+        print(f"[ADD_OBJECT] Calling _update_objects_list()")
         # Use full rebuild to show locality places in UI list
         self._update_objects_list()
+        print(f"[ADD_OBJECT] _update_objects_list() completed")
         self.needs_update = True
         
         # Trigger canvas redraw to show the new colors
@@ -767,6 +777,11 @@ class TransitionRatePanel(AnalysisPlotPanel):
         # Update the UI list to show locality places under the transition
         self._update_objects_list()
         
+        # Force immediate GTK update to show locality in UI
+        # Without this, locality only appears after second click due to event loop timing
+        if self.objects_listbox:
+            self.objects_listbox.show_all()
+        
         # Trigger plot update
         self.needs_update = True
     
@@ -810,6 +825,9 @@ class TransitionRatePanel(AnalysisPlotPanel):
         
         Overrides parent method to show transition and all its locality places.
         """
+        print(f"[UPDATE_LIST] _update_objects_list() called")
+        print(f"[UPDATE_LIST]   {len(self.selected_objects)} transitions in list")
+        print(f"[UPDATE_LIST]   {len(self._locality_places)} transitions have locality data")
         
         # Import GTK here to avoid issues
         import gi
@@ -832,6 +850,7 @@ class TransitionRatePanel(AnalysisPlotPanel):
             self.objects_listbox.add(row)
         else:
             for i, obj in enumerate(self.selected_objects):
+                print(f"[UPDATE_LIST]   Processing transition {obj.id}, locality present: {obj.id in self._locality_places}")
                 color = self._get_color(i)
                 obj_name = getattr(obj, 'name', f'Transition{obj.id}')
                 transition_type = getattr(obj, 'transition_type', 'continuous')
@@ -885,6 +904,7 @@ class TransitionRatePanel(AnalysisPlotPanel):
                 
                 # Add locality places if available
                 if obj.id in self._locality_places:
+                    print(f"[UPDATE_LIST]     Adding locality UI for transition {obj.id}")
                     locality_data = self._locality_places[obj.id]
                     
                     # For source: Only show output places
