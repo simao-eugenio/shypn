@@ -1569,20 +1569,33 @@ class ModelCanvasLoader:
                     print(f"[CONTROLLER_WIRE] Viability capturing existing callback: {existing_callback}")
                     print(f"[CONTROLLER_WIRE]   Callable: {callable(existing_callback) if existing_callback else False}")
                     
-                    def combined_callback():
-                        print(f"[VIABILITY_COMBINED] Combined callback executing...")
-                        if existing_callback and callable(existing_callback):
-                            print(f"[VIABILITY_COMBINED] Calling existing callback (Report Panel)...")
-                            existing_callback()
-                            print(f"[VIABILITY_COMBINED] Existing callback completed")
-                        else:
-                            print(f"[VIABILITY_COMBINED] No existing callback to call")
-                        print(f"[VIABILITY_COMBINED] Calling Viability Panel callback...")
-                        viability_panel.on_simulation_complete()
-                        print(f"[VIABILITY_COMBINED] Viability Panel callback completed")
+                    # Check if existing callback is already a Viability Panel callback
+                    # If so, skip to avoid infinite wrapping
+                    is_viability_callback = (
+                        existing_callback and 
+                        hasattr(existing_callback, '__self__') and 
+                        existing_callback.__self__.__class__.__name__ == 'ViabilityPanel'
+                    )
                     
-                    simulation_controller.on_simulation_complete = combined_callback
-                    print(f"[CONTROLLER_WIRE] ✅ Wired simulation_complete → ViabilityPanel")
+                    if is_viability_callback:
+                        print(f"[CONTROLLER_WIRE] ⚠️  Existing callback is already a Viability Panel callback, skipping to avoid double-wrap")
+                    else:
+                        print(f"[CONTROLLER_WIRE] Creating combined callback to preserve Report Panel callback")
+                        
+                        def combined_callback():
+                            print(f"[VIABILITY_COMBINED] Combined callback executing...")
+                            if existing_callback and callable(existing_callback):
+                                print(f"[VIABILITY_COMBINED] Calling existing callback (Report Panel)...")
+                                existing_callback()
+                                print(f"[VIABILITY_COMBINED] Existing callback completed")
+                            else:
+                                print(f"[VIABILITY_COMBINED] No existing callback to call")
+                            print(f"[VIABILITY_COMBINED] Calling Viability Panel callback...")
+                            viability_panel.on_simulation_complete()
+                            print(f"[VIABILITY_COMBINED] Viability Panel callback completed")
+                        
+                        simulation_controller.on_simulation_complete = combined_callback
+                        print(f"[CONTROLLER_WIRE] ✅ Wired simulation_complete → ViabilityPanel")
                 
                 # Connect Topology Panel to Viability Panel for analysis data
                 if hasattr(self, 'topology_panel_loader') and self.topology_panel_loader:
