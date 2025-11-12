@@ -588,17 +588,14 @@ class ViabilityPanel(Gtk.Box):
             overlay_manager = self.model_canvas.overlay_managers.get(self.drawing_area)
             if overlay_manager and hasattr(overlay_manager, 'model'):
                 self.model = overlay_manager.model
-                print(f"[VIABILITY_PANEL] Got model from overlay_manager: {len(self.model.transitions) if self.model else 0} transitions")
                 return self.model
         
         # Try to get from model_canvas directly (fallback)
         if self.model_canvas and hasattr(self.model_canvas, 'get_current_model'):
             self.model = self.model_canvas.get_current_model()
             if self.model:
-                print(f"[VIABILITY_PANEL] Got model from model_canvas: {len(self.model.transitions)} transitions")
                 return self.model
         
-        print(f"[VIABILITY_PANEL] WARNING: Could not get current model")
         return None
     
     def investigate_transition(self, transition_id: str):
@@ -609,8 +606,6 @@ class ViabilityPanel(Gtk.Box):
         Args:
             transition_id: ID of transition to add
         """
-        print(f"[VIABILITY_PANEL] investigate_transition called with: {transition_id}")
-        
         # Check if already in list
         if transition_id in self.selected_localities:
             self._show_feedback(f"Transition {transition_id} already in list", "warning")
@@ -619,27 +614,19 @@ class ViabilityPanel(Gtk.Box):
         # Get KB
         kb = self._get_kb()
         if not kb:
-            print("[VIABILITY_PANEL] ERROR: No knowledge base available")
             self._show_error("No knowledge base available")
             return
         
         # Check if KB is populated, if not try to populate it
         if not kb.transitions:
-            print("[VIABILITY_PANEL] KB is empty, attempting to populate from model...")
-            if self._populate_kb_from_model(kb):
-                print(f"[VIABILITY_PANEL] KB populated: {len(kb.transitions)} transitions, {len(kb.places)} places")
-            else:
-                print("[VIABILITY_PANEL] ERROR: Failed to populate KB from model")
+            if not self._populate_kb_from_model(kb):
                 return
         
         # Get transition from KB
         transition = kb.transitions.get(transition_id)
         if not transition:
-            print(f"[VIABILITY_PANEL] ERROR: Transition {transition_id} not found in KB")
             self._show_error(f"Transition {transition_id} not found")
             return
-        
-        print(f"[VIABILITY_PANEL] Transition found: {transition}")
         
         # Add to list
         self._add_transition_to_list(transition)
@@ -658,16 +645,11 @@ class ViabilityPanel(Gtk.Box):
         Args:
             transition: TransitionKnowledge object
         """
-        print(f"[VIABILITY_PANEL] _add_transition_to_list called for: {transition.transition_id}")
-        
         # Get current model dynamically
         model = self._get_current_model()
         if not model:
-            print(f"[VIABILITY_PANEL] ERROR: No model available")
             self._show_error("No model loaded")
             return
-        
-        print(f"[VIABILITY_PANEL] Model available: {len(model.transitions)} transitions, {len(model.arcs)} arcs")
         
         # Get transition object from model
         transition_obj = None
@@ -677,17 +659,12 @@ class ViabilityPanel(Gtk.Box):
                 break
         
         if not transition_obj:
-            print(f"[VIABILITY_PANEL] ERROR: Transition {transition.transition_id} not found in model")
             return
-        
-        print(f"[VIABILITY_PANEL] Found transition object: {transition_obj.id}")
         
         # Use LocalityDetector to get locality (same as plot panel)
         from shypn.diagnostic import LocalityDetector
         locality_detector = LocalityDetector(model)
         diagnostic_locality = locality_detector.get_locality_for_transition(transition_obj)
-        
-        print(f"[VIABILITY_PANEL] Detected locality for {transition.transition_id}: {len(diagnostic_locality.input_places)} inputs, {len(diagnostic_locality.output_places)} outputs")
         
         # Convert diagnostic Locality (objects) to investigation Locality (IDs)
         from .investigation import Locality
@@ -829,84 +806,8 @@ class ViabilityPanel(Gtk.Box):
         if not self.selected_localities:
             self.diagnose_button.set_sensitive(False)
     
-    def _build_locality_from_transition(self, transition, kb):
-        """Build a Locality object from a transition by querying the model directly.
-        
-        Args:
-            transition: TransitionKnowledge object
-            kb: ModelKnowledgeBase (kept for compatibility but not used)
-            
-        Returns:
-            Locality object with IDs (not objects)
-        """
-        from .investigation import Locality
-        
-        # Get input/output arcs from MODEL (not KB)
-        input_place_ids = []
-        output_place_ids = []
-        input_arc_ids = []
-        output_arc_ids = []
-        
-        # Query arcs directly from model
-        if not self.model:
-            print(f"[VIABILITY_PANEL] WARNING: No model available to query arcs")
-            return Locality(
-                transition_id=transition.transition_id,
-                input_places=[],
-                output_places=[],
-                input_arcs=[],
-                output_arcs=[]
-            )
-        
-        print(f"[VIABILITY_PANEL] Model has {len(self.model.arcs)} arcs, looking for arcs of transition {transition.transition_id}")
-        
-        # Iterate through model arcs
-        for arc in self.model.arcs:
-            # Check if arc connects to this transition
-            # Arc.source and Arc.target are Place/Transition objects
-            source_id = arc.source.id if hasattr(arc.source, 'id') else str(arc.source)
-            target_id = arc.target.id if hasattr(arc.target, 'id') else str(arc.target)
-            arc_id = arc.id if hasattr(arc, 'id') else f"arc_{source_id}_{target_id}"
-            
-            # Debug: Print first 5 arcs to see what we're working with
-            if len(input_arc_ids) + len(output_arc_ids) < 5:
-                print(f"[VIABILITY_PANEL]   Checking arc {arc_id}: {source_id} -> {target_id}")
-                print(f"[VIABILITY_PANEL]     source type: {type(arc.source).__name__}, target type: {type(arc.target).__name__}")
-            
-            # Determine arc type
-            from shypn.netobjs import Place, Transition
-            source_is_place = isinstance(arc.source, Place)
-            target_is_transition = isinstance(arc.target, Transition)
-            source_is_transition = isinstance(arc.source, Transition)
-            target_is_place = isinstance(arc.target, Place)
-            
-            if source_is_place and target_is_transition and target_id == transition.transition_id:
-                # Place → Transition (INPUT)
-                input_arc_ids.append(arc_id)
-                input_place_ids.append(source_id)
-                print(f"[VIABILITY_PANEL]   ✓ Found INPUT arc {arc_id} from place {source_id}")
-            elif source_is_transition and target_is_place and source_id == transition.transition_id:
-                # Transition → Place (OUTPUT)
-                output_arc_ids.append(arc_id)
-                output_place_ids.append(target_id)
-                print(f"[VIABILITY_PANEL]   ✓ Found OUTPUT arc {arc_id} to place {target_id}")
-        
-        # Create locality with string IDs
-        locality = Locality(
-            transition_id=transition.transition_id,
-            input_places=input_place_ids,
-            output_places=output_place_ids,
-            input_arcs=input_arc_ids,
-            output_arcs=output_arc_ids
-        )
-        
-        print(f"[VIABILITY_PANEL] Built locality: {len(input_place_ids)} inputs, {len(output_place_ids)} outputs")
-        return locality
-    
     def _refresh_subnet_parameters(self):
         """Refresh subnet parameters tables based on selected localities."""
-        print(f"[VIABILITY_PANEL] _refresh_subnet_parameters called")
-        
         # Clear all stores
         self.places_store.clear()
         self.transitions_store.clear()
@@ -915,7 +816,6 @@ class ViabilityPanel(Gtk.Box):
         # Get current model dynamically
         model = self._get_current_model()
         if not model:
-            print(f"[VIABILITY_PANEL] No model available")
             return
         
         # Collect all unique place IDs, transition IDs, and arc IDs from localities
@@ -923,15 +823,10 @@ class ViabilityPanel(Gtk.Box):
         all_transition_ids = set()
         all_arc_ids = set()
         
-        print(f"[VIABILITY_PANEL] Processing {len(self.selected_localities)} localities")
-        
         for transition_id, data in self.selected_localities.items():
             locality = data.get('locality')
             if not locality:
-                print(f"[VIABILITY_PANEL]   WARNING: No locality for transition {transition_id}")
                 continue
-            
-            print(f"[VIABILITY_PANEL]   Locality {transition_id}: {len(locality.input_places)} inputs, {len(locality.output_places)} outputs, {len(locality.input_arcs)} input arcs, {len(locality.output_arcs)} output arcs")
             
             # Add transition ID
             all_transition_ids.add(locality.transition_id)
@@ -943,8 +838,6 @@ class ViabilityPanel(Gtk.Box):
             # Add arc IDs
             all_arc_ids.update(locality.input_arcs)
             all_arc_ids.update(locality.output_arcs)
-        
-        print(f"[VIABILITY_PANEL] Collected: {len(all_place_ids)} places, {len(all_transition_ids)} transitions, {len(all_arc_ids)} arcs")
         
         # Populate Places table
         for place in model.places:
@@ -994,8 +887,6 @@ class ViabilityPanel(Gtk.Box):
                 weight,
                 arc_type
             ])
-        
-        print(f"[VIABILITY_PANEL] Refreshed subnet parameters: {len(self.places_store)} places, {len(self.transitions_store)} transitions, {len(self.arcs_store)} arcs")
     
     # === EDITING CALLBACKS ===
     
@@ -1076,8 +967,6 @@ class ViabilityPanel(Gtk.Box):
         Returns:
             List of Issue objects
         """
-        print(f"[VIABILITY_PANEL] Running analysis pipeline for: {transition.transition_id}")
-        
         # Initialize data puller if needed
         if not hasattr(self, 'data_puller') or self.data_puller is None:
             kb = self._get_kb()
@@ -1098,7 +987,6 @@ class ViabilityPanel(Gtk.Box):
         # Get current model dynamically
         model = self._get_current_model()
         if not model:
-            print(f"[VIABILITY_PANEL] ERROR: No model available for analysis")
             return [], []
         
         # Get transition object from model
@@ -1109,7 +997,6 @@ class ViabilityPanel(Gtk.Box):
                 break
         
         if not transition_obj:
-            print(f"[VIABILITY_PANEL] ERROR: Transition {transition.transition_id} not found in model")
             return [], []
         
         # Use LocalityDetector to get locality (same approach as _add_transition_to_list)
@@ -1141,12 +1028,8 @@ class ViabilityPanel(Gtk.Box):
         try:
             locality_issues = locality_analyzer.analyze(context)
             all_issues.extend(locality_issues)
-            print(f"[VIABILITY_PANEL] Level 1 (Locality): {len(locality_issues)} issues")
-            if locality_issues:
-                for issue in locality_issues:
-                    print(f"  - {issue.category}: {issue.message[:60]}...")
         except Exception as e:
-            print(f"[VIABILITY_PANEL] ERROR in locality analysis: {e}")
+            pass
             import traceback
             traceback.print_exc()
         
@@ -1157,9 +1040,8 @@ class ViabilityPanel(Gtk.Box):
         try:
             boundary_issues = boundary_analyzer.analyze(context)
             all_issues.extend(boundary_issues)
-            print(f"[VIABILITY_PANEL] Level 3 (Boundary): {len(boundary_issues)} issues")
         except Exception as e:
-            print(f"[VIABILITY_PANEL] ERROR in boundary analysis: {e}")
+            pass
             import traceback
             traceback.print_exc()
         
@@ -1186,7 +1068,6 @@ class ViabilityPanel(Gtk.Box):
         Returns:
             List of Suggestion objects
         """
-        print(f"[VIABILITY_PANEL] Generating suggestions for {len(issues)} issues")
         
         # Initialize data puller if needed
         if not hasattr(self, 'data_puller') or self.data_puller is None:
@@ -2175,7 +2056,6 @@ class ViabilityPanel(Gtk.Box):
             overlay_manager = self.model_canvas.overlay_managers.get(self.drawing_area)
             if overlay_manager and hasattr(overlay_manager, 'model'):
                 self.model = overlay_manager.model
-                print(f"[VIABILITY_PANEL] Model updated: {len(self.model.transitions) if self.model else 0} transitions")
     
     def set_drawing_area(self, drawing_area):
         """Set drawing area and update model.
@@ -2190,7 +2070,6 @@ class ViabilityPanel(Gtk.Box):
             overlay_manager = self.model_canvas.overlay_managers.get(self.drawing_area)
             if overlay_manager and hasattr(overlay_manager, 'model'):
                 self.model = overlay_manager.model
-                print(f"[VIABILITY_PANEL] Model updated via set_drawing_area: {len(self.model.transitions) if self.model else 0} transitions")
     
     def refresh_all(self):
         """Refresh all (compatibility - now no-op)."""
