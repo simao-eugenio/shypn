@@ -341,6 +341,86 @@ class ModelCanvasLoader:
         # print(f"[TAB_SWITCH] Wiring result: {wired}")
         
         # ============================================================
+        # CRITICAL: Clear global Analyses panel when switching tabs
+        # Since there's only ONE Analyses panel shared across ALL canvases,
+        # we must clear the selected objects and reset arc colors when switching
+        # ============================================================
+        if self.right_panel_loader:
+            from shypn.netobjs import Transition, Place, Arc
+            
+            # Clear transition panel selections
+            if hasattr(self.right_panel_loader, 'transition_panel') and self.right_panel_loader.transition_panel:
+                transition_panel = self.right_panel_loader.transition_panel
+                
+                # Reset arc colors for all transitions with locality
+                # We need to check ALL canvases since selections could be from any canvas
+                for transition_id, locality_data in list(transition_panel._locality_places.items()):
+                    # Find which canvas this transition belongs to
+                    for check_drawing_area, check_manager in self.canvas_managers.items():
+                        # Find the transition in this canvas
+                        transition_obj = None
+                        for t in check_manager.transitions:
+                            if t.id == transition_id:
+                                transition_obj = t
+                                break
+                        
+                        if transition_obj:
+                            # Reset colors of arcs from input places to transition
+                            for place in locality_data.get('input_places', []):
+                                for arc in check_manager.arcs:
+                                    if arc.source.id == place.id and arc.target.id == transition_id:
+                                        arc.color = Arc.DEFAULT_COLOR
+                            
+                            # Reset colors of arcs from transition to output places
+                            for place in locality_data.get('output_places', []):
+                                for arc in check_manager.arcs:
+                                    if arc.source.id == transition_id and arc.target.id == place.id:
+                                        arc.color = Arc.DEFAULT_COLOR
+                            
+                            # Trigger redraw for this canvas
+                            check_manager.mark_needs_redraw()
+                            break
+                
+                # Reset colors for all selected transitions
+                for obj in transition_panel.selected_objects:
+                    old_callback = obj.on_changed if hasattr(obj, 'on_changed') else None
+                    obj.on_changed = None
+                    
+                    if isinstance(obj, Transition):
+                        obj.border_color = Transition.DEFAULT_BORDER_COLOR
+                        obj.fill_color = Transition.DEFAULT_COLOR
+                    
+                    obj.on_changed = old_callback
+                
+                # Clear the selections
+                transition_panel.selected_objects.clear()
+                transition_panel.last_data_length.clear()
+                transition_panel._plot_lines.clear()
+                transition_panel._locality_places.clear()
+                transition_panel._show_empty_state()
+                transition_panel._update_objects_list()
+            
+            # Clear place panel selections
+            if hasattr(self.right_panel_loader, 'place_panel') and self.right_panel_loader.place_panel:
+                place_panel = self.right_panel_loader.place_panel
+                # Reset colors for all selected places
+                for obj in place_panel.selected_objects:
+                    old_callback = obj.on_changed if hasattr(obj, 'on_changed') else None
+                    obj.on_changed = None
+                    
+                    if isinstance(obj, Place):
+                        obj.border_color = Place.DEFAULT_BORDER_COLOR
+                    
+                    obj.on_changed = old_callback
+                
+                # Clear the selections
+                place_panel.selected_objects.clear()
+                place_panel.last_data_length.clear()
+                place_panel._plot_lines.clear()
+                place_panel._show_empty_state()
+                place_panel._update_objects_list()
+        
+        # ============================================================
         # CRITICAL: Update right panel loader model and context menu handler
         # This ensures "Add to Transition Analyses" works consistently
         # ============================================================
