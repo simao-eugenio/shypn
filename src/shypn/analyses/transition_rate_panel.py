@@ -107,14 +107,8 @@ class TransitionRatePanel(AnalysisPlotPanel):
             obj: Transition object to add
         """
         # Check if this transition already exists
-        is_duplicate = any((o.id == obj.id for o in self.selected_objects))
-        
-        if is_duplicate:
-            print(f"[ADD_OBJECT] Transition {obj.id} already in list, skipping add but allowing locality update")
-            # Don't add again, but allow caller to update locality
+        if any((o.id == obj.id for o in self.selected_objects)):
             return
-        
-        print(f"[ADD_OBJECT] Adding transition {obj.id} to list")
         
         # Get the color that will be assigned to this object
         index = len(self.selected_objects)
@@ -133,11 +127,8 @@ class TransitionRatePanel(AnalysisPlotPanel):
             obj.on_changed()
         
         self.selected_objects.append(obj)
-        print(f"[ADD_OBJECT] Appended transition {obj.id}, list now has {len(self.selected_objects)} items")
-        print(f"[ADD_OBJECT] Calling _update_objects_list()")
         # Use full rebuild to show locality places in UI list
         self._update_objects_list()
-        print(f"[ADD_OBJECT] _update_objects_list() completed")
         self.needs_update = True
         
         # Trigger canvas redraw to show the new colors
@@ -721,12 +712,7 @@ class TransitionRatePanel(AnalysisPlotPanel):
             locality: Locality object with input/output places
         """
         if not locality.is_valid:
-            print(f"[ADD_LOCALITY] ⚠ Locality for transition {transition.id} is NOT valid, skipping")
             return
-        
-        print(f"[ADD_LOCALITY] Adding locality for transition {transition.id}")
-        print(f"[ADD_LOCALITY]   Input places: {[p.id for p in locality.input_places]}")
-        print(f"[ADD_LOCALITY]   Output places: {[p.id for p in locality.output_places]}")
         
         # Store locality information
         self._locality_places[transition.id] = {
@@ -737,42 +723,30 @@ class TransitionRatePanel(AnalysisPlotPanel):
         
         # Get transition's plot color (should already be set from add_object)
         transition_color = getattr(transition, 'border_color', None)
-        print(f"[ADD_LOCALITY]   Transition color: {transition_color}")
         
         # Actually add the locality places to the PlaceRatePanel for plotting
         if self._place_panel is not None:
-            print(f"[ADD_LOCALITY]   Adding places to place_panel")
             # Add input places
             for place in locality.input_places:
                 self._place_panel.add_object(place)
-                print(f"[ADD_LOCALITY]     Added input place {place.id}")
             
             # Add output places
             for place in locality.output_places:
                 self._place_panel.add_object(place)
-                print(f"[ADD_LOCALITY]     Added output place {place.id}")
-        else:
-            print(f"[ADD_LOCALITY]   ⚠ No place_panel reference")
         
         # Color the arcs that belong to this locality with transition's plot color
         if transition_color and self._model_manager:
-            print(f"[ARC_COLOR] Coloring locality arcs for transition {transition.id} with color {transition_color}")
-            
             # Find and color arcs from input places to transition
             for place in locality.input_places:
                 for arc in self._model_manager.arcs:
                     if arc.source.id == place.id and arc.target.id == transition.id:
                         arc.color = transition_color
-                        print(f"[ARC_COLOR] ✅ Colored input arc {arc.id}: {place.name} → {transition.name}")
             
             # Find and color arcs from transition to output places
             for place in locality.output_places:
                 for arc in self._model_manager.arcs:
                     if arc.source.id == transition.id and arc.target.id == place.id:
                         arc.color = transition_color
-                        print(f"[ARC_COLOR] ✅ Colored output arc {arc.id}: {transition.name} → {place.name}")
-        else:
-            print(f"[ADD_LOCALITY]   ⚠ No transition_color or model_manager")
         
         # Update the UI list to show locality places under the transition
         self._update_objects_list()
@@ -825,10 +799,6 @@ class TransitionRatePanel(AnalysisPlotPanel):
         
         Overrides parent method to show transition and all its locality places.
         """
-        print(f"[UPDATE_LIST] _update_objects_list() called")
-        print(f"[UPDATE_LIST]   {len(self.selected_objects)} transitions in list")
-        print(f"[UPDATE_LIST]   {len(self._locality_places)} transitions have locality data")
-        
         # Import GTK here to avoid issues
         import gi
         gi.require_version('Gtk', '3.0')
@@ -850,7 +820,6 @@ class TransitionRatePanel(AnalysisPlotPanel):
             self.objects_listbox.add(row)
         else:
             for i, obj in enumerate(self.selected_objects):
-                print(f"[UPDATE_LIST]   Processing transition {obj.id}, locality present: {obj.id in self._locality_places}")
                 color = self._get_color(i)
                 obj_name = getattr(obj, 'name', f'Transition{obj.id}')
                 transition_type = getattr(obj, 'transition_type', 'continuous')
@@ -904,7 +873,6 @@ class TransitionRatePanel(AnalysisPlotPanel):
                 
                 # Add locality places if available
                 if obj.id in self._locality_places:
-                    print(f"[UPDATE_LIST]     Adding locality UI for transition {obj.id}")
                     locality_data = self._locality_places[obj.id]
                     
                     # For source: Only show output places
