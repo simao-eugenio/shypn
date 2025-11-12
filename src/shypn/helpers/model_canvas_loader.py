@@ -457,6 +457,25 @@ class ModelCanvasLoader:
                                 self.viability_panel_container.pack_start(viability_loader.widget, True, True, 0)
                             viability_loader.panel.show_all()
                             print(f"[TAB_SWITCH] ✓ Swapped to per-document viability panel for drawing_area {id(drawing_area)}")
+        
+        # ============================================================
+        # CRITICAL: Update Report Panel controller when switching tabs
+        # This ensures Dynamic Analyses tables show the correct document's data
+        # ============================================================
+        if drawing_area and drawing_area in self.overlay_managers:
+            overlay_manager = self.overlay_managers[drawing_area]
+            
+            # Get the controller for this document
+            if hasattr(overlay_manager, 'simulation_controller') and overlay_manager.simulation_controller:
+                controller = overlay_manager.simulation_controller
+                
+                # Update Report Panel's controller reference
+                if hasattr(overlay_manager, 'report_panel_loader') and overlay_manager.report_panel_loader:
+                    report_panel = overlay_manager.report_panel_loader.panel
+                    if report_panel and hasattr(report_panel, 'set_controller'):
+                        print(f"[TAB_SWITCH] Updating Report Panel controller for drawing_area {id(drawing_area)}")
+                        report_panel.set_controller(controller)
+                        print(f"[TAB_SWITCH] ✓ Report Panel now shows data for controller {id(controller)}")
 
     def _on_tab_close_clicked(self, button, page_widget):
         """Handle tab close button click.
