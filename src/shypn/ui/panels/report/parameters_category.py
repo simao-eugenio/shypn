@@ -380,8 +380,7 @@ class DynamicAnalysesCategory(BaseReportCategory):
         # IMPORTANT: Only register the callback ONCE per controller to avoid overwriting
         # Check if this controller already has our callback registered
         if controller and id(controller) not in self._registered_controllers:
-            pass
-            # print(f"[SET_CONTROLLER] Registering NEW on_simulation_complete callback for controller {id(controller)}")
+            print(f"[SET_CONTROLLER] Registering NEW on_simulation_complete callback for controller {id(controller)}")
             # Use GLib.idle_add to ensure UI update happens on main thread
             from gi.repository import GLib
             # CRITICAL: Capture controller by value (not self.controller which changes)
@@ -427,10 +426,9 @@ class DynamicAnalysesCategory(BaseReportCategory):
             # Set the callback on this controller
             controller.on_simulation_complete = on_complete
             self._registered_controllers.add(id(controller))
-            # print(f"[SET_CONTROLLER] Callback registered successfully")
+            print(f"[SET_CONTROLLER] Callback registered successfully")
         elif controller:
-            pass
-            # print(f"[SET_CONTROLLER] Controller {id(controller)} already has callback registered, skipping")
+            print(f"[SET_CONTROLLER] Controller {id(controller)} already has callback registered, skipping")
     
     def _refresh_and_clear_pending(self, generation):
         """Helper to refresh and clear pending ID. Returns False to remove from idle.
