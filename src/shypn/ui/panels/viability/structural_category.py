@@ -130,11 +130,9 @@ class StructuralCategory(BaseViabilityCategory):
                 if firings == 0:
                     dead_transitions.append(trans_id)
             
-            print(f"[STRUCTURAL] Simulation analysis: {len(dead_transitions)}/{len(kb.transitions)} transitions never fired")
             return dead_transitions
             
         except Exception as e:
-            print(f"[Structural] Error getting simulation data: {e}")
             import traceback
             traceback.print_exc()
             return []
@@ -209,9 +207,6 @@ class StructuralCategory(BaseViabilityCategory):
         
         # SOURCE 2: Simulation data (transitions that never fired)
         dead_from_simulation = self._get_dead_from_simulation()
-        
-        # Diagnostic
-        print(f"[STRUCTURAL] Scanning: liveness={len(dead_from_liveness)}, simulation={len(dead_from_simulation)}")
         
         # Combine sources (union of both)
         all_dead = set(dead_from_liveness) | set(dead_from_simulation)

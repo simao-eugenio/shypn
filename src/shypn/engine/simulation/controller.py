@@ -306,7 +306,6 @@ class SimulationController:
                 pass  # Behaviors rebuilt for affected transitions
         
         elif event_type == 'created':
-            print(f"[OBSERVER] Controller received 'created' event for {type(obj).__name__}")
             # New object created (place, transition, or arc)
             # Invalidate model adapter caches to include the new object
             from shypn.netobjs.place import Place
@@ -315,7 +314,6 @@ class SimulationController:
             
             # If a new transition was created, initialize its state and enablement
             if isinstance(obj, Transition):
-                print(f"[OBSERVER] New transition created: {obj.id}, is_source={getattr(obj, 'is_source', False)}")
                 if obj.id not in self.transition_states:
                     self.transition_states[obj.id] = TransitionState()
                 
@@ -349,10 +347,8 @@ class SimulationController:
                             behavior.set_enablement_time(self.time)
         
         elif event_type == 'modified':
-            print(f"[OBSERVER] Controller received 'modified' event for {type(obj).__name__}")
             # Object properties were modified
             if isinstance(obj, Transition):
-                print(f"[OBSERVER] Transition modified: {obj.id}, is_source={getattr(obj, 'is_source', False)}")
                 # Invalidate behavior cache (type or properties may have changed)
                 if obj.id in self.behavior_cache:
                     del self.behavior_cache[obj.id]
@@ -819,18 +815,10 @@ class SimulationController:
                     self._debug_continuous_printed = True
                     # print(f"[FIRE_NOTIFY] Continuous: {transition.id}, notifying {len(self.step_listeners)} listeners")
                     for i, listener in enumerate(self.step_listeners):
-                        pass
                         # Check if listener is a bound method with __self__
                         listener_obj = listener.__self__ if hasattr(listener, '__self__') else listener
-                        # print(f"[FIRE_NOTIFY]   Listener {i}: {type(listener).__name__} -> {type(listener_obj).__name__} (id={id(listener_obj)})")
-                        print(f"[FIRE_NOTIFY]     has 'on_transition_fired': {hasattr(listener_obj, 'on_transition_fired')}")
                         if hasattr(listener_obj, 'on_transition_fired'):
-                            pass
-                            # print(f"[FIRE_NOTIFY]     ✅ Calling on_transition_fired()")
                             listener_obj.on_transition_fired(transition, self.time, details)
-                        else:
-                            pass
-                            # print(f"[FIRE_NOTIFY]     ❌ Skipping (no method)")
                 else:
                     for listener in self.step_listeners:
                         listener_obj = listener.__self__ if hasattr(listener, '__self__') else listener
@@ -967,18 +955,10 @@ class SimulationController:
             self._debug_listeners_printed = True
             # print(f"[FIRE_NOTIFY] Discrete: {transition.id}, notifying {len(self.step_listeners)} listeners")
             for i, listener in enumerate(self.step_listeners):
-                pass
                 # Check if listener is a bound method with __self__
                 listener_obj = listener.__self__ if hasattr(listener, '__self__') else listener
-                # print(f"[FIRE_NOTIFY]   Listener {i}: {type(listener).__name__} -> {type(listener_obj).__name__} (id={id(listener_obj)})")
-                print(f"[FIRE_NOTIFY]     has 'on_transition_fired': {hasattr(listener_obj, 'on_transition_fired')}")
                 if hasattr(listener_obj, 'on_transition_fired'):
-                    pass
-                    # print(f"[FIRE_NOTIFY]     ✅ Calling on_transition_fired()")
                     listener_obj.on_transition_fired(transition, self.time, details)
-                else:
-                    pass
-                    # print(f"[FIRE_NOTIFY]     ❌ Skipping (no method)")
         else:
             for listener in self.step_listeners:
                 listener_obj = listener.__self__ if hasattr(listener, '__self__') else listener
@@ -1913,32 +1893,25 @@ class SimulationController:
             # Execute one simulation step
             success = self.step(self._time_step)
             if not success:
-                pass
                 # Simulation completed (duration reached)
-                print(f"[SIMULATION] Simulation completed naturally at time={self.time}")
                 self._running = False
                 self._timeout_id = None
                 
                 # Stop data collection
                 if self.data_collector:
                     self.data_collector.stop_collection()
-                    print(f"[DEBUG_STOP] Data collector stopped. has_data() = {self.data_collector.has_data()}")
                 
-                # Show final token distribution
-                print(f"[SIMULATION] Final token distribution:")
-                for place in self.model.places:
-                    print(f"[SIMULATION]   {place.id}: {place.tokens} tokens")
-                
-                # Notify completion callback
+                # Notify completion callback (deferred to avoid blocking UI)
                 if self.on_simulation_complete:
-                    print(f"[DEBUG_STOP] Calling on_simulation_complete callback...")
-                    try:
-                        self.on_simulation_complete()
-                        print(f"[DEBUG_STOP] Callback completed successfully")
-                    except Exception as e:
-                        print(f"[ERROR] Exception in on_simulation_complete callback: {e}")
-                        import traceback
-                        traceback.print_exc()
+                    def deferred_callback():
+                        try:
+                            self.on_simulation_complete()
+                        except Exception as e:
+                            print(f"[ERROR] Exception in on_simulation_complete callback: {e}")
+                            import traceback
+                            traceback.print_exc()
+                        return False  # Don't repeat
+                    GLib.idle_add(deferred_callback)
                 
                 return False
             self._steps_executed += 1
@@ -1962,36 +1935,21 @@ class SimulationController:
             return
         self._stop_requested = True
         
-        print(f"[SIMULATION] Stop requested by user at time={self.time}")
-        
-        # Show final token distribution
-        print(f"[SIMULATION] Final token distribution:")
-        for place in self.model.places:
-            print(f"[SIMULATION]   {place.id}: {place.tokens} tokens")
-        
         # Stop data collection
         if self.data_collector:
             self.data_collector.stop_collection()
-            print(f"[DEBUG_STOP] Data collector stopped. has_data() = {self.data_collector.has_data()}")
         
-        # Notify completion callback
-        print(f"[DEBUG_STOP] Controller ID: {id(self)}")
-        print(f"[DEBUG_STOP] self.time = {self.time}")  # DEBUG: Show time before callback
-        print(f"[DEBUG_STOP] Callback value: {self.on_simulation_complete}")
-        print(f"[DEBUG_STOP] Private attr: {self._on_simulation_complete}")
-        
-        if self.on_simulation_complete:
-            print(f"[DEBUG_STOP] Calling on_simulation_complete callback...")
-            try:
-                self.on_simulation_complete()
-                print(f"[DEBUG_STOP] Callback completed successfully")
-            except Exception as e:
-                print(f"[ERROR] Exception in on_simulation_complete callback: {e}")
-                import traceback
-                traceback.print_exc()
-        else:
-            pass
-            # print(f"[DEBUG_STOP] ⚠️  No on_simulation_complete callback registered")
+        # Notify completion callback (deferred to avoid blocking)
+        if self.on_simulation_complete and GLIB_AVAILABLE:
+            def deferred_callback():
+                try:
+                    self.on_simulation_complete()
+                except Exception as e:
+                    print(f"[ERROR] Exception in on_simulation_complete callback: {e}")
+                    import traceback
+                    traceback.print_exc()
+                return False  # Don't repeat
+            GLib.idle_add(deferred_callback)
         
         for state in self.transition_states.values():
             state.enablement_time = None
@@ -2124,10 +2082,6 @@ class SimulationController:
         # This populates self.transition_states with enablement tracking
         # Without this, transitions won't have state and simulation won't run
         self._update_enablement_states()
-        
-        # Show first 5 transition states
-        for t_id in list(self.transition_states.keys())[:5]:
-            print(f"[RESET_FOR_NEW_MODEL] transition_states[{t_id}] = {self.transition_states[t_id]}")
         
         self._notify_step_listeners()
 

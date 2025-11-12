@@ -324,7 +324,7 @@ class CanvasLifecycleManager:
         
         # 3. Ensure controller has TransitionState for all transitions
         logger.debug("  Initializing transition states...")
-        print(f"[LIFECYCLE] Initializing transition states for {len(context.document_model.transitions)} transitions")
+        logger.debug(f"[LIFECYCLE] Initializing transition states for {len(context.document_model.transitions)} transitions")
         from shypn.engine.simulation.controller import TransitionState
         
         source_count = 0
@@ -340,10 +340,9 @@ class CanvasLifecycleManager:
                     source_count += 1
                     state = context.controller.transition_states[transition.id]
                     state.enablement_time = context.controller.time  # Enable at current time (usually 0)
-                    print(f"[LIFECYCLE] ✅ Enabled source transition {transition.id} at t={context.controller.time}")
                     logger.debug(f"    Enabled source transition {transition.id} at t={context.controller.time}")
         
-        print(f"[LIFECYCLE] ✅ Initialized {len(context.document_model.transitions)} transitions, {source_count} source transitions enabled")
+        logger.debug(f"[LIFECYCLE] ✅ Initialized {len(context.document_model.transitions)} transitions, {source_count} source transitions enabled")
         
         # 4. Update context metadata
         context.file_path = file_path

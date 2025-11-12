@@ -90,7 +90,6 @@ class BiologicalCategory(BaseViabilityCategory):
             return stats
             
         except Exception as e:
-            print(f"[Biological] Error getting place activity: {e}")
             return stats
     
     def _build_content(self):
