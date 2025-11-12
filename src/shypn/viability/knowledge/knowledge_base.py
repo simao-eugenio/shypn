@@ -225,7 +225,6 @@ class ModelKnowledgeBase:
         arc_types = {}
         for arc in self.arcs.values():
             arc_types[arc.arc_type] = arc_types.get(arc.arc_type, 0) + 1
-        print(f"[KB] Arc types stored: {arc_types}")
         
         # Debug: Check which transitions have NO input arcs
         transitions_with_no_inputs = []
@@ -234,8 +233,6 @@ class ModelKnowledgeBase:
                          if a.target_id == trans_id and a.arc_type == "place_to_transition"]
             if len(input_arcs) == 0:
                 transitions_with_no_inputs.append(trans_id)
-        
-        print(f"[KB] Transitions with NO input arcs (sources): {sorted(transitions_with_no_inputs)}")
         
         self.last_updated['structural'] = datetime.now()
     

@@ -383,8 +383,6 @@ class CanvasLifecycleManager:
             # Set ID scope
             self.id_manager.set_scope(new_context.id_scope)
             logger.debug(f"  ID scope set to: {new_context.id_scope}")
-        else:
-            logger.warning(f"Canvas {id(to_area)} not registered - cannot activate")
     
     def destroy_canvas(self, drawing_area: Gtk.DrawingArea):
         """Cleanup canvas resources (tab closed).

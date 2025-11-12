@@ -136,7 +136,6 @@ class RightPanelLoader:
         # Context menu handler will be created later in recreate_context_menu_handler()
         # after model_canvas_loader is set. This ensures viability panel support.
         self.context_menu_handler = None
-        print("[RightPanelLoader] Context menu handler will be created after model_canvas_loader is set")
         
         # Register panels with model if available
         if self.model:
@@ -162,7 +161,6 @@ class RightPanelLoader:
             diagnostics_panel=self.diagnostics_panel,
             model_canvas_loader=self.model_canvas_loader
         )
-        print(f"[RightPanelLoader] Recreated context menu handler with model_canvas_loader: {self.model_canvas_loader}")
         
         # Update the panel's reference too for consistency
         if self.dynamic_analyses_panel:

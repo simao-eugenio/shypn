@@ -496,7 +496,6 @@ def main(argv=None):
 		# Wire canvas loader to right panel loader (reverse direction)
 		# This allows context menu handler to access per-document viability panels
 		right_panel_loader.model_canvas_loader = model_canvas_loader
-		print(f"[SHYPN] Set model_canvas_loader on right_panel_loader: {model_canvas_loader}")
 		
 		# Recreate context menu handler now that model_canvas_loader is set
 		# This enables "Add to Viability Analysis" context menu option
@@ -665,13 +664,10 @@ def main(argv=None):
 			# Add container to stack
 			left_dock_stack.add_named(viability_panel_container, 'viability')
 			# Now add panel content to container
-			viability_panel_loader.add_to_stack(left_dock_stack, viability_panel_container, 'viability')
-			# Connect viability panel to topology panel (needed for diagnosis)
-			if topology_panel_loader and hasattr(topology_panel_loader, 'panel'):
-				viability_panel_loader.panel.set_topology_panel(topology_panel_loader.panel)
-				print("[SHYPN] Connected Viability Panel to Topology Panel")
-		
-		# ====================================================================
+		viability_panel_loader.add_to_stack(left_dock_stack, viability_panel_container, 'viability')
+		# Connect viability panel to topology panel (needed for diagnosis)
+		if topology_panel_loader and hasattr(topology_panel_loader, 'panel'):
+			viability_panel_loader.panel.set_topology_panel(topology_panel_loader.panel)		# ====================================================================
 		# Report Panel Container (will hold per-document panels)
 		# ====================================================================
 		# Multi-document: Use the existing UI container to switch between
@@ -822,17 +818,14 @@ def main(argv=None):
 							model_canvas_loader.report_panel_container.remove(child)
 						
 						# Pack into container
-						model_canvas_loader.report_panel_container.pack_start(report_loader.panel, True, True, 0)
-						report_loader.parent_container = model_canvas_loader.report_panel_container
-						# Note: Don't show_all() yet - let user click Report button to show it
-						print("[REPORT_INIT] ✅ Packed initial document's Report Panel into container")
-			
+					model_canvas_loader.report_panel_container.pack_start(report_loader.panel, True, True, 0)
+					report_loader.parent_container = model_canvas_loader.report_panel_container
+					# Note: Don't show_all() yet - let user click Report button to show it
+		
 		except Exception as e:
    # print(f"[REPORT_INIT] ❌ Error wiring report panel: {e}")
 			import traceback
-			traceback.print_exc()
-		
-		# Note: report_panel_container is already in the UI stack, no need to add it again
+			traceback.print_exc()		# Note: report_panel_container is already in the UI stack, no need to add it again
 		
 		# ====================================================================
 		# Show initial document's Report Panel on demand

@@ -341,31 +341,15 @@ class DynamicAnalysesCategory(BaseReportCategory):
         Args:
             controller: SimulationController instance
         """
-        import traceback
-        print(f"\n[SET_CONTROLLER] ========================================")
-        print(f"[SET_CONTROLLER] Setting controller: {controller}")
-        print(f"[SET_CONTROLLER] Controller ID: {id(controller) if controller else 'None'}")
-        print(f"[SET_CONTROLLER] Call stack:")
-        for line in traceback.format_stack()[-5:-1]:
-            print(f"  {line.strip()}")
-        print(f"[SET_CONTROLLER] ========================================\n")
-        print(f"[SET_CONTROLLER] Controller has data_collector: {hasattr(controller, 'data_collector') if controller else False}")
-        
-        if controller and hasattr(controller, 'data_collector'):
-            print(f"[SET_CONTROLLER] data_collector: {controller.data_collector}")
-            print(f"[SET_CONTROLLER] data_collector ID: {id(controller.data_collector) if controller.data_collector else 'None'}")
-        
         # Cancel any pending refresh from previous controller
         if self._pending_refresh_id is not None:
             from gi.repository import GLib
-            # print(f"[SET_CONTROLLER] Cancelling pending refresh {self._pending_refresh_id}")
             GLib.source_remove(self._pending_refresh_id)
             self._pending_refresh_id = None
         
         # Increment generation to invalidate any in-flight refreshes
         self._refresh_generation += 1
         current_generation = self._refresh_generation
-        # print(f"[SET_CONTROLLER] New refresh generation: {current_generation}")
         
         # Store the old controller before updating
         old_controller = self.controller
@@ -373,14 +357,12 @@ class DynamicAnalysesCategory(BaseReportCategory):
         
         # Immediately refresh to show this document's data
         # This reads from the document's stored data, not from the controller's live data_collector
-        # print(f"[SET_CONTROLLER] Refreshing to show document data")
         self._refresh_simulation_data(generation=current_generation)
         
         # Register callback for simulation complete
         # IMPORTANT: Only register the callback ONCE per controller to avoid overwriting
         # Check if this controller already has our callback registered
         if controller and id(controller) not in self._registered_controllers:
-            print(f"[SET_CONTROLLER] Registering NEW on_simulation_complete callback for controller {id(controller)}")
             # Use GLib.idle_add to ensure UI update happens on main thread
             from gi.repository import GLib
             # CRITICAL: Capture controller by value (not self.controller which changes)
@@ -392,56 +374,36 @@ class DynamicAnalysesCategory(BaseReportCategory):
             existing_callback = getattr(controller, 'on_simulation_complete', None)
             
             def on_complete():
-                print(f"[CALLBACK] ===== Simulation complete for controller {id(captured_controller)} =====")
-                
                 # MULTI-DOCUMENT FIX: Capture data to document's report_data
                 # Get the drawing_area for this controller from model_canvas_loader
                 if hasattr(self, 'parent_panel') and self.parent_panel:
                     model_canvas_loader = getattr(self.parent_panel, 'model_canvas_loader', None)
                     if model_canvas_loader and hasattr(model_canvas_loader, 'overlay_managers'):
-                        print(f"[CALLBACK] Searching {len(model_canvas_loader.overlay_managers)} overlay_managers for this controller")
                         # Find which drawing_area has this controller
                         for drawing_area, overlay_manager in model_canvas_loader.overlay_managers.items():
                             if hasattr(overlay_manager, 'simulation_controller'):
-                                print(f"[CALLBACK]   Checking overlay_manager {id(drawing_area)}: controller={id(overlay_manager.simulation_controller)}")
                                 if overlay_manager.simulation_controller is captured_controller:
-                                    print(f"[CALLBACK] ✅ Found drawing_area for this controller: {id(drawing_area)}")
                                     # Capture simulation data to document's report_data
                                     if hasattr(overlay_manager, 'report_data'):
-                                        print(f"[CALLBACK] ✅ Capturing simulation data to document report_data")
                                         overlay_manager.report_data.capture_simulation_results(captured_controller)
-                                        print(f"[CALLBACK] ✅ Data captured, has_data={overlay_manager.report_data.has_simulation_data()}")
-                                    else:
-                                        print(f"[CALLBACK] ❌ overlay_manager has no report_data!")
                                     break
-                            else:
-                                print(f"[CALLBACK]   overlay_manager {id(drawing_area)} has no simulation_controller attribute")
-                        else:
-                            print(f"[CALLBACK] ❌ Controller not found in any overlay_manager!")
                 
                 # Only refresh UI if this captured controller is still the active one
                 if self.controller is captured_controller:
-                    print(f"[CALLBACK] ✅ Controller matches active, will refresh UI")
                     # Capture the current generation when callback fires
                     callback_generation = self._refresh_generation
                     self._pending_refresh_id = GLib.idle_add(lambda: self._refresh_and_clear_pending(callback_generation))
-                else:
-                    print(f"[CALLBACK] ⚠️  Controller no longer active, data captured but not refreshing UI")
                 
                 # Call any existing callback that was registered before us (e.g., Viability Panel)
                 if existing_callback and callable(existing_callback):
-                    print(f"[CALLBACK] ✅ Calling existing callback (e.g., Viability Panel)")
                     try:
                         existing_callback()
                     except Exception as e:
-                        print(f"[CALLBACK] ❌ Error in existing callback: {e}")
+                        pass  # Silently ignore errors in chained callbacks
             
             # Set the combined callback on this controller
             controller.on_simulation_complete = on_complete
             self._registered_controllers.add(id(controller))
-            print(f"[SET_CONTROLLER] Callback registered successfully (chained with existing)")
-        elif controller:
-            print(f"[SET_CONTROLLER] Controller {id(controller)} already has callback registered, skipping")
     
     def _refresh_and_clear_pending(self, generation):
         """Helper to refresh and clear pending ID. Returns False to remove from idle.
@@ -453,10 +415,7 @@ class DynamicAnalysesCategory(BaseReportCategory):
         
         # Check if this refresh is still valid
         if generation == self._refresh_generation:
-            print(f"[REFRESH] Generation {generation} matches current, proceeding with refresh")
             self._refresh_simulation_data(generation=generation)
-        else:
-            print(f"[REFRESH] Generation {generation} is stale (current: {self._refresh_generation}), skipping refresh")
         
         return False  # Remove from idle queue
             
