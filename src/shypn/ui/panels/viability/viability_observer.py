@@ -207,11 +207,6 @@ class ViabilityObserver:
             data: Event data
             source: Source component
         """
-        print(f"[OBSERVER] ========== record_event() CALLED ==========")
-        print(f"[OBSERVER] event_type: {event_type}")
-        print(f"[OBSERVER] source: {source}")
-        print(f"[OBSERVER] data keys: {list(data.keys())}")
-        
         event = ObservationEvent(
             event_type=event_type,
             timestamp=datetime.now(),
@@ -219,16 +214,12 @@ class ViabilityObserver:
             source=source
         )
         self.events.append(event)
-        print(f"[OBSERVER] Event appended, total events: {len(self.events)}")
         
         # Update knowledge based on event
         self._update_knowledge(event)
-        print(f"[OBSERVER] Knowledge updated")
         
         # Trigger rule evaluation
-        print(f"[OBSERVER] About to evaluate rules...")
         self._evaluate_rules()
-        print(f"[OBSERVER] Rules evaluated")
     
     def _update_knowledge(self, event: ObservationEvent):
         """Update accumulated knowledge from event.
@@ -325,10 +316,6 @@ class ViabilityObserver:
         at the first failure. It evaluates ALL rules and gathers ALL
         applicable suggestions.
         """
-        print(f"[OBSERVER] ========== _evaluate_rules() START ==========")
-        print(f"[OBSERVER] Total rules: {len(self.rules)}")
-        print(f"[OBSERVER] Knowledge keys: {list(self.knowledge.keys())}")
-        
         suggestions_by_category = {
             'structural': [],
             'biological': [],
@@ -338,10 +325,6 @@ class ViabilityObserver:
         
         # Sort rules by priority
         sorted_rules = sorted(self.rules.values(), key=lambda r: r.priority)
-        print(f"[OBSERVER] Sorted {len(sorted_rules)} rules by priority")
-        print(f"[OBSERVER] knowledge keys: {list(self.knowledge.keys())}")
-        print(f"[OBSERVER] simulation_state keys: {list(self.knowledge.get('simulation_state', {}).keys())}")
-        print(f"[OBSERVER] simulation_state dead_transitions: {self.knowledge.get('simulation_state', {}).get('dead_transitions', 'NOT_FOUND')}")
         
         # Evaluate EVERY rule (never stop early)
         rules_evaluated = 0
@@ -354,7 +337,6 @@ class ViabilityObserver:
             try:
                 # Check if rule applies
                 applies = rule.condition(self.knowledge)
-                print(f"[OBSERVER] Rule '{rule.rule_id}' (category={rule.category}): condition={applies}")
                 
                 if applies:
                     # Generate suggestions
@@ -362,7 +344,6 @@ class ViabilityObserver:
                     if issues:
                         rules_triggered += 1
                         suggestions_by_category[rule.category].extend(issues)
-                        print(f"[OBSERVER]   → Generated {len(issues)} issues")
             except Exception as e:
                 import traceback
                 print(f"[OBSERVER] ❌ Error evaluating rule {rule.rule_id}: {e}")
@@ -370,18 +351,11 @@ class ViabilityObserver:
                 # Continue to next rule (never stop!)
                 continue
         
-        print(f"[OBSERVER] Evaluated {rules_evaluated} rules, {rules_triggered} triggered")
-        print(f"[OBSERVER] Suggestions by category:")
-        for cat, issues in suggestions_by_category.items():
-            print(f"[OBSERVER]   {cat}: {len(issues)} issues")
-        
         # Notify subscribers of updates
         for category, issues in suggestions_by_category.items():
             if issues:
                 print(f"[OBSERVER] Notifying subscribers for category '{category}'...")
                 self._notify_subscribers(category, issues)
-        
-        print(f"[OBSERVER] ========== _evaluate_rules() END ==========")
     
     def _notify_subscribers(self, category: str, issues: List[Any]):
         """Notify subscribers of updated suggestions.
@@ -414,7 +388,6 @@ class ViabilityObserver:
         if category not in self.subscribers:
             self.subscribers[category] = []
         self.subscribers[category].append(callback)
-        print(f"[OBSERVER] ✅ Subscribed to category '{category}', total subscribers: {len(self.subscribers[category])}")
     
     def get_current_suggestions(self, category: str) -> List[Any]:
         """Get current suggestions for a category.

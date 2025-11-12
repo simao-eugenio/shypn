@@ -163,8 +163,6 @@ class ViabilityPanelLoader:
         self.parent_container = container
         self._stack = stack
         self._stack_panel_name = panel_name
-        
-        print(f"[VIABILITY_LOADER] Added to stack as '{panel_name}'")
     
     def show_in_stack(self):
         """Show this panel in the GtkStack (Master Palette control)."""

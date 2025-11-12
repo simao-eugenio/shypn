@@ -524,8 +524,6 @@ class ModelsCategory(BaseReportCategory):
                 print(f"[REPORT→KB] ⚠️ No KB available for structural update")
                 return
             
-            print(f"[REPORT→KB] Updating structural knowledge...")
-            
             # Extract structural data
             places_data = []
             transitions_data = []
@@ -552,7 +550,6 @@ class ModelsCategory(BaseReportCategory):
             
             # Update KB (DTOs will normalize the data)
             kb.update_topology_structural(places_data, transitions_data, arcs_data)
-            print(f"[REPORT→KB] ✓ Updated: {len(places_data)} places, {len(transitions_data)} transitions, {len(arcs_data)} arcs")
             
         except Exception as e:
             import traceback
@@ -577,8 +574,6 @@ class ModelsCategory(BaseReportCategory):
             
             if not kb:
                 return  # KB not available
-            
-            print(f"[PATHWAY→KB] Updating pathway knowledge...")
             
             # Track stats
             compounds_added = 0
@@ -670,8 +665,6 @@ class ModelsCategory(BaseReportCategory):
             
             if not kb:
                 return  # KB not available
-            
-            print(f"[KINETICS→KB] Updating kinetic knowledge...")
             
             # Try to get heuristic database
             heuristic_db = None

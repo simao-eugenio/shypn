@@ -250,19 +250,14 @@ class ViabilityPanel(Gtk.Box):
         Args:
             model_canvas: ModelCanvasLoader instance
         """
-        print(f"[VIABILITY_PANEL] ========== set_model_canvas() CALLED ==========")
-        print(f"[VIABILITY_PANEL] model_canvas: {model_canvas}")
-        
         self.model_canvas = model_canvas
         
         # Propagate to all categories (CRITICAL!)
         for category in self.categories:
             category.model_canvas = model_canvas
         
-        print(f"[VIABILITY_PANEL] About to feed observer with KB data...")
         # Feed initial KB data to observer
         self._feed_observer_with_kb_data()
-        print(f"[VIABILITY_PANEL] KB data fed to observer")
     
     def set_drawing_area(self, drawing_area):
         """Set the drawing area this panel is associated with.
@@ -271,14 +266,11 @@ class ViabilityPanel(Gtk.Box):
             drawing_area: Gtk.DrawingArea widget for this document
         """
         self.drawing_area = drawing_area
-        print(f"[VIABILITY] Set drawing_area: {id(drawing_area)}")
         
         # Register simulation complete callback with controller
         if self.model_canvas and drawing_area:
             controller = self.model_canvas.simulation_controllers.get(drawing_area)
             if controller:
-                print(f"[VIABILITY] ✅ Registering on_simulation_complete callback with controller")
-                
                 # CRITICAL: Preserve existing callback (e.g., Report Panel)
                 existing_callback = getattr(controller, 'on_simulation_complete', None)
                 is_already_viability = (
@@ -287,11 +279,8 @@ class ViabilityPanel(Gtk.Box):
                     existing_callback.__self__.__class__.__name__ == 'ViabilityPanel'
                 )
                 
-                if is_already_viability:
-                    print(f"[VIABILITY] ⚠️ Callback already registered, skipping")
-                else:
+                if not is_already_viability:
                     if existing_callback and callable(existing_callback):
-                        print(f"[VIABILITY] Preserving existing callback (Report Panel)")
                         # Create combined callback
                         viability_callback = self.on_simulation_complete
                         def combined():
@@ -302,7 +291,6 @@ class ViabilityPanel(Gtk.Box):
                     else:
                         controller.on_simulation_complete = self.on_simulation_complete
             else:
-                print(f"[VIABILITY] ⚠️ No controller found for drawing_area (will register when available)")
                 # Store callback to register later if controller created after this
                 self._pending_callback_registration = True
     
@@ -325,13 +313,9 @@ class ViabilityPanel(Gtk.Box):
                 existing_callback.__self__.__class__.__name__ == 'ViabilityPanel'
             )
             
-            if is_already_viability or controller.on_simulation_complete == self.on_simulation_complete:
-                print(f"[VIABILITY] ✓ Callback already registered")
-            else:
+            if not is_already_viability and controller.on_simulation_complete != self.on_simulation_complete:
                 # Register callback, preserving any existing callback
-                print(f"[VIABILITY] ✅ Registering on_simulation_complete callback")
                 if existing_callback and callable(existing_callback):
-                    print(f"[VIABILITY] Preserving existing callback (Report Panel)")
                     viability_callback = self.on_simulation_complete
                     def combined():
                         if existing_callback:
@@ -577,26 +561,15 @@ class ViabilityPanel(Gtk.Box):
         This allows the observer to evaluate rules immediately instead of
         waiting for events to occur.
         """
-        print(f"[VIABILITY_OBSERVER] ========== _feed_observer_with_kb_data() CALLED ==========")
-        print(f"[VIABILITY_OBSERVER] model_canvas: {self.model_canvas}")
-        
         if not self.model_canvas:
             print(f"[VIABILITY_OBSERVER] ⚠️ No model_canvas - cannot feed observer")
             return
         
         try:
             kb = self.model_canvas.get_current_knowledge_base()
-            print(f"[VIABILITY_OBSERVER] KB: {kb}")
             if not kb:
                 print(f"[VIABILITY_OBSERVER] ⚠️ No KB available")
                 return
-            
-            print(f"[VIABILITY_OBSERVER] KB has:")
-            print(f"[VIABILITY_OBSERVER]   places: {len(kb.places) if hasattr(kb, 'places') else 0}")
-            print(f"[VIABILITY_OBSERVER]   transitions: {len(kb.transitions) if hasattr(kb, 'transitions') else 0}")
-            print(f"[VIABILITY_OBSERVER]   arcs: {len(kb.arcs) if hasattr(kb, 'arcs') else 0}")
-            print(f"[VIABILITY_OBSERVER]   compounds: {len(kb.compounds) if hasattr(kb, 'compounds') else 0}")
-            print(f"[VIABILITY_OBSERVER]   reactions: {len(kb.reactions) if hasattr(kb, 'reactions') else 0}")
             
             # Record KB update event
             self.observer.record_event(
@@ -615,7 +588,6 @@ class ViabilityPanel(Gtk.Box):
                 },
                 source='viability_panel'
             )
-            print(f"[VIABILITY_OBSERVER] ✅ Event recorded")
         except Exception as e:
             import traceback
             print(f"[VIABILITY_OBSERVER] ❌ Error feeding KB data to observer: {e}")

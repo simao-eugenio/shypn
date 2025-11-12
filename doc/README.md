@@ -1,138 +1,344 @@
-# Documentation Directory
+````markdown
+# SHYpn - Systems Biology Pathway Modeling Platform
 
-This directory contains comprehensive technical documentation for the SHYpn project (440+ markdown files).
+**Hybrid Petri Net Platform for Biological Pathway and Regulatory Network Modeling, Simulation, and Analysis**
 
-## Latest Documentation (October 2025)
+A comprehensive GTK-based platform for systems biology pathway modeling with advanced simulation and analysis capabilities.
 
-### Canvas Health Series
-Major feature series providing complete parity across all canvas creation flows:
+## Project Status (November 2025)
 
-- **[FIRING_POLICIES.md](FIRING_POLICIES.md)** - 7 firing policies for biological realism
-  - Random, Earliest, Latest, Priority, Race, Age, Preemptive-Priority
-  - Default policy: 'random' for biological systems
-  
-- **[FIX_STOCHASTIC_SCHEDULING_INITIALIZATION.md](FIX_STOCHASTIC_SCHEDULING_INITIALIZATION.md)** - Stochastic transition scheduling
-  - Fixed initialization timing issues
-  - Proper enablement state tracking
-  
-- **[DUPLICATE_ID_BUG_FIX.md](DUPLICATE_ID_BUG_FIX.md)** - Critical duplicate ID bug fixes
-  - Bug #1: DocumentModel.from_dict() counter update
-  - Bug #2: ID parsing ("10" vs "P10" format)
-  
-- **[SBML_COMPLETE_FLOW_ANALYSIS.md](SBML_COMPLETE_FLOW_ANALYSIS.md)** - Complete SBML import pipeline
-  - Parse → Post-process → Convert → Save → Load
-  - ID generation flow documentation
-  
-- **[DUPLICATE_ID_BUG_ALL_FLOWS_ANALYSIS.md](DUPLICATE_ID_BUG_ALL_FLOWS_ANALYSIS.md)** - Cross-flow analysis
-  - SBML, KEGG, Interactive drawing, File operations
-  - Impact assessment across all workflows
+**Current State**: Active development - Feature-rich Petri net editor
+- ✅ GTK3 stable implementation with Wayland support
+- ✅ Multi-document canvas system with tabbed interface
+- ✅ Master Palette unified panel control system
+- ✅ Dockable/undockable panels with float/attach functionality
+- ✅ File Panel V3 with normalized XML UI architecture
+- ✅ File explorer with hierarchical tree view and file operations
+- ✅ SwissKnife unified palette (Edit/Simulate/Layout tools)
+- ✅ Property dialogs for all Petri net objects with topology integration
+- ✅ Arc transformations (straight/curved, normal/inhibitor, parallel arcs)
+- ✅ Simulation system with stochastic transitions and real-time analysis
+- ✅ Graph layout algorithms (auto, hierarchical, force-directed)
+- ✅ KEGG pathway import with enhancement pipeline
+- ✅ Project management system
+- ✅ Canvas context menus with rich functionality
+- ✅ **Production-ready codebase** (all debug output removed, zero syntax errors)
+- ✅ **Clean repository structure** (documentation organized, test files consolidated, backups removed)
 
-### Analysis Panel Series (December 2024)
-Performance optimization and feature enhancements:
+**Recent Updates** (November 2025):
+- ✅ **Repository Cleanup** - Final organization pass (Nov 12, 2025)
+  - Moved 17 markdown files from root to `doc/`
+  - Moved 16 test files from root to `tests/`
+  - Removed obsolete backup archive (backup_20251105_185353_ui_src.tar.gz)
+  - Removed 107+ debug print statements across 26+ files
+  - Zero syntax errors, production-ready state
+  - Clean root directory for professional project structure
+- ✅ **Catalyst/TestArc Implementation** - Complete fix for KEGG model catalysts
+  - Removed all silent fallbacks in simulation engine (explicit error handling)
+  - Added proper TestArc handling in enablement checks (non-consuming arcs)
+  - Fixed dict/list compatibility in behavior code
+  - All KEGG models now load and simulate correctly with catalysts
+- ✅ **Hybrid Petri Net Validation** - Equilibrium and deadlock analysis
+  - Documented continuous chain equilibrium behavior
+  - Created test suite for hybrid transition type combinations
+  - Mathematical validation of Michaelis-Menten equilibrium
+  - Design guidelines for biological pathway modeling
+- ✅ **Repository Organization** - Major cleanup (Nov 5, 2025)
+  - Moved 673 documentation files from root to `doc/`
+  - Moved 90 test/diagnostic files to `tests/diagnostic/`
+  - Moved 54 utility scripts to `scripts/`
+  - Clean root directory with proper project structure
+- ✅ **Canvas Health fixing series** - Complete feature parity across all canvas creation flows (5 branches merged)
+  - Color matching (transitions: border+fill, places: border) across Default/File New/File Open/KEGG/SBML
+  - Locality detection and automatic addition
+  - Data collector wiring for plot panels
+  - Pan/Zoom NavigationToolbar integration
+  - Wayland compatibility fixes
+- ✅ **SBML workflow enhancements** - Production-ready biological modeling
+  - 7 firing policies (random, earliest, latest, priority, race, age, preemptive-priority)
+  - Fixed duplicate ID bugs (DocumentModel.from_dict + ID parsing "10" vs "P10")
+  - Fixed stochastic transition scheduling
+  - Can load SBML models and add source/sink transitions without conflicts
+  - Scientific corrections (mass action → stochastic terminology)
+- ✅ **Master Palette system** - Unified panel control with exclusive button logic
+- ✅ **Panel architecture refactoring** - All 5 panels use skeleton pattern (synchronous float/attach)
+- ✅ **File Panel V3** - Normalized XML UI + OOP architecture (Base → Loader → Controller)
+- ✅ **CategoryFrame structure** - Programmatic collapsible categories with exclusive expansion
+- ✅ **Float/attach functionality** - All panels support detach to floating window
+- ✅ **Analysis panel performance optimization** - 95% faster updates (156ms → 7ms)
+- ✅ **Locality integration fix** - Complete P-T-P pattern plotting in analyses
+- ✅ **Canvas management** - Proper reset/clear with immediate visual feedback
+- ✅ **UI improvements** - Hierarchical display of locality objects with color-coded indicators
+- ✅ **Comprehensive testing** - 34/34 property dialog and analysis tests passing (100%)
+- ✅ **Documentation** - 690+ documentation files organized in `doc/`
+- ✅ **Complete repository cleanup** - Legacy code removed, deprecated files archived
+- ✅ **Debug output cleanup** - 120+ debug prints removed from 28+ files (Nov 12, 2025)
+- ✅ **Syntax error fixes** - 27 empty code blocks fixed in 15 files
+- ✅ **Code quality** - Zero syntax errors, production-ready state
+- ✅ **Repository organization** - All markdown files in `doc/`, all tests in `tests/`, clean root
+- ✅ Arc boundary precision fixes (proper border width accounting)
+- ✅ Inhibitor arc hollow circle positioning on curved arcs
+- ✅ Context menu enhancements (arc transformation options)
+- ✅ Source/sink place types implementation
+- ✅ Workspace state persistence
+- ✅ Unsaved changes protection
 
-- **[ANALYSES_PANEL_PERFORMANCE_COMPLETE.md](ANALYSES_PANEL_PERFORMANCE_COMPLETE.md)** - 95% performance improvement
-- **[ANALYSES_COMPLETE_FIX_SUMMARY.md](ANALYSES_COMPLETE_FIX_SUMMARY.md)** - Complete fix summary
-- **[ANALYSES_LOCALITY_AND_RESET_FIXES.md](ANALYSES_LOCALITY_AND_RESET_FIXES.md)** - Locality integration
-- **[ANALYSES_LOCALITY_UI_LIST_FIX.md](ANALYSES_LOCALITY_UI_LIST_FIX.md)** - UI improvements
+## GTK 3 Notice
 
-### Property Dialog Integration
-Complete topology integration for all dialogs:
+This project currently uses GTK 3.2+. While there was consideration for GTK 4 migration, the project is stabilizing on GTK 3 for production use. The codebase follows modern Python and OOP practices regardless of the GTK version.
+ 
+## Architectural Guideline: Object-Oriented Design
 
-- **[PLACE_DIALOG_TOPOLOGY_INTEGRATION.md](PLACE_DIALOG_TOPOLOGY_INTEGRATION.md)** - Place dialog
-- **[ARC_DIALOG_TOPOLOGY_INTEGRATION.md](ARC_DIALOG_TOPOLOGY_INTEGRATION.md)** - Arc dialog  
-- **[TRANSITION_DIALOG_TOPOLOGY_INTEGRATION.md](TRANSITION_DIALOG_TOPOLOGY_INTEGRATION.md)** - Transition dialog
-- **[DIALOG_PROPERTIES_SIMULATION_INTEGRATION_ANALYSIS.md](DIALOG_PROPERTIES_SIMULATION_INTEGRATION_ANALYSIS.md)** - Complete integration
-- **[PROPERTY_DIALOG_TESTS_100_PERCENT.md](PROPERTY_DIALOG_TESTS_100_PERCENT.md)** - Test results (34/34 passing)
+This project is designed with an object-oriented programming (OOP) approach. Core logic, APIs, and UI components are implemented as classes, utilizing principles such as encapsulation, inheritance, and polymorphism. Contributors are encouraged to structure new modules and features using OOP best practices to ensure maintainability and extensibility.
+## Repository Structure Overview
 
-## Core Documentation
+```
+shypn/
+├── archive/        # Archived and deprecated code (no longer in active use)
+│   ├── deprecated/ # Deprecated Python files (6 items)
+│   ├── ui_removed/ # Deprecated UI files (none yet)
+│   └── *.py        # Legacy analysis and debug scripts
+├── data/           # Data model files (schemas, ORM models, sample data)
+├── doc/            # Comprehensive documentation (690+ markdown files)
+│   ├── cleanup/    # Cleanup documentation (October-November 2025)
+│   ├── topology/   # Topology and network analysis documentation
+│   ├── independency/ # Petri net independency analysis
+│   ├── crossfetch/ # Cross-model fetching documentation
+│   ├── heuristic/  # Heuristic algorithms documentation
+│   ├── atomicity/  # Atomic operations documentation
+│   ├── concurrency/ # Concurrency and parallelism documentation
+│   ├── time/       # Time-related documentation
+│   ├── project/    # Project management documentation
+│   ├── validation/ # Validation and testing documentation
+│   └── README.md   # Main project README (moved from root)
+├── models/         # User Petri net model files (.shy format - primary extension)
+├── scripts/        # Utility scripts and diagnostic tools (54 files)
+│   ├── add_source_transitions.py
+│   ├── analyze_biomd61_parameters.py
+│   ├── check_arc_types.py
+│   ├── check_stochastic_sources.py
+│   ├── compare_topology.py
+│   ├── diagnose_firing_issue.py
+│   ├── diagnosis_sigmoid_issue.py
+│   ├── fix_stochastic_to_continuous.py
+│   ├── inspect_kegg_ec_numbers.py
+│   └── verify_biomd61_fix.py
+├── src/
+│   └── shypn/
+│       ├── analyses/      # Analysis tools and real-time plotting (optimized)
+│       ├── canvas/        # Canvas management and overlay system
+│       ├── data/          # Data models and project management
+│       ├── dev/           # Development and testing utilities
+│       ├── diagnostic/    # Diagnostic tools
+│       ├── edit/          # Editing tools and graph layout
+│       ├── engine/        # Simulation engine and behaviors
+│       ├── file/          # File operations and persistence
+│       ├── helpers/       # UI loaders (panels, palettes, dialogs)
+│       ├── importer/      # KEGG pathway import system
+│       ├── matrix/        # Petri net matrix representations
+│       ├── netobjs/       # Petri net objects (Place, Transition, Arc)
+│       ├── pathway/       # Pathway enhancement pipeline
+│       ├── ui/            # UI component classes
+│       └── utils/         # Utility functions
+├── tests/          # Complete test suite (146+ test files)
+│   ├── diagnostic/        # Diagnostic and test scripts (90 files)
+│   │   ├── test_*.py      # Unit and integration tests
+│   │   ├── diagnose_*.py  # Diagnostic scripts
+│   │   ├── debug_*.py     # Debug scripts
+│   │   ├── check_*.py     # Validation scripts
+│   │   └── analyze_*.py   # Analysis scripts
+│   ├── validation/        # Validation test suites
+│   │   ├── continuous/    # Continuous transition tests (including chain equilibrium)
+│   │   ├── stochastic/    # Stochastic transition tests
+│   │   ├── immediate/     # Immediate transition tests
+│   │   └── timed/         # Timed transition tests
+│   ├── prop_dialogs/      # Property dialog integration tests (34 tests)
+│   ├── test_*.py          # Additional test files (16 files moved from root Nov 12, 2025)
+│   └── ...
+├── ui/
+│   ├── canvas/     # Document canvas interfaces (.ui files)
+│   ├── dialogs/    # Modal dialogs (.ui files)
+│   ├── main/       # Main window interface (.ui files)
+│   ├── palettes/   # Control palettes (.ui files)
+│   └── panels/     # Dockable panels (left/right) (.ui files)
+├── workspace/      # User workspace directory
+│   ├── examples/   # Example Petri net models
+│   └── projects/   # User projects
+└── venv/           # Python virtual environment (optional)
+```
 
-### Project Fundamentals
-- **[COORDINATE_SYSTEM.md](COORDINATE_SYSTEM.md)** - Coordinate system conventions
-- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Contribution guidelines
-- **[CHANGELOG.md](CHANGELOG.md)** - Version history
+**Key Directories**:
+- `src/shypn/`: Main application source code (Python) - Production ready
+  - `analyses/`: Real-time plotting with 95% performance improvement
+  - `engine/`: Simulation engine with hybrid Petri net support (continuous, stochastic, immediate, timed)
+  - `helpers/`: Panel loaders (Files V3, Analyses, Pathways, Topology) with skeleton pattern
+  - `ui/`: UI component classes (FilePanelBase, CategoryFrame, dialogs, controllers)
+- `ui/`: GTK UI definition files (Glade XML format) - All files actively used
+  - `panels/`: Panel UI definitions including file_panel_v3.ui
+- `tests/`: Complete test suite (146+ files, all tests passing)
+  - `diagnostic/`: Test and diagnostic scripts (90 files) - organized Nov 5, 2025
+  - `validation/`: Validation test suites for all transition types
+  - `prop_dialogs/`: Integration tests for Place, Arc, and Transition dialogs (100% passing)
+  - Additional test files moved from root (16 files) - organized Nov 12, 2025
+- `scripts/`: Utility scripts (54 files) - KEGG inspection, topology comparison, diagnostic tools
+- `workspace/`: User workspace with examples and projects
+- `doc/`: Comprehensive technical documentation (690+ files) - organized Nov 5-12, 2025
+  - `validation/`: Validation documentation including continuous chain equilibrium analysis
+  - `README.md`: Main project README (moved from root Nov 12, 2025)
+  - Recent additions: Catalyst fix, hybrid Petri net analysis, canvas health series
+  - Panel architecture, File Panel V3, Master Palette system
+- `archive/`: Archived and deprecated code (not for active use)
+  - `deprecated/`: 6 unused Python files
+  - `sh/`: Historical test shell scripts (4 files, moved Oct 2025)
+  - Legacy analysis and debug scripts
+
+## Installation
+
+### Prerequisites
+- Python 3.8+
+- GTK 3.22+
+- PyGObject (python3-gi)
+- Cairo graphics library
+
+### System Dependencies (Ubuntu/Debian)
+```bash
+sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-3.0
+```
+
+### Python Environment
+```bash
+# Option 1: Virtual environment (recommended)
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# Option 2: System site-packages (for WSL/WSLg)
+python3 -m venv venv/shypnenv --system-site-packages
+source venv/shypnenv/bin/activate
+```
+
+## Usage
+
+### Running the Application
+```bash
+# From repository root
+python3 src/shypn.py
+
+# Or with virtual environment activated
+source venv/bin/activate
+python3 src/shypn.py
+```
+
+### Basic Operations
+- **New Document**: File → New or Ctrl+N
+- **Open Document**: File → Open or Ctrl+O or double-click in file explorer
+- **Save Document**: File → Save or Ctrl+S
+- **Toggle Panels**: Use the minimize/maximize buttons in panel headers
+- **SwissKnife Palette**: Access Edit, Simulate, and Layout tools from unified palette
+- **Property Dialogs**: Double-click objects or right-click → Properties
+- **Arc Transformations**: Right-click arcs → Transform to Straight/Curved, Convert to Normal/Inhibitor
+- **Simulation**: Use Simulate tools (Step, Run, Reset, Settings)
+- **Graph Layout**: Apply Auto, Hierarchical, or Force-Directed layouts
+- **Pan Canvas**: Middle-mouse drag or right-click and drag
+- **Zoom**: Mouse wheel or zoom controls in status bar
+
+### Advanced Features
+- **Source/Sink Places**: Create places with infinite token supply/capacity
+- **Parallel Arcs**: Multiple arcs between same objects curve automatically
+- **Inhibitor Arcs**: Convert normal arcs to inhibitor arcs with hollow circle markers
+- **KEGG Import**: Import biological pathways from KEGG database
+- **Project Management**: Create and manage projects with multiple models
+- **Real-Time Analysis**: Optimized plotting with 95% performance improvement (7ms updates)
+- **Locality Plotting**: Automatic selection of Place-Transition-Place patterns for analysis
+- **Property Dialogs**: Complete topology integration showing network connections
+- **Analysis Tools**: Use right panel for model analysis and data collection with hierarchical display
+
+## Running the GTK4 UI under WSLg / Windows
+
+If you run the project from WSL (WSLg) you may see inconsistencies when using a Conda Python environment because Conda-provided GTK/GLib stacks can be isolated from the system Wayland backend. A reliable workaround is to create a small virtualenv that uses the system site-packages (so it picks up the system GTK/GI installation that works with WSLg).
+
+Steps (one-time):
+
+1. Create the venv (uses system Python and system GTK):
+
+```bash
+python3 -m venv venv/shypnenv --system-site-packages
+```
+
+2. Activate and run the UI (use system python inside the venv):
+
+```bash
+. venv/shypnenv/bin/activate
+/usr/bin/python3 src/shypn.py
+```
+
+Notes:
+- This approach keeps your Conda environment untouched while allowing GTK4 apps to use the system Wayland backend (WSLg). It is the recommended approach when working on Windows+WSL development if the Conda GTK stack misbehaves.
+- If you prefer to work with Conda, you can attempt to fix the Conda environment (rebuild PyGObject + GTK packages) but that is more involved and may be fragile.
+
+## Contributing
+
+Please read [CONTRIBUTING.md](doc/CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
+
+## Documentation
+
+All project documentation is located in the [`doc/`](doc/) directory (440+ files):
+
+### Core Documentation
+- **[COORDINATE_SYSTEM.md](doc/COORDINATE_SYSTEM.md)** - Coordinate system conventions (Cartesian vs Graphics)
+- **[CONTRIBUTING.md](doc/CONTRIBUTING.md)** - Contribution guidelines and code standards
+- **[CHANGELOG.md](doc/CHANGELOG.md)** - Version history and changes
+
+### Canvas Health Series (October 2025)
+- **[FIRING_POLICIES.md](doc/FIRING_POLICIES.md)** - 7 firing policies implementation
+- **[FIX_STOCHASTIC_SCHEDULING_INITIALIZATION.md](doc/FIX_STOCHASTIC_SCHEDULING_INITIALIZATION.md)** - Stochastic transition scheduling fixes
+- **[DUPLICATE_ID_BUG_FIX.md](doc/DUPLICATE_ID_BUG_FIX.md)** - Duplicate ID bug analysis and fix
+- **[SBML_COMPLETE_FLOW_ANALYSIS.md](doc/SBML_COMPLETE_FLOW_ANALYSIS.md)** - Complete SBML import pipeline documentation
+- **[DUPLICATE_ID_BUG_ALL_FLOWS_ANALYSIS.md](doc/DUPLICATE_ID_BUG_ALL_FLOWS_ANALYSIS.md)** - Cross-flow duplicate ID analysis
+
+### Recent Features (December 2024)
+- **[ANALYSES_PANEL_PERFORMANCE_COMPLETE.md](doc/ANALYSES_PANEL_PERFORMANCE_COMPLETE.md)** - Performance optimization (95% improvement)
+- **[ANALYSES_COMPLETE_FIX_SUMMARY.md](doc/ANALYSES_COMPLETE_FIX_SUMMARY.md)** - Complete analysis panel fix summary
+- **[ANALYSES_LOCALITY_AND_RESET_FIXES.md](doc/ANALYSES_LOCALITY_AND_RESET_FIXES.md)** - Locality integration and reset fixes
+- **[ANALYSES_LOCALITY_UI_LIST_FIX.md](doc/ANALYSES_LOCALITY_UI_LIST_FIX.md)** - UI list display improvements
+- **[DIALOG_PROPERTIES_SIMULATION_INTEGRATION_ANALYSIS.md](doc/DIALOG_PROPERTIES_SIMULATION_INTEGRATION_ANALYSIS.md)** - Complete integration analysis
+- **[PROPERTY_DIALOG_TESTS_100_PERCENT.md](doc/PROPERTY_DIALOG_TESTS_100_PERCENT.md)** - Test coverage results (34/34 passing)
+- **[PLACE_DIALOG_TOPOLOGY_INTEGRATION.md](doc/PLACE_DIALOG_TOPOLOGY_INTEGRATION.md)** - Place dialog topology integration
+- **[ARC_DIALOG_TOPOLOGY_INTEGRATION.md](doc/ARC_DIALOG_TOPOLOGY_INTEGRATION.md)** - Arc dialog topology integration
+- **[TRANSITION_DIALOG_TOPOLOGY_INTEGRATION.md](doc/TRANSITION_DIALOG_TOPOLOGY_INTEGRATION.md)** - Transition dialog topology integration
 
 ### Technical Documentation
-- **[REFINEMENTS_LOG.md](REFINEMENTS_LOG.md)** - Detailed technical refinements
-- **[CANVAS_CONTROLS.md](CANVAS_CONTROLS.md)** - Canvas control documentation
-- **[ZOOM_PALETTE.md](ZOOM_PALETTE.md)** - Zoom palette implementation
-- **[FIX_EMPTY_PANEL.md](FIX_EMPTY_PANEL.md)** - Panel visibility fixes
-- **[VSCODE_SETUP_VALIDATION.md](VSCODE_SETUP_VALIDATION.md)** - VS Code setup
-- **[DOCUMENTATION_UPDATE_SUMMARY.md](DOCUMENTATION_UPDATE_SUMMARY.md)** - Recent updates
+- **[REFINEMENTS_LOG.md](doc/REFINEMENTS_LOG.md)** - Detailed technical refinements and fixes
+- **[CANVAS_CONTROLS.md](doc/CANVAS_CONTROLS.md)** - Canvas control and interaction documentation
+- **[ZOOM_PALETTE.md](doc/ZOOM_PALETTE.md)** - Zoom palette implementation details
+- **[FIX_EMPTY_PANEL.md](doc/FIX_EMPTY_PANEL.md)** - Panel visibility fixes documentation
+- **[VSCODE_SETUP_VALIDATION.md](doc/VSCODE_SETUP_VALIDATION.md)** - VS Code setup and validation
+- **[DOCUMENTATION_UPDATE_SUMMARY.md](doc/DOCUMENTATION_UPDATE_SUMMARY.md)** - Recent documentation updates
 
-### Arc Features
-- **[ALL_ARC_TYPES_TRANSFORMATION_VERIFIED.md](ALL_ARC_TYPES_TRANSFORMATION_VERIFIED.md)** - Arc transformations
-- **[ARC_BORDER_FIX_SUMMARY.md](ARC_BORDER_FIX_SUMMARY.md)** - Border rendering fixes
-- **[ARC_BOUNDARY_PRECISION_FIX.md](ARC_BOUNDARY_PRECISION_FIX.md)** - Boundary precision
-- **[ARC_CONTEXT_MENU_FIX.md](ARC_CONTEXT_MENU_FIX.md)** - Context menu enhancements
-- **[ARC_DIALOG_COMPACTNESS_REFINEMENT.md](ARC_DIALOG_COMPACTNESS_REFINEMENT.md)** - Dialog UI improvements
-- **[ARC_DIALOG_LOADING_FIX.md](ARC_DIALOG_LOADING_FIX.md)** - Dialog loading fixes
-- **[ARC_EDITING_CURRENT_STATE.md](ARC_EDITING_CURRENT_STATE.md)** - Current implementation state
+### Architecture Documentation
+- **[doc/topology/](doc/topology/)** - Topology and network analysis
+- **[doc/independency/](doc/independency/)** - Petri net independency analysis
+- **[doc/crossfetch/](doc/crossfetch/)** - Cross-model fetching
+- **[doc/heuristic/](doc/heuristic/)** - Heuristic algorithms
+- **[doc/atomicity/](doc/atomicity/)** - Atomic operations
+- **[doc/concurrency/](doc/concurrency/)** - Concurrency and parallelism
+- **[doc/time/](doc/time/)** - Time-related documentation
+- **[doc/project/](doc/project/)** - Project management
+- **[doc/validation/](doc/validation/)** - Validation and testing
 
-## Documentation by Category
+### Cleanup Documentation (October-November 2025)
+- **[INDENTATION_FIXES_COMPLETE.md](INDENTATION_FIXES_COMPLETE.md)** - Indentation error fixes (27 blocks in 15 files)
+- **[cleanup/](cleanup/)** - Complete cleanup documentation
+  - Repository cleanup summary (Nov 5, 2025)
+  - Repository organization final pass (Nov 12, 2025)
+  - UI analysis report
+  - Debug print removal report (120+ prints removed)
+  - Final verification results
 
-### `/topology/`
-Network topology and connection analysis documentation
+See the [`doc/`](doc/) directory for additional technical documentation and implementation notes.
 
-### `/independency/`
-Petri net independency and conflict analysis
+**Note on Coordinate Systems**: This project uses Cartesian coordinates conceptually (origin at lower-left, Y grows upward) for all documentation and mathematical reasoning, but implements using standard graphics coordinates (origin at top-left, Y grows downward) for Cairo/GTK rendering. See [COORDINATE_SYSTEM.md](doc/COORDINATE_SYSTEM.md) for details.
 
-### `/crossfetch/`
-Cross-model data fetching strategies
+## License
 
-### `/heuristic/`
-Heuristic algorithms for layout and optimization
-
-### `/atomicity/`
-Atomic operations and transaction handling
-
-### `/concurrency/`
-Concurrency patterns and parallelism
-
-### `/time/`
-Time-based operations and temporal logic
-
-### `/project/`
-Project management system documentation
-
-### `/validation/`
-Testing and validation procedures
-
-### `/cleanup/` (October 2025)
-Repository cleanup documentation:
-- **[INDENTATION_FIXES_COMPLETE.md](INDENTATION_FIXES_COMPLETE.md)** - Fixed 27 blocks in 15 files
-- Repository cleanup summary
-- UI analysis report
-- Debug print removal (107 prints from 26 files)
-- Final verification results
-
-## Documentation Statistics
-
-- **Total Files**: 440+ markdown documents
-- **Recent Additions**: Canvas Health series (5 docs), Cleanup documentation (4 docs)
-- **Coverage**: All major features documented
-- **Test Documentation**: 100% property dialog tests documented
-- **API Documentation**: Complete engine and behavior documentation
-
-## How to Use This Documentation
-
-1. **For New Developers**: Start with CONTRIBUTING.md and COORDINATE_SYSTEM.md
-2. **For Feature Work**: Check the relevant category directory (e.g., /topology/ for network features)
-3. **For Bug Fixes**: Review recent fix documentation (ANALYSES_*, ARC_*, DUPLICATE_ID_*)
-4. **For Testing**: See PROPERTY_DIALOG_TESTS_100_PERCENT.md and /validation/
-5. **For Architecture**: Review technical documentation and refinements logs
-
-## Maintenance
-
-Documentation is actively maintained and updated with each major feature or fix. When adding new features:
-
-1. Document the feature in the relevant category directory
-2. Update this README if it's a major feature
-3. Add test documentation if tests are included
-4. Update CHANGELOG.md with user-facing changes
-
-## Related Directories
-
-- `tests/`: Test files referenced in documentation (organized November 2025)
-- `scripts/`: Utility and diagnostic scripts (organized November 2025)
-- `src/shypn/`: Source code documented here
-- `ui/`: UI files and dialog specifications
+Specify the license here.

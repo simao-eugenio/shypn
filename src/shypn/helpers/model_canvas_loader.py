@@ -173,24 +173,15 @@ class ModelCanvasLoader:
         # Solution: Delete the UI tab and create a new one using add_document() for consistency
         self.document_count = self.notebook.get_n_pages()
         if self.document_count > 0:
-            print(f"\n[DEFAULT_TAB_INIT] ==========================================")
-            print(f"[DEFAULT_TAB_INIT] Found {self.document_count} tab(s) from UI file")
-            print(f"[DEFAULT_TAB_INIT] Removing UI tab and creating fresh programmatic tab")
-            
             # Remove all pages from the UI file
             while self.notebook.get_n_pages() > 0:
                 self.notebook.remove_page(0)
-            
-            print(f"[DEFAULT_TAB_INIT] Removed UI tabs, notebook now has {self.notebook.get_n_pages()} pages")
-            print(f"[DEFAULT_TAB_INIT] ==========================================\n")
         
         self.notebook.connect('switch-page', self._on_notebook_page_changed)
         
         # Create fresh default tab using add_document() for consistent initialization
         # This ensures the default tab follows the SAME path as File→New
-        print(f"[DEFAULT_TAB_INIT] Creating fresh default tab via add_document()")
         page_index, drawing_area = self.add_document(filename='default')
-        print(f"[DEFAULT_TAB_INIT] ✅ Default tab created at index {page_index}")
         
         # Wire data collector for the initial default tab
         # The switch-page signal doesn't fire for the initially displayed page,
@@ -473,9 +464,7 @@ class ModelCanvasLoader:
                 if hasattr(overlay_manager, 'report_panel_loader') and overlay_manager.report_panel_loader:
                     report_panel = overlay_manager.report_panel_loader.panel
                     if report_panel and hasattr(report_panel, 'set_controller'):
-                        print(f"[TAB_SWITCH] Updating Report Panel controller for drawing_area {id(drawing_area)}")
                         report_panel.set_controller(controller)
-                        print(f"[TAB_SWITCH] ✓ Report Panel now shows data for controller {id(controller)}")
 
     def _on_tab_close_clicked(self, button, page_widget):
         """Handle tab close button click.
@@ -863,7 +852,6 @@ class ModelCanvasLoader:
             self.knowledge_bases[drawing_area] = kb
             # Make KB accessible from canvas manager
             manager.knowledge_base = kb
-            print(f"[KNOWLEDGE_BASE] Created KB for canvas {id(drawing_area)}")
         except Exception as e:
             print(f"[KNOWLEDGE_BASE] ⚠️ Failed to create knowledge base: {e}")
 
@@ -879,9 +867,7 @@ class ModelCanvasLoader:
         manager.mark_needs_redraw()
         
         # Setup overlay manager to handle all palettes
-        print(f"[SETUP_CANVAS] overlay_box={overlay_box is not None}, overlay_widget={overlay_widget is not None}")
         if overlay_box and overlay_widget:
-            print(f"[SETUP_CANVAS] ✅ Creating CanvasOverlayManager")
             overlay_manager = CanvasOverlayManager(
                 overlay_widget=overlay_widget,
                 overlay_box=overlay_box,
@@ -892,7 +878,6 @@ class ModelCanvasLoader:
             
             # Store overlay manager for later access
             self.overlay_managers[drawing_area] = overlay_manager
-            print(f"[SETUP_CANVAS] ✅ Stored overlay_manager in self.overlay_managers (id={id(drawing_area)})")
             
             # Connect signals from palettes
             overlay_manager.connect_tool_changed_signal(
@@ -1211,7 +1196,6 @@ class ModelCanvasLoader:
                                                         viability_panel.on_simulation_complete()
                                                     
                                                     controller.on_simulation_complete = combined_callback
-                                                    print(f"[RESET] ✅ Re-wired simulation_complete → Per-document ViabilityPanel")
                                             except Exception as e:
                                                 print(f"[RESET] ⚠️ Failed to wire viability callback: {e}")
                                 else:
@@ -1406,8 +1390,6 @@ class ModelCanvasLoader:
                 print(f"[CONTROLLER_WIRE] Failed to wire controller: {e}")
                 import traceback
                 traceback.print_exc()
-        else:
-            print(f"[CONTROLLER_WIRE] ⚠️  GLOBAL report_panel_loader not available (expected for multi-doc)")
         
         # ============================================================
         # VIABILITY PANEL INTEGRATION: Wire simulation complete callback
@@ -1442,8 +1424,6 @@ class ModelCanvasLoader:
                 print(f"[CONTROLLER_WIRE] Failed to wire global viability callback: {e}")
                 import traceback
                 traceback.print_exc()
-        else:
-            print(f"[CONTROLLER_WIRE] ⚠️ Global viability panel loader not available (using per-document instead)")
         
         # ============================================================
         # GLOBAL-SYNC: Integrate with canvas lifecycle system
@@ -1476,15 +1456,12 @@ class ModelCanvasLoader:
         
         # MULTI-DOCUMENT: Create per-document Report Panel
         # Each document gets its own Report Panel instance to maintain independent state
-        print(f"[PER_DOC_REPORT] Checking if report_panel_loader exists for drawing_area {id(drawing_area)}")
         if not hasattr(self.overlay_managers[drawing_area], 'report_panel_loader'):
-            print(f"[PER_DOC_REPORT] Creating NEW per-document Report Panel")
             from shypn.helpers.report_panel_loader import ReportPanelLoader
             
             # Pass the ModelCanvasLoader (self) so Report Panel can access get_current_model()
             report_panel_loader = ReportPanelLoader(project=None, model_canvas_loader=self)
             report_panel_loader.load()
-            print(f"[PER_DOC_REPORT] ReportPanelLoader created and loaded")
             
             # Wire float/attach callbacks from main app (stored in model_canvas_loader)
             if hasattr(self, 'on_report_float') and hasattr(self, 'on_report_attach'):
@@ -1500,16 +1477,13 @@ class ModelCanvasLoader:
             
             # Wire controller to this document's Report Panel
             if hasattr(report_panel_loader, 'panel') and report_panel_loader.panel:
-                print(f"[CONTROLLER_WIRE] ✅ Wiring controller to PER-DOCUMENT Report Panel (drawing_area {id(drawing_area)})")
                 report_panel_loader.panel.set_controller(simulation_controller)
-                print(f"[CONTROLLER_WIRE] ✅ Controller set successfully")
                 
                 # CRITICAL: Set the actual model manager for ModelsCategory
                 # Get the model manager for this specific drawing_area
                 model_manager = self.overlay_managers[drawing_area].canvas_manager
                 if model_manager:
                     report_panel_loader.panel.set_model_canvas(model_manager)
-                    print(f"[CONTROLLER_WIRE] ✅ Set model_manager: {len(model_manager.places)} places, {len(model_manager.transitions)} transitions")
                 
                 # Connect Topology Panel to Report Panel for analysis data
                 if hasattr(self, 'topology_panel_loader') and self.topology_panel_loader:
@@ -1531,14 +1505,11 @@ class ModelCanvasLoader:
         # PER-DOCUMENT VIABILITY PANEL: One instance per model/document
         # ============================================================
         # Each document gets its own Viability Panel instance to maintain independent state
-        print(f"[PER_DOC_VIABILITY] Checking if viability_panel_loader exists for drawing_area {id(drawing_area)}")
         if not hasattr(self.overlay_managers[drawing_area], 'viability_panel_loader'):
-            print(f"[PER_DOC_VIABILITY] Creating NEW per-document Viability Panel")
             from shypn.helpers.viability_panel_loader import ViabilityPanelLoader
             
             # Create per-document viability panel (panel is created in __init__)
             viability_panel_loader = ViabilityPanelLoader(model=None)
-            print(f"[PER_DOC_VIABILITY] ViabilityPanelLoader created")
             
             # Wire model_canvas_loader so viability can access current model
             viability_panel_loader.set_model_canvas_loader(self)
@@ -1549,8 +1520,6 @@ class ModelCanvasLoader:
             
             # Wire controller to this document's Viability Panel
             if hasattr(viability_panel_loader, 'panel') and viability_panel_loader.panel:
-                print(f"[CONTROLLER_WIRE] ✅ Wiring simulation callback to PER-DOCUMENT Viability Panel (drawing_area {id(drawing_area)})")
-                
                 # Get the panel
                 viability_panel = viability_panel_loader.panel
                 
@@ -1561,13 +1530,10 @@ class ModelCanvasLoader:
                 # Set the model canvas loader (not canvas_manager!)
                 # The panel needs model_canvas_loader to access get_current_knowledge_base()
                 viability_panel.set_model_canvas(self)
-                print(f"[CONTROLLER_WIRE] ✅ Set model_canvas_loader for Viability Panel")
                 
                 # Wire simulation complete callback
                 if hasattr(viability_panel, 'on_simulation_complete'):
                     existing_callback = getattr(simulation_controller, 'on_simulation_complete', None)
-                    print(f"[CONTROLLER_WIRE] Viability capturing existing callback: {existing_callback}")
-                    print(f"[CONTROLLER_WIRE]   Callable: {callable(existing_callback) if existing_callback else False}")
                     
                     # Check if existing callback is already a Viability Panel callback
                     # If so, skip to avoid infinite wrapping
@@ -1577,25 +1543,14 @@ class ModelCanvasLoader:
                         existing_callback.__self__.__class__.__name__ == 'ViabilityPanel'
                     )
                     
-                    if is_viability_callback:
-                        print(f"[CONTROLLER_WIRE] ⚠️  Existing callback is already a Viability Panel callback, skipping to avoid double-wrap")
-                    else:
-                        print(f"[CONTROLLER_WIRE] Creating combined callback to preserve Report Panel callback")
-                        
+                    if not is_viability_callback:
+                        # Create combined callback to preserve Report Panel callback
                         def combined_callback():
-                            print(f"[VIABILITY_COMBINED] Combined callback executing...")
                             if existing_callback and callable(existing_callback):
-                                print(f"[VIABILITY_COMBINED] Calling existing callback (Report Panel)...")
                                 existing_callback()
-                                print(f"[VIABILITY_COMBINED] Existing callback completed")
-                            else:
-                                print(f"[VIABILITY_COMBINED] No existing callback to call")
-                            print(f"[VIABILITY_COMBINED] Calling Viability Panel callback...")
                             viability_panel.on_simulation_complete()
-                            print(f"[VIABILITY_COMBINED] Viability Panel callback completed")
                         
                         simulation_controller.on_simulation_complete = combined_callback
-                        print(f"[CONTROLLER_WIRE] ✅ Wired simulation_complete → ViabilityPanel")
                 
                 # Connect Topology Panel to Viability Panel for analysis data
                 if hasattr(self, 'topology_panel_loader') and self.topology_panel_loader:
@@ -1604,7 +1559,6 @@ class ModelCanvasLoader:
                         print(f"[CONTROLLER_WIRE] ✅ Connected Topology Panel to Viability Panel")
             
             self.overlay_managers[drawing_area].viability_panel_loader = viability_panel_loader
-            print(f"[PER_DOC_VIABILITY] ✓ Created per-document Viability Panel for drawing_area {id(drawing_area)}")
         
         # ============================================================
         # OLD PALETTE CODE - Keeping temporarily for reference
@@ -3533,7 +3487,6 @@ class ModelCanvasLoader:
         Args:
             right_panel_loader: RightPanelLoader instance from main application
         """
-        print(f"[MODEL_CANVAS_LOADER] set_right_panel_loader() called")
         self.right_panel_loader = right_panel_loader
         if self.notebook and self.notebook.get_n_pages() > 0:
             current_page_num = self.notebook.get_current_page()
@@ -3541,9 +3494,7 @@ class ModelCanvasLoader:
             self._on_notebook_page_changed(self.notebook, current_page, current_page_num)
         
         # Wire locality sync callback for all existing Report panels
-        print(f"[MODEL_CANVAS_LOADER] About to call _wire_locality_sync_for_existing_panels()")
         self._wire_locality_sync_for_existing_panels()
-        print(f"[MODEL_CANVAS_LOADER] Completed _wire_locality_sync_for_existing_panels()")
     
     def _wire_locality_sync_for_existing_panels(self):
         """Wire transition→report locality sync callbacks for all existing panels.
@@ -3559,7 +3510,6 @@ class ModelCanvasLoader:
             return
         
         transition_panel = self.right_panel_loader.transition_panel
-        print(f"[LOCALITY_WIRE] Wiring locality sync for {len(self.overlay_managers)} existing documents")
         
         # Create a SINGLE callback that dynamically routes to the current active document's report panel
         # This fixes the issue where the callback was captured for a specific document
@@ -3626,7 +3576,6 @@ class ModelCanvasLoader:
         
         # Set the single dynamic callback (no loop needed, single global transition panel)
         transition_panel.on_selection_changed_callback = on_transition_selected
-        print(f"[LOCALITY_WIRE] ✓ Wired dynamic callback for all documents")
     
     def wire_existing_canvases_to_right_panel(self):
         """Wire data_collector to right_panel for all existing canvases.
@@ -3667,8 +3616,6 @@ class ModelCanvasLoader:
             print(f"[VIABILITY_WIRE] Global viability panel or method not available")
             return
         
-        print(f"[VIABILITY_WIRE] Wiring GLOBAL viability callbacks for {len(self.simulation_controllers)} existing controllers")
-        
         # Wire callback for each existing controller
         for drawing_area, controller in self.simulation_controllers.items():
             try:
@@ -3684,7 +3631,6 @@ class ModelCanvasLoader:
                     return combined
                 
                 controller.on_simulation_complete = make_combined_callback(existing_callback)
-                print(f"[VIABILITY_WIRE] ✓ Wired GLOBAL callback for drawing_area {id(drawing_area)}")
             except Exception as e:
                 print(f"[VIABILITY_WIRE] ⚠️ Failed to wire callback for drawing_area {id(drawing_area)}: {e}")
 
