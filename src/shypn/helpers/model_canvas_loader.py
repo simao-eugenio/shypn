@@ -2371,6 +2371,23 @@ class ModelCanvasLoader:
         self._last_pointer_world_x = world_x
         self._last_pointer_world_y = world_y
         
+        # Update hover tooltip for objects under cursor
+        hovered_obj = manager.find_object_at_position(world_x, world_y)
+        if hovered_obj:
+            from shypn.netobjs import Place, Transition, Arc
+            if isinstance(hovered_obj, (Place, Transition, Arc)):
+                # Show ID-Name tooltip
+                obj_id = hovered_obj.id if hasattr(hovered_obj, 'id') else "?"
+                obj_name = hovered_obj.name if hasattr(hovered_obj, 'name') else ""
+                if obj_name and obj_name != obj_id:
+                    tooltip = f"{obj_id} - {obj_name}"
+                else:
+                    tooltip = obj_id
+                widget.set_tooltip_text(tooltip)
+        else:
+            # Clear tooltip when not hovering over any object
+            widget.set_tooltip_text(None)
+        
         # Update lasso path if active
         if lasso_state.get('active', False) and lasso_state.get('selector'):
             if lasso_state['selector'].is_active:
@@ -2891,7 +2908,14 @@ class ModelCanvasLoader:
             obj_type = 'Arc'
         else:
             obj_type = 'Object'
-        title_item = Gtk.MenuItem(label=f'{obj_type}: {obj.name}')
+        
+        # Format title with ID for arcs, just name for other objects
+        if isinstance(obj, Arc):
+            title_label = f'{obj_type}: {obj.id} - {obj.name}'
+        else:
+            title_label = f'{obj_type}: {obj.name}'
+        
+        title_item = Gtk.MenuItem(label=title_label)
         title_item.set_sensitive(False)
         title_item.show()
         menu.append(title_item)
@@ -3608,13 +3632,11 @@ class ModelCanvasLoader:
         during their creation in _setup_edit_palettes().
         """
         if not hasattr(self, 'viability_panel_loader') or not self.viability_panel_loader:
-            print(f"[VIABILITY_WIRE] No global viability_panel_loader - skipping global wiring")
-            return
+            return  # No global viability panel, will use per-document panels
         
         viability_panel = self.viability_panel_loader.panel
         if not viability_panel or not hasattr(viability_panel, 'on_simulation_complete'):
-            print(f"[VIABILITY_WIRE] Global viability panel or method not available")
-            return
+            return  # Panel not ready yet, will be wired later
         
         # Wire callback for each existing controller
         for drawing_area, controller in self.simulation_controllers.items():

@@ -521,8 +521,7 @@ class ModelsCategory(BaseReportCategory):
                         kb = loader.get_current_knowledge_base()
             
             if not kb:
-                print(f"[REPORT→KB] ⚠️ No KB available for structural update")
-                return
+                return  # KB not available yet
             
             # Extract structural data
             places_data = []

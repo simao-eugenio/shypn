@@ -116,6 +116,12 @@ class ArcPropDialogLoader(GObject.GObject):
         if name_entry and hasattr(self.arc_obj, 'name'):
             name_entry.set_text(str(self.arc_obj.name))
             name_entry.set_editable(False)
+        
+        # Populate ID field (read-only)
+        id_entry = self.builder.get_object('id_entry')
+        if id_entry and hasattr(self.arc_obj, 'id'):
+            id_entry.set_text(str(self.arc_obj.id))
+        
         description_text = self.builder.get_object('description_text')
         if description_text and hasattr(self.arc_obj, 'label'):
             buffer = description_text.get_buffer()
