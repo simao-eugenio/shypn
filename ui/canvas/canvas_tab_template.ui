@@ -1,5 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- GTK3 Canvas Tab Template - Single canvas instance for cloning -->
+<!-- GTK3 Canvas Tab Template - Single canvas instance for cloning
+
+CERTIFICATION: This template contains ONLY GTK widget definitions.
+NO Petri net model data, notebook content, or XML objects are included.
+
+This template is used by add_document() to create ALL canvases:
+- Default canvas (at startup)
+- File→New canvases
+- Imported file canvases
+
+All canvases start as empty drawing areas. Model data is loaded separately
+via ModelCanvasManager and file operations, NOT from this UI template.
+-->
 <interface>
   <requires lib="gtk+" version="3.0"/>
 
