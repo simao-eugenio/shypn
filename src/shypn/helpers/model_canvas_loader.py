@@ -169,18 +169,34 @@ class ModelCanvasLoader:
         style_context.add_provider(css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION + 1)
         
         # CRITICAL FIX: Remove default tab from UI file and create fresh one programmatically
-        # The UI file contains a pre-baked tab that has timing issues with controller wiring
-        # Solution: Delete the UI tab and create a new one using add_document() for consistency
+        # 
+        # CERTIFICATION: The default canvas is NOT created from any notebook/XML file.
+        # 
+        # The UI file (model_canvas.ui) contains a pre-baked GtkNotebook tab for convenience
+        # during UI design, but this tab has timing issues with controller wiring and causes
+        # inconsistent behavior compared to File→New canvases.
+        # 
+        # SOLUTION: We ALWAYS delete ALL pages from the UI file and create a fresh canvas
+        # programmatically using add_document(). This ensures:
+        # 1. Default canvas is created the SAME way as File→New
+        # 2. NO notebook XML content is loaded
+        # 3. Consistent initialization across all canvas creation scenarios
+        # 4. Proper controller wiring and viability panel state
+        # 
         self.document_count = self.notebook.get_n_pages()
         if self.document_count > 0:
-            # Remove all pages from the UI file
+            # Remove all pages from the UI file (typically 1 pre-baked page)
             while self.notebook.get_n_pages() > 0:
                 self.notebook.remove_page(0)
+        
+        # Verify notebook is empty before proceeding
+        assert self.notebook.get_n_pages() == 0, "Failed to remove UI file pages - notebook should be empty"
         
         self.notebook.connect('switch-page', self._on_notebook_page_changed)
         
         # Create fresh default tab using add_document() for consistent initialization
         # This ensures the default tab follows the SAME path as File→New
+        # NO XML/notebook content is loaded - canvas starts completely empty
         page_index, drawing_area = self.add_document(filename='default')
         
         # Wire data collector for the initial default tab
@@ -693,6 +709,15 @@ class ModelCanvasLoader:
 
     def add_document(self, title=None, filename=None, replace_empty_default=True):
         """Add a new document (tab) to the canvas.
+        
+        CERTIFICATION: All canvases are created from the canvas_tab_template.ui file,
+        NOT from any notebook XML or .ipynb file. This ensures:
+        - Clean slate with no pre-loaded content
+        - Consistent widget hierarchy across all scenarios
+        - Proper GTK widget initialization for Wayland compatibility
+        
+        The template contains only the GTK widget structure (GtkOverlay, GtkScrolledWindow,
+        GtkDrawingArea) with no Petri net objects or model data.
         
         Args:
             title: Optional title for the new document tab (deprecated, use filename).
