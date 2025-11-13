@@ -721,22 +721,17 @@ class ViabilityPanel(Gtk.Box):
         if not hasattr(self, 'drawing_area') or not self.drawing_area:
             # FALLBACK: If drawing_area not set, try to get current document
             # This provides backward compatibility for panels created before fix
-            print(f"[Viability] WARNING: _get_current_model called but drawing_area NOT SET!")
             try:
                 drawing_area = self.model_canvas.get_current_document()
                 if drawing_area:
-                    print(f"[Viability] WARNING: drawing_area not set, using current document {id(drawing_area)} as fallback")
                     # Automatically set it for future calls
                     self.drawing_area = drawing_area
                 else:
-                    print(f"[Viability] ERROR: Could not get current document")
                     return None
-            except Exception as e:
-                print(f"[Viability] ERROR: Exception getting current document: {e}")
+            except:
                 return None
         
         drawing_area = self.drawing_area
-        print(f"[Viability] _get_current_model using drawing_area: {id(drawing_area)}")
         
         try:
             # Get canvas manager for THIS panel's document
@@ -744,18 +739,11 @@ class ViabilityPanel(Gtk.Box):
             # The manager contains the actual objects being rendered
             if hasattr(self.model_canvas, 'canvas_managers'):
                 manager = self.model_canvas.canvas_managers.get(drawing_area)
-                print(f"[Viability] Got canvas_manager: {manager}")
                 if manager:
-                    print(f"[Viability] Returning manager (has {len(manager.transitions) if hasattr(manager, 'transitions') else 0} transitions)")
                     return manager
-                else:
-                    print(f"[Viability] ERROR: No canvas manager found for drawing_area {id(drawing_area)}")
-        except Exception as e:
-            print(f"[Viability] Error getting canvas manager: {e}")
-            import traceback
-            traceback.print_exc()
+        except:
+            pass
         
-        print(f"[Viability] ERROR: Could not get canvas manager!")
         return None
     
     def _get_canvas_manager(self):
@@ -776,7 +764,6 @@ class ViabilityPanel(Gtk.Box):
             try:
                 drawing_area = self.model_canvas.get_current_document()
                 if drawing_area:
-                    print(f"[Viability] WARNING: drawing_area not set, using current document as fallback")
                     self.drawing_area = drawing_area
                 else:
                     return None
@@ -789,8 +776,8 @@ class ViabilityPanel(Gtk.Box):
             # Get canvas manager for THIS panel's document
             if hasattr(self.model_canvas, 'canvas_managers'):
                 return self.model_canvas.canvas_managers.get(self.drawing_area)
-        except Exception as e:
-            print(f"[Viability] Error getting this panel's canvas manager: {e}")
+        except:
+            pass
         
         return None
     
@@ -799,26 +786,15 @@ class ViabilityPanel(Gtk.Box):
         
         IMPORTANT: This redraws THIS panel's canvas, not the currently visible one.
         """
-        print(f"[Viability] _trigger_canvas_redraw called")
-        print(f"[Viability]   drawing_area: {id(self.drawing_area) if self.drawing_area else 'NONE'}")
-        
         # Get canvas manager for THIS panel and trigger redraw
         canvas_manager = self._get_canvas_manager()
-        print(f"[Viability]   canvas_manager: {canvas_manager}")
-        
         if canvas_manager and hasattr(canvas_manager, 'mark_needs_redraw'):
             canvas_manager.mark_needs_redraw()
-            print(f"[Viability]   ✓ Called mark_needs_redraw()")
         
         # Queue draw on THIS panel's drawing area
         if hasattr(self, 'drawing_area') and self.drawing_area:
             if hasattr(self.drawing_area, 'queue_draw'):
                 self.drawing_area.queue_draw()
-                print(f"[Viability]   ✓ Called queue_draw()")
-            else:
-                print(f"[Viability]   ✗ drawing_area has no queue_draw method")
-        else:
-            print(f"[Viability]   ✗ No drawing_area set")
     
     def investigate_transition(self, transition_id: str):
         """Add a transition to the localities list for later diagnosis.
@@ -835,14 +811,10 @@ class ViabilityPanel(Gtk.Box):
             return
         
         # Get model directly
-        print(f"[Viability] Getting model for drawing_area {id(self.drawing_area) if self.drawing_area else 'NONE'}")
         model = self._get_current_model()
         if not model:
-            print(f"[Viability] ERROR: No model found!")
             self._show_error("No model available")
             return
-        
-        print(f"[Viability] Model found: {model}, has {len(model.transitions) if model.transitions else 0} transitions")
         
         # Get transition from model
         transition_obj = None
@@ -881,8 +853,6 @@ class ViabilityPanel(Gtk.Box):
         """
         color_rgb = self._get_viability_color()
         
-        print(f"[Viability] Setting {place_obj.id} border to {color_rgb}")
-        
         # Set border color
         place_obj.border_color = color_rgb
     
@@ -894,14 +864,9 @@ class ViabilityPanel(Gtk.Box):
         """
         color_rgb = self._get_viability_color()
         
-        print(f"[Viability] Setting {transition_obj.id} colors to {color_rgb}")
-        print(f"[Viability]   Before: border={getattr(transition_obj, 'border_color', 'NONE')}, fill={getattr(transition_obj, 'fill_color', 'NONE')}")
-        
         # Set border and fill color
         transition_obj.border_color = color_rgb
         transition_obj.fill_color = color_rgb
-        
-        print(f"[Viability]   After: border={transition_obj.border_color}, fill={transition_obj.fill_color}")
     
     def _color_arc(self, arc_obj):
         """Color an arc with viability purple.
@@ -910,8 +875,6 @@ class ViabilityPanel(Gtk.Box):
             arc_obj: Arc object to color
         """
         color_rgb = self._get_viability_color()
-        
-        print(f"[Viability] Setting {arc_obj.id} color to {color_rgb}")
         
         # Set arc color
         arc_obj.color = color_rgb
@@ -1098,52 +1061,45 @@ class ViabilityPanel(Gtk.Box):
         # Get current model to fetch fresh object references
         model = self._get_current_model()
         if not model:
-            print(f"[Viability] Warning: No current model when removing {transition_id}")
-        else:
-            locality_ids = self._locality_objects.get(transition_id)
-            if locality_ids:
-                print(f"[Viability] Removing {transition_id} and resetting colors:")
-                
-                # Reset transition color - find by iterating transitions list
-                transition_id_to_find = locality_ids.get('transition_id')
-                for t_obj in model.transitions:
-                    if t_obj.id == transition_id_to_find:
-                        print(f"  - Transition: {t_obj.id}")
-                        t_obj.border_color = Transition.DEFAULT_BORDER_COLOR
-                        t_obj.fill_color = Transition.DEFAULT_COLOR
+            return
+        
+        locality_ids = self._locality_objects.get(transition_id)
+        if locality_ids:
+            # Reset transition color - find by iterating transitions list
+            transition_id_to_find = locality_ids.get('transition_id')
+            for t_obj in model.transitions:
+                if t_obj.id == transition_id_to_find:
+                    t_obj.border_color = Transition.DEFAULT_BORDER_COLOR
+                    t_obj.fill_color = Transition.DEFAULT_COLOR
+                    break
+            
+            # Reset input place colors - find by iterating places list
+            for place_id in locality_ids.get('input_place_ids', []):
+                for p_obj in model.places:
+                    if p_obj.id == place_id:
+                        p_obj.border_color = Place.DEFAULT_BORDER_COLOR
                         break
-                
-                # Reset input place colors - find by iterating places list
-                for place_id in locality_ids.get('input_place_ids', []):
-                    for p_obj in model.places:
-                        if p_obj.id == place_id:
-                            print(f"  - Input place: {p_obj.id}")
-                            p_obj.border_color = Place.DEFAULT_BORDER_COLOR
-                            break
-                
-                # Reset output place colors
-                for place_id in locality_ids.get('output_place_ids', []):
-                    for p_obj in model.places:
-                        if p_obj.id == place_id:
-                            print(f"  - Output place: {p_obj.id}")
-                            p_obj.border_color = Place.DEFAULT_BORDER_COLOR
-                            break
-                
-                # Reset input arc colors - find by iterating arcs list
-                for arc_id in locality_ids.get('input_arc_ids', []):
-                    for a_obj in model.arcs:
-                        if a_obj.id == arc_id:
-                            print(f"  - Input arc: {a_obj.id}")
-                            a_obj.color = Arc.DEFAULT_COLOR
-                            break
-                
-                # Reset output arc colors
-                for arc_id in locality_ids.get('output_arc_ids', []):
-                    for a_obj in model.arcs:
-                        if a_obj.id == arc_id:
-                            print(f"  - Output arc: {a_obj.id}")
-                            a_obj.color = Arc.DEFAULT_COLOR
-                            break
+            
+            # Reset output place colors
+            for place_id in locality_ids.get('output_place_ids', []):
+                for p_obj in model.places:
+                    if p_obj.id == place_id:
+                        p_obj.border_color = Place.DEFAULT_BORDER_COLOR
+                        break
+            
+            # Reset input arc colors - find by iterating arcs list
+            for arc_id in locality_ids.get('input_arc_ids', []):
+                for a_obj in model.arcs:
+                    if a_obj.id == arc_id:
+                        a_obj.color = Arc.DEFAULT_COLOR
+                        break
+            
+            # Reset output arc colors
+            for arc_id in locality_ids.get('output_arc_ids', []):
+                for a_obj in model.arcs:
+                    if a_obj.id == arc_id:
+                        a_obj.color = Arc.DEFAULT_COLOR
+                        break
         
         # Remove from tracking and UI
         if transition_id in self._locality_objects:
@@ -1810,7 +1766,6 @@ class ViabilityPanel(Gtk.Box):
             try:
                 drawing_area = self.model_canvas.get_current_document()
                 if drawing_area:
-                    print(f"[Viability] WARNING: drawing_area not set, using current document as fallback")
                     self.drawing_area = drawing_area
                 else:
                     return None
@@ -1823,9 +1778,10 @@ class ViabilityPanel(Gtk.Box):
             # Get KB for THIS panel's document
             if hasattr(self.model_canvas, 'knowledge_bases'):
                 return self.model_canvas.knowledge_bases.get(self.drawing_area)
-        except Exception as e:
-            print(f"[Viability] Error getting this panel's KB: {e}")
-            return None
+        except:
+            pass
+        
+        return None
     
     def _populate_kb_from_model(self, kb):
         """Populate KB from current model if empty.
@@ -1837,15 +1793,10 @@ class ViabilityPanel(Gtk.Box):
             True if successful, False otherwise
         """
         try:
-            print(f"[Viability] _populate_kb_from_model START")
-            
             # Get current model using the proper accessor
             model = self._get_current_model()
             
-            print(f"[Viability] Got model: {model}")
-            
             if not model:
-                print(f"[Viability] No model found")
                 return False
             
             # Extract data from model
@@ -1856,32 +1807,25 @@ class ViabilityPanel(Gtk.Box):
             # Places
             if hasattr(model, 'places') and model.places:
                 places_data = [p for p in model.places if p]
-                print(f"[Viability] Found {len(places_data)} places")
             
             # Transitions
             if hasattr(model, 'transitions') and model.transitions:
                 transitions_data = [t for t in model.transitions if t]
-                print(f"[Viability] Found {len(transitions_data)} transitions: {[t.id for t in transitions_data]}")
             
             # Arcs
             if hasattr(model, 'arcs') and model.arcs:
                 arcs_data = [a for a in model.arcs if a]
-                print(f"[Viability] Found {len(arcs_data)} arcs")
             
             if not transitions_data:
-                print(f"[Viability] No transitions found in model")
                 return False
             
             # Populate KB
-            print(f"[Viability] Calling kb.update_topology_structural...")
             kb.update_topology_structural(places_data, transitions_data, arcs_data)
-            print(f"[Viability] KB populated successfully, transitions in KB: {len(kb.transitions)}")
             
             return True
             
         except Exception as e:
             import traceback
-            print(f"[Viability] Exception in _populate_kb_from_model: {e}")
             traceback.print_exc()
             return False
     
@@ -2259,7 +2203,6 @@ class ViabilityPanel(Gtk.Box):
             drawing_area: Gtk.DrawingArea widget
         """
         self.drawing_area = drawing_area
-        print(f"[Viability] set_drawing_area called: {id(drawing_area)}")
         
         # Update model reference from drawing area's overlay manager
         if self.model_canvas and self.drawing_area:
