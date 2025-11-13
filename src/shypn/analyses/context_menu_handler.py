@@ -192,7 +192,6 @@ class ContextMenuHandler:
         
         # Add "Add to Viability" option for places and transitions
         viability_panel = self._get_current_viability_panel()
-        print(f"[CONTEXT_MENU] add_analysis_menu_items: viability_panel = {viability_panel}")
         if viability_panel:
             self._add_viability_menu_item(menu, obj, viability_panel)
             
@@ -225,13 +224,9 @@ class ContextMenuHandler:
         
         def on_add_to_viability(widget):
             """Callback when 'Add to Viability' is clicked."""
-            print(f"[CONTEXT_MENU] on_add_to_viability called for {obj.id}")
             # Add the object to viability panel for focused analysis
             if hasattr(viability_panel, 'add_object_for_analysis'):
-                print(f"[CONTEXT_MENU] Calling viability_panel.add_object_for_analysis({obj.id})")
                 viability_panel.add_object_for_analysis(obj)
-            else:
-                print(f"[CONTEXT_MENU] ERROR: viability_panel has no add_object_for_analysis method")
         
         menu_item.connect("activate", on_add_to_viability)
         menu_item.show()
