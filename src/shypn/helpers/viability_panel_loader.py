@@ -258,6 +258,10 @@ class ViabilityPanelLoader:
             self.panel.float_button.set_active(True)
             self._updating_button = False
         
+        # Ensure content is visible before showing window
+        self.content.set_no_show_all(False)
+        self.content.show_all()
+        
         # Show window
         self.window.show_all()
     

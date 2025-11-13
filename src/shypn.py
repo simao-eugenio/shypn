@@ -1127,15 +1127,18 @@ def main(argv=None):
 						if overlay_manager and hasattr(overlay_manager, 'viability_panel_loader'):
 							viability_loader = overlay_manager.viability_panel_loader
 							if viability_loader and viability_loader.panel:
-								# Clear container first
-								for child in viability_panel_container.get_children():
-									viability_panel_container.remove(child)
-								# Add per-document panel
-								if viability_loader.widget.get_parent() != viability_panel_container:
-									current_parent = viability_loader.widget.get_parent()
+								# Check if widget needs to be moved to container
+								current_parent = viability_loader.widget.get_parent()
+								if current_parent != viability_panel_container:
+									# Remove from old parent if exists
 									if current_parent:
 										current_parent.remove(viability_loader.widget)
+									# Clear container before adding
+									for child in viability_panel_container.get_children():
+										viability_panel_container.remove(child)
+									# Add to container
 									viability_panel_container.pack_start(viability_loader.widget, True, True, 0)
+								# Show panel content
 								viability_loader.panel.show_all()
 								print(f"[VIABILITY_TOGGLE] ✓ Showing per-document viability panel for drawing_area {id(drawing_area)}")
 			else:

@@ -38,6 +38,9 @@ from .analysis import LocalityAnalyzer, DependencyAnalyzer, BoundaryAnalyzer, Co
 from .fixes import FixSequencer, FixApplier, FixPredictor
 from .ui.subnet_view import SubnetView
 from .ui.investigation_view import InvestigationView
+from .experiment_manager import ExperimentManager
+from .subnet_simulator import SubnetSimulator
+from .ui.simulation_control_toolbar import SimulationControlToolbar
 
 
 class ViabilityPanel(Gtk.Box):
@@ -61,6 +64,7 @@ class ViabilityPanel(Gtk.Box):
         
         self.model = model
         self.model_canvas = model_canvas
+        self.drawing_area = None  # Will be set via set_drawing_area()
         self.topology_panel = None
         self.analyses_panel = None
         
@@ -80,12 +84,16 @@ class ViabilityPanel(Gtk.Box):
         self.fix_applier = None  # Created when KB available
         self.fix_predictor = None  # Created when KB available
         
+        # Simulation components (NEW)
+        self.experiment_manager = ExperimentManager()
+        self.subnet_simulator = SubnetSimulator(self)
+        
         # Current investigation
         self.current_investigation = None
         self.current_view = None  # SubnetView or InvestigationView
-        # Current investigation
-        self.current_investigation = None
-        self.current_view = None  # SubnetView or InvestigationView
+        
+        # Locality tracking for coloring
+        self._locality_objects = {}
         
         # Build panel UI
         self._build_header()
@@ -185,7 +193,25 @@ class ViabilityPanel(Gtk.Box):
         sep.set_margin_top(10)
         main_box.pack_start(sep, False, False, 0)
         
-        # === SECTION 2: SUBNET PARAMETERS EXPANDER (NEW) ===
+        # === SIMULATION CONTROLS (NEW) ===
+        self.simulation_toolbar = SimulationControlToolbar()
+        main_box.pack_start(self.simulation_toolbar, False, False, 0)
+        
+        # Connect simulation control signals
+        self.simulation_toolbar.run_button.connect("clicked", self._on_run_simulation)
+        self.simulation_toolbar.step_button.connect("clicked", self._on_step_simulation)
+        self.simulation_toolbar.pause_button.connect("clicked", self._on_pause_simulation)
+        self.simulation_toolbar.stop_button.connect("clicked", self._on_stop_simulation)
+        self.simulation_toolbar.reset_button.connect("clicked", self._on_reset_simulation)
+        
+        # Connect experiment management signals
+        self.simulation_toolbar.add_exp_button.connect("clicked", self._on_add_experiment)
+        self.simulation_toolbar.copy_exp_button.connect("clicked", self._on_copy_experiment)
+        self.simulation_toolbar.save_exp_button.connect("clicked", self._on_save_experiments)
+        self.simulation_toolbar.load_exp_button.connect("clicked", self._on_load_experiments)
+        self.simulation_toolbar.experiment_combo.connect("changed", self._on_experiment_changed)
+        
+        # === SECTION 2: SUBNET PARAMETERS EXPANDER ===
         self.subnet_expander = Gtk.Expander()
         self.subnet_expander.set_expanded(True)
         self.subnet_expander.set_margin_start(10)
@@ -230,6 +256,15 @@ class ViabilityPanel(Gtk.Box):
         arcs_scroll.add(self.arcs_treeview)
         self.subnet_notebook.append_page(arcs_scroll, Gtk.Label(label="Arcs"))
         
+        # Results tab with simulation results (NEW)
+        results_scroll = Gtk.ScrolledWindow()
+        results_scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        results_scroll.set_size_request(-1, 200)
+        
+        self.results_treeview, self.results_store = self._create_results_treeview()
+        results_scroll.add(self.results_treeview)
+        self.subnet_notebook.append_page(results_scroll, Gtk.Label(label="Results"))
+        
         self.subnet_expander.add(self.subnet_notebook)
         main_box.pack_start(self.subnet_expander, False, False, 0)
         
@@ -237,6 +272,49 @@ class ViabilityPanel(Gtk.Box):
         sep2 = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
         sep2.set_margin_top(10)
         main_box.pack_start(sep2, False, False, 0)
+        
+        # === DIAGNOSTICS LOG (NEW) ===
+        self.diagnostics_expander = Gtk.Expander()
+        self.diagnostics_expander.set_expanded(True)
+        self.diagnostics_expander.set_margin_start(10)
+        self.diagnostics_expander.set_margin_end(10)
+        self.diagnostics_expander.set_margin_top(10)
+        
+        diag_label = Gtk.Label()
+        diag_label.set_xalign(0)
+        diag_label.set_markup("<b>SIMULATION LOG</b>")
+        self.diagnostics_expander.set_label_widget(diag_label)
+        
+        diag_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
+        diag_box.set_margin_start(12)
+        diag_box.set_margin_top(6)
+        diag_box.set_margin_bottom(6)
+        
+        # Scrolled TextView for log
+        log_scroll = Gtk.ScrolledWindow()
+        log_scroll.set_size_request(-1, 150)
+        log_scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        
+        self.diagnostics_textview = Gtk.TextView()
+        self.diagnostics_textview.set_editable(False)
+        self.diagnostics_textview.set_wrap_mode(Gtk.WrapMode.WORD)
+        self.diagnostics_textview.set_monospace(True)
+        self.diagnostics_textbuffer = self.diagnostics_textview.get_buffer()
+        log_scroll.add(self.diagnostics_textview)
+        diag_box.pack_start(log_scroll, True, True, 0)
+        
+        # Clear log button
+        clear_log_btn = Gtk.Button(label="Clear Log")
+        clear_log_btn.connect("clicked", self._on_clear_diagnostics_log)
+        diag_box.pack_start(clear_log_btn, False, False, 0)
+        
+        self.diagnostics_expander.add(diag_box)
+        main_box.pack_start(self.diagnostics_expander, False, False, 0)
+        
+        # Separator
+        sep3 = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
+        sep3.set_margin_top(10)
+        main_box.pack_start(sep3, False, False, 0)
         
         # === SECTION 3: DIAGNOSIS SUMMARY EXPANDER ===
         self.summary_expander = Gtk.Expander()
@@ -573,35 +651,180 @@ class ViabilityPanel(Gtk.Box):
         
         return treeview, store
     
+    def _create_results_treeview(self):
+        """Create TreeView for simulation results display.
+        
+        Columns: Element, Initial, Final, Change, Notes
+        """
+        # Create ListStore: element, initial, final, change, notes
+        store = Gtk.ListStore(str, str, str, str, str)
+        
+        # Create TreeView
+        treeview = Gtk.TreeView(model=store)
+        treeview.set_enable_search(False)
+        
+        # Column 0: Element
+        renderer_elem = Gtk.CellRendererText()
+        column_elem = Gtk.TreeViewColumn("Element", renderer_elem, text=0)
+        column_elem.set_resizable(True)
+        column_elem.set_min_width(150)
+        treeview.append_column(column_elem)
+        
+        # Column 1: Initial
+        renderer_init = Gtk.CellRendererText()
+        column_init = Gtk.TreeViewColumn("Initial", renderer_init, text=1)
+        column_init.set_resizable(True)
+        column_init.set_min_width(80)
+        treeview.append_column(column_init)
+        
+        # Column 2: Final
+        renderer_final = Gtk.CellRendererText()
+        column_final = Gtk.TreeViewColumn("Final", renderer_final, text=2)
+        column_final.set_resizable(True)
+        column_final.set_min_width(80)
+        treeview.append_column(column_final)
+        
+        # Column 3: Change
+        renderer_change = Gtk.CellRendererText()
+        column_change = Gtk.TreeViewColumn("Δ", renderer_change, text=3)
+        column_change.set_resizable(True)
+        column_change.set_min_width(80)
+        treeview.append_column(column_change)
+        
+        # Column 4: Notes
+        renderer_notes = Gtk.CellRendererText()
+        column_notes = Gtk.TreeViewColumn("Notes", renderer_notes, text=4)
+        column_notes.set_resizable(True)
+        column_notes.set_expand(True)
+        column_notes.set_min_width(200)
+        treeview.append_column(column_notes)
+        
+        return treeview, store
+    
     def _get_current_model(self):
-        """Get the current model dynamically from overlay manager.
+        """Get THIS panel's canvas manager (which contains the actual rendered objects).
+        
+        CRITICAL: Returns the canvas manager, NOT a DocumentModel!
+        The canvas manager contains the ACTUAL objects being rendered (self.places, self.transitions, self.arcs).
+        Calling to_document_model() creates NEW copies and resets colors, so we must work with the manager directly.
+        
+        IMPORTANT: This method now returns the canvas manager for THIS panel's document,
+        not the globally active document. This prevents cross-document state issues.
         
         Returns:
-            Model instance or None
+            ModelCanvasManager instance (with .places, .transitions, .arcs attributes) or None
         """
-        # Try cached model first
-        if self.model:
-            return self.model
+        if not hasattr(self, 'model_canvas') or not self.model_canvas:
+            return None
         
-        # Try to get from model_canvas and drawing_area
-        if self.model_canvas and hasattr(self, 'drawing_area') and self.drawing_area:
-            overlay_manager = self.model_canvas.overlay_managers.get(self.drawing_area)
-            if overlay_manager and hasattr(overlay_manager, 'model'):
-                self.model = overlay_manager.model
-                return self.model
+        # Use THIS panel's drawing area, not the current one
+        if not hasattr(self, 'drawing_area') or not self.drawing_area:
+            # FALLBACK: If drawing_area not set, try to get current document
+            # This provides backward compatibility for panels created before fix
+            print(f"[Viability] WARNING: _get_current_model called but drawing_area NOT SET!")
+            try:
+                drawing_area = self.model_canvas.get_current_document()
+                if drawing_area:
+                    print(f"[Viability] WARNING: drawing_area not set, using current document {id(drawing_area)} as fallback")
+                    # Automatically set it for future calls
+                    self.drawing_area = drawing_area
+                else:
+                    print(f"[Viability] ERROR: Could not get current document")
+                    return None
+            except Exception as e:
+                print(f"[Viability] ERROR: Exception getting current document: {e}")
+                return None
         
-        # Try to get from model_canvas directly (fallback)
-        if self.model_canvas and hasattr(self.model_canvas, 'get_current_model'):
-            self.model = self.model_canvas.get_current_model()
-            if self.model:
-                return self.model
+        drawing_area = self.drawing_area
+        print(f"[Viability] _get_current_model using drawing_area: {id(drawing_area)}")
+        
+        try:
+            # Get canvas manager for THIS panel's document
+            # CRITICAL: Return the manager itself, NOT to_document_model()!
+            # The manager contains the actual objects being rendered
+            if hasattr(self.model_canvas, 'canvas_managers'):
+                manager = self.model_canvas.canvas_managers.get(drawing_area)
+                print(f"[Viability] Got canvas_manager: {manager}")
+                if manager:
+                    print(f"[Viability] Returning manager (has {len(manager.transitions) if hasattr(manager, 'transitions') else 0} transitions)")
+                    return manager
+                else:
+                    print(f"[Viability] ERROR: No canvas manager found for drawing_area {id(drawing_area)}")
+        except Exception as e:
+            print(f"[Viability] Error getting canvas manager: {e}")
+            import traceback
+            traceback.print_exc()
+        
+        print(f"[Viability] ERROR: Could not get canvas manager!")
+        return None
+    
+    def _get_canvas_manager(self):
+        """Get THIS panel's canvas manager (not the currently visible tab).
+        
+        IMPORTANT: This method now returns the canvas manager for THIS panel's
+        document, not the globally active document.
+        
+        Returns:
+            ModelCanvasManager instance or None
+        """
+        if not hasattr(self, 'model_canvas') or not self.model_canvas:
+            return None
+        
+        # Use THIS panel's drawing area
+        if not hasattr(self, 'drawing_area') or not self.drawing_area:
+            # FALLBACK: Try to set drawing_area from current document
+            try:
+                drawing_area = self.model_canvas.get_current_document()
+                if drawing_area:
+                    print(f"[Viability] WARNING: drawing_area not set, using current document as fallback")
+                    self.drawing_area = drawing_area
+                else:
+                    return None
+            except:
+                return None
+        
+        drawing_area = self.drawing_area
+        
+        try:
+            # Get canvas manager for THIS panel's document
+            if hasattr(self.model_canvas, 'canvas_managers'):
+                return self.model_canvas.canvas_managers.get(self.drawing_area)
+        except Exception as e:
+            print(f"[Viability] Error getting this panel's canvas manager: {e}")
         
         return None
+    
+    def _trigger_canvas_redraw(self):
+        """Trigger canvas redraw for THIS panel's document.
+        
+        IMPORTANT: This redraws THIS panel's canvas, not the currently visible one.
+        """
+        print(f"[Viability] _trigger_canvas_redraw called")
+        print(f"[Viability]   drawing_area: {id(self.drawing_area) if self.drawing_area else 'NONE'}")
+        
+        # Get canvas manager for THIS panel and trigger redraw
+        canvas_manager = self._get_canvas_manager()
+        print(f"[Viability]   canvas_manager: {canvas_manager}")
+        
+        if canvas_manager and hasattr(canvas_manager, 'mark_needs_redraw'):
+            canvas_manager.mark_needs_redraw()
+            print(f"[Viability]   ✓ Called mark_needs_redraw()")
+        
+        # Queue draw on THIS panel's drawing area
+        if hasattr(self, 'drawing_area') and self.drawing_area:
+            if hasattr(self.drawing_area, 'queue_draw'):
+                self.drawing_area.queue_draw()
+                print(f"[Viability]   ✓ Called queue_draw()")
+            else:
+                print(f"[Viability]   ✗ drawing_area has no queue_draw method")
+        else:
+            print(f"[Viability]   ✗ No drawing_area set")
     
     def investigate_transition(self, transition_id: str):
         """Add a transition to the localities list for later diagnosis.
         
         Called from right-click context menu: "Add to Viability Analysis"
+        Gets transition and locality directly from the model, not from KB.
         
         Args:
             transition_id: ID of transition to add
@@ -611,39 +834,96 @@ class ViabilityPanel(Gtk.Box):
             self._show_feedback(f"Transition {transition_id} already in list", "warning")
             return
         
-        # Get KB
-        kb = self._get_kb()
-        if not kb:
-            self._show_error("No knowledge base available")
+        # Get model directly
+        print(f"[Viability] Getting model for drawing_area {id(self.drawing_area) if self.drawing_area else 'NONE'}")
+        model = self._get_current_model()
+        if not model:
+            print(f"[Viability] ERROR: No model found!")
+            self._show_error("No model available")
             return
         
-        # Check if KB is populated, if not try to populate it
-        if not kb.transitions:
-            if not self._populate_kb_from_model(kb):
-                return
+        print(f"[Viability] Model found: {model}, has {len(model.transitions) if model.transitions else 0} transitions")
         
-        # Get transition from KB
-        transition = kb.transitions.get(transition_id)
-        if not transition:
+        # Get transition from model
+        transition_obj = None
+        for t in model.transitions:
+            if t.id == transition_id:
+                transition_obj = t
+                break
+        
+        if not transition_obj:
             self._show_error(f"Transition {transition_id} not found")
             return
         
-        # Add to list
-        self._add_transition_to_list(transition)
+        # Add to list (pass the model object, not KB object)
+        self._add_transition_to_list(transition_obj)
         
         # Enable diagnose button
         self.diagnose_button.set_sensitive(True)
         
         self._show_feedback(f"Added {transition_id} to analysis list", "info")
     
-    def _add_transition_to_list(self, transition):
+    def _get_viability_color(self):
+        """Get the viability purple color as RGB tuple.
+        
+        Returns:
+            tuple: RGB color tuple (0-1 range)
+        """
+        import matplotlib.colors as mcolors
+        viability_color_hex = '#9b59b6'  # Purple to distinguish from plot panel
+        return mcolors.hex2color(viability_color_hex)
+    
+    def _color_locality_place(self, place_obj):
+        """Color a locality place with viability purple border.
+        
+        Args:
+            place_obj: Place object to color
+        """
+        color_rgb = self._get_viability_color()
+        
+        print(f"[Viability] Setting {place_obj.id} border to {color_rgb}")
+        
+        # Set border color
+        place_obj.border_color = color_rgb
+    
+    def _color_transition(self, transition_obj):
+        """Color a transition with viability purple border and fill.
+        
+        Args:
+            transition_obj: Transition object to color
+        """
+        color_rgb = self._get_viability_color()
+        
+        print(f"[Viability] Setting {transition_obj.id} colors to {color_rgb}")
+        print(f"[Viability]   Before: border={getattr(transition_obj, 'border_color', 'NONE')}, fill={getattr(transition_obj, 'fill_color', 'NONE')}")
+        
+        # Set border and fill color
+        transition_obj.border_color = color_rgb
+        transition_obj.fill_color = color_rgb
+        
+        print(f"[Viability]   After: border={transition_obj.border_color}, fill={transition_obj.fill_color}")
+    
+    def _color_arc(self, arc_obj):
+        """Color an arc with viability purple.
+        
+        Args:
+            arc_obj: Arc object to color
+        """
+        color_rgb = self._get_viability_color()
+        
+        print(f"[Viability] Setting {arc_obj.id} color to {color_rgb}")
+        
+        # Set arc color
+        arc_obj.color = color_rgb
+    
+    def _add_transition_to_list(self, transition_obj):
         """Add a transition to the localities list (matching plot panel style).
         
         Adds transition as main row, then input/output places as indented child rows,
         exactly like the dynamic analyses plot panel shows transitions with localities.
         
         Args:
-            transition: TransitionKnowledge object
+            transition_obj: Transition object from the model (not KB)
         """
         # Get current model dynamically
         model = self._get_current_model()
@@ -651,30 +931,56 @@ class ViabilityPanel(Gtk.Box):
             self._show_error("No model loaded")
             return
         
-        # Get transition object from model
-        transition_obj = None
-        for t in model.transitions:
-            if t.id == transition.transition_id:
-                transition_obj = t
-                break
-        
-        if not transition_obj:
-            return
-        
         # Use LocalityDetector to get locality (same as plot panel)
         from shypn.diagnostic import LocalityDetector
         locality_detector = LocalityDetector(model)
         diagnostic_locality = locality_detector.get_locality_for_transition(transition_obj)
         
+        # Store the IDs (not objects) for reliable cross-document usage
+        locality_ids = {
+            'transition_id': transition_obj.id,
+            'input_place_ids': [p.id for p in diagnostic_locality.input_places],
+            'output_place_ids': [p.id for p in diagnostic_locality.output_places],
+            'input_arc_ids': [a.id for a in diagnostic_locality.input_arcs],
+            'output_arc_ids': [a.id for a in diagnostic_locality.output_arcs]
+        }
+        
         # Convert diagnostic Locality (objects) to investigation Locality (IDs)
         from .investigation import Locality
         locality = Locality(
-            transition_id=transition.transition_id,
+            transition_id=transition_obj.id,
             input_places=[p.id for p in diagnostic_locality.input_places],
             output_places=[p.id for p in diagnostic_locality.output_places],
             input_arcs=[a.id for a in diagnostic_locality.input_arcs],
             output_arcs=[a.id for a in diagnostic_locality.output_arcs]
         )
+        
+        # === COLOR ALL LOCALITY OBJECTS FIRST ===
+        
+        # Color transition
+        self._color_transition(transition_obj)
+        
+        # Color input places
+        for place_obj in diagnostic_locality.input_places:
+            self._color_locality_place(place_obj)
+        
+        # Color output places
+        for place_obj in diagnostic_locality.output_places:
+            self._color_locality_place(place_obj)
+        
+        # Color input arcs
+        for arc_obj in diagnostic_locality.input_arcs:
+            self._color_arc(arc_obj)
+        
+        # Color output arcs
+        for arc_obj in diagnostic_locality.output_arcs:
+            self._color_arc(arc_obj)
+        
+        # Trigger single canvas redraw after coloring all locality objects
+        self._trigger_canvas_redraw()
+        
+        # Store locality IDs for this transition
+        self._locality_objects[transition_obj.id] = locality_ids
         
         # === MAIN TRANSITION ROW ===
         transition_row = Gtk.ListBoxRow()
@@ -687,13 +993,13 @@ class ViabilityPanel(Gtk.Box):
         # Checkbox (store transition_id as Python attribute, not GTK data)
         checkbox = Gtk.CheckButton()
         checkbox.set_active(True)
-        checkbox.transition_id = transition.transition_id  # Store as Python attribute
+        checkbox.transition_id = transition_obj.id  # Store as Python attribute
         transition_hbox.pack_start(checkbox, False, False, 0)
         
         # Transition label (ID and optional label)
-        label_text = transition.transition_id
-        if transition.label:
-            label_text = f"{transition.transition_id} ({transition.label})"
+        label_text = transition_obj.id
+        if hasattr(transition_obj, 'label') and transition_obj.label:
+            label_text = f"{transition_obj.id} ({transition_obj.label})"
         
         transition_label = Gtk.Label(label=label_text)
         transition_label.set_xalign(0)
@@ -702,44 +1008,33 @@ class ViabilityPanel(Gtk.Box):
         # Remove button
         remove_btn = Gtk.Button(label="✕")
         remove_btn.set_relief(Gtk.ReliefStyle.NONE)
-        remove_btn.connect("clicked", lambda w: self._remove_transition_from_list(transition.transition_id))
+        remove_btn.connect("clicked", lambda w: self._remove_transition_from_list(transition_obj.id))
         transition_hbox.pack_start(remove_btn, False, False, 0)
         
         transition_row.add(transition_hbox)
         self.localities_listbox.add(transition_row)
         
         # === INPUT PLACES (INDENTED ROWS) ===
-        for place_id in locality.input_places:
-            # Get place object from model
-            place_obj = None
-            for p in model.places:
-                if p.id == place_id:
-                    place_obj = p
-                    break
-            if place_obj:
-                self._add_locality_place_row_to_list(place_obj, "← Input:")
+        for place_obj in diagnostic_locality.input_places:
+            self._add_locality_place_row_to_list(place_obj, "← Input:")
         
         # === OUTPUT PLACES (INDENTED ROWS) ===
-        for place_id in locality.output_places:
-            # Get place object from model
-            place_obj = None
-            for p in model.places:
-                if p.id == place_id:
-                    place_obj = p
-                    break
-            if place_obj:
-                self._add_locality_place_row_to_list(place_obj, "→ Output:")
+        for place_obj in diagnostic_locality.output_places:
+            self._add_locality_place_row_to_list(place_obj, "→ Output:")
         
         # Show all new widgets
         self.localities_listbox.show_all()
         
-        # Track in dict (store locality too)
-        self.selected_localities[transition.transition_id] = {
+        # Track in dict (store locality IDs for cross-document safety)
+        self.selected_localities[transition_obj.id] = {
             'row': transition_row,
             'checkbox': checkbox,
-            'transition': transition,
+            'transition': transition_obj,
             'locality': locality
         }
+        
+        # Trigger canvas redraw to show colored elements
+        self._trigger_canvas_redraw()
         
         # Refresh subnet parameters display
         self._refresh_subnet_parameters()
@@ -796,8 +1091,68 @@ class ViabilityPanel(Gtk.Box):
             return
         
         data = self.selected_localities[transition_id]
+        
+        # Reset colors - fetch objects from CURRENT model
+        from shypn.netobjs import Place, Transition, Arc
+        
+        # Get current model to fetch fresh object references
+        model = self._get_current_model()
+        if not model:
+            print(f"[Viability] Warning: No current model when removing {transition_id}")
+        else:
+            locality_ids = self._locality_objects.get(transition_id)
+            if locality_ids:
+                print(f"[Viability] Removing {transition_id} and resetting colors:")
+                
+                # Reset transition color - find by iterating transitions list
+                transition_id_to_find = locality_ids.get('transition_id')
+                for t_obj in model.transitions:
+                    if t_obj.id == transition_id_to_find:
+                        print(f"  - Transition: {t_obj.id}")
+                        t_obj.border_color = Transition.DEFAULT_BORDER_COLOR
+                        t_obj.fill_color = Transition.DEFAULT_COLOR
+                        break
+                
+                # Reset input place colors - find by iterating places list
+                for place_id in locality_ids.get('input_place_ids', []):
+                    for p_obj in model.places:
+                        if p_obj.id == place_id:
+                            print(f"  - Input place: {p_obj.id}")
+                            p_obj.border_color = Place.DEFAULT_BORDER_COLOR
+                            break
+                
+                # Reset output place colors
+                for place_id in locality_ids.get('output_place_ids', []):
+                    for p_obj in model.places:
+                        if p_obj.id == place_id:
+                            print(f"  - Output place: {p_obj.id}")
+                            p_obj.border_color = Place.DEFAULT_BORDER_COLOR
+                            break
+                
+                # Reset input arc colors - find by iterating arcs list
+                for arc_id in locality_ids.get('input_arc_ids', []):
+                    for a_obj in model.arcs:
+                        if a_obj.id == arc_id:
+                            print(f"  - Input arc: {a_obj.id}")
+                            a_obj.color = Arc.DEFAULT_COLOR
+                            break
+                
+                # Reset output arc colors
+                for arc_id in locality_ids.get('output_arc_ids', []):
+                    for a_obj in model.arcs:
+                        if a_obj.id == arc_id:
+                            print(f"  - Output arc: {a_obj.id}")
+                            a_obj.color = Arc.DEFAULT_COLOR
+                            break
+        
+        # Remove from tracking and UI
+        if transition_id in self._locality_objects:
+            del self._locality_objects[transition_id]
         self.localities_listbox.remove(data['row'])
         del self.selected_localities[transition_id]
+        
+        # Trigger canvas redraw
+        self._trigger_canvas_redraw()
         
         # Refresh subnet parameters display
         self._refresh_subnet_parameters()
@@ -900,13 +1255,14 @@ class ViabilityPanel(Gtk.Box):
             store[path][2] = new_marking
             
             # Update model
-            for place in self.model.places:
-                if place.id == place_id:
-                    place.marking = new_marking
-                    print(f"[VIABILITY_PANEL] Updated {place_id} marking to {new_marking}")
-                    break
+            model = self._get_current_model()
+            if model:
+                for place in model.places:
+                    if place.id == place_id:
+                        place.marking = new_marking
+                        break
         except ValueError:
-            print(f"[VIABILITY_PANEL] Invalid marking value: {new_text}")
+            pass
     
     def _on_transition_rate_edited(self, widget, path, new_text, store):
         """Handle transition rate edit."""
@@ -918,13 +1274,14 @@ class ViabilityPanel(Gtk.Box):
             store[path][2] = new_rate
             
             # Update model
-            for transition in self.model.transitions:
-                if transition.id == transition_id:
-                    transition.rate = new_rate
-                    print(f"[VIABILITY_PANEL] Updated {transition_id} rate to {new_rate}")
-                    break
+            model = self._get_current_model()
+            if model:
+                for transition in model.transitions:
+                    if transition.id == transition_id:
+                        transition.rate = new_rate
+                        break
         except ValueError:
-            print(f"[VIABILITY_PANEL] Invalid rate value: {new_text}")
+            pass
     
     def _on_transition_formula_edited(self, widget, path, new_text, store):
         """Handle transition formula edit."""
@@ -934,11 +1291,12 @@ class ViabilityPanel(Gtk.Box):
         store[path][3] = new_text
         
         # Update model
-        for transition in self.model.transitions:
-            if transition.id == transition_id:
-                transition.formula = new_text
-                print(f"[VIABILITY_PANEL] Updated {transition_id} formula to: {new_text}")
-                break
+        model = self._get_current_model()
+        if model:
+            for transition in model.transitions:
+                if transition.id == transition_id:
+                    transition.formula = new_text
+                    break
     
     def _on_arc_weight_edited(self, widget, path, new_text, store):
         """Handle arc weight edit."""
@@ -950,13 +1308,14 @@ class ViabilityPanel(Gtk.Box):
             store[path][3] = new_weight
             
             # Update model
-            for arc in self.model.arcs:
-                if arc.id == arc_id:
-                    arc.weight = new_weight
-                    print(f"[VIABILITY_PANEL] Updated {arc_id} weight to {new_weight}")
-                    break
+            model = self._get_current_model()
+            if model:
+                for arc in model.arcs:
+                    if arc.id == arc_id:
+                        arc.weight = new_weight
+                        break
         except ValueError:
-            print(f"[VIABILITY_PANEL] Invalid weight value: {new_text}")
+            pass
     
     def _run_analysis_pipeline(self, transition):
         """Run the full analysis pipeline on a transition.
@@ -1049,13 +1408,9 @@ class ViabilityPanel(Gtk.Box):
         try:
             conservation_issues = conservation_analyzer.analyze(context)
             all_issues.extend(conservation_issues)
-            print(f"[VIABILITY_PANEL] Level 4 (Conservation): {len(conservation_issues)} issues")
         except Exception as e:
-            print(f"[VIABILITY_PANEL] ERROR in conservation analysis: {e}")
             import traceback
             traceback.print_exc()
-        
-        print(f"[VIABILITY_PANEL] Total issues found: {len(all_issues)}")
         return all_issues
     
     def _generate_suggestions_from_issues(self, issues, transition):
@@ -1112,286 +1467,32 @@ class ViabilityPanel(Gtk.Box):
                     # Default to locality analyzer
                     analyzer_name = 'locality (default)'
                     suggestions = locality_analyzer.generate_suggestions([issue], context)
-                
-                print(f"[VIABILITY_PANEL] Issue '{issue.message[:40]}...' -> {analyzer_name} -> {len(suggestions)} suggestions")
                 all_suggestions.extend(suggestions)
             except Exception as e:
-                print(f"[VIABILITY_PANEL] ERROR generating suggestions for issue: {e}")
                 import traceback
                 traceback.print_exc()
         
-        print(f"[VIABILITY_PANEL] Generated {len(all_suggestions)} suggestions")
         return all_suggestions
-    
-    def _OLD_investigate_transition(self, transition_id: str):
-        """OLD METHOD - kept for reference during refactoring.
-        
-        Called from right-click context menu: "Add to Viability Analysis"
-        
-        Args:
-            transition_id: ID of transition to investigate
-        """
-        print(f"[VIABILITY_PANEL] investigate_transition called with: {transition_id}")
-        
-        # Get KB
-        kb = self._get_kb()
-        if not kb:
-            print("[VIABILITY_PANEL] ERROR: No knowledge base available")
-            self._show_error("No knowledge base available")
-            return
-        
-        print(f"[VIABILITY_PANEL] KB found: {kb}")
-        
-        # Check if KB is populated, if not try to populate it
-        if not kb.transitions:
-            print("[VIABILITY_PANEL] KB is empty, attempting to populate from model...")
-            if self._populate_kb_from_model(kb):
-                print(f="[VIABILITY_PANEL] KB populated: {len(kb.transitions)} transitions, {len(kb.places)} places")
-            else:
-                print("[VIABILITY_PANEL] ERROR: Failed to populate KB from model")
-                return
-        else:
-            print(f"[VIABILITY_PANEL] KB already populated: {len(kb.transitions)} transitions")
-        
-        # Initialize data puller
-        self.data_puller = DataPuller(kb, simulation=self._get_simulation())
-        cached_puller = CachedDataPuller(self.data_puller, self.data_cache)
-        
-        # Initialize fix system
-        self.fix_applier = FixApplier(kb)
-        self.fix_predictor = FixPredictor(kb)
-        
-        # Build subnet around transition - using old SubnetBuilder for now
-        # TODO: Replace with new simplified builder when ready
-        try:
-            # For now, create a simple single-locality subnet
-            from .investigation import Locality, Subnet
-            
-            print(f"[VIABILITY_PANEL] Looking for transition: {transition_id}")
-            print(f="[VIABILITY_PANEL] KB type: {type(kb)}")
-            print(f"[VIABILITY_PANEL] KB has transitions attr: {hasattr(kb, 'transitions')}")
-            
-            # Get transition - try multiple ways
-            transition = None
-            if hasattr(kb, 'transitions'):
-                print(f"[VIABILITY_PANEL] KB.transitions type: {type(kb.transitions)}")
-                if isinstance(kb.transitions, dict):
-                    print(f"[VIABILITY_PANEL] Available transitions: {list(kb.transitions.keys())[:10]}")
-                    transition = kb.transitions.get(transition_id)
-                    print(f"[VIABILITY_PANEL] Transition lookup result: {transition}")
-                else:
-                    print(f"[VIABILITY_PANEL] KB.transitions is not a dict, trying as attribute")
-                    transition = getattr(kb.transitions, transition_id, None)
-            else:
-                print(f"[VIABILITY_PANEL] KB has no transitions attribute!")
-            
-            if not transition:
-                print(f="[VIABILITY_PANEL] ERROR: Transition {transition_id} not found in KB")
-                # Don't show error dialog for now, just print and return
-                print(f"[VIABILITY_PANEL] This may be because KB structure is different than expected")
-                return
-            
-            print(f"[VIABILITY_PANEL] Transition found: {transition}")
-            print(f="[VIABILITY_PANEL] Transition type: {type(transition)}")
-            
-            # Get input/output arcs from KB (TransitionKnowledge stores arc IDs in inputs/outputs lists)
-            input_arcs = []
-            output_arcs = []
-            input_places = []
-            output_places = []
-            
-            # Query arcs from KB - look for arcs targeting this transition (inputs)
-            for arc_id, arc in kb.arcs.items():
-                if arc.arc_type == "place_to_transition" and arc.target_id == transition_id:
-                    input_arcs.append(arc_id)
-                    input_places.append(arc.source_id)
-                elif arc.arc_type == "transition_to_place" and arc.source_id == transition_id:
-                    output_arcs.append(arc_id)
-                    output_places.append(arc.target_id)
-            
-            print(f"[VIABILITY_PANEL] Input arcs: {input_arcs}")
-            print(f"[VIABILITY_PANEL] Output arcs: {output_arcs}")
-            print(f"[VIABILITY_PANEL] Input places: {input_places}")
-            print(f"[VIABILITY_PANEL] Output places: {output_places}")
-            
-            # Build locality
-            locality = Locality(
-                transition_id=transition_id,
-                input_places=input_places,
-                output_places=output_places,
-                input_arcs=input_arcs,
-                output_arcs=output_arcs
-            )
-            
-            # Build simple subnet
-            subnet = Subnet(
-                transitions={transition_id},
-                places=set(locality.input_places + locality.output_places),
-                arcs=set(locality.input_arcs + locality.output_arcs)
-            )
-            subnet.localities = [locality]  # Add localities attribute
-            
-        except Exception as e:
-            self._show_error(f"Failed to build subnet: {e}")
-            import traceback
-            traceback.print_exc()
-            return
-        
-        # Run multi-level analysis - First collect all Issues
-        all_issues = []
-        
-        # Get simulation data as dict (or None if not available)
-        sim_controller = self._get_simulation()
-        sim_data = None
-        if sim_controller:
-            # TODO: Extract simulation data dict from controller
-            # For now, pass None to avoid errors
-            sim_data = None
-        
-        # Build analysis context
-        context = {
-            'transition': transition,
-            'locality': locality,
-            'subnet': subnet,
-            'kb': kb,
-            'sim_data': sim_data  # Pass None for now instead of controller
-        }
-        
-        # STEP 1: Run analyzers to collect Issues
-        try:
-            locality_issues = self.locality_analyzer.analyze(context) if locality else []
-            all_issues.extend(locality_issues)
-            print(f"[VIABILITY_PANEL] Locality analysis: {len(locality_issues)} issues")
-        except Exception as e:
-            print(f"Locality analysis failed: {e}")
-            import traceback
-            traceback.print_exc()
-        
-        try:
-            dependency_issues = self.dependency_analyzer.analyze(context)
-            all_issues.extend(dependency_issues)
-            print(f"[VIABILITY_PANEL] Dependency analysis: {len(dependency_issues)} issues")
-        except Exception as e:
-            print(f"Dependency analysis failed: {e}")
-            import traceback
-            traceback.print_exc()
-        
-        try:
-            boundary_issues = self.boundary_analyzer.analyze(context)
-            all_issues.extend(boundary_issues)
-            print(f"[VIABILITY_PANEL] Boundary analysis: {len(boundary_issues)} issues")
-        except Exception as e:
-            print(f"Boundary analysis failed: {e}")
-            import traceback
-            traceback.print_exc()
-        
-        try:
-            conservation_issues = self.conservation_analyzer.analyze(context)
-            all_issues.extend(conservation_issues)
-            print(f"[VIABILITY_PANEL] Conservation analysis: {len(conservation_issues)} issues")
-        except Exception as e:
-            print(f"Conservation analysis failed: {e}")
-            import traceback
-            traceback.print_exc()
-        
-        print(f"[VIABILITY_PANEL] Total issues found: {len(all_issues)}")
-        
-        # STEP 2: Generate Suggestions from Issues
-        all_suggestions = []
-        
-        try:
-            locality_suggestions = self.locality_analyzer.generate_suggestions(all_issues, context)
-            all_suggestions.extend(locality_suggestions)
-            print(f"[VIABILITY_PANEL] Locality suggestions: {len(locality_suggestions)}")
-        except Exception as e:
-            print(f"Failed to generate locality suggestions: {e}")
-            import traceback
-            traceback.print_exc()
-        
-        try:
-            dependency_suggestions = self.dependency_analyzer.generate_suggestions(all_issues, context)
-            all_suggestions.extend(dependency_suggestions)
-            print(f"[VIABILITY_PANEL] Dependency suggestions: {len(dependency_suggestions)}")
-        except Exception as e:
-            print(f"Failed to generate dependency suggestions: {e}")
-            import traceback
-            traceback.print_exc()
-        
-        try:
-            boundary_suggestions = self.boundary_analyzer.generate_suggestions(all_issues, context)
-            all_suggestions.extend(boundary_suggestions)
-            print(f"[VIABILITY_PANEL] Boundary suggestions: {len(boundary_suggestions)}")
-        except Exception as e:
-            print(f"Failed to generate boundary suggestions: {e}")
-            import traceback
-            traceback.print_exc()
-        
-        try:
-            conservation_suggestions = self.conservation_analyzer.generate_suggestions(all_issues, context)
-            all_suggestions.extend(conservation_suggestions)
-            print(f"[VIABILITY_PANEL] Conservation suggestions: {len(conservation_suggestions)}")
-        except Exception as e:
-            print(f"Failed to generate conservation suggestions: {e}")
-            import traceback
-            traceback.print_exc()
-        
-        print(f"[VIABILITY_PANEL] Total suggestions generated: {len(all_suggestions)}")
-        
-        # Sequence fixes
-        try:
-            fix_sequence = self.fix_sequencer.sequence(all_suggestions) if all_suggestions else None
-        except Exception as e:
-            print(f"Fix sequencing failed: {e}")
-            fix_sequence = None
-        
-        # Create investigation
-        from .investigation import Investigation
-        self.current_investigation = Investigation(
-            root_transition_id=transition_id,
-            subnet=subnet,
-            suggestions=all_suggestions,
-            fix_sequence=fix_sequence
-        )
-        
-        print(f"[VIABILITY_PANEL] Investigation created: {self.current_investigation}")
-        print(f"[VIABILITY_PANEL] Suggestions count: {len(all_suggestions)}")
-        
-        # Build and show UI
-        self._show_investigation_view()
     
     def _show_investigation_view(self):
         """Show investigation results in UI."""
-        print(f"[VIABILITY_PANEL] _show_investigation_view called")
         
         if not self.current_investigation:
-            print("[VIABILITY_PANEL] ERROR: No current investigation!")
             return
-        
-        print(f"[VIABILITY_PANEL] Current investigation: {self.current_investigation}")
-        print(f"[VIABILITY_PANEL] Subnet localities: {len(self.current_investigation.subnet.localities) if hasattr(self.current_investigation.subnet, 'localities') else 0}")
         
         # Remove empty state
         if self.empty_label in self.content_box.get_children():
-            print("[VIABILITY_PANEL] Removing empty state label")
             self.content_box.remove(self.empty_label)
         
         # Remove old view if exists
         if self.current_view and self.current_view in self.content_box.get_children():
-            print("[VIABILITY_PANEL] Removing old view")
             self.content_box.remove(self.current_view)
         
         # FOR NOW: Always use simple fallback view since Investigation dataclass
         # structure doesn't match what InvestigationView/SubnetView expect
-        print("[VIABILITY_PANEL] Using simple fallback view")
         self.current_view = self._create_simple_results_view()
         
-        print(f"[VIABILITY_PANEL] View created: {type(self.current_view)}")
-        print(f"[VIABILITY_PANEL] content_box children before add: {len(self.content_box.get_children())}")
-        
         self.content_box.pack_start(self.current_view, True, True, 0)
-        
-        print(f"[VIABILITY_PANEL] content_box children after add: {len(self.content_box.get_children())}")
-        print("[VIABILITY_PANEL] Calling show_all()...")
         
         # Make everything visible
         self.current_view.show_all()
@@ -1405,12 +1506,6 @@ class ViabilityPanel(Gtk.Box):
         self.scrolled_window.queue_draw()
         
         # Check visibility
-        print(f"[VIABILITY_PANEL] Current view visible: {self.current_view.get_visible()}")
-        print(f"[VIABILITY_PANEL] Content box visible: {self.content_box.get_visible()}")
-        print(f"[VIABILITY_PANEL] Scrolled window visible: {self.scrolled_window.get_visible()}")
-        print(f"[VIABILITY_PANEL] Panel visible: {self.get_visible()}")
-        
-        print("[VIABILITY_PANEL] UI update complete")
     
     def _create_simple_results_view(self):
         """Create simple fallback view showing investigation results.
@@ -1418,9 +1513,6 @@ class ViabilityPanel(Gtk.Box):
         Returns:
             Gtk.Box with simple text results
         """
-        print("[VIABILITY_PANEL] _create_simple_results_view called")
-        print(f"[VIABILITY_PANEL] Investigation: {self.current_investigation}")
-        print(f"[VIABILITY_PANEL] Suggestions: {len(self.current_investigation.suggestions) if self.current_investigation else 0}")
         
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         box.set_margin_start(10)
@@ -1701,14 +1793,39 @@ class ViabilityPanel(Gtk.Box):
         dialog.destroy()
     
     def _get_kb(self):
-        """Get current knowledge base.
+        """Get THIS panel's knowledge base (not the currently visible tab).
+        
+        IMPORTANT: This returns the KB for THIS panel's document,
+        not the globally active document.
         
         Returns:
-            Knowledge base or None
+            ModelKnowledgeBase instance or None
         """
-        if self.model_canvas and hasattr(self.model_canvas, 'get_current_knowledge_base'):
-            return self.model_canvas.get_current_knowledge_base()
-        return None
+        if not hasattr(self, 'model_canvas') or not self.model_canvas:
+            return None
+        
+        # Use THIS panel's drawing area to get the correct KB
+        if not hasattr(self, 'drawing_area') or not self.drawing_area:
+            # FALLBACK: Try to set drawing_area from current document
+            try:
+                drawing_area = self.model_canvas.get_current_document()
+                if drawing_area:
+                    print(f"[Viability] WARNING: drawing_area not set, using current document as fallback")
+                    self.drawing_area = drawing_area
+                else:
+                    return None
+            except:
+                return None
+        
+        drawing_area = self.drawing_area
+        
+        try:
+            # Get KB for THIS panel's document
+            if hasattr(self.model_canvas, 'knowledge_bases'):
+                return self.model_canvas.knowledge_bases.get(self.drawing_area)
+        except Exception as e:
+            print(f"[Viability] Error getting this panel's KB: {e}")
+            return None
     
     def _populate_kb_from_model(self, kb):
         """Populate KB from current model if empty.
@@ -1720,15 +1837,15 @@ class ViabilityPanel(Gtk.Box):
             True if successful, False otherwise
         """
         try:
-            # Get current model
-            model = None
-            if self.model_canvas:
-                model = self.model_canvas
-            elif self.model:
-                model = self.model
+            print(f"[Viability] _populate_kb_from_model START")
+            
+            # Get current model using the proper accessor
+            model = self._get_current_model()
+            
+            print(f"[Viability] Got model: {model}")
             
             if not model:
-                print("[VIABILITY_PANEL] No model available to populate KB")
+                print(f"[Viability] No model found")
                 return False
             
             # Extract data from model
@@ -1739,28 +1856,32 @@ class ViabilityPanel(Gtk.Box):
             # Places
             if hasattr(model, 'places') and model.places:
                 places_data = [p for p in model.places if p]
+                print(f"[Viability] Found {len(places_data)} places")
             
             # Transitions
             if hasattr(model, 'transitions') and model.transitions:
                 transitions_data = [t for t in model.transitions if t]
+                print(f"[Viability] Found {len(transitions_data)} transitions: {[t.id for t in transitions_data]}")
             
             # Arcs
             if hasattr(model, 'arcs') and model.arcs:
                 arcs_data = [a for a in model.arcs if a]
+                print(f"[Viability] Found {len(arcs_data)} arcs")
             
             if not transitions_data:
-                print("[VIABILITY_PANEL] No transitions found in model")
+                print(f"[Viability] No transitions found in model")
                 return False
             
             # Populate KB
-            print(f"[VIABILITY_PANEL] Populating KB with {len(places_data)} places, {len(transitions_data)} transitions, {len(arcs_data)} arcs")
+            print(f"[Viability] Calling kb.update_topology_structural...")
             kb.update_topology_structural(places_data, transitions_data, arcs_data)
+            print(f"[Viability] KB populated successfully, transitions in KB: {len(kb.transitions)}")
             
             return True
             
         except Exception as e:
-            print(f"[VIABILITY_PANEL] Failed to populate KB: {e}")
             import traceback
+            print(f"[Viability] Exception in _populate_kb_from_model: {e}")
             traceback.print_exc()
             return False
     
@@ -1820,8 +1941,6 @@ class ViabilityPanel(Gtk.Box):
         
         Runs analysis on all checked transitions in the localities list.
         """
-        print("[VIABILITY_PANEL] _on_diagnose_clicked called")
-        
         # Get checked transitions
         checked_transitions = []
         for transition_id, data in self.selected_localities.items():
@@ -1832,8 +1951,6 @@ class ViabilityPanel(Gtk.Box):
         if not checked_transitions:
             self._show_feedback("No transitions selected for diagnosis", "warning")
             return
-        
-        print(f"[VIABILITY_PANEL] Diagnosing {len(checked_transitions)} transitions")
         
         # Clear previous results
         self._clear_results()
@@ -1848,8 +1965,6 @@ class ViabilityPanel(Gtk.Box):
         total_issues = 0
         
         for transition in checked_transitions:
-            print(f"[VIABILITY_PANEL] Analyzing transition: {transition.transition_id}")
-            
             # Run analysis levels
             issues = self._run_analysis_pipeline(transition)
             total_issues += len(issues)
@@ -1858,15 +1973,10 @@ class ViabilityPanel(Gtk.Box):
             suggestions = self._generate_suggestions_from_issues(issues, transition)
             
             # Categorize suggestions
-            print(f"[VIABILITY_PANEL] Categorizing {len(suggestions)} suggestions for transition {transition.transition_id}")
             for suggestion in suggestions:
                 category = suggestion.category.lower()
-                print(f"[VIABILITY_PANEL]   Suggestion category: '{category}' (raw: '{suggestion.category}')")
                 if category in all_suggestions_by_category:
                     all_suggestions_by_category[category].append(suggestion)
-                    print(f"[VIABILITY_PANEL]     Added to {category}")
-                else:
-                    print(f"[VIABILITY_PANEL]     WARNING: Unknown category '{category}', skipping")
         
         # Populate summary
         self._populate_summary(total_issues, all_suggestions_by_category, len(checked_transitions))
@@ -1894,21 +2004,102 @@ class ViabilityPanel(Gtk.Box):
     def _on_clear_all_clicked(self, button):
         """Handle 'Clear All' button click.
         
-        Removes all transitions from the localities list.
+        Clears all localities and resets the entire panel state.
         """
-        print("[VIABILITY_PANEL] _on_clear_all_clicked called")
+        # Reset colors - fetch objects from CURRENT model
+        from shypn.netobjs import Place, Transition, Arc
+        
+        print("[Viability] Clearing all localities and resetting colors...")
+        
+        # Get current model to fetch fresh object references
+        model = self._get_current_model()
+        if not model:
+            print("[Viability] Warning: No current model when clearing all")
+        else:
+            for transition_id in self.selected_localities.keys():
+                locality_ids = self._locality_objects.get(transition_id)
+                if not locality_ids:
+                    continue
+                
+                print(f"  Resetting colors for {transition_id}:")
+                
+                # Reset transition color - find by iterating transitions list
+                transition_id_to_find = locality_ids.get('transition_id')
+                for t_obj in model.transitions:
+                    if t_obj.id == transition_id_to_find:
+                        print(f"    - Transition: {t_obj.id}")
+                        t_obj.border_color = Transition.DEFAULT_BORDER_COLOR
+                        t_obj.fill_color = Transition.DEFAULT_COLOR
+                        break
+                
+                # Reset input place colors - find by iterating places list
+                for place_id in locality_ids.get('input_place_ids', []):
+                    for p_obj in model.places:
+                        if p_obj.id == place_id:
+                            print(f"    - Input place: {p_obj.id}")
+                            p_obj.border_color = Place.DEFAULT_BORDER_COLOR
+                            break
+                
+                # Reset output place colors
+                for place_id in locality_ids.get('output_place_ids', []):
+                    for p_obj in model.places:
+                        if p_obj.id == place_id:
+                            print(f"    - Output place: {p_obj.id}")
+                            p_obj.border_color = Place.DEFAULT_BORDER_COLOR
+                            break
+                
+                # Reset input arc colors - find by iterating arcs list
+                for arc_id in locality_ids.get('input_arc_ids', []):
+                    for a_obj in model.arcs:
+                        if a_obj.id == arc_id:
+                            print(f"    - Input arc: {a_obj.id}")
+                            a_obj.color = Arc.DEFAULT_COLOR
+                            break
+                
+                # Reset output arc colors
+                for arc_id in locality_ids.get('output_arc_ids', []):
+                    for a_obj in model.arcs:
+                        if a_obj.id == arc_id:
+                            print(f"    - Output arc: {a_obj.id}")
+                            a_obj.color = Arc.DEFAULT_COLOR
+                            break
+        
+        print("[Viability] All colors reset")
         
         # Clear localities list
         for row in list(self.localities_listbox.get_children()):
             self.localities_listbox.remove(row)
         
         self.selected_localities.clear()
+        self._locality_objects.clear()
+        
+        # Clear subnet parameters tables
+        self.places_store.clear()
+        self.transitions_store.clear()
+        self.arcs_store.clear()
+        
+        # Clear simulation results
+        self.results_store.clear()
+        
+        # Clear diagnostics log
+        self.diagnostics_textbuffer.set_text("")
+        
+        # Reset simulator
+        if self.subnet_simulator.is_initialized():
+            self.subnet_simulator.reset()
+        
+        # Reset toolbar status
+        self.simulation_toolbar.set_status("Ready", "ready")
+        self.simulation_toolbar.set_running_state(False)
         
         # Disable diagnose button
         self.diagnose_button.set_sensitive(False)
         
         # Clear results
         self._clear_results()
+        
+        # Trigger canvas redraw to show reset colors
+        self._trigger_canvas_redraw()
         
         self._show_feedback("All localities cleared", "info")
     
@@ -2021,19 +2212,23 @@ class ViabilityPanel(Gtk.Box):
             store.append([str(priority), str(issue), str(suggestion_text), str(confidence)])
     
     def add_object_for_analysis(self, obj):
-        """Add object for analysis (compatibility).
+        """Add object for analysis with visual highlight.
+        
+        This is called from the context menu "Add to Viability Analysis".
+        It delegates to investigate_transition which handles:
+        - KB lookup
+        - Locality detection
+        - Full locality coloring (transition + places + arcs)
+        - Adding to UI list
         
         Args:
             obj: Place or Transition object
         """
-        print(f"[VIABILITY_PANEL] add_object_for_analysis called with: {obj}")
-        from shypn.netobjs import Transition
+        from shypn.netobjs import Transition, Place
         
         if isinstance(obj, Transition):
-            print(f"[VIABILITY_PANEL] Object is Transition, calling investigate_transition({obj.id})")
+            # Add to viability panel - this handles ALL coloring (transition + locality)
             self.investigate_transition(obj.id)
-        else:
-            print(f"[VIABILITY_PANEL] Object is not a Transition: {type(obj)}")
     
     def set_model(self, model):
         """Update model reference (compatibility).
@@ -2064,6 +2259,7 @@ class ViabilityPanel(Gtk.Box):
             drawing_area: Gtk.DrawingArea widget
         """
         self.drawing_area = drawing_area
+        print(f"[Viability] set_drawing_area called: {id(drawing_area)}")
         
         # Update model reference from drawing area's overlay manager
         if self.model_canvas and self.drawing_area:
@@ -2082,4 +2278,344 @@ class ViabilityPanel(Gtk.Box):
             ModelKnowledgeBase or None
         """
         return self._get_kb()
-
+    
+    # ========================================================================
+    # SIMULATION CONTROL CALLBACKS (NEW)
+    # ========================================================================
+    
+    def _append_diagnostics_log(self, message):
+        """Add timestamped message to diagnostics log.
+        
+        Args:
+            message: Log message text
+        """
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        full_message = f"{timestamp} - {message}\n"
+        
+        self.diagnostics_textbuffer.insert(
+            self.diagnostics_textbuffer.get_end_iter(),
+            full_message
+        )
+        
+        # Auto-scroll to bottom
+        mark = self.diagnostics_textbuffer.create_mark(
+            None,
+            self.diagnostics_textbuffer.get_end_iter(),
+            False
+        )
+        self.diagnostics_textview.scroll_to_mark(mark, 0.0, True, 0.0, 1.0)
+    
+    def _on_clear_diagnostics_log(self, button):
+        """Clear diagnostics log."""
+        self.diagnostics_textbuffer.set_text("")
+    
+    def _on_run_simulation(self, button):
+        """Run simulation to completion."""
+        # 1. Initialize simulator
+        if not self.subnet_simulator.initialize_simulation():
+            self._append_diagnostics_log("✗ Failed to initialize simulation (no subnet selected)")
+            return
+        
+        self._append_diagnostics_log("▶ Simulation started")
+        self.simulation_toolbar.set_status("Running...", "running")
+        self.simulation_toolbar.set_running_state(True)
+        
+        # 2. Get settings
+        settings = self.simulation_toolbar.get_simulation_settings()
+        max_time = settings['max_time']
+        max_steps = settings['max_steps']
+        
+        # 3. Run simulation
+        results = self.subnet_simulator.run_to_completion(
+            max_time=max_time,
+            max_steps=max_steps,
+            log_callback=self._append_diagnostics_log
+        )
+        
+        # 4. Update results display
+        self._update_results_display(results)
+        
+        # 5. Update status
+        status_type = "success" if "✓" in results.viability_status else "error"
+        self.simulation_toolbar.set_status(results.viability_status, status_type)
+        self.simulation_toolbar.set_running_state(False)
+        
+        self._append_diagnostics_log(
+            f"Completed in {results.execution_time:.2f}s real time "
+            f"({results.step_count} steps, t={results.sim_time:.2f}s sim time)"
+        )
+    
+    def _on_step_simulation(self, button):
+        """Execute single firing event."""
+        # 1. Initialize if needed
+        if not self.subnet_simulator.is_initialized():
+            if not self.subnet_simulator.initialize_simulation():
+                self._append_diagnostics_log("✗ Failed to initialize (no subnet selected)")
+                return
+            self._append_diagnostics_log("⏭ Step mode started")
+        
+        # 2. Execute step
+        step_info = self.subnet_simulator.step()
+        
+        if not step_info:
+            self._append_diagnostics_log("✗ Step failed")
+            return
+        
+        # 3. Log step
+        if step_info['deadlocked']:
+            self._append_diagnostics_log("✗ Deadlock - no enabled transitions")
+            self.simulation_toolbar.set_status("Deadlocked", "error")
+        else:
+            trans_id = step_info['fired_transition']
+            changes_str = ", ".join([
+                f"{pid}: {old}→{new}"
+                for pid, (old, new) in step_info['marking_changes'].items()
+            ])
+            self._append_diagnostics_log(
+                f"Step {self.subnet_simulator.state.step_count}: "
+                f"{trans_id} fired ({changes_str})"
+            )
+            
+            # Update live markings in Places tab
+            self._update_live_markings()
+            
+            # Update status
+            enabled_count = len(step_info['enabled_transitions'])
+            self.simulation_toolbar.set_status(
+                f"Step {self.subnet_simulator.state.step_count} "
+                f"(t={self.subnet_simulator.state.time:.2f}s, {enabled_count} enabled)",
+                "running"
+            )
+    
+    def _on_pause_simulation(self, button):
+        """Pause running simulation."""
+        if self.subnet_simulator.state:
+            self.subnet_simulator.pause()
+            self._append_diagnostics_log("⏸ Paused")
+            self.simulation_toolbar.set_status("Paused", "paused")
+    
+    def _on_stop_simulation(self, button):
+        """Stop and reset simulation."""
+        if self.subnet_simulator.state:
+            self.subnet_simulator.stop()
+        self.subnet_simulator.reset()
+        self._append_diagnostics_log("⏹ Stopped and reset")
+        self.simulation_toolbar.set_status("Ready", "ready")
+        self.simulation_toolbar.set_running_state(False)
+        self.results_store.clear()
+    
+    def _on_reset_simulation(self, button):
+        """Reset simulation to initial state."""
+        self.subnet_simulator.reset()
+        self._append_diagnostics_log("↻ Reset to initial state")
+        self.simulation_toolbar.set_status("Ready", "ready")
+        self.results_store.clear()
+        
+        # Restore initial markings in Places tab
+        if self.subnet_simulator.initial_markings:
+            for row in self.places_store:
+                place_id = row[0]
+                if place_id in self.subnet_simulator.initial_markings:
+                    row[2] = self.subnet_simulator.initial_markings[place_id]
+    
+    def _update_results_display(self, results):
+        """Populate Results tab with simulation outcomes.
+        
+        Args:
+            results: SimulationResults instance
+        """
+        self.results_store.clear()
+        
+        # Header
+        self.results_store.append([
+            "=== SIMULATION RESULTS ===",
+            "", "", "", f"Status: {results.viability_status}"
+        ])
+        
+        # Place markings section
+        self.results_store.append(["", "", "", "", ""])
+        self.results_store.append(["PLACE MARKINGS", "Initial", "Final", "Δ", ""])
+        
+        for place_id, final_marking in sorted(results.final_markings.items()):
+            # Get initial marking
+            initial = self.subnet_simulator.initial_markings.get(place_id, 0)
+            delta = final_marking - initial
+            delta_str = f"+{delta}" if delta > 0 else str(delta) if delta != 0 else "0"
+            
+            self.results_store.append([
+                f"  {place_id}",
+                str(initial),
+                str(final_marking),
+                delta_str,
+                ""
+            ])
+        
+        # Transition firings section
+        self.results_store.append(["", "", "", "", ""])
+        self.results_store.append(["TRANSITION FIRINGS", "Count", "Flux", "", ""])
+        
+        for trans_id, count in sorted(results.firing_counts.items()):
+            flux = results.fluxes.get(trans_id, 0)
+            flux_str = f"{flux:.3f} /s" if flux > 0 else "0"
+            
+            self.results_store.append([
+                f"  {trans_id}",
+                str(count),
+                flux_str,
+                "",
+                f"{count} firings"
+            ])
+        
+        # Viability section
+        self.results_store.append(["", "", "", "", ""])
+        self.results_store.append([
+            "VIABILITY",
+            "", "", "",
+            results.viability_status
+        ])
+        
+        if results.unbounded_places:
+            self.results_store.append([
+                "  Unbounded places:",
+                "", "", "",
+                ", ".join(results.unbounded_places)
+            ])
+        
+        # Performance
+        self.results_store.append(["", "", "", "", ""])
+        self.results_store.append([
+            "PERFORMANCE",
+            "", "", "",
+            f"Real: {results.execution_time:.3f}s, Sim: {results.sim_time:.2f}s, Steps: {results.step_count}"
+        ])
+        
+        # Switch to Results tab
+        self.subnet_notebook.set_current_page(3)  # Tab index 3 (0=Places, 1=Transitions, 2=Arcs, 3=Results)
+    
+    def _update_live_markings(self):
+        """Update Places tab with current simulation markings (live view)."""
+        if not self.subnet_simulator.state:
+            return
+        
+        for row in self.places_store:
+            place_id = row[0]
+            current_marking = self.subnet_simulator.state.current_markings.get(place_id)
+            if current_marking is not None:
+                row[2] = current_marking  # Column 2 = marking
+    
+    def _on_add_experiment(self, button):
+        """Create new experiment snapshot."""
+        snapshot = self.experiment_manager.add_snapshot()
+        
+        # Capture current TreeView values
+        snapshot.capture_from_treeviews(
+            self.places_store,
+            self.transitions_store,
+            self.arcs_store
+        )
+        
+        # Add to combo
+        self.simulation_toolbar.add_experiment_to_combo(snapshot.name)
+        
+        self._append_diagnostics_log(f"✓ Created experiment: {snapshot.name}")
+    
+    def _on_copy_experiment(self, button):
+        """Duplicate current experiment."""
+        active_index = self.simulation_toolbar.get_active_experiment_index()
+        snapshot = self.experiment_manager.copy_snapshot(active_index)
+        
+        if snapshot:
+            self.simulation_toolbar.add_experiment_to_combo(snapshot.name)
+            self._append_diagnostics_log(f"✓ Copied experiment: {snapshot.name}")
+        else:
+            self._append_diagnostics_log("⚠ No experiment to copy")
+    
+    def _on_save_experiments(self, button):
+        """Export experiments to JSON file."""
+        if not self.experiment_manager.snapshots:
+            self._append_diagnostics_log("⚠ No experiments to save")
+            return
+        
+        dialog = Gtk.FileChooserDialog(
+            title="Save Experiments",
+            action=Gtk.FileChooserAction.SAVE
+        )
+        dialog.add_buttons(
+            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+            Gtk.STOCK_SAVE, Gtk.ResponseType.OK
+        )
+        dialog.set_current_name("viability_experiments.json")
+        
+        # Add JSON filter
+        filter_json = Gtk.FileFilter()
+        filter_json.set_name("JSON files")
+        filter_json.add_pattern("*.json")
+        dialog.add_filter(filter_json)
+        
+        response = dialog.run()
+        if response == Gtk.ResponseType.OK:
+            filepath = dialog.get_filename()
+            if not filepath.endswith('.json'):
+                filepath += '.json'
+            
+            try:
+                self.experiment_manager.export_to_json(filepath)
+                self._append_diagnostics_log(f"💾 Saved experiments to {filepath}")
+            except Exception as e:
+                self._append_diagnostics_log(f"✗ Save failed: {e}")
+        
+        dialog.destroy()
+    
+    def _on_load_experiments(self, button):
+        """Import experiments from JSON file."""
+        dialog = Gtk.FileChooserDialog(
+            title="Load Experiments",
+            action=Gtk.FileChooserAction.OPEN
+        )
+        dialog.add_buttons(
+            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+            Gtk.STOCK_OPEN, Gtk.ResponseType.OK
+        )
+        
+        # Add JSON filter
+        filter_json = Gtk.FileFilter()
+        filter_json.set_name("JSON files")
+        filter_json.add_pattern("*.json")
+        dialog.add_filter(filter_json)
+        
+        response = dialog.run()
+        if response == Gtk.ResponseType.OK:
+            filepath = dialog.get_filename()
+            
+            try:
+                if self.experiment_manager.import_from_json(filepath):
+                    # Rebuild combo
+                    names = self.experiment_manager.get_snapshot_names()
+                    self.simulation_toolbar.populate_experiment_combo(names)
+                    
+                    self._append_diagnostics_log(f"📂 Loaded {len(names)} experiments from {filepath}")
+                else:
+                    self._append_diagnostics_log(f"✗ Load failed: Invalid file format")
+            except Exception as e:
+                self._append_diagnostics_log(f"✗ Load failed: {e}")
+        
+        dialog.destroy()
+    
+    def _on_experiment_changed(self, combo):
+        """Switch between experiment snapshots."""
+        index = combo.get_active()
+        if index < 0:
+            return
+        
+        snapshot = self.experiment_manager.switch_to(index)
+        
+        if snapshot:
+            # Apply snapshot values to TreeViews
+            snapshot.apply_to_treeviews(
+                self.places_store,
+                self.transitions_store,
+                self.arcs_store
+            )
+            
+            self._append_diagnostics_log(f"Switched to: {snapshot.name}")
