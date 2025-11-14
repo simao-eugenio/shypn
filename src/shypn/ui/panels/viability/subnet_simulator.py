@@ -367,17 +367,17 @@ class SubnetSimulator:
                     f"{pid}: {old}→{new}"
                     for pid, (old, new) in step_info['marking_changes'].items()
                 ])
-                log_callback(f"Step {self.state.step_count}: {trans_id} fired ({changes_str})")
-                # Full markings snapshot after this step
+                # Build one-line log with markings snapshot
+                full_line = f"Step {self.state.step_count}: {trans_id} fired ({changes_str})"
                 try:
                     markings_list = ", ".join([
                         f"{pid}={self.state.current_markings.get(pid, 0)}"
                         for pid in sorted(self.state.current_markings.keys())
                     ])
-                    log_callback(f"Markings: {markings_list}")
+                    full_line += f" | Markings: {markings_list}"
                 except Exception:
-                    # Best-effort logging; continue if any issue arises
                     pass
+                log_callback(full_line)
         
         self.state.is_running = False
         
