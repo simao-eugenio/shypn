@@ -10,12 +10,13 @@ Design Principles:
 - Separation of Concerns: Palettes, tools, and modes managed independently
 """
 import sys
+import logging
 try:
     import gi
     gi.require_version('Gtk', '3.0')
     from gi.repository import Gtk
 except Exception as e:
-    print('ERROR: GTK3 not available in canvas_overlay_manager:', e, file=sys.stderr)
+    logging.getLogger(__name__).error('GTK3 not available in canvas_overlay_manager: %s', e)
     sys.exit(1)
 
 from shypn.canvas.base_overlay_manager import BaseOverlayManager
@@ -29,7 +30,7 @@ try:
     from shypn.helpers.simulate_palette_loader import create_simulate_palette
     from shypn.helpers.simulate_tools_palette_loader import create_simulate_tools_palette
 except ImportError as e:
-    print(f'ERROR: Cannot import palette loaders: {e}', file=sys.stderr)
+    logging.getLogger(__name__).error('Cannot import palette loaders: %s', e)
     sys.exit(1)
 
 # Import editing operations classes
@@ -39,7 +40,7 @@ try:
         LassoSelector
     )
 except ImportError as e:
-    print(f'ERROR: Cannot import editing operations: {e}', file=sys.stderr)
+    logging.getLogger(__name__).error('Cannot import editing operations: %s', e)
     sys.exit(1)
 
 

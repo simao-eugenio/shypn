@@ -14,6 +14,7 @@ Date: 2025-10-22
 
 import os
 import sys
+import logging
 from pathlib import Path
 from typing import Optional
 
@@ -103,7 +104,7 @@ class FilePanelController:
         self.tree_store.clear()
         
         if not self.current_path.exists():
-            print(f"⚠ Path does not exist: {self.current_path}", file=sys.stderr)
+            logging.getLogger(__name__).warning(f"Path does not exist: {self.current_path}")
             return
         
         try:
@@ -121,7 +122,7 @@ class FilePanelController:
             try:
                 items = list(self.current_path.iterdir())
             except PermissionError:
-                print(f"⚠ Permission denied: {self.current_path}", file=sys.stderr)
+                logging.getLogger(__name__).warning(f"Permission denied: {self.current_path}")
                 return
             
             # Sort: directories first, then files (alphabetically)
@@ -140,7 +141,7 @@ class FilePanelController:
                 ])
         
         except Exception as e:
-            print(f"Error populating tree: {e}", file=sys.stderr)
+            logging.getLogger(__name__).error(f"Error populating tree: {e}")
     
     def _update_path_entry(self, selected_file: Optional[str] = None):
         """Update path entry with current directory or selected file."""
@@ -229,7 +230,7 @@ class FilePanelController:
             elif path.is_file():
                 self._open_file(str(path))
         else:
-            print(f"⚠ Path does not exist: {path}", file=sys.stderr)
+            logging.getLogger(__name__).warning(f"Path does not exist: {path}")
     
     # ===============================
     # Context Menu
@@ -289,7 +290,7 @@ class FilePanelController:
                     filepath.touch()
                     self.refresh_tree()
                 except Exception as e:
-                    print(f"Error creating file: {e}", file=sys.stderr)
+                    logging.getLogger(__name__).error(f"Error creating file: {e}")
         
         dialog.destroy()
     
@@ -320,7 +321,7 @@ class FilePanelController:
                     folderpath.mkdir(parents=True, exist_ok=True)
                     self.refresh_tree()
                 except Exception as e:
-                    print(f"Error creating folder: {e}", file=sys.stderr)
+                    logging.getLogger(__name__).error(f"Error creating folder: {e}")
         
         dialog.destroy()
     
@@ -377,7 +378,7 @@ class FilePanelController:
                         path.unlink()
                     self.refresh_tree()
                 except Exception as e:
-                    print(f"Error deleting: {e}", file=sys.stderr)
+                    logging.getLogger(__name__).error(f"Error deleting: {e}")
     
     def _on_context_refresh(self, menu_item):
         """Refresh file tree."""
@@ -420,9 +421,9 @@ class FilePanelController:
             try:
                 self.canvas_loader.load_file(filepath)
             except Exception as e:
-                print(f"Error opening file: {e}", file=sys.stderr)
+                logging.getLogger(__name__).error(f"Error opening file: {e}")
         else:
-            print(f"⚠ No canvas loader available to open file", file=sys.stderr)
+            logging.getLogger(__name__).warning("No canvas loader available to open file")
     
     def _find_project_file_in_folder(self, folder_path):
         """Find .shy project file in a folder.
@@ -460,11 +461,9 @@ class FilePanelController:
             try:
                 self.on_project_opened(project_path)
             except Exception as e:
-                print(f"Error opening project: {e}", file=sys.stderr)
-                import traceback
-                traceback.print_exc()
+                logging.getLogger(__name__).exception(f"Error opening project: {e}")
         else:
-            print(f"⚠ No project opened callback set", file=sys.stderr)
+            logging.getLogger(__name__).warning("No project opened callback set")
     
     def on_open_project(self, button=None):
         """Handle Open Project button - enters project opening mode.
