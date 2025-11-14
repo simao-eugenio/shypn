@@ -94,9 +94,9 @@ class ContextMenuHandler:
         self.model_canvas_loader = model_canvas_loader
     
     def _get_current_viability_panel(self):
-        """Get the viability panel for the current document.
+        """Get the viability panel for the CURRENT document.
         
-        Returns per-document viability panel if available, otherwise returns
+        Tries to get per-document panel first (new architecture), falls back to
         the global viability panel (for backward compatibility).
         
         Returns:
@@ -110,9 +110,13 @@ class ContextMenuHandler:
                 if overlay_manager and hasattr(overlay_manager, 'viability_panel_loader'):
                     viability_loader = overlay_manager.viability_panel_loader
                     if viability_loader and hasattr(viability_loader, 'panel'):
-                        return viability_loader.panel
+                        panel = viability_loader.panel
+                        print(f"[CONTEXT_MENU] ✓ Found per-document viability panel {id(panel)} for drawing_area {id(drawing_area)}")
+                        return panel
         
         # Fallback to global panel (old architecture)
+        if self.viability_panel:
+            print(f"[CONTEXT_MENU] ⚠️ Using GLOBAL viability panel {id(self.viability_panel)} (fallback)")
         return self.viability_panel
     
     def set_model(self, model):

@@ -164,7 +164,8 @@ class DependencyAnalyzer(BaseAnalyzer):
         
         # Calculate firing rates
         rates = {}
-        for trans_id in subnet.transitions:
+        for trans_obj in subnet.transitions:
+            trans_id = trans_obj.id  # Extract ID from object
             data = sim_data.get(trans_id, {})
             rate = data.get('firing_count', 0) / data.get('duration', 60.0) if data else 0
             rates[trans_id] = rate

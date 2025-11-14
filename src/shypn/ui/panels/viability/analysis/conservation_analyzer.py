@@ -99,7 +99,8 @@ class ConservationAnalyzer(BaseAnalyzer):
             # Simple check: sum of tokens should be constant
             if len(subnet_inv_places) >= 2:
                 time_series = []
-                for place_id in subnet_inv_places:
+                for place_obj in subnet_inv_places:
+                    place_id = place_obj.id  # Extract ID from object
                     history = place_data.get(place_id, {})
                     tokens = history.get('tokens', [])
                     if tokens:
@@ -157,7 +158,8 @@ class ConservationAnalyzer(BaseAnalyzer):
             return issues
         
         # For now, just check if reactions have compound mappings
-        for trans_id in subnet.transitions:
+        for trans_obj in subnet.transitions:
+            trans_id = trans_obj.id  # Extract ID from object
             trans = kb.transitions.get(trans_id)
             if not trans:
                 continue
@@ -204,7 +206,8 @@ class ConservationAnalyzer(BaseAnalyzer):
         # Calculate total tokens in internal places over time
         internal_totals = []
         
-        for place_id in subnet.internal_places:
+        for place_obj in subnet.internal_places:
+            place_id = place_obj.id  # Extract ID from object
             history = place_data.get(place_id, {})
             tokens = history.get('tokens', [])
             if tokens:
@@ -295,7 +298,8 @@ class ConservationAnalyzer(BaseAnalyzer):
         place_data = sim_data.get('places', {})
         internal_totals = []
         
-        for place_id in subnet.internal_places:
+        for place_obj in subnet.internal_places:
+            place_id = place_obj.id  # Extract ID from object
             history = place_data.get(place_id, {})
             tokens = history.get('tokens', [])
             if tokens:
