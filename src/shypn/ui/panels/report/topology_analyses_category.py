@@ -236,8 +236,8 @@ class TopologyAnalysesCategory(BaseReportCategory):
             findings.append(f"{t_inv} T-invariants ({t_cov:.0%} coverage)")
         
         # Graph findings
-        cycles = stats.get('cycles', 0)
-        if cycles > 0:
+        cycles = stats.get('cycles', 0) or 0
+        if isinstance(cycles, (int, float)) and cycles > 0:
             findings.append(f"{cycles} feedback cycle(s) detected")
         
         hubs = stats.get('hubs', 0)
@@ -299,14 +299,14 @@ class TopologyAnalysesCategory(BaseReportCategory):
         Args:
             stats: statistics dict from summary
         """
-        cycles = stats.get('cycles', 0)
+        cycles = stats.get('cycles', 0) or 0
         hubs = stats.get('hubs', 0)
         paths = stats.get('paths', 0)
         
         if cycles > 0 or hubs > 0 or paths > 0:
             lines = []
             
-            if cycles > 0:
+            if isinstance(cycles, (int, float)) and cycles > 0:
                 lines.append(f"✓ {cycles} feedback cycle(s)")
             
             if hubs > 0:

@@ -130,22 +130,30 @@ class SubnetSimulator:
             if not locality:
                 continue
             
-            # Get transition object
-            trans_obj = next((t for t in model.transitions if t.id == transition_id), None)
+            # Get transition object (prefer object from locality if available)
+            trans_obj = getattr(locality, 'transition', None)
+            if not trans_obj:
+                trans_obj = next((t for t in model.transitions if t.id == transition_id), None)
             if trans_obj and trans_obj not in subnet['transitions']:
                 subnet['transitions'].append(trans_obj)
             
-            # Get place objects
-            all_place_ids = set(locality.input_places) | set(locality.output_places)
-            for place_id in all_place_ids:
-                place_obj = next((p for p in model.places if p.id == place_id), None)
+            # Get place objects (handle both object and ID forms)
+            all_places = set(locality.input_places) | set(locality.output_places)
+            for place in all_places:
+                if hasattr(place, 'id'):
+                    place_obj = place
+                else:
+                    place_obj = next((p for p in model.places if p.id == place), None)
                 if place_obj and place_obj not in subnet['places']:
                     subnet['places'].append(place_obj)
             
-            # Get arc objects
-            all_arc_ids = set(locality.input_arcs) | set(locality.output_arcs)
-            for arc_id in all_arc_ids:
-                arc_obj = next((a for a in model.arcs if a.id == arc_id), None)
+            # Get arc objects (handle both object and ID forms)
+            all_arcs = set(locality.input_arcs) | set(locality.output_arcs)
+            for arc in all_arcs:
+                if hasattr(arc, 'id'):
+                    arc_obj = arc
+                else:
+                    arc_obj = next((a for a in model.arcs if a.id == arc), None)
                 if arc_obj and arc_obj not in subnet['arcs']:
                     subnet['arcs'].append(arc_obj)
         
@@ -360,14 +368,24 @@ class SubnetSimulator:
                     log_callback("✗ Deadlock detected - no enabled transitions")
                 break
             
-            # Log step (throttle to avoid spam)
-            if log_callback and (self.state.step_count <= 10 or self.state.step_count % 100 == 0):
+            # Log every step with transition firing and full place markings
+            if log_callback:
                 trans_id = step_info['fired_transition']
                 changes_str = ", ".join([
                     f"{pid}: {old}→{new}"
                     for pid, (old, new) in step_info['marking_changes'].items()
                 ])
-                log_callback(f"Step {self.state.step_count}: {trans_id} fired ({changes_str})")
+                # Build one-line log with markings snapshot
+                full_line = f"Step {self.state.step_count}: {trans_id} fired ({changes_str})"
+                try:
+                    markings_list = ", ".join([
+                        f"{pid}={self.state.current_markings.get(pid, 0)}"
+                        for pid in sorted(self.state.current_markings.keys())
+                    ])
+                    full_line += f" | Markings: {markings_list}"
+                except Exception:
+                    pass
+                log_callback(full_line)
         
         self.state.is_running = False
         

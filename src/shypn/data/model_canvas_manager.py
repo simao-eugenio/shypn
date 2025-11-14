@@ -601,6 +601,17 @@ class ModelCanvasManager:
             arc._manager = self  # Set manager reference for parallel detection
             self._notify_observers('created', arc)
         
+        # SAFETY: Validate and remove corrupted arcs after loading
+        # Corrupted arcs can have invalid source/target references (e.g., pointing to other arcs)
+        # This prevents crashes in rendering and hit-testing
+        validation = self.validate_arcs()
+        if not validation['valid']:
+            print(f"[ARC_VALIDATION] ⚠️ Detected {len(validation['corrupted_arcs'])} corrupted arc(s) after load")
+            for error in validation['errors']:
+                print(f"[ARC_VALIDATION]   - {error}")
+            removed = self.remove_corrupted_arcs()
+            print(f"[ARC_VALIDATION] ✅ Cleaned up {removed} corrupted arc(s)")
+        
         # Auto-convert loop arcs and parallel arcs to curved
         # This ensures loaded models have proper curved rendering for loops and parallels
         for arc in arcs:
@@ -2050,6 +2061,89 @@ class ModelCanvasManager:
             'valid': len(errors) == 0,
             'errors': errors
         }
+    
+    def validate_arcs(self):
+        """Validate all arcs and detect corrupted references.
+        
+        Checks that all arcs have valid source and target references
+        (Place or Transition objects with x, y attributes).
+        
+        Returns:
+            dict: {'valid': bool, 'corrupted_arcs': list, 'errors': list}
+        """
+        corrupted = []
+        errors = []
+        
+        for arc in self.arcs:
+            arc_label = f"Arc {arc.id} ({arc.source_id} → {arc.target_id})"
+            
+            # Check source
+            if not hasattr(arc, 'source') or arc.source is None:
+                errors.append(f"{arc_label}: source is None")
+                corrupted.append(arc)
+            elif not hasattr(arc.source, 'x') or not hasattr(arc.source, 'y'):
+                errors.append(f"{arc_label}: source ({type(arc.source).__name__}) has no x, y attributes")
+                corrupted.append(arc)
+            
+            # Check target
+            if not hasattr(arc, 'target') or arc.target is None:
+                errors.append(f"{arc_label}: target is None")
+                if arc not in corrupted:
+                    corrupted.append(arc)
+            elif not hasattr(arc.target, 'x') or not hasattr(arc.target, 'y'):
+                errors.append(f"{arc_label}: target ({type(arc.target).__name__}) has no x, y attributes")
+                if arc not in corrupted:
+                    corrupted.append(arc)
+        
+        return {
+            'valid': len(corrupted) == 0,
+            'corrupted_arcs': corrupted,
+            'errors': errors
+        }
+    
+    def remove_corrupted_arcs(self):
+        """Remove corrupted arcs from the model.
+        
+        Identifies and removes any arcs with invalid source/target references.
+        This is a safety measure to prevent crashes from corrupted model data.
+        
+        Returns:
+            int: Number of corrupted arcs removed
+        """
+        validation = self.validate_arcs()
+        
+        if validation['valid']:
+            return 0  # No corrupted arcs
+        
+        corrupted = validation['corrupted_arcs']
+        removed_count = 0
+        
+        for arc in corrupted:
+            try:
+                arc_label = f"Arc {arc.id}"
+                if hasattr(arc, 'source_id'):
+                    arc_label += f" ({arc.source_id}"
+                if hasattr(arc, 'target_id'):
+                    arc_label += f" → {arc.target_id})"
+                else:
+                    arc_label += " → ?)"
+                
+                print(f"[ARC_CLEANUP] ⚠️ Removing corrupted arc: {arc_label}")
+                
+                # Remove from arcs list
+                if arc in self.arcs:
+                    self.arcs.remove(arc)
+                    removed_count += 1
+                    
+            except Exception as e:
+                print(f"[ARC_CLEANUP] ❌ Error removing arc: {e}")
+        
+        if removed_count > 0:
+            print(f"[ARC_CLEANUP] ✅ Removed {removed_count} corrupted arc(s)")
+            self.mark_dirty()
+            self.mark_needs_redraw()
+        
+        return removed_count
     
     def get_document_state(self):
         """Get the current document state for saving.

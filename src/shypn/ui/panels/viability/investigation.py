@@ -1,6 +1,9 @@
 """Investigation data classes and manager.
 
 Defines the core investigation structures for locality and subnet analysis.
+
+NOTE: This module no longer defines Locality - use diagnostic.Locality instead.
+The Locality class with object references is the authoritative definition.
 """
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -12,19 +15,6 @@ class InvestigationMode(Enum):
     """Investigation mode."""
     SINGLE_LOCALITY = "single"
     SUBNET = "subnet"
-
-
-@dataclass
-class Locality:
-    """Single transition locality (immediate neighborhood)."""
-    transition_id: str
-    input_places: List[str] = field(default_factory=list)
-    output_places: List[str] = field(default_factory=list)
-    input_arcs: List[str] = field(default_factory=list)
-    output_arcs: List[str] = field(default_factory=list)
-    
-    def __repr__(self):
-        return f"Locality({self.transition_id}: {len(self.input_places)}→{len(self.output_places)})"
 
 
 @dataclass
@@ -57,25 +47,28 @@ class Investigation:
 @dataclass
 class Dependency:
     """Flow dependency between localities in a subnet."""
-    source_transition_id: str
-    target_transition_id: str
-    connecting_place_id: str
+    source_transition: Any  # Transition object
+    target_transition: Any  # Transition object
+    connecting_place: Any  # Place object
     flow_rate: Optional[float] = None
     
     def __repr__(self):
-        return f"{self.source_transition_id} → {self.connecting_place_id} → {self.target_transition_id}"
+        source_id = getattr(self.source_transition, 'id', str(self.source_transition))
+        target_id = getattr(self.target_transition, 'id', str(self.target_transition))
+        place_id = getattr(self.connecting_place, 'id', str(self.connecting_place))
+        return f"{source_id} → {place_id} → {target_id}"
 
 
 @dataclass
 class Subnet:
     """Subnet extracted from multiple localities."""
-    transitions: Set[str] = field(default_factory=set)  # Transition IDs
-    places: Set[str] = field(default_factory=set)  # Place IDs
-    arcs: Set[str] = field(default_factory=set)  # Arc IDs
-    boundary_places: Set[str] = field(default_factory=set)  # Places on boundary
-    internal_places: Set[str] = field(default_factory=set)  # Places fully internal
-    boundary_inputs: List[str] = field(default_factory=list)  # Input places
-    boundary_outputs: List[str] = field(default_factory=list)  # Output places
+    transitions: Set[Any] = field(default_factory=set)  # Transition objects
+    places: Set[Any] = field(default_factory=set)  # Place objects
+    arcs: Set[Any] = field(default_factory=set)  # Arc objects
+    boundary_places: Set[Any] = field(default_factory=set)  # Places on boundary
+    internal_places: Set[Any] = field(default_factory=set)  # Places fully internal
+    boundary_inputs: List[Any] = field(default_factory=list)  # Input place objects
+    boundary_outputs: List[Any] = field(default_factory=list)  # Output place objects
     dependencies: List[Dependency] = field(default_factory=list)
     
     def __len__(self):

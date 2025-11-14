@@ -57,17 +57,55 @@ class SimulationControlToolbar(Gtk.Box):
         self.add_exp_button.set_tooltip_text("Create new experiment from current parameters")
         row.pack_start(self.add_exp_button, False, False, 0)
         
-        self.copy_exp_button = Gtk.Button(label="📋 Copy")
+        self.copy_exp_button = Gtk.Button(label="Copy")
         self.copy_exp_button.set_tooltip_text("Duplicate current experiment for variation")
         row.pack_start(self.copy_exp_button, False, False, 0)
         
-        self.save_exp_button = Gtk.Button(label="💾 Save")
+        self.save_exp_button = Gtk.Button(label="Save")
         self.save_exp_button.set_tooltip_text("Export experiments to JSON file")
         row.pack_start(self.save_exp_button, False, False, 0)
         
-        self.load_exp_button = Gtk.Button(label="📂 Load")
+        self.load_exp_button = Gtk.Button(label="Load")
         self.load_exp_button.set_tooltip_text("Import experiments from JSON file")
         row.pack_start(self.load_exp_button, False, False, 0)
+
+        # Settings moved here: Time and Steps beside Load
+        row.pack_start(Gtk.Separator(orientation=Gtk.Orientation.VERTICAL), False, False, 6)
+
+        # Time limit
+        row.pack_start(Gtk.Label(label="Time:"), False, False, 0)
+        self.time_spinbutton = Gtk.SpinButton(
+            adjustment=Gtk.Adjustment(
+                value=100,
+                lower=0.1,
+                upper=10000,
+                step_increment=1,
+                page_increment=10,
+                page_size=0
+            )
+        )
+        self.time_spinbutton.set_width_chars(5)
+        self.time_spinbutton.set_digits(1)
+        self.time_spinbutton.set_tooltip_text("Maximum simulation time (seconds)")
+        row.pack_start(self.time_spinbutton, False, False, 0)
+        row.pack_start(Gtk.Label(label="s"), False, False, 0)
+
+        # Step limit
+        row.pack_start(Gtk.Label(label="  Steps:"), False, False, 0)
+        self.steps_spinbutton = Gtk.SpinButton(
+            adjustment=Gtk.Adjustment(
+                value=1000,
+                lower=1,
+                upper=1000000,
+                step_increment=100,
+                page_increment=1000,
+                page_size=0
+            )
+        )
+        self.steps_spinbutton.set_width_chars(6)
+        self.steps_spinbutton.set_digits(0)
+        self.steps_spinbutton.set_tooltip_text("Maximum firing events")
+        row.pack_start(self.steps_spinbutton, False, False, 0)
         
         self.pack_start(row, False, False, 0)
     
@@ -80,26 +118,26 @@ class SimulationControlToolbar(Gtk.Box):
         
         # === CONTROL BUTTONS ===
         
-        self.run_button = Gtk.Button(label="▶ Run")
+        self.run_button = Gtk.Button(label="Run")
         self.run_button.set_tooltip_text("Run simulation to completion (time/step limit)")
         self.run_button.get_style_context().add_class("suggested-action")
         row.pack_start(self.run_button, False, False, 0)
         
-        self.step_button = Gtk.Button(label="⏭ Step")
+        self.step_button = Gtk.Button(label="Step")
         self.step_button.set_tooltip_text("Execute single firing event")
         row.pack_start(self.step_button, False, False, 0)
         
-        self.pause_button = Gtk.Button(label="⏸ Pause")
+        self.pause_button = Gtk.Button(label="Pause")
         self.pause_button.set_tooltip_text("Pause running simulation")
         self.pause_button.set_sensitive(False)
         row.pack_start(self.pause_button, False, False, 0)
         
-        self.stop_button = Gtk.Button(label="⏹ Stop")
+        self.stop_button = Gtk.Button(label="Stop")
         self.stop_button.set_tooltip_text("Stop and reset simulation")
         self.stop_button.set_sensitive(False)
         row.pack_start(self.stop_button, False, False, 0)
         
-        self.reset_button = Gtk.Button(label="↻ Reset")
+        self.reset_button = Gtk.Button(label="Reset")
         self.reset_button.set_tooltip_text("Reset to initial state")
         row.pack_start(self.reset_button, False, False, 0)
         
@@ -109,27 +147,8 @@ class SimulationControlToolbar(Gtk.Box):
         
         # === SETTINGS ===
         
-        # Time limit
-        row.pack_start(Gtk.Label(label="Time:"), False, False, 0)
-        self.time_spinbutton = Gtk.SpinButton(
-            adjustment=Gtk.Adjustment(100, 0.1, 10000, 1, 10, 0)
-        )
-        self.time_spinbutton.set_width_chars(5)
-        self.time_spinbutton.set_digits(1)
-        self.time_spinbutton.set_tooltip_text("Maximum simulation time (seconds)")
-        row.pack_start(self.time_spinbutton, False, False, 0)
-        row.pack_start(Gtk.Label(label="s"), False, False, 0)
-        
-        # Step limit
-        row.pack_start(Gtk.Label(label="  Steps:"), False, False, 0)
-        self.steps_spinbutton = Gtk.SpinButton(
-            adjustment=Gtk.Adjustment(1000, 1, 1000000, 100, 1000, 0)
-        )
-        self.steps_spinbutton.set_width_chars(6)
-        self.steps_spinbutton.set_digits(0)
-        self.steps_spinbutton.set_tooltip_text("Maximum firing events")
-        row.pack_start(self.steps_spinbutton, False, False, 0)
-        
+        # Time and Steps moved to the experiment row
+
         # Method selector
         row.pack_start(Gtk.Label(label="  Method:"), False, False, 0)
         self.method_combo = Gtk.ComboBoxText()
@@ -142,7 +161,7 @@ class SimulationControlToolbar(Gtk.Box):
         
         # === STATUS LABEL ===
         
-        self.status_label = Gtk.Label(label="● Ready")
+        self.status_label = Gtk.Label(label="Ready")
         self.status_label.set_halign(Gtk.Align.END)
         self.status_label.set_margin_start(10)
         row.pack_end(self.status_label, True, True, 0)
@@ -156,16 +175,8 @@ class SimulationControlToolbar(Gtk.Box):
             text: Status message
             status_type: One of "ready", "running", "paused", "success", "error"
         """
-        symbols = {
-            "ready": "●",
-            "running": "⏵",
-            "paused": "⏸",
-            "success": "✓",
-            "error": "✗"
-        }
-        
-        symbol = symbols.get(status_type, "●")
-        self.status_label.set_label(f"{symbol} {text}")
+        # Display plain text only (no icons)
+        self.status_label.set_label(f"{text}")
     
     def set_running_state(self, is_running):
         """Update button states for running/stopped.

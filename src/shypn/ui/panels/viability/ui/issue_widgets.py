@@ -19,12 +19,6 @@ class IssueWidget(Gtk.Box):
     └─────────────────────────────────────────────────────────┘
     """
     
-    SEVERITY_EMOJIS = {
-        'error': '🔴',
-        'warning': '🟡',
-        'info': '🟢'
-    }
-    
     SEVERITY_CSS_CLASSES = {
         'error': 'issue-error',
         'warning': 'issue-warning',
@@ -57,14 +51,9 @@ class IssueWidget(Gtk.Box):
     
     def _build_ui(self):
         """Build the widget UI."""
-        # Main message row
+        # Main message row (plain text only)
         message_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
-        
-        # Severity emoji
-        emoji = self.SEVERITY_EMOJIS.get(self.issue.severity, '🟢')
-        emoji_label = Gtk.Label(label=emoji)
-        message_box.pack_start(emoji_label, False, False, 0)
-        
+
         # Message text
         message_label = Gtk.Label(label=self.issue.message)
         message_label.set_line_wrap(True)
@@ -76,7 +65,7 @@ class IssueWidget(Gtk.Box):
         
         # Metadata row (category and element)
         meta_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
-        meta_box.set_margin_start(24)  # Indent under emoji
+        meta_box.set_margin_start(8)
         
         category_label = Gtk.Label(label=f"Category: {self.issue.category}")
         category_label.set_xalign(0)
@@ -315,11 +304,7 @@ class IssueSummary(Gtk.Box):
             count = counts[severity]
             
             box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
-            
-            emoji = IssueWidget.SEVERITY_EMOJIS.get(severity, '🟢')
-            emoji_label = Gtk.Label(label=emoji)
-            box.pack_start(emoji_label, False, False, 0)
-            
+
             text = f"{count} {severity}{'s' if count != 1 else ''}"
             label = Gtk.Label(label=text)
             label.set_xalign(0)
