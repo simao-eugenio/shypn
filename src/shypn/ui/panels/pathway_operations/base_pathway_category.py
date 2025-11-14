@@ -182,21 +182,30 @@ class BasePathwayCategory(CategoryFrame):
         pass
     
     def set_model_canvas(self, model_canvas):
-        """Set or update the model canvas.
-        
+        """Set or update the model canvas / manager.
+
         Args:
-            model_canvas: ModelCanvasLoader instance (not ModelCanvasManager!)
-                         We extract the current manager from the loader.
+            model_canvas: Either a ModelCanvasLoader (multi-document) or a
+                ModelCanvasManager. Subclasses that need direct access to the
+                manager should use ``self.model_canvas_manager`` after this
+                method runs.
         """
-        # Store the loader (for backward compatibility with existing code)
+        # Store reference (loader or manager) for subclasses that expect it
         self.model_canvas = model_canvas
-        
-        # CRITICAL FIX: Extract the actual ModelCanvasManager from the loader
-        # The loader has multiple canvas managers (one per tab), we need the current one
-        if model_canvas and hasattr(model_canvas, 'get_current_model'):
-            self.model_canvas_manager = model_canvas.get_current_model()
-        else:
-            self.model_canvas_manager = None
+
+        # Prefer modern helper: ModelCanvasLoader.get_current_model_manager()
+        manager = None
+        if model_canvas is not None:
+            if hasattr(model_canvas, 'get_current_model_manager') and callable(getattr(model_canvas, 'get_current_model_manager')):
+                manager = model_canvas.get_current_model_manager()
+            elif hasattr(model_canvas, 'get_current_model') and callable(getattr(model_canvas, 'get_current_model')):
+                # Backward-compatibility: some loaders still expose get_current_model()
+                manager = model_canvas.get_current_model()
+            elif hasattr(model_canvas, 'transitions'):
+                # A ModelCanvasManager (or similar) was passed directly
+                manager = model_canvas
+
+        self.model_canvas_manager = manager
     
     # ========================================================================
     # Import Lifecycle (Override in subclasses)

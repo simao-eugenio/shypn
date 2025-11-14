@@ -111,6 +111,8 @@ class ModelCanvasLoader:
         self.persistency = None
         self.right_panel_loader = None
         self.report_panel_loader = None  # PHASE 1-2: For simulation results tables
+        # Pathway Operations panel loader (for KEGG/SBML/BRENDA heuristics)
+        self.pathway_panel_loader = None
         self.context_menu_handler = None
         self._clipboard = []  # Clipboard for cut/copy/paste operations
         
@@ -128,8 +130,42 @@ class ModelCanvasLoader:
         # Track whether we've fully initialized the first page (page 0)
         self._first_page_initialized = False
 
-    def load(self):
+    # ------------------------------------------------------------------
+    # Public helpers for per-document access
+    # ------------------------------------------------------------------
+
+    def get_current_model_manager(self):
+        """Return the ModelCanvasManager for the active document/tab.
+
+        This provides a single, stable way for UI panels (Pathway
+        Operations, BRENDA, heuristics, etc.) to access the Petri net
+        model for the currently selected document in the notebook.
+        """
+        try:
+            if not self.notebook:
+                return None
+            page_num = self.notebook.get_current_page()
+            if page_num < 0:
+                return None
+            page_widget = self.notebook.get_nth_page(page_num)
+            if page_widget is None:
+                return None
+
+            # Robustly resolve the GtkDrawingArea for this page
+            drawing_area = self._get_drawing_area_from_page(page_widget)
+            if drawing_area is None:
+                return None
+
+            return self.canvas_managers.get(drawing_area)
+        except Exception:
+            return None
+
+    def load(self, create_initial_document=True):
         """Load the canvas UI and return the container.
+        
+        Args:
+            create_initial_document: If True, creates the default document during load.
+                                    If False, caller must create document after wiring dependencies.
         
         Returns:
             Gtk.Box: The model canvas container with notebook.
@@ -202,7 +238,9 @@ class ModelCanvasLoader:
         # Create fresh default tab using add_document() for consistent initialization
         # This ensures the default tab follows the SAME path as File→New
         # NO XML/notebook content is loaded - canvas starts completely empty
-        page_index, drawing_area = self.add_document(filename='default')
+        # NOTE: Can be deferred if caller needs to set dependencies first (e.g., left_dock_stack)
+        if create_initial_document:
+            page_index, drawing_area = self.add_document(filename='default')
         
         # After creation, ensure lifecycle global manager and scope are active
         try:
@@ -221,7 +259,7 @@ class ModelCanvasLoader:
         # Wire data collector for the initial default tab
         # The switch-page signal doesn't fire for the initially displayed page,
         # so we need to manually wire the data collector for tab 0
-        if self.notebook.get_n_pages() > 0:
+        if create_initial_document and self.notebook.get_n_pages() > 0:
             initial_page = self.notebook.get_nth_page(0)
             self._wire_data_collector_for_page(initial_page)
             
@@ -239,6 +277,14 @@ class ModelCanvasLoader:
                     # This ensures "Add to Transition Analyses" works from app startup
                     if self.right_panel_loader.context_menu_handler:
                         self.right_panel_loader.context_menu_handler.set_model(manager)
+
+            # Notify Pathway Operations panel so categories (e.g., BRENDA)
+            # can resolve the current model manager on startup
+            try:
+                if self.pathway_panel_loader and hasattr(self.pathway_panel_loader, 'set_model_canvas'):
+                    self.pathway_panel_loader.set_model_canvas(self)
+            except Exception:
+                pass
 
             # CRITICAL: Ensure lifecycle sets active canvas for the first tab
             # switch-page doesn't fire for page 0, so ID scope and context
@@ -540,6 +586,13 @@ class ModelCanvasLoader:
             
             if self.right_panel_loader.context_menu_handler and (not self.context_menu_handler):
                 self.set_context_menu_handler(self.right_panel_loader.context_menu_handler)
+
+        # Keep Pathway Operations panel in sync with active document
+        if hasattr(self, 'pathway_panel_loader') and self.pathway_panel_loader:
+            try:
+                self.pathway_panel_loader.set_model_canvas(self)
+            except Exception:
+                pass
         
         # ============================================================
         # Swap per-document Viability Panel when tab changes
@@ -2000,6 +2053,14 @@ class ModelCanvasLoader:
             if hasattr(self, 'main_window') and self.main_window:
                 report_panel_loader.parent_window = self.main_window
             
+            # Set shared container and stack references for detach/hang_on operations
+            if hasattr(self, 'report_panel_container') and self.report_panel_container is not None:
+                report_panel_loader.parent_container = self.report_panel_container
+                report_panel_loader.is_hanged = True
+            if hasattr(self, 'left_dock_stack') and self.left_dock_stack is not None:
+                report_panel_loader._stack = self.left_dock_stack
+                report_panel_loader._stack_panel_name = 'report'
+            
             # DON'T call add_to_stack() - Report panel is manually managed per-document
             # Each tab switch will manually pack_start() the appropriate panel
             
@@ -2041,6 +2102,25 @@ class ModelCanvasLoader:
             
             # Wire model_canvas_loader so viability can access current model
             viability_panel_loader.set_model_canvas_loader(self)
+
+            # If the shared container/stack are available, expose them to the loader
+            if hasattr(self, 'viability_panel_container') and self.viability_panel_container is not None:
+                viability_panel_loader.parent_container = self.viability_panel_container
+                # Default to docked mode knowledge; actual packing is controlled by UI toggle
+                viability_panel_loader.is_hanged = True
+                print(f"[MODEL_CANVAS] Set viability parent_container: {self.viability_panel_container}")
+            if hasattr(self, 'left_dock_stack') and self.left_dock_stack is not None:
+                viability_panel_loader._stack = self.left_dock_stack
+                viability_panel_loader._stack_panel_name = 'viability'
+                print(f"[MODEL_CANVAS] Set viability _stack: {self.left_dock_stack}")
+            else:
+                print(f"[MODEL_CANVAS] WARNING: left_dock_stack not available! hasattr={hasattr(self, 'left_dock_stack')}, value={getattr(self, 'left_dock_stack', None)}")
+
+            # If host provided UI callbacks for float/attach, wire them
+            if hasattr(self, 'on_viability_float') and callable(getattr(self, 'on_viability_float')):
+                viability_panel_loader.on_float_callback = self.on_viability_float
+            if hasattr(self, 'on_viability_attach') and callable(getattr(self, 'on_viability_attach')):
+                viability_panel_loader.on_attach_callback = self.on_viability_attach
             
             # Set parent window for Wayland transient relationship
             if hasattr(self, 'main_window') and self.main_window:
@@ -5465,11 +5545,13 @@ class ModelCanvasLoader:
         dialog.run()
         dialog.destroy()
 
-def create_model_canvas(ui_path=None):
+def create_model_canvas(ui_path=None, create_initial_document=True):
     """Convenience function to create and load the model canvas loader.
     
     Args:
         ui_path: Optional path to model_canvas.ui.
+        create_initial_document: If True, creates default document during load.
+                                If False, caller must create document after wiring dependencies.
         
     Returns:
         ModelCanvasLoader: The loaded model canvas loader instance.
@@ -5480,5 +5562,5 @@ def create_model_canvas(ui_path=None):
         # Add to main window workspace
     """
     loader = ModelCanvasLoader(ui_path)
-    loader.load()
+    loader.load(create_initial_document=create_initial_document)
     return loader

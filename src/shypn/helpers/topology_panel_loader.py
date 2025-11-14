@@ -240,6 +240,10 @@ class TopologyPanelLoader:
             self.panel.float_button.set_active(True)
             self._updating_button = False
         
+        # Notify host to collapse/hide docked area if desired
+        if hasattr(self, 'on_float_callback') and callable(self.on_float_callback):
+            self.on_float_callback()
+        
         # Show window
         self.window.show_all()
     
@@ -278,6 +282,10 @@ class TopologyPanelLoader:
             self._updating_button = True
             self.panel.float_button.set_active(False)
             self._updating_button = False
+        
+        # Notify host to expand/show docked area if needed
+        if hasattr(self, 'on_attach_callback') and callable(self.on_attach_callback):
+            self.on_attach_callback()
     
     def hide(self):
         """Hide the panel (window or docked)."""

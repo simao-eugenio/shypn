@@ -72,6 +72,18 @@ class DataCollector:
         self.place_data.clear()
         self.transition_data.clear()
         self.is_collecting = False
+
+    def clear_transition(self, transition_id: str) -> None:
+        """Clear recorded series for a single transition.
+
+        Keeps global time points and other transitions intact so that
+        only the specified transition's firing history is reset.
+
+        Args:
+            transition_id: Identifier of the transition to clear.
+        """
+        if transition_id in self.transition_data:
+            self.transition_data[transition_id].clear()
         
     def get_place_series(self, place_id: str) -> Tuple[List[float], List[int]]:
         """Get time-series for a specific place.

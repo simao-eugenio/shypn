@@ -115,6 +115,10 @@ class ReportPanelLoader:
         if not self.is_hanged:
             return
         
+        # Notify that panel is floating FIRST (collapse paned before UI changes)
+        if self.on_float_callback:
+            self.on_float_callback()
+        
         # Remove from container
         if self.parent_container:
             self.parent_container.remove(self.content)
@@ -124,8 +128,6 @@ class ReportPanelLoader:
         # Hide the stack if this was the active panel (matches other panel behavior)
         if hasattr(self, '_stack') and self._stack:
             self._stack.set_visible(False)
-            # Also set no-show-all to prevent it from reappearing
-            self._stack.set_no_show_all(True)
         
         # Add content to window
         self.window.add(self.content)
@@ -142,10 +144,6 @@ class ReportPanelLoader:
             self._updating_button = True
             self.panel.float_button.set_active(True)
             self._updating_button = False
-        
-        # Notify that panel is floating
-        if self.on_float_callback:
-            self.on_float_callback()
         
         # Show window (use show_all for Wayland compatibility)
         self.window.show_all()
@@ -187,7 +185,6 @@ class ReportPanelLoader:
         
         # Show the stack if available (Report panel is in a stack)
         if hasattr(self, '_stack') and self._stack:
-            self._stack.set_no_show_all(False)
             self._stack.set_visible(True)
             self._stack.set_visible_child_name(self._stack_panel_name)
         

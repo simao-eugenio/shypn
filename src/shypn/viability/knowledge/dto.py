@@ -107,6 +107,23 @@ class TransitionDTO:
     # Optional kinetics
     rate: Optional[float] = None           # For stochastic/timed transitions
     kinetic_law: Optional[str] = None      # e.g., "michaelis_menten(P1, vmax=10, km=5)"
+
+    @staticmethod
+    def _safe_float(value) -> Optional[float]:
+        """Best-effort float conversion for legacy KB usage.
+
+        KB/DTO is a low-priority helper for an optional intelligent
+        module. We must *never* let non-numeric values (e.g. full rate
+        function strings like "michaelis_menten(...)") break normal
+        workflows. When conversion fails, we return None instead of
+        raising.
+        """
+        if value is None:
+            return None
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
     
     @classmethod
     def from_object(cls, transition_obj) -> 'TransitionDTO':
@@ -139,7 +156,7 @@ class TransitionDTO:
             kinetic_law = transition_obj.metadata.get('kinetic_law')
         
         if hasattr(transition_obj, 'rate'):
-            rate = float(transition_obj.rate) if transition_obj.rate is not None else None
+            rate = cls._safe_float(transition_obj.rate)
         
         return cls(
             transition_id=str(transition_obj.id) if hasattr(transition_obj, 'id') else str(transition_obj),
@@ -169,7 +186,7 @@ class TransitionDTO:
             reaction_id=data.get('reaction_id'),
             reaction_name=data.get('reaction_name'),
             ec_number=data.get('ec_number'),
-            rate=float(data['rate']) if 'rate' in data and data['rate'] is not None else None,
+            rate=cls._safe_float(data['rate']) if 'rate' in data else None,
             kinetic_law=data.get('kinetic_law')
         )
 

@@ -90,7 +90,12 @@ class BRENDACategory(BasePathwayCategory):
         # Set attributes BEFORE calling super().__init__()
         self.workspace_settings = workspace_settings
         self.parent_window = parent_window
+        # The loader typically wraps the active ModelCanvasManager used
+        # throughout the app (heuristics, simulation, etc.). We keep both
+        # a reference to the loader and, when possible, to its manager so
+        # that BRENDA can see the same transitions as other controllers.
         self.model_canvas_loader = model_canvas_loader
+        self.model_canvas_manager = None
         self.logger = logging.getLogger(self.__class__.__name__)
         
         # Initialize backend
@@ -137,6 +142,72 @@ class BRENDACategory(BasePathwayCategory):
         
         # Now call super().__init__() which will call _build_content()
         super().__init__(category_name="BRENDA")
+
+    # --------------------------------------------------------------------
+    # Canvas wiring
+    # --------------------------------------------------------------------
+
+    def _ensure_manager_current(self):
+        """Ensure model_canvas_manager points to the active document's manager.
+
+        Uses the loader's get_current_model_manager() when available.
+        Also refreshes the backend controller reference.
+        """
+        try:
+            loader = getattr(self, 'model_canvas_loader', None)
+            current = None
+            if loader and hasattr(loader, 'get_current_model_manager') and callable(getattr(loader, 'get_current_model_manager')):
+                current = loader.get_current_model_manager()
+
+            if current is not None and current is not getattr(self, 'model_canvas_manager', None):
+                self.model_canvas_manager = current
+                if self.brenda_controller:
+                    self.brenda_controller.set_model_canvas(self.model_canvas_manager)
+                self.logger.info(
+                    f"[BRENDA_CANVAS] Refreshed manager: "
+                    f"{len(getattr(self.model_canvas_manager, 'transitions', []))} transitions"
+                )
+        except Exception:
+            pass
+
+    def set_model_canvas(self, model_canvas):
+        """Set or update the active model canvas / loader.
+
+        Pathway Operations is per-document. We expect ``model_canvas`` to
+        be a per-document handle (typically ``ModelCanvasLoader``). The
+        actual Petri net model lives in a ``ModelCanvasManager`` instance
+        which we resolve via the loader's ``get_current_model_manager()``
+        helper. This ensures BRENDA enrichment operates on the same
+        transitions as heuristics and simulation for the active tab.
+
+        Args:
+            model_canvas: Typically a ModelCanvasLoader for the document
+        """
+        self.logger.info(f"[BRENDA_CANVAS] set_model_canvas called with: {type(model_canvas)}")
+
+        # Store loader reference (if that's what we received)
+        self.model_canvas_loader = model_canvas
+
+        # Resolve the manager using the loader's helper when available
+        manager = None
+        if model_canvas is not None:
+            if hasattr(model_canvas, 'get_current_model_manager') and callable(getattr(model_canvas, 'get_current_model_manager')):
+                manager = model_canvas.get_current_model_manager()
+            elif hasattr(model_canvas, 'transitions'):
+                # Fallback: a ModelCanvasManager (or similar) was passed directly
+                manager = model_canvas
+
+        self.model_canvas_manager = manager
+
+        # Also update controller so scan/apply paths use the same canvas
+        if self.brenda_controller and self.model_canvas_manager is not None:
+            self.brenda_controller.set_model_canvas(self.model_canvas_manager)
+            self.logger.info(
+                f"[BRENDA_CANVAS] Manager set with "
+                f"{len(getattr(self.model_canvas_manager, 'transitions', []))} transitions"
+            )
+        else:
+            self.logger.warning("[BRENDA_CANVAS] No model canvas manager available after set_model_canvas")
     
     def _build_content(self) -> Gtk.Widget:
         """Build the BRENDA category content.
@@ -512,6 +583,10 @@ class BRENDACategory(BasePathwayCategory):
         self.apply_button.connect('clicked', self._on_apply_clicked)
         box.pack_start(self.apply_button, False, False, 0)
         
+        # Also support double-click on a single row to apply immediately
+        # (more natural when enriching a single transition via context menu)
+        self.results_tree.connect('row-activated', self._on_row_activated)
+        
         return box
     
     # Event handlers
@@ -598,6 +673,8 @@ class BRENDACategory(BasePathwayCategory):
     
     def _on_search_clicked(self, button):
         """Handle search BRENDA button click."""
+        # Always refresh manager context before operations
+        self._ensure_manager_current()
         if not self.authenticated:
             self._show_status("Please authenticate first", error=True)
             return
@@ -910,6 +987,9 @@ class BRENDACategory(BasePathwayCategory):
             self._show_status("Please authenticate first", error=True)
             return
         
+        # Ensure we have the current manager
+        self._ensure_manager_current()
+
         if not self.model_canvas_manager:
             self._show_status("No model loaded on canvas", error=True)
             return
@@ -1183,20 +1263,9 @@ class BRENDACategory(BasePathwayCategory):
         context_substrates = context.get('substrates', [])
         
         # Calculate quality scores and relevance for all parameters
+        # NOTE: Do NOT filter out records without Kcat; show Km-only/Ki-only too.
         scored_params = []
-        filtered_count = 0
-        
         for param in results['parameters']:
-            # FILTER: Only include parameter sets that have Kcat
-            # Kcat is needed to calculate Vmax for rate function generation
-            # Skip parameters that don't have Kcat (cannot generate complete rate function)
-            if param.get('kcat') is None:
-                filtered_count += 1
-                self.logger.info(f"[BRENDA_FILTER] Skipping parameter set without Kcat: "
-                               f"organism={param.get('organism')}, substrate={param.get('substrate')}, "
-                               f"km={param.get('km')}, ki={param.get('ki')}")
-                continue
-            
             # Calculate quality score (0-100%) based on data completeness
             quality_data = {
                 'organism': param.get('organism', ''),
@@ -1210,7 +1279,7 @@ class BRENDACategory(BasePathwayCategory):
                 param.get('substrate')
             )
             
-            # Bonus for having multiple parameters (Km + Kcat is better than just Km)
+            # Bonus for completeness (Km+Kcat preferred, but not required to display)
             completeness_bonus = 0.0
             param_count = sum([
                 1 if param.get('km') is not None else 0,
@@ -1218,10 +1287,9 @@ class BRENDACategory(BasePathwayCategory):
                 1 if param.get('ki') is not None else 0
             ])
             if param_count >= 2:
-                completeness_bonus = 0.15  # 15% bonus for having 2+ parameters
+                completeness_bonus = 0.15
             if param_count == 3:
-                completeness_bonus = 0.25  # 25% bonus for having all 3 parameters
-            
+                completeness_bonus = 0.25
             quality_score = min(1.0, quality_score + completeness_bonus)
             
             # Calculate relevance score based on model context
@@ -1241,20 +1309,10 @@ class BRENDACategory(BasePathwayCategory):
                 'combined_score': combined_score
             })
         
-        # Log filtering summary
-        if filtered_count > 0:
-            self.logger.info(f"[BRENDA_FILTER] Filtered out {filtered_count} parameter sets without Kcat")
-            self.logger.info(f"[BRENDA_FILTER] Showing {len(scored_params)} parameter sets with Kcat (usable for rate functions)")
-        
-        # Update results count label to show filtering info
+        # Update results count label
         total_params = len(results.get('parameters', []))
         usable_params = len(scored_params)
-        if filtered_count > 0:
-            self.results_count_label.set_markup(
-                f"<i>{usable_params} usable results (filtered {filtered_count} without Kcat)</i>"
-            )
-        else:
-            self.results_count_label.set_markup(f"<i>{usable_params} results</i>")
+        self.results_count_label.set_markup(f"<i>{usable_params} results</i>")
         
         # Sort by combined score (highest first)
         scored_params.sort(key=lambda x: x['combined_score'], reverse=True)
@@ -1383,11 +1441,21 @@ class BRENDACategory(BasePathwayCategory):
             self._show_status("No parameters selected", error=True)
             return
         
-        # Check if this is batch mode (parameters have transition_id)
-        # Group by transition for batch application
+        # If we have an enrichment transition (context-menu flow) AND
+        # the user only selected a single row, treat this as a
+        # single-transition apply instead of batch mode. This keeps
+        # Selected -> Model behavior consistent and avoids cases where
+        # a transition_id from a different canvas cannot be resolved.
+        enrichment_transition = getattr(self, '_enrichment_transition', None)
+        if enrichment_transition is not None and len(selected) == 1:
+            self._apply_single_transition_parameters(enrichment_transition, selected)
+            return
+
+        # Otherwise, check if this is batch mode (parameters have
+        # transition_id) and group by transition for batch application.
         transition_groups = {}
         has_transition_ids = False
-        
+
         for param in selected:
             trans_id = param.get('transition_id')
             if trans_id:
@@ -1399,13 +1467,55 @@ class BRENDACategory(BasePathwayCategory):
                         'params': []
                     }
                 transition_groups[trans_id]['params'].append(param)
-        
+
         if has_transition_ids and transition_groups:
             # Batch mode - apply directly to specific transitions
             self._apply_batch_parameters(transition_groups)
         else:
             # Single transition mode - show dialog to choose target
             self._show_apply_dialog(selected)
+
+    def _on_row_activated(self, tree_view, path, column):
+        """Handle double-click/Enter on a result row.
+            # Refresh manager to active document
+            self._ensure_manager_current()
+        
+        UX: When user came from "Enrich with BRENDA" on a single
+        transition, double-clicking a row should immediately apply that
+        parameter set to that transition, without needing to tick the
+        checkbox and click Apply.
+        """
+        try:
+            model = tree_view.get_model()
+            if path is None or model is None:
+                return
+            row = model[path]
+            param = row[10]
+        except Exception:
+            return
+
+        # Prefer single-transition context if available; this keeps the
+        # behavior consistent with the context-menu "Enrich with BRENDA" flow.
+        enrichment_transition = getattr(self, '_enrichment_transition', None)
+        if enrichment_transition is not None:
+            self._apply_single_transition_parameters(enrichment_transition, [param])
+            return
+
+        # Fallbacks: use transition_id stored on the param (batch query),
+        # or show the standard apply dialog if we cannot resolve a target.
+        transition_id = param.get('transition_id') if isinstance(param, dict) else None
+        if transition_id and self.model_canvas_manager and hasattr(self.model_canvas_manager, 'transitions'):
+            target = None
+            for t in self.model_canvas_manager.transitions:
+                if str(t.id) == str(transition_id):
+                    target = t
+                    break
+            if target is not None:
+                self._apply_single_transition_parameters(target, [param])
+                return
+
+        # Last resort: behave like pressing Apply with only this row selected
+        self._show_apply_dialog([param])
     
     def _apply_batch_parameters(self, transition_groups: Dict[str, Dict[str, Any]]):
         """Apply parameters to multiple transitions in batch mode.
@@ -1660,6 +1770,9 @@ class BRENDACategory(BasePathwayCategory):
             transition: Transition object (may be stale reference)
             params: List of parameter dicts to apply
         """
+        # Ensure we're using the active document's manager
+        self._ensure_manager_current()
+
         if not self.brenda_controller:
             self._show_status("BRENDA controller not available", error=True)
             return
@@ -1735,23 +1848,35 @@ class BRENDACategory(BasePathwayCategory):
             # Build parameters dict from all selected params
             params_dict = {'_override_rate_function': True}
             self.logger.info(f"[SINGLE_APPLY] Building params_dict from {len(params)} parameters")
-            
+
+            def _try_set_numeric(target: dict, key: str, value: Any):
+                if value is None:
+                    return
+                try:
+                    v = float(value) if isinstance(value, str) else value
+                    target[key] = v
+                    self.logger.info(f"[SINGLE_APPLY]   {key} = {v} ({type(v).__name__})")
+                except (ValueError, TypeError):
+                    self.logger.warning(f"[SINGLE_APPLY] Skipping {key}: non-numeric '{value}'")
+
             for param in params:
-                param_type = param.get('type', 'Km').lower()
-                param_value = param.get('value')
-                
-                # Convert value to float if it's a string
-                if param_value is not None:
-                    if isinstance(param_value, str):
-                        try:
-                            param_value = float(param_value)
-                        except (ValueError, TypeError):
-                            self.logger.warning(f"[SINGLE_APPLY] Could not convert value '{param_value}' to float")
-                            continue
-                    
-                    params_dict[param_type] = param_value
-                    self.logger.info(f"[SINGLE_APPLY]   {param_type} = {param_value} ({type(param_value).__name__})")
-            
+                # Support both grouped dicts with km/kcat/ki and flat type/value pairs
+                if isinstance(param, dict):
+                    # Grouped result (single search/grouping): may contain km/kcat/ki keys
+                    if any(k in param for k in ('km', 'kcat', 'ki', 'vmax')):
+                        _try_set_numeric(params_dict, 'km', param.get('km'))
+                        _try_set_numeric(params_dict, 'kcat', param.get('kcat'))
+                        _try_set_numeric(params_dict, 'ki', param.get('ki'))
+                        _try_set_numeric(params_dict, 'vmax', param.get('vmax'))
+                    else:
+                        # Batch-style row: expects 'type' + 'value'
+                        ptype = str(param.get('type', ''))
+                        pvalue = param.get('value')
+                        if ptype:
+                            key = ptype.strip().lower()
+                            if key in ('km', 'kcat', 'ki', 'vmax'):
+                                _try_set_numeric(params_dict, key, pvalue)
+
             self.logger.info(f"[SINGLE_APPLY] Final params_dict: {params_dict}")
             
             # Apply parameters to transition
@@ -1824,7 +1949,22 @@ class BRENDACategory(BasePathwayCategory):
             self._reset_simulation_after_parameter_changes()
             
             # Show success message
-            self._show_status(f"Applied {len(params)} parameters to {transition.id}", error=False)
+            # Build a human-readable summary of key values used
+            km_val = params_dict.get('km')
+            kcat_val = params_dict.get('kcat')
+            vmax_val = params_dict.get('vmax')
+            summary_parts = []
+            if vmax_val is not None:
+                summary_parts.append(f"Vmax={vmax_val}")
+            if km_val is not None:
+                summary_parts.append(f"Km={km_val}")
+            if kcat_val is not None:
+                summary_parts.append(f"kcat={kcat_val}")
+            summary_str = ", ".join(summary_parts) if summary_parts else "no numeric parameters"
+            self._show_status(
+                f"Applied BRENDA parameters to {transition.id}: {summary_str}",
+                error=False
+            )
             
             # Trigger canvas redraw
             if self.model_canvas and hasattr(self.model_canvas, 'queue_draw'):
