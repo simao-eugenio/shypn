@@ -49,77 +49,112 @@ class DeleteOperation:
 
 	Stores snapshot dicts (see snapshots.capture_delete_snapshots) for objects
 	and incident arcs removed in a delete action. Undo recreates the objects and
-	associated arcs. Redo deletes them again.
+	associated arcs with original IDs; redo deletes them again using facade
+	methods to ensure cascade + observers.
 	"""
 	def __init__(self, snapshots: List[dict]):
-		# Defensive copy
 		self.snapshots = [dict(s) for s in snapshots]
 
 	def apply_undo(self, manager):
-		"""Recreate deleted objects and arcs.
+		"""Recreate deleted objects and arcs in a safe order.
 
-		Order matters: create places/transitions first, then arcs referencing them.
-		We bypass ID generation to preserve original IDs, assuming no conflicts.
+		Implementation details:
+		- Create Places & Transitions first (manual instantiation preserves IDs)
+		- Register their IDs with the IDManager to avoid future collisions
+		- Recreate Arcs referencing restored endpoints
+		- Notify observers & mark document dirty/redraw
 		"""
-		from shypn.core.model.place import Place  # local imports to avoid cycles
-		from shypn.core.model.transition import Transition
-		from shypn.core.model.arc import Arc
-
+		from shypn.netobjs import Place, Transition, Arc
 		dc = manager.document_controller
 
-		# Build lookup to avoid duplicates if multiple snapshots reference same arc
-		pending_arcs: List[dict] = []
+		pending_arc_snaps: List[dict] = []
+		created_nodes = []
 
 		for snap in self.snapshots:
 			kind = snap.get('kind')
 			if kind == 'arc':
-				pending_arcs.append(snap)
+				pending_arc_snaps.append(snap)
 				continue
 			if kind == 'place':
 				obj = Place(snap.get('x', 0.0), snap.get('y', 0.0), snap.get('id'), snap.get('label'), radius=snap.get('radius'))
 				dc.places.append(obj)
+				created_nodes.append(obj)
 			elif kind == 'transition':
 				obj = Transition(snap.get('x', 0.0), snap.get('y', 0.0), snap.get('id'), snap.get('label'), width=snap.get('width'), height=snap.get('height'))
 				dc.transitions.append(obj)
-			# inline arcs for place/transition
+				created_nodes.append(obj)
 			for arc_snap in snap.get('arcs', []):
-				pending_arcs.append(arc_snap)
+				pending_arc_snaps.append(arc_snap)
 
-		# Build mapping from ID to object for endpoint resolution
+		# Register IDs for nodes
+		for n in created_nodes:
+			if hasattr(n, 'id'):
+				if 'P' in n.id:
+					dc.id_manager.register_place_id(n.id)
+				elif 'T' in n.id:
+					dc.id_manager.register_transition_id(n.id)
+
+		# Build mapping for endpoints
 		id_map = {getattr(p, 'id'): p for p in dc.places}
 		id_map.update({getattr(t, 'id'): t for t in dc.transitions})
 
-		# Create arcs
-		for a in pending_arcs:
-			if any(existing.id == a.get('id') for existing in dc.arcs):
-				continue  # skip if already present
-			source = id_map.get(a.get('source_id'))
-			target = id_map.get(a.get('target_id'))
+		created_arcs = []
+		for arc_snap in pending_arc_snaps:
+			arc_id = arc_snap.get('id')
+			if any(getattr(existing, 'id', None) == arc_id for existing in dc.arcs):
+				continue
+			source = id_map.get(arc_snap.get('source_id'))
+			target = id_map.get(arc_snap.get('target_id'))
 			if source and target:
-				arc = Arc(source, target, a.get('id'), a.get('label'))
+				arc = Arc(source, target, arc_id, arc_snap.get('label'))
 				dc.arcs.append(arc)
+				created_arcs.append(arc)
+				if arc_id and 'A' in arc_id:
+					dc.id_manager.register_arc_id(arc_id)
 
+		# Observer notifications (facade-level)
+		for obj in created_nodes + created_arcs:
+			try:
+				manager._notify_observers('created', obj)
+			except Exception:
+				pass
+
+		# Mark dirty & redraw
+		manager.mark_dirty()
 		manager.mark_needs_redraw()
 
 	def apply_redo(self, manager):
-		"""Delete the objects again using snapshot IDs.
+		"""Delete the objects again via facade cascade methods."""
+		from shypn.netobjs import Place, Transition, Arc
+		# Delete nodes first (cascade removes attached arcs) then standalone arcs
+		# Collect node IDs to delete
+		place_ids = {s.get('id') for s in self.snapshots if s.get('kind') == 'place'}
+		transition_ids = {s.get('id') for s in self.snapshots if s.get('kind') == 'transition'}
+		arc_ids = [s.get('id') for s in self.snapshots if s.get('kind') == 'arc']
 
-		We remove arcs first, then places/transitions to mirror cascade behavior.
-		"""
-		dc = manager.document_controller
-		# Remove arcs by id
-		arc_ids = {snap.get('id') for snap in self.snapshots if snap.get('kind') == 'arc'}
-		for snap in self.snapshots:
-			if snap.get('kind') in ('place', 'transition'):
-				for arc_snap in snap.get('arcs', []):
-					arc_ids.add(arc_snap.get('id'))
-		dc.arcs = [a for a in dc.arcs if getattr(a, 'id', None) not in arc_ids]
+		# Helper to find by id
+		def _find(seq, obj_id):
+			for o in seq:
+				if getattr(o, 'id', None) == obj_id:
+					return o
+			return None
 
-		# Remove places/transitions
-		place_ids = {snap.get('id') for snap in self.snapshots if snap.get('kind') == 'place'}
-		transition_ids = {snap.get('id') for snap in self.snapshots if snap.get('kind') == 'transition'}
-		dc.places = [p for p in dc.places if getattr(p, 'id', None) not in place_ids]
-		dc.transitions = [t for t in dc.transitions if getattr(t, 'id', None) not in transition_ids]
+		for pid in place_ids:
+			p = _find(manager.places, pid)
+			if p:
+				manager.remove_place(p)
 
+		for tid in transition_ids:
+			t = _find(manager.transitions, tid)
+			if t:
+				manager.remove_transition(t)
+
+		# Remaining arcs (that were standalone deletions originally)
+		for aid in arc_ids:
+			arc = _find(manager.arcs, aid)
+			if arc:
+				manager.remove_arc(arc)
+
+		manager.mark_dirty()
 		manager.mark_needs_redraw()
 
