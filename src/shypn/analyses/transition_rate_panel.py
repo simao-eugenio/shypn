@@ -7,6 +7,8 @@ This is a SEPARATE MODULE - not implemented in loaders!
 Loaders only instantiate this panel and attach it to the UI.
 """
 from typing import List, Tuple, Any
+import logging
+logger = logging.getLogger(__name__)
 
 from shypn.analyses.plot_panel import AnalysisPlotPanel
 
@@ -142,15 +144,17 @@ class TransitionRatePanel(AnalysisPlotPanel):
             if self._model_manager:
                 detector = LocalityDetector(self._model_manager)
                 locality = detector.get_locality_for_transition(obj)
-                print(f"[LOCALITY_SYNC] Transition {obj.name} added, locality valid: {locality.is_valid if locality else False}")
-                print(f"[LOCALITY_SYNC] Calling callback with transition {obj.id} and locality")
+                if logger.isEnabledFor(logging.DEBUG):
+                    logger.debug(f"[LOCALITY_SYNC] Transition {obj.name} added, locality valid: {locality.is_valid if locality else False}")
+                    logger.debug(f"[LOCALITY_SYNC] Calling callback with transition {obj.id} and locality")
                 # Notify callback with transition and its locality
                 self.on_selection_changed_callback(obj, locality)
-                print(f"[LOCALITY_SYNC] Callback completed")
+                if logger.isEnabledFor(logging.DEBUG):
+                    logger.debug("[LOCALITY_SYNC] Callback completed")
             else:
-                print(f"[LOCALITY_SYNC] No model_manager, cannot detect locality")
+                logger.debug("[LOCALITY_SYNC] No model_manager, cannot detect locality")
         else:
-            print(f"[LOCALITY_SYNC] No callback set for transition selection")
+            logger.debug("[LOCALITY_SYNC] No callback set for transition selection")
     
     def _get_rate_data(self, transition_id: Any) -> List[Tuple[float, float]]:
         """Get behavior-specific data for a transition.
@@ -167,14 +171,14 @@ class TransitionRatePanel(AnalysisPlotPanel):
         """
         DEBUG_PLOT_DATA = True  # Enable debug output
         
-        if DEBUG_PLOT_DATA:
-            print(f"[PLOT] _get_rate_data() called for transition {transition_id}")
+        if DEBUG_PLOT_DATA and logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f"[PLOT] _get_rate_data() called for transition {transition_id}")
             # print(f"[PLOT]   self.data_collector={self.data_collector} (id={id(self.data_collector) if self.data_collector else 'None'})")
         
         # Safety check: return empty if no data collector
         if not self.data_collector:
-            if DEBUG_PLOT_DATA:
-                print(f"[PLOT]   ERROR: No data collector!")
+            if DEBUG_PLOT_DATA and logger.isEnabledFor(logging.DEBUG):
+                logger.debug("[PLOT] ERROR: No data collector")
             return []
         
         # Get raw firing event data from collector
@@ -185,8 +189,8 @@ class TransitionRatePanel(AnalysisPlotPanel):
             # print(f"[PLOT]   raw_events count: {len(raw_events) if raw_events else 0}")
         
         if not raw_events:
-            if DEBUG_PLOT_DATA:
-                print(f"[PLOT]   WARNING: No raw events for transition {transition_id}")
+            if DEBUG_PLOT_DATA and logger.isEnabledFor(logging.DEBUG):
+                logger.debug(f"[PLOT] WARNING: No raw events for transition {transition_id}")
             return []
         
         # Determine transition type by checking if details contain 'rate' field
@@ -216,8 +220,8 @@ class TransitionRatePanel(AnalysisPlotPanel):
                            if event_type == 'fired']
             
             if len(firing_times) < 1:
-                if DEBUG_PLOT_DATA:
-                    pass
+                if DEBUG_PLOT_DATA and logger.isEnabledFor(logging.DEBUG):
+                    logger.debug(f"[PLOT] No firing events for transition {transition_id}")
                 return []
             
             # Convert to cumulative count series
@@ -770,7 +774,7 @@ class TransitionRatePanel(AnalysisPlotPanel):
         # If this transition has locality, reset arc colors first
         if obj.id in self._locality_places and self._model_manager:
             locality_data = self._locality_places[obj.id]
-            print(f"[ARC_COLOR] Resetting locality arc colors for transition {obj.id}")
+            logger.debug(f"[ARC_COLOR] Resetting locality arc colors for transition {obj.id}")
             
             # Reset colors of arcs from input places to transition
             for place in locality_data['input_places']:
@@ -778,7 +782,7 @@ class TransitionRatePanel(AnalysisPlotPanel):
                     if arc.source.id == place.id and arc.target.id == obj.id:
                         from shypn.netobjs.arc import Arc
                         arc.color = Arc.DEFAULT_COLOR
-                        print(f"[ARC_COLOR] ✅ Reset input arc {arc.id} to default")
+                        logger.debug(f"[ARC_COLOR] Reset input arc {arc.id} to default")
             
             # Reset colors of arcs from transition to output places
             for place in locality_data['output_places']:
@@ -786,7 +790,7 @@ class TransitionRatePanel(AnalysisPlotPanel):
                     if arc.source.id == obj.id and arc.target.id == place.id:
                         from shypn.netobjs.arc import Arc
                         arc.color = Arc.DEFAULT_COLOR
-                        print(f"[ARC_COLOR] ✅ Reset output arc {arc.id} to default")
+                        logger.debug(f"[ARC_COLOR] Reset output arc {arc.id} to default")
             
             # Remove locality data
             del self._locality_places[obj.id]
