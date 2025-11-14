@@ -537,27 +537,32 @@ class ModelCanvasLoader:
                         # CRITICAL: ALWAYS swap panel INSTANCE on tab switch
                         # Match Report Panel logic: clear container UNCONDITIONALLY, then pack new panel
                         
-                        print(f"[TAB_SWITCH] 🔄 Swapping to panel instance {id(viability_loader.panel)} for drawing_area {id(drawing_area)}")
+                        import logging
+                        logging.getLogger(__name__).debug(f"[TAB_SWITCH] Swapping to panel instance {id(viability_loader.panel)} for drawing_area {id(drawing_area)}")
                         
                         # Clear container first (removes whatever panel is currently shown)
                         # This MUST be unconditional - old panels may still report wrong parent
                         for child in self.viability_panel_container.get_children():
-                            print(f"[TAB_SWITCH]   └─ Removing old panel instance {id(child)}")
+                            import logging
+                            logging.getLogger(__name__).debug(f"[TAB_SWITCH] Removing old panel instance {id(child)}")
                             self.viability_panel_container.remove(child)
                         
                         # CRITICAL: Explicitly remove new panel from its current parent (if any)
                         # GTK requires widget.get_parent() == NULL before pack_start()
                         current_parent = viability_loader.widget.get_parent()
                         if current_parent:
-                            print(f"[TAB_SWITCH]   └─ Panel has parent {type(current_parent).__name__} (id={id(current_parent)}), removing...")
+                            import logging
+                            logging.getLogger(__name__).debug(f"[TAB_SWITCH] Panel had parent {type(current_parent).__name__} (id={id(current_parent)}), removing before repack")
                             current_parent.remove(viability_loader.widget)
                         
                         # Verify parent is None after removal
                         verify_parent = viability_loader.widget.get_parent()
                         if verify_parent:
-                            print(f"[TAB_SWITCH]   ⚠️  WARNING: Panel STILL has parent {type(verify_parent).__name__} after removal!")
+                            import logging
+                            logging.getLogger(__name__).warning(f"[TAB_SWITCH] Panel still has parent {type(verify_parent).__name__} after removal")
                         else:
-                            print(f"[TAB_SWITCH]   ✓ Panel parent is None, ready to pack")
+                            import logging
+                            logging.getLogger(__name__).debug("[TAB_SWITCH] Panel parent is None, ready to pack")
                         
                         # Add new panel to container
                         try:
@@ -565,22 +570,29 @@ class ModelCanvasLoader:
                             import warnings
                             # Enable GTK warnings as Python warnings
                             warnings.simplefilter('error')
-                            print(f"[TAB_SWITCH]   └─ About to pack panel (id={id(viability_loader.widget)}) into container (id={id(self.viability_panel_container)})")
+                            import logging
+                            logging.getLogger(__name__).debug(f"[TAB_SWITCH] Packing panel (id={id(viability_loader.widget)}) into container (id={id(self.viability_panel_container)})")
+                            # Defensive: ensure widget has no parent before packing
+                            parent_before = viability_loader.widget.get_parent()
+                            if parent_before:
+                                parent_before.remove(viability_loader.widget)
                             self.viability_panel_container.pack_start(viability_loader.widget, True, True, 0)
-                            print(f"[TAB_SWITCH]   └─ ✅ Successfully packed panel instance {id(viability_loader.panel)}")
+                            import logging
+                            logging.getLogger(__name__).debug(f"[TAB_SWITCH] Successfully packed panel instance {id(viability_loader.panel)}")
                         except Exception as e:
-                            print(f"[TAB_SWITCH]   ❌ ERROR packing panel: {e}")
-                            import traceback
-                            traceback.print_exc()
+                            import logging, traceback
+                            logging.getLogger(__name__).exception(f"[TAB_SWITCH] Error packing panel: {e}")
                         
                         # Notify panel of drawing area change (triggers refresh_all)
-                        print(f"[TAB_SWITCH]   └─ Calling set_drawing_area on panel")
+                        import logging
+                        logging.getLogger(__name__).debug("[TAB_SWITCH] Calling set_drawing_area on panel")
                         viability_loader.panel.set_drawing_area(drawing_area)
                         
                         # Show panel content
                         viability_loader.panel.show_all()
                         
-                        print(f"[TAB_SWITCH] ✅ Panel instance swap complete")
+                        import logging
+                        logging.getLogger(__name__).debug("[TAB_SWITCH] Panel instance swap complete")
         
         # ============================================================
         # CRITICAL: Update Report Panel controller when switching tabs
@@ -3952,8 +3964,10 @@ class ModelCanvasLoader:
             
             Routes the selection to the CURRENTLY ACTIVE document's report panel.
             """
-            print(f"[LOCALITY_CALLBACK] Received transition {transition.name if hasattr(transition, 'name') else transition.id}")
-            print(f"[LOCALITY_CALLBACK] Locality valid: {locality.is_valid if locality else False}")
+            import logging
+            lg = logging.getLogger(__name__)
+            lg.debug(f"[LOCALITY_CALLBACK] Received transition {transition.name if hasattr(transition, 'name') else transition.id}")
+            lg.debug(f"[LOCALITY_CALLBACK] Locality valid: {locality.is_valid if locality else False}")
             
             # Get the current active drawing area
             current_page_num = self.notebook.get_current_page()
@@ -3968,45 +3982,45 @@ class ModelCanvasLoader:
                         drawing_area = drawing_area.get_child()
             
             if not drawing_area or drawing_area not in self.overlay_managers:
-                print(f"[LOCALITY_CALLBACK] ⚠️ No active drawing area found")
+                lg.warning("[LOCALITY_CALLBACK] No active drawing area found")
                 return
             
             # Get the report panel for the current document
             overlay_manager = self.overlay_managers[drawing_area]
             if not hasattr(overlay_manager, 'report_panel_loader'):
-                print(f"[LOCALITY_CALLBACK] ⚠️ No report_panel_loader for active document")
+                lg.warning("[LOCALITY_CALLBACK] No report_panel_loader for active document")
                 return
             
             report_panel_loader = overlay_manager.report_panel_loader
             if not report_panel_loader or not hasattr(report_panel_loader, 'panel'):
-                print(f"[LOCALITY_CALLBACK] ⚠️ No report panel for active document")
+                lg.warning("[LOCALITY_CALLBACK] No report panel for active document")
                 return
             
             report_panel = report_panel_loader.panel
-            print(f"[LOCALITY_CALLBACK] Report panel categories: {len(report_panel.categories)}")
+            lg.debug(f"[LOCALITY_CALLBACK] Report panel categories: {len(report_panel.categories)}")
             
             # Find ModelsCategory in Report panel (for "Show Selected Locality")
             from shypn.ui.panels.report.model_structure_category import ModelsCategory
             for category in report_panel.categories:
-                print(f"[LOCALITY_CALLBACK] Checking category: {type(category).__name__}")
+                lg.debug(f"[LOCALITY_CALLBACK] Checking category: {type(category).__name__}")
                 if isinstance(category, ModelsCategory):
-                    print(f"[LOCALITY_CALLBACK] Found ModelsCategory, calling set_selected_locality()")
+                    lg.debug("[LOCALITY_CALLBACK] Found ModelsCategory, calling set_selected_locality()")
                     category.set_selected_locality(transition, locality)
-                    print(f"[LOCALITY_CALLBACK] set_selected_locality() completed")
+                    lg.debug("[LOCALITY_CALLBACK] set_selected_locality() completed")
                     break
             else:
-                print(f"[LOCALITY_CALLBACK] ⚠️ ModelsCategory not found in report panel!")
+                lg.debug("[LOCALITY_CALLBACK] ModelsCategory not found in report panel")
             
             # Find DynamicAnalysesCategory in Report panel (for "Reaction Selected" simulation data)
             from shypn.ui.panels.report.parameters_category import DynamicAnalysesCategory
             for category in report_panel.categories:
                 if isinstance(category, DynamicAnalysesCategory):
-                    print(f"[LOCALITY_CALLBACK] Found DynamicAnalysesCategory, calling set_selected_reaction()")
+                    lg.debug("[LOCALITY_CALLBACK] Found DynamicAnalysesCategory, calling set_selected_reaction()")
                     category.set_selected_reaction(transition, locality)
-                    print(f"[LOCALITY_CALLBACK] set_selected_reaction() completed")
+                    lg.debug("[LOCALITY_CALLBACK] set_selected_reaction() completed")
                     break
             else:
-                print(f"[LOCALITY_CALLBACK] ⚠️ DynamicAnalysesCategory not found in report panel!")
+                lg.debug("[LOCALITY_CALLBACK] DynamicAnalysesCategory not found in report panel")
         
         # Set the single dynamic callback (no loop needed, single global transition panel)
         transition_panel.on_selection_changed_callback = on_transition_selected
