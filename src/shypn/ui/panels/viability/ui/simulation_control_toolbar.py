@@ -68,6 +68,44 @@ class SimulationControlToolbar(Gtk.Box):
         self.load_exp_button = Gtk.Button(label="Load")
         self.load_exp_button.set_tooltip_text("Import experiments from JSON file")
         row.pack_start(self.load_exp_button, False, False, 0)
+
+        # Settings moved here: Time and Steps beside Load
+        row.pack_start(Gtk.Separator(orientation=Gtk.Orientation.VERTICAL), False, False, 6)
+
+        # Time limit
+        row.pack_start(Gtk.Label(label="Time:"), False, False, 0)
+        self.time_spinbutton = Gtk.SpinButton(
+            adjustment=Gtk.Adjustment(
+                value=100,
+                lower=0.1,
+                upper=10000,
+                step_increment=1,
+                page_increment=10,
+                page_size=0
+            )
+        )
+        self.time_spinbutton.set_width_chars(5)
+        self.time_spinbutton.set_digits(1)
+        self.time_spinbutton.set_tooltip_text("Maximum simulation time (seconds)")
+        row.pack_start(self.time_spinbutton, False, False, 0)
+        row.pack_start(Gtk.Label(label="s"), False, False, 0)
+
+        # Step limit
+        row.pack_start(Gtk.Label(label="  Steps:"), False, False, 0)
+        self.steps_spinbutton = Gtk.SpinButton(
+            adjustment=Gtk.Adjustment(
+                value=1000,
+                lower=1,
+                upper=1000000,
+                step_increment=100,
+                page_increment=1000,
+                page_size=0
+            )
+        )
+        self.steps_spinbutton.set_width_chars(6)
+        self.steps_spinbutton.set_digits(0)
+        self.steps_spinbutton.set_tooltip_text("Maximum firing events")
+        row.pack_start(self.steps_spinbutton, False, False, 0)
         
         self.pack_start(row, False, False, 0)
     
@@ -109,41 +147,8 @@ class SimulationControlToolbar(Gtk.Box):
         
         # === SETTINGS ===
         
-        # Time limit
-        row.pack_start(Gtk.Label(label="Time:"), False, False, 0)
-        self.time_spinbutton = Gtk.SpinButton(
-            adjustment=Gtk.Adjustment(
-                value=100,
-                lower=0.1,
-                upper=10000,
-                step_increment=1,
-                page_increment=10,
-                page_size=0
-            )
-        )
-        self.time_spinbutton.set_width_chars(5)
-        self.time_spinbutton.set_digits(1)
-        self.time_spinbutton.set_tooltip_text("Maximum simulation time (seconds)")
-        row.pack_start(self.time_spinbutton, False, False, 0)
-        row.pack_start(Gtk.Label(label="s"), False, False, 0)
-        
-        # Step limit
-        row.pack_start(Gtk.Label(label="  Steps:"), False, False, 0)
-        self.steps_spinbutton = Gtk.SpinButton(
-            adjustment=Gtk.Adjustment(
-                value=1000,
-                lower=1,
-                upper=1000000,
-                step_increment=100,
-                page_increment=1000,
-                page_size=0
-            )
-        )
-        self.steps_spinbutton.set_width_chars(6)
-        self.steps_spinbutton.set_digits(0)
-        self.steps_spinbutton.set_tooltip_text("Maximum firing events")
-        row.pack_start(self.steps_spinbutton, False, False, 0)
-        
+        # Time and Steps moved to the experiment row
+
         # Method selector
         row.pack_start(Gtk.Label(label="  Method:"), False, False, 0)
         self.method_combo = Gtk.ComboBoxText()
