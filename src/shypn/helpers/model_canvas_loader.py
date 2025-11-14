@@ -2604,6 +2604,41 @@ class ModelCanvasLoader:
         self._lasso_state[drawing_area] = {'active': False, 'selector': None}
         self._setup_canvas_context_menu(drawing_area, manager)
 
+        # Also attach handlers to GtkViewport (wrapper inside scrolled window),
+        # some environments deliver events at the viewport level first.
+        try:
+            scrolled = drawing_area.get_parent()
+            if scrolled and hasattr(scrolled, 'get_child'):
+                viewport = scrolled.get_child()
+            else:
+                viewport = None
+            if viewport and hasattr(viewport, 'connect'):
+                # Preserve masks on viewport and add required ones
+                required_mask = (
+                    Gdk.EventMask.BUTTON_PRESS_MASK
+                    | Gdk.EventMask.BUTTON_RELEASE_MASK
+                    | Gdk.EventMask.POINTER_MOTION_MASK
+                    | Gdk.EventMask.SCROLL_MASK
+                    | Gdk.EventMask.KEY_PRESS_MASK
+                )
+                try:
+                    current_mask_vp = viewport.get_events()
+                except Exception:
+                    current_mask_vp = 0
+                try:
+                    viewport.set_events(current_mask_vp | required_mask)
+                except Exception:
+                    pass
+
+                # Wrapper lambdas forward events to the drawing_area handlers
+                viewport.connect('button-press-event', lambda w, e, m=manager: self._on_button_press(drawing_area, e, m))
+                viewport.connect('button-release-event', lambda w, e, m=manager: self._on_button_release(drawing_area, e, m))
+                viewport.connect('motion-notify-event', lambda w, e, m=manager: self._on_motion_notify(drawing_area, e, m))
+                viewport.connect('scroll-event', lambda w, e, m=manager: self._on_scroll_event(drawing_area, e, m))
+                viewport.connect('key-press-event', lambda w, e, m=manager: self._on_key_press_event(drawing_area, e, m))
+        except Exception:
+            pass
+
     def _on_button_press(self, widget, event, manager):
         """Handle button press events (GTK3)."""
         # Grab focus so keyboard shortcuts work
