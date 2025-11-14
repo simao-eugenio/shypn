@@ -167,6 +167,13 @@ class Arc(PetriNetObject):
             cr: Cairo context (with zoom transformation already applied)
             zoom: Current zoom level for line width compensation
         """
+        # DEFENSIVE: Check for corrupted arc references
+        # Skip rendering if source/target don't have x, y attributes
+        if not hasattr(self.source, 'x') or not hasattr(self.source, 'y'):
+            return  # Corrupted arc - skip rendering
+        if not hasattr(self.target, 'x') or not hasattr(self.target, 'y'):
+            return  # Corrupted arc - skip rendering
+        
         # Ensure clean Cairo context state
         cr.new_path()
         
@@ -495,6 +502,19 @@ class Arc(PetriNetObject):
         Returns:
             bool: True if point is near the arc line
         """
+        # DEFENSIVE: Check for corrupted arc references (source/target pointing to wrong object types)
+        # An arc's source and target should always be Place or Transition objects with x, y attributes
+        # If they're not (e.g., pointing to another Arc), the model is corrupted
+        if not hasattr(self.source, 'x') or not hasattr(self.source, 'y'):
+            # Corrupted arc: source is not a Place/Transition
+            # Return False to avoid crash - this arc cannot be clicked
+            return False
+        
+        if not hasattr(self.target, 'x') or not hasattr(self.target, 'y'):
+            # Corrupted arc: target is not a Place/Transition  
+            # Return False to avoid crash - this arc cannot be clicked
+            return False
+        
         # Get source and target positions
         src_x, src_y = self.source.x, self.source.y
         tgt_x, tgt_y = self.target.x, self.target.y

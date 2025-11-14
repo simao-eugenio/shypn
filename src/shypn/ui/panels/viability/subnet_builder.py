@@ -44,24 +44,24 @@ class SubnetBuilder:
         # Multiple localities - full subnet
         subnet = Subnet()
         
-        # Collect all transitions
+        # Collect all transitions (objects)
         for locality in localities:
-            subnet.transitions.add(locality.transition.id)
+            subnet.transitions.add(locality.transition)
         
-        # Collect all places and arcs
+        # Collect all places and arcs (objects)
         for locality in localities:
             # Input places
             for place in locality.input_places:
-                subnet.places.add(place.id)
+                subnet.places.add(place)
             # Output places
             for place in locality.output_places:
-                subnet.places.add(place.id)
+                subnet.places.add(place)
             # Input arcs
             for arc in locality.input_arcs:
-                subnet.arcs.add(arc.id)
+                subnet.arcs.add(arc)
             # Output arcs
             for arc in locality.output_arcs:
-                subnet.arcs.add(arc.id)
+                subnet.arcs.add(arc)
         
         # Classify places as boundary vs internal
         boundary, internal = self.classify_places(subnet.places, subnet.transitions, localities)
@@ -124,20 +124,20 @@ class SubnetBuilder:
         # All localities should be visited if connected
         return len(visited) == len(localities)
     
-    def _get_all_places(self, locality: Any) -> Set[str]:
-        """Get all place IDs (inputs and outputs) for a locality.
+    def _get_all_places(self, locality: Any) -> Set[Any]:
+        """Get all place objects (inputs and outputs) for a locality.
         
         Args:
             locality: Locality object
             
         Returns:
-            Set of place IDs
+            Set of place objects
         """
         places = set()
         for place in locality.input_places:
-            places.add(place.id)
+            places.add(place)
         for place in locality.output_places:
-            places.add(place.id)
+            places.add(place)
         return places
     
     def _build_single_locality_subnet(self, locality: Any) -> Subnet:
@@ -150,41 +150,41 @@ class SubnetBuilder:
             Subnet with single transition
         """
         subnet = Subnet()
-        subnet.transitions.add(locality.transition.id)
+        subnet.transitions.add(locality.transition)
         
-        # All places
+        # All places (objects)
         for place in locality.input_places:
-            subnet.places.add(place.id)
-            subnet.boundary_places.add(place.id)
-            subnet.boundary_inputs.append(place.id)
+            subnet.places.add(place)
+            subnet.boundary_places.add(place)
+            subnet.boundary_inputs.append(place)
         
         for place in locality.output_places:
-            subnet.places.add(place.id)
-            subnet.boundary_places.add(place.id)
-            subnet.boundary_outputs.append(place.id)
+            subnet.places.add(place)
+            subnet.boundary_places.add(place)
+            subnet.boundary_outputs.append(place)
         
-        # All arcs
+        # All arcs (objects)
         for arc in locality.input_arcs:
-            subnet.arcs.add(arc.id)
+            subnet.arcs.add(arc)
         for arc in locality.output_arcs:
-            subnet.arcs.add(arc.id)
+            subnet.arcs.add(arc)
         
         return subnet
     
     def classify_places(
         self, 
-        places: Set[str], 
-        transitions: Set[str], 
+        places: Set[Any], 
+        transitions: Set[Any], 
         localities: List[Any]
-    ) -> Tuple[Set[str], Set[str]]:
+    ) -> Tuple[Set[Any], Set[Any]]:
         """Classify places as boundary (external connections) vs internal.
         
         A place is on the boundary if it has arcs to/from transitions
         outside the subnet.
         
         Args:
-            places: Set of place IDs in subnet
-            transitions: Set of transition IDs in subnet
+            places: Set of place objects in subnet
+            transitions: Set of transition objects in subnet
             localities: List of Locality objects
             
         Returns:
@@ -196,49 +196,49 @@ class SubnetBuilder:
         # Build map of place → transitions that use it
         place_to_transitions = self._build_place_transition_map(localities)
         
-        for place_id in places:
+        for place_obj in places:
             # Get all transitions connected to this place
-            connected_transitions = place_to_transitions.get(place_id, set())
+            connected_transitions = place_to_transitions.get(place_obj, set())
             
             # Check if any connected transition is outside subnet
             has_external = False
-            for trans_id in connected_transitions:
-                if trans_id not in transitions:
+            for trans_obj in connected_transitions:
+                if trans_obj not in transitions:
                     has_external = True
                     break
             
             if has_external:
-                boundary.add(place_id)
+                boundary.add(place_obj)
             else:
-                internal.add(place_id)
+                internal.add(place_obj)
         
         return boundary, internal
     
-    def _build_place_transition_map(self, localities: List[Any]) -> Dict[str, Set[str]]:
-        """Build map of place ID → set of transition IDs connected to it.
+    def _build_place_transition_map(self, localities: List[Any]) -> Dict[Any, Set[Any]]:
+        """Build map of place object → set of transition objects connected to it.
         
         Args:
             localities: List of Locality objects
             
         Returns:
-            Dict mapping place IDs to sets of transition IDs
+            Dict mapping place objects to sets of transition objects
         """
         place_map = {}
         
         for locality in localities:
-            trans_id = locality.transition.id
+            trans_obj = locality.transition
             
             # Input places
             for place in locality.input_places:
-                if place.id not in place_map:
-                    place_map[place.id] = set()
-                place_map[place.id].add(trans_id)
+                if place not in place_map:
+                    place_map[place] = set()
+                place_map[place].add(trans_obj)
             
             # Output places
             for place in locality.output_places:
-                if place.id not in place_map:
-                    place_map[place.id] = set()
-                place_map[place.id].add(trans_id)
+                if place not in place_map:
+                    place_map[place] = set()
+                place_map[place].add(trans_obj)
         
         return place_map
     
@@ -246,7 +246,7 @@ class SubnetBuilder:
         self, 
         subnet: Subnet, 
         localities: List[Any]
-    ) -> Tuple[List[str], List[str]]:
+    ) -> Tuple[List[Any], List[Any]]:
         """Identify which boundary places are inputs vs outputs.
         
         Args:
@@ -254,34 +254,30 @@ class SubnetBuilder:
             localities: List of Locality objects
             
         Returns:
-            Tuple of (input_places, output_places)
+            Tuple of (input_place_objects, output_place_objects)
         """
         inputs = []
         outputs = []
         
         # Places that are only inputs to subnet transitions
-        for place_id in subnet.boundary_places:
+        for place_obj in subnet.boundary_places:
             is_input = False
             is_output = False
             
             for locality in localities:
                 # Check if place is input to this transition
-                for place in locality.input_places:
-                    if place.id == place_id:
-                        is_input = True
-                        break
+                if place_obj in locality.input_places:
+                    is_input = True
                 
                 # Check if place is output from this transition
-                for place in locality.output_places:
-                    if place.id == place_id:
-                        is_output = True
-                        break
+                if place_obj in locality.output_places:
+                    is_output = True
             
             # Classify based on usage
             if is_input and not is_output:
-                inputs.append(place_id)
+                inputs.append(place_obj)
             elif is_output and not is_input:
-                outputs.append(place_id)
+                outputs.append(place_obj)
             # If both, it's an intermediate place (not strictly boundary I/O)
         
         return inputs, outputs
@@ -301,37 +297,37 @@ class SubnetBuilder:
         dependencies = []
         
         # Build maps for efficient lookup
-        place_to_producers = {}  # place_id → list of transition_ids that produce it
-        place_to_consumers = {}  # place_id → list of transition_ids that consume it
+        place_to_producers = {}  # place_obj → list of transition_objs that produce it
+        place_to_consumers = {}  # place_obj → list of transition_objs that consume it
         
         for locality in localities:
-            trans_id = locality.transition.id
+            trans_obj = locality.transition
             
             # Output places (produced by this transition)
             for place in locality.output_places:
-                if place.id not in place_to_producers:
-                    place_to_producers[place.id] = []
-                place_to_producers[place.id].append(trans_id)
+                if place not in place_to_producers:
+                    place_to_producers[place] = []
+                place_to_producers[place].append(trans_obj)
             
             # Input places (consumed by this transition)
             for place in locality.input_places:
-                if place.id not in place_to_consumers:
-                    place_to_consumers[place.id] = []
-                place_to_consumers[place.id].append(trans_id)
+                if place not in place_to_consumers:
+                    place_to_consumers[place] = []
+                place_to_consumers[place].append(trans_obj)
         
         # Find dependencies: producer → place → consumer
-        for place_id in subnet.places:
-            producers = place_to_producers.get(place_id, [])
-            consumers = place_to_consumers.get(place_id, [])
+        for place_obj in subnet.places:
+            producers = place_to_producers.get(place_obj, [])
+            consumers = place_to_consumers.get(place_obj, [])
             
             # Create dependency for each producer-consumer pair
             for producer in producers:
                 for consumer in consumers:
                     if producer != consumer:  # Don't create self-dependencies
                         dep = Dependency(
-                            source_transition_id=producer,
-                            target_transition_id=consumer,
-                            connecting_place_id=place_id
+                            source_transition=producer,
+                            target_transition=consumer,
+                            connecting_place=place_obj
                         )
                         dependencies.append(dep)
         

@@ -150,11 +150,10 @@ class LocalityAnalyzer(BaseAnalyzer):
         
         # Check for unmapped compounds
         unmapped_places = []
-        for place_id in locality.input_places + locality.output_places:
-            # Get place object from KB
-            place = kb.places.get(place_id)
-            if place and (not hasattr(place, 'compound_id') or not place.compound_id):
-                place_name = self._get_human_readable_name(kb, place_id, "place")
+        for place_obj in locality.input_places + locality.output_places:
+            # Place is already an object (not an ID)
+            if not hasattr(place_obj, 'compound_id') or not place_obj.compound_id:
+                place_name = self._get_human_readable_name(kb, place_obj.id, "place")
                 unmapped_places.append(place_name)
         
         if unmapped_places:

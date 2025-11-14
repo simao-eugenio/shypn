@@ -95,12 +95,15 @@ class ViabilityPanel(Gtk.Box):
         # Locality tracking for coloring
         self._locality_objects = {}
         
+        # Track current drawing area to detect document switches
+        self._current_drawing_area_id = None
+        
         # Build panel UI
         self._build_header()
         self._build_content()
         
-        # Show all widgets
-        self.show_all()
+        # Don't call show_all() here - panel will be shown after being packed into container
+        # (matches Report panel pattern)
     
     def _build_header(self):
         """Build panel header."""
@@ -805,6 +808,9 @@ class ViabilityPanel(Gtk.Box):
         Args:
             transition_id: ID of transition to add
         """
+        print(f"[VIABILITY_INVESTIGATE] 🔍 Adding {transition_id} to panel {id(self)}, drawing_area={id(self.drawing_area) if self.drawing_area else 'None'}")
+        print(f"[VIABILITY_INVESTIGATE] 📋 Current localities: {list(self.selected_localities.keys())}")
+        
         # Check if already in list
         if transition_id in self.selected_localities:
             self._show_feedback(f"Transition {transition_id} already in list", "warning")
@@ -897,26 +903,7 @@ class ViabilityPanel(Gtk.Box):
         # Use LocalityDetector to get locality (same as plot panel)
         from shypn.diagnostic import LocalityDetector
         locality_detector = LocalityDetector(model)
-        diagnostic_locality = locality_detector.get_locality_for_transition(transition_obj)
-        
-        # Store the IDs (not objects) for reliable cross-document usage
-        locality_ids = {
-            'transition_id': transition_obj.id,
-            'input_place_ids': [p.id for p in diagnostic_locality.input_places],
-            'output_place_ids': [p.id for p in diagnostic_locality.output_places],
-            'input_arc_ids': [a.id for a in diagnostic_locality.input_arcs],
-            'output_arc_ids': [a.id for a in diagnostic_locality.output_arcs]
-        }
-        
-        # Convert diagnostic Locality (objects) to investigation Locality (IDs)
-        from .investigation import Locality
-        locality = Locality(
-            transition_id=transition_obj.id,
-            input_places=[p.id for p in diagnostic_locality.input_places],
-            output_places=[p.id for p in diagnostic_locality.output_places],
-            input_arcs=[a.id for a in diagnostic_locality.input_arcs],
-            output_arcs=[a.id for a in diagnostic_locality.output_arcs]
-        )
+        locality = locality_detector.get_locality_for_transition(transition_obj)
         
         # === COLOR ALL LOCALITY OBJECTS FIRST ===
         
@@ -924,26 +911,26 @@ class ViabilityPanel(Gtk.Box):
         self._color_transition(transition_obj)
         
         # Color input places
-        for place_obj in diagnostic_locality.input_places:
+        for place_obj in locality.input_places:
             self._color_locality_place(place_obj)
         
         # Color output places
-        for place_obj in diagnostic_locality.output_places:
+        for place_obj in locality.output_places:
             self._color_locality_place(place_obj)
         
         # Color input arcs
-        for arc_obj in diagnostic_locality.input_arcs:
+        for arc_obj in locality.input_arcs:
             self._color_arc(arc_obj)
         
         # Color output arcs
-        for arc_obj in diagnostic_locality.output_arcs:
+        for arc_obj in locality.output_arcs:
             self._color_arc(arc_obj)
         
         # Trigger single canvas redraw after coloring all locality objects
         self._trigger_canvas_redraw()
         
-        # Store locality IDs for this transition
-        self._locality_objects[transition_obj.id] = locality_ids
+        # Store locality for this transition
+        self._locality_objects[transition_obj.id] = locality
         
         # === MAIN TRANSITION ROW ===
         transition_row = Gtk.ListBoxRow()
@@ -978,15 +965,16 @@ class ViabilityPanel(Gtk.Box):
         self.localities_listbox.add(transition_row)
         
         # === INPUT PLACES (INDENTED ROWS) ===
-        for place_obj in diagnostic_locality.input_places:
+        for place_obj in locality.input_places:
             self._add_locality_place_row_to_list(place_obj, "← Input:")
         
         # === OUTPUT PLACES (INDENTED ROWS) ===
-        for place_obj in diagnostic_locality.output_places:
+        for place_obj in locality.output_places:
             self._add_locality_place_row_to_list(place_obj, "→ Output:")
         
-        # Show all new widgets
-        self.localities_listbox.show_all()
+        # Show all new widgets (only if panel is packed)
+        if self.get_parent() is not None:
+            self.localities_listbox.show_all()
         
         # Track in dict (store locality IDs for cross-document safety)
         self.selected_localities[transition_obj.id] = {
@@ -1002,8 +990,9 @@ class ViabilityPanel(Gtk.Box):
         # Refresh subnet parameters display
         self._refresh_subnet_parameters()
         
-        # Show
-        self.localities_listbox.show_all()
+        # Show (only if panel is packed)
+        if self.get_parent() is not None:
+            self.localities_listbox.show_all()
     
     def _add_locality_place_row_to_list(self, place, label_prefix):
         """Add a locality place row to the objects list.
@@ -1063,43 +1052,27 @@ class ViabilityPanel(Gtk.Box):
         if not model:
             return
         
-        locality_ids = self._locality_objects.get(transition_id)
-        if locality_ids:
-            # Reset transition color - find by iterating transitions list
-            transition_id_to_find = locality_ids.get('transition_id')
-            for t_obj in model.transitions:
-                if t_obj.id == transition_id_to_find:
-                    t_obj.border_color = Transition.DEFAULT_BORDER_COLOR
-                    t_obj.fill_color = Transition.DEFAULT_COLOR
-                    break
+        locality_obj = self._locality_objects.get(transition_id)
+        if locality_obj:
+            # Reset transition color
+            locality_obj.transition.border_color = Transition.DEFAULT_BORDER_COLOR
+            locality_obj.transition.fill_color = Transition.DEFAULT_COLOR
             
-            # Reset input place colors - find by iterating places list
-            for place_id in locality_ids.get('input_place_ids', []):
-                for p_obj in model.places:
-                    if p_obj.id == place_id:
-                        p_obj.border_color = Place.DEFAULT_BORDER_COLOR
-                        break
+            # Reset input place colors
+            for p_obj in locality_obj.input_places:
+                p_obj.border_color = Place.DEFAULT_BORDER_COLOR
             
             # Reset output place colors
-            for place_id in locality_ids.get('output_place_ids', []):
-                for p_obj in model.places:
-                    if p_obj.id == place_id:
-                        p_obj.border_color = Place.DEFAULT_BORDER_COLOR
-                        break
+            for p_obj in locality_obj.output_places:
+                p_obj.border_color = Place.DEFAULT_BORDER_COLOR
             
-            # Reset input arc colors - find by iterating arcs list
-            for arc_id in locality_ids.get('input_arc_ids', []):
-                for a_obj in model.arcs:
-                    if a_obj.id == arc_id:
-                        a_obj.color = Arc.DEFAULT_COLOR
-                        break
+            # Reset input arc colors
+            for a_obj in locality_obj.input_arcs:
+                a_obj.color = Arc.DEFAULT_COLOR
             
             # Reset output arc colors
-            for arc_id in locality_ids.get('output_arc_ids', []):
-                for a_obj in model.arcs:
-                    if a_obj.id == arc_id:
-                        a_obj.color = Arc.DEFAULT_COLOR
-                        break
+            for a_obj in locality_obj.output_arcs:
+                a_obj.color = Arc.DEFAULT_COLOR
         
         # Remove from tracking and UI
         if transition_id in self._locality_objects:
@@ -1317,17 +1290,7 @@ class ViabilityPanel(Gtk.Box):
         # Use LocalityDetector to get locality (same approach as _add_transition_to_list)
         from shypn.diagnostic import LocalityDetector
         locality_detector = LocalityDetector(model)
-        diagnostic_locality = locality_detector.get_locality_for_transition(transition_obj)
-        
-        # Convert diagnostic Locality (objects) to investigation Locality (IDs)
-        from .investigation import Locality
-        locality = Locality(
-            transition_id=transition.transition_id,
-            input_places=[p.id for p in diagnostic_locality.input_places],
-            output_places=[p.id for p in diagnostic_locality.output_places],
-            input_arcs=[a.id for a in diagnostic_locality.input_arcs],
-            output_arcs=[a.id for a in diagnostic_locality.output_arcs]
-        )
+        locality = locality_detector.get_locality_for_transition(transition_obj)
         
         context = {
             'transition': transition,
@@ -1450,11 +1413,12 @@ class ViabilityPanel(Gtk.Box):
         
         self.content_box.pack_start(self.current_view, True, True, 0)
         
-        # Make everything visible
-        self.current_view.show_all()
-        self.content_box.show_all()
-        self.scrolled_window.show_all()
-        self.show_all()
+        # Make everything visible (only if panel is packed)
+        if self.get_parent() is not None:
+            self.current_view.show_all()
+            self.content_box.show_all()
+            self.scrolled_window.show_all()
+            self.show_all()
         
         # Force queue draw
         self.queue_draw()
@@ -1967,46 +1931,28 @@ class ViabilityPanel(Gtk.Box):
                 
                 print(f"  Resetting colors for {transition_id}:")
                 
-                # Reset transition color - find by iterating transitions list
-                transition_id_to_find = locality_ids.get('transition_id')
-                for t_obj in model.transitions:
-                    if t_obj.id == transition_id_to_find:
-                        print(f"    - Transition: {t_obj.id}")
-                        t_obj.border_color = Transition.DEFAULT_BORDER_COLOR
-                        t_obj.fill_color = Transition.DEFAULT_COLOR
-                        break
+                # Reset transition color
+                print(f"    - Transition: {locality_ids.transition.id}")
+                locality_ids.transition.border_color = Transition.DEFAULT_BORDER_COLOR
+                locality_ids.transition.fill_color = Transition.DEFAULT_COLOR
                 
-                # Reset input place colors - find by iterating places list
-                for place_id in locality_ids.get('input_place_ids', []):
-                    for p_obj in model.places:
-                        if p_obj.id == place_id:
-                            print(f"    - Input place: {p_obj.id}")
-                            p_obj.border_color = Place.DEFAULT_BORDER_COLOR
-                            break
+                # Reset input place colors
+                for p_obj in locality_ids.input_places:
+                    print(f"    - Input place: {p_obj.id}")
+                    p_obj.border_color = Place.DEFAULT_BORDER_COLOR
                 
                 # Reset output place colors
-                for place_id in locality_ids.get('output_place_ids', []):
-                    for p_obj in model.places:
-                        if p_obj.id == place_id:
-                            print(f"    - Output place: {p_obj.id}")
-                            p_obj.border_color = Place.DEFAULT_BORDER_COLOR
-                            break
+                for p_obj in locality_ids.output_places:
+                    print(f"    - Output place: {p_obj.id}")
+                    p_obj.border_color = Place.DEFAULT_BORDER_COLOR
                 
-                # Reset input arc colors - find by iterating arcs list
-                for arc_id in locality_ids.get('input_arc_ids', []):
-                    for a_obj in model.arcs:
-                        if a_obj.id == arc_id:
-                            print(f"    - Input arc: {a_obj.id}")
-                            a_obj.color = Arc.DEFAULT_COLOR
-                            break
+                # Reset input arc colors
+                for arc_obj in locality_ids.input_arcs:
+                    print(f"    - Input arc: {arc_obj.id}")
                 
                 # Reset output arc colors
-                for arc_id in locality_ids.get('output_arc_ids', []):
-                    for a_obj in model.arcs:
-                        if a_obj.id == arc_id:
-                            print(f"    - Output arc: {a_obj.id}")
-                            a_obj.color = Arc.DEFAULT_COLOR
-                            break
+                for arc_obj in locality_ids.output_arcs:
+                    print(f"    - Output arc: {arc_obj.id}")
         
         print("[Viability] All colors reset")
         
@@ -2062,7 +2008,8 @@ class ViabilityPanel(Gtk.Box):
         summary_placeholder.set_xalign(0)
         summary_placeholder.get_style_context().add_class("dim-label")
         self.summary_box.pack_start(summary_placeholder, False, False, 0)
-        self.summary_box.show_all()
+        if self.get_parent() is not None:
+            self.summary_box.show_all()
         
         # Collapse all expanders
         self.summary_expander.set_expanded(False)
@@ -2135,7 +2082,8 @@ class ViabilityPanel(Gtk.Box):
         health_grid.attach(kinetic_count_label, 1, 2, 1, 1)
         
         self.summary_box.pack_start(health_grid, False, False, 0)
-        self.summary_box.show_all()
+        if self.get_parent() is not None:
+            self.summary_box.show_all()
     
     def _populate_suggestions_treeview(self, store, suggestions):
         """Populate a suggestions TreeView with data.
@@ -2199,20 +2147,286 @@ class ViabilityPanel(Gtk.Box):
     def set_drawing_area(self, drawing_area):
         """Set drawing area and update model.
         
+        Called when this panel becomes active due to tab switching.
+        Refreshes the panel to show data for the newly active document.
+        
         Args:
             drawing_area: Gtk.DrawingArea widget
         """
+        # Detect if this is a different document (new tab or tab switch)
+        new_drawing_area_id = id(drawing_area) if drawing_area else None
+        is_new_document = (new_drawing_area_id != self._current_drawing_area_id)
+        
+        # Store previous drawing area for comparison
+        prev_drawing_area_id = self._current_drawing_area_id
+        
         self.drawing_area = drawing_area
+        self._current_drawing_area_id = new_drawing_area_id
         
         # Update model reference from drawing area's overlay manager
         if self.model_canvas and self.drawing_area:
             overlay_manager = self.model_canvas.overlay_managers.get(self.drawing_area)
             if overlay_manager and hasattr(overlay_manager, 'model'):
                 self.model = overlay_manager.model
+        
+        # If this is a new document, clear all panel data
+        if is_new_document:
+            print(f"[VIABILITY_PANEL] 🆕 New document detected, clearing panel")
+            self._clear_panel_for_new_document()
+        
+        # CRITICAL: Always refresh when switching documents (even between existing tabs)
+        # This ensures the UI shows THIS document's data, not stale data from previous tab
+        print(f"[VIABILITY_PANEL] 🔄 Tab switch: drawing_area {prev_drawing_area_id} → {new_drawing_area_id}")
+        self.refresh_all()
+    
+    def _clear_panel_for_new_document(self):
+        """Clear all panel data when switching to a new/different document.
+        
+        This ensures the panel starts fresh for each document, preventing
+        data from previous documents from being displayed.
+        """
+        print(f"[VIABILITY_CLEAR] 🧹 Clearing panel data for new document")
+        
+        # Clear selected localities
+        self.selected_localities.clear()
+        self._locality_objects.clear()
+        
+        # Clear localities ListBox
+        for row in list(self.localities_listbox.get_children()):
+            self.localities_listbox.remove(row)
+        
+        # Clear subnet parameters tables
+        if hasattr(self, 'places_store') and self.places_store:
+            self.places_store.clear()
+        if hasattr(self, 'transitions_store') and self.transitions_store:
+            self.transitions_store.clear()
+        if hasattr(self, 'arcs_store') and self.arcs_store:
+            self.arcs_store.clear()
+        if hasattr(self, 'subnet_params_store') and self.subnet_params_store:
+            self.subnet_params_store.clear()
+        if hasattr(self, 'subnet_io_store') and self.subnet_io_store:
+            self.subnet_io_store.clear()
+        
+        # Clear suggestions stores
+        if hasattr(self, 'structural_store') and self.structural_store:
+            self.structural_store.clear()
+        if hasattr(self, 'biological_store') and self.biological_store:
+            self.biological_store.clear()
+        if hasattr(self, 'kinetic_store') and self.kinetic_store:
+            self.kinetic_store.clear()
+        
+        # Clear investigation
+        self.current_investigation = None
+        self.current_view = None
+        
+        print(f"[VIABILITY_CLEAR] ✅ Panel cleared")
     
     def refresh_all(self):
-        """Refresh all (compatibility - now no-op)."""
-        pass
+        """Refresh all panel data to match current document.
+        
+        Called when tab switches to update displayed data.
+        This ensures the panel shows the correct document's viability state.
+        """
+        try:
+            print(f"[VIABILITY_REFRESH] 🔄 Refreshing panel for drawing_area {id(self.drawing_area) if self.drawing_area else 'None'}")
+            print(f"[VIABILITY_REFRESH] 📋 Selected localities: {list(self.selected_localities.keys())}")
+            
+            # Refresh localities ListBox to show THIS document's selections
+            self._refresh_localities_list()
+            
+            # Refresh subnet parameters tables from current localities
+            self._refresh_subnet_parameters()
+            
+            # Update UI state
+            self._update_ui_state()
+            
+            print(f"[VIABILITY_REFRESH] ✅ Refresh complete")
+        except Exception as e:
+            print(f"[VIABILITY_REFRESH] ⚠️ Error refreshing panel: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _refresh_localities_list(self):
+        """Rebuild localities ListBox to match THIS document's selected_localities.
+        
+        Called on tab switch to ensure the UI shows the correct document's selections.
+        """
+        print(f"[VIABILITY_REFRESH_LIST] 🔧 Rebuilding localities list, {len(self.selected_localities)} transitions")
+        
+        # Clear all existing rows from ListBox
+        for row in list(self.localities_listbox.get_children()):
+            self.localities_listbox.remove(row)
+        
+        # Get current model
+        model = self._get_current_model()
+        if not model:
+            return
+        
+        # Rebuild ListBox from selected_localities dict
+        # Need to recreate rows because they were removed from previous document's panel
+        for transition_id, data in list(self.selected_localities.items()):
+            # Get transition object from current model
+            transition_obj = None
+            for t in model.transitions:
+                if t.id == transition_id:
+                    transition_obj = t
+                    break
+            
+            if not transition_obj:
+                # Transition doesn't exist in this document, remove from dict
+                del self.selected_localities[transition_id]
+                if transition_id in self._locality_objects:
+                    del self._locality_objects[transition_id]
+                continue
+            
+            # Get locality from _locality_objects
+            locality_ids = self._locality_objects.get(transition_id)
+            if not locality_ids:
+                continue
+            
+            # Recreate transition row
+            transition_row = Gtk.ListBoxRow()
+            transition_hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+            transition_hbox.set_margin_start(6)
+            transition_hbox.set_margin_end(6)
+            transition_hbox.set_margin_top(3)
+            transition_hbox.set_margin_bottom(3)
+            
+            # Checkbox
+            checkbox = Gtk.CheckButton()
+            checkbox.set_active(True)
+            checkbox.transition_id = transition_obj.id
+            transition_hbox.pack_start(checkbox, False, False, 0)
+            
+            # Transition label
+            label_text = transition_obj.id
+            if hasattr(transition_obj, 'label') and transition_obj.label:
+                label_text = f"{transition_obj.id} ({transition_obj.label})"
+            
+            transition_label = Gtk.Label(label=label_text)
+            transition_label.set_xalign(0)
+            transition_hbox.pack_start(transition_label, True, True, 0)
+            
+            # Remove button
+            remove_btn = Gtk.Button(label="✕")
+            remove_btn.set_relief(Gtk.ReliefStyle.NONE)
+            remove_btn.connect("clicked", lambda w, tid=transition_id: self._remove_transition_from_list(tid))
+            transition_hbox.pack_start(remove_btn, False, False, 0)
+            
+            transition_row.add(transition_hbox)
+            self.localities_listbox.add(transition_row)
+            
+            # Update selected_localities with new row and checkbox references
+            self.selected_localities[transition_id]['row'] = transition_row
+            self.selected_localities[transition_id]['checkbox'] = checkbox
+            
+            # Add input places
+            for place_obj in locality_ids.input_places:
+                self._add_locality_place_row_to_list(place_obj, "← Input:")
+            
+            # Add output places
+            for place_obj in locality_ids.output_places:
+                self._add_locality_place_row_to_list(place_obj, "→ Output:")
+        
+        # Only show widgets if panel is already packed into a container
+        # If panel has no parent, it means it hasn't been added to the UI yet
+        # and calling show_all() will cause GTK realize errors
+        if self.get_parent() is not None:
+            self.localities_listbox.show_all()
+    
+    def _refresh_subnet_parameters(self):
+        """Refresh subnet parameters tables from current selected localities."""
+        try:
+            # Clear existing data
+            self.places_store.clear()
+            self.transitions_store.clear()
+            self.arcs_store.clear()
+        except Exception as e:
+            print(f"[VIABILITY_REFRESH] ⚠️ Error clearing stores: {e}")
+            return
+        
+        # Rebuild from current localities
+        canvas_manager = self._get_canvas_manager()
+        if not canvas_manager:
+            return
+        
+        # Collect all places, transitions, and arcs from selected localities
+        all_place_ids = set()
+        all_transition_ids = set()
+        all_arc_ids = set()
+        
+        for transition_id, locality_obj in self._locality_objects.items():
+            # Places
+            for place_obj in locality_obj.input_places:
+                all_place_ids.add(place_obj.id)
+            for place_obj in locality_obj.output_places:
+                all_place_ids.add(place_obj.id)
+            
+            # Transitions
+            all_transition_ids.add(locality_obj.transition.id)
+            
+            # Arcs
+            for arc_obj in locality_obj.input_arcs:
+                all_arc_ids.add(arc_obj.id)
+            for arc_obj in locality_obj.output_arcs:
+                all_arc_ids.add(arc_obj.id)
+        
+        # Populate places table
+        for place_id in sorted(all_place_ids):
+            for place in canvas_manager.places:
+                if place.id == place_id:
+                    place_type = "Source" if (hasattr(place, 'is_source') and place.is_source) else "Normal"
+                    label = place.label if hasattr(place, 'label') else ""
+                    marking = place.marking if hasattr(place, 'marking') else (place.initial_marking if hasattr(place, 'initial_marking') else 0)
+                    self.places_store.append([
+                        place.id,
+                        place.name or place.id,
+                        marking,
+                        place_type,
+                        label
+                    ])
+                    break
+        
+        # Populate transitions table
+        for transition_id in sorted(all_transition_ids):
+            for transition in canvas_manager.transitions:
+                if transition.id == transition_id:
+                    rate = getattr(transition, 'rate', 1.0)
+                    formula = getattr(transition, 'formula', getattr(transition, 'rate_formula', ''))
+                    trans_type = getattr(transition, 'transition_type', 'continuous')
+                    label = getattr(transition, 'label', '')
+                    self.transitions_store.append([
+                        transition.id,
+                        transition.name or transition.id,
+                        rate,
+                        formula,
+                        trans_type,
+                        label
+                    ])
+                    break
+        
+        # Populate arcs table
+        for arc_id in sorted(all_arc_ids):
+            for arc in canvas_manager.arcs:
+                if arc.id == arc_id:
+                    from shypn.netobjs import Place
+                    source_id = arc.source.id if hasattr(arc.source, 'id') else str(arc.source)
+                    target_id = arc.target.id if hasattr(arc.target, 'id') else str(arc.target)
+                    arc_type = "Place→Transition" if isinstance(arc.source, Place) else "Transition→Place"
+                    weight = arc.weight if hasattr(arc, 'weight') else 1
+                    self.arcs_store.append([
+                        arc.id,
+                        source_id,
+                        target_id,
+                        weight,
+                        arc_type
+                    ])
+                    break
+    
+    def _update_ui_state(self):
+        """Update UI state based on current selections."""
+        has_localities = len(self.selected_localities) > 0
+        self.diagnose_button.set_sensitive(has_localities)
     
     def get_knowledge_base(self):
         """Get knowledge base (compatibility).

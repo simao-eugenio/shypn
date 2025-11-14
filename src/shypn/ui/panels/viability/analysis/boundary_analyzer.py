@@ -82,7 +82,8 @@ class BoundaryAnalyzer(BaseAnalyzer):
         
         place_data = sim_data.get('places', {})
         
-        for place_id in subnet.boundary_places:
+        for place_obj in subnet.boundary_places:
+            place_id = place_obj.id  # Extract ID from object
             history = place_data.get(place_id, {})
             tokens_over_time = history.get('tokens', [])
             
@@ -132,7 +133,8 @@ class BoundaryAnalyzer(BaseAnalyzer):
         
         place_data = sim_data.get('places', {})
         
-        for place_id in subnet.boundary_places:
+        for place_obj in subnet.boundary_places:
+            place_id = place_obj.id  # Extract ID from object
             history = place_data.get(place_id, {})
             tokens_over_time = history.get('tokens', [])
             
@@ -183,7 +185,8 @@ class BoundaryAnalyzer(BaseAnalyzer):
         total_increase = 0
         total_decrease = 0
         
-        for place_id in subnet.boundary_places:
+        for place_obj in subnet.boundary_places:
+            place_id = place_obj.id  # Extract ID from object
             history = place_data.get(place_id, {})
             tokens_over_time = history.get('tokens', [])
             
@@ -248,7 +251,8 @@ class BoundaryAnalyzer(BaseAnalyzer):
         analysis = BoundaryAnalysis()
         place_data = sim_data.get('places', {})
         
-        for place_id in subnet.boundary_places:
+        for place_obj in subnet.boundary_places:
+            place_id = place_obj.id  # Extract ID from object
             history = place_data.get(place_id, {})
             tokens_over_time = history.get('tokens', [])
             
