@@ -300,13 +300,8 @@ class ModelCanvasLoader:
             page: Notebook page widget (Gtk.Overlay or Gtk.ScrolledWindow)
         """
         # print(f"\n[WIRE] _wire_data_collector_for_page() called")
-        drawing_area = None
-        if isinstance(page, Gtk.Overlay):
-            scrolled = page.get_child()
-            if isinstance(scrolled, Gtk.ScrolledWindow):
-                drawing_area = scrolled.get_child()
-                if hasattr(drawing_area, 'get_child'):
-                    drawing_area = drawing_area.get_child()
+        # Always resolve the actual GtkDrawingArea via helper to avoid viewport mixups
+        drawing_area = self._get_drawing_area_from_page(page)
         
         # print(f"[WIRE]   drawing_area={drawing_area} (id={id(drawing_area) if drawing_area else 'None'})")
         
@@ -1008,13 +1003,25 @@ class ModelCanvasLoader:
         Returns:
             Gtk.DrawingArea or None
         """
+        # Notebook page structure is: Gtk.Overlay → Gtk.ScrolledWindow → Gtk.Viewport → Gtk.DrawingArea
+        # Gtk.ScrolledWindow auto-wraps its child in a Gtk.Viewport at runtime.
+        # Always descend through the Viewport to return the actual Gtk.DrawingArea.
+        widget = None
         if isinstance(page_widget, Gtk.Overlay):
             scrolled = page_widget.get_child()
             if isinstance(scrolled, Gtk.ScrolledWindow):
-                return scrolled.get_child()
+                widget = scrolled.get_child()
         elif isinstance(page_widget, Gtk.ScrolledWindow):
-            return page_widget.get_child()
-        return None
+            widget = page_widget.get_child()
+
+        # If the immediate child is a GtkViewport, get its child (the DrawingArea)
+        if widget is not None and hasattr(widget, 'get_child'):
+            inner = widget.get_child()
+            if inner is not None:
+                widget = inner
+
+        # Ensure the returned widget is the GtkDrawingArea instance
+        return widget
 
     def add_document(self, title=None, filename=None, replace_empty_default=True):
         """Add a new document (tab) to the canvas.
