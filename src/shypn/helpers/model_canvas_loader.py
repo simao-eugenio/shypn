@@ -985,7 +985,20 @@ class ModelCanvasLoader:
             # runs full initialization (same as initial startup) and ensure
             # the recreation follows the exact File→New code path.
             self._first_page_initialized = False
-            self.add_document(filename='default')
+            page_index, new_drawing = self.add_document(filename='default')
+            # Explicitly activate lifecycle context and focus for the new canvas
+            try:
+                if self.lifecycle_adapter and new_drawing:
+                    self.lifecycle_adapter.switch_to_canvas(new_drawing)
+                if self.lifecycle_manager and hasattr(self.lifecycle_manager, 'id_manager') and new_drawing:
+                    from shypn.data.canvas.id_manager import set_lifecycle_scope_manager
+                    set_lifecycle_scope_manager(self.lifecycle_manager.id_manager)
+                    self.lifecycle_manager.id_manager.set_scope(f"canvas_{id(new_drawing)}")
+                if new_drawing:
+                    new_drawing.set_can_focus(True)
+                    new_drawing.grab_focus()
+            except Exception:
+                pass
         return True
 
     def is_current_tab_empty_default(self):
@@ -2558,7 +2571,19 @@ class ModelCanvasLoader:
             drawing_area: GtkDrawingArea widget.
             manager: ModelCanvasManager instance.
         """
-        drawing_area.set_events(Gdk.EventMask.BUTTON_PRESS_MASK | Gdk.EventMask.BUTTON_RELEASE_MASK | Gdk.EventMask.POINTER_MOTION_MASK | Gdk.EventMask.SCROLL_MASK | Gdk.EventMask.KEY_PRESS_MASK)
+        # Preserve any existing event mask and add required ones
+        required_mask = (
+            Gdk.EventMask.BUTTON_PRESS_MASK
+            | Gdk.EventMask.BUTTON_RELEASE_MASK
+            | Gdk.EventMask.POINTER_MOTION_MASK
+            | Gdk.EventMask.SCROLL_MASK
+            | Gdk.EventMask.KEY_PRESS_MASK
+        )
+        try:
+            current_mask = drawing_area.get_events()
+        except Exception:
+            current_mask = 0
+        drawing_area.set_events(current_mask | required_mask)
         drawing_area.set_can_focus(True)
         drawing_area.connect('button-press-event', self._on_button_press, manager)
         drawing_area.connect('button-release-event', self._on_button_release, manager)
