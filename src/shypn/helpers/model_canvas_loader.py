@@ -1226,12 +1226,9 @@ class ModelCanvasLoader:
         page_index = self.notebook.append_page(overlay, tab_box)
         overlay.show_all()
         
-        # WAYLAND FIX: Realize the widget before setup to ensure proper parent window hierarchy
-        # On Wayland, dialogs require their parent to be realized (have a GdkWindow/GdkSurface)
-        # Default canvas works because it's loaded from UI file and realized when main window shows
-        # File→New/Import canvases are created programmatically and need explicit realization
-        if not overlay.get_realized():
-            overlay.realize()
+        # Do not force explicit realize here; GTK will realize widgets when packed
+        # and shown by the toplevel window. Forcing realize early can break event
+        # mask setup and cause GTK criticals about anchoring.
         
         # PHASE 4: Set ID scope EARLY for this new canvas
         # Ensure that any ID generation (including during initial setup or file load)
@@ -2571,7 +2568,7 @@ class ModelCanvasLoader:
             drawing_area: GtkDrawingArea widget.
             manager: ModelCanvasManager instance.
         """
-        # Preserve any existing event mask and add required ones
+        # Ensure required event masks using add_events (safe after realize)
         required_mask = (
             Gdk.EventMask.BUTTON_PRESS_MASK
             | Gdk.EventMask.BUTTON_RELEASE_MASK
@@ -2580,10 +2577,10 @@ class ModelCanvasLoader:
             | Gdk.EventMask.KEY_PRESS_MASK
         )
         try:
-            current_mask = drawing_area.get_events()
+            if hasattr(drawing_area, 'add_events'):
+                drawing_area.add_events(required_mask)
         except Exception:
-            current_mask = 0
-        drawing_area.set_events(current_mask | required_mask)
+            pass
         drawing_area.set_can_focus(True)
         drawing_area.connect('button-press-event', self._on_button_press, manager)
         drawing_area.connect('button-release-event', self._on_button_release, manager)
@@ -2622,11 +2619,8 @@ class ModelCanvasLoader:
                     | Gdk.EventMask.KEY_PRESS_MASK
                 )
                 try:
-                    current_mask_sw = scrolled.get_events()
-                except Exception:
-                    current_mask_sw = 0
-                try:
-                    scrolled.set_events(current_mask_sw | required_mask)
+                    if hasattr(scrolled, 'add_events'):
+                        scrolled.add_events(required_mask)
                 except Exception:
                     pass
                 scrolled.connect('button-press-event', lambda w, e, m=manager: self._on_button_press(drawing_area, e, m))
@@ -2644,11 +2638,8 @@ class ModelCanvasLoader:
                     | Gdk.EventMask.KEY_PRESS_MASK
                 )
                 try:
-                    current_mask_vp = viewport.get_events()
-                except Exception:
-                    current_mask_vp = 0
-                try:
-                    viewport.set_events(current_mask_vp | required_mask)
+                    if hasattr(viewport, 'add_events'):
+                        viewport.add_events(required_mask)
                 except Exception:
                     pass
 
