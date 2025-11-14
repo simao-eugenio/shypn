@@ -120,11 +120,11 @@ class ViabilityPanel(Gtk.Box):
         header_label.set_tooltip_text("Model viability analysis and suggestions")
         header_box.pack_start(header_label, True, True, 0)
         
-        # Float button (right)
+        # Float button (right) - match Topology/Analyses icon and style
         self.float_button = Gtk.ToggleButton()
-        self.float_button.set_label("Detach")
+        self.float_button.set_label("⬈")
         self.float_button.set_tooltip_text("Detach panel to floating window")
-        self.float_button.set_relief(Gtk.ReliefStyle.NONE)
+        self.float_button.set_relief(Gtk.ReliefStyle.NONE)  # Flat button
         self.float_button.set_valign(Gtk.Align.CENTER)
         header_box.pack_end(self.float_button, False, False, 0)
         
@@ -420,6 +420,24 @@ class ViabilityPanel(Gtk.Box):
         kinetic_scroll.add(self.kinetic_treeview)
         self.kinetic_expander.add(kinetic_scroll)
         main_box.pack_start(self.kinetic_expander, False, False, 0)
+
+        # === SECTION 7: INVESTIGATION RESULTS CONTAINER ===
+        # Dedicated container managed by _show_investigation_view.
+        # This isolates dynamic results from the static sections above.
+        self.content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        self.content_box.set_margin_start(10)
+        self.content_box.set_margin_end(10)
+        self.content_box.set_margin_top(6)
+        self.content_box.set_margin_bottom(10)
+
+        # Empty-state placeholder for results container
+        self.empty_label = Gtk.Label()
+        self.empty_label.set_markup("<i>Run a diagnosis to see investigation results here</i>")
+        self.empty_label.set_justify(Gtk.Justification.CENTER)
+        self.content_box.pack_start(self.empty_label, False, False, 0)
+
+        # Add results container to main layout
+        main_box.pack_start(self.content_box, False, False, 0)
         
         # Add main box to scrolled window
         self.scrolled_window = Gtk.ScrolledWindow()
@@ -1399,8 +1417,14 @@ class ViabilityPanel(Gtk.Box):
         if not self.current_investigation:
             return
         
+        # Safety: ensure results container exists
+        if not hasattr(self, 'content_box') or self.content_box is None:
+            return
+        if not hasattr(self, 'empty_label'):
+            self.empty_label = None
+        
         # Remove empty state
-        if self.empty_label in self.content_box.get_children():
+        if self.empty_label and self.empty_label in self.content_box.get_children():
             self.content_box.remove(self.empty_label)
         
         # Remove old view if exists

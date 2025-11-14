@@ -197,9 +197,9 @@ def main(argv=None):
 			
 			header_bar.connect('button-press-event', on_header_bar_button_press)
 
-		# Load model canvas
+		# Load model canvas (defer document creation until after left_dock_stack is set)
 		try:
-			model_canvas_loader = create_model_canvas()
+			model_canvas_loader = create_model_canvas(create_initial_document=False)
 			# Set parent window for zoom palette window
 			model_canvas_loader.parent_window = window
 		except Exception as e:
@@ -376,6 +376,12 @@ def main(argv=None):
 				model_canvas=model_canvas_loader,
 				workspace_settings=workspace_settings
 			)
+
+			# Store on canvas loader so it can keep it in sync on tab switches
+			try:
+				model_canvas_loader.pathway_panel_loader = pathway_panel_loader
+			except Exception:
+				pass
 			
 			# WAYLAND FIX: Set parent window for SBML Import panel immediately
 			# This ensures FileChooserDialog has valid parent before panel is attached
@@ -485,6 +491,14 @@ def main(argv=None):
 			# Wire pathway operations panel to context menu handler for BRENDA enrichment
 			if pathway_panel_loader and hasattr(pathway_panel_loader, 'panel'):
 				right_panel_loader.context_menu_handler.set_pathway_operations_panel(pathway_panel_loader.panel)
+
+		# Ensure Pathway Operations panel re-resolves the current manager
+		# after all canvas wiring is complete (startup default tab)
+		try:
+			if pathway_panel_loader:
+				pathway_panel_loader.set_model_canvas(model_canvas_loader)
+		except Exception:
+			pass
 		
 		# Wire file explorer panel to canvas loader
 		# This allows keyboard shortcuts (Ctrl+S, Ctrl+Shift+S) to trigger save operations
@@ -498,6 +512,15 @@ def main(argv=None):
 		if left_dock_stack is None:
 			logging.getLogger(__name__).error('left_dock_stack not found in main window')
 			sys.exit(6)
+		
+		# CRITICAL: Set left_dock_stack on model_canvas_loader BEFORE any documents are created
+		# This ensures per-document panel loaders (Viability, Report) can access it during initialization
+		model_canvas_loader.left_dock_stack = left_dock_stack
+		print(f"[SHYPN] Set left_dock_stack on model_canvas_loader early: {model_canvas_loader.left_dock_stack}")
+		
+		# Now create the initial document (deferred from load() to ensure dependencies are set)
+		page_index, drawing_area = model_canvas_loader.add_document(filename='default')
+		print(f"[SHYPN] Created initial document after setting left_dock_stack")
 
 		# Get individual panel containers from the stack
 		files_panel_container = main_builder.get_object('files_panel_container')
@@ -627,6 +650,7 @@ def main(argv=None):
 		# Add Viability panel container to stack
 		# NOTE: Per-document ViabilityPanel instances will be swapped in/out of this container
 		# This matches Report panel architecture - no global panel instance
+		print(f"[SHYPN] Setting up viability container, container exists: {viability_panel_container is not None}")
 		if viability_panel_container:
 			# Add empty container to stack - per-document panels added dynamically
 			left_dock_stack.add_named(viability_panel_container, 'viability')
@@ -635,6 +659,9 @@ def main(argv=None):
 			# This mirrors the Report panel wiring just above
 			model_canvas_loader.viability_panel_container = viability_panel_container
 			model_canvas_loader.left_dock_stack = left_dock_stack
+			print(f"[SHYPN] Set left_dock_stack on model_canvas_loader: {model_canvas_loader.left_dock_stack}")
+		else:
+			print(f"[SHYPN] WARNING: viability_panel_container is None!")
 		
 		# ====================================================================
 		# Report Panel Container (will hold per-document panels)
@@ -645,11 +672,23 @@ def main(argv=None):
 			# Define Report panel float/attach callbacks
 			def on_report_float():
 				"""Collapse left paned when Report panel floats."""
-				if left_paned:
+				# Check if any other panel is still docked
+				any_docked = False
+				if left_panel_loader and left_panel_loader.is_hanged:
+					any_docked = True
+				elif right_panel_loader and right_panel_loader.is_hanged:
+					any_docked = True
+				elif pathway_panel_loader and pathway_panel_loader.is_hanged:
+					any_docked = True
+				elif topology_panel_loader and topology_panel_loader.is_hanged:
+					any_docked = True
+				# Only collapse if NO panels remain docked
+				if not any_docked and left_paned:
 					try:
 						left_paned.set_position(0)
 					except Exception:
 						pass  # Ignore paned errors
+				# NOTE: Do NOT call master_palette.set_active() here - creates circular callbacks
 			
 			def on_report_attach():
 				"""Expand left paned when Report panel attaches."""
@@ -658,6 +697,7 @@ def main(argv=None):
 						left_paned.set_position(320)
 					except Exception:
 						pass  # Ignore paned errors
+				# NOTE: Do NOT call master_palette.set_active() here - creates circular callbacks
 			
 			# Store container reference for panel switching
 			# We use the report_panel_container from the UI file directly
@@ -1010,8 +1050,21 @@ def main(argv=None):
 			
 			EXCLUSIVE MODE: Only one panel active at a time.
 			When button is activated, deactivate others.
+			
+			PER-DOCUMENT ARCHITECTURE: Each model has its own Report Panel instance.
+			Must handle both docked and floating states.
 			"""
-			if not report_panel_container:
+			# Get current document's report loader
+			drawing_area = model_canvas_loader.get_current_document()
+			if not drawing_area:
+				return
+			
+			overlay_manager = model_canvas_loader.overlay_managers.get(drawing_area)
+			if not overlay_manager or not hasattr(overlay_manager, 'report_panel_loader'):
+				return
+			
+			report_loader = overlay_manager.report_panel_loader
+			if not report_loader:
 				return
 			
 			if is_active:
@@ -1022,39 +1075,56 @@ def main(argv=None):
 				master_palette.set_active('topology', False)
 				master_palette.set_active('viability', False)
 				
-				# Show report panel in stack
+				# If panel is floating, just show the window and ENSURE dock is collapsed
+				if not report_loader.is_hanged:
+					if report_loader.window:
+						report_loader.window.show_all()
+					# CRITICAL: Always collapse dock when panel is floating
+					if left_dock_stack:
+						left_dock_stack.set_visible(False)
+					if report_panel_container:
+						report_panel_container.set_visible(False)
+					if left_paned:
+						try:
+							left_paned.set_position(0)
+						except Exception:
+							pass
+					return
+				
+				# Panel is docked - show in stack
 				if left_dock_stack:
 					left_dock_stack.set_visible_child_name('report')
 					left_dock_stack.set_visible(True)
-				# Expand left paned to show report panel
+				
+				# Expand left paned to show stack
 				if left_paned:
 					try:
 						left_paned.set_position(320)
 					except Exception:
 						pass
-				# Show report container and panel content
+				
+				# Show container and panel content
 				if report_panel_container:
 					report_panel_container.set_visible(True)
-					# Show the actual Report panel content for current document
-					drawing_area = model_canvas_loader.get_current_document()
-					if drawing_area:
-						overlay_manager = model_canvas_loader.overlay_managers.get(drawing_area)
-						if overlay_manager and hasattr(overlay_manager, 'report_panel_loader'):
-							report_loader = overlay_manager.report_panel_loader
-							if report_loader and report_loader.panel:
-								report_loader.panel.show_all()
+					if report_loader.panel:
+						report_loader.panel.show_all()
 			else:
-				# Hide report panel
-				if report_panel_container:
-					report_panel_container.set_visible(False)
-				# Hide stack when last panel is hidden
-				if left_dock_stack:
-					left_dock_stack.set_visible(False)
-				if left_paned:
-					try:
-						left_paned.set_position(0)
-					except Exception:
-						pass
+				# Hide panel
+				if report_loader.is_hanged:
+					# Panel is docked - hide container and collapse dock
+					if report_panel_container:
+						report_panel_container.set_visible(False)
+					if left_dock_stack:
+						left_dock_stack.set_visible(False)
+					if left_paned:
+						try:
+							left_paned.set_position(0)
+						except Exception:
+							pass
+				else:
+					# Panel is floating - just hide the window
+					if report_loader.window:
+						report_loader.window.hide()
 
 		def on_viability_toggle(is_active):
 			"""Handle Viability panel toggle from Master Palette.
@@ -1063,9 +1133,19 @@ def main(argv=None):
 			When button is activated, deactivate others.
 			
 			PER-DOCUMENT ARCHITECTURE: Each model has its own Viability Panel instance.
-			This function swaps the per-document panel into the shared container.
+			Must swap per-document panel into shared container when toggling.
 			"""
-			if not viability_panel_container:
+			# Get current document's viability loader
+			drawing_area = model_canvas_loader.get_current_document()
+			if not drawing_area:
+				return
+			
+			overlay_manager = model_canvas_loader.overlay_managers.get(drawing_area)
+			if not overlay_manager or not hasattr(overlay_manager, 'viability_panel_loader'):
+				return
+			
+			viability_loader = overlay_manager.viability_panel_loader
+			if not viability_loader:
 				return
 			
 			if is_active:
@@ -1076,65 +1156,69 @@ def main(argv=None):
 				master_palette.set_active('topology', False)
 				master_palette.set_active('report', False)
 				
-				# Show viability panel in stack
+				# If panel is floating, just show the window and ENSURE dock is collapsed
+				if not viability_loader.is_hanged:
+					if viability_loader.window:
+						viability_loader.window.show_all()
+					# CRITICAL: Always collapse dock and hide containers when panel is floating
+					if left_dock_stack:
+						left_dock_stack.set_visible(False)
+					if viability_panel_container:
+						viability_panel_container.set_visible(False)
+					if left_paned:
+						try:
+							left_paned.set_position(0)
+						except Exception:
+							pass
+					return
+				
+				# Panel is docked - show in stack
 				if left_dock_stack:
 					left_dock_stack.set_visible_child_name('viability')
 					left_dock_stack.set_visible(True)
-				# Expand left paned to show viability panel
+				
+				# Expand left paned to show stack
 				if left_paned:
 					try:
-						left_paned.set_position(320)  # Match Topology/Report panel width
+						left_paned.set_position(320)
 					except Exception:
 						pass
-				# Show viability container and panel content for current document
+				
+				# Swap this document's panel into the shared container
 				if viability_panel_container:
 					viability_panel_container.set_visible(True)
-					# Show the actual Viability panel content for current document
-					drawing_area = model_canvas_loader.get_current_document()
-					if drawing_area:
-						overlay_manager = model_canvas_loader.overlay_managers.get(drawing_area)
-						if overlay_manager and hasattr(overlay_manager, 'viability_panel_loader'):
-							viability_loader = overlay_manager.viability_panel_loader
-							if viability_loader and viability_loader.panel:
-								# CRITICAL: ALWAYS clear container first (unconditional, matching tab switch logic)
-								# Clears whatever panel is currently shown, then adds the new one
-								for child in viability_panel_container.get_children():
-									viability_panel_container.remove(child)
-								
-								# CRITICAL: Explicitly remove new panel from its current parent (if any)
-								# GTK requires widget.get_parent() == NULL before pack_start()
-								current_parent = viability_loader.widget.get_parent()
-								if current_parent:
-									print(f"[VIABILITY_TOGGLE]   └─ Panel has parent {type(current_parent).__name__} (id={id(current_parent)}), removing...")
-									current_parent.remove(viability_loader.widget)
-								
-								# Verify parent is None after removal
-								verify_parent = viability_loader.widget.get_parent()
-								if verify_parent:
-									print(f"[VIABILITY_TOGGLE]   ⚠️  WARNING: Panel STILL has parent {type(verify_parent).__name__} after removal!")
-								else:
-									print(f"[VIABILITY_TOGGLE]   ✓ Panel parent is None, ready to pack")
-								
-								# Add current document's panel to container
-								viability_panel_container.pack_start(viability_loader.widget, True, True, 0)
-								# Ensure panel is bound to this document and refreshes AFTER packing
-								if hasattr(viability_loader.panel, 'set_drawing_area'):
-									viability_loader.panel.set_drawing_area(drawing_area)
-								# Show panel content
-								viability_loader.panel.show_all()
-								print(f"[VIABILITY_TOGGLE] ✓ Showing per-document viability panel for drawing_area {id(drawing_area)}")
+					
+					# Clear container first
+					for child in viability_panel_container.get_children():
+						viability_panel_container.remove(child)
+					
+					# Remove panel from its current parent (if any)
+					current_parent = viability_loader.widget.get_parent()
+					if current_parent and current_parent != viability_panel_container:
+						current_parent.remove(viability_loader.widget)
+					
+					# Pack this document's panel
+					viability_panel_container.pack_start(viability_loader.widget, True, True, 0)
+					viability_loader.parent_container = viability_panel_container
+					viability_loader.widget.show_all()
 			else:
-				# Hide viability panel
-				if viability_panel_container:
-					viability_panel_container.set_visible(False)
-				# Hide stack when last panel is hidden
-				if left_dock_stack:
-					left_dock_stack.set_visible(False)
-				if left_paned:
-					try:
-						left_paned.set_position(0)
-					except Exception:
-						pass
+				# Hide panel
+				if viability_loader.is_hanged:
+					# Panel is docked - hide container
+					if viability_panel_container:
+						viability_panel_container.set_visible(False)
+					# Hide stack when last panel is hidden
+					if left_dock_stack:
+						left_dock_stack.set_visible(False)
+					if left_paned:
+						try:
+							left_paned.set_position(0)
+						except Exception:
+							pass
+				else:
+					# Panel is floating - hide the window
+					if viability_loader.window:
+						viability_loader.window.hide()
 
 		# Set up callbacks to manage paned position when panels float/attach (detach button)
 		def on_left_float():
@@ -1210,6 +1294,36 @@ def main(argv=None):
 				except Exception:
 					pass  # Ignore paned errors
 			# NOTE: Do NOT call master_palette.set_active() here - creates circular callbacks
+
+		# Define float/attach callbacks for viability panel (left dock)
+		def on_viability_float():
+			"""Collapse left paned when Viability panel floats."""
+			# Check if any other panel is still docked
+			any_docked = False
+			if left_panel_loader and left_panel_loader.is_hanged:
+				any_docked = True
+			elif right_panel_loader and right_panel_loader.is_hanged:
+				any_docked = True
+			elif pathway_panel_loader and pathway_panel_loader.is_hanged:
+				any_docked = True
+			elif topology_panel_loader and topology_panel_loader.is_hanged:
+				any_docked = True
+			# Only collapse if NO panels remain docked
+			if not any_docked and left_paned:
+				try:
+					left_paned.set_position(0)
+				except Exception:
+					pass  # Ignore paned errors
+			# NOTE: Do NOT call master_palette.set_active() here - creates circular callbacks
+
+		def on_viability_attach():
+			"""Expand left paned when Viability panel reattaches/docks."""
+			if left_paned:
+				try:
+					left_paned.set_position(320)
+				except Exception:
+					pass  # Ignore paned errors
+			# NOTE: Do NOT call master_palette.set_active() here - creates circular callbacks
 		
 		# Wire up callbacks
 		left_panel_loader.on_float_callback = on_left_float
@@ -1222,6 +1336,11 @@ def main(argv=None):
 		if topology_panel_loader:
 			topology_panel_loader.on_float_callback = on_topology_float
 			topology_panel_loader.on_attach_callback = on_topology_attach
+
+		# Expose viability callbacks to model_canvas_loader so per-document
+		# ViabilityPanelLoader instances can wire them on creation
+		model_canvas_loader.on_viability_float = on_viability_float
+		model_canvas_loader.on_viability_attach = on_viability_attach
 
 		# ====================================================================
 		# Wire Master Palette buttons to toggle handlers

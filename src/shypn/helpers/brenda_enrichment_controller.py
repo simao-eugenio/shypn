@@ -519,11 +519,8 @@ class BRENDAEnrichmentController:
             
             if existing_vmax:
                 vmax = existing_vmax
-                # print(f"[BRENDA_MM] ⚠️ No Kcat provided, reusing existing Vmax={vmax} with new Km={km}")
-                print(f"[BRENDA_MM] Note: For accurate kinetics, select both Km and Kcat parameters from BRENDA")
+                print(f"[BRENDA_MM] Reusing existing Vmax={vmax} with new Km={km}")
             else:
-                pass
-                # print(f"[BRENDA_MM] ❌ Missing Vmax/Kcat for T{transition.id}, cannot generate rate function")
                 print(f"[BRENDA_MM] ℹ️  TIP: Select BOTH a Km and a Kcat parameter from BRENDA results to generate complete rate function")
                 return
         

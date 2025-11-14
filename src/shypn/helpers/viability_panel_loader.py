@@ -40,6 +40,9 @@ class ViabilityPanelLoader:
         self.parent_container = None
         self.is_hanged = True
         self._updating_button = False
+        # Optional UI callbacks (wired by host app)
+        self.on_float_callback = None
+        self.on_attach_callback = None
         
         # Create floating window
         self.window = Gtk.Window()
@@ -149,14 +152,18 @@ class ViabilityPanelLoader:
             container: GtkBox container within the stack for this panel
             panel_name: Name identifier for this panel in the stack ('viability')
         """
-        # Add panel widget directly to container
-        if self.widget.get_parent() != container:
-            current_parent = self.widget.get_parent()
-            if current_parent:
+        # Always remove from current parent before adding to the target container
+        current_parent = self.widget.get_parent()
+        if current_parent and current_parent is not container:
+            try:
                 current_parent.remove(self.widget)
+            except Exception:
+                pass
+        if self.widget.get_parent() != container:
             container.pack_start(self.widget, True, True, 0)
         
-        # Don't call show_all() here - let show_in_stack() handle visibility
+        # Show all widgets to ensure proper realization (match Topology/Analyses)
+        self.widget.show_all()
         
         # Store references for compatibility
         self.is_hanged = True
@@ -198,6 +205,7 @@ class ViabilityPanelLoader:
             container: Gtk.Box or other container to embed content into.
         """
         if self.is_hanged:
+            # Already attached, just ensure visibility
             if not self.content.get_visible():
                 self.content.show_all()
             # Make sure container is visible when re-showing
@@ -211,13 +219,19 @@ class ViabilityPanelLoader:
         # Remove content from window
         self.window.remove(self.content)
         
-        # Hang content on container
+        # Attach content to container
         container.pack_start(self.content, True, True, 0)
         self.content.show_all()
         
         # Make container visible (it was hidden when detached)
         container.set_visible(True)
         
+        # Show the stack if available
+        if hasattr(self, '_stack') and self._stack:
+            self._stack.set_visible(True)
+            self._stack.set_visible_child_name(self._stack_panel_name)
+        
+        # Update state
         self.is_hanged = True
         self.parent_container = container
         
@@ -226,23 +240,32 @@ class ViabilityPanelLoader:
             self._updating_button = True
             self.panel.float_button.set_active(False)
             self._updating_button = False
+        
+        # Notify host to expand/show docked area if needed
+        if callable(self.on_attach_callback):
+            self.on_attach_callback()
     
     def detach(self):
         """Detach from container and restore as independent window."""
         if not self.is_hanged:
             return
         
-        # Remove from container
+        print(f"[VIABILITY] Detaching - container visible: {self.parent_container.get_visible() if self.parent_container else 'N/A'}")
+        print(f"[VIABILITY] Detaching - stack visible: {self._stack.get_visible() if hasattr(self, '_stack') and self._stack else 'N/A'}")
+        
+        # Remove content from container
         if self.parent_container:
             self.parent_container.remove(self.content)
             # Hide the container after unattaching
             self.parent_container.set_visible(False)
+            print(f"[VIABILITY] Container hidden: {not self.parent_container.get_visible()}")
         
         # Hide the stack if this was the active panel
         if hasattr(self, '_stack') and self._stack:
             self._stack.set_visible(False)
+            print(f"[VIABILITY] Stack hidden: {not self._stack.get_visible()}")
         
-        # Return content to independent window
+        # Add content to independent window
         self.window.add(self.content)
         
         # Set transient for main window if available
@@ -252,18 +275,20 @@ class ViabilityPanelLoader:
         # Update state
         self.is_hanged = False
         
+        # Notify host to collapse/hide docked area (after UI changes)
+        if callable(self.on_float_callback):
+            print(f"[VIABILITY] Calling float callback")
+            self.on_float_callback()
+        
         # Update float button state
         if hasattr(self.panel, 'float_button') and not self.panel.float_button.get_active():
             self._updating_button = True
             self.panel.float_button.set_active(True)
             self._updating_button = False
         
-        # Ensure content is visible before showing window
-        self.content.set_no_show_all(False)
-        self.content.show_all()
-        
         # Show window
         self.window.show_all()
+        print(f"[VIABILITY] Detach complete")
     
     def _on_float_toggled(self, button):
         """Internal callback when float toggle button is clicked."""
@@ -279,20 +304,22 @@ class ViabilityPanelLoader:
     
     def _on_delete_event(self, window, event):
         """Handle window close (X button clicked)."""
-        # Hide the window
-        self.hide()
-        
-        # Update float button to inactive state
+        # Hide the floating window and reattach to dock container if available
+        try:
+            self.window.hide()
+        except Exception:
+            pass
+
+        if self.parent_container:
+            self.hang_on(self.parent_container)
+
+        # Update float button to inactive state after reattach
         if hasattr(self.panel, 'float_button') and self.panel.float_button.get_active():
             self._updating_button = True
             self.panel.float_button.set_active(False)
             self._updating_button = False
-        
-        # Dock back if we have a container
-        if self.parent_container:
-            self.hang_on(self.parent_container)
-        
-        # Return True to prevent window destruction
+
+        # Return True to prevent window destruction (we keep the window instance)
         return True
     
     def hide(self):

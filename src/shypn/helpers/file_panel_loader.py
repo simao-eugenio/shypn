@@ -678,6 +678,10 @@ class FilePanelLoader:
         # Update state - panel is now floating
         self.is_hanged = False
         
+        # Notify host to collapse/hide docked area if desired
+        if callable(self.on_float_callback):
+            self.on_float_callback()
+        
         # Show window
         self.window.show_all()
     
@@ -717,6 +721,9 @@ class FilePanelLoader:
         # Update state - panel is now in stack
         self.is_hanged = True
         
+        # Notify host to expand/show docked area if needed
+        if callable(self.on_attach_callback):
+            self.on_attach_callback()
     
     def _on_delete_event(self, window, event):
         """Handle window delete event - hide and re-attach."""
