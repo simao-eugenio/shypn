@@ -4629,24 +4629,24 @@ class ModelCanvasLoader:
             drawing_area: GtkDrawingArea widget
         """
         from shypn.netobjs import Place, Transition, Arc
-        
-        # Record operation for undo (capture state before deletion)
+
+        # Record operation for undo (capture state before cascade deletion)
         if hasattr(manager, 'undo_manager'):
             from shypn.edit.snapshots import capture_delete_snapshots
             from shypn.edit.undo_operations import DeleteOperation
             snapshots = capture_delete_snapshots(manager, [obj])
             manager.undo_manager.push(DeleteOperation(snapshots))
-        
-        # Perform deletion
+
+        # Perform deletion using facade methods to ensure cascade + observers
         if isinstance(obj, Place):
             if obj in manager.places:
-                manager.places.remove(obj)
+                manager.remove_place(obj)
         elif isinstance(obj, Transition):
             if obj in manager.transitions:
-                manager.transitions.remove(obj)
+                manager.remove_transition(obj)
         elif isinstance(obj, Arc):
             if obj in manager.arcs:
-                manager.arcs.remove(obj)
+                manager.remove_arc(obj)
         
         if obj.selected:
             manager.selection_manager.deselect(obj)
