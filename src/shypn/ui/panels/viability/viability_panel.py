@@ -122,7 +122,7 @@ class ViabilityPanel(Gtk.Box):
         
         # Float button (right)
         self.float_button = Gtk.ToggleButton()
-        self.float_button.set_label("⬈")
+        self.float_button.set_label("Detach")
         self.float_button.set_tooltip_text("Detach panel to floating window")
         self.float_button.set_relief(Gtk.ReliefStyle.NONE)
         self.float_button.set_valign(Gtk.Align.CENTER)
@@ -689,7 +689,7 @@ class ViabilityPanel(Gtk.Box):
         
         # Column 3: Change
         renderer_change = Gtk.CellRendererText()
-        column_change = Gtk.TreeViewColumn("Δ", renderer_change, text=3)
+        column_change = Gtk.TreeViewColumn("Change", renderer_change, text=3)
         column_change.set_resizable(True)
         column_change.set_min_width(80)
         treeview.append_column(column_change)
@@ -956,7 +956,7 @@ class ViabilityPanel(Gtk.Box):
         transition_hbox.pack_start(transition_label, True, True, 0)
         
         # Remove button
-        remove_btn = Gtk.Button(label="✕")
+        remove_btn = Gtk.Button(label="Remove")
         remove_btn.set_relief(Gtk.ReliefStyle.NONE)
         remove_btn.connect("clicked", lambda w: self._remove_transition_from_list(transition_obj.id))
         transition_hbox.pack_start(remove_btn, False, False, 0)
@@ -966,11 +966,11 @@ class ViabilityPanel(Gtk.Box):
         
         # === INPUT PLACES (INDENTED ROWS) ===
         for place_obj in locality.input_places:
-            self._add_locality_place_row_to_list(place_obj, "← Input:")
+            self._add_locality_place_row_to_list(place_obj, "Input:")
         
         # === OUTPUT PLACES (INDENTED ROWS) ===
         for place_obj in locality.output_places:
-            self._add_locality_place_row_to_list(place_obj, "→ Output:")
+            self._add_locality_place_row_to_list(place_obj, "Output:")
         
         # Show all new widgets (only if panel is packed)
         if self.get_parent() is not None:
@@ -1658,7 +1658,7 @@ class ViabilityPanel(Gtk.Box):
         # Warnings
         if prediction.has_warnings():
             warnings_label = Gtk.Label()
-            warnings_label.set_markup(f"<b>⚠ Warnings:</b>")
+            warnings_label.set_markup(f"<b>Warnings:</b>")
             warnings_label.set_halign(Gtk.Align.START)
             content.pack_start(warnings_label, False, False, 0)
             
@@ -2308,7 +2308,7 @@ class ViabilityPanel(Gtk.Box):
             transition_hbox.pack_start(transition_label, True, True, 0)
             
             # Remove button
-            remove_btn = Gtk.Button(label="✕")
+            remove_btn = Gtk.Button(label="Remove")
             remove_btn.set_relief(Gtk.ReliefStyle.NONE)
             remove_btn.connect("clicked", lambda w, tid=transition_id: self._remove_transition_from_list(tid))
             transition_hbox.pack_start(remove_btn, False, False, 0)
