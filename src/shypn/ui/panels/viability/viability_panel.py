@@ -2529,19 +2529,21 @@ class ViabilityPanel(Gtk.Box):
                 f"{pid}: {old}→{new}"
                 for pid, (old, new) in step_info['marking_changes'].items()
             ])
-            self._append_diagnostics_log(
-                f"Step {self.subnet_simulator.state.step_count}: "
-                f"{trans_id} fired ({changes_str})"
-            )
-            # Log full place markings after step
+            # One-line log including fired transition, changes, and full markings
             try:
                 markings_list = ", ".join([
                     f"{pid}={self.subnet_simulator.state.current_markings.get(pid, 0)}"
                     for pid in sorted(self.subnet_simulator.state.current_markings.keys())
                 ])
-                self._append_diagnostics_log(f"Markings: {markings_list}")
+                self._append_diagnostics_log(
+                    f"Step {self.subnet_simulator.state.step_count}: "
+                    f"{trans_id} fired ({changes_str}) | Markings: {markings_list}"
+                )
             except Exception:
-                pass
+                self._append_diagnostics_log(
+                    f"Step {self.subnet_simulator.state.step_count}: "
+                    f"{trans_id} fired ({changes_str})"
+                )
             
             # Update live markings in Places tab
             self._update_live_markings()
