@@ -323,7 +323,9 @@ class SimulationController:
                 is_source = getattr(obj, 'is_source', False)
                 
                 if is_source:
-                    print(f"[OBSERVER] ✅ Enabling source transition {obj.id} at t={self.time}")
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.info(f"[OBSERVER] ✅ Enabling source transition {obj.id} at t={self.time}")
                     # Source transitions are always enabled
                     state = self.transition_states[obj.id]
                     state.enablement_time = self.time
@@ -362,7 +364,8 @@ class SimulationController:
                         behavior = self._get_behavior(obj)
                         if hasattr(behavior, 'set_enablement_time'):
                             behavior.set_enablement_time(self.time)
-                        print(f"[OBSERVER] ✅ Enabled source transition {obj.id} at t={self.time}")
+                        import logging
+                        logging.getLogger(__name__).info(f"[OBSERVER] ✅ Enabled source transition {obj.id} at t={self.time}")
 
     def _get_behavior(self, transition):
         """Get or create behavior instance for a transition.
@@ -870,7 +873,8 @@ class SimulationController:
         
         # Check if simulation is complete (duration reached)
         if self.is_simulation_complete():
-            print(f"[SIMULATION] Duration reached: time={self.time}, duration={self.settings.duration}")
+            import logging
+            logging.getLogger(__name__).info(f"[SIMULATION] Duration reached: time={self.time}, duration={self.settings.duration}")
             return False  # Simulation complete
         
         if immediate_fired_total > 0 or window_crossing_fired > 0 or discrete_fired or continuous_active > 0:
@@ -1907,7 +1911,8 @@ class SimulationController:
                         try:
                             self.on_simulation_complete()
                         except Exception as e:
-                            print(f"[ERROR] Exception in on_simulation_complete callback: {e}")
+                            import logging
+                            logging.getLogger(__name__).exception(f"[ERROR] Exception in on_simulation_complete callback: {e}")
                             import traceback
                             traceback.print_exc()
                         return False  # Don't repeat
@@ -1945,7 +1950,8 @@ class SimulationController:
                 try:
                     self.on_simulation_complete()
                 except Exception as e:
-                    print(f"[ERROR] Exception in on_simulation_complete callback: {e}")
+                    import logging
+                    logging.getLogger(__name__).exception(f"[ERROR] Exception in on_simulation_complete callback: {e}")
                     import traceback
                     traceback.print_exc()
                 return False  # Don't repeat

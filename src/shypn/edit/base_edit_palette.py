@@ -188,7 +188,8 @@ class BaseEditPalette(GObject.GObject, metaclass=GObjectABCMeta):
             
             self._css_applied = True
         except Exception as e:
-            print(f"[BaseEditPalette] Warning: CSS styling failed: {e}", file=sys.stderr)
+            import logging
+            logging.getLogger(__name__).warning(f"[BaseEditPalette] CSS styling failed: {e}")
     
     # ==================== Utility Methods ====================
     

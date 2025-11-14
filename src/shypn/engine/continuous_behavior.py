@@ -238,7 +238,10 @@ class ContinuousBehavior(TransitionBehavior):
             if source_place.tokens <= self.min_token_threshold:
                 # Debug: Show when transitions become disabled due to token depletion
                 if source_place.tokens > 0 and source_place.tokens < 1e-6:
-                    print(f"[CONTINUOUS] Transition disabled: {arc.source_id} has {source_place.tokens:.10f} tokens (below threshold {self.min_token_threshold})")
+                    import logging
+                    logging.getLogger(__name__).debug(
+                        f"[CONTINUOUS] Transition disabled: {arc.source_id} has {source_place.tokens:.10f} tokens (below threshold {self.min_token_threshold})"
+                    )
                 return False, f"input-place-below-threshold-P{arc.source_id}"
         
         return True, "enabled-continuous"

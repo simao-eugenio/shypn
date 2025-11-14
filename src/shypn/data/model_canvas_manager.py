@@ -606,11 +606,11 @@ class ModelCanvasManager:
         # This prevents crashes in rendering and hit-testing
         validation = self.validate_arcs()
         if not validation['valid']:
-            print(f"[ARC_VALIDATION] ⚠️ Detected {len(validation['corrupted_arcs'])} corrupted arc(s) after load")
+            logger.warning(f"[ARC_VALIDATION] ⚠️ Detected {len(validation['corrupted_arcs'])} corrupted arc(s) after load")
             for error in validation['errors']:
-                print(f"[ARC_VALIDATION]   - {error}")
+                logger.warning(f"[ARC_VALIDATION]   - {error}")
             removed = self.remove_corrupted_arcs()
-            print(f"[ARC_VALIDATION] ✅ Cleaned up {removed} corrupted arc(s)")
+            logger.info(f"[ARC_VALIDATION] ✅ Cleaned up {removed} corrupted arc(s)")
         
         # Auto-convert loop arcs and parallel arcs to curved
         # This ensures loaded models have proper curved rendering for loops and parallels
@@ -878,7 +878,7 @@ class ModelCanvasManager:
             
             from shypn.engine.simulation.controller import TransitionState
             
-            print(f"[INIT_STATES] Initializing transition states for {len(self.transitions)} transitions")
+            # Removed debug print; using logger below
             logger.info(f"[INIT_STATES] Initializing transition states for {len(self.transitions)} transitions")
             
             source_count = 0
@@ -900,7 +900,7 @@ class ModelCanvasManager:
                     state.enablement_time = controller.time  # Enable at time 0
                     if hasattr(behavior, 'set_enablement_time'):
                         behavior.set_enablement_time(controller.time)
-                    print(f"[INIT_STATES] ✅ {transition.id}: Source transition enabled at t={controller.time}")
+                    # Removed debug print; using logger below
                     logger.info(f"[INIT_STATES] ✅ {transition.id}: Source transition enabled at t={controller.time}")
                 else:
                     # Check if non-source transition is structurally enabled
