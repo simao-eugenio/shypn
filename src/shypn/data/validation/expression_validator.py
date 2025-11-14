@@ -184,8 +184,8 @@ class SafeExpressionVisitor(ast.NodeVisitor):
         ast.Eq, ast.NotEq, ast.Lt, ast.LtE, ast.Gt, ast.GtE,
         ast.Is, ast.IsNot, ast.In, ast.NotIn,
         
-        # Values
-        ast.Num, ast.Str, ast.Constant,  # Constant for Python 3.8+
+        # Values (ast.Num/ast.Str unified as ast.Constant in modern Python)
+        ast.Constant,
         
         # Containers
         ast.List, ast.Tuple, ast.Dict, ast.Set,

@@ -2171,12 +2171,14 @@ class ViabilityPanel(Gtk.Box):
         
         # If this is a new document, clear all panel data
         if is_new_document:
-            print(f"[VIABILITY_PANEL] 🆕 New document detected, clearing panel")
+            import logging
+            logging.getLogger(__name__).debug("[VIABILITY_PANEL] New document detected, clearing panel")
             self._clear_panel_for_new_document()
         
         # CRITICAL: Always refresh when switching documents (even between existing tabs)
         # This ensures the UI shows THIS document's data, not stale data from previous tab
-        print(f"[VIABILITY_PANEL] 🔄 Tab switch: drawing_area {prev_drawing_area_id} → {new_drawing_area_id}")
+        import logging
+        logging.getLogger(__name__).debug(f"[VIABILITY_PANEL] Tab switch: drawing_area {prev_drawing_area_id} → {new_drawing_area_id}")
         self.refresh_all()
     
     def _clear_panel_for_new_document(self):
@@ -2185,7 +2187,8 @@ class ViabilityPanel(Gtk.Box):
         This ensures the panel starts fresh for each document, preventing
         data from previous documents from being displayed.
         """
-        print(f"[VIABILITY_CLEAR] 🧹 Clearing panel data for new document")
+        import logging
+        logging.getLogger(__name__).debug("[VIABILITY_CLEAR] Clearing panel data for new document")
         
         # Clear selected localities
         self.selected_localities.clear()
@@ -2219,7 +2222,8 @@ class ViabilityPanel(Gtk.Box):
         self.current_investigation = None
         self.current_view = None
         
-        print(f"[VIABILITY_CLEAR] ✅ Panel cleared")
+        import logging
+        logging.getLogger(__name__).debug("[VIABILITY_CLEAR] Panel cleared")
     
     def refresh_all(self):
         """Refresh all panel data to match current document.
@@ -2228,8 +2232,10 @@ class ViabilityPanel(Gtk.Box):
         This ensures the panel shows the correct document's viability state.
         """
         try:
-            print(f"[VIABILITY_REFRESH] 🔄 Refreshing panel for drawing_area {id(self.drawing_area) if self.drawing_area else 'None'}")
-            print(f"[VIABILITY_REFRESH] 📋 Selected localities: {list(self.selected_localities.keys())}")
+            import logging
+            lg = logging.getLogger(__name__)
+            lg.debug(f"[VIABILITY_REFRESH] Refreshing panel for drawing_area {id(self.drawing_area) if self.drawing_area else 'None'}")
+            lg.debug(f"[VIABILITY_REFRESH] Selected localities: {list(self.selected_localities.keys())}")
             
             # Refresh localities ListBox to show THIS document's selections
             self._refresh_localities_list()
@@ -2240,9 +2246,11 @@ class ViabilityPanel(Gtk.Box):
             # Update UI state
             self._update_ui_state()
             
-            print(f"[VIABILITY_REFRESH] ✅ Refresh complete")
+            import logging
+            logging.getLogger(__name__).debug("[VIABILITY_REFRESH] Refresh complete")
         except Exception as e:
-            print(f"[VIABILITY_REFRESH] ⚠️ Error refreshing panel: {e}")
+            import logging
+            logging.getLogger(__name__).warning(f"[VIABILITY_REFRESH] Error refreshing panel: {e}")
             import traceback
             traceback.print_exc()
     
@@ -2251,7 +2259,8 @@ class ViabilityPanel(Gtk.Box):
         
         Called on tab switch to ensure the UI shows the correct document's selections.
         """
-        print(f"[VIABILITY_REFRESH_LIST] 🔧 Rebuilding localities list, {len(self.selected_localities)} transitions")
+        import logging
+        logging.getLogger(__name__).debug(f"[VIABILITY_REFRESH_LIST] Rebuilding localities list, {len(self.selected_localities)} transitions")
         
         # Clear all existing rows from ListBox
         for row in list(self.localities_listbox.get_children()):
@@ -2342,7 +2351,8 @@ class ViabilityPanel(Gtk.Box):
             self.transitions_store.clear()
             self.arcs_store.clear()
         except Exception as e:
-            print(f"[VIABILITY_REFRESH] ⚠️ Error clearing stores: {e}")
+            import logging
+            logging.getLogger(__name__).warning(f"[VIABILITY_REFRESH] Error clearing stores: {e}")
             return
         
         # Rebuild from current localities

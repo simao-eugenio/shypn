@@ -6,7 +6,7 @@ Petri net model including places, transitions, arcs, and metadata.
 
 from typing import List, Dict, Optional, Any, Tuple
 from shypn.netobjs import Place, Transition, Arc, PetriNetObject
-from .id_manager import IDManager
+from .id_manager import IDManager, suspend_lifecycle_delegation
 
 
 class DocumentModel:
@@ -429,8 +429,9 @@ class DocumentModel:
             place = Place.from_dict(place_data)
             document.places.append(place)
             places_dict[place.id] = place  # Use string ID as dict key
-            # Register ID to update counter
-            document.id_manager.register_place_id(place.id)
+            # Register ID to update counter (LOCAL ONLY to avoid scope contamination)
+            with suspend_lifecycle_delegation():
+                document.id_manager.register_place_id(place.id)
         
         # Restore transitions second (they have no dependencies)
         transitions_dict = {}
@@ -438,15 +439,17 @@ class DocumentModel:
             transition = Transition.from_dict(transition_data)
             document.transitions.append(transition)
             transitions_dict[transition.id] = transition  # Use string ID as dict key
-            # Register ID to update counter
-            document.id_manager.register_transition_id(transition.id)
+            # Register ID to update counter (LOCAL ONLY)
+            with suspend_lifecycle_delegation():
+                document.id_manager.register_transition_id(transition.id)
         
         # Restore arcs last (they depend on places and transitions)
         for arc_data in data.get("arcs", []):
             arc = Arc.from_dict(arc_data, places=places_dict, transitions=transitions_dict)
             document.arcs.append(arc)
-            # Register ID to update counter
-            document.id_manager.register_arc_id(arc.id)
+            # Register ID to update counter (LOCAL ONLY)
+            with suspend_lifecycle_delegation():
+                document.id_manager.register_arc_id(arc.id)
         
         # IMPORTANT: Reset all places to their initial marking
         # When loading a saved file, we want to start with the initial state,

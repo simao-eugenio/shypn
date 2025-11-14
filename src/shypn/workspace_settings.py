@@ -9,6 +9,7 @@ Settings are stored in ~/.config/shypn/workspace.json
 """
 import os
 import sys
+import logging
 import json
 from pathlib import Path
 from typing import Optional, Dict, Any
@@ -56,7 +57,7 @@ class WorkspaceSettings:
                     # Merge loaded settings with defaults
                     self.settings.update(loaded)
             except Exception as e:
-                print(f"Warning: Could not load workspace settings: {e}", file=sys.stderr)
+                logging.getLogger(__name__).warning(f"Could not load workspace settings: {e}")
     
     def save(self) -> None:
         """Save settings to file."""
@@ -64,7 +65,7 @@ class WorkspaceSettings:
             with open(self.config_file, 'w', encoding='utf-8') as f:
                 json.dump(self.settings, f, indent=2)
         except Exception as e:
-            print(f"Warning: Could not save workspace settings: {e}", file=sys.stderr)
+            logging.getLogger(__name__).warning(f"Could not save workspace settings: {e}")
     
     def get_window_geometry(self) -> Dict[str, Any]:
         """Get window geometry settings.

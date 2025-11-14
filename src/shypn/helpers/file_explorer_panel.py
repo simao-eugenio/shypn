@@ -1819,6 +1819,17 @@ class FileExplorerPanel:
         # Benefits: No reuse logic complexity, consistent behavior, no stale state
         page_index, drawing_area = self.canvas_loader.add_document(filename=base_name)
         manager = self.canvas_loader.get_canvas_manager(drawing_area)
+
+        # Ensure ID scope is set to the new canvas BEFORE loading objects
+        try:
+            if hasattr(self.canvas_loader, 'lifecycle_adapter') and self.canvas_loader.lifecycle_adapter:
+                self.canvas_loader.lifecycle_adapter.switch_to_canvas(drawing_area)
+            if hasattr(self.canvas_loader, 'lifecycle_manager') and self.canvas_loader.lifecycle_manager:
+                from shypn.data.canvas.id_manager import set_lifecycle_scope_manager
+                set_lifecycle_scope_manager(self.canvas_loader.lifecycle_manager.id_manager)
+                self.canvas_loader.lifecycle_manager.id_manager.set_scope(f"canvas_{id(drawing_area)}")
+        except Exception:
+            pass
         
         if manager:
             # ===== UNIFIED OBJECT LOADING =====

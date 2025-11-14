@@ -13,6 +13,7 @@ Architecture:
 """
 import os
 import sys
+import logging
 
 REPO_ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), '..'))
 UI_PATH = os.path.join(REPO_ROOT, 'ui', 'main', 'main_window.ui')
@@ -44,7 +45,7 @@ try:
 		os.environ['G_MESSAGES_DEBUG'] = ''
 	
 except Exception as e:
-	print('ERROR: GTK3 (PyGObject) not available:', e, file=sys.stderr)
+	logging.getLogger(__name__).error('GTK3 (PyGObject) not available: %s', e)
 	sys.exit(1)
 
 # TEST MODE: Check which file panel to use
@@ -71,7 +72,7 @@ try:
 	from shypn.file import create_persistency_manager
 	from shypn.ui import MasterPalette
 except ImportError as e:
-	print(f'ERROR: Cannot import loaders: {e}', file=sys.stderr)
+	logging.getLogger(__name__).error('Cannot import loaders: %s', e)
 	sys.exit(1)
 
 def main(argv=None):
@@ -80,7 +81,7 @@ def main(argv=None):
 
 	# Validate main UI file exists
 	if not os.path.exists(UI_PATH):
-		print(f'ERROR: Main UI file not found: {UI_PATH}', file=sys.stderr)
+		logging.getLogger(__name__).error('Main UI file not found: %s', UI_PATH)
 		sys.exit(2)
 
 	app = Gtk.Application(application_id='org.shypn.dockdemo')
@@ -108,7 +109,7 @@ def main(argv=None):
 		main_builder = Gtk.Builder.new_from_file(UI_PATH)
 		window = main_builder.get_object('main_window')
 		if window is None:
-			print('ERROR: `main_window` object not found in UI file.', file=sys.stderr)
+			logging.getLogger(__name__).error('`main_window` object not found in UI file.')
 			sys.exit(3)
 		
 		# Setup menu actions (File, Edit, View, Help)
@@ -202,14 +203,14 @@ def main(argv=None):
 			# Set parent window for zoom palette window
 			model_canvas_loader.parent_window = window
 		except Exception as e:
-			print(f'ERROR: Failed to load model canvas: {e}', file=sys.stderr)
+			logging.getLogger(__name__).error('Failed to load model canvas: %s', e)
 			sys.exit(8)
 
 		# Create file persistency manager
 		try:
 			persistency = create_persistency_manager(parent_window=window)
 		except Exception as e:
-			print(f'ERROR: Failed to create persistency manager: {e}', file=sys.stderr)
+			logging.getLogger(__name__).error('Failed to create persistency manager: %s', e)
 			sys.exit(11)
 		
 		# Wire persistency manager to canvas loader
@@ -219,7 +220,7 @@ def main(argv=None):
 		# Get main workspace and add canvas
 		main_workspace = main_builder.get_object('main_workspace')
 		if main_workspace is None:
-			print('ERROR: main_workspace not found in main window', file=sys.stderr)
+			logging.getLogger(__name__).error('main_workspace not found in main window')
 			sys.exit(9)
 		
 		# Add canvas to workspace (expands to fill space)
@@ -232,7 +233,7 @@ def main(argv=None):
 			# Fallback: create status bar if not in UI file (shouldn't happen)
 			status_bar = Gtk.Statusbar()
 			status_bar.set_visible(True)
-			print("Warning: status_bar not found in UI, creating fallback", file=sys.stderr)
+			logging.getLogger(__name__).warning("status_bar not found in UI, creating fallback")
 		
 		# Initialize status bar context
 		status_context_id = status_bar.get_context_id("main")
@@ -259,7 +260,7 @@ def main(argv=None):
 			# We need file_explorer available for wiring callbacks before add_to_stack()
 			left_panel_loader = create_left_panel(load_window=True)
 		except Exception as e:
-			print(f'ERROR: Failed to load left panel: {e}', file=sys.stderr)
+			logging.getLogger(__name__).error('Failed to load left panel: %s', e)
 			sys.exit(4)
 		
 		# ====================================================================
@@ -359,7 +360,7 @@ def main(argv=None):
 				# Will be wired after pathway_panel_loader is created (see below)
 				
 		except Exception as e:
-			print(f'WARNING: Failed to load topology panel: {e}', file=sys.stderr)
+			logging.getLogger(__name__).warning('Failed to load topology panel: %s', e)
 			topology_panel_loader = None
 		
 		# Load pathway panel via its loader
@@ -429,7 +430,7 @@ def main(argv=None):
 				# 	sbml_ctrl._on_load_complete = sbml_load_with_topology_notify
 				
 		except Exception as e:
-			print(f'WARNING: Failed to load pathway panel: {e}', file=sys.stderr)
+			logging.getLogger(__name__).warning('Failed to load pathway panel: %s', e)
 			pathway_panel_loader = None
 			topology_panel_loader = None
 		
@@ -465,9 +466,8 @@ def main(argv=None):
 		try:
 			model_canvas_loader.wire_existing_canvases_to_right_panel()
 		except Exception as e:
-			import traceback
-			print(f"[SHYPN ERROR] Exception in wire_existing_canvases_to_right_panel(): {e}", file=sys.stderr)
-			traceback.print_exc()
+			import logging
+			logging.getLogger(__name__).exception("[SHYPN ERROR] Exception in wire_existing_canvases_to_right_panel(): %s", e)
 		
 		# Wire context menu handler to canvas loader
 		# This allows right-click context menus to include "Add to Analysis" options
@@ -489,7 +489,7 @@ def main(argv=None):
 		# Get the GtkStack that contains all panel containers
 		left_dock_stack = main_builder.get_object('left_dock_stack')
 		if left_dock_stack is None:
-			print('ERROR: left_dock_stack not found in main window', file=sys.stderr)
+			logging.getLogger(__name__).error('left_dock_stack not found in main window')
 			sys.exit(6)
 
 		# Get individual panel containers from the stack

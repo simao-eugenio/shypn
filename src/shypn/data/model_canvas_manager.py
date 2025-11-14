@@ -606,11 +606,11 @@ class ModelCanvasManager:
         # This prevents crashes in rendering and hit-testing
         validation = self.validate_arcs()
         if not validation['valid']:
-            print(f"[ARC_VALIDATION] ⚠️ Detected {len(validation['corrupted_arcs'])} corrupted arc(s) after load")
+            logger.warning(f"[ARC_VALIDATION] ⚠️ Detected {len(validation['corrupted_arcs'])} corrupted arc(s) after load")
             for error in validation['errors']:
-                print(f"[ARC_VALIDATION]   - {error}")
+                logger.warning(f"[ARC_VALIDATION]   - {error}")
             removed = self.remove_corrupted_arcs()
-            print(f"[ARC_VALIDATION] ✅ Cleaned up {removed} corrupted arc(s)")
+            logger.info(f"[ARC_VALIDATION] ✅ Cleaned up {removed} corrupted arc(s)")
         
         # Auto-convert loop arcs and parallel arcs to curved
         # This ensures loaded models have proper curved rendering for loops and parallels
@@ -620,6 +620,14 @@ class ModelCanvasManager:
         
         # Update ID counters to avoid collisions
         # Register all existing IDs with the IDManager
+        # Ensure lifecycle scope is set to this canvas before registering
+        try:
+            if self._canvas_loader and hasattr(self._canvas_loader, 'lifecycle_manager') and self._drawing_area:
+                from shypn.data.canvas.id_manager import set_lifecycle_scope_manager
+                set_lifecycle_scope_manager(self._canvas_loader.lifecycle_manager.id_manager)
+                self._canvas_loader.lifecycle_manager.id_manager.set_scope(f"canvas_{id(self._drawing_area)}")
+        except Exception:
+            pass
         if places:
             for p in self.places:
                 self.document_controller.id_manager.register_place_id(p.id)
@@ -878,7 +886,7 @@ class ModelCanvasManager:
             
             from shypn.engine.simulation.controller import TransitionState
             
-            print(f"[INIT_STATES] Initializing transition states for {len(self.transitions)} transitions")
+            # Removed debug print; using logger below
             logger.info(f"[INIT_STATES] Initializing transition states for {len(self.transitions)} transitions")
             
             source_count = 0
@@ -900,7 +908,7 @@ class ModelCanvasManager:
                     state.enablement_time = controller.time  # Enable at time 0
                     if hasattr(behavior, 'set_enablement_time'):
                         behavior.set_enablement_time(controller.time)
-                    print(f"[INIT_STATES] ✅ {transition.id}: Source transition enabled at t={controller.time}")
+                    # Removed debug print; using logger below
                     logger.info(f"[INIT_STATES] ✅ {transition.id}: Source transition enabled at t={controller.time}")
                 else:
                     # Check if non-source transition is structurally enabled

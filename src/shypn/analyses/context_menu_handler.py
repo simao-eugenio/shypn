@@ -5,6 +5,8 @@ This module provides the ContextMenuHandler class for adding "Add to Analysis"
 menu items to the context menus of places and transitions in the canvas.
 """
 import gi
+import logging
+logger = logging.getLogger(__name__)
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk
 
@@ -111,12 +113,12 @@ class ContextMenuHandler:
                     viability_loader = overlay_manager.viability_panel_loader
                     if viability_loader and hasattr(viability_loader, 'panel'):
                         panel = viability_loader.panel
-                        print(f"[CONTEXT_MENU] ✓ Found per-document viability panel {id(panel)} for drawing_area {id(drawing_area)}")
+                        logger.debug(f"[CONTEXT_MENU] Found per-document viability panel {id(panel)} for drawing_area {id(drawing_area)}")
                         return panel
         
         # Fallback to global panel (old architecture)
         if self.viability_panel:
-            print(f"[CONTEXT_MENU] ⚠️ Using GLOBAL viability panel {id(self.viability_panel)} (fallback)")
+            logger.debug(f"[CONTEXT_MENU] Using GLOBAL viability panel {id(self.viability_panel)} (fallback)")
         return self.viability_panel
     
     def set_model(self, model):
@@ -307,18 +309,17 @@ class ContextMenuHandler:
         # Add locality places if panel supports it
         # (these places will also get their border colors set automatically)
         if hasattr(panel, 'add_locality_places'):
-            print(f"[CTX_MENU]   Calling panel.add_locality_places()")
+            logger.debug("[CTX_MENU] Calling panel.add_locality_places()")
             panel.add_locality_places(transition, locality)
-            print(f"[CTX_MENU]   panel.add_locality_places() completed")
+            logger.debug("[CTX_MENU] panel.add_locality_places() completed")
         else:
-            print(f"[CTX_MENU]   ⚠ Panel doesn't have add_locality_places method")
+            logger.debug("[CTX_MENU] Panel missing add_locality_places; locality not added")
         
         # Request canvas redraw to show new border colors
         if self.model:
             self.model.mark_needs_redraw()
         else:
-    
-            pass
+            logger.debug("[CTX_MENU] No model; cannot request redraw")
     
     def _add_brenda_enrichment_menu(self, menu, transition):
         """Add BRENDA enrichment menu item for transitions.
