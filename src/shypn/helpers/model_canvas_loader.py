@@ -1272,6 +1272,14 @@ class ModelCanvasLoader:
         except Exception:
             pass
         manager = ModelCanvasManager(canvas_width=2000, canvas_height=2000, filename=filename)
+
+        # Per-document UndoManager initialization (lifecycle-integrated)
+        try:
+            from shypn.edit.undo_manager import UndoManager
+            if not hasattr(manager, 'undo_manager'):
+                manager.undo_manager = UndoManager()
+        except Exception:
+            pass
         self.canvas_managers[drawing_area] = manager
         
         # Store references back to loader and drawing area for simulation reset
@@ -2894,18 +2902,17 @@ class ModelCanvasLoader:
             state['button'] = 0
             return True
         
-        # Get move data before ending drag (for undo)
-        move_data = None
+        # Capture initial positions before ending drag (for undo)
+        initial_positions = None
         if manager.selection_manager.is_dragging():
-            move_data = manager.selection_manager.get_move_data_for_undo()
+            initial_positions = manager.selection_manager.get_move_data_for_undo()
         
         # End drag
         if manager.selection_manager.end_drag():
-            pass
-            # Record move operation for undo if objects moved
-            if move_data and hasattr(manager, 'undo_manager'):
+            # Push move operation capturing final positions
+            if initial_positions and hasattr(manager, 'undo_manager'):
                 from shypn.edit.undo_operations import MoveOperation
-                manager.undo_manager.push(MoveOperation(move_data))
+                manager.undo_manager.push(MoveOperation(initial_positions, manager))
             
             # Reset drag state immediately to stop further drag processing
             state['active'] = False
@@ -3149,18 +3156,31 @@ class ModelCanvasLoader:
         
         # Undo (Ctrl+Z) - check both lowercase and uppercase
         if is_ctrl and not is_shift and (event.keyval == Gdk.KEY_z or event.keyval == Gdk.KEY_Z):
-            pass
-            # TODO: Implement undo/redo functionality
-            # Undo/redo system not yet implemented
-            # For now, just consume the event silently
+            if hasattr(manager, 'undo_manager') and manager.undo_manager and manager.undo_manager.undo(manager):
+                widget.queue_draw()
             return True
         
         # Redo (Ctrl+Shift+Z or Ctrl+Y) - check both lowercase and uppercase
         if (is_ctrl and is_shift and (event.keyval == Gdk.KEY_z or event.keyval == Gdk.KEY_Z)) or \
            (is_ctrl and not is_shift and (event.keyval == Gdk.KEY_y or event.keyval == Gdk.KEY_Y)):
-            # TODO: Implement undo/redo functionality
-            # Undo/redo system not yet implemented
-            # For now, just consume the event silently
+            if hasattr(manager, 'undo_manager') and manager.undo_manager and manager.undo_manager.redo(manager):
+                widget.queue_draw()
+            return True
+
+        # New document (Ctrl+N)
+        if is_ctrl and not is_shift and (event.keyval == Gdk.KEY_n or event.keyval == Gdk.KEY_N):
+            if hasattr(self, 'add_document'):
+                self.add_document(replace_empty_default=False)
+            return True
+
+        # Close tab (Ctrl+W)
+        if is_ctrl and not is_shift and (event.keyval == Gdk.KEY_w or event.keyval == Gdk.KEY_W):
+            try:
+                page_num = self.notebook.page_num(widget.get_parent().get_parent()) if widget.get_parent() else -1
+            except Exception:
+                page_num = self.notebook.get_current_page()
+            if page_num >= 0:
+                self.close_tab(page_num)
             return True
         
         if event.keyval == Gdk.KEY_Escape:
