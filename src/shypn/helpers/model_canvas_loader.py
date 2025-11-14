@@ -2612,6 +2612,28 @@ class ModelCanvasLoader:
                 viewport = scrolled.get_child()
             else:
                 viewport = None
+            # Attach to GtkScrolledWindow as well (some backends deliver here)
+            if scrolled and hasattr(scrolled, 'connect'):
+                required_mask = (
+                    Gdk.EventMask.BUTTON_PRESS_MASK
+                    | Gdk.EventMask.BUTTON_RELEASE_MASK
+                    | Gdk.EventMask.POINTER_MOTION_MASK
+                    | Gdk.EventMask.SCROLL_MASK
+                    | Gdk.EventMask.KEY_PRESS_MASK
+                )
+                try:
+                    current_mask_sw = scrolled.get_events()
+                except Exception:
+                    current_mask_sw = 0
+                try:
+                    scrolled.set_events(current_mask_sw | required_mask)
+                except Exception:
+                    pass
+                scrolled.connect('button-press-event', lambda w, e, m=manager: self._on_button_press(drawing_area, e, m))
+                scrolled.connect('button-release-event', lambda w, e, m=manager: self._on_button_release(drawing_area, e, m))
+                scrolled.connect('motion-notify-event', lambda w, e, m=manager: self._on_motion_notify(drawing_area, e, m))
+                scrolled.connect('scroll-event', lambda w, e, m=manager: self._on_scroll_event(drawing_area, e, m))
+                scrolled.connect('key-press-event', lambda w, e, m=manager: self._on_key_press_event(drawing_area, e, m))
             if viewport and hasattr(viewport, 'connect'):
                 # Preserve masks on viewport and add required ones
                 required_mask = (
