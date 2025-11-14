@@ -4632,10 +4632,63 @@ class ModelCanvasLoader:
 
         # Record operation for undo (capture state before cascade deletion)
         if hasattr(manager, 'undo_manager'):
-            from shypn.edit.snapshots import capture_delete_snapshots
-            from shypn.edit.undo_operations import DeleteOperation
-            snapshots = capture_delete_snapshots(manager, [obj])
-            manager.undo_manager.push(DeleteOperation(snapshots))
+            try:
+                from shypn.edit.snapshots import capture_delete_snapshots
+                from shypn.edit.undo_operations import DeleteOperation
+                snapshots = capture_delete_snapshots(manager, [obj])
+                manager.undo_manager.push(DeleteOperation(snapshots))
+            except Exception:
+                # Fallback: inline snapshot capture to avoid import-time issues
+                def _inline_capture(manager, targets):
+                    snaps = []
+                    recorded_arc_ids = set()
+                    def snap_arc(a):
+                        return {
+                            'kind': 'arc',
+                            'id': getattr(a, 'id', None),
+                            'label': getattr(a, 'label', None),
+                            'source_id': getattr(a.source, 'id', None),
+                            'target_id': getattr(a.target, 'id', None),
+                        }
+                    for target in targets:
+                        if isinstance(target, Arc):
+                            s = snap_arc(target)
+                            if s['id'] and s['id'] not in recorded_arc_ids:
+                                snaps.append(s)
+                                recorded_arc_ids.add(s['id'])
+                            continue
+                        kind = 'place' if isinstance(target, Place) else 'transition'
+                        base = {
+                            'kind': kind,
+                            'id': getattr(target, 'id', None),
+                            'label': getattr(target, 'label', None),
+                            'x': getattr(target, 'x', 0.0),
+                            'y': getattr(target, 'y', 0.0),
+                        }
+                        if kind == 'place':
+                            base['radius'] = getattr(target, 'radius', None)
+                        else:
+                            base['width'] = getattr(target, 'width', None)
+                            base['height'] = getattr(target, 'height', None)
+                        incident = []
+                        connected_ids = []
+                        for a in manager.arcs:
+                            if a.source == target or a.target == target:
+                                a_id = getattr(a, 'id', None)
+                                if a_id and a_id not in recorded_arc_ids:
+                                    incident.append(snap_arc(a))
+                                    connected_ids.append(a_id)
+                                    recorded_arc_ids.add(a_id)
+                        base['connected_arc_ids'] = connected_ids
+                        base['arcs'] = incident
+                        snaps.append(base)
+                    return snaps
+                try:
+                    from shypn.edit.undo_operations import DeleteOperation
+                    snapshots = _inline_capture(manager, [obj])
+                    manager.undo_manager.push(DeleteOperation(snapshots))
+                except Exception:
+                    pass
 
         # Perform deletion using facade methods to ensure cascade + observers
         if isinstance(obj, Place):
