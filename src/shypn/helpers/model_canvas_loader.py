@@ -220,6 +220,15 @@ class ModelCanvasLoader:
                     # This ensures "Add to Transition Analyses" works from app startup
                     if self.right_panel_loader.context_menu_handler:
                         self.right_panel_loader.context_menu_handler.set_model(manager)
+
+            # CRITICAL: Ensure lifecycle sets active canvas for the first tab
+            # switch-page doesn't fire for page 0, so ID scope and context
+            # need to be explicitly activated here for consistency.
+            if self.lifecycle_adapter and drawing_area:
+                try:
+                    self.lifecycle_adapter.switch_to_canvas(drawing_area)
+                except Exception:
+                    pass
         
         return self.container
 
