@@ -980,6 +980,11 @@ class ModelCanvasLoader:
             del self.knowledge_bases[drawing_area]
             print(f"[KNOWLEDGE_BASE] Cleaned up KB for canvas {id(drawing_area)}")
         if self.notebook.get_n_pages() == 0:
+            # When the last tab is closed, recreate a fresh default canvas.
+            # Reset the first-page initialization flag so the page-added hook
+            # runs full initialization (same as initial startup) and ensure
+            # the recreation follows the exact File→New code path.
+            self._first_page_initialized = False
             self.add_document(filename='default')
         return True
 
