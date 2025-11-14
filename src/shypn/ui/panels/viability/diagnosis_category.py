@@ -459,7 +459,7 @@ class DiagnosisCategory(BaseViabilityCategory):
         action_box.set_margin_top(6)
         action_box.set_margin_bottom(6)
         
-        self.repair_button = Gtk.Button(label="🔧 Repair Selected")
+        self.repair_button = Gtk.Button(label="Repair Selected")
         self.repair_button.set_tooltip_text("Apply selected suggestions")
         self.repair_button.set_sensitive(False)
         self.repair_button.connect('clicked', self._on_repair_clicked)
@@ -774,9 +774,7 @@ class DiagnosisCategory(BaseViabilityCategory):
         hbox.set_margin_top(3)
         hbox.set_margin_bottom(3)
         
-        # Transition icon
-        icon_label = Gtk.Label(label="🔄")
-        hbox.pack_start(icon_label, False, False, 0)
+        # Transition icon removed (plain text only)
         
         # Transition info
         display_text = trans_id
@@ -792,7 +790,7 @@ class DiagnosisCategory(BaseViabilityCategory):
         hbox.pack_start(label, True, True, 0)
         
         # Remove button
-        remove_btn = Gtk.Button(label="✕")
+        remove_btn = Gtk.Button(label="Remove")
         remove_btn.set_relief(Gtk.ReliefStyle.NONE)
         remove_btn.connect('clicked', self._on_remove_locality_clicked, transition)
         hbox.pack_start(remove_btn, False, False, 0)
@@ -803,12 +801,12 @@ class DiagnosisCategory(BaseViabilityCategory):
         # Add indented input places
         if not is_source:  # Source transitions have no inputs
             for place in locality.input_places:
-                self._add_place_row_to_list(place, "← Input:", transition)
+                self._add_place_row_to_list(place, "Input:", transition)
         
         # Add indented output places
         if not is_sink:  # Sink transitions have no outputs
             for place in locality.output_places:
-                self._add_place_row_to_list(place, "→ Output:", transition)
+                self._add_place_row_to_list(place, "Output:", transition)
         
         self.locality_listbox.show_all()
     
@@ -817,7 +815,7 @@ class DiagnosisCategory(BaseViabilityCategory):
         
         Args:
             place: Place object
-            label_prefix: "← Input:" or "→ Output:"
+            label_prefix: "Input:" or "Output:"
             parent_transition: Parent Transition object
         """
         place_row = Gtk.ListBoxRow()
@@ -831,10 +829,7 @@ class DiagnosisCategory(BaseViabilityCategory):
         hbox.set_margin_top(1)
         hbox.set_margin_bottom(1)
         
-        # Place icon (smaller)
-        icon_label = Gtk.Label(label="●")
-        icon_label.get_style_context().add_class('dim-label')
-        hbox.pack_start(icon_label, False, False, 0)
+        # Place icon removed (plain text only)
         
         # Place info
         place_name = getattr(place, 'name', '') or ''
@@ -962,9 +957,7 @@ class DiagnosisCategory(BaseViabilityCategory):
                 hbox.set_margin_top(3)
                 hbox.set_margin_bottom(3)
                 
-                # Transition icon
-                icon_label = Gtk.Label(label="🔄")
-                hbox.pack_start(icon_label, False, False, 0)
+                # Transition icon removed (plain text only)
                 
                 # Transition info
                 info_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
@@ -981,7 +974,7 @@ class DiagnosisCategory(BaseViabilityCategory):
                 # Locality summary
                 n_inputs = len(locality.input_places)
                 n_outputs = len(locality.output_places)
-                summary_label = Gtk.Label(label=f"   ↓ {n_inputs} inputs, {n_outputs} outputs →")
+                summary_label = Gtk.Label(label=f"   Inputs: {n_inputs}, Outputs: {n_outputs}")
                 summary_label.set_xalign(0)
                 summary_label.get_style_context().add_class('dim-label')
                 info_box.pack_start(summary_label, False, False, 0)

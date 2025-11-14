@@ -49,14 +49,12 @@ class SuggestionWidget(Gtk.Box):
         # Main row: action text + buttons
         main_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         
-        # Action label with emoji
+        # Action label (plain text)
         action_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
-        emoji_label = Gtk.Label(label="💡")
         action_label = Gtk.Label(label=self.suggestion.action)
         action_label.set_line_wrap(True)
         action_label.set_max_width_chars(60)
         action_label.set_xalign(0)
-        action_box.pack_start(emoji_label, False, False, 0)
         action_box.pack_start(action_label, True, True, 0)
         
         main_row.pack_start(action_box, True, True, 0)
@@ -85,7 +83,7 @@ class SuggestionWidget(Gtk.Box):
         if self.suggestion.impact:
             impact_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
             impact_box.set_margin_start(20)
-            impact_label = Gtk.Label(label=f"→ {self.suggestion.impact}")
+            impact_label = Gtk.Label(label=f"Impact: {self.suggestion.impact}")
             impact_label.set_line_wrap(True)
             impact_label.set_max_width_chars(60)
             impact_label.set_xalign(0)
@@ -273,7 +271,7 @@ class SuggestionAppliedBanner(Gtk.InfoBar):
         
         # Content area
         content = self.get_content_area()
-        label = Gtk.Label(label=f"✓ Applied: {suggestion.action}")
+        label = Gtk.Label(label=f"Applied: {suggestion.action}")
         label.set_line_wrap(True)
         label.set_max_width_chars(60)
         label.set_xalign(0)

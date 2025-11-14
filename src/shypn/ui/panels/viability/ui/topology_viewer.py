@@ -327,7 +327,7 @@ class TopologyViewerWithLegend(Gtk.Box):
     │ │            (Topology visualization)                 │ │
     │ │                                                      │ │
     │ └─────────────────────────────────────────────────────┘ │
-    │ Legend: ⬜ Transition  ⚪ Internal  🟢 Input  🔴 Output │
+    │ Legend: Transition  Internal  Input  Output  Arc  Dependency |
     └─────────────────────────────────────────────────────────┘
     """
     
@@ -360,27 +360,13 @@ class TopologyViewerWithLegend(Gtk.Box):
         title.get_style_context().add_class('dim-label')
         legend.pack_start(title, False, False, 0)
         
-        # Items
-        items = [
-            ("⬜", "Transition"),
-            ("⚪", "Internal"),
-            ("🟢", "Input"),
-            ("🔴", "Output"),
-            ("━━", "Arc"),
-            ("┄┄", "Dependency")
-        ]
+        # Items (plain text only)
+        items = ["Transition", "Internal", "Input", "Output", "Arc", "Dependency"]
         
-        for symbol, label in items:
-            box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
-            
-            symbol_label = Gtk.Label(label=symbol)
-            box.pack_start(symbol_label, False, False, 0)
-            
+        for label in items:
             text_label = Gtk.Label(label=label)
             text_label.get_style_context().add_class('dim-label')
-            box.pack_start(text_label, False, False, 0)
-            
-            legend.pack_start(box, False, False, 0)
+            legend.pack_start(text_label, False, False, 0)
         
         return legend
     

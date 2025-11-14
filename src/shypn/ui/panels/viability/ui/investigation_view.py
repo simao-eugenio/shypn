@@ -262,7 +262,7 @@ class LocalityOverviewCard(Gtk.Frame):
         
         # I/O counts
         locality = self.investigation.locality
-        io_text = f"→ {len(locality.input_places)} inputs, {len(locality.output_places)} outputs"
+        io_text = f"Inputs: {len(locality.input_places)}, Outputs: {len(locality.output_places)}"
         io_label = Gtk.Label(label=io_text)
         io_label.set_xalign(0)
         io_label.get_style_context().add_class('dim-label')
@@ -279,7 +279,7 @@ class LocalityOverviewCard(Gtk.Frame):
         status_row.pack_start(summary, True, True, 0)
         
         if self.on_expand:
-            expand_btn = Gtk.Button(label="Expand →")
+            expand_btn = Gtk.Button(label="Expand")
             expand_btn.connect('clicked', self._on_expand_clicked)
             expand_btn.get_style_context().add_class('flat')
             status_row.pack_end(expand_btn, False, False, 0)
