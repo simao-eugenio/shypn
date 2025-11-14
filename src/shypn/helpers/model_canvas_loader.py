@@ -125,6 +125,9 @@ class ModelCanvasLoader:
         self._last_pointer_world_x = 0.0
         self._last_pointer_world_y = 0.0
 
+        # Track whether we've fully initialized the first page (page 0)
+        self._first_page_initialized = False
+
     def load(self):
         """Load the canvas UI and return the container.
         
@@ -193,12 +196,28 @@ class ModelCanvasLoader:
         assert self.notebook.get_n_pages() == 0, "Failed to remove UI file pages - notebook should be empty"
         
         self.notebook.connect('switch-page', self._on_notebook_page_changed)
+        # Intercept page creation so page 0 runs the same init flow
+        self.notebook.connect('page-added', self._on_notebook_page_added)
         
         # Create fresh default tab using add_document() for consistent initialization
         # This ensures the default tab follows the SAME path as File→New
         # NO XML/notebook content is loaded - canvas starts completely empty
         page_index, drawing_area = self.add_document(filename='default')
         
+        # After creation, ensure lifecycle global manager and scope are active
+        try:
+            import logging
+            lg = logging.getLogger(__name__)
+            if self.lifecycle_manager and hasattr(self.lifecycle_manager, 'id_manager'):
+                from shypn.data.canvas.id_manager import set_lifecycle_scope_manager
+                # Re-assert global delegator in case earlier init was skipped
+                set_lifecycle_scope_manager(self.lifecycle_manager.id_manager)
+                # Explicitly set scope to the first canvas
+                self.lifecycle_manager.id_manager.set_scope(f"canvas_{id(drawing_area)}")
+                lg.debug(f"[CANVAS_INIT] Activated ID scope for first canvas: canvas_{id(drawing_area)}")
+        except Exception:
+            pass
+
         # Wire data collector for the initial default tab
         # The switch-page signal doesn't fire for the initially displayed page,
         # so we need to manually wire the data collector for tab 0
@@ -220,8 +239,57 @@ class ModelCanvasLoader:
                     # This ensures "Add to Transition Analyses" works from app startup
                     if self.right_panel_loader.context_menu_handler:
                         self.right_panel_loader.context_menu_handler.set_model(manager)
+
+            # CRITICAL: Ensure lifecycle sets active canvas for the first tab
+            # switch-page doesn't fire for page 0, so ID scope and context
+            # need to be explicitly activated here for consistency.
+            if self.lifecycle_adapter and drawing_area:
+                try:
+                    self.lifecycle_adapter.switch_to_canvas(drawing_area)
+                except Exception:
+                    pass
         
         return self.container
+
+    def _on_notebook_page_added(self, notebook, child, page_num):
+        """Ensure newly added pages (especially page 0) get full initialization.
+
+        GtkNotebook does not emit switch-page for the initially displayed tab.
+        This hook guarantees page 0 runs the same wiring as later tabs.
+        """
+        try:
+            # Only do this once for the first page
+            if page_num == 0 and not getattr(self, '_first_page_initialized', False):
+                # Wire data collector and right panel model
+                self._wire_data_collector_for_page(child)
+
+                drawing_area = self._get_drawing_area_from_page(child)
+                if drawing_area and drawing_area in self.canvas_managers:
+                    manager = self.canvas_managers[drawing_area]
+                    if self.right_panel_loader:
+                        self.right_panel_loader.set_model(manager)
+                        if self.right_panel_loader.context_menu_handler:
+                            self.right_panel_loader.context_menu_handler.set_model(manager)
+
+                # Ensure lifecycle active canvas and ID scope are set
+                if drawing_area:
+                    if self.lifecycle_adapter:
+                        try:
+                            self.lifecycle_adapter.switch_to_canvas(drawing_area)
+                        except Exception:
+                            pass
+                    try:
+                        if self.lifecycle_manager and hasattr(self.lifecycle_manager, 'id_manager'):
+                            from shypn.data.canvas.id_manager import set_lifecycle_scope_manager
+                            set_lifecycle_scope_manager(self.lifecycle_manager.id_manager)
+                            self.lifecycle_manager.id_manager.set_scope(f"canvas_{id(drawing_area)}")
+                    except Exception:
+                        pass
+
+                self._first_page_initialized = True
+        except Exception:
+            # Defensive: never raise from GTK signal handlers
+            pass
 
     def _wire_data_collector_for_page(self, page):
         """Wire the data collector to the right panel for a given page.
@@ -232,13 +300,8 @@ class ModelCanvasLoader:
             page: Notebook page widget (Gtk.Overlay or Gtk.ScrolledWindow)
         """
         # print(f"\n[WIRE] _wire_data_collector_for_page() called")
-        drawing_area = None
-        if isinstance(page, Gtk.Overlay):
-            scrolled = page.get_child()
-            if isinstance(scrolled, Gtk.ScrolledWindow):
-                drawing_area = scrolled.get_child()
-                if hasattr(drawing_area, 'get_child'):
-                    drawing_area = drawing_area.get_child()
+        # Always resolve the actual GtkDrawingArea via helper to avoid viewport mixups
+        drawing_area = self._get_drawing_area_from_page(page)
         
         # print(f"[WIRE]   drawing_area={drawing_area} (id={id(drawing_area) if drawing_area else 'None'})")
         
@@ -537,27 +600,32 @@ class ModelCanvasLoader:
                         # CRITICAL: ALWAYS swap panel INSTANCE on tab switch
                         # Match Report Panel logic: clear container UNCONDITIONALLY, then pack new panel
                         
-                        print(f"[TAB_SWITCH] 🔄 Swapping to panel instance {id(viability_loader.panel)} for drawing_area {id(drawing_area)}")
+                        import logging
+                        logging.getLogger(__name__).debug(f"[TAB_SWITCH] Swapping to panel instance {id(viability_loader.panel)} for drawing_area {id(drawing_area)}")
                         
                         # Clear container first (removes whatever panel is currently shown)
                         # This MUST be unconditional - old panels may still report wrong parent
                         for child in self.viability_panel_container.get_children():
-                            print(f"[TAB_SWITCH]   └─ Removing old panel instance {id(child)}")
+                            import logging
+                            logging.getLogger(__name__).debug(f"[TAB_SWITCH] Removing old panel instance {id(child)}")
                             self.viability_panel_container.remove(child)
                         
                         # CRITICAL: Explicitly remove new panel from its current parent (if any)
                         # GTK requires widget.get_parent() == NULL before pack_start()
                         current_parent = viability_loader.widget.get_parent()
                         if current_parent:
-                            print(f"[TAB_SWITCH]   └─ Panel has parent {type(current_parent).__name__} (id={id(current_parent)}), removing...")
+                            import logging
+                            logging.getLogger(__name__).debug(f"[TAB_SWITCH] Panel had parent {type(current_parent).__name__} (id={id(current_parent)}), removing before repack")
                             current_parent.remove(viability_loader.widget)
                         
                         # Verify parent is None after removal
                         verify_parent = viability_loader.widget.get_parent()
                         if verify_parent:
-                            print(f"[TAB_SWITCH]   ⚠️  WARNING: Panel STILL has parent {type(verify_parent).__name__} after removal!")
+                            import logging
+                            logging.getLogger(__name__).warning(f"[TAB_SWITCH] Panel still has parent {type(verify_parent).__name__} after removal")
                         else:
-                            print(f"[TAB_SWITCH]   ✓ Panel parent is None, ready to pack")
+                            import logging
+                            logging.getLogger(__name__).debug("[TAB_SWITCH] Panel parent is None, ready to pack")
                         
                         # Add new panel to container
                         try:
@@ -565,22 +633,29 @@ class ModelCanvasLoader:
                             import warnings
                             # Enable GTK warnings as Python warnings
                             warnings.simplefilter('error')
-                            print(f"[TAB_SWITCH]   └─ About to pack panel (id={id(viability_loader.widget)}) into container (id={id(self.viability_panel_container)})")
+                            import logging
+                            logging.getLogger(__name__).debug(f"[TAB_SWITCH] Packing panel (id={id(viability_loader.widget)}) into container (id={id(self.viability_panel_container)})")
+                            # Defensive: ensure widget has no parent before packing
+                            parent_before = viability_loader.widget.get_parent()
+                            if parent_before:
+                                parent_before.remove(viability_loader.widget)
                             self.viability_panel_container.pack_start(viability_loader.widget, True, True, 0)
-                            print(f"[TAB_SWITCH]   └─ ✅ Successfully packed panel instance {id(viability_loader.panel)}")
+                            import logging
+                            logging.getLogger(__name__).debug(f"[TAB_SWITCH] Successfully packed panel instance {id(viability_loader.panel)}")
                         except Exception as e:
-                            print(f"[TAB_SWITCH]   ❌ ERROR packing panel: {e}")
-                            import traceback
-                            traceback.print_exc()
+                            import logging, traceback
+                            logging.getLogger(__name__).exception(f"[TAB_SWITCH] Error packing panel: {e}")
                         
                         # Notify panel of drawing area change (triggers refresh_all)
-                        print(f"[TAB_SWITCH]   └─ Calling set_drawing_area on panel")
+                        import logging
+                        logging.getLogger(__name__).debug("[TAB_SWITCH] Calling set_drawing_area on panel")
                         viability_loader.panel.set_drawing_area(drawing_area)
                         
                         # Show panel content
                         viability_loader.panel.show_all()
                         
-                        print(f"[TAB_SWITCH] ✅ Panel instance swap complete")
+                        import logging
+                        logging.getLogger(__name__).debug("[TAB_SWITCH] Panel instance swap complete")
         
         # ============================================================
         # CRITICAL: Update Report Panel controller when switching tabs
@@ -905,7 +980,25 @@ class ModelCanvasLoader:
             del self.knowledge_bases[drawing_area]
             print(f"[KNOWLEDGE_BASE] Cleaned up KB for canvas {id(drawing_area)}")
         if self.notebook.get_n_pages() == 0:
-            self.add_document(filename='default')
+            # When the last tab is closed, recreate a fresh default canvas.
+            # Reset the first-page initialization flag so the page-added hook
+            # runs full initialization (same as initial startup) and ensure
+            # the recreation follows the exact File→New code path.
+            self._first_page_initialized = False
+            page_index, new_drawing = self.add_document(filename='default')
+            # Explicitly activate lifecycle context and focus for the new canvas
+            try:
+                if self.lifecycle_adapter and new_drawing:
+                    self.lifecycle_adapter.switch_to_canvas(new_drawing)
+                if self.lifecycle_manager and hasattr(self.lifecycle_manager, 'id_manager') and new_drawing:
+                    from shypn.data.canvas.id_manager import set_lifecycle_scope_manager
+                    set_lifecycle_scope_manager(self.lifecycle_manager.id_manager)
+                    self.lifecycle_manager.id_manager.set_scope(f"canvas_{id(new_drawing)}")
+                if new_drawing:
+                    new_drawing.set_can_focus(True)
+                    new_drawing.grab_focus()
+            except Exception:
+                pass
         return True
 
     def is_current_tab_empty_default(self):
@@ -928,13 +1021,25 @@ class ModelCanvasLoader:
         Returns:
             Gtk.DrawingArea or None
         """
+        # Notebook page structure is: Gtk.Overlay → Gtk.ScrolledWindow → Gtk.Viewport → Gtk.DrawingArea
+        # Gtk.ScrolledWindow auto-wraps its child in a Gtk.Viewport at runtime.
+        # Always descend through the Viewport to return the actual Gtk.DrawingArea.
+        widget = None
         if isinstance(page_widget, Gtk.Overlay):
             scrolled = page_widget.get_child()
             if isinstance(scrolled, Gtk.ScrolledWindow):
-                return scrolled.get_child()
+                widget = scrolled.get_child()
         elif isinstance(page_widget, Gtk.ScrolledWindow):
-            return page_widget.get_child()
-        return None
+            widget = page_widget.get_child()
+
+        # If the immediate child is a GtkViewport, get its child (the DrawingArea)
+        if widget is not None and hasattr(widget, 'get_child'):
+            inner = widget.get_child()
+            if inner is not None:
+                widget = inner
+
+        # Ensure the returned widget is the GtkDrawingArea instance
+        return widget
 
     def add_document(self, title=None, filename=None, replace_empty_default=True):
         """Add a new document (tab) to the canvas.
@@ -1121,12 +1226,9 @@ class ModelCanvasLoader:
         page_index = self.notebook.append_page(overlay, tab_box)
         overlay.show_all()
         
-        # WAYLAND FIX: Realize the widget before setup to ensure proper parent window hierarchy
-        # On Wayland, dialogs require their parent to be realized (have a GdkWindow/GdkSurface)
-        # Default canvas works because it's loaded from UI file and realized when main window shows
-        # File→New/Import canvases are created programmatically and need explicit realization
-        if not overlay.get_realized():
-            overlay.realize()
+        # Do not force explicit realize here; GTK will realize widgets when packed
+        # and shown by the toplevel window. Forcing realize early can break event
+        # mask setup and cause GTK criticals about anchoring.
         
         # PHASE 4: Set ID scope EARLY for this new canvas
         # Ensure that any ID generation (including during initial setup or file load)
@@ -1162,6 +1264,13 @@ class ModelCanvasLoader:
         """
         if filename is None:
             filename = 'default'
+        # Ensure ID scope is set for this drawing_area before manager initialization
+        try:
+            if self.lifecycle_manager and hasattr(self.lifecycle_manager, 'id_manager'):
+                scope_name = f"canvas_{id(drawing_area)}"
+                self.lifecycle_manager.id_manager.set_scope(scope_name)
+        except Exception:
+            pass
         manager = ModelCanvasManager(canvas_width=2000, canvas_height=2000, filename=filename)
         self.canvas_managers[drawing_area] = manager
         
@@ -2459,7 +2568,19 @@ class ModelCanvasLoader:
             drawing_area: GtkDrawingArea widget.
             manager: ModelCanvasManager instance.
         """
-        drawing_area.set_events(Gdk.EventMask.BUTTON_PRESS_MASK | Gdk.EventMask.BUTTON_RELEASE_MASK | Gdk.EventMask.POINTER_MOTION_MASK | Gdk.EventMask.SCROLL_MASK | Gdk.EventMask.KEY_PRESS_MASK)
+        # Ensure required event masks using add_events (safe after realize)
+        required_mask = (
+            Gdk.EventMask.BUTTON_PRESS_MASK
+            | Gdk.EventMask.BUTTON_RELEASE_MASK
+            | Gdk.EventMask.POINTER_MOTION_MASK
+            | Gdk.EventMask.SCROLL_MASK
+            | Gdk.EventMask.KEY_PRESS_MASK
+        )
+        try:
+            if hasattr(drawing_area, 'add_events'):
+                drawing_area.add_events(required_mask)
+        except Exception:
+            pass
         drawing_area.set_can_focus(True)
         drawing_area.connect('button-press-event', self._on_button_press, manager)
         drawing_area.connect('button-release-event', self._on_button_release, manager)
@@ -2479,6 +2600,57 @@ class ModelCanvasLoader:
             self._lasso_state = {}
         self._lasso_state[drawing_area] = {'active': False, 'selector': None}
         self._setup_canvas_context_menu(drawing_area, manager)
+
+        # Also attach handlers to GtkViewport (wrapper inside scrolled window),
+        # some environments deliver events at the viewport level first.
+        try:
+            scrolled = drawing_area.get_parent()
+            if scrolled and hasattr(scrolled, 'get_child'):
+                viewport = scrolled.get_child()
+            else:
+                viewport = None
+            # Attach to GtkScrolledWindow as well (some backends deliver here)
+            if scrolled and hasattr(scrolled, 'connect'):
+                required_mask = (
+                    Gdk.EventMask.BUTTON_PRESS_MASK
+                    | Gdk.EventMask.BUTTON_RELEASE_MASK
+                    | Gdk.EventMask.POINTER_MOTION_MASK
+                    | Gdk.EventMask.SCROLL_MASK
+                    | Gdk.EventMask.KEY_PRESS_MASK
+                )
+                try:
+                    if hasattr(scrolled, 'add_events'):
+                        scrolled.add_events(required_mask)
+                except Exception:
+                    pass
+                scrolled.connect('button-press-event', lambda w, e, m=manager: self._on_button_press(drawing_area, e, m))
+                scrolled.connect('button-release-event', lambda w, e, m=manager: self._on_button_release(drawing_area, e, m))
+                scrolled.connect('motion-notify-event', lambda w, e, m=manager: self._on_motion_notify(drawing_area, e, m))
+                scrolled.connect('scroll-event', lambda w, e, m=manager: self._on_scroll_event(drawing_area, e, m))
+                scrolled.connect('key-press-event', lambda w, e, m=manager: self._on_key_press_event(drawing_area, e, m))
+            if viewport and hasattr(viewport, 'connect'):
+                # Preserve masks on viewport and add required ones
+                required_mask = (
+                    Gdk.EventMask.BUTTON_PRESS_MASK
+                    | Gdk.EventMask.BUTTON_RELEASE_MASK
+                    | Gdk.EventMask.POINTER_MOTION_MASK
+                    | Gdk.EventMask.SCROLL_MASK
+                    | Gdk.EventMask.KEY_PRESS_MASK
+                )
+                try:
+                    if hasattr(viewport, 'add_events'):
+                        viewport.add_events(required_mask)
+                except Exception:
+                    pass
+
+                # Wrapper lambdas forward events to the drawing_area handlers
+                viewport.connect('button-press-event', lambda w, e, m=manager: self._on_button_press(drawing_area, e, m))
+                viewport.connect('button-release-event', lambda w, e, m=manager: self._on_button_release(drawing_area, e, m))
+                viewport.connect('motion-notify-event', lambda w, e, m=manager: self._on_motion_notify(drawing_area, e, m))
+                viewport.connect('scroll-event', lambda w, e, m=manager: self._on_scroll_event(drawing_area, e, m))
+                viewport.connect('key-press-event', lambda w, e, m=manager: self._on_key_press_event(drawing_area, e, m))
+        except Exception:
+            pass
 
     def _on_button_press(self, widget, event, manager):
         """Handle button press events (GTK3)."""
@@ -3952,8 +4124,10 @@ class ModelCanvasLoader:
             
             Routes the selection to the CURRENTLY ACTIVE document's report panel.
             """
-            print(f"[LOCALITY_CALLBACK] Received transition {transition.name if hasattr(transition, 'name') else transition.id}")
-            print(f"[LOCALITY_CALLBACK] Locality valid: {locality.is_valid if locality else False}")
+            import logging
+            lg = logging.getLogger(__name__)
+            lg.debug(f"[LOCALITY_CALLBACK] Received transition {transition.name if hasattr(transition, 'name') else transition.id}")
+            lg.debug(f"[LOCALITY_CALLBACK] Locality valid: {locality.is_valid if locality else False}")
             
             # Get the current active drawing area
             current_page_num = self.notebook.get_current_page()
@@ -3968,45 +4142,45 @@ class ModelCanvasLoader:
                         drawing_area = drawing_area.get_child()
             
             if not drawing_area or drawing_area not in self.overlay_managers:
-                print(f"[LOCALITY_CALLBACK] ⚠️ No active drawing area found")
+                lg.warning("[LOCALITY_CALLBACK] No active drawing area found")
                 return
             
             # Get the report panel for the current document
             overlay_manager = self.overlay_managers[drawing_area]
             if not hasattr(overlay_manager, 'report_panel_loader'):
-                print(f"[LOCALITY_CALLBACK] ⚠️ No report_panel_loader for active document")
+                lg.warning("[LOCALITY_CALLBACK] No report_panel_loader for active document")
                 return
             
             report_panel_loader = overlay_manager.report_panel_loader
             if not report_panel_loader or not hasattr(report_panel_loader, 'panel'):
-                print(f"[LOCALITY_CALLBACK] ⚠️ No report panel for active document")
+                lg.warning("[LOCALITY_CALLBACK] No report panel for active document")
                 return
             
             report_panel = report_panel_loader.panel
-            print(f"[LOCALITY_CALLBACK] Report panel categories: {len(report_panel.categories)}")
+            lg.debug(f"[LOCALITY_CALLBACK] Report panel categories: {len(report_panel.categories)}")
             
             # Find ModelsCategory in Report panel (for "Show Selected Locality")
             from shypn.ui.panels.report.model_structure_category import ModelsCategory
             for category in report_panel.categories:
-                print(f"[LOCALITY_CALLBACK] Checking category: {type(category).__name__}")
+                lg.debug(f"[LOCALITY_CALLBACK] Checking category: {type(category).__name__}")
                 if isinstance(category, ModelsCategory):
-                    print(f"[LOCALITY_CALLBACK] Found ModelsCategory, calling set_selected_locality()")
+                    lg.debug("[LOCALITY_CALLBACK] Found ModelsCategory, calling set_selected_locality()")
                     category.set_selected_locality(transition, locality)
-                    print(f"[LOCALITY_CALLBACK] set_selected_locality() completed")
+                    lg.debug("[LOCALITY_CALLBACK] set_selected_locality() completed")
                     break
             else:
-                print(f"[LOCALITY_CALLBACK] ⚠️ ModelsCategory not found in report panel!")
+                lg.debug("[LOCALITY_CALLBACK] ModelsCategory not found in report panel")
             
             # Find DynamicAnalysesCategory in Report panel (for "Reaction Selected" simulation data)
             from shypn.ui.panels.report.parameters_category import DynamicAnalysesCategory
             for category in report_panel.categories:
                 if isinstance(category, DynamicAnalysesCategory):
-                    print(f"[LOCALITY_CALLBACK] Found DynamicAnalysesCategory, calling set_selected_reaction()")
+                    lg.debug("[LOCALITY_CALLBACK] Found DynamicAnalysesCategory, calling set_selected_reaction()")
                     category.set_selected_reaction(transition, locality)
-                    print(f"[LOCALITY_CALLBACK] set_selected_reaction() completed")
+                    lg.debug("[LOCALITY_CALLBACK] set_selected_reaction() completed")
                     break
             else:
-                print(f"[LOCALITY_CALLBACK] ⚠️ DynamicAnalysesCategory not found in report panel!")
+                lg.debug("[LOCALITY_CALLBACK] DynamicAnalysesCategory not found in report panel")
         
         # Set the single dynamic callback (no loop needed, single global transition panel)
         transition_panel.on_selection_changed_callback = on_transition_selected

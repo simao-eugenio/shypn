@@ -4,6 +4,8 @@ Place Properties Dialog Loader
 Loads and manages the Place properties dialog UI.
 """
 import os
+import logging
+logger = logging.getLogger(__name__)
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, GObject
@@ -225,13 +227,11 @@ class PlacePropDialogLoader(GObject.GObject):
                     )
         
         except ImportError as e:
-            # Topology module not available - silently skip
-            print(f"Topology tab not available: {e}")
+            # Topology module not available - silently skip (debug only)
+            logger.debug(f"Topology tab not available: {e}")
         except Exception as e:
-            # Any other error - log but don't crash the dialog
-            # print(f"Error setting up topology tab: {type(e).__name__}: {e}")
-            import traceback
-            traceback.print_exc()
+            # Log exception with traceback but do not crash dialog
+            logger.exception(f"Error setting up topology tab: {type(e).__name__}: {e}")
 
     def run(self):
         """Show the dialog and run it modally.
@@ -247,10 +247,10 @@ class PlacePropDialogLoader(GObject.GObject):
             parent_mapped = self.parent_window.get_mapped()
             parent_realized = self.parent_window.get_realized()
             
-            print(f"[DIALOG WAYLAND] Parent window mapped: {parent_mapped}, realized: {parent_realized}")
+            logger.debug(f"[DIALOG WAYLAND] Parent window mapped: {parent_mapped}, realized: {parent_realized}")
             
             if not parent_mapped:
-                print(f"[DIALOG WAYLAND] WARNING: Parent window not mapped! This may cause Error 71")
+                logger.warning("[DIALOG WAYLAND] Parent window not mapped; may trigger protocol warnings")
             
             # CRITICAL WAYLAND FIX: Check window state (maximized, fullscreen, etc.)
             # Error 71 occurs when dialogs are opened while window is in transition
@@ -265,12 +265,12 @@ class PlacePropDialogLoader(GObject.GObject):
                 is_fullscreen = bool(state & Gdk.WindowState.FULLSCREEN)
                 is_tiled = bool(state & Gdk.WindowState.TILED)
                 
-                print(f"[DIALOG WAYLAND] Window state: maximized={is_maximized}, fullscreen={is_fullscreen}, tiled={is_tiled}")
+                logger.debug(f"[DIALOG WAYLAND] Window state: maximized={is_maximized}, fullscreen={is_fullscreen}, tiled={is_tiled}")
                 
                 # WAYLAND WORKAROUND: If window is maximized/fullscreen/tiled, wait a bit
                 # This gives Wayland compositor time to complete the state transition
                 if is_maximized or is_fullscreen or is_tiled:
-                    print(f"[DIALOG WAYLAND] Window in special state, waiting for stability...")
+                    logger.debug("[DIALOG WAYLAND] Window in special state; delaying transient assignment 100ms")
                     from gi.repository import GLib
                     import time
                     time.sleep(0.1)  # 100ms delay to let compositor settle
@@ -280,18 +280,18 @@ class PlacePropDialogLoader(GObject.GObject):
             display = Gdk.Display.get_default()
             if display:
                 display.sync()  # Wait for all requests to be processed
-                print(f"[DIALOG WAYLAND] Display sync completed")
+                logger.debug("[DIALOG WAYLAND] Display sync completed")
             
             # Now set transient after compositor is synced
             self.dialog.set_transient_for(self.parent_window)
-            print(f"[DIALOG WAYLAND] set_transient_for completed")
+            logger.debug("[DIALOG WAYLAND] set_transient_for completed")
         
         # WAYLAND FIX: Explicitly show dialog before run() to prevent protocol errors
         # Critical for imported canvases where widget hierarchy is established asynchronously
         # Default canvas works because it's realized when main window shows
         # Imported canvases are created programmatically and dialogs may open before fully ready
         self.dialog.show()
-        print(f"[DIALOG WAYLAND] dialog.show() completed, calling run()")
+        logger.debug("[DIALOG WAYLAND] dialog.show() completed; entering run() loop")
         return self.dialog.run()
 
     def get_dialog(self):

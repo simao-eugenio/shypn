@@ -157,9 +157,8 @@ class TopologyAnalysesCategory(BaseReportCategory):
                 self._update_display(summary)
                 return
             except Exception as e:
-                print(f"[TOPOLOGY_CATEGORY] ERROR: Could not fetch topology summary: {e}", file=sys.__stderr__)
-                import traceback
-                traceback.print_exc()
+                import logging
+                logging.getLogger(__name__).exception(f"[TOPOLOGY_CATEGORY] Could not fetch topology summary: {e}")
                 # Fall through to placeholder display
         
         # Otherwise show placeholder (topology panel not yet connected)

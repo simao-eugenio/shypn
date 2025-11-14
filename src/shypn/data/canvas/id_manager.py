@@ -22,6 +22,7 @@ to enable multi-canvas support with isolated ID sequences.
 """
 
 from typing import Tuple, Optional
+from contextlib import contextmanager
 
 # Global reference to lifecycle ID scope manager (set by lifecycle system)
 _lifecycle_scope_manager: Optional['IDScopeManager'] = None  # type: ignore
@@ -47,6 +48,27 @@ def get_lifecycle_scope_manager() -> Optional['IDScopeManager']:  # type: ignore
         IDScopeManager instance or None
     """
     return _lifecycle_scope_manager
+
+
+@contextmanager
+def suspend_lifecycle_delegation():
+    """Temporarily disable lifecycle delegation for ID operations.
+    
+    Useful when parsing/loading a document off-canvas so that registering
+    existing IDs does not contaminate whichever canvas scope happens to be
+    active at the time (e.g., page 0).
+    
+    Example:
+        with suspend_lifecycle_delegation():
+            id_manager.register_place_id("P100")
+    """
+    global _lifecycle_scope_manager
+    saved = _lifecycle_scope_manager
+    _lifecycle_scope_manager = None
+    try:
+        yield
+    finally:
+        _lifecycle_scope_manager = saved
 
 
 class IDManager:
