@@ -3084,22 +3084,24 @@ class ModelCanvasLoader:
         if event.keyval == Gdk.KEY_Delete or event.keyval == Gdk.KEY_KP_Delete:
             selected = manager.selection_manager.get_selected_objects(manager)
             if selected:
-                pass
-                # TODO: Implement undo support for delete
-                # from shypn.edit.undo_operations import DeleteOperation
-                # Store delete data for undo
-                # delete_data = []
-                # for obj in selected:
-                #     delete_data.append(manager.serialize_object_for_undo(obj))
-                
-                # Delete all selected objects
-                for obj in selected:
+                # Capture snapshots for undo
+                if hasattr(manager, 'undo_manager'):
+                    try:
+                        from shypn.edit.snapshots import capture_delete_snapshots
+                        from shypn.edit.undo_operations import DeleteOperation
+                        snapshots = capture_delete_snapshots(manager, selected)
+                        manager.undo_manager.push(DeleteOperation(snapshots))
+                    except Exception:
+                        # Fallback inline capture
+                        try:
+                            from shypn.edit.undo_operations import DeleteOperation
+                            snapshots = self._capture_delete_snapshots_inline(manager, selected)
+                            manager.undo_manager.push(DeleteOperation(snapshots))
+                        except Exception:
+                            pass
+                # Delete all selected objects (cascade-aware)
+                for obj in list(selected):
                     self._delete_object(manager, obj)
-                
-                # Push to undo stack
-                # if hasattr(manager, 'undo_manager') and delete_data:
-                #     manager.undo_manager.push(DeleteOperation(delete_data, manager))
-                
                 widget.queue_draw()
                 return True
         
@@ -5131,25 +5133,24 @@ class ModelCanvasLoader:
         # First copy, then delete
         self._copy_selection(manager)
         
-        # Delete selected objects
+        # Delete selected objects (with undo snapshots)
         selected = manager.selection_manager.get_selected_objects(manager)
         if selected:
-            pass
-            # TODO: Implement undo support for cut
-            # from shypn.edit.undo_operations import DeleteOperation
-            # Store delete data for undo
-            # delete_data = []
-            # for obj in selected:
-            #     delete_data.append(manager.serialize_object_for_undo(obj))
-            
-            # Delete all selected objects
-            for obj in selected:
+            if hasattr(manager, 'undo_manager'):
+                try:
+                    from shypn.edit.snapshots import capture_delete_snapshots
+                    from shypn.edit.undo_operations import DeleteOperation
+                    snapshots = capture_delete_snapshots(manager, selected)
+                    manager.undo_manager.push(DeleteOperation(snapshots))
+                except Exception:
+                    try:
+                        from shypn.edit.undo_operations import DeleteOperation
+                        snapshots = self._capture_delete_snapshots_inline(manager, selected)
+                        manager.undo_manager.push(DeleteOperation(snapshots))
+                    except Exception:
+                        pass
+            for obj in list(selected):
                 self._delete_object(manager, obj)
-            
-            # Push to undo stack
-            # if hasattr(manager, 'undo_manager') and delete_data:
-            #     manager.undo_manager.push(DeleteOperation(delete_data, manager))
-            
             widget.queue_draw()
     
     def _delete_object(self, manager, obj):
@@ -5167,6 +5168,55 @@ class ModelCanvasLoader:
             manager.remove_transition(obj)
         elif isinstance(obj, Arc):
             manager.remove_arc(obj)
+
+    def _capture_delete_snapshots_inline(self, manager, targets):
+        """Inline snapshot capture used when import fails.
+        Mirrors shypn.edit.snapshots.capture_delete_snapshots.
+        """
+        from shypn.netobjs import Place, Transition, Arc
+        snaps = []
+        recorded_arc_ids = set()
+        def snap_arc(a):
+            return {
+                'kind': 'arc',
+                'id': getattr(a, 'id', None),
+                'label': getattr(a, 'label', None),
+                'source_id': getattr(a.source, 'id', None),
+                'target_id': getattr(a.target, 'id', None),
+            }
+        for target in targets:
+            if isinstance(target, Arc):
+                s = snap_arc(target)
+                if s['id'] and s['id'] not in recorded_arc_ids:
+                    snaps.append(s)
+                    recorded_arc_ids.add(s['id'])
+                continue
+            kind = 'place' if isinstance(target, Place) else 'transition'
+            base = {
+                'kind': kind,
+                'id': getattr(target, 'id', None),
+                'label': getattr(target, 'label', None),
+                'x': getattr(target, 'x', 0.0),
+                'y': getattr(target, 'y', 0.0),
+            }
+            if kind == 'place':
+                base['radius'] = getattr(target, 'radius', None)
+            else:
+                base['width'] = getattr(target, 'width', None)
+                base['height'] = getattr(target, 'height', None)
+            incident = []
+            connected_ids = []
+            for a in manager.arcs:
+                if a.source == target or a.target == target:
+                    a_id = getattr(a, 'id', None)
+                    if a_id and a_id not in recorded_arc_ids:
+                        incident.append(snap_arc(a))
+                        connected_ids.append(a_id)
+                        recorded_arc_ids.add(a_id)
+            base['connected_arc_ids'] = connected_ids
+            base['arcs'] = incident
+            snaps.append(base)
+        return snaps
     
     def _copy_selection(self, manager):
         """Copy selected objects to clipboard.
