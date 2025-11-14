@@ -360,14 +360,24 @@ class SubnetSimulator:
                     log_callback("✗ Deadlock detected - no enabled transitions")
                 break
             
-            # Log step (throttle to avoid spam)
-            if log_callback and (self.state.step_count <= 10 or self.state.step_count % 100 == 0):
+            # Log every step with transition firing and full place markings
+            if log_callback:
                 trans_id = step_info['fired_transition']
                 changes_str = ", ".join([
                     f"{pid}: {old}→{new}"
                     for pid, (old, new) in step_info['marking_changes'].items()
                 ])
                 log_callback(f"Step {self.state.step_count}: {trans_id} fired ({changes_str})")
+                # Full markings snapshot after this step
+                try:
+                    markings_list = ", ".join([
+                        f"{pid}={self.state.current_markings.get(pid, 0)}"
+                        for pid in sorted(self.state.current_markings.keys())
+                    ])
+                    log_callback(f"Markings: {markings_list}")
+                except Exception:
+                    # Best-effort logging; continue if any issue arises
+                    pass
         
         self.state.is_running = False
         
