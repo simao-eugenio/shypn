@@ -125,6 +125,9 @@ class ModelCanvasLoader:
         self._last_pointer_world_x = 0.0
         self._last_pointer_world_y = 0.0
 
+        # Track whether we've fully initialized the first page (page 0)
+        self._first_page_initialized = False
+
     def load(self):
         """Load the canvas UI and return the container.
         
@@ -193,12 +196,28 @@ class ModelCanvasLoader:
         assert self.notebook.get_n_pages() == 0, "Failed to remove UI file pages - notebook should be empty"
         
         self.notebook.connect('switch-page', self._on_notebook_page_changed)
+        # Intercept page creation so page 0 runs the same init flow
+        self.notebook.connect('page-added', self._on_notebook_page_added)
         
         # Create fresh default tab using add_document() for consistent initialization
         # This ensures the default tab follows the SAME path as File→New
         # NO XML/notebook content is loaded - canvas starts completely empty
         page_index, drawing_area = self.add_document(filename='default')
         
+        # After creation, ensure lifecycle global manager and scope are active
+        try:
+            import logging
+            lg = logging.getLogger(__name__)
+            if self.lifecycle_manager and hasattr(self.lifecycle_manager, 'id_manager'):
+                from shypn.data.canvas.id_manager import set_lifecycle_scope_manager
+                # Re-assert global delegator in case earlier init was skipped
+                set_lifecycle_scope_manager(self.lifecycle_manager.id_manager)
+                # Explicitly set scope to the first canvas
+                self.lifecycle_manager.id_manager.set_scope(f"canvas_{id(drawing_area)}")
+                lg.debug(f"[CANVAS_INIT] Activated ID scope for first canvas: canvas_{id(drawing_area)}")
+        except Exception:
+            pass
+
         # Wire data collector for the initial default tab
         # The switch-page signal doesn't fire for the initially displayed page,
         # so we need to manually wire the data collector for tab 0
@@ -231,6 +250,46 @@ class ModelCanvasLoader:
                     pass
         
         return self.container
+
+    def _on_notebook_page_added(self, notebook, child, page_num):
+        """Ensure newly added pages (especially page 0) get full initialization.
+
+        GtkNotebook does not emit switch-page for the initially displayed tab.
+        This hook guarantees page 0 runs the same wiring as later tabs.
+        """
+        try:
+            # Only do this once for the first page
+            if page_num == 0 and not getattr(self, '_first_page_initialized', False):
+                # Wire data collector and right panel model
+                self._wire_data_collector_for_page(child)
+
+                drawing_area = self._get_drawing_area_from_page(child)
+                if drawing_area and drawing_area in self.canvas_managers:
+                    manager = self.canvas_managers[drawing_area]
+                    if self.right_panel_loader:
+                        self.right_panel_loader.set_model(manager)
+                        if self.right_panel_loader.context_menu_handler:
+                            self.right_panel_loader.context_menu_handler.set_model(manager)
+
+                # Ensure lifecycle active canvas and ID scope are set
+                if drawing_area:
+                    if self.lifecycle_adapter:
+                        try:
+                            self.lifecycle_adapter.switch_to_canvas(drawing_area)
+                        except Exception:
+                            pass
+                    try:
+                        if self.lifecycle_manager and hasattr(self.lifecycle_manager, 'id_manager'):
+                            from shypn.data.canvas.id_manager import set_lifecycle_scope_manager
+                            set_lifecycle_scope_manager(self.lifecycle_manager.id_manager)
+                            self.lifecycle_manager.id_manager.set_scope(f"canvas_{id(drawing_area)}")
+                    except Exception:
+                        pass
+
+                self._first_page_initialized = True
+        except Exception:
+            # Defensive: never raise from GTK signal handlers
+            pass
 
     def _wire_data_collector_for_page(self, page):
         """Wire the data collector to the right panel for a given page.
@@ -1183,6 +1242,13 @@ class ModelCanvasLoader:
         """
         if filename is None:
             filename = 'default'
+        # Ensure ID scope is set for this drawing_area before manager initialization
+        try:
+            if self.lifecycle_manager and hasattr(self.lifecycle_manager, 'id_manager'):
+                scope_name = f"canvas_{id(drawing_area)}"
+                self.lifecycle_manager.id_manager.set_scope(scope_name)
+        except Exception:
+            pass
         manager = ModelCanvasManager(canvas_width=2000, canvas_height=2000, filename=filename)
         self.canvas_managers[drawing_area] = manager
         

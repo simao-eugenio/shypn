@@ -620,6 +620,14 @@ class ModelCanvasManager:
         
         # Update ID counters to avoid collisions
         # Register all existing IDs with the IDManager
+        # Ensure lifecycle scope is set to this canvas before registering
+        try:
+            if self._canvas_loader and hasattr(self._canvas_loader, 'lifecycle_manager') and self._drawing_area:
+                from shypn.data.canvas.id_manager import set_lifecycle_scope_manager
+                set_lifecycle_scope_manager(self._canvas_loader.lifecycle_manager.id_manager)
+                self._canvas_loader.lifecycle_manager.id_manager.set_scope(f"canvas_{id(self._drawing_area)}")
+        except Exception:
+            pass
         if places:
             for p in self.places:
                 self.document_controller.id_manager.register_place_id(p.id)
