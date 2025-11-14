@@ -135,14 +135,42 @@ class MenuActions:
 	# ====================================================================
 	
 	def on_edit_undo(self, action, param):
-		"""Undo the last action."""
-		# TODO: Implement undo logic
-		pass
+		"""Undo the last action for the active document."""
+		try:
+			if not self.model_canvas_loader:
+				return
+			da = self.model_canvas_loader.get_current_document()
+			if not da:
+				return
+			manager = self.model_canvas_loader.get_canvas_manager(da)
+			if manager and hasattr(manager, 'undo_manager') and manager.undo_manager:
+				if manager.undo_manager.undo(manager):
+					try:
+						da.queue_draw()
+					except Exception:
+						pass
+		except Exception:
+			# Keep menu action resilient
+			pass
 	
 	def on_edit_redo(self, action, param):
-		"""Redo the last undone action."""
-		# TODO: Implement redo logic
-		pass
+		"""Redo the last undone action for the active document."""
+		try:
+			if not self.model_canvas_loader:
+				return
+			da = self.model_canvas_loader.get_current_document()
+			if not da:
+				return
+			manager = self.model_canvas_loader.get_canvas_manager(da)
+			if manager and hasattr(manager, 'undo_manager') and manager.undo_manager:
+				if manager.undo_manager.redo(manager):
+					try:
+						da.queue_draw()
+					except Exception:
+						pass
+		except Exception:
+			# Keep menu action resilient
+			pass
 	
 	def on_edit_cut(self, action, param):
 		"""Cut the selected content."""

@@ -216,6 +216,13 @@ def main(argv=None):
 		# Wire persistency manager to canvas loader
 		# This allows canvas operations (like clear canvas) to reset persistency state
 		model_canvas_loader.set_persistency_manager(persistency)
+
+		# Wire canvas loader to menu actions so global accelerators (Ctrl+Z/Y/etc.)
+		# operate on the active document even when focus is outside the canvas.
+		try:
+			menu_actions.set_canvas_loader(model_canvas_loader)
+		except Exception:
+			pass
 		
 		# Get main workspace and add canvas
 		main_workspace = main_builder.get_object('main_workspace')
