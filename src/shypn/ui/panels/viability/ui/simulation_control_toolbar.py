@@ -112,7 +112,14 @@ class SimulationControlToolbar(Gtk.Box):
         # Time limit
         row.pack_start(Gtk.Label(label="Time:"), False, False, 0)
         self.time_spinbutton = Gtk.SpinButton(
-            adjustment=Gtk.Adjustment(100, 0.1, 10000, 1, 10, 0)
+            adjustment=Gtk.Adjustment(
+                value=100,
+                lower=0.1,
+                upper=10000,
+                step_increment=1,
+                page_increment=10,
+                page_size=0
+            )
         )
         self.time_spinbutton.set_width_chars(5)
         self.time_spinbutton.set_digits(1)
@@ -123,7 +130,14 @@ class SimulationControlToolbar(Gtk.Box):
         # Step limit
         row.pack_start(Gtk.Label(label="  Steps:"), False, False, 0)
         self.steps_spinbutton = Gtk.SpinButton(
-            adjustment=Gtk.Adjustment(1000, 1, 1000000, 100, 1000, 0)
+            adjustment=Gtk.Adjustment(
+                value=1000,
+                lower=1,
+                upper=1000000,
+                step_increment=100,
+                page_increment=1000,
+                page_size=0
+            )
         )
         self.steps_spinbutton.set_width_chars(6)
         self.steps_spinbutton.set_digits(0)

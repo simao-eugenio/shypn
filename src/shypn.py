@@ -433,51 +433,9 @@ def main(argv=None):
 			pathway_panel_loader = None
 			topology_panel_loader = None
 		
-		# Load viability panel AFTER topology (needs topology reference)
-		try:
-			# Viability panel doesn't need model at init - will get it at analysis time
-			viability_panel_loader = ViabilityPanelLoader(model=None)
-			
-			# Store viability_panel_loader reference for access
-			model_canvas_loader.viability_panel_loader = viability_panel_loader
-			
-			# Wire simulation complete callbacks for all existing controllers
-			model_canvas_loader._wire_viability_callbacks()
-			
-			# Wire model_canvas_loader so viability can access current model
-			if hasattr(viability_panel_loader, 'controller') and viability_panel_loader.controller:
-				viability_panel_loader.set_model_canvas_loader(model_canvas_loader)
-				
-				# Wire lifecycle events (same as topology)
-				def on_viability_tab_switched(notebook, page, page_num):
-					"""Called when user switches to different model tab."""
-					drawing_area = model_canvas_loader.get_current_document()
-					if drawing_area and viability_panel_loader.controller:
-						viability_panel_loader.controller.on_tab_switched(drawing_area)
-				
-				if model_canvas_loader.notebook:
-					model_canvas_loader.notebook.connect('switch-page', on_viability_tab_switched)
-				
-			# File operations - chain with topology's wrapper
-			if file_explorer:
-				# Get the current handler (which is topology's wrapper)
-				viability_previous_handler = getattr(file_explorer, 'on_file_open_requested', None)
-				
-				def on_file_open_with_viability_notify(filepath):
-					"""Wrapper that notifies viability panel after file opens."""
-					# Call previous handler (topology's wrapper, which calls original)
-					if viability_previous_handler:
-						viability_previous_handler(filepath)
-					
-					# Notify viability panel
-					drawing_area = model_canvas_loader.get_current_document()
-					if drawing_area and viability_panel_loader.controller:
-						viability_panel_loader.controller.on_file_opened(drawing_area)
-				
-				file_explorer.on_file_open_requested = on_file_open_with_viability_notify
-		except Exception as e:
-			print(f'WARNING: Failed to load viability panel: {e}', file=sys.stderr)
-			viability_panel_loader = None
+		# NOTE: Viability panel is now ONLY created per-document in model_canvas_loader.py
+		# No global viability panel loader - this matches Report panel architecture
+		# Each document gets its own ViabilityPanel instance with independent state
 		
 		# Wire pathway panel loader to file panel for project synchronization
 		# This ensures pathway import controllers get updated when project is opened
@@ -659,15 +617,19 @@ def main(argv=None):
 		if topology_panel_loader:
 			topology_panel_loader.add_to_stack(left_dock_stack, topology_panel_container, 'topology')
 		
-		# Add Viability panel to stack (container created programmatically, add to stack first)
-		if viability_panel_loader and viability_panel_container:
-			# Add container to stack
+		# Add Viability panel container to stack
+		# NOTE: Per-document ViabilityPanel instances will be swapped in/out of this container
+		# This matches Report panel architecture - no global panel instance
+		if viability_panel_container:
+			# Add empty container to stack - per-document panels added dynamically
 			left_dock_stack.add_named(viability_panel_container, 'viability')
-			# Now add panel content to container
-		viability_panel_loader.add_to_stack(left_dock_stack, viability_panel_container, 'viability')
-		# Connect viability panel to topology panel (needed for diagnosis)
-		if topology_panel_loader and hasattr(topology_panel_loader, 'panel'):
-			viability_panel_loader.panel.set_topology_panel(topology_panel_loader.panel)		# ====================================================================
+
+			# Expose container to model_canvas_loader so tab-switch logic can swap panels
+			# This mirrors the Report panel wiring just above
+			model_canvas_loader.viability_panel_container = viability_panel_container
+			model_canvas_loader.left_dock_stack = left_dock_stack
+		
+		# ====================================================================
 		# Report Panel Container (will hold per-document panels)
 		# ====================================================================
 		# Multi-document: Use the existing UI container to switch between
@@ -1127,17 +1089,30 @@ def main(argv=None):
 						if overlay_manager and hasattr(overlay_manager, 'viability_panel_loader'):
 							viability_loader = overlay_manager.viability_panel_loader
 							if viability_loader and viability_loader.panel:
-								# Check if widget needs to be moved to container
+								# CRITICAL: ALWAYS clear container first (unconditional, matching tab switch logic)
+								# Clears whatever panel is currently shown, then adds the new one
+								for child in viability_panel_container.get_children():
+									viability_panel_container.remove(child)
+								
+								# CRITICAL: Explicitly remove new panel from its current parent (if any)
+								# GTK requires widget.get_parent() == NULL before pack_start()
 								current_parent = viability_loader.widget.get_parent()
-								if current_parent != viability_panel_container:
-									# Remove from old parent if exists
-									if current_parent:
-										current_parent.remove(viability_loader.widget)
-									# Clear container before adding
-									for child in viability_panel_container.get_children():
-										viability_panel_container.remove(child)
-									# Add to container
-									viability_panel_container.pack_start(viability_loader.widget, True, True, 0)
+								if current_parent:
+									print(f"[VIABILITY_TOGGLE]   └─ Panel has parent {type(current_parent).__name__} (id={id(current_parent)}), removing...")
+									current_parent.remove(viability_loader.widget)
+								
+								# Verify parent is None after removal
+								verify_parent = viability_loader.widget.get_parent()
+								if verify_parent:
+									print(f"[VIABILITY_TOGGLE]   ⚠️  WARNING: Panel STILL has parent {type(verify_parent).__name__} after removal!")
+								else:
+									print(f"[VIABILITY_TOGGLE]   ✓ Panel parent is None, ready to pack")
+								
+								# Add current document's panel to container
+								viability_panel_container.pack_start(viability_loader.widget, True, True, 0)
+								# Ensure panel is bound to this document and refreshes AFTER packing
+								if hasattr(viability_loader.panel, 'set_drawing_area'):
+									viability_loader.panel.set_drawing_area(drawing_area)
 								# Show panel content
 								viability_loader.panel.show_all()
 								print(f"[VIABILITY_TOGGLE] ✓ Showing per-document viability panel for drawing_area {id(drawing_area)}")
@@ -1259,11 +1234,10 @@ def main(argv=None):
 			if 'topology' in master_palette.buttons:
 				master_palette.buttons['topology'].widget.set_tooltip_text('Topology Analysis')
 		
-		# Enable viability button if panel loaded successfully
-		if viability_panel_loader:
-			master_palette.set_sensitive('viability', True)
-			if 'viability' in master_palette.buttons:
-				master_palette.buttons['viability'].widget.set_tooltip_text('Model Viability & Repair')
+		# Enable viability button (per-document panels created automatically)
+		master_palette.set_sensitive('viability', True)
+		if 'viability' in master_palette.buttons:
+			master_palette.buttons['viability'].widget.set_tooltip_text('Model Viability & Repair')
 		
 		# Both maximize and minimize buttons removed for Wayland compatibility
 		# Users can:
