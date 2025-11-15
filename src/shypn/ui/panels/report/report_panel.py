@@ -24,6 +24,7 @@ from .model_structure_category import ModelsCategory
 from .provenance_category import ProvenanceCategory
 from .parameters_category import DynamicAnalysesCategory
 from .topology_analyses_category import TopologyAnalysesCategory
+from .export_toolbar import ExportToolbar
 
 
 class ReportPanel(Gtk.Box):
@@ -57,6 +58,9 @@ class ReportPanel(Gtk.Box):
         
         # Category controllers
         self.categories = []
+        
+        # Export toolbar
+        self.export_toolbar = None
         
         # Float button (for loader float/detach functionality)
         self.float_button = None
@@ -98,6 +102,14 @@ class ReportPanel(Gtk.Box):
         # Separator
         separator = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
         self.pack_start(separator, False, False, 0)
+        
+        # ===== EXPORT TOOLBAR =====
+        self.export_toolbar = ExportToolbar(parent_window=self.get_toplevel())
+        self.pack_start(self.export_toolbar, False, False, 0)
+        
+        # Separator after toolbar
+        separator2 = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
+        self.pack_start(separator2, False, False, 0)
         
         # ===== MAIN CONTENT =====
         # Main container with scrolling
@@ -335,6 +347,10 @@ class ReportPanel(Gtk.Box):
             model_manager: ModelCanvasManager instance with model data
         """
         # print(f"[REPORT] set_model_canvas called with: {model_manager}")
+        
+        # Update export toolbar with parent window
+        if self.export_toolbar:
+            self.export_toolbar.set_parent_window(self.get_toplevel())
         
         if model_manager:
             pass
@@ -720,6 +736,10 @@ class ReportPanel(Gtk.Box):
             filepath: Path to the opened file
         """
         # print(f"[REPORT] on_file_opened: {filepath}")
+        
+        # Notify export toolbar of file path for metadata loading
+        if self.export_toolbar:
+            self.export_toolbar.set_filepath(filepath)
         
         # Add a small delay to ensure model is fully loaded
         from gi.repository import GLib
