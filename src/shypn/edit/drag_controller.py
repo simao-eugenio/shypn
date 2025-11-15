@@ -68,8 +68,8 @@ class DragController:
         # Initial world positions before drag started
         self._initial_positions: Dict[int, Tuple[float, float]] = {}
         
-        # Drag configuration
-        self._snap_to_grid = False
+        # Drag configuration - snap to grid enabled by default
+        self._snap_to_grid = True
         self._grid_spacing = 10.0
         self._constrain_axis: Optional[str] = None  # None, 'horizontal', 'vertical'
         

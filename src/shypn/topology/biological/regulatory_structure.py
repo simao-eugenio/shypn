@@ -86,8 +86,14 @@ class RegulatoryStructureAnalyzer(TopologyAnalyzer):
             # Detect test arcs and catalysts
             test_arcs = self._detect_test_arcs()
             
+            # Detect inhibitor arcs
+            inhibitor_arcs = self._detect_inhibitor_arcs()
+            
             # Build catalyst usage map
             catalyst_map = self._build_catalyst_map(test_arcs)
+            
+            # Build inhibitor usage map
+            inhibitor_map = self._build_inhibitor_map(inhibitor_arcs)
             
             # Detect shared catalysts
             shared_catalysts = self._detect_shared_catalysts(catalyst_map)
@@ -100,7 +106,7 @@ class RegulatoryStructureAnalyzer(TopologyAnalyzer):
             
             # Calculate statistics
             stats = self._calculate_statistics(
-                test_arcs, catalyst_map, shared_catalysts, patterns
+                test_arcs, catalyst_map, shared_catalysts, patterns, inhibitor_arcs, inhibitor_map
             )
             
             # Generate interpretation
@@ -109,8 +115,10 @@ class RegulatoryStructureAnalyzer(TopologyAnalyzer):
             # Build result data
             data = {
                 'test_arcs': test_arcs,
+                'inhibitor_arcs': inhibitor_arcs,
                 'catalysts': list(catalyst_map.keys()),
                 'catalyst_map': catalyst_map,
+                'inhibitor_map': inhibitor_map,
                 'shared_catalysts': shared_catalysts,
                 'patterns': patterns,
                 'validation': validation,
@@ -198,6 +206,43 @@ class RegulatoryStructureAnalyzer(TopologyAnalyzer):
         
         return test_arcs
     
+    def _detect_inhibitor_arcs(self) -> List[Dict[str, Any]]:
+        """Detect all inhibitor arcs in the model.
+        
+        Returns:
+            List of inhibitor arc details with source, target, weight
+        """
+        inhibitor_arcs = []
+        
+        # Get arcs collection (dict or list)
+        arcs_collection = self.model.arcs
+        if isinstance(arcs_collection, dict):
+            arcs = arcs_collection.values()
+        else:
+            arcs = arcs_collection
+        
+        for arc in arcs:
+            # Check if arc is an inhibitor arc
+            arc_type = getattr(arc, 'arc_type', 'normal')
+            if arc_type == 'inhibitor':
+                # Get source and target
+                source = arc.source
+                target = arc.target
+                
+                arc_info = {
+                    'arc_id': arc.id if hasattr(arc, 'id') else None,
+                    'source_id': source.id if hasattr(source, 'id') else None,
+                    'source_name': source.name if hasattr(source, 'name') else 'Unknown',
+                    'target_id': target.id if hasattr(target, 'id') else None,
+                    'target_name': target.name if hasattr(target, 'name') else 'Unknown',
+                    'weight': arc.weight if hasattr(arc, 'weight') else 1,
+                    'arc_obj': arc
+                }
+                
+                inhibitor_arcs.append(arc_info)
+        
+        return inhibitor_arcs
+    
     def _build_catalyst_map(self, test_arcs: List[Dict[str, Any]]) -> Dict[int, List[Dict[str, Any]]]:
         """Build map of catalyst places to transitions they catalyze.
         
@@ -220,6 +265,29 @@ class RegulatoryStructureAnalyzer(TopologyAnalyzer):
             })
         
         return dict(catalyst_map)
+    
+    def _build_inhibitor_map(self, inhibitor_arcs: List[Dict[str, Any]]) -> Dict[int, List[Dict[str, Any]]]:
+        """Build map of inhibitor places to transitions they inhibit.
+        
+        Args:
+            inhibitor_arcs: List of inhibitor arc details
+            
+        Returns:
+            Dict mapping inhibitor_place_id -> list of inhibited transitions
+        """
+        inhibitor_map = defaultdict(list)
+        
+        for arc_info in inhibitor_arcs:
+            inhibitor_id = arc_info['source_id']
+            transition_id = arc_info['target_id']
+            
+            inhibitor_map[inhibitor_id].append({
+                'transition_id': transition_id,
+                'transition_name': arc_info['target_name'],
+                'weight': arc_info['weight']
+            })
+        
+        return dict(inhibitor_map)
     
     def _detect_shared_catalysts(self, catalyst_map: Dict[int, List[Dict[str, Any]]]) -> List[Dict[str, Any]]:
         """Detect catalysts that are shared by multiple transitions.
@@ -374,7 +442,9 @@ class RegulatoryStructureAnalyzer(TopologyAnalyzer):
         test_arcs: List[Dict[str, Any]],
         catalyst_map: Dict[int, List[Dict[str, Any]]],
         shared_catalysts: List[Dict[str, Any]],
-        patterns: List[Dict[str, Any]]
+        patterns: List[Dict[str, Any]],
+        inhibitor_arcs: List[Dict[str, Any]],
+        inhibitor_map: Dict[int, List[Dict[str, Any]]]
     ) -> Dict[str, Any]:
         """Calculate summary statistics.
         
@@ -383,6 +453,8 @@ class RegulatoryStructureAnalyzer(TopologyAnalyzer):
             catalyst_map: Map of catalysts
             shared_catalysts: List of shared catalysts
             patterns: List of regulatory patterns
+            inhibitor_arcs: List of inhibitor arcs
+            inhibitor_map: Map of inhibitors
             
         Returns:
             Dictionary of statistics
@@ -396,12 +468,21 @@ class RegulatoryStructureAnalyzer(TopologyAnalyzer):
             for t in transitions:
                 catalyzed_transitions.add(t['transition_id'])
         
+        inhibited_transitions = set()
+        for transitions in inhibitor_map.values():
+            for t in transitions:
+                inhibited_transitions.add(t['transition_id'])
+        
         return {
             'total_test_arcs': len(test_arcs),
+            'total_inhibitor_arcs': len(inhibitor_arcs),
             'total_catalysts': len(catalyst_map),
+            'total_inhibitors': len(inhibitor_map),
             'total_transitions': total_transitions,
             'catalyzed_transitions': len(catalyzed_transitions),
+            'inhibited_transitions': len(inhibited_transitions),
             'catalyzed_pct': (len(catalyzed_transitions) / total_transitions * 100) if total_transitions > 0 else 0,
+            'inhibited_pct': (len(inhibited_transitions) / total_transitions * 100) if total_transitions > 0 else 0,
             'shared_catalysts': len(shared_catalysts),
             'single_use_catalysts': len(catalyst_map) - len(shared_catalysts),
             'patterns_detected': len(patterns)
@@ -498,12 +579,26 @@ class RegulatoryStructureAnalyzer(TopologyAnalyzer):
         Returns:
             Summary string
         """
-        if stats['total_catalysts'] == 0:
-            return "No test arcs found (no explicit catalysts)"
+        parts = []
         
-        return (f"Found {stats['total_catalysts']} catalyst(s), "
-                f"{stats['catalyzed_transitions']} catalyzed transitions, "
-                f"{stats['shared_catalysts']} shared")
+        if stats['total_catalysts'] > 0:
+            parts.append(f"{stats['total_catalysts']} catalyst(s)")
+        
+        if stats['total_inhibitors'] > 0:
+            parts.append(f"{stats['total_inhibitors']} inhibitor(s)")
+        
+        if not parts:
+            return "No regulatory arcs found (no catalysts or inhibitors)"
+        
+        summary = f"Found {', '.join(parts)}"
+        
+        if stats['catalyzed_transitions'] > 0:
+            summary += f", {stats['catalyzed_transitions']} catalyzed"
+        
+        if stats['inhibited_transitions'] > 0:
+            summary += f", {stats['inhibited_transitions']} inhibited"
+        
+        return summary
     
     def _get_place_by_id(self, place_id: int) -> Optional[Any]:
         """Get place object by ID.

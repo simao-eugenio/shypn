@@ -168,7 +168,7 @@ class DynamicAnalysesCategory(BaseReportCategory):
         self.reaction_selected_status = Gtk.Label()
         self.reaction_selected_status.set_xalign(0)
         self.reaction_selected_status.set_line_wrap(True)
-        self.reaction_selected_status.set_markup("<i>No reaction selected. Select a reaction from Analyses panel to see locality simulation data.</i>")
+        self.reaction_selected_status.set_markup("<i>No reactions selected. Select one or more reactions from Analyses panel to see locality simulation data.</i>")
         sim_box.pack_start(self.reaction_selected_status, False, False, 0)
         
         self.simulation_expander.add(sim_box)
@@ -807,7 +807,7 @@ class DynamicAnalysesCategory(BaseReportCategory):
             # Clear table and show "awaiting selection" message
             self.reaction_selected_store.clear()
             self.reaction_selected_status.set_markup(
-                "<i>No reaction selected. Select a reaction from Analyses panel to see locality simulation data.</i>"
+                "<i>No reactions selected. Select one or more reactions from Analyses panel to see locality simulation data.</i>"
             )
             self.reaction_selected_status.show()
             return
@@ -840,7 +840,7 @@ class DynamicAnalysesCategory(BaseReportCategory):
         if not transition_panel:
             # DON'T clear the table! Just show message
             self.reaction_selected_status.set_markup(
-                "<i>No reaction selected. Select a reaction from Analyses panel to see locality simulation data.</i>"
+                "<i>No reactions selected. Select one or more reactions from Analyses panel to see locality simulation data.</i>"
             )
             self.reaction_selected_status.show()
             return
@@ -849,26 +849,41 @@ class DynamicAnalysesCategory(BaseReportCategory):
         if not hasattr(transition_panel, 'selected_objects') or not transition_panel.selected_objects:
             # DON'T clear the table! Just show message
             self.reaction_selected_status.set_markup(
-                "<i>No reaction selected. Select a reaction from Analyses panel to see locality simulation data.</i>"
+                "<i>No reactions selected. Select one or more reactions from Analyses panel to see locality simulation data.</i>"
             )
             self.reaction_selected_status.show()
             return
         
-        # Use the first selected transition
-        transition = list(transition_panel.selected_objects)[0]
+        # Use ALL selected transitions (multi-selection support)
+        selected_transitions = list(transition_panel.selected_objects)
         
-        # Detect locality for this transition
+        # Detect locality for each transition
         from shypn.diagnostic import LocalityDetector
-        locality = None
+        detector = None
         if hasattr(transition_panel, '_model_manager') and transition_panel._model_manager:
             detector = LocalityDetector(transition_panel._model_manager)
-            locality = detector.get_locality_for_transition(transition)
         
-        if not locality or not locality.is_valid:
-            # DON'T clear the table! Just show message
-            # This preserves data when switching tabs or when new tab has no locality
+        if not detector:
             self.reaction_selected_status.set_markup(
-                f"<i>Transition <b>{transition.id}</b> does not have a valid locality (need input → transition → output).</i>"
+                "<i>Cannot detect localities: no model manager available.</i>"
+            )
+            self.reaction_selected_status.show()
+            return
+        
+        # Build list of (transition, locality) pairs for valid localities
+        valid_selections = []
+        invalid_count = 0
+        for transition in selected_transitions:
+            locality = detector.get_locality_for_transition(transition)
+            if locality and locality.is_valid:
+                valid_selections.append((transition, locality))
+            else:
+                invalid_count += 1
+        
+        if not valid_selections:
+            # All selected transitions lack valid locality
+            self.reaction_selected_status.set_markup(
+                f"<i>None of the {len(selected_transitions)} selected transition(s) have valid localities (need input → transition → output).</i>"
             )
             self.reaction_selected_status.show()
             return
@@ -901,7 +916,7 @@ class DynamicAnalysesCategory(BaseReportCategory):
         if not report_data or not report_data.has_simulation_data():
             self.reaction_selected_store.clear()
             self.reaction_selected_status.set_markup(
-                f"<i>No simulation data for reaction <b>{transition.id}</b>. Run a simulation first.</i>"
+                f"<i>No simulation data for selected reaction(s). Run a simulation first.</i>"
             )
             self.reaction_selected_status.show()
             return
@@ -914,7 +929,7 @@ class DynamicAnalysesCategory(BaseReportCategory):
         transition_data = sim_data['transition_data']
         
         
-        # Clear and populate table with SUMMARY statistics
+        # Clear and populate table with SUMMARY statistics for ALL selected reactions
         self.reaction_selected_store.clear()
         
         # Helper function to calculate statistics
@@ -924,86 +939,125 @@ class DynamicAnalysesCategory(BaseReportCategory):
                 return 0, 0, 0
             return min(data_series), max(data_series), sum(data_series) / len(data_series)
         
-        # Add TRANSITION row
-        trans_id = transition.id
-        trans_name = getattr(transition, 'name', trans_id) or trans_id
-        if trans_id in transition_data and transition_data[trans_id]:
-            firings_series = transition_data[trans_id]
-            total_firings = sum(firings_series)
-            min_firings, max_firings, avg_firings = calc_stats(firings_series)
-            duration = time_points[-1] - time_points[0] if len(time_points) > 1 else 1
-            avg_rate = total_firings / duration if duration > 0 else 0
+        # Track totals for summary
+        total_transitions = 0
+        total_input_places = 0
+        total_output_places = 0
+        
+        # Process each valid transition/locality pair
+        for idx, (transition, locality) in enumerate(valid_selections):
+            # Add separator row between reactions (except before first)
+            if idx > 0:
+                self.reaction_selected_store.append([
+                    "─" * 15,  # Separator visual
+                    "─" * 10,
+                    "─" * 15,
+                    "─" * 10,
+                    "─" * 10,
+                    "─" * 10,
+                    "─" * 10,
+                    "─" * 10,
+                    "─" * 15
+                ])
             
-            self.reaction_selected_store.append([
-                "Transition",
-                trans_id,
-                trans_name,
-                "-",  # Initial (N/A for transitions)
-                "-",  # Final (N/A for transitions)
-                f"{min_firings:.0f}",
-                f"{max_firings:.0f}",
-                f"{avg_firings:.2f}",
-                f"{total_firings:.0f} firings ({avg_rate:.2f}/s)"
-            ])
-        
-        # Add INPUT PLACE rows
-        for place in locality.input_places:
-            place_id = place.id
-            place_name = getattr(place, 'name', place_id) or place_id
-            if place_id in place_data and place_data[place_id]:
-                tokens_series = place_data[place_id]
-                initial = tokens_series[0] if tokens_series else 0
-                final = tokens_series[-1] if tokens_series else 0
-                min_tokens, max_tokens, avg_tokens = calc_stats(tokens_series)
-                consumed = initial - final
+            # Add TRANSITION row
+            trans_id = transition.id
+            trans_name = getattr(transition, 'name', trans_id) or trans_id
+            if trans_id in transition_data and transition_data[trans_id]:
+                firings_series = transition_data[trans_id]
+                total_firings = sum(firings_series)
+                min_firings, max_firings, avg_firings = calc_stats(firings_series)
                 duration = time_points[-1] - time_points[0] if len(time_points) > 1 else 1
-                consumption_rate = consumed / duration if duration > 0 else 0
+                avg_rate = total_firings / duration if duration > 0 else 0
                 
                 self.reaction_selected_store.append([
-                    "Input Place",
-                    place_id,
-                    place_name,
-                    f"{initial:.2f}",
-                    f"{final:.2f}",
-                    f"{min_tokens:.2f}",
-                    f"{max_tokens:.2f}",
-                    f"{avg_tokens:.2f}",
-                    f"Consumed: {consumed:.2f} ({consumption_rate:.2f}/s)"
+                    "Transition",
+                    trans_id,
+                    trans_name,
+                    "-",  # Initial (N/A for transitions)
+                    "-",  # Final (N/A for transitions)
+                    f"{min_firings:.0f}",
+                    f"{max_firings:.0f}",
+                    f"{avg_firings:.2f}",
+                    f"{total_firings:.0f} firings ({avg_rate:.2f}/s)"
                 ])
+                total_transitions += 1
+            
+            # Add INPUT PLACE rows
+            for place in locality.input_places:
+                place_id = place.id
+                place_name = getattr(place, 'name', place_id) or place_id
+                if place_id in place_data and place_data[place_id]:
+                    tokens_series = place_data[place_id]
+                    initial = tokens_series[0] if tokens_series else 0
+                    final = tokens_series[-1] if tokens_series else 0
+                    min_tokens, max_tokens, avg_tokens = calc_stats(tokens_series)
+                    consumed = initial - final
+                    duration = time_points[-1] - time_points[0] if len(time_points) > 1 else 1
+                    consumption_rate = consumed / duration if duration > 0 else 0
+                    
+                    self.reaction_selected_store.append([
+                        "Input Place",
+                        place_id,
+                        place_name,
+                        f"{initial:.2f}",
+                        f"{final:.2f}",
+                        f"{min_tokens:.2f}",
+                        f"{max_tokens:.2f}",
+                        f"{avg_tokens:.2f}",
+                        f"Consumed: {consumed:.2f} ({consumption_rate:.2f}/s)"
+                    ])
+                    total_input_places += 1
+            
+            # Add OUTPUT PLACE rows
+            for place in locality.output_places:
+                place_id = place.id
+                place_name = getattr(place, 'name', place_id) or place_id
+                if place_id in place_data and place_data[place_id]:
+                    tokens_series = place_data[place_id]
+                    initial = tokens_series[0] if tokens_series else 0
+                    final = tokens_series[-1] if tokens_series else 0
+                    min_tokens, max_tokens, avg_tokens = calc_stats(tokens_series)
+                    produced = final - initial
+                    duration = time_points[-1] - time_points[0] if len(time_points) > 1 else 1
+                    production_rate = produced / duration if duration > 0 else 0
+                    
+                    self.reaction_selected_store.append([
+                        "Output Place",
+                        place_id,
+                        place_name,
+                        f"{initial:.2f}",
+                        f"{final:.2f}",
+                        f"{min_tokens:.2f}",
+                        f"{max_tokens:.2f}",
+                        f"{avg_tokens:.2f}",
+                        f"Produced: {produced:.2f} ({production_rate:.2f}/s)"
+                    ])
+                    total_output_places += 1
         
-        # Add OUTPUT PLACE rows
-        for place in locality.output_places:
-            place_id = place.id
-            place_name = getattr(place, 'name', place_id) or place_id
-            if place_id in place_data and place_data[place_id]:
-                tokens_series = place_data[place_id]
-                initial = tokens_series[0] if tokens_series else 0
-                final = tokens_series[-1] if tokens_series else 0
-                min_tokens, max_tokens, avg_tokens = calc_stats(tokens_series)
-                produced = final - initial
-                duration = time_points[-1] - time_points[0] if len(time_points) > 1 else 1
-                production_rate = produced / duration if duration > 0 else 0
-                
-                self.reaction_selected_store.append([
-                    "Output Place",
-                    place_id,
-                    place_name,
-                    f"{initial:.2f}",
-                    f"{final:.2f}",
-                    f"{min_tokens:.2f}",
-                    f"{max_tokens:.2f}",
-                    f"{avg_tokens:.2f}",
-                    f"Produced: {produced:.2f} ({production_rate:.2f}/s)"
-                ])
+        # Update status based on number of reactions
+        num_selected = len(valid_selections)
+        if num_selected == 1:
+            # Single reaction: show specific details
+            transition, locality = valid_selections[0]
+            num_inputs = len(locality.input_places)
+            num_outputs = len(locality.output_places)
+            status_text = (
+                f"<i>Summary for <b>{transition.id}</b>: "
+                f"1 transition, {num_inputs} input place(s), {num_outputs} output place(s)</i>"
+            )
+        else:
+            # Multiple reactions: show aggregate summary
+            status_text = (
+                f"<i>Summary for <b>{num_selected} reactions</b>: "
+                f"{total_transitions} transition(s), {total_input_places} input place(s), {total_output_places} output place(s)</i>"
+            )
         
-        # Update status
-        num_inputs = len(locality.input_places)
-        num_outputs = len(locality.output_places)
-        total_rows = len(self.reaction_selected_store)
+        # Add note if some selections were invalid
+        if invalid_count > 0:
+            status_text = status_text.replace("</i>", f" ({invalid_count} invalid)</i>")
         
-        self.reaction_selected_status.set_markup(
-            f"<i>Summary for <b>{transition.id}</b>: "
-            f"1 transition, {num_inputs} input place(s), {num_outputs} output place(s)</i>"
-        )
+        self.reaction_selected_status.set_markup(status_text)
         self.reaction_selected_status.show()
+
         

@@ -692,8 +692,8 @@ class KEGGCategory(BasePathwayCategory):
                     canvas_manager.fit_to_page(
                         padding_percent=15,
                         deferred=True,
-                        horizontal_offset_percent=30,
-                        vertical_offset_percent=10
+                        horizontal_offset_percent=30,  # Shift content RIGHT for left panels
+                        vertical_offset_percent=-10    # Shift content UP for bottom panels
                     )
                     
                     # Force redraw to display loaded objects

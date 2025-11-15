@@ -1531,6 +1531,48 @@ class BaseTopologyCategory:
         self._run_analyzer(analyzer_name, drawing_area)
         return False  # Don't repeat
     
+    def _check_model_complexity(self):
+        """Check if model complexity is viable for behavioral analysis.
+        
+        Estimates state space size to determine if reachability-based analyses
+        (Reachability, Liveness, Deadlocks) are safe to run without freezing.
+        
+        Returns:
+            tuple: (is_viable, estimated_states, n_places, reason)
+                - is_viable: True if model is safe to analyze
+                - estimated_states: Estimated number of states
+                - n_places: Number of places in model
+                - reason: String explaining why not viable (or None if viable)
+        """
+        if not self.model_canvas or not hasattr(self.model_canvas, 'model'):
+            return (False, 0, 0, "No model loaded")
+        
+        model = self.model_canvas.model
+        if not model or not hasattr(model, 'places'):
+            return (False, 0, 0, "No model loaded")
+        
+        n_places = len(model.places)
+        n_transitions = len(model.transitions)
+        
+        # Empty model is always viable
+        if n_places == 0:
+            return (True, 0, 0, None)
+        
+        # Estimate state space size (same heuristic as ReachabilityAnalyzer)
+        avg_tokens_per_place = sum(p.tokens for p in model.places) / n_places
+        estimated_states = int((avg_tokens_per_place + 1) ** n_places)
+        
+        # Check against thresholds
+        if estimated_states > 100000:
+            reason = f"Estimated {estimated_states:,} states (>100k limit)"
+            return (False, estimated_states, n_places, reason)
+        
+        if n_places > 30:
+            reason = f"{n_places} places (>30 place limit)"
+            return (False, estimated_states, n_places, reason)
+        
+        return (True, estimated_states, n_places, None)
+    
     def refresh(self):
         """Refresh the category content.
         
@@ -1539,6 +1581,10 @@ class BaseTopologyCategory:
         """
         # Update summary for current model
         self._update_summary()
+        
+        # Update button state based on model complexity (behavioral category only)
+        if self.use_grouped_table and self.run_all_button:
+            self._update_button_complexity_state()
     
     def set_model_canvas(self, model_canvas):
         """Set model canvas and refresh.
@@ -1548,6 +1594,47 @@ class BaseTopologyCategory:
         """
         self.model_canvas = model_canvas
         self.refresh()
+    
+    def _update_button_complexity_state(self):
+        """Update Run All button state based on model complexity.
+        
+        For behavioral category, disables button if model is too complex.
+        Other categories can override this method if needed.
+        """
+        # Only apply complexity check to behavioral category
+        if self.title != "BEHAVIORAL ANALYSIS":
+            return
+        
+        is_viable, estimated_states, n_places, reason = self._check_model_complexity()
+        
+        if is_viable:
+            self.run_all_button.set_sensitive(True)
+            self.run_all_button.set_tooltip_text(
+                "Run all safe analyzers in priority order:\n"
+                "• Priority 1 (Fastest): O(n) algorithms run first\n"
+                "• Priority 2 (Fast): O(n²) algorithms run second\n"
+                "• Priority 3-4: Slower algorithms skipped (run manually)\n\n"
+                "Fast algorithms display results immediately while slower ones complete."
+            )
+            # Update status if showing complexity warning
+            if "too complex" in self.grouped_status_label.get_text().lower():
+                self.grouped_status_label.set_markup("<i>No analyses run yet</i>")
+        else:
+            self.run_all_button.set_sensitive(False)
+            self.run_all_button.set_tooltip_text(
+                f"⛔ Model too complex for automated analysis\n\n"
+                f"Reason: {reason}\n\n"
+                f"The model's state space is too large for reachability-based\n"
+                f"analyses (Reachability, Liveness, Deadlocks) which could\n"
+                f"freeze the system (30-60+ seconds or more).\n\n"
+                f"Options:\n"
+                f"• Analyze a smaller subnetwork\n"
+                f"• Reduce initial token counts\n"
+                f"• Run lightweight analyses manually (Boundedness, Fairness)"
+            )
+            self.grouped_status_label.set_markup(
+                f"<i>⛔ Model too complex: {reason}</i>"
+            )
     
     def get_widget(self):
         """Get the category frame widget.

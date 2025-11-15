@@ -174,16 +174,19 @@ class BiologicalCategory(BaseTopologyCategory):
             #     ))
         
         elif analyzer_name == 'regulatory_structure':
-            # Result format: {'test_arcs': [...], 'catalyst_map': {...}, 'shared_catalysts': [...]}
+            # Result format: {'test_arcs': [...], 'inhibitor_arcs': [...], 'catalyst_map': {...}, 'inhibitor_map': {...}}
             test_arcs = result.get('test_arcs', [])
+            inhibitor_arcs = result.get('inhibitor_arcs', [])
             catalyst_map = result.get('catalyst_map', {})
+            inhibitor_map = result.get('inhibitor_map', {})
             
             # Show each test arc (catalyst)
             for arc_info in test_arcs:
-                catalyst_place_id = arc_info.get('catalyst_place_id', '')
-                catalyst_place_name = arc_info.get('catalyst_place_name', str(catalyst_place_id))
-                transition_id = arc_info.get('transition_id', '')
-                transition_name = arc_info.get('transition_name', str(transition_id))
+                # Test arc structure: source (catalyst place) -> target (transition)
+                catalyst_place_id = arc_info.get('source_id', '')
+                catalyst_place_name = arc_info.get('source_name', str(catalyst_place_id))
+                transition_id = arc_info.get('target_id', '')
+                transition_name = arc_info.get('target_name', str(transition_id))
                 
                 # Get how many transitions use this catalyst
                 catalyst_usage = len(catalyst_map.get(catalyst_place_id, []))
@@ -195,6 +198,26 @@ class BiologicalCategory(BaseTopologyCategory):
                     0.0,
                     'Enzymatic',
                     f'Enzyme used by {catalyst_usage} transition(s)'
+                ))
+            
+            # Show each inhibitor arc
+            for arc_info in inhibitor_arcs:
+                # Inhibitor arc structure: source (inhibitor place) -> target (transition)
+                inhibitor_place_id = arc_info.get('source_id', '')
+                inhibitor_place_name = arc_info.get('source_name', str(inhibitor_place_id))
+                transition_id = arc_info.get('target_id', '')
+                transition_name = arc_info.get('target_name', str(transition_id))
+                
+                # Get how many transitions this inhibitor affects
+                inhibitor_usage = len(inhibitor_map.get(inhibitor_place_id, []))
+                
+                rows.append((
+                    'Inhibitor',
+                    transition_name,
+                    f'{inhibitor_place_name} (inhibitor arc)',
+                    0.0,
+                    'Negative Feedback',
+                    f'Inhibits {inhibitor_usage} transition(s)'
                 ))
         
         return rows
