@@ -1585,17 +1585,22 @@ class ModelCanvasManager:
         This is typically called after loading/importing models to ensure
         all content is immediately visible to the user.
         
+        Coordinate System: Graphical (screen) coordinates
+        - Origin at top-left
+        - X increases rightward
+        - Y increases downward
+        
         Args:
             padding_percent: Percentage of viewport to leave as margin (10% default).
                            Use 15% for larger imported models (SBML/KEGG).
             deferred: If True, defer execution until next draw (when viewport size is known).
             horizontal_offset_percent: Percentage of viewport width to offset center horizontally.
-                                     Positive values shift RIGHT (+X direction in Cartesian).
-                                     Typical: 20-30% when right panel visible, 0% when closed.
+                                     Positive values shift content RIGHT (+X direction).
+                                     Typical: 20-30% when left panels visible, 0% when closed.
             vertical_offset_percent: Percentage of viewport height to offset center vertically.
-                                   Positive values shift UP (increase Y in Cartesian).
-                                   Negative values shift DOWN (decrease Y in Cartesian).
-                                   Typical: +30% to shift content up when bottom panels are open.
+                                   Positive values shift content DOWN (+Y direction).
+                                   Negative values shift content UP (-Y direction).
+                                   Typical: -10% to shift content up when bottom panels open.
         
         Returns:
             bool: True if content was fitted, False if no content exists or deferred.
@@ -1621,14 +1626,15 @@ class ModelCanvasManager:
         min_x, min_y, max_x, max_y = bounds
         
         # Add ~40px padding to account for object sizes (places/transitions are ~20-30px radius)
-        content_width = max_x - min_x + 40
-        content_height = max_y - min_y + 40
+        # This ensures object boundaries aren't clipped at edges
+        content_width = max_x - min_x + 80
+        content_height = max_y - min_y + 80
         
         # Handle edge case: single object or very small cluster
-        if content_width < 40:
-            content_width = 40
-        if content_height < 40:
-            content_height = 40
+        if content_width < 80:
+            content_width = 80
+        if content_height < 80:
+            content_height = 80
         
         
         # Calculate available viewport space (with padding margin)
@@ -1650,31 +1656,35 @@ class ModelCanvasManager:
         self.zoom = target_zoom
         self.viewport_controller.zoom = target_zoom
         
-        # Center on content
-        center_x = (min_x + max_x) / 2.0
-        center_y = (min_y + max_y) / 2.0
+        # Calculate content center point in world coordinates
+        # This is the geometric center of the bounding box
+        content_center_x = (min_x + max_x) / 2.0
+        content_center_y = (min_y + max_y) / 2.0
         
-        # Calculate horizontal offset in world coordinates (for right panel accommodation)
-        # IMPORTANT: Offset is calculated as percentage of viewport BEFORE dividing by zoom
-        # This ensures offset remains constant in screen space regardless of zoom level
-        # In Cartesian world space: positive offset shifts content to the RIGHT (+X direction)
-        # This is achieved by moving the viewport LEFT (adding to pan_x)
-        # When right panel is open, this makes content appear more centered in visible area
-        horizontal_offset_world = (horizontal_offset_percent / 100.0) * self.viewport_controller.viewport_width / target_zoom
+        # Calculate viewport dimensions in world coordinates (after zoom)
+        viewport_width_world = self.viewport_controller.viewport_width / target_zoom
+        viewport_height_world = self.viewport_controller.viewport_height / target_zoom
         
-        # Calculate vertical offset in world coordinates
-        # IMPORTANT: Offset is calculated as percentage of viewport BEFORE dividing by zoom
-        # This ensures offset remains constant in screen space regardless of zoom level
-        # In Cartesian world space: positive offset shifts content UP (increase Y)
-        # This is achieved by moving the viewport DOWN (adding to pan_y)
-        # When bottom panels are open, use positive value to shift content up
-        vertical_offset_world = (vertical_offset_percent / 100.0) * self.viewport_controller.viewport_height / target_zoom
+        # Calculate offsets in world coordinates
+        # Transform formula: screen = (world + pan) * zoom
+        # Therefore: pan shifts world in screen space direction
+        #   +pan_x shifts content RIGHT on screen
+        #   +pan_y shifts content DOWN on screen
+        horizontal_offset_world = (horizontal_offset_percent / 100.0) * viewport_width_world
+        vertical_offset_world = (vertical_offset_percent / 100.0) * viewport_height_world
         
-        # Set pan directly without clamping (we want to show content anywhere)
-        # ADD horizontal_offset to pan_x: shifts viewport LEFT, content appears RIGHT (positive X)
-        # ADD vertical_offset to pan_y: shifts viewport DOWN, content appears UP (increase Y in Cartesian)
-        self.viewport_controller.pan_x = center_x - (self.viewport_controller.viewport_width / 2) / target_zoom + horizontal_offset_world
-        self.viewport_controller.pan_y = center_y - (self.viewport_controller.viewport_height / 2) / target_zoom + vertical_offset_world
+        # Calculate pan to center content in viewport
+        # Base pan positions viewport top-left corner to show content centered
+        # Formula: pan = content_center - viewport_half_size
+        # This makes: screen_center = (content_center - viewport_half + viewport_half) * zoom = content_center * zoom ✓
+        base_pan_x = content_center_x - (viewport_width_world / 2.0)
+        base_pan_y = content_center_y - (viewport_height_world / 2.0)
+        
+        # Apply offsets to shift content position on screen
+        # Positive horizontal_offset shifts content RIGHT (increase pan_x)
+        # Positive vertical_offset shifts content DOWN (increase pan_y)
+        self.viewport_controller.pan_x = base_pan_x + horizontal_offset_world
+        self.viewport_controller.pan_y = base_pan_y + vertical_offset_world
         
         # Update local references
         self.pan_x = self.viewport_controller.pan_x

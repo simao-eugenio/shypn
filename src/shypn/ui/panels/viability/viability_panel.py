@@ -2426,6 +2426,14 @@ class ViabilityPanel(Gtk.Box):
             for transition in canvas_manager.transitions:
                 if transition.id == transition_id:
                     rate = getattr(transition, 'rate', 1.0)
+                    # Handle case where rate might be a string expression
+                    if isinstance(rate, str):
+                        rate = 0.0
+                    else:
+                        try:
+                            rate = float(rate)
+                        except (ValueError, TypeError):
+                            rate = 1.0
                     formula = getattr(transition, 'formula', getattr(transition, 'rate_formula', ''))
                     trans_type = getattr(transition, 'transition_type', 'continuous')
                     label = getattr(transition, 'label', '')

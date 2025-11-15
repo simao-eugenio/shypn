@@ -1382,6 +1382,15 @@ class ModelsCategory(BaseReportCategory):
         
         # Extract rate and parameters
         rate = getattr(transition, 'rate', 0.0)
+        # Handle case where rate might be a string expression (rate_function)
+        if isinstance(rate, str):
+            # For continuous transitions with rate_function, show as N/A
+            rate = 0.0
+        else:
+            try:
+                rate = float(rate)
+            except (ValueError, TypeError):
+                rate = 0.0
         units = getattr(transition, 'rate_units', '1/s')
         
         # Build parameters string

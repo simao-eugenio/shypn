@@ -1877,9 +1877,9 @@ class FileExplorerPanel:
             # This preserves user's saved view position and zoom level
             if not has_view_state:
                 # Use deferred=True to wait for viewport dimensions on first draw
-                # Use 30% horizontal offset to shift right (accounting for right panel)
-                # Use +10% vertical offset to shift UP in Cartesian space (increase Y)
-                manager.fit_to_page(padding_percent=15, deferred=True, horizontal_offset_percent=30, vertical_offset_percent=10)
+                # Use 30% horizontal offset to shift content RIGHT for left panels
+                # Use -10% vertical offset to shift content UP for bottom panels
+                manager.fit_to_page(padding_percent=15, deferred=True, horizontal_offset_percent=30, vertical_offset_percent=-10)
             
             # PHASE 1: Set per-document file state
             # Initialize manager's filepath and mark as clean (just loaded)
