@@ -791,15 +791,21 @@ class SimulationController:
                         
                         window_crossing_fired += 1
         
+        # Phase 3: Continuous transitions with conflict resolution
+        # Group continuous transitions by locality conflicts and apply firing policies
         continuous_transitions = [t for t in self.model.transitions if t.transition_type == 'continuous']
-        continuous_to_integrate = []
+        continuous_enabled = []
         for transition in continuous_transitions:
             behavior = self._get_behavior(transition)
             can_flow, reason = behavior.can_fire()
             if can_flow:
                 input_arcs = behavior.get_input_arcs()
                 output_arcs = behavior.get_output_arcs()
-                continuous_to_integrate.append((transition, behavior, input_arcs, output_arcs))
+                continuous_enabled.append((transition, behavior, input_arcs, output_arcs))
+        
+        # Apply conflict resolution for continuous transitions
+        # Check if any continuous transitions share input places (conflict)
+        continuous_to_integrate = self._resolve_continuous_conflicts(continuous_enabled)
         
         continuous_active = 0
         for transition, behavior, input_arcs, output_arcs in continuous_to_integrate:
@@ -1779,6 +1785,99 @@ class SimulationController:
             pass
             # Unknown policy - default to random
             return random.choice(enabled_transitions)
+
+    def _resolve_continuous_conflicts(self, continuous_enabled: List) -> List:
+        """Apply conflict resolution for continuous transitions.
+        
+        Continuous transitions that share input places are in conflict.
+        Unlike discrete transitions, multiple continuous transitions can fire
+        simultaneously if they don't share resources (parallel flows).
+        
+        Strategy:
+        1. Identify conflict groups (transitions sharing input places)
+        2. For each conflict group, apply firing policy to select winner(s)
+        3. Non-conflicting transitions always fire (parallel execution)
+        
+        Args:
+            continuous_enabled: List of (transition, behavior, input_arcs, output_arcs) tuples
+            
+        Returns:
+            List of (transition, behavior, input_arcs, output_arcs) tuples to integrate
+        """
+        if len(continuous_enabled) <= 1:
+            return continuous_enabled
+        
+        # Build map of input places to transitions
+        place_to_transitions = {}
+        transition_data = {}  # Store full tuple data for each transition
+        
+        for trans_tuple in continuous_enabled:
+            transition, behavior, input_arcs, output_arcs = trans_tuple
+            transition_data[transition.id] = trans_tuple
+            
+            # Get input places for this transition
+            input_places = set()
+            for arc in input_arcs:
+                if hasattr(arc, 'source_id'):
+                    input_places.add(arc.source_id)
+            
+            # Map places to transitions
+            for place_id in input_places:
+                if place_id not in place_to_transitions:
+                    place_to_transitions[place_id] = []
+                place_to_transitions[place_id].append(transition)
+        
+        # Find conflict groups (transitions sharing at least one input place)
+        conflict_groups = []
+        processed = set()
+        
+        for transition, _, _, _ in continuous_enabled:
+            if transition.id in processed:
+                continue
+                
+            # Find all transitions that share places with this one
+            conflict_group = {transition}
+            to_check = [transition]
+            
+            while to_check:
+                current = to_check.pop()
+                processed.add(current.id)
+                
+                # Get input places for current transition
+                current_tuple = transition_data[current.id]
+                _, _, input_arcs, _ = current_tuple
+                
+                for arc in input_arcs:
+                    if hasattr(arc, 'source_id'):
+                        place_id = arc.source_id
+                        if place_id in place_to_transitions:
+                            for conflicting in place_to_transitions[place_id]:
+                                if conflicting.id not in processed:
+                                    conflict_group.add(conflicting)
+                                    to_check.append(conflicting)
+                                    processed.add(conflicting.id)
+            
+            if len(conflict_group) > 1:
+                conflict_groups.append(list(conflict_group))
+        
+        # Apply conflict resolution
+        selected = []
+        conflicting_ids = set()
+        
+        for group in conflict_groups:
+            if len(group) > 1:
+                # Apply _select_transition to resolve conflict
+                winner = self._select_transition(group)
+                selected.append(transition_data[winner.id])
+                conflicting_ids.update(t.id for t in group)
+        
+        # Add non-conflicting transitions (parallel execution)
+        for trans_tuple in continuous_enabled:
+            transition = trans_tuple[0]
+            if transition.id not in conflicting_ids:
+                selected.append(trans_tuple)
+        
+        return selected
 
     def run(self, time_step: float = None, max_steps: Optional[int] = None) -> bool:
         """Start continuous simulation execution.
