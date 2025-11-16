@@ -371,8 +371,8 @@
                                 <property name="visible">True</property>
                                 <property name="can-focus">False</property>
                                 <property name="hexpand">True</property>
-                                <property name="active">5</property>
-                                <property name="tooltip-text">Conflict resolution policy when multiple transitions are enabled simultaneously. Random: uniform selection; Earliest: first enabled fires; Latest: last enabled fires; Priority: uses priority value; Race: mass action competition; Age: FIFO scheduling; Preemptive-Priority: allows interruption</property>
+                                <property name="active">4</property>
+                                <property name="tooltip-text">Conflict resolution policy when multiple transitions are enabled simultaneously. Race (default): mass action kinetics for biological realism; Random: uniform selection; Earliest: first enabled fires; Latest: last enabled fires; Priority: uses priority value; Age: FIFO scheduling; Preemptive-Priority: allows interruption</property>
                                 <items>
                                   <item translatable="yes">Random</item>
                                   <item translatable="yes">Earliest</item>
