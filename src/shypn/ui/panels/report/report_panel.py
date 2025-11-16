@@ -631,7 +631,7 @@ class ReportPanel(Gtk.Box):
         # Save dialog
         dialog = Gtk.FileChooserDialog(
             title="Export Report as HTML",
-            parent=self.get_toplevel(),
+            transient_for=self.get_toplevel(),
             action=Gtk.FileChooserAction.SAVE
         )
         dialog.add_buttons(
