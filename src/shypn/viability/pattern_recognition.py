@@ -328,7 +328,6 @@ class BiochemicalPatternDetector:
                         affected_elements=[trans_id]
                     ))
             except Exception as e:
-                print(f"[PATTERN] Error checking cofactors for {trans_id}: {e}")
                 continue
         
         return patterns
@@ -1107,38 +1106,31 @@ class PatternRecognitionEngine:
         Returns:
             Dict with 'patterns' and 'suggestions' keys
         """
-        print("[PATTERN_ENGINE] Starting multi-domain analysis...")
         
         # Detect patterns across all domains
         patterns = []
         
         # Structural patterns
-        print("[PATTERN_ENGINE] Detecting structural patterns...")
         patterns.extend(self.structural_detector.detect_dead_ends(self.kb))
         patterns.extend(self.structural_detector.detect_bottlenecks(self.kb))
         patterns.extend(self.structural_detector.detect_unused_paths(self.kb))
         patterns.extend(self.structural_detector.detect_timing_conflicts(self.kb))
         
         # Biochemical patterns
-        print("[PATTERN_ENGINE] Detecting biochemical patterns...")
         patterns.extend(self.biochemical_detector.detect_missing_cofactors(self.kb))
         
         # Kinetic patterns
-        print("[PATTERN_ENGINE] Detecting kinetic patterns...")
         patterns.extend(self.kinetic_detector.detect_rate_too_low(self.kb))
         patterns.extend(self.kinetic_detector.detect_missing_substrate_dependence(self.kb))
         patterns.extend(self.kinetic_detector.detect_pathway_imbalance(self.kb))
         
-        print(f"[PATTERN_ENGINE] Detected {len(patterns)} patterns")
         
         # Generate repair suggestions
-        print("[PATTERN_ENGINE] Generating repair suggestions...")
         all_suggestions = []
         for pattern in patterns:
             suggestions = self.repair_suggester.suggest_repairs(pattern)
             all_suggestions.extend(suggestions)
         
-        print(f"[PATTERN_ENGINE] Generated {len(all_suggestions)} repair suggestions")
         
         return {
             'patterns': patterns,

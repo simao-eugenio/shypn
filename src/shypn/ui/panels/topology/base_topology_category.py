@@ -616,13 +616,10 @@ class BaseTopologyCategory:
         Args:
             button: Button that was clicked
         """
-        print(f"[{self.__class__.__name__}] Run All clicked")
         drawing_area = self._get_current_drawing_area()
         if not drawing_area:
-            print(f"[{self.__class__.__name__}] No drawing area!")
             return
         
-        print(f"[{self.__class__.__name__}] Drawing area: {drawing_area}")
         
         # Disable button and show spinner
         self.run_all_button.set_sensitive(False)
@@ -636,13 +633,11 @@ class BaseTopologyCategory:
         
         # Get all analyzers and sort by priority (Priority 1 = fastest)
         analyzers = self._get_analyzers()
-        print(f"[{self.__class__.__name__}] Got {len(analyzers)} analyzers: {list(analyzers.keys())}")
         analyzer_list = []
         
         # Check model size for smart Priority 3 filtering
         model_size = self._get_model_size(drawing_area)
         is_small_model = model_size > 0 and model_size < 15
-        print(f"[{self.__class__.__name__}] Model size: {model_size} objects (small model: {is_small_model})")
         
         for analyzer_name in analyzers.keys():
             # Handle dangerous analyzers based on model size
@@ -655,10 +650,8 @@ class BaseTopologyCategory:
                     # Allow Priority 3 analyzers on small models (< 15 objects)
                     # Priority 4+ (siphons, traps) still require manual execution
                     if priority == 3 and is_small_model:
-                        print(f"[{self.__class__.__name__}] Including Priority 3 analyzer '{analyzer_name}' for small model")
                     else:
                         # Skip Priority 4+ or Priority 3 on large models
-                        print(f"[{self.__class__.__name__}] Skipping dangerous analyzer '{analyzer_name}' (Priority {priority})")
                         continue
             
             # Get priority from metadata (default to 5 if not found)
@@ -669,7 +662,6 @@ class BaseTopologyCategory:
         # Sort by priority (ascending: 1, 2, 3, 4...)
         analyzer_list.sort(key=lambda x: x[0])
         
-        print(f"[{self.__class__.__name__}] Sorted analyzer list ({len(analyzer_list)} to run):")
         for priority, name in analyzer_list:
             print(f"  Priority {priority}: {name}")
         
@@ -692,14 +684,11 @@ class BaseTopologyCategory:
             analyzer_name: Name of analyzer to run
             drawing_area: Current drawing area
         """
-        print(f"[{self.__class__.__name__}] Running analyzer: {analyzer_name}")
         
         if analyzer_name in self.analyzing:
-            print(f"[{self.__class__.__name__}] {analyzer_name} already analyzing, skipping")
             return False  # Already analyzing, stop GLib.timeout_add from repeating
         
         self.analyzing.add(analyzer_name)
-        print(f"[{self.__class__.__name__}] Added {analyzer_name} to analyzing set")
         
         # Record start time
         import time
@@ -819,19 +808,16 @@ class BaseTopologyCategory:
         try:
             kb = self.get_knowledge_base()
             if not kb:
-                print(f"[KB UPDATE] ⚠️ No KB available for {analyzer_name} - get_knowledge_base() returned None")
                 print(f"  - self.parent_panel: {self.parent_panel}")
                 print(f"  - self.model_canvas: {self.model_canvas}")
                 if self.model_canvas:
                     print(f"  - has get_current_knowledge_base: {hasattr(self.model_canvas, 'get_current_knowledge_base')}")
                 return False  # No KB available
             
-            print(f"[KB UPDATE] Processing {analyzer_name}...")
             
             # Handle AnalysisResult objects
             if hasattr(result, 'success'):
                 if not result.success:
-                    print(f"[KB UPDATE] ⚠️ {analyzer_name} analysis failed, skipping KB update")
                     return False  # Skip failed analyses
                 result_data = result.data if hasattr(result, 'data') else {}
             else:

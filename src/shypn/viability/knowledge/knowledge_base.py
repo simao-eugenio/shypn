@@ -661,12 +661,7 @@ class ModelKnowledgeBase:
         
         # Debug: Show what we found
         if transition_id in ['T5', 'T6', 'T35', 'T36']:  # Sample transitions
-            print(f"[KB_QUERY] get_input_arcs_for_transition({transition_id}):")
-            print(f"[KB_QUERY]   Total arcs in KB: {len(self.arcs)}")
-            print(f"[KB_QUERY]   Arcs targeting {transition_id}: {len([a for a in self.arcs.values() if a.target_id == transition_id])}")
-            print(f"[KB_QUERY]   Input arcs (place→trans): {len(input_arcs)}")
             for arc in input_arcs:
-                print(f"[KB_QUERY]     - {arc.arc_id}: {arc.source_id} → {arc.target_id}")
         
         return input_arcs
     
@@ -1058,7 +1053,6 @@ class ModelKnowledgeBase:
             filepath: Path to save file (e.g., "model.shypn.kb.json")
         """
         # TODO: Implement serialization (Phase 1)
-        print(f"[KB] Saving to {filepath} (not yet implemented)")
     
     @classmethod
     def load_from_file(cls, filepath: str) -> 'ModelKnowledgeBase':
@@ -1071,7 +1065,6 @@ class ModelKnowledgeBase:
             ModelKnowledgeBase instance
         """
         # TODO: Implement deserialization (Phase 1)
-        print(f"[KB] Loading from {filepath} (not yet implemented)")
         return cls()
 
 

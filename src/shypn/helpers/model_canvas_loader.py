@@ -380,19 +380,16 @@ class ModelCanvasLoader:
         # Always resolve the actual GtkDrawingArea via helper to avoid viewport mixups
         drawing_area = self._get_drawing_area_from_page(page)
         
-        # print(f"[WIRE]   drawing_area={drawing_area} (id={id(drawing_area) if drawing_area else 'None'})")
         
         if self.right_panel_loader and drawing_area:
             pass
             # Get simulate_tools_palette from SwissKnife registry
             if drawing_area in self.overlay_managers:
                 overlay_manager = self.overlay_managers[drawing_area]
-                # print(f"[WIRE]   Found overlay_manager")
                 
                 # SwissKnifePalette stores SimulateToolsPaletteLoader in widget_palette_instances
                 if hasattr(overlay_manager, 'swissknife_palette'):
                     swissknife = overlay_manager.swissknife_palette
-                    # print(f"[WIRE]   Found swissknife_palette")
                     
                     # NEW architecture: widget_palette_instances is in swissknife.registry
                     # OLD architecture: widget_palette_instances is directly on swissknife
@@ -400,35 +397,25 @@ class ModelCanvasLoader:
                     
                     if hasattr(swissknife, 'registry') and hasattr(swissknife.registry, 'widget_palette_instances'):
                         pass
-                        # print(f"[WIRE]   Using NEW architecture (registry.widget_palette_instances)")
                         simulate_tools_palette = swissknife.registry.widget_palette_instances.get('simulate')
                     elif hasattr(swissknife, 'widget_palette_instances'):
                         pass
-                        # print(f"[WIRE]   Using OLD architecture (widget_palette_instances)")
                         simulate_tools_palette = swissknife.widget_palette_instances.get('simulate')
                     else:
                         pass
-                        # print(f"[WIRE]   ❌ FAIL: No widget_palette_instances found in registry or swissknife")
                     
-                    # print(f"[WIRE]   simulate_tools_palette={simulate_tools_palette}")
                     if simulate_tools_palette and hasattr(simulate_tools_palette, 'data_collector'):
                         data_collector = simulate_tools_palette.data_collector
-                        # print(f"[WIRE]   ✅ SUCCESS: Wiring data_collector to right panel")
-                        # print(f"[WIRE]      data_collector={data_collector} (id={id(data_collector)})")
                         self.right_panel_loader.set_data_collector(data_collector)
                         return True
                     else:
                         pass
-                        # print(f"[WIRE]   ❌ FAIL: No simulate_tools_palette or data_collector found")
                 else:
                     pass
-                    # print(f"[WIRE]   ❌ FAIL: No swissknife_palette")
             else:
                 pass
-                # print(f"[WIRE]   ❌ FAIL: drawing_area not in overlay_managers")
         else:
             pass
-            # print(f"[WIRE]   ❌ FAIL: No right_panel_loader or drawing_area")
         return False
 
     def _on_notebook_page_changed(self, notebook, page, page_num):
@@ -440,8 +427,6 @@ class ModelCanvasLoader:
             page_num: The index of the new page.
         """
         # print(f"\n[TAB_SWITCH] ==========================================")
-        # print(f"[TAB_SWITCH] Page changed to index {page_num}")
-        # print(f"[TAB_SWITCH] ==========================================")
         
         # Update active tab styling - remove 'active' class from all tabs, add to current
         for i in range(notebook.get_n_pages()):
@@ -462,7 +447,6 @@ class ModelCanvasLoader:
                 if hasattr(drawing_area, 'get_child'):
                     drawing_area = drawing_area.get_child()
         
-        # print(f"[TAB_SWITCH] Extracted drawing_area: {drawing_area} (id={id(drawing_area) if drawing_area else 'None'})")
         
         # ============================================================
         # GLOBAL-SYNC: Switch canvas context when tab changes
@@ -517,9 +501,7 @@ class ModelCanvasLoader:
                     pass
         
         # Wire data collector for the switched-to page
-        # print(f"[TAB_SWITCH] Calling _wire_data_collector_for_page()...")
         wired = self._wire_data_collector_for_page(page)
-        # print(f"[TAB_SWITCH] Wiring result: {wired}")
         
         # ============================================================
         # CRITICAL: Clear global Analyses panel when switching tabs
@@ -1062,7 +1044,6 @@ class ModelCanvasLoader:
         if drawing_area and drawing_area in self.knowledge_bases:
             # Cleanup knowledge base
             del self.knowledge_bases[drawing_area]
-            print(f"[KNOWLEDGE_BASE] Cleaned up KB for canvas {id(drawing_area)}")
         if self.notebook.get_n_pages() == 0:
             # When the last tab is closed, recreate a fresh default canvas.
             # Reset the first-page initialization flag so the page-added hook
@@ -1443,7 +1424,6 @@ class ModelCanvasLoader:
             # Make KB accessible from canvas manager
             manager.knowledge_base = kb
         except Exception as e:
-            print(f"[KNOWLEDGE_BASE] ⚠️ Failed to create knowledge base: {e}")
 
         def on_draw_wrapper(widget, cr):
             allocation = widget.get_allocation()
@@ -1489,8 +1469,6 @@ class ModelCanvasLoader:
             # Canvas setup complete - enable callbacks now that state is properly initialized
             manager._suppress_callbacks = False
         else:
-            print(f"[SETUP_CANVAS] ❌ NO overlay_box or overlay_widget - CanvasOverlayManager NOT created!")
-            print(f"[SETUP_CANVAS] ❌ This canvas will NOT have TransitionRatePanel or right_panel_loader!")
             # CRITICAL FIX: Even without overlay_box, MUST enable callbacks
             # Otherwise canvas becomes non-interactive
             manager._suppress_callbacks = False
@@ -1631,7 +1609,6 @@ class ModelCanvasLoader:
             # not here when the manager is still empty. The reset happens in
             # _ensure_simulation_reset() which is called after load_objects().
             # This ensures the controller sees the full loaded model.
-            # print(f"[LOAD] Skipping controller reset here (will reset after objects loaded)")
             
             # ============================================================
             # CRITICAL: Reset Swiss Knife Palette to default state
@@ -1689,39 +1666,28 @@ class ModelCanvasLoader:
             if drawing_area in self.simulation_controllers:
                 controller = self.simulation_controllers[drawing_area]
                 manager = self.canvas_managers.get(drawing_area)
-                # print(f"[RESET] _ensure_simulation_reset called for canvas")
-                # print(f"[RESET] Controller ID: {id(controller)}")
                 if manager:
                     pass
-                    # print(f"[RESET] Manager has {len(manager.places)} places, {len(manager.transitions)} transitions")
                     # CRITICAL: Use reset_for_new_model() instead of reset()
                     # This recreates the model adapter and ensures the controller
                     # references the correct manager with the loaded objects
                     controller.reset_for_new_model(manager)
-                    # print(f"[RESET] Full reset complete (model adapter recreated)")
                     
                     # CRITICAL: Update SimulateToolsPaletteLoader's controller reference
                     # The palette has its own simulation controller reference that needs
                     # to be updated when we reset/recreate the controller for a loaded model
-                    # print(f"[RESET] Looking for overlay_manager...")
                     overlay_manager = self.overlay_managers.get(drawing_area)
                     if overlay_manager:
                         pass
-                        # print(f"[RESET] Found overlay_manager: {type(overlay_manager).__name__}")
                         swissknife = getattr(overlay_manager, 'swissknife_palette', None)
-                        # print(f"[RESET] swissknife_palette: {swissknife}")
                         if swissknife:
                             pass
                             # Use registry.get_widget_palette_instance() instead
                             if hasattr(swissknife, 'registry'):
                                 pass
-                                # print(f"[RESET] Has registry attribute")
                                 simulate_tools_palette = swissknife.registry.get_widget_palette_instance('simulate')
-                                # print(f"[RESET] simulate_tools_palette: {simulate_tools_palette}")
                                 if simulate_tools_palette:
                                     pass
-                                    # print(f"[RESET] ✅ Updating SimulateToolsPaletteLoader.simulation reference")
-                                    # print(f"[RESET] Old controller ID: {id(simulate_tools_palette.simulation) if simulate_tools_palette.simulation else 'None'}")
                                     
                                     # CRITICAL: Preserve step listeners from old controller
                                     # When we replace the controller reference, we need to re-register
@@ -1729,32 +1695,26 @@ class ModelCanvasLoader:
                                     old_controller = simulate_tools_palette.simulation
                                     if old_controller and hasattr(old_controller, 'step_listeners'):
                                         pass
-                                        # print(f"[RESET] Old controller had {len(old_controller.step_listeners)} step listeners")
                                     
                                     simulate_tools_palette.simulation = controller
-                                    # print(f"[RESET] New controller ID: {id(simulate_tools_palette.simulation)}")
                                     
                                     # Re-register step listeners on new controller
                                     # The palette's _on_simulation_step callback updates progress and triggers redraws
                                     if hasattr(simulate_tools_palette, '_on_simulation_step'):
                                         controller.add_step_listener(simulate_tools_palette._on_simulation_step)
-                                        # print(f"[RESET] Re-registered palette step listener")
                                     if hasattr(simulate_tools_palette, 'data_collector'):
                                         controller.add_step_listener(simulate_tools_palette.data_collector.on_simulation_step)
-                                        # print(f"[RESET] Re-registered data collector step listener")
                                     
                                     # PHASE 1-2 FIX: Do NOT overwrite controller.data_collector
                                     # The controller has its own DataCollector (for Report Panel)
                                     # The simulate_tools_palette has its own (for real-time plots)
                                     # Both should coexist
                                     # DO NOT OVERWRITE: controller.data_collector = simulate_tools_palette.data_collector
-                                    # print(f"[RESET] ✅ Preserved both data collectors (controller + palette)")
                                     
                                     # CRITICAL: Re-apply UI defaults to new controller
                                     # This ensures progress bar works globally after controller reset
                                     # (for File → Open, File → Reset, KEGG/SBML imports, parameter changes)
                                     simulate_tools_palette._apply_ui_defaults_to_settings()
-                                    # print(f"[RESET] ✅ Re-applied UI defaults (duration, units) to new controller")
                                     
                                     # PHASE 1-2 FIX: Wire controller to Report Panel for table population
                                     # The Report Panel needs the controller reference to access simulation results
@@ -1762,13 +1722,10 @@ class ModelCanvasLoader:
                                         report_panel = self.report_panel_loader.panel
                                         if report_panel and hasattr(report_panel, 'set_controller'):
                                             report_panel.set_controller(controller)
-                                            # print(f"[RESET] ✅ Wired controller to Report Panel for simulation tables")
                                         else:
                                             pass
-                                            # print(f"[RESET] ⚠️  Report panel not found or no set_controller method")
                                     else:
                                         pass
-                                        # print(f"[RESET] ⚠️  report_panel_loader not found in model_canvas_loader")
                                     
                                     # VIABILITY PANEL: Wire simulation complete callback after reset
                                     # After controller reset, re-establish the callback chain for PER-DOCUMENT panel
@@ -1787,29 +1744,20 @@ class ModelCanvasLoader:
                                                     
                                                     controller.on_simulation_complete = combined_callback
                                             except Exception as e:
-                                                print(f"[RESET] ⚠️ Failed to wire viability callback: {e}")
                                 else:
                                     pass
-                                    # print(f"[RESET] ❌ simulate_tools_palette not found in registry")
                             else:
                                 pass
-                                # print(f"[RESET] ❌ No registry attribute on swissknife")
                         else:
                             pass
-                            # print(f"[RESET] ❌ No swissknife_palette")
                     else:
                         pass
-                        # print(f"[RESET] ❌ overlay_manager not found for drawing_area")
                 else:
                     pass
                     # Fallback to basic reset if we can't get the manager
                     controller.reset()
-                    # print(f"[RESET] Basic reset complete (no manager reference)")
-                # print(f"[RESET] Simulation reset for canvas: {drawing_area}")
                 if manager:
                     pass
-                    # print(f"[RESET] Controller.model has {len(controller.model.places)} places, {len(controller.model.transitions)} transitions")
-                    # print(f"[RESET] Controller.transition_states has {len(controller.transition_states)} entries")
                     
                     # CRITICAL LIFECYCLE FIX: Verify all transitions are registered
                     # After import/load, controller.transition_states should have entries for ALL transitions
@@ -1818,7 +1766,6 @@ class ModelCanvasLoader:
                     for transition in manager.transitions:
                         if transition.id not in controller.transition_states:
                             missing_count += 1
-                            # print(f"[RESET] ⚠️ Missing transition_state for {transition.id} - forcing registration")
                             # Force create state for this transition
                             state = controller._get_or_create_state(transition)
                             # Initialize enablement state for this transition
@@ -1833,10 +1780,8 @@ class ModelCanvasLoader:
                     
                     if missing_count > 0:
                         pass
-                        # print(f"[RESET] ✅ Registered {missing_count} missing transitions")
                     else:
                         pass
-                        # print(f"[RESET] ✅ All {len(manager.transitions)} transitions properly registered")
                     
                     # CRITICAL LIFECYCLE FIX #2: Invalidate model adapter caches
                     # After load, the model adapter may have stale arc/place/transition caches
@@ -1844,10 +1789,8 @@ class ModelCanvasLoader:
                     # We must explicitly invalidate here to ensure proper simulation state
                     if hasattr(controller, 'model_adapter') and controller.model_adapter:
                         controller.model_adapter.invalidate_caches()
-                        # print(f"[RESET] ✅ Model adapter caches invalidated")
         except Exception as e:
             pass
-            # print(f"[RESET] Error resetting simulation: {e}")
             import traceback
             traceback.print_exc()
         
@@ -1962,22 +1905,15 @@ class ModelCanvasLoader:
         # ============================================================
         # When a new controller is created (File→New, interactive model, etc.),
         # automatically wire it to the Report Panel so simulation data appears
-        # print(f"[CONTROLLER_WIRE] Controller created for canvas")
-        # print(f"[CONTROLLER_WIRE] Has report_panel_loader: {hasattr(self, 'report_panel_loader')}")
         if hasattr(self, 'report_panel_loader'):
             pass
-            # print(f"[CONTROLLER_WIRE] report_panel_loader = {self.report_panel_loader}")
             if self.report_panel_loader and hasattr(self.report_panel_loader, 'panel'):
                 pass
-                # print(f"[CONTROLLER_WIRE] report_panel_loader.panel = {self.report_panel_loader.panel}")
                 
         if hasattr(self, 'report_panel_loader') and self.report_panel_loader:
             try:
-                print(f"[CONTROLLER_WIRE] ❌ Using GLOBAL report_panel_loader (WRONG for multi-document!)")
-                print(f"[CONTROLLER_WIRE] This should use per-document report_panel_loader instead")
                 self.report_panel_loader.panel.set_controller(simulation_controller)
             except Exception as e:
-                print(f"[CONTROLLER_WIRE] Failed to wire controller: {e}")
                 import traceback
                 traceback.print_exc()
         
@@ -2117,7 +2053,6 @@ class ModelCanvasLoader:
                 # when the transition panel is guaranteed to exist
             
             self.overlay_managers[drawing_area].report_panel_loader = report_panel_loader
-            # print(f"[MODEL_CANVAS_LOADER] Created per-document Report Panel for drawing_area {id(drawing_area)}")
         
         # ============================================================
         # PER-DOCUMENT VIABILITY PANEL: One instance per model/document
@@ -2141,7 +2076,6 @@ class ModelCanvasLoader:
                 viability_panel_loader._stack = self.left_dock_stack
                 viability_panel_loader._stack_panel_name = 'viability'
             else:
-                print(f"[MODEL_CANVAS] WARNING: left_dock_stack not available! hasattr={hasattr(self, 'left_dock_stack')}, value={getattr(self, 'left_dock_stack', None)}")
 
             # If host provided UI callbacks for float/attach, wire them
             if hasattr(self, 'on_viability_float') and callable(getattr(self, 'on_viability_float')):
@@ -3923,21 +3857,17 @@ class ModelCanvasLoader:
         drawing_area = self.get_current_document()
         if drawing_area is None:
             pass
-            # print("[RESET] No active canvas to reset")
             return False
         
         # PHASE 4: Use lifecycle system if available
         if self.lifecycle_manager:
             try:
                 self.lifecycle_manager.reset_canvas(drawing_area)
-                # print(f"[RESET] ✓ Canvas reset via lifecycle system")
                 # Trigger redraw
                 drawing_area.queue_draw()
                 return True
             except Exception as e:
                 pass
-                # print(f"[RESET] ⚠️  Lifecycle reset failed: {e}")
-                # print("[RESET] Falling back to legacy reset")
         
         # Legacy fallback: Manual cleanup
         try:
@@ -3957,11 +3887,9 @@ class ModelCanvasLoader:
                 
                 # Trigger redraw
                 drawing_area.queue_draw()
-                # print("[RESET] ✓ Canvas reset via legacy method")
                 return True
         except Exception as e:
             pass
-            # print(f"[RESET] ✗ Reset failed: {e}")
             return False
         
         return False
@@ -4015,7 +3943,6 @@ class ModelCanvasLoader:
                         info['next_transition_id'] = scope_data.get('transition', 0) + 1
                         info['next_arc_id'] = scope_data.get('arc', 0) + 1
             except Exception as e:
-                print(f"[INFO] Could not get lifecycle info: {e}")
         
         # Get element count from canvas manager
         manager = self.get_canvas_manager(drawing_area)
@@ -4121,12 +4048,9 @@ class ModelCanvasLoader:
             is_save: True if save operation, False if load operation
         """
         # print(f"\n[FILE_OP] ========================================")
-        # print(f"[FILE_OP] File operation: {'SAVE' if is_save else 'LOAD'}")
-        # print(f"[FILE_OP] filepath: {filepath}")
         
         if not filepath:
             pass
-            # print(f"[FILE_OP] No filepath, returning")
             return
         
         # Extract filename with .shy extension
@@ -4136,39 +4060,31 @@ class ModelCanvasLoader:
             base = os.path.splitext(filename)[0]
             filename = f"{base}.shy"
         
-        # print(f"[FILE_OP] Extracted filename: {filename}")
         
         # Get current page
         current_page_num = self.notebook.get_current_page()
         if current_page_num < 0:
             pass
-            # print(f"[FILE_OP] No current page, returning")
             return
         
         current_page = self.notebook.get_nth_page(current_page_num)
-        # print(f"[FILE_OP] Current page num: {current_page_num}")
         
         # Update tab label with new filename (no asterisk after save/load)
         self._update_tab_label(current_page, filename, is_modified=False)
-        # print(f"[FILE_OP] Tab label updated to: {filename}")
         
         # Also update the canvas manager's filename (without extension for internal use)
         drawing_area = self._get_drawing_area_from_page(current_page)
-        # print(f"[FILE_OP] drawing_area: {drawing_area} (id={id(drawing_area) if drawing_area else 'None'})")
         
         if drawing_area and drawing_area in self.canvas_managers:
             manager = self.canvas_managers[drawing_area]
             # Store filename without extension in manager
             base_filename = os.path.splitext(filename)[0]
             manager.filename = base_filename
-            # print(f"[FILE_OP] Manager filename updated to: {base_filename}")
             
             # If this was a save operation, mark as saved (clears imported flag)
             if is_save:
                 manager.mark_as_saved()
-                # print(f"[FILE_OP] Manager marked as saved")
         
-        # print(f"[FILE_OP] ========================================\n")
 
     def _on_dirty_state_changed(self, is_dirty):
         """Handle dirty state change to update tab label modification indicator.
@@ -4239,7 +4155,6 @@ class ModelCanvasLoader:
             return
         
         if not hasattr(self.right_panel_loader, 'transition_panel') or not self.right_panel_loader.transition_panel:
-            print(f"[LOCALITY_WIRE] No transition_panel in right_panel_loader yet")
             return
         
         transition_panel = self.right_panel_loader.transition_panel
@@ -4885,7 +4800,6 @@ class ModelCanvasLoader:
         
         # CRITICAL: Ensure parent_window is valid for Wayland
         if not self.parent_window:
-            print(f"[DIALOG] ERROR: parent_window is None! Cannot open dialog.")
             return
         
         # WAYLAND FIX: Ensure the canvas page widget AND drawing area are mapped before opening dialog
@@ -4938,7 +4852,6 @@ class ModelCanvasLoader:
                     self._on_object_properties(obj, manager, drawing_area)
                     return False  # Don't repeat
                 elif retry_count[0] >= MAX_RETRIES:
-                    print(f"[DIALOG] ERROR: Gave up after {MAX_RETRIES} retries")
                     print(f"  Final state: page_ready={page_ready}, drawing_ready={drawing_ready}, is_current={is_current}")
                     return False  # Give up
                 else:
@@ -5016,7 +4929,6 @@ class ModelCanvasLoader:
                             state = controller.transition_states[obj.id]
                             if state.enablement_time is None:
                                 state.enablement_time = controller.time
-                                print(f"[PROPERTIES_CHANGED] Enabled source transition {obj.id} at t={controller.time}")
                     
                     # Clear historical data so plot shows new rate function immediately
                     if hasattr(controller, 'data_collector') and controller.data_collector:
@@ -5066,7 +4978,6 @@ class ModelCanvasLoader:
                 if controller:
                     controller._update_enablement_states()
         except Exception as e:
-            print(f"[ERROR] Dialog run failed: {e}")
             import traceback
             traceback.print_exc()
         finally:

@@ -250,20 +250,16 @@ class ViabilityPanelLoader:
         if not self.is_hanged:
             return
         
-        print(f"[VIABILITY] Detaching - container visible: {self.parent_container.get_visible() if self.parent_container else 'N/A'}")
-        print(f"[VIABILITY] Detaching - stack visible: {self._stack.get_visible() if hasattr(self, '_stack') and self._stack else 'N/A'}")
         
         # Remove content from container
         if self.parent_container:
             self.parent_container.remove(self.content)
             # Hide the container after unattaching
             self.parent_container.set_visible(False)
-            print(f"[VIABILITY] Container hidden: {not self.parent_container.get_visible()}")
         
         # Hide the stack if this was the active panel
         if hasattr(self, '_stack') and self._stack:
             self._stack.set_visible(False)
-            print(f"[VIABILITY] Stack hidden: {not self._stack.get_visible()}")
         
         # Add content to independent window
         self.window.add(self.content)
@@ -277,7 +273,6 @@ class ViabilityPanelLoader:
         
         # Notify host to collapse/hide docked area (after UI changes)
         if callable(self.on_float_callback):
-            print(f"[VIABILITY] Calling float callback")
             self.on_float_callback()
         
         # Update float button state
@@ -288,7 +283,6 @@ class ViabilityPanelLoader:
         
         # Show window
         self.window.show_all()
-        print(f"[VIABILITY] Detach complete")
     
     def _on_float_toggled(self, button):
         """Internal callback when float toggle button is clicked."""

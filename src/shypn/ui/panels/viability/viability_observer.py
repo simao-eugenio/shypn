@@ -34,7 +34,6 @@ try:
     PATTERN_ENGINE_AVAILABLE = True
 except ImportError:
     PATTERN_ENGINE_AVAILABLE = False
-    print("[OBSERVER] Warning: Pattern recognition engine not available")
 
 
 @dataclass
@@ -237,16 +236,9 @@ class ViabilityObserver:
             # Extract simulation data
             sim_data = event.data.get('simulation_data', {})
             
-            print(f"[OBSERVER_DEBUG] ========== SIMULATION_COMPLETE EVENT ==========")
-            print(f"[OBSERVER_DEBUG] sim_data type: {type(sim_data)}")
-            print(f"[OBSERVER_DEBUG] sim_data keys: {list(sim_data.keys())}")
-            print(f"[OBSERVER_DEBUG] dead_transitions type: {type(sim_data.get('dead_transitions', []))}")
-            print(f"[OBSERVER_DEBUG] dead_transitions length: {len(sim_data.get('dead_transitions', []))}")
             if sim_data.get('dead_transitions'):
                 dt_list = sim_data.get('dead_transitions', [])
-                print(f"[OBSERVER_DEBUG] First 3 dead_transitions:")
                 for i, dt in enumerate(dt_list[:3]):
-                    print(f"[OBSERVER_DEBUG]   [{i}] type={type(dt)}, repr={repr(dt)}")
             
             self.knowledge['simulation_state'].update(sim_data)
             
@@ -346,7 +338,6 @@ class ViabilityObserver:
                         suggestions_by_category[rule.category].extend(issues)
             except Exception as e:
                 import traceback
-                print(f"[OBSERVER] ❌ Error evaluating rule {rule.rule_id}: {e}")
                 traceback.print_exc()
                 # Continue to next rule (never stop!)
                 continue
@@ -354,7 +345,6 @@ class ViabilityObserver:
         # Notify subscribers of updates
         for category, issues in suggestions_by_category.items():
             if issues:
-                print(f"[OBSERVER] Notifying subscribers for category '{category}'...")
                 self._notify_subscribers(category, issues)
     
     def _notify_subscribers(self, category: str, issues: List[Any]):
@@ -364,18 +354,13 @@ class ViabilityObserver:
             category: Category name
             issues: List of issues/suggestions
         """
-        print(f"[OBSERVER] _notify_subscribers for category '{category}' with {len(issues)} issues")
-        print(f"[OBSERVER] Subscribers for '{category}': {len(self.subscribers.get(category, []))}")
         
         if category in self.subscribers:
             for i, callback in enumerate(self.subscribers[category]):
                 try:
-                    print(f"[OBSERVER] Calling subscriber {i+1}/{len(self.subscribers[category])} for '{category}'...")
                     callback(issues)
-                    print(f"[OBSERVER]   ✅ Subscriber {i+1} called successfully")
                 except Exception as e:
                     import traceback
-                    print(f"[OBSERVER]   ❌ Error notifying subscriber {i+1}: {e}")
                     traceback.print_exc()
     
     def subscribe(self, category: str, callback: Callable[[List[Any]], None]):
@@ -422,7 +407,6 @@ class ViabilityObserver:
         Returns:
             List of suggestion dicts with category, title, description, action
         """
-        print(f"[OBSERVER] ========== generate_suggestions_for_locality() ==========")
         suggestions = []
         
         transition_id = locality_knowledge.get('transition_id')
@@ -430,8 +414,6 @@ class ViabilityObserver:
         kb = locality_knowledge.get('kb')
         sim_data = locality_knowledge.get('simulation_data', {})
         
-        print(f"[OBSERVER] Transition: {transition_id}")
-        print(f"[OBSERVER] Has simulation data: {sim_data.get('has_data', False)}")
         
         # STRUCTURAL SUGGESTIONS
         # Check if transition never fires
@@ -482,7 +464,6 @@ class ViabilityObserver:
                 }
                 suggestions.append(suggestion)
         
-        print(f"[OBSERVER] Generated {len(suggestions)} suggestions for locality")
         return suggestions
     
     def generate_all_suggestions(self, kb, simulation_data=None) -> Dict[str, List[Dict]]:
@@ -497,9 +478,6 @@ class ViabilityObserver:
         Returns:
             Dict mapping category names to lists of suggestions (as dicts, NOT Suggestion objects)
         """
-        print(f"[OBSERVER] ========== generate_all_suggestions() ==========")
-        print(f"[OBSERVER] KB transitions: {len(kb.transitions) if kb else 0}")
-        print(f"[OBSERVER] Has simulation data: {simulation_data is not None}")
         
         all_suggestions = {
             'structural': [],
@@ -512,13 +490,10 @@ class ViabilityObserver:
             return all_suggestions
         
         # Get inactive transitions from KB (using simulation_traces)
-        print(f"[OBSERVER] KB has {len(kb.simulation_traces)} simulation traces")
         inactive_transitions = kb.get_inactive_transitions()
-        print(f"[OBSERVER] Found {len(inactive_transitions)} inactive transitions")
         
         # STRUCTURAL SUGGESTIONS - Use smart diagnosis for dead transitions
         for trans_id in inactive_transitions:
-            print(f"[OBSERVER] Diagnosing dead transition: {trans_id}")
             diagnosis = self._diagnose_dead_transition(kb, trans_id)
             
             if diagnosis:
@@ -534,7 +509,6 @@ class ViabilityObserver:
                     'metadata': diagnosis.get('suggestions', [])
                 }
                 all_suggestions['structural'].append(suggestion)
-                print(f"[OBSERVER]   → {diagnosis['reason']}")
         
         # KINETIC SUGGESTIONS - for transitions without rates
         for trans_id, trans_obj in kb.transitions.items():
@@ -570,7 +544,6 @@ class ViabilityObserver:
         # ADVANCED PATTERN RECOGNITION ENGINE
         # ============================================================================
         if PATTERN_ENGINE_AVAILABLE:
-            print(f"[OBSERVER] Running pattern recognition engine...")
             try:
                 pattern_engine = PatternRecognitionEngine(kb)
                 analysis = pattern_engine.analyze()
@@ -578,7 +551,6 @@ class ViabilityObserver:
                 patterns = analysis.get('patterns', [])
                 pattern_suggestions = analysis.get('suggestions', [])
                 
-                print(f"[OBSERVER] Pattern engine found {len(patterns)} patterns, {len(pattern_suggestions)} suggestions")
                 
                 # Convert pattern suggestions to our format
                 for sugg in pattern_suggestions:
@@ -604,14 +576,11 @@ class ViabilityObserver:
                         'pattern_based': True  # Mark as coming from pattern engine
                     }
                     all_suggestions[category].append(suggestion)
-                    print(f"[OBSERVER]   Pattern suggestion: {sugg.action} → {sugg.description[:60]}")
                 
             except Exception as e:
-                print(f"[OBSERVER] Pattern recognition engine error: {e}")
                 import traceback
                 traceback.print_exc()
         else:
-            print(f"[OBSERVER] Pattern recognition engine not available (skipping advanced analysis)")
         
         # DIAGNOSIS - summary of all issues
         total_suggestions = sum(len(s) for s in all_suggestions.values())
@@ -628,9 +597,7 @@ class ViabilityObserver:
             }
             all_suggestions['diagnosis'].append(suggestion)
         
-        print(f"[OBSERVER] Generated {total_suggestions} total suggestions:")
         for cat, suggs in all_suggestions.items():
-            print(f"[OBSERVER]   {cat}: {len(suggs)}")
         
         return all_suggestions
     
@@ -724,7 +691,6 @@ class ViabilityObserver:
         rate_str = transition.kinetic_law if hasattr(transition, 'kinetic_law') and transition.kinetic_law else (
             f"rate={transition.current_rate}" if hasattr(transition, 'current_rate') and transition.current_rate else "NO_RATE"
         )
-        print(f"[DIAGNOSE] {trans_id}: {len(input_arcs)} input arcs, is_source={len(input_arcs) == 0}, has_rate={has_rate}, rate_info={rate_str}")
         
         # TYPE 1: Source transition (no inputs) - check if it should be a source
         if not input_arcs:
