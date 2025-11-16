@@ -143,8 +143,6 @@ class TransitionRatePanel(AnalysisPlotPanel):
         if self._model_manager:
             logger.debug(f"[COLOR] Calling mark_needs_redraw()")
             self._model_manager.mark_needs_redraw()
-        else:
-            logger.warning(f"[COLOR] No model_manager, cannot trigger redraw!")
         
         # Notify Report panel of selection change (if callback is set)
         if self.on_selection_changed_callback:
