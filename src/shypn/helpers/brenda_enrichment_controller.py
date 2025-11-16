@@ -148,7 +148,6 @@ class BRENDAEnrichmentController:
                         transition_info['ec_number'] = ec_val[0]
                     elif ec_val and ec_val != '-':
                         transition_info['ec_number'] = str(ec_val)
-                    else:
                     
                     # Check for existing kinetic data
                     has_km = 'km' in transition.metadata or 'Km' in transition.metadata
@@ -189,12 +188,10 @@ class BRENDAEnrichmentController:
                                 # Also store in transition metadata for future use
                                 if not hasattr(transition, 'metadata'):
                                     transition.metadata = {}
-                                if not transition.metadata:
-                                    transition.metadata = {}
                                 transition.metadata['ec_numbers'] = ec_numbers
                                 transition.metadata['ec_number'] = ec_numbers[0]
-                            else:
                         except Exception as e:
+                            pass
                 
                 transitions.append(transition_info)
         
@@ -220,7 +217,9 @@ class BRENDAEnrichmentController:
         success = self.brenda_api.authenticate(email, password)
         
         if success:
+            pass
         else:
+            pass
         
         return success
     
@@ -274,8 +273,6 @@ class BRENDAEnrichmentController:
                     'kcat_values': kcat_values,
                     'ki_values': ki_values,
                 }
-                
-                      f"{len(km_values)} Km, {len(kcat_values)} kcat, {len(ki_values)} Ki values")
                 
                 return result
             else:
@@ -434,6 +431,7 @@ class BRENDAEnrichmentController:
                 if not override:
                     return
                 else:
+                    pass
 
         
         # Need at least Vmax (or Kcat) and Km
@@ -540,10 +538,14 @@ class BRENDAEnrichmentController:
         verify_type = getattr(transition, 'transition_type', 'unknown')
         
         if verify_func == rate_function:
+            pass
         else:
+            pass
         
         if verify_type == 'continuous':
+            pass
         else:
+            pass
         
     
     def add_citations(self, citations: List[str]):
@@ -673,10 +675,6 @@ class BRENDAEnrichmentController:
         enrichment = self.current_enrichment
         self.current_enrichment = None
         
-              f"{enrichment.get_transition_count()} transitions, "
-              f"{enrichment.get_total_parameters()} parameters, "
-              f"{enrichment.get_citation_count()} citations")
-        
         return enrichment
     
     # ========================================================================
@@ -716,6 +714,7 @@ class BRENDAEnrichmentController:
             if data:
                 brenda_data[ec_number] = data
             else:
+                pass
         
         
         # Match and apply enrichments
@@ -766,7 +765,9 @@ class BRENDAEnrichmentController:
                     skipped_count += 1
             else:
                 if ec:
+                    pass
                 else:
+                    pass
         
         
         # Save to project

@@ -16,6 +16,7 @@ Example:
     class MyObserver(BaseObserver):
         def on_event(self, event):
             if isinstance(event, ObjectAddedEvent):
+                pass
 """
 
 from .base_event import BaseEvent

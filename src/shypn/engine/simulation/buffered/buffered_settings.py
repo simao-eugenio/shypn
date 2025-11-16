@@ -41,7 +41,9 @@ class BufferedSimulationSettings:
         
         # Commit atomically (validated, all-or-nothing)
         if buffered.commit():
+            pass
         else:
+            pass
     
     Thread Safety:
         All public methods are thread-safe. The commit operation

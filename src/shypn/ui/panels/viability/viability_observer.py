@@ -581,6 +581,7 @@ class ViabilityObserver:
                 import traceback
                 traceback.print_exc()
         else:
+            pass
         
         # DIAGNOSIS - summary of all issues
         total_suggestions = sum(len(s) for s in all_suggestions.values())

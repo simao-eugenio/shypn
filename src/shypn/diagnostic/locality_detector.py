@@ -23,6 +23,7 @@ Example:
     locality = detector.get_locality_for_transition(transition)
     
     if locality.is_valid:
+        pass
 """
 
 from typing import Dict, List, Any, Optional
@@ -206,6 +207,7 @@ class LocalityDetector:
             locality = detector.get_locality_for_transition(t1)
             
             if locality.is_valid:
+                pass
             else:
                       f"{len(locality.output_places)} outputs")
         """
