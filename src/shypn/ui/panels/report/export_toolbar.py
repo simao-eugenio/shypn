@@ -144,22 +144,15 @@ class ExportToolbar(Gtk.Box):
                     data = category.get_structured_data()
                     # Map category titles to keys
                     title = data.get('title', '')
-                    print(f"[EXPORT_TOOLBAR] Collecting data from category: {title}")
-                    print(f"[EXPORT_TOOLBAR]   has_data: {data.get('has_data', False)}")
                     if 'Model' in title or 'MODELS' in title:
                         report_data['model'] = data
-                        print(f"[EXPORT_TOOLBAR]   → Mapped to 'model'")
                     elif 'Dynamic' in title or 'DYNAMIC' in title:
                         report_data['dynamic'] = data
-                        print(f"[EXPORT_TOOLBAR]   → Mapped to 'dynamic'")
                     elif 'Topolog' in title or 'TOPOLOG' in title:
                         report_data['topology'] = data
-                        print(f"[EXPORT_TOOLBAR]   → Mapped to 'topology'")
                     elif 'Provenance' in title or 'PROVENANCE' in title:
                         report_data['provenance'] = data
-                        print(f"[EXPORT_TOOLBAR]   → Mapped to 'provenance'")
         
-        print(f"[EXPORT_TOOLBAR] Total report_data keys collected: {list(report_data.keys())}")
         return report_data
     
     def set_filepath(self, filepath: str):

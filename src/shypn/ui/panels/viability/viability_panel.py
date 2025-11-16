@@ -826,8 +826,6 @@ class ViabilityPanel(Gtk.Box):
         Args:
             transition_id: ID of transition to add
         """
-        print(f"[VIABILITY_INVESTIGATE] 🔍 Adding {transition_id} to panel {id(self)}, drawing_area={id(self.drawing_area) if self.drawing_area else 'None'}")
-        print(f"[VIABILITY_INVESTIGATE] 📋 Current localities: {list(self.selected_localities.keys())}")
         
         # Check if already in list
         if transition_id in self.selected_localities:
@@ -1708,7 +1706,6 @@ class ViabilityPanel(Gtk.Box):
             level: "info", "success", "warning", "error"
         """
         # TODO: Implement proper feedback UI (toast/notification)
-        print(f"[{level.upper()}] {message}")
     
     def _show_error(self, message: str):
         """Show error message.
@@ -1716,7 +1713,6 @@ class ViabilityPanel(Gtk.Box):
         Args:
             message: Error message
         """
-        print(f"[VIABILITY_PANEL ERROR] {message}")
         
         # Get proper window parent
         parent = None
@@ -1941,12 +1937,10 @@ class ViabilityPanel(Gtk.Box):
         # Reset colors - fetch objects from CURRENT model
         from shypn.netobjs import Place, Transition, Arc
         
-        print("[Viability] Clearing all localities and resetting colors...")
         
         # Get current model to fetch fresh object references
         model = self._get_current_model()
         if not model:
-            print("[Viability] Warning: No current model when clearing all")
         else:
             for transition_id in self.selected_localities.keys():
                 locality_ids = self._locality_objects.get(transition_id)
@@ -1978,7 +1972,6 @@ class ViabilityPanel(Gtk.Box):
                 for arc_obj in locality_ids.output_arcs:
                     print(f"    - Output arc: {arc_obj.id}")
         
-        print("[Viability] All colors reset")
         
         # Clear localities list
         for row in list(self.localities_listbox.get_children()):

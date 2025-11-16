@@ -1551,11 +1551,8 @@ class FileExplorerPanel:
             # Determine if we need to auto-generate a filepath
             needs_new_filepath = not manager.has_filepath() or manager.is_default_filename()
             
-            print(f"[SAVE] has_filepath={manager.has_filepath()}, is_default={manager.is_default_filename()}, needs_new={needs_new_filepath}")
-            print(f"[SAVE] filepath={manager.filepath}, filename={manager.filename}")
             
             if needs_new_filepath:
-                print("[SAVE] Opening file chooser dialog...")
                 # Open file chooser dialog for default/imported files
                 
                 # Determine initial directory: project/models/ if project is open, otherwise workspace
@@ -1609,7 +1606,6 @@ class FileExplorerPanel:
                 
                 if response == Gtk.ResponseType.OK:
                     filepath = dialog.get_filename()
-                    print(f"[SAVE] User selected: {filepath}")
                     
                     # Ensure .shy extension
                     if not filepath.endswith('.shy'):
@@ -1632,7 +1628,6 @@ class FileExplorerPanel:
                     self.set_current_file(filepath)
                     self._load_current_directory()  # Refresh file tree
                 else:
-                    print("[SAVE] User cancelled file chooser")
                 
                 # Close dialog
                 dialog.destroy()
@@ -1641,7 +1636,6 @@ class FileExplorerPanel:
                 # Direct save to existing file
                 filepath = manager.get_filepath()
                 
-                print(f"[SAVE] Direct save to existing file: {filepath}")
                 
                 document.save_to_file(filepath)
                 
@@ -1685,8 +1679,6 @@ class FileExplorerPanel:
             # Convert canvas state to document model
             document = manager.to_document_model()
             
-            print(f"[SAVE_AS] Starting Save As dialog...")
-            print(f"[SAVE_AS] filepath={manager.filepath}, filename={manager.filename}")
             
             # Determine initial directory: project/models/ if project is open, otherwise workspace
             if self.project:
@@ -1744,11 +1736,9 @@ class FileExplorerPanel:
             response = dialog.run()
             filepath = None
             
-            print(f"[SAVE_AS] Dialog response: {response}")
             
             if response == Gtk.ResponseType.OK:
                 filepath = dialog.get_filename()
-                print(f"[SAVE_AS] User selected: {filepath}")
                 
                 # Ensure .shy extension
                 if not filepath.endswith('.shy'):

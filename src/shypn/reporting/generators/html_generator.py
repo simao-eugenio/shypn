@@ -102,16 +102,12 @@ class HTMLGenerator(BaseDocumentGenerator):
         
         # Report Panel Data (if available)
         report_data = data.get("additional", {}).get("report_data", {})
-        print(f"[HTML_GEN] report_data keys: {list(report_data.keys())}")
-        print(f"[HTML_GEN] report_data present: {bool(report_data)}")
         if report_data:
-            print(f"[HTML_GEN] Generating report data sections...")
             # Executive Summary (NEW)
             html_parts.append('<div class="section">')
             html_parts.append('<h2>Summary</h2>')
             html_parts.append(self._format_summary_section(report_data))
             html_parts.append('</div>')
-            print(f"[HTML_GEN] ✓ Summary section added")
             
             # Model Structure
             if 'model' in report_data and report_data['model'].get('has_data'):
@@ -119,9 +115,7 @@ class HTMLGenerator(BaseDocumentGenerator):
                 html_parts.append('<h2>Model Structure</h2>')
                 html_parts.append(self._format_model_structure(report_data['model']))
                 html_parts.append('</div>')
-                print(f"[HTML_GEN] ✓ Model Structure section added")
             else:
-                print(f"[HTML_GEN] ✗ Model Structure section skipped (has_data={report_data.get('model', {}).get('has_data', False)})")
             
             # Dynamic Analyses (includes Species Concentration & Reaction Activity)
             if 'dynamic' in report_data and report_data['dynamic'].get('has_data'):
@@ -129,9 +123,7 @@ class HTMLGenerator(BaseDocumentGenerator):
                 html_parts.append('<h2>Dynamic Analyses</h2>')
                 html_parts.append(self._format_dynamic_analyses(report_data['dynamic']))
                 html_parts.append('</div>')
-                print(f"[HTML_GEN] ✓ Dynamic Analyses section added")
             else:
-                print(f"[HTML_GEN] ✗ Dynamic Analyses section skipped (has_data={report_data.get('dynamic', {}).get('has_data', False)})")
             
             # Topology Analyses (includes Key Findings in tabular form)
             if 'topology' in report_data and report_data['topology'].get('has_data'):
@@ -139,9 +131,7 @@ class HTMLGenerator(BaseDocumentGenerator):
                 html_parts.append('<h2>Topology Analyses</h2>')
                 html_parts.append(self._format_topology_analyses(report_data['topology']))
                 html_parts.append('</div>')
-                print(f"[HTML_GEN] ✓ Topology Analyses section added")
             else:
-                print(f"[HTML_GEN] ✗ Topology Analyses section skipped (has_data={report_data.get('topology', {}).get('has_data', False)})")
             
             # Provenance Data
             if 'provenance' in report_data and report_data['provenance'].get('has_data'):
@@ -149,11 +139,8 @@ class HTMLGenerator(BaseDocumentGenerator):
                 html_parts.append('<h2>Data Provenance</h2>')
                 html_parts.append(self._format_provenance_data(report_data['provenance']))
                 html_parts.append('</div>')
-                print(f"[HTML_GEN] ✓ Data Provenance section added")
             else:
-                print(f"[HTML_GEN] ✗ Data Provenance section skipped (has_data={report_data.get('provenance', {}).get('has_data', False)})")
         else:
-            print(f"[HTML_GEN] No report_data available - skipping all report sections")
         
         # Close
         html_parts.extend(['</div>', '</body>', '</html>'])
