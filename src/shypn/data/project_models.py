@@ -180,6 +180,26 @@ class Project:
             return os.path.join(self.base_path, 'enrichments')
         return None
     
+    def get_metadata_dir(self) -> Optional[str]:
+        """Get the metadata directory path.
+        
+        Returns:
+            Absolute path to metadata directory, or None if base_path not set
+        """
+        if self.base_path:
+            return os.path.join(self.base_path, 'metadata')
+        return None
+    
+    def get_exports_dir(self) -> Optional[str]:
+        """Get the exports directory path.
+        
+        Returns:
+            Absolute path to exports directory, or None if base_path not set
+        """
+        if self.base_path:
+            return os.path.join(self.base_path, 'exports')
+        return None
+    
     # Pathway management properties and methods
     @property
     def pathways(self) -> ProjectPathwayManager:
@@ -441,8 +461,9 @@ class Project:
         os.makedirs(self.get_models_dir(), exist_ok=True)
         os.makedirs(self.get_pathways_dir(), exist_ok=True)
         os.makedirs(self.get_simulations_dir(), exist_ok=True)
-        os.makedirs(os.path.join(self.base_path, 'exports'), exist_ok=True)
-        os.makedirs(os.path.join(self.base_path, 'metadata', 'backups'), exist_ok=True)
+        os.makedirs(self.get_exports_dir(), exist_ok=True)
+        os.makedirs(self.get_metadata_dir(), exist_ok=True)
+        os.makedirs(os.path.join(self.get_metadata_dir(), 'backups'), exist_ok=True)
 
 
 class ProjectManager:
@@ -586,11 +607,9 @@ class ProjectManager:
         
         project = Project(name=name, base_path=base_path)
         
-        # Create directory structure
+        # Create directory structure using the unified method
         os.makedirs(base_path, exist_ok=True)
-        os.makedirs(project.get_models_dir(), exist_ok=True)
-        os.makedirs(project.get_pathways_dir(), exist_ok=True)
-        os.makedirs(project.get_simulations_dir(), exist_ok=True)
+        project.create_directory_structure()
         
         # Save project file
         project.save()

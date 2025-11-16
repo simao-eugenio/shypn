@@ -1398,7 +1398,7 @@ def main(argv=None):
 						# Defensive check for parent window (Wayland compatibility)
 						parent = window if window else None
 						dialog = Gtk.MessageDialog(
-							parent=parent,
+							transient_for=parent,
 							modal=True,
 							message_type=Gtk.MessageType.WARNING,
 							buttons=Gtk.ButtonsType.NONE,

@@ -166,11 +166,10 @@ class DynamicAnalysesPanel(Gtk.Box):
         for category in self.categories:
             category.set_model(model)
         
-        # Update or create context menu handler
+        # Update context menu handler
         if self.context_menu_handler:
             self.context_menu_handler.set_model(model)
         else:
-            pass
             # Context menu handler doesn't exist yet, create it
             self._setup_context_menu()
     

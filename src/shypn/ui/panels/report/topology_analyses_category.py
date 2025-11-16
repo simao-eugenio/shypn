@@ -224,12 +224,12 @@ class TopologyAnalysesCategory(BaseReportCategory):
         stats = summary.get('statistics', {})
         
         # Structural findings
-        p_inv = stats.get('p_invariants', 0)
+        p_inv = stats.get('p_invariants', 0) or 0
         if p_inv > 0:
             p_cov = stats.get('p_invariant_coverage', 0)
             findings.append(f"{p_inv} P-invariants ({p_cov:.0%} coverage)")
         
-        t_inv = stats.get('t_invariants', 0)
+        t_inv = stats.get('t_invariants', 0) or 0
         if t_inv > 0:
             t_cov = stats.get('t_invariant_coverage', 0)
             findings.append(f"{t_inv} T-invariants ({t_cov:.0%} coverage)")
@@ -399,7 +399,87 @@ class TopologyAnalysesCategory(BaseReportCategory):
             
             self.biological_summary_label.set_text("\n".join(lines))
         else:
-            self.biological_summary_label.set_text("○ No biological analysis performed")
+                        self.biological_summary_label.set_text("○ No biological analysis performed")
+    
+    def get_structured_data(self):
+        """Get structured topology analysis data for document generation.
+        
+        Returns:
+            dict: Topology data with keys:
+                - title: 'Topological Analyses'
+                - has_data: Boolean
+                - status: str ('complete', 'partial', 'error', 'not_analyzed')
+                - statistics: dict with all topology metrics
+                - key_findings: list of finding strings
+                - sections: dict with structural, graph, behavioral, biological summaries
+        """
+        if not self.topology_panel:
+            return {
+                'title': 'Topological Analyses',
+                'has_data': False,
+                'status': 'not_analyzed',
+                'summary': 'Topology panel not connected'
+            }
+        
+        try:
+            summary = self.topology_panel.generate_summary_for_report_panel()
+            
+            return {
+                'title': 'Topological Analyses',
+                'has_data': True,
+                'status': summary.get('status', 'unknown'),
+                'statistics': summary.get('statistics', {}),
+                'key_findings': self._extract_key_findings(summary),
+                'warnings': summary.get('warnings', []),
+                'sections': {
+                    'structural': self._get_structural_data(summary.get('statistics', {})),
+                    'graph': self._get_graph_data(summary.get('statistics', {})),
+                    'behavioral': self._get_behavioral_data(summary.get('statistics', {})),
+                    'biological': self._get_biological_data(summary.get('statistics', {}))
+                }
+            }
+        except Exception as e:
+            return {
+                'title': 'Topological Analyses',
+                'has_data': False,
+                'status': 'error',
+                'summary': f'Error fetching topology data: {str(e)}'
+            }
+    
+    def _get_structural_data(self, stats):
+        """Extract structural analysis data."""
+        return {
+            'p_invariants': stats.get('p_invariants', 0),
+            'p_invariant_coverage': stats.get('p_invariant_coverage', 0),
+            't_invariants': stats.get('t_invariants', 0),
+            't_invariant_coverage': stats.get('t_invariant_coverage', 0),
+            'siphons': stats.get('siphons', 0),
+            'traps': stats.get('traps', 0)
+        }
+    
+    def _get_graph_data(self, stats):
+        """Extract graph analysis data."""
+        return {
+            'cycles': stats.get('cycles', 0),
+            'hubs': stats.get('hubs', 0),
+            'paths': stats.get('paths', 0)
+        }
+    
+    def _get_behavioral_data(self, stats):
+        """Extract behavioral analysis data."""
+        return {
+            'is_bounded': stats.get('is_bounded'),
+            'is_live': stats.get('is_live'),
+            'is_deadlock_free': stats.get('is_deadlock_free'),
+            'is_reversible': stats.get('is_reversible')
+        }
+    
+    def _get_biological_data(self, stats):
+        """Extract biological analysis data."""
+        return {
+            'dependency_score': stats.get('dependency_score'),
+            'regulatory_patterns': stats.get('regulatory_patterns', [])
+        }
     
     def _show_placeholder(self):
         """Show placeholder when topology panel not connected."""

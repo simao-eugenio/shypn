@@ -207,6 +207,31 @@ class ModelCanvasLoader:
         style_context = self.notebook.get_style_context()
         style_context.add_provider(css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION + 1)
         
+        # Apply global CSS for canvas object tooltips - green background with black text
+        tooltip_css_provider = Gtk.CssProvider()
+        tooltip_css = b"""
+        tooltip {
+            background-color: #22cc22;
+            color: #000000;
+            border: 1px solid #1a991a;
+            border-radius: 3px;
+            padding: 4px 8px;
+        }
+        tooltip * {
+            color: #000000;
+        }
+        tooltip label {
+            color: #000000;
+        }
+        """
+        tooltip_css_provider.load_from_data(tooltip_css)
+        screen = Gdk.Screen.get_default()
+        Gtk.StyleContext.add_provider_for_screen(
+            screen,
+            tooltip_css_provider,
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
+        
         # CRITICAL FIX: Remove default tab from UI file and create fresh one programmatically
         # 
         # CERTIFICATION: The default canvas is NOT created from any notebook/XML file.
@@ -3045,13 +3070,14 @@ class ModelCanvasLoader:
         if hovered_obj:
             from shypn.netobjs import Place, Transition, Arc
             if isinstance(hovered_obj, (Place, Transition, Arc)):
-                # Show ID-Name tooltip
+                # Show ID-Name tooltip with green background and white text (styled via CSS)
                 obj_id = hovered_obj.id if hasattr(hovered_obj, 'id') else "?"
                 obj_name = hovered_obj.name if hasattr(hovered_obj, 'name') else ""
                 if obj_name and obj_name != obj_id:
                     tooltip = f"{obj_id} - {obj_name}"
                 else:
                     tooltip = obj_id
+                # Use set_tooltip_text - CSS will apply green background and white text
                 widget.set_tooltip_text(tooltip)
         else:
             # Clear tooltip when not hovering over any object

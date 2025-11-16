@@ -139,6 +139,7 @@ class DynamicAnalysesCategory(BaseReportCategory):
         self.reaction_selected_table = Gtk.TreeView(model=self.reaction_selected_store)
         self.reaction_selected_table.set_enable_search(True)
         self.reaction_selected_table.set_search_column(1)  # Search by ID
+        self.reaction_selected_table.set_grid_lines(Gtk.TreeViewGridLines.NONE)  # Remove all grid lines
         
         # Add columns for summary view
         columns = [
@@ -283,6 +284,146 @@ class DynamicAnalysesCategory(BaseReportCategory):
             self.summary_label.set_markup('\n'.join(summary_lines))
         else:
             self.summary_label.set_markup("<i>No simulation or experimental data available</i>")
+    
+    def get_structured_data(self):
+        """Get structured dynamic analyses data for document generation.
+        
+        Returns:
+            dict: Dynamic analyses data with keys:
+                - title: 'Dynamic Analyses'
+                - has_data: Boolean
+                - model_info: dict with species/reactions counts
+                - organisms: list of organism names
+                - enrichments_count: int
+                - simulation_parameters: dict with simulation settings
+                - simulation_data: dict with species and reactions data tables
+        """
+        if not self.model_canvas and not self.project:
+            return {
+                'title': 'Dynamic Analyses',
+                'has_data': False,
+                'summary': 'No data available'
+            }
+        
+        # Extract model info
+        model_info = {}
+        if self.model_canvas and hasattr(self.model_canvas, 'model'):
+            model = self.model_canvas.model
+            model_info = {
+                'num_places': len(model.places) if hasattr(model, 'places') else 0,
+                'num_transitions': len(model.transitions) if hasattr(model, 'transitions') else 0
+            }
+        
+        # Extract organism and enrichment info
+        organisms = []
+        enrichments_count = 0
+        if self.project and hasattr(self.project, 'pathways'):
+            pathways = self.project.pathways.list_pathways()
+            organisms_set = set()
+            for pathway in pathways:
+                if hasattr(pathway, 'source_organism') and pathway.source_organism:
+                    organisms_set.add(pathway.source_organism)
+            organisms = list(organisms_set)
+            enrichments_count = sum(len(p.enrichments) for p in pathways if hasattr(p, 'enrichments'))
+        
+        # Extract simulation parameters from stored data
+        simulation_parameters = {}
+        
+        # Get report_data from the current document's overlay_manager
+        report_data = None
+        if hasattr(self, 'parent_panel') and self.parent_panel:
+            model_canvas_loader = getattr(self.parent_panel, 'model_canvas_loader', None)
+            if model_canvas_loader and hasattr(model_canvas_loader, 'overlay_managers'):
+                # Find which drawing_area has this controller
+                if self.controller:
+                    for drawing_area, overlay_manager in model_canvas_loader.overlay_managers.items():
+                        if hasattr(overlay_manager, 'simulation_controller') and overlay_manager.simulation_controller is self.controller:
+                            if hasattr(overlay_manager, 'report_data'):
+                                report_data = overlay_manager.report_data
+                            break
+        
+        if report_data and report_data.has_simulation_data():
+            sim_data = report_data.last_simulation_data
+            metadata = sim_data.get('metadata', {})
+            
+            # Calculate statistics
+            num_time_points = len(sim_data.get('time_points', []))
+            total_steps = num_time_points - 1 if num_time_points > 0 else 0
+            
+            # Calculate total firings
+            total_firings = 0
+            for firing_series in sim_data.get('transition_data', {}).values():
+                if firing_series:
+                    total_firings += firing_series[-1]
+            
+            duration = metadata.get('duration', 0)
+            avg_rate = total_firings / duration if duration > 0 else 0
+            
+            simulation_parameters = {
+                'timestamp': metadata.get('timestamp', ''),
+                'time_step': metadata.get('time_step'),
+                'target_duration': metadata.get('target_duration'),
+                'actual_duration': duration,
+                'time_scale': metadata.get('time_scale', 1.0),
+                'num_time_points': num_time_points,
+                'total_steps': total_steps,
+                'total_firings': total_firings,
+                'avg_firing_rate': avg_rate
+            }
+        
+        # Extract simulation data if available
+        simulation_data = {
+            'species': [],
+            'reactions': []
+        }
+        
+        if self.species_table and hasattr(self.species_table, 'store'):
+            for row in self.species_table.store:
+                simulation_data['species'].append({
+                    'name': row[0],
+                    'id': row[1],
+                    'initial': row[2],
+                    'final': row[3],
+                    'min': row[4],
+                    'max': row[5],
+                    'avg': row[6]
+                })
+        
+        if self.reaction_table and hasattr(self.reaction_table, 'store'):
+            for row in self.reaction_table.store:
+                simulation_data['reactions'].append({
+                    'name': row[0],
+                    'id': row[1],
+                    'avg_rate': row[2],
+                    'total_firings': row[3],
+                    'status': row[4]
+                })
+        
+        # Extract reaction selected data (locality summary)
+        if self.reaction_selected_store:
+            simulation_data['reactions_selected'] = []
+            for row in self.reaction_selected_store:
+                simulation_data['reactions_selected'].append({
+                    'component': row[0],
+                    'id': row[1],
+                    'name': row[2],
+                    'initial': row[3],
+                    'final': row[4],
+                    'min': row[5],
+                    'max': row[6],
+                    'average': row[7],
+                    'info': row[8]
+                })
+        
+        return {
+            'title': 'Dynamic Analyses',
+            'has_data': bool(model_info or organisms or enrichments_count > 0 or simulation_data['species'] or simulation_parameters),
+            'model_info': model_info,
+            'organisms': organisms,
+            'enrichments_count': enrichments_count,
+            'simulation_parameters': simulation_parameters,
+            'simulation_data': simulation_data
+        }
     
     def export_to_text(self):
         """Export as plain text."""
@@ -946,20 +1087,6 @@ class DynamicAnalysesCategory(BaseReportCategory):
         
         # Process each valid transition/locality pair
         for idx, (transition, locality) in enumerate(valid_selections):
-            # Add separator row between reactions (except before first)
-            if idx > 0:
-                self.reaction_selected_store.append([
-                    "─" * 15,  # Separator visual
-                    "─" * 10,
-                    "─" * 15,
-                    "─" * 10,
-                    "─" * 10,
-                    "─" * 10,
-                    "─" * 10,
-                    "─" * 10,
-                    "─" * 15
-                ])
-            
             # Add TRANSITION row
             trans_id = transition.id
             trans_name = getattr(transition, 'name', trans_id) or trans_id

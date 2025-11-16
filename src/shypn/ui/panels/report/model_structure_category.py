@@ -1738,3 +1738,145 @@ class ModelsCategory(BaseReportCategory):
         print(f"[MODELS_CATEGORY] Calling _populate_locality_table()")
         self._populate_locality_table()
         print(f"[MODELS_CATEGORY] _populate_locality_table() completed")
+    
+    def get_structured_data(self):
+        """Get structured model data for document generation.
+        
+        Returns:
+            dict: Model data with keys:
+                - title: 'Model Structure'
+                - has_data: Boolean
+                - overview: dict with name, project, file_path, dates, description
+                - structure: dict with places_count, transitions_count, arcs_count, model_types
+                - provenance: dict with source info (if available)
+                - species: list of dicts with species data
+                - reactions: list of dicts with reaction data
+        """
+        if not self.model_canvas:
+            return {
+                'title': 'Model Structure',
+                'has_data': False,
+                'summary': 'No model loaded'
+            }
+        
+        model = self.model_canvas
+        
+        # Extract overview data
+        overview = {
+            'name': getattr(model, 'name', 'Untitled'),
+            'project': self.project.name if self.project and hasattr(self.project, 'name') else None,
+            'file_path': getattr(model, 'file_path', None),
+            'created_date': getattr(model, 'created_date', None),
+            'modified_date': getattr(model, 'modified_date', None),
+            'description': getattr(model, 'description', None)
+        }
+        
+        # Extract structure counts
+        places_count = len(model.places) if hasattr(model, 'places') else 0
+        transitions_count = len(model.transitions) if hasattr(model, 'transitions') else 0
+        arcs_count = len(model.arcs) if hasattr(model, 'arcs') else 0
+        
+        structure = {
+            'places_count': places_count,
+            'transitions_count': transitions_count,
+            'arcs_count': arcs_count,
+            'model_types': self._extract_model_types(model)
+        }
+        
+        # Extract provenance data (if available from metadata)
+        provenance = self._extract_provenance_data(model)
+        
+        # Extract species data from TreeView store
+        species = []
+        if self.species_store:
+            for row in self.species_store:
+                species.append({
+                    'index': row[0],
+                    'id': row[1],
+                    'name': row[2],
+                    'initial_tokens': row[3],
+                    'units': row[4],
+                    'mass': row[5],
+                    'conservation': row[7]
+                })
+        
+        # Extract reaction data from TreeView store
+        reactions = []
+        if self.reactions_store:
+            for row in self.reactions_store:
+                reactions.append({
+                    'index': row[0],
+                    'id': row[1],
+                    'name': row[2],
+                    'type': row[3],
+                    'ec_number': row[4],
+                    'vmax': row[5],
+                    'km': row[7],
+                    'kcat': row[9],
+                    'ki': row[11],
+                    'rate_function': row[13],
+                    'reversible': row[14]
+                })
+        
+        return {
+            'title': 'Model Structure',
+            'has_data': True,
+            'overview': overview,
+            'structure': structure,
+            'provenance': provenance,
+            'species': species,
+            'reactions': reactions
+        }
+    
+    def _extract_model_types(self, model):
+        """Extract model type information.
+        
+        Returns:
+            list: List of model type strings (e.g., ['Stochastic', 'Timed'])
+        """
+        model_types = []
+        if hasattr(model, 'transitions') and model.transitions:
+            has_stochastic = any(
+                hasattr(t, 'transition_type') and t.transition_type == 'stochastic'
+                for t in model.transitions if t
+            )
+            has_continuous = any(
+                hasattr(t, 'transition_type') and t.transition_type == 'continuous'
+                for t in model.transitions if t
+            )
+            has_timed = any(
+                hasattr(t, 'transition_type') and t.transition_type == 'timed'
+                for t in model.transitions if t
+            )
+            
+            if has_stochastic:
+                model_types.append('Stochastic')
+            if has_continuous:
+                model_types.append('Continuous')
+            if has_timed:
+                model_types.append('Timed')
+        
+        if not model_types:
+            model_types.append('Standard')
+        
+        return model_types
+    
+    def _extract_provenance_data(self, model):
+        """Extract provenance/import data if available.
+        
+        Returns:
+            dict: Provenance data or None if not available
+        """
+        # Check for import metadata
+        metadata = getattr(model, 'metadata', {})
+        if isinstance(metadata, dict):
+            import_data = metadata.get('import', {})
+            if import_data:
+                return {
+                    'source_type': import_data.get('source_type'),
+                    'source_id': import_data.get('source_id'),
+                    'organism': import_data.get('organism'),
+                    'import_date': import_data.get('import_date')
+                }
+        
+        return None
