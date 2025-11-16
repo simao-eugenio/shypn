@@ -1305,28 +1305,18 @@ class ModelsCategory(BaseReportCategory):
         Called when user selects transition in Analyses panel.
         Shows: Input Places → Transition → Output Places in unified table.
         """
-        print(f"[POPULATE_LOCALITY] Starting...")
-        print(f"[POPULATE_LOCALITY]   selected_transition: {self.selected_transition}")
-        print(f"[POPULATE_LOCALITY]   selected_locality: {self.selected_locality}")
-        
         self.locality_store.clear()
         
         if not self.selected_transition or not self.selected_locality:
             # Hide expander when no selection
-            print(f"[POPULATE_LOCALITY] No transition or locality, hiding expander")
             self.locality_expander.set_visible(False)
             return
         
         # Show expander
-        print(f"[POPULATE_LOCALITY] Showing expander")
         self.locality_expander.set_visible(True)
         
         transition = self.selected_transition
         locality = self.selected_locality
-        
-        print(f"[POPULATE_LOCALITY] Transition: {transition.name if hasattr(transition, 'name') else transition.id}")
-        print(f"[POPULATE_LOCALITY] Input places: {len(locality.input_places)}")
-        print(f"[POPULATE_LOCALITY] Output places: {len(locality.output_places)}")
         
         index = 0
         
@@ -1727,17 +1717,10 @@ class ModelsCategory(BaseReportCategory):
             transition: Transition object
             locality: Locality object from LocalityDetector
         """
-        print(f"[MODELS_CATEGORY] set_selected_locality() called")
-        print(f"[MODELS_CATEGORY]   transition: {transition.name if hasattr(transition, 'name') else transition.id}")
-        print(f"[MODELS_CATEGORY]   locality: {locality}")
-        print(f"[MODELS_CATEGORY]   locality.is_valid: {locality.is_valid if locality else 'None'}")
-        
         self.selected_transition = transition
         self.selected_locality = locality
         
-        print(f"[MODELS_CATEGORY] Calling _populate_locality_table()")
         self._populate_locality_table()
-        print(f"[MODELS_CATEGORY] _populate_locality_table() completed")
     
     def get_structured_data(self):
         """Get structured model data for document generation.
