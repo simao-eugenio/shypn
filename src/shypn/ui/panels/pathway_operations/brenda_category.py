@@ -206,8 +206,6 @@ class BRENDACategory(BasePathwayCategory):
                 f"[BRENDA_CANVAS] Manager set with "
                 f"{len(getattr(self.model_canvas_manager, 'transitions', []))} transitions"
             )
-        else:
-            self.logger.warning("[BRENDA_CANVAS] No model canvas manager available after set_model_canvas")
     
     def _build_content(self) -> Gtk.Widget:
         """Build the BRENDA category content.
