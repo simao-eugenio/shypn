@@ -152,8 +152,8 @@ class TransitionPropDialogLoader(GObject.GObject):
                 'age': 5,
                 'preemptive-priority': 6
             }
-            policy = self.transition_obj.firing_policy or 'random'
-            firing_policy_combo.set_active(policy_map.get(policy, 0))
+            policy = self.transition_obj.firing_policy or 'race'
+            firing_policy_combo.set_active(policy_map.get(policy, 4))
             
             # Connect signal to show/hide priority value field
             firing_policy_combo.connect('changed', self._on_firing_policy_changed)
