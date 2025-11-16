@@ -154,6 +154,17 @@ class TransitionPropDialogLoader(GObject.GObject):
             }
             policy = self.transition_obj.firing_policy or 'random'
             firing_policy_combo.set_active(policy_map.get(policy, 0))
+            
+            # Connect signal to show/hide priority value field
+            firing_policy_combo.connect('changed', self._on_firing_policy_changed)
+        
+        # Priority value spin button (numeric priority for priority-based policies)
+        priority_value_spin = self.builder.get_object('priority_value_spin')
+        if priority_value_spin and hasattr(self.transition_obj, 'priority'):
+            priority_value_spin.set_value(float(self.transition_obj.priority))
+        
+        # Show/hide priority value field based on current policy
+        self._update_priority_field_visibility()
         
         # Source/Sink checkboxes
         is_source_check = self.builder.get_object('is_source_check')
@@ -253,6 +264,21 @@ class TransitionPropDialogLoader(GObject.GObject):
             parent = firing_policy_combo.get_parent()
             if parent:
                 parent.set_visible(editable_fields.get('firing_policy', True))
+    
+    def _update_priority_field_visibility(self):
+        """Show/hide priority value field based on selected firing policy."""
+        firing_policy_combo = self.builder.get_object('firing_policy_combo')
+        priority_value_box = self.builder.get_object('priority_value_box')
+        
+        if firing_policy_combo and priority_value_box:
+            active_index = firing_policy_combo.get_active()
+            # Show priority field only for: Priority (index 3) or Preemptive-Priority (index 6)
+            show_priority = active_index in [3, 6]
+            priority_value_box.set_visible(show_priority)
+    
+    def _on_firing_policy_changed(self, combo):
+        """Handle firing policy combo box changes."""
+        self._update_priority_field_visibility()
     
     def _update_type_description(self):
         """Update type description label based on current type."""
@@ -365,6 +391,11 @@ class TransitionPropDialogLoader(GObject.GObject):
                 policy_index = firing_policy_combo.get_active()
                 if policy_index >= 0:
                     self.transition_obj.firing_policy = policy_list[policy_index]
+            
+            # Priority value (numeric)
+            priority_value_spin = self.builder.get_object('priority_value_spin')
+            if priority_value_spin:
+                self.transition_obj.priority = int(priority_value_spin.get_value())
             
             # Source/Sink
             is_source_check = self.builder.get_object('is_source_check')
