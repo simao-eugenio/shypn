@@ -650,6 +650,7 @@ class BaseTopologyCategory:
                     # Allow Priority 3 analyzers on small models (< 15 objects)
                     # Priority 4+ (siphons, traps) still require manual execution
                     if priority == 3 and is_small_model:
+                        pass
                     else:
                         # Skip Priority 4+ or Priority 3 on large models
                         continue

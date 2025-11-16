@@ -344,6 +344,7 @@ class PathwayValidator:
         validator = PathwayValidator()
         result = validator.validate(pathway_data)
         if result.is_valid:
+            pass
         else:
             for error in result.errors:
     """

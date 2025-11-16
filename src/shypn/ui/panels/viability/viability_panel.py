@@ -1941,6 +1941,7 @@ class ViabilityPanel(Gtk.Box):
         # Get current model to fetch fresh object references
         model = self._get_current_model()
         if not model:
+            pass
         else:
             for transition_id in self.selected_localities.keys():
                 locality_ids = self._locality_objects.get(transition_id)

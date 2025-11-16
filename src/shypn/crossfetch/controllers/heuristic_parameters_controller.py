@@ -209,8 +209,6 @@ class HeuristicParametersController:
                 self.logger.error(f"Transition {transition_id} not found in canvas")
                 return False
             
-            if hasattr(transition, 'properties'):
-            
             # CRITICAL: Populate input_arcs and output_arcs for rate_function generation
             # The canvas transition objects don't have these by default, but we need them
             # to get substrate place names when auto-generating rate_function strings

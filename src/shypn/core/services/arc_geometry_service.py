@@ -141,6 +141,7 @@ def count_parallel_arcs(arc: Any, all_arcs: List[Any]) -> int:
     
     Example:
         if count_parallel_arcs(arc, all_arcs) > 0:
+            pass
     """
     return len(detect_parallel_arcs(arc, all_arcs))
 

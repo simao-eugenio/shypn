@@ -87,6 +87,7 @@ class LocalityAnalyzer:
             analysis = analyzer.analyze_locality(locality)
             
             if analysis['is_valid']:
+                pass
         """
         return {
             'is_valid': locality.is_valid,

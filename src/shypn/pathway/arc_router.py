@@ -50,6 +50,7 @@ class ArcRouter(PostProcessorBase):
         # Arcs now have curved paths
         for arc in document.arcs:
             if arc.is_curved:
+                pass
     """
     
     def __init__(self, options: Optional['EnhancementOptions'] = None):

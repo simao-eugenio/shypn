@@ -116,6 +116,7 @@ class HTMLGenerator(BaseDocumentGenerator):
                 html_parts.append(self._format_model_structure(report_data['model']))
                 html_parts.append('</div>')
             else:
+                pass
             
             # Dynamic Analyses (includes Species Concentration & Reaction Activity)
             if 'dynamic' in report_data and report_data['dynamic'].get('has_data'):
@@ -124,6 +125,7 @@ class HTMLGenerator(BaseDocumentGenerator):
                 html_parts.append(self._format_dynamic_analyses(report_data['dynamic']))
                 html_parts.append('</div>')
             else:
+                pass
             
             # Topology Analyses (includes Key Findings in tabular form)
             if 'topology' in report_data and report_data['topology'].get('has_data'):
@@ -132,6 +134,7 @@ class HTMLGenerator(BaseDocumentGenerator):
                 html_parts.append(self._format_topology_analyses(report_data['topology']))
                 html_parts.append('</div>')
             else:
+                pass
             
             # Provenance Data
             if 'provenance' in report_data and report_data['provenance'].get('has_data'):
@@ -140,7 +143,9 @@ class HTMLGenerator(BaseDocumentGenerator):
                 html_parts.append(self._format_provenance_data(report_data['provenance']))
                 html_parts.append('</div>')
             else:
+                pass
         else:
+            pass
         
         # Close
         html_parts.extend(['</div>', '</body>', '</html>'])

@@ -43,6 +43,7 @@ class MetadataEnhancer(PostProcessorBase):
         # Elements now have rich metadata
         for place in document.places:
             if hasattr(place, 'metadata'):
+                pass
     """
     
     def __init__(self, options: Optional['EnhancementOptions'] = None):

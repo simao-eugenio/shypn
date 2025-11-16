@@ -1424,6 +1424,7 @@ class ModelCanvasLoader:
             # Make KB accessible from canvas manager
             manager.knowledge_base = kb
         except Exception as e:
+            pass
 
         def on_draw_wrapper(widget, cr):
             allocation = widget.get_allocation()
@@ -1744,6 +1745,7 @@ class ModelCanvasLoader:
                                                     
                                                     controller.on_simulation_complete = combined_callback
                                             except Exception as e:
+                                                pass
                                 else:
                                     pass
                             else:
@@ -2076,6 +2078,7 @@ class ModelCanvasLoader:
                 viability_panel_loader._stack = self.left_dock_stack
                 viability_panel_loader._stack_panel_name = 'viability'
             else:
+                pass
 
             # If host provided UI callbacks for float/attach, wire them
             if hasattr(self, 'on_viability_float') and callable(getattr(self, 'on_viability_float')):
@@ -3943,6 +3946,7 @@ class ModelCanvasLoader:
                         info['next_transition_id'] = scope_data.get('transition', 0) + 1
                         info['next_arc_id'] = scope_data.get('arc', 0) + 1
             except Exception as e:
+                pass
         
         # Get element count from canvas manager
         manager = self.get_canvas_manager(drawing_area)
