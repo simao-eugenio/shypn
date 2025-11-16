@@ -1439,6 +1439,88 @@ class FileExplorerPanel:
         """
         self.canvas_loader = canvas_loader
 
+    def _save_metadata_for_document(self, drawing_area, filepath):
+        """Save metadata for a document to project/metadata/ directory.
+        
+        Accesses the report panel's export toolbar to get metadata and saves it
+        to the project's metadata directory. If not in a project, saves alongside
+        the model file.
+        
+        Args:
+            drawing_area: The document's drawing area
+            filepath: Path to the .shy file
+        
+        Returns:
+            bool: True if metadata was saved successfully
+        """
+        try:
+            import os
+            
+            # Determine metadata path based on project structure
+            if self.project and hasattr(self.project, 'get_metadata_dir'):
+                # Save in project/metadata/ directory
+                metadata_dir = self.project.get_metadata_dir()
+                if metadata_dir:
+                    os.makedirs(metadata_dir, exist_ok=True)
+                    # Use model filename for metadata file
+                    model_filename = os.path.basename(filepath).replace('.shy', '.shypn')
+                    shypn_path = os.path.join(metadata_dir, model_filename)
+                else:
+                    # Fallback: save alongside model file
+                    shypn_path = filepath.replace('.shy', '.shypn')
+            else:
+                # No project context: save alongside model file
+                shypn_path = filepath.replace('.shy', '.shypn')
+            
+            # Get overlay manager for this document
+            if not hasattr(self, 'canvas_loader') or not self.canvas_loader:
+                return False
+            
+            if drawing_area not in self.canvas_loader.overlay_managers:
+                return False
+            
+            overlay_manager = self.canvas_loader.overlay_managers.get(drawing_area)
+            if not overlay_manager:
+                return False
+            
+            # Get report panel loader
+            if not hasattr(overlay_manager, 'report_panel_loader'):
+                return False
+            
+            report_panel_loader = overlay_manager.report_panel_loader
+            if not report_panel_loader or not hasattr(report_panel_loader, 'panel'):
+                return False
+            
+            # Get export toolbar from report panel
+            report_panel = report_panel_loader.panel
+            if not hasattr(report_panel, 'export_toolbar'):
+                return False
+            
+            export_toolbar = report_panel.export_toolbar
+            if not export_toolbar:
+                return False
+            
+            # Get metadata from export toolbar
+            if not hasattr(export_toolbar, 'metadata') or not export_toolbar.metadata:
+                # No metadata yet - this is OK, don't treat as error
+                return True
+            
+            # Save metadata to .shypn file
+            from shypn.reporting.metadata.metadata_storage import MetadataStorage
+            success = MetadataStorage.save_to_shypn_file(shypn_path, export_toolbar.metadata)
+            
+            if success:
+                # Update export toolbar's filepath so it knows where metadata is saved
+                export_toolbar.set_filepath(shypn_path)
+            
+            return success
+            
+        except Exception as e:
+            print(f"Error saving metadata for document: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+
     def save_current_document(self):
         """Save the current document using per-document state.
         
@@ -1469,8 +1551,11 @@ class FileExplorerPanel:
             # Determine if we need to auto-generate a filepath
             needs_new_filepath = not manager.has_filepath() or manager.is_default_filename()
             
+            print(f"[SAVE] has_filepath={manager.has_filepath()}, is_default={manager.is_default_filename()}, needs_new={needs_new_filepath}")
+            print(f"[SAVE] filepath={manager.filepath}, filename={manager.filename}")
             
             if needs_new_filepath:
+                print("[SAVE] Opening file chooser dialog...")
                 # Open file chooser dialog for default/imported files
                 
                 # Determine initial directory: project/models/ if project is open, otherwise workspace
@@ -1493,11 +1578,11 @@ class FileExplorerPanel:
                 dialog = Gtk.FileChooserDialog(
                     title="Save File",
                     transient_for=self.parent_window,
-                    action=Gtk.FileChooserAction.SAVE,
-                    buttons=(
-                        Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
-                        Gtk.STOCK_SAVE, Gtk.ResponseType.OK
-                    )
+                    action=Gtk.FileChooserAction.SAVE
+                )
+                dialog.add_buttons(
+                    Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+                    Gtk.STOCK_SAVE, Gtk.ResponseType.OK
                 )
                 
                 # Set initial directory and filename
@@ -1524,6 +1609,7 @@ class FileExplorerPanel:
                 
                 if response == Gtk.ResponseType.OK:
                     filepath = dialog.get_filename()
+                    print(f"[SAVE] User selected: {filepath}")
                     
                     # Ensure .shy extension
                     if not filepath.endswith('.shy'):
@@ -1532,6 +1618,8 @@ class FileExplorerPanel:
                     # Save to selected file
                     document.save_to_file(filepath)
                     
+                    # Save metadata to .shypn file
+                    self._save_metadata_for_document(drawing_area, filepath)
                     
                     # Update manager state
                     manager.set_filepath(filepath)
@@ -1544,7 +1632,7 @@ class FileExplorerPanel:
                     self.set_current_file(filepath)
                     self._load_current_directory()  # Refresh file tree
                 else:
-                    pass
+                    print("[SAVE] User cancelled file chooser")
                 
                 # Close dialog
                 dialog.destroy()
@@ -1553,8 +1641,12 @@ class FileExplorerPanel:
                 # Direct save to existing file
                 filepath = manager.get_filepath()
                 
+                print(f"[SAVE] Direct save to existing file: {filepath}")
                 
                 document.save_to_file(filepath)
+                
+                # Save metadata to .shypn file
+                self._save_metadata_for_document(drawing_area, filepath)
                 
                 # Update manager state
                 manager.mark_clean()
@@ -1593,6 +1685,9 @@ class FileExplorerPanel:
             # Convert canvas state to document model
             document = manager.to_document_model()
             
+            print(f"[SAVE_AS] Starting Save As dialog...")
+            print(f"[SAVE_AS] filepath={manager.filepath}, filename={manager.filename}")
+            
             # Determine initial directory: project/models/ if project is open, otherwise workspace
             if self.project:
                 pass
@@ -1618,11 +1713,11 @@ class FileExplorerPanel:
             dialog = Gtk.FileChooserDialog(
                 title="Save As",
                 transient_for=self.parent_window,
-                action=Gtk.FileChooserAction.SAVE,
-                buttons=(
-                    Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
-                    Gtk.STOCK_SAVE, Gtk.ResponseType.OK
-                )
+                action=Gtk.FileChooserAction.SAVE
+            )
+            dialog.add_buttons(
+                Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+                Gtk.STOCK_SAVE, Gtk.ResponseType.OK
             )
             
             # Set initial directory
@@ -1649,8 +1744,11 @@ class FileExplorerPanel:
             response = dialog.run()
             filepath = None
             
+            print(f"[SAVE_AS] Dialog response: {response}")
+            
             if response == Gtk.ResponseType.OK:
                 filepath = dialog.get_filename()
+                print(f"[SAVE_AS] User selected: {filepath}")
                 
                 # Ensure .shy extension
                 if not filepath.endswith('.shy'):
@@ -1659,6 +1757,8 @@ class FileExplorerPanel:
                 # Save to selected file
                 document.save_to_file(filepath)
                 
+                # Save metadata to .shypn file
+                self._save_metadata_for_document(drawing_area, filepath)
                 
                 # Update manager state
                 manager.set_filepath(filepath)
@@ -1885,6 +1985,30 @@ class FileExplorerPanel:
             # Initialize manager's filepath and mark as clean (just loaded)
             manager.set_filepath(filepath)
             manager.mark_clean()  # Just loaded, no unsaved changes
+            
+            # Notify report panel that file was opened (for metadata loading)
+            # Determine metadata path based on project structure
+            if self.project and hasattr(self.project, 'get_metadata_dir'):
+                metadata_dir = self.project.get_metadata_dir()
+                if metadata_dir:
+                    # Look for metadata in project/metadata/ directory
+                    model_filename = os.path.basename(filepath).replace('.shy', '.shypn')
+                    shypn_path = os.path.join(metadata_dir, model_filename)
+                else:
+                    # Fallback: look alongside model file
+                    shypn_path = filepath.replace('.shy', '.shypn')
+            else:
+                # No project context: look alongside model file
+                shypn_path = filepath.replace('.shy', '.shypn')
+            
+            if drawing_area in self.canvas_loader.overlay_managers:
+                overlay_manager = self.canvas_loader.overlay_managers.get(drawing_area)
+                if overlay_manager and hasattr(overlay_manager, 'report_panel_loader'):
+                    report_panel_loader = overlay_manager.report_panel_loader
+                    if report_panel_loader and hasattr(report_panel_loader, 'panel'):
+                        report_panel = report_panel_loader.panel
+                        if hasattr(report_panel, 'on_file_opened'):
+                            report_panel.on_file_opened(shypn_path)
             
             # Update manager's filename to match the loaded file
             manager.filename = base_name

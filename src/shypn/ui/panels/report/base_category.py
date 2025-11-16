@@ -115,6 +115,25 @@ class BaseReportCategory:
         """
         return f"<h2>{self.title}</h2>\n<p>(Export not implemented)</p>\n"
     
+    def get_structured_data(self):
+        """Get structured data for document generation.
+        
+        Returns dictionary with category data in a format suitable for
+        PDF/Excel/HTML generation. Should be implemented by subclasses.
+        
+        Returns:
+            dict: Structured data dictionary with keys like:
+                - 'title': Category title
+                - 'has_data': Boolean indicating if there's meaningful data
+                - 'summary': Brief text summary
+                - ... (category-specific fields)
+        """
+        return {
+            'title': self.title,
+            'has_data': False,
+            'summary': 'No data available'
+        }
+    
     def _create_label(self, text, bold=False, xalign=0):
         """Helper to create a label.
         

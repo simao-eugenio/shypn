@@ -178,6 +178,60 @@ class ProvenanceCategory(BaseReportCategory):
         
         return "\n".join(lines)
     
+    def get_structured_data(self):
+        """Get structured provenance data for document generation.
+        
+        Returns:
+            dict: Provenance data with keys:
+                - title: 'Provenance & Lineage'
+                - has_data: Boolean
+                - pathways: list of pathway dicts with source info
+                - summary: dict with counts by type
+        """
+        if not self.project or not hasattr(self.project, 'pathways'):
+            return {
+                'title': 'Provenance & Lineage',
+                'has_data': False,
+                'summary': 'No project loaded'
+            }
+        
+        pathways = self.project.pathways.list_pathways()
+        
+        # Build pathways list
+        pathways_data = []
+        for pathway in pathways:
+            pathways_data.append({
+                'name': pathway.name or 'Untitled',
+                'source_type': pathway.source_type or 'Unknown',
+                'source_id': pathway.source_id or 'N/A',
+                'organism': pathway.source_organism or 'N/A',
+                'import_date': str(pathway.imported_date) if hasattr(pathway, 'imported_date') and pathway.imported_date else 'N/A',
+                'raw_file': pathway.raw_file if hasattr(pathway, 'raw_file') else None,
+                'model_id': pathway.model_id if hasattr(pathway, 'model_id') else None,
+                'enrichments_count': len(pathway.enrichments) if hasattr(pathway, 'enrichments') else 0
+            })
+        
+        # Build summary
+        kegg_count = len([p for p in pathways if p.source_type == 'kegg'])
+        sbml_count = len([p for p in pathways if p.source_type == 'sbml'])
+        converted_count = len([p for p in pathways if p.model_id])
+        enriched_count = len([p for p in pathways if p.enrichments])
+        
+        summary = {
+            'total': len(pathways),
+            'kegg': kegg_count,
+            'sbml': sbml_count,
+            'converted': converted_count,
+            'enriched': enriched_count
+        }
+        
+        return {
+            'title': 'Provenance & Lineage',
+            'has_data': len(pathways) > 0,
+            'pathways': pathways_data,
+            'summary': summary
+        }
+    
     def export_to_text(self):
         """Export as plain text."""
         if not self.project or not hasattr(self.project, 'pathways'):

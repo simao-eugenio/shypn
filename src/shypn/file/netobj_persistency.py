@@ -279,7 +279,7 @@ class NetObjPersistency:
             return True
         # Ensure parent window is set (fixes Wayland crash)
         parent = self.parent_window if self.parent_window else None
-        dialog = Gtk.MessageDialog(parent=parent, modal=True, message_type=Gtk.MessageType.WARNING, buttons=Gtk.ButtonsType.NONE, text='Unsaved changes')
+        dialog = Gtk.MessageDialog(transient_for=parent, modal=True, message_type=Gtk.MessageType.WARNING, buttons=Gtk.ButtonsType.NONE, text='Unsaved changes')
         dialog.set_keep_above(True)  # Ensure dialog stays on top
         dialog.format_secondary_text(f"Document '{self.get_display_name()}' has unsaved changes.\n" + 'Do you want to save before continuing?')
         dialog.add_button('Cancel', Gtk.ResponseType.CANCEL)
@@ -560,7 +560,7 @@ class NetObjPersistency:
         """
         # Ensure parent window is set (fixes Wayland crash)
         parent = self.parent_window if self.parent_window else None
-        dialog = Gtk.MessageDialog(parent=parent, modal=True, message_type=Gtk.MessageType.INFO, buttons=Gtk.ButtonsType.OK, text=title)
+        dialog = Gtk.MessageDialog(transient_for=parent, modal=True, message_type=Gtk.MessageType.INFO, buttons=Gtk.ButtonsType.OK, text=title)
         dialog.set_keep_above(True)  # Ensure dialog stays on top
         dialog.format_secondary_text(message)
         dialog.run()
@@ -575,7 +575,7 @@ class NetObjPersistency:
         """
         # Ensure parent window is set (fixes Wayland crash)
         parent = self.parent_window if self.parent_window else None
-        dialog = Gtk.MessageDialog(parent=parent, modal=True, message_type=Gtk.MessageType.ERROR, buttons=Gtk.ButtonsType.OK, text=title)
+        dialog = Gtk.MessageDialog(transient_for=parent, modal=True, message_type=Gtk.MessageType.ERROR, buttons=Gtk.ButtonsType.OK, text=title)
         dialog.set_keep_above(True)  # Ensure dialog stays on top
         dialog.format_secondary_text(message)
         dialog.run()

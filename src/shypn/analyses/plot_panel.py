@@ -237,6 +237,10 @@ class AnalysisPlotPanel(Gtk.Box):
         index = len(self.selected_objects)
         color_hex = self._get_color(index)
         
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.debug(f"[COLOR_PLACE] add_object: obj={obj.id}, index={index}, color={color_hex}")
+        
         # Convert hex color to RGB tuple for Cairo rendering
         # Hex format: '#e74c3c' -> RGB tuple: (0.906, 0.298, 0.235)
         import matplotlib.colors as mcolors
@@ -247,6 +251,7 @@ class AnalysisPlotPanel(Gtk.Box):
         from shypn.netobjs import Transition
         
         obj.border_color = color_rgb
+        logger.debug(f"[COLOR_PLACE] Set border_color={color_rgb} on {type(obj).__name__} {obj.id}")
         
         # Only set fill_color for Transitions (Places don't have fill_color)
         if isinstance(obj, Transition):
@@ -254,7 +259,10 @@ class AnalysisPlotPanel(Gtk.Box):
         
         # Trigger object's on_changed callback to notify the canvas
         if hasattr(obj, 'on_changed') and obj.on_changed:
+            logger.debug(f"[COLOR_PLACE] Calling on_changed callback")
             obj.on_changed()
+        else:
+            logger.warning(f"[COLOR_PLACE] No on_changed callback for {type(obj).__name__} {obj.id}!")
         
         self.selected_objects.append(obj)
         # Add UI row immediately without full rebuild
@@ -263,7 +271,10 @@ class AnalysisPlotPanel(Gtk.Box):
         
         # Trigger canvas redraw to show the new border color
         if self._model_manager:
+            logger.debug(f"[COLOR_PLACE] Calling mark_needs_redraw()")
             self._model_manager.mark_needs_redraw()
+        else:
+            logger.warning(f"[COLOR_PLACE] No model_manager, cannot trigger redraw!")
 
 
     def remove_object(self, obj: Any):

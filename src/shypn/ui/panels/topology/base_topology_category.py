@@ -538,7 +538,8 @@ class BaseTopologyCategory:
             "Run all safe analyzers in priority order:\n"
             "• Priority 1 (Fastest): O(n) algorithms run first\n"
             "• Priority 2 (Fast): O(n²) algorithms run second\n"
-            "• Priority 3-4: Slower algorithms skipped (run manually)\n\n"
+            "• Priority 3: Exponential algorithms (auto-run on small models < 15 objects)\n"
+            "• Priority 4: Critical algorithms skipped (run manually)\n\n"
             "Fast algorithms display results immediately while slower ones complete."
         )
         toolbar.pack_start(self.run_all_button, False, False, 0)
@@ -638,13 +639,27 @@ class BaseTopologyCategory:
         print(f"[{self.__class__.__name__}] Got {len(analyzers)} analyzers: {list(analyzers.keys())}")
         analyzer_list = []
         
+        # Check model size for smart Priority 3 filtering
+        model_size = self._get_model_size(drawing_area)
+        is_small_model = model_size > 0 and model_size < 15
+        print(f"[{self.__class__.__name__}] Model size: {model_size} objects (small model: {is_small_model})")
+        
         for analyzer_name in analyzers.keys():
-            # Skip dangerous analyzers unless already analyzed
+            # Handle dangerous analyzers based on model size
             if analyzer_name in DANGEROUS_ANALYZERS:
                 analyzed_set = self.analyzed.get(drawing_area, set())
                 if analyzer_name not in analyzed_set:
-                    # Skip dangerous analyzers in "Run All"
-                    continue
+                    metadata = ANALYZER_METADATA.get(analyzer_name, {})
+                    priority = metadata.get('priority', 5)
+                    
+                    # Allow Priority 3 analyzers on small models (< 15 objects)
+                    # Priority 4+ (siphons, traps) still require manual execution
+                    if priority == 3 and is_small_model:
+                        print(f"[{self.__class__.__name__}] Including Priority 3 analyzer '{analyzer_name}' for small model")
+                    else:
+                        # Skip Priority 4+ or Priority 3 on large models
+                        print(f"[{self.__class__.__name__}] Skipping dangerous analyzer '{analyzer_name}' (Priority {priority})")
+                        continue
             
             # Get priority from metadata (default to 5 if not found)
             metadata = ANALYZER_METADATA.get(analyzer_name, {})
@@ -1531,6 +1546,45 @@ class BaseTopologyCategory:
         self._run_analyzer(analyzer_name, drawing_area)
         return False  # Don't repeat
     
+    def _get_model_size(self, drawing_area):
+        """Get total number of objects (places + transitions) in the model.
+        
+        Args:
+            drawing_area: Current drawing area
+            
+        Returns:
+            int: Total number of objects (places + transitions), or 0 if no model
+        """
+        if not self.model_canvas:
+            return 0
+        
+        # Get canvas manager
+        manager = None
+        if hasattr(self.model_canvas, 'get_canvas_manager'):
+            manager = self.model_canvas.get_canvas_manager(drawing_area)
+        elif hasattr(self.model_canvas, 'canvas_managers'):
+            manager = self.model_canvas.canvas_managers.get(drawing_area)
+        
+        if not manager:
+            return 0
+        
+        # Convert to DocumentModel
+        try:
+            if hasattr(manager, 'to_document_model'):
+                model = manager.to_document_model()
+            else:
+                return 0
+        except Exception:
+            return 0
+        
+        if not model or not hasattr(model, 'places'):
+            return 0
+        
+        n_places = len(model.places)
+        n_transitions = len(model.transitions)
+        
+        return n_places + n_transitions
+    
     def _check_model_complexity(self):
         """Check if model complexity is viable for behavioral analysis.
         
@@ -1544,11 +1598,34 @@ class BaseTopologyCategory:
                 - n_places: Number of places in model
                 - reason: String explaining why not viable (or None if viable)
         """
-        if not self.model_canvas or not hasattr(self.model_canvas, 'model'):
+        if not self.model_canvas:
             return (False, 0, 0, "No model loaded")
         
-        model = self.model_canvas.model
-        if not model or not hasattr(model, 'places'):
+        # Get current drawing area
+        drawing_area = self._get_current_drawing_area()
+        if not drawing_area:
+            return (False, 0, 0, "No model loaded")
+        
+        # Get canvas manager
+        manager = None
+        if hasattr(self.model_canvas, 'get_canvas_manager'):
+            manager = self.model_canvas.get_canvas_manager(drawing_area)
+        elif hasattr(self.model_canvas, 'canvas_managers'):
+            manager = self.model_canvas.canvas_managers.get(drawing_area)
+        
+        if not manager:
+            return (False, 0, 0, "No model loaded")
+        
+        # Convert to DocumentModel
+        try:
+            if hasattr(manager, 'to_document_model'):
+                model = manager.to_document_model()
+            else:
+                return (False, 0, 0, "No model loaded")
+        except Exception:
+            return (False, 0, 0, "No model loaded")
+        
+        if not model or not hasattr(model, 'places') or model.is_empty():
             return (False, 0, 0, "No model loaded")
         
         n_places = len(model.places)

@@ -173,6 +173,33 @@ class StochasticBehavior(TransitionBehavior):
             return rate
             
         except Exception as e:
+            # If NameError, suggest similar function names
+            if isinstance(e, NameError):
+                try:
+                    import re
+                    import difflib
+                    # Import at module level to avoid UnboundLocalError
+                    from shypn.engine import function_catalog
+                    
+                    # Extract undefined name from error message
+                    match = re.search(r"name '(\w+)' is not defined", str(e))
+                    if match:
+                        undefined_name = match.group(1)
+                        # Find close matches (case-insensitive)
+                        close_matches = difflib.get_close_matches(
+                            undefined_name.lower(), 
+                            [name.lower() for name in function_catalog.FUNCTION_CATALOG.keys()],
+                            n=3,
+                            cutoff=0.6
+                        )
+                        if close_matches:
+                            # Get actual function names (preserving case)
+                            actual_names = [name for name in function_catalog.FUNCTION_CATALOG.keys() 
+                                          if name.lower() in close_matches]
+                            print(f"   💡 Did you mean: {', '.join(actual_names)}?")
+                except Exception:
+                    pass  # Silently skip suggestion if import fails
+            
             raise RuntimeError(
                 f"Failed to evaluate rate_function for stochastic transition '{self.transition.name}': {e}\n"
                 f"Expression: {self.rate_function_expr}\n"

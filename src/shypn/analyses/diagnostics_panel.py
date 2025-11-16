@@ -290,10 +290,52 @@ class DiagnosticsPanel:
             text_lines.append("━━━ Runtime Diagnostics ━━━")
             text_lines.append("  No data collector available")
         
-        # Update TextView
+        # Update TextView with scroll position preservation
         if self.textview:
+            self._update_text_preserve_scroll("\n".join(text_lines))
+    
+    def _update_text_preserve_scroll(self, text):
+        """Update TextView text while preserving scroll position.
+        
+        Args:
+            text: New text to display
+        """
+        if not self.textview:
+            return
+        
+        # Get the parent ScrolledWindow
+        parent = self.textview.get_parent()
+        if not isinstance(parent, Gtk.ScrolledWindow):
+            # Fallback: just update text without preserving scroll
             buffer = self.textview.get_buffer()
-            buffer.set_text("\n".join(text_lines))
+            buffer.set_text(text)
+            return
+        
+        # Get current scroll position
+        vadjustment = parent.get_vadjustment()
+        old_value = vadjustment.get_value()
+        old_upper = vadjustment.get_upper()
+        
+        # Update text
+        buffer = self.textview.get_buffer()
+        buffer.set_text(text)
+        
+        # Wait for text to be laid out, then restore scroll position
+        def restore_scroll():
+            new_upper = vadjustment.get_upper()
+            
+            # If we were at the bottom before, stay at the bottom
+            # (allows auto-scrolling for new content)
+            if old_value >= old_upper - vadjustment.get_page_size() - 1:
+                vadjustment.set_value(new_upper - vadjustment.get_page_size())
+            else:
+                # Otherwise preserve the old position
+                vadjustment.set_value(old_value)
+            
+            return False  # Don't repeat
+        
+        # Schedule scroll restoration after layout
+        GLib.idle_add(restore_scroll)
     
     def _show_no_transition(self):
         """Show message when no transition selected."""

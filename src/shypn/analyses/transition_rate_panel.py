@@ -116,6 +116,8 @@ class TransitionRatePanel(AnalysisPlotPanel):
         index = len(self.selected_objects)
         color_hex = self._get_color(index)
         
+        logger.debug(f"[COLOR] add_object: transition={obj.id}, index={index}, color={color_hex}")
+        
         # Convert hex color to RGB tuple for Cairo rendering
         import matplotlib.colors as mcolors
         color_rgb = mcolors.hex2color(color_hex)
@@ -123,10 +125,14 @@ class TransitionRatePanel(AnalysisPlotPanel):
         # Set both border and fill color to match the plot color
         obj.border_color = color_rgb
         obj.fill_color = color_rgb
+        logger.debug(f"[COLOR] Set border_color={color_rgb}, fill_color={color_rgb}")
         
         # Trigger object's on_changed callback to notify the canvas
         if hasattr(obj, 'on_changed') and obj.on_changed:
+            logger.debug(f"[COLOR] Calling on_changed callback")
             obj.on_changed()
+        else:
+            logger.warning(f"[COLOR] No on_changed callback for transition {obj.id}!")
         
         self.selected_objects.append(obj)
         # Use full rebuild to show locality places in UI list
@@ -135,7 +141,10 @@ class TransitionRatePanel(AnalysisPlotPanel):
         
         # Trigger canvas redraw to show the new colors
         if self._model_manager:
+            logger.debug(f"[COLOR] Calling mark_needs_redraw()")
             self._model_manager.mark_needs_redraw()
+        else:
+            logger.warning(f"[COLOR] No model_manager, cannot trigger redraw!")
         
         # Notify Report panel of selection change (if callback is set)
         if self.on_selection_changed_callback:
@@ -715,7 +724,10 @@ class TransitionRatePanel(AnalysisPlotPanel):
             transition: Transition object
             locality: Locality object with input/output places
         """
+        logger.debug(f"[LOCALITY] add_locality_places called: transition={transition.id}, locality.is_valid={locality.is_valid}, place_panel={self._place_panel is not None}")
+        
         if not locality.is_valid:
+            logger.warning(f"[LOCALITY] Locality is invalid, skipping")
             return
         
         # Store locality information
@@ -724,19 +736,27 @@ class TransitionRatePanel(AnalysisPlotPanel):
             'output_places': list(locality.output_places),
             'transition': transition
         }
+        logger.debug(f"[LOCALITY] Stored locality: {len(locality.input_places)} inputs, {len(locality.output_places)} outputs")
         
         # Get transition's plot color (should already be set from add_object)
         transition_color = getattr(transition, 'border_color', None)
+        logger.debug(f"[LOCALITY] Transition color: {transition_color}")
         
         # Actually add the locality places to the PlaceRatePanel for plotting
         if self._place_panel is not None:
+            logger.debug(f"[LOCALITY] Adding {len(locality.input_places)} input places and {len(locality.output_places)} output places to PlaceRatePanel")
             # Add input places
             for place in locality.input_places:
+                logger.debug(f"[LOCALITY] Adding input place {place.id} to place_panel")
                 self._place_panel.add_object(place)
             
             # Add output places
             for place in locality.output_places:
+                logger.debug(f"[LOCALITY] Adding output place {place.id} to place_panel")
                 self._place_panel.add_object(place)
+            logger.debug(f"[LOCALITY] All places added to PlaceRatePanel")
+        else:
+            logger.warning(f"[LOCALITY] _place_panel is None! Cannot add locality places to place panel")
         
         # Color the arcs that belong to this locality with transition's plot color
         if transition_color and self._model_manager:

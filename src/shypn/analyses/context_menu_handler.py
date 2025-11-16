@@ -251,8 +251,15 @@ class ContextMenuHandler:
             panel: TransitionRatePanel instance
         """
         
-        # Check if locality detector exists
+        # Ensure we have a locality detector - create one if missing
+        if not self.locality_detector and self.model:
+            from shypn.diagnostic import LocalityDetector
+            self.locality_detector = LocalityDetector(self.model)
+            logger.debug(f"[CTX_MENU] Created locality detector for model {id(self.model)}")
+        
+        # If still no locality detector (no model), add simple menu item
         if not self.locality_detector:
+            logger.warning(f"[CTX_MENU] No locality detector - model is None")
             menu_item = Gtk.MenuItem(label=f"Add to Transition Analysis")
             menu_item.connect("activate", 
                             lambda w: self._on_add_to_analysis_clicked(transition, panel))
@@ -261,10 +268,13 @@ class ContextMenuHandler:
             return
         
         # Detect locality
+        logger.debug(f"[CTX_MENU] Detecting locality for transition {transition.id}")
         locality = self.locality_detector.get_locality_for_transition(transition)
+        logger.debug(f"[CTX_MENU] Locality valid={locality.is_valid}, inputs={len(locality.input_places)}, outputs={len(locality.output_places)}")
         
         if not locality.is_valid:
             # No valid locality, add simple menu item
+            logger.debug(f"[CTX_MENU] Invalid locality - adding transition only (no locality)")
             menu_item = Gtk.MenuItem(label=f"Add to Transition Analysis")
             menu_item.connect("activate", 
                             lambda w: self._on_add_to_analysis_clicked(transition, panel))
@@ -274,6 +284,7 @@ class ContextMenuHandler:
         
         # Create menu item that automatically adds transition + locality
         locality_count = locality.place_count
+        logger.debug(f"[CTX_MENU] Valid locality with {locality_count} places - will add transition+locality")
         menu_item = Gtk.MenuItem(label=f"Add to Transition Analysis")
         menu_item.connect("activate",
                          lambda w: self._add_transition_with_locality(transition, locality, panel))
@@ -298,22 +309,20 @@ class ContextMenuHandler:
             locality: Locality object with input/output places
             panel: TransitionRatePanel instance
         """
+        logger.debug(f"[CTX_MENU] _add_transition_with_locality called: transition={transition.id}, locality.is_valid={locality.is_valid}, panel={type(panel).__name__}")
+        
         # Add transition (border color will be set automatically in panel.add_object)
         panel.add_object(transition)
-        
-        # Add locality places if panel supports it
-        # (these places will also get their border colors set automatically)
-        if hasattr(panel, 'add_locality_places') and locality and locality.is_valid:
-            panel.add_locality_places(transition, locality)
+        logger.debug(f"[CTX_MENU] Transition {transition.id} added to panel")
         
         # Add locality places if panel supports it
         # (these places will also get their border colors set automatically)
         if hasattr(panel, 'add_locality_places'):
-            logger.debug("[CTX_MENU] Calling panel.add_locality_places()")
+            logger.debug(f"[CTX_MENU] Panel has add_locality_places method, calling it now...")
             panel.add_locality_places(transition, locality)
-            logger.debug("[CTX_MENU] panel.add_locality_places() completed")
+            logger.debug(f"[CTX_MENU] panel.add_locality_places() completed successfully")
         else:
-            logger.debug("[CTX_MENU] Panel missing add_locality_places; locality not added")
+            logger.warning(f"[CTX_MENU] Panel missing add_locality_places method! Panel type: {type(panel)}")
         
         # Request canvas redraw to show new border colors
         if self.model:

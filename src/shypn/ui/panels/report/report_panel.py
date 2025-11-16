@@ -104,7 +104,8 @@ class ReportPanel(Gtk.Box):
         self.pack_start(separator, False, False, 0)
         
         # ===== EXPORT TOOLBAR =====
-        self.export_toolbar = ExportToolbar(parent_window=self.get_toplevel())
+        self.export_toolbar = ExportToolbar()
+        self.export_toolbar.set_parent_panel(self)  # Give toolbar access to this panel
         self.pack_start(self.export_toolbar, False, False, 0)
         
         # Separator after toolbar
@@ -232,19 +233,19 @@ class ReportPanel(Gtk.Box):
         box.set_margin_bottom(12)
         
         # Export PDF button
-        pdf_btn = Gtk.Button(label="📤 Export PDF")
+        pdf_btn = Gtk.Button(label="Export PDF")
         pdf_btn.set_tooltip_text("Export full report as PDF")
         pdf_btn.connect('clicked', self._on_export_pdf)
         box.pack_start(pdf_btn, True, True, 0)
         
         # Export HTML button
-        html_btn = Gtk.Button(label="📤 Export HTML")
+        html_btn = Gtk.Button(label="Export HTML")
         html_btn.set_tooltip_text("Export full report as HTML")
         html_btn.connect('clicked', self._on_export_html)
         box.pack_start(html_btn, True, True, 0)
         
         # Copy button
-        copy_btn = Gtk.Button(label="📋 Copy Text")
+        copy_btn = Gtk.Button(label="Copy Text")
         copy_btn.set_tooltip_text("Copy report as plain text")
         copy_btn.connect('clicked', self._on_copy_text)
         box.pack_start(copy_btn, True, True, 0)
