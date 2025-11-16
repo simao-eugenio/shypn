@@ -1627,7 +1627,6 @@ class FileExplorerPanel:
                     self.canvas_loader.update_current_tab_label(filename, is_modified=False)
                     self.set_current_file(filepath)
                     self._load_current_directory()  # Refresh file tree
-                else:
                 
                 # Close dialog
                 dialog.destroy()
