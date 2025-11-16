@@ -770,7 +770,6 @@ def main(argv=None):
 							if hasattr(overlay_manager, 'simulation_controller'):
 								simulation_controller = overlay_manager.simulation_controller
 								report_loader.panel.set_controller(simulation_controller)
-								print(f"[TAB_REPORT] ✅ Set controller to refresh Report Panel data")
 							
 							model_canvas_loader.report_panel_container.pack_start(report_loader.panel, True, True, 0)
 							report_loader.parent_container = model_canvas_loader.report_panel_container

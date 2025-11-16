@@ -4831,13 +4831,7 @@ class ModelCanvasLoader:
             page_num = self.notebook.page_num(page_widget)
         is_current_page = (page_num == current_page_num)
         
-        print(f"  page_widget: {page_widget}")
-        print(f"  page_mapped: {page_mapped}, drawing_mapped: {drawing_mapped}")
-        print(f"  page_realized: {page_realized}, drawing_realized: {drawing_realized}")
-        print(f"  page_num: {page_num}, current_page_num: {current_page_num}, is_current: {is_current_page}")
-        
         if not (page_mapped and drawing_mapped and is_current_page):
-            print(f"  Reason: page_mapped={page_mapped}, drawing_mapped={drawing_mapped}, is_current={is_current_page}")
             # Use timeout to defer dialog opening until both widgets are mapped
             from gi.repository import GLib
             
