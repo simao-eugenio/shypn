@@ -239,8 +239,8 @@ class TopologyAnalysesCategory(BaseReportCategory):
         if isinstance(cycles, (int, float)) and cycles > 0:
             findings.append(f"{cycles} feedback cycle(s) detected")
         
-        hubs = stats.get('hubs', 0)
-        if hubs > 0:
+        hubs = stats.get('hubs', 0) or 0
+        if isinstance(hubs, (int, float)) and hubs > 0:
             findings.append(f"{hubs} hub node(s) identified")
         
         # Behavioral findings
