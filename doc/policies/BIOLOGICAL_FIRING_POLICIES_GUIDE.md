@@ -385,12 +385,84 @@ Is this a kinetic competition between enzymes?
 
 ---
 
+## Technical Implementation: Continuous Transitions and Conflict Resolution
+
+### How Continuous Transitions are Scheduled
+
+**Important:** When continuous transitions are placed under firing policy control, they become **piecewise continuous** rather than fully continuous:
+
+1. **Conflict Resolution at Time Step Boundaries**
+   - At each simulation time step `t`, the scheduler identifies which continuous transitions share input places
+   - The firing policy (race, priority, etc.) selects which transitions will participate in the integration step `[t, t+dt]`
+   - Transitions that "lose" the conflict are **paused** for that time step
+
+2. **Continuous Integration Within Time Steps**
+   - Selected transitions integrate continuously over the interval `[t, t+dt]` using RK4 (Runge-Kutta 4th order)
+   - The ODE integration is **not interrupted** during the time step - it completes the full `dt` interval
+   - Token flow follows the rate function: `dM/dt = rate(M, t)`
+
+3. **Piecewise Continuous Behavior**
+   - The system is continuous **within** each time step: `[t₀, t₁], [t₁, t₂], [t₂, t₃], ...`
+   - The set of active transitions can **change between** time steps based on conflict resolution
+   - This creates piecewise continuous trajectories where slopes can change at time step boundaries
+
+### Mathematical Formulation
+
+For continuous transitions with conflict:
+
+```
+At time t:
+1. Evaluate enablement: E(t) = {transitions that can_fire()}
+2. Find conflicts: C = {groups sharing input places}
+3. Apply policy: W(t) = select_transitions(C, policy)
+4. Integrate over [t, t+dt]: M(t+dt) = M(t) + ∫ᵗᵗ⁺ᵈᵗ rate(M(τ), τ) dτ
+5. Advance: t ← t + dt
+```
+
+### Biological Validity
+
+This piecewise continuous approach is **biologically appropriate** because:
+
+1. **Time step `dt` represents measurement/reaction granularity**
+   - In biology, reactions don't happen instantaneously - they have finite timescales
+   - The time step should match the fastest reaction timescale in your system
+   - Typical values: `dt = 0.001` to `0.1` seconds depending on kinetics
+
+2. **Conflict resolution represents molecular competition**
+   - 'race' policy: Transitions compete stochastically based on rates (Gillespie-like)
+   - 'priority' policy: Regulatory control determines which pathway dominates
+   - The "winner" consumes substrates during `[t, t+dt]`, preventing others from firing
+
+3. **Matches hybrid systems formalism**
+   - Standard in tools like Cell Designer, COPASI, and hybrid Petri net simulators
+   - Allows modeling systems with both fast (continuous) and slow (discrete) dynamics
+   - Supports mode switching (e.g., metabolic state changes)
+
+### When to Use Smaller Time Steps
+
+If you need smoother continuous behavior with less "piecewise" character:
+
+- **Decrease `dt`** in simulation settings (e.g., from 0.1 to 0.01)
+- Smaller time steps = more frequent conflict resolution = smoother transitions between states
+- Trade-off: Computation time increases linearly with `1/dt`
+
+### Alternative: Pure Continuous (No Conflict Resolution)
+
+If you want truly continuous behavior without conflict resolution:
+
+- Set **all conflicting transitions to the same firing policy** (e.g., all 'race')
+- OR ensure transitions **don't share input places** (restructure network)
+- OR use a **continuous ODE solver** outside the Petri net formalism
+
+---
+
 ## References
 
 1. **Gillespie Algorithm:** Gillespie, D.T. (1977). "Exact stochastic simulation of coupled chemical reactions"
 2. **Mass Action Kinetics:** Guldberg, C.M. & Waage, P. (1864). "Studies Concerning Affinity"
 3. **Stochastic Petri Nets:** Marsan, M.A. et al. (1995). "Modelling with Generalized Stochastic Petri Nets"
-4. **Systems Biology:** Kitano, H. (2002). "Systems Biology: A Brief Overview"
+4. **Hybrid Petri Nets:** David, R. & Alla, H. (2010). "Discrete, Continuous, and Hybrid Petri Nets"
+5. **Systems Biology:** Kitano, H. (2002). "Systems Biology: A Brief Overview"
 
 ---
 
@@ -398,6 +470,8 @@ Is this a kinetic competition between enzymes?
 
 - **2025-11-16:** Initial documentation
   - Added conflict resolution for continuous transitions
+  - Documented piecewise continuous behavior
+  - Explained biological validity of time-stepped integration
   - Changed default from `random` to `race`
   - Unified scheduler across all transition types
 
