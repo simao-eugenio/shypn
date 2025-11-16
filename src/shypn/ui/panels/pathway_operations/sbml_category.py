@@ -553,128 +553,139 @@ class SBMLCategory(BasePathwayCategory):
             
             # For auto-load, we need the canvas_loader to create a new tab
             if canvas_loader and document_model and saved_filepath:
-                try:
-                    self.logger.info("✓ Auto-loading imported model into new canvas tab...")
-                    
-                    # Get base name for tab
-                    base_name = os.path.splitext(os.path.basename(saved_filepath))[0]
-                    self.logger.info(f"Loading model: {base_name}")
-                    
-                    # UNIFIED APPROACH: Always create fresh canvas via add_document()
-                    # This ensures IDENTICAL initialization to File→New and File→Open:
-                    # - Fresh ModelCanvasManager
-                    # - Proper controller wiring
-                    # - Report Panel creation and registration
-                    # - Callback setup
-                    # Benefits: No reuse logic complexity, consistent behavior, no stale state
-                    self.logger.info(f"Creating fresh canvas for SBML import: {base_name}")
-                    
-                    # DEFENSIVE: Wrap canvas operations in try-except to catch errors
+                # PERFORMANCE FIX: Defer canvas loading to prevent UI freeze
+                # Canvas operations (creating tab, loading objects, fitting) are heavy
+                # and block the UI if done synchronously. By using GLib.idle_add,
+                # we allow the GTK event loop to process other events between steps.
+                
+                def do_canvas_load():
+                    """Deferred canvas loading to keep UI responsive."""
                     try:
-                        page_index, drawing_area = canvas_loader.add_document(filename=base_name)
-                    except Exception as e:
-                        raise ValueError(f"Failed to create new canvas tab: {e}")
-                    
-                    if drawing_area is None:
-                        raise ValueError("add_document() returned None for drawing_area")
-                    
-                    try:
-                        canvas_manager = canvas_loader.get_canvas_manager(drawing_area)
-                    except Exception as e:
-                        raise ValueError(f"Failed to get canvas manager: {e}")
-                    
-                    if not canvas_manager:
-                        raise ValueError("get_canvas_manager() returned None")
-                    
-                    # ===== UNIFIED OBJECT LOADING =====
-                    # Use load_objects() for consistent initialization (same as File → Open)
-                    try:
-                        canvas_manager.load_objects(
-                            places=document_model.places,
-                            transitions=document_model.transitions,
-                            arcs=document_model.arcs
-                        )
-                    except Exception as e:
-                        raise ValueError(f"Failed to load objects to canvas: {e}")
-                    
-                    # CRITICAL: Set change callback for proper state management
-                    if hasattr(canvas_manager, 'document_controller') and canvas_manager.document_controller:
+                        self.logger.info("✓ Auto-loading imported model into new canvas tab...")
+                        
+                        # Get base name for tab
+                        base_name = os.path.splitext(os.path.basename(saved_filepath))[0]
+                        self.logger.info(f"Loading model: {base_name}")
+                        
+                        # UNIFIED APPROACH: Always create fresh canvas via add_document()
+                        # This ensures IDENTICAL initialization to File→New and File→Open:
+                        # - Fresh ModelCanvasManager
+                        # - Proper controller wiring
+                        # - Report Panel creation and registration
+                        # - Callback setup
+                        # Benefits: No reuse logic complexity, consistent behavior, no stale state
+                        self.logger.info(f"Creating fresh canvas for SBML import: {base_name}")
+                        
+                        # DEFENSIVE: Wrap canvas operations in try-except to catch errors
                         try:
-                            canvas_manager.document_controller.set_change_callback(
-                                canvas_manager._on_object_changed
+                            page_index, drawing_area = canvas_loader.add_document(filename=base_name)
+                        except Exception as e:
+                            raise ValueError(f"Failed to create new canvas tab: {e}")
+                        
+                        if drawing_area is None:
+                            raise ValueError("add_document() returned None for drawing_area")
+                        
+                        try:
+                            canvas_manager = canvas_loader.get_canvas_manager(drawing_area)
+                        except Exception as e:
+                            raise ValueError(f"Failed to get canvas manager: {e}")
+                        
+                        if not canvas_manager:
+                            raise ValueError("get_canvas_manager() returned None")
+                    
+                        # ===== UNIFIED OBJECT LOADING =====
+                        # Use load_objects() for consistent initialization (same as File → Open)
+                        try:
+                            canvas_manager.load_objects(
+                                places=document_model.places,
+                                transitions=document_model.transitions,
+                                arcs=document_model.arcs
                             )
                         except Exception as e:
-                            self.logger.warning(f"Failed to set change callback: {e}")
-                    else:
-                        self.logger.warning("document_controller not available for change callback")
-                    
-                    # Set filepath and mark as clean (just imported/saved)
-                    canvas_manager.set_filepath(saved_filepath)
-                    canvas_manager.mark_clean()
-                    
-                    # Mark as imported
-                    canvas_manager.mark_as_imported(base_name)
-                    
-                    # Fit to page to show entire model (with padding)
-                    canvas_manager.fit_to_page(
-                        padding_percent=15,
-                        deferred=True,
-                        horizontal_offset_percent=30,  # Shift content RIGHT for left panels
-                        vertical_offset_percent=-10    # Shift content UP for bottom panels
-                    )
-                    
-                    # Force redraw to display loaded objects
-                    canvas_manager.mark_needs_redraw()
-                    
-                    # CRITICAL: Ensure simulation is reset after loading objects
-                    # This guarantees clean initial state for the imported model
-                    if canvas_loader and hasattr(canvas_loader, '_ensure_simulation_reset'):
-                        canvas_loader._ensure_simulation_reset(drawing_area)
-                    
-                    # REPORT PANEL: Trigger refresh after SBML import (deferred)
-                    # Use GLib.idle_add to ensure this happens AFTER tab switch completes
-                    # DEFENSIVE: Check overlay_managers exists and contains drawing_area
-                    if (hasattr(canvas_loader, 'overlay_managers') and 
-                        canvas_loader.overlay_managers and 
-                        drawing_area in canvas_loader.overlay_managers):
-                        from gi.repository import GLib
+                            raise ValueError(f"Failed to load objects to canvas: {e}")
                         
-                        def refresh_report_panel():
-                            """Deferred refresh to ensure tab switch completes first."""
+                        # CRITICAL: Set change callback for proper state management
+                        if hasattr(canvas_manager, 'document_controller') and canvas_manager.document_controller:
                             try:
-                                overlay_manager = canvas_loader.overlay_managers.get(drawing_area)
-                                if overlay_manager and hasattr(overlay_manager, 'report_panel_loader'):
-                                    report_panel_loader = overlay_manager.report_panel_loader
-                                    if report_panel_loader and hasattr(report_panel_loader, 'panel'):
-                                        self.logger.info("Triggering Report Panel refresh after SBML import (deferred)")
-                                        simulation_controller = getattr(overlay_manager, 'simulation_controller', None)
-                                        if simulation_controller and hasattr(report_panel_loader.panel, 'set_controller'):
-                                            report_panel_loader.panel.set_controller(simulation_controller)
-                                            self.logger.info("✅ Report Panel refreshed")
+                                canvas_manager.document_controller.set_change_callback(
+                                    canvas_manager._on_object_changed
+                                )
                             except Exception as e:
-                                self.logger.warning(f"Failed to refresh report panel: {e}")
-                            return False  # Don't repeat
+                                self.logger.warning(f"Failed to set change callback: {e}")
+                        else:
+                            self.logger.warning("document_controller not available for change callback")
                         
-                        GLib.idle_add(refresh_report_panel)
-                        self.logger.info("Report Panel refresh scheduled (idle)")
+                        # Set filepath and mark as clean (just imported/saved)
+                        canvas_manager.set_filepath(saved_filepath)
+                        canvas_manager.mark_clean()
+                        
+                        # Mark as imported
+                        canvas_manager.mark_as_imported(base_name)
+                        
+                        # Fit to page to show entire model (with padding)
+                        canvas_manager.fit_to_page(
+                            padding_percent=15,
+                            deferred=True,
+                            horizontal_offset_percent=30,  # Shift content RIGHT for left panels
+                            vertical_offset_percent=-10    # Shift content UP for bottom panels
+                        )
+                        
+                        # Force redraw to display loaded objects
+                        canvas_manager.mark_needs_redraw()
+                        
+                        # CRITICAL: Ensure simulation is reset after loading objects
+                        # This guarantees clean initial state for the imported model
+                        if canvas_loader and hasattr(canvas_loader, '_ensure_simulation_reset'):
+                            canvas_loader._ensure_simulation_reset(drawing_area)
                     
-                    self.logger.info("=== SBML canvas auto-load COMPLETED ===")
-                    self._show_status(
-                        f"✅ Model loaded to canvas: {base_name}\n"
-                        f"💡 Use View → Fit to Page (Ctrl+0) to adjust view if needed"
-                    )
+                        # REPORT PANEL: Trigger refresh after SBML import (deferred)
+                        # Use GLib.idle_add to ensure this happens AFTER tab switch completes
+                        # DEFENSIVE: Check overlay_managers exists and contains drawing_area
+                        if (hasattr(canvas_loader, 'overlay_managers') and 
+                            canvas_loader.overlay_managers and 
+                            drawing_area in canvas_loader.overlay_managers):
+                            
+                            def refresh_report_panel():
+                                """Deferred refresh to ensure tab switch completes first."""
+                                try:
+                                    overlay_manager = canvas_loader.overlay_managers.get(drawing_area)
+                                    if overlay_manager and hasattr(overlay_manager, 'report_panel_loader'):
+                                        report_panel_loader = overlay_manager.report_panel_loader
+                                        if report_panel_loader and hasattr(report_panel_loader, 'panel'):
+                                            self.logger.info("Triggering Report Panel refresh after SBML import (deferred)")
+                                            simulation_controller = getattr(overlay_manager, 'simulation_controller', None)
+                                            if simulation_controller and hasattr(report_panel_loader.panel, 'set_controller'):
+                                                report_panel_loader.panel.set_controller(simulation_controller)
+                                                self.logger.info("✅ Report Panel refreshed")
+                                except Exception as e:
+                                    self.logger.warning(f"Failed to refresh report panel: {e}")
+                                return False  # Don't repeat
+                            
+                            GLib.idle_add(refresh_report_panel)
+                            self.logger.info("Report Panel refresh scheduled (idle)")
+                        
+                        self.logger.info("=== SBML canvas auto-load COMPLETED ===")
+                        self._show_status(
+                            f"✅ Model loaded to canvas: {base_name}\n"
+                            f"💡 Use View → Fit to Page (Ctrl+0) to adjust view if needed"
+                        )
+                        
+                    except Exception as load_error:
+                        self.logger.error(f"=== SBML canvas auto-load FAILED ===")
+                        self.logger.error(f"Failed to auto-load model to canvas: {load_error}")
+                        import traceback
+                        traceback.print_exc()
+                        # Show fallback message
+                        self._show_status(
+                            f"✅ Model saved to {saved_filepath}\n"
+                            f"⚠️ Auto-load failed, use File → Open to load manually\n"
+                            f"💡 Use View → Fit to Page (Ctrl+0) to see the entire model"
+                        )
                     
-                except Exception as load_error:
-                    self.logger.error(f"=== SBML canvas auto-load FAILED ===")
-                    self.logger.error(f"Failed to auto-load model to canvas: {load_error}")
-                    import traceback
-                    traceback.print_exc()
-                    # Show fallback message
-                    self._show_status(
-                        f"✅ Model saved to {saved_filepath}\n"
-                        f"⚠️ Auto-load failed, use File → Open to load manually\n"
-                        f"💡 Use View → Fit to Page (Ctrl+0) to see the entire model"
-                    )
+                    return False  # Don't repeat GLib.idle_add
+                
+                # Schedule canvas loading on idle to prevent UI freeze
+                GLib.idle_add(do_canvas_load)
             else:
                 # No canvas loader available - this is expected if panel not connected to canvas
                 reason = "model_canvas is None" if not self.model_canvas else "canvas_loader not detected"
