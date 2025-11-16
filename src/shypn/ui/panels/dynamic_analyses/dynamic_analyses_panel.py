@@ -136,13 +136,10 @@ class DynamicAnalysesPanel(Gtk.Box):
             transition_panel = self.transitions_category.panel if self.transitions_category else None
             diagnostics_panel = self.diagnostics_category.panel if self.diagnostics_category else None
             
-            print(f"[DYNAMIC_ANALYSES] _setup_context_menu: model={self.model is not None}, place_panel={place_panel is not None}, transition_panel={transition_panel is not None}", file=sys.stderr)
-            
             # CRITICAL: Set place_panel reference on transitions category
             # This is essential for locality plotting to work from app startup
             if self.transitions_category and place_panel:
                 self.transitions_category.set_place_panel(place_panel)
-                print(f"[DYNAMIC_ANALYSES] Set place_panel on transitions_category in _setup_context_menu", file=sys.stderr)
             
             # Preserve model_canvas_loader from existing handler if it exists
             existing_model_canvas_loader = None
@@ -157,10 +154,8 @@ class DynamicAnalysesPanel(Gtk.Box):
                     diagnostics_panel=diagnostics_panel,
                     model_canvas_loader=existing_model_canvas_loader
                 )
-                print(f"[DYNAMIC_ANALYSES] Created handler, locality_detector={self.context_menu_handler.locality_detector is not None}", file=sys.stderr)
         except Exception as e:
             import traceback
-            print(f"[DYNAMIC_ANALYSES] Warning: Could not create context menu handler: {e}", file=sys.stderr)
             traceback.print_exc()
     
     def set_model(self, model):
@@ -171,8 +166,6 @@ class DynamicAnalysesPanel(Gtk.Box):
         """
         self.model = model
         
-        print(f"[DYNAMIC_ANALYSES] set_model: model={model is not None}, handler_exists={self.context_menu_handler is not None}", file=sys.stderr)
-        
         # Update all categories
         for category in self.categories:
             category.set_model(model)
@@ -182,16 +175,12 @@ class DynamicAnalysesPanel(Gtk.Box):
         if self.transitions_category and self.places_category:
             place_panel = self.places_category.panel if self.places_category else None
             if place_panel:
-                print(f"[DYNAMIC_ANALYSES] Setting place_panel on transitions_category", file=sys.stderr)
                 self.transitions_category.set_place_panel(place_panel)
         
         # Update context menu handler
         if self.context_menu_handler:
-            print(f"[DYNAMIC_ANALYSES] Updating existing handler with model", file=sys.stderr)
             self.context_menu_handler.set_model(model)
-            print(f"[DYNAMIC_ANALYSES] After update, locality_detector={self.context_menu_handler.locality_detector is not None}", file=sys.stderr)
         else:
-            print(f"[DYNAMIC_ANALYSES] No handler exists, creating new one", file=sys.stderr)
             # Context menu handler doesn't exist yet, create it
             self._setup_context_menu()
     

@@ -78,8 +78,6 @@ class OperationsPalette(BaseEditPalette):
         """
         if self.edit_operations:
             self.edit_operations.activate_lasso_mode()
-        else:
-            print("[OperationsPalette] ERROR: edit_operations not set", file=sys.stderr)
     
     def _on_undo_clicked(self, button):
         """Handle undo button click.
@@ -89,8 +87,6 @@ class OperationsPalette(BaseEditPalette):
         """
         if self.edit_operations:
             self.edit_operations.undo()
-        else:
-            print("[OperationsPalette] ERROR: edit_operations not set", file=sys.stderr)
     
     def _on_redo_clicked(self, button):
         """Handle redo button click.
@@ -100,8 +96,6 @@ class OperationsPalette(BaseEditPalette):
         """
         if self.edit_operations:
             self.edit_operations.redo()
-        else:
-            print("[OperationsPalette] ERROR: edit_operations not set", file=sys.stderr)
     
     def set_edit_operations(self, edit_operations):
         """Set edit operations and register state callback.
