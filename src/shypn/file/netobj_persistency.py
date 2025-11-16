@@ -326,7 +326,7 @@ class NetObjPersistency:
         # Create dialog
         dialog = Gtk.FileChooserDialog(
             title='Save Petri Net',
-            parent=parent,
+            transient_for=parent,
             action=Gtk.FileChooserAction.SAVE
         )
         dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_SAVE, Gtk.ResponseType.OK)
@@ -489,7 +489,7 @@ class NetObjPersistency:
         # Create dialog
         dialog = Gtk.FileChooserDialog(
             title='Open Petri Net',
-            parent=parent,
+            transient_for=parent,
             action=Gtk.FileChooserAction.OPEN
         )
         dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.OK)

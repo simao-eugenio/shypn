@@ -223,7 +223,7 @@ class TopologyTabLoader(ABC):
         
         dialog = Gtk.FileChooserDialog(
             title="Export Topology Analysis",
-            parent=parent,
+            transient_for=parent,
             action=Gtk.FileChooserAction.SAVE
         )
         dialog.add_buttons(

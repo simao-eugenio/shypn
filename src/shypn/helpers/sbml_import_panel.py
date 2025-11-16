@@ -306,7 +306,7 @@ class SBMLImportPanel:
         # WAYLAND FIX: Use parent window for dialog
         dialog = Gtk.FileChooserDialog(
             title="Select SBML File",
-            parent=self.parent_window,
+            transient_for=self.parent_window,
             action=Gtk.FileChooserAction.OPEN,
             buttons=(
                 Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
