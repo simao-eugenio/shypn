@@ -302,6 +302,12 @@ class ModelCanvasLoader:
                     # This ensures "Add to Transition Analyses" works from app startup
                     if self.right_panel_loader.context_menu_handler:
                         self.right_panel_loader.context_menu_handler.set_model(manager)
+                        
+                        # CRITICAL: Set context menu handler on model_canvas_loader
+                        # This enables the "Add to Analysis" menu items to appear on canvas objects
+                        # Without this, right-click context menus won't have analysis options
+                        if not self.context_menu_handler:
+                            self.set_context_menu_handler(self.right_panel_loader.context_menu_handler)
 
             # Notify Pathway Operations panel so categories (e.g., BRENDA)
             # can resolve the current model manager on startup
@@ -3770,12 +3776,10 @@ class ModelCanvasLoader:
                 def on_activate(widget, cb):
                     cb()
                 menu_item.connect('activate', on_activate, callback)
-            menu_item.show()
+                menu_item.show()
             menu.append(menu_item)
         if self.context_menu_handler:
-            self.context_menu_handler.add_analysis_menu_items(menu, obj)
-        
-        # Store reference to active menu for cleanup before dialogs
+            self.context_menu_handler.add_analysis_menu_items(menu, obj)        # Store reference to active menu for cleanup before dialogs
         self._active_context_menu = menu
         
         # Attach menu to drawing_area for proper Wayland parent window handling

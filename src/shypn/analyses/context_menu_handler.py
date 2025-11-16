@@ -143,7 +143,6 @@ class ContextMenuHandler:
         transition_panel for transitions).
         
         For transitions with valid localities, adds a submenu with:
-            pass
         - "Transition Only" option
         - "With Locality (N places)" option
         
@@ -310,6 +309,10 @@ class ContextMenuHandler:
             panel: TransitionRatePanel instance
         """
         logger.debug(f"[CTX_MENU] _add_transition_with_locality called: transition={transition.id}, locality.is_valid={locality.is_valid}, panel={type(panel).__name__}")
+        
+        # Check if panel has place_panel reference
+        has_place_panel = hasattr(panel, '_place_panel') and panel._place_panel is not None
+        logger.debug(f"[CTX_MENU] Panel has _place_panel={has_place_panel}")
         
         # Add transition (border color will be set automatically in panel.add_object)
         panel.add_object(transition)
