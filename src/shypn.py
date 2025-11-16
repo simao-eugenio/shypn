@@ -516,11 +516,9 @@ def main(argv=None):
 		# CRITICAL: Set left_dock_stack on model_canvas_loader BEFORE any documents are created
 		# This ensures per-document panel loaders (Viability, Report) can access it during initialization
 		model_canvas_loader.left_dock_stack = left_dock_stack
-		print(f"[SHYPN] Set left_dock_stack on model_canvas_loader early: {model_canvas_loader.left_dock_stack}")
 		
 		# Now create the initial document (deferred from load() to ensure dependencies are set)
 		page_index, drawing_area = model_canvas_loader.add_document(filename='default')
-		print(f"[SHYPN] Created initial document after setting left_dock_stack")
 
 		# Get individual panel containers from the stack
 		files_panel_container = main_builder.get_object('files_panel_container')
@@ -650,7 +648,6 @@ def main(argv=None):
 		# Add Viability panel container to stack
 		# NOTE: Per-document ViabilityPanel instances will be swapped in/out of this container
 		# This matches Report panel architecture - no global panel instance
-		print(f"[SHYPN] Setting up viability container, container exists: {viability_panel_container is not None}")
 		if viability_panel_container:
 			# Add empty container to stack - per-document panels added dynamically
 			left_dock_stack.add_named(viability_panel_container, 'viability')
@@ -659,9 +656,6 @@ def main(argv=None):
 			# This mirrors the Report panel wiring just above
 			model_canvas_loader.viability_panel_container = viability_panel_container
 			model_canvas_loader.left_dock_stack = left_dock_stack
-			print(f"[SHYPN] Set left_dock_stack on model_canvas_loader: {model_canvas_loader.left_dock_stack}")
-		else:
-			print(f"[SHYPN] WARNING: viability_panel_container is None!")
 		
 		# ====================================================================
 		# Report Panel Container (will hold per-document panels)

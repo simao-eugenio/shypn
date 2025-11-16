@@ -2109,11 +2109,9 @@ class ModelCanvasLoader:
                 if hasattr(self, 'topology_panel_loader') and self.topology_panel_loader:
                     if hasattr(self.topology_panel_loader, 'panel') and self.topology_panel_loader.panel:
                         report_panel_loader.panel.set_topology_panel(self.topology_panel_loader.panel)
-                        print(f"[CONTROLLER_WIRE] ✅ Connected Topology Panel to Report Panel")
                         
                         # Trigger immediate refresh to show any existing analysis data
                         report_panel_loader.panel.refresh_all()
-                        print(f"[CONTROLLER_WIRE] ✅ Refreshed Report Panel to load topology data")
                 
                 # NOTE: Locality sync callback will be wired later in set_right_panel_loader()
                 # when the transition panel is guaranteed to exist
@@ -2139,11 +2137,9 @@ class ModelCanvasLoader:
                 viability_panel_loader.parent_container = self.viability_panel_container
                 # Default to docked mode knowledge; actual packing is controlled by UI toggle
                 viability_panel_loader.is_hanged = True
-                print(f"[MODEL_CANVAS] Set viability parent_container: {self.viability_panel_container}")
             if hasattr(self, 'left_dock_stack') and self.left_dock_stack is not None:
                 viability_panel_loader._stack = self.left_dock_stack
                 viability_panel_loader._stack_panel_name = 'viability'
-                print(f"[MODEL_CANVAS] Set viability _stack: {self.left_dock_stack}")
             else:
                 print(f"[MODEL_CANVAS] WARNING: left_dock_stack not available! hasattr={hasattr(self, 'left_dock_stack')}, value={getattr(self, 'left_dock_stack', None)}")
 
@@ -2194,7 +2190,6 @@ class ModelCanvasLoader:
                 if hasattr(self, 'topology_panel_loader') and self.topology_panel_loader:
                     if hasattr(self.topology_panel_loader, 'panel') and self.topology_panel_loader.panel:
                         viability_panel.set_topology_panel(self.topology_panel_loader.panel)
-                        print(f"[CONTROLLER_WIRE] ✅ Connected Topology Panel to Viability Panel")
             
             self.overlay_managers[drawing_area].viability_panel_loader = viability_panel_loader
         
