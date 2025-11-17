@@ -181,17 +181,67 @@ def main(argv=None):
 		
 		window.connect('screen-changed', on_screen_changed)
 		
+		# Wire window control buttons (Wayland-safe)
+		minimize_button = main_builder.get_object('minimize_button')
+		maximize_button = main_builder.get_object('maximize_button')
+		maximize_button_image = main_builder.get_object('maximize_button_image')
+		
+		if minimize_button:
+			def on_minimize_clicked(button):
+				"""Minimize window - Wayland safe."""
+				try:
+					window.iconify()
+				except Exception as e:
+					logging.getLogger(__name__).warning('Failed to minimize window: %s', e)
+			
+			minimize_button.connect('clicked', on_minimize_clicked)
+		
+		if maximize_button:
+			def on_maximize_clicked(button):
+				"""Toggle maximize/unmaximize - Wayland safe."""
+				try:
+					if window.is_maximized():
+						window.unmaximize()
+						if maximize_button_image:
+							maximize_button_image.set_from_icon_name('window-maximize-symbolic', 1)
+					else:
+						window.maximize()
+						if maximize_button_image:
+							maximize_button_image.set_from_icon_name('window-restore-symbolic', 1)
+				except Exception as e:
+					logging.getLogger(__name__).warning('Failed to toggle maximize: %s', e)
+			
+			maximize_button.connect('clicked', on_maximize_clicked)
+			
+			# Update icon when window state changes (e.g., double-click on header)
+			def on_window_state_changed(window, event):
+				"""Update maximize button icon based on window state."""
+				try:
+					if maximize_button_image:
+						if window.is_maximized():
+							maximize_button_image.set_from_icon_name('window-restore-symbolic', 1)
+						else:
+							maximize_button_image.set_from_icon_name('window-maximize-symbolic', 1)
+				except Exception:
+					pass  # Suppress any icon update errors
+				return False
+			
+			window.connect('window-state-event', on_window_state_changed)
+		
 		# Add double-click on header bar to toggle maximize
-		# NOTE: May cause Error 71 on Wayland if panels are visible
+		# NOTE: Keep this for UX consistency, but button is now primary method
 		header_bar = main_builder.get_object('header_bar')
 		if header_bar:
 			def on_header_bar_button_press(widget, event):
 				"""Handle double-click on header bar to toggle maximize."""
 				if event.type == Gdk.EventType.DOUBLE_BUTTON_PRESS and event.button == 1:
-					if window.is_maximized():
-						window.unmaximize()
-					else:
-						window.maximize()
+					try:
+						if window.is_maximized():
+							window.unmaximize()
+						else:
+							window.maximize()
+					except Exception:
+						pass  # Suppress Wayland errors
 					return True
 				return False
 			
@@ -234,33 +284,6 @@ def main(argv=None):
 		canvas_container = model_canvas_loader.container
 		main_workspace.pack_start(canvas_container, True, True, 0)  # GTK3 uses pack_start
 		
-		# Get status bar from main_window.ui (now defined in XML)
-		status_bar = main_builder.get_object('status_bar')
-		if not status_bar:
-			# Fallback: create status bar if not in UI file (shouldn't happen)
-			status_bar = Gtk.Statusbar()
-			status_bar.set_visible(True)
-			logging.getLogger(__name__).warning("status_bar not found in UI, creating fallback")
-		
-		# Initialize status bar context
-		status_context_id = status_bar.get_context_id("main")
-		
-		# Helper function to update status bar
-		def update_status(message):
-			"""Update the status bar with a message."""
-			if status_bar and status_context_id:
-				status_bar.pop(status_context_id)
-				if message:
-					status_bar.push(status_context_id, message)
-		
-		# Set initial status
-		update_status("Ready")
-		
-		# Wire status bar to canvas loader
-		model_canvas_loader.status_bar = status_bar
-		model_canvas_loader.status_context_id = status_context_id
-		model_canvas_loader.update_status = update_status
-
 		# Load left panel via its loader
 		try:
 			# Load the panel immediately so file_explorer is initialized
@@ -303,10 +326,8 @@ def main(argv=None):
 				Args:
 					filepath: Full path to the file to open
 				"""
-				update_status(f"Opening {os.path.basename(filepath)}...")
 				# Delegate to FileExplorerPanel which handles all file loading logic
 				file_explorer._open_file_from_path(filepath)
-				update_status(f"Opened {os.path.basename(filepath)}")
 			
 			file_explorer.on_file_open_requested = on_file_open_requested
 
@@ -574,6 +595,8 @@ def main(argv=None):
 		# Get palette slot and insert palette BEFORE showing main window
 		master_palette_slot = main_builder.get_object('master_palette_slot')
 		if master_palette_slot:
+			# Set CSS name for styling
+			master_palette_slot.set_name('master_palette_slot')
 			# Clear any existing children (shouldn't be any)
 			for child in master_palette_slot.get_children():
 				master_palette_slot.remove(child)

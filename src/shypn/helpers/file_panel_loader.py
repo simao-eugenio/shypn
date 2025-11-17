@@ -65,7 +65,7 @@ class FilePanelLoader:
         self._updating_button = False
         self.on_float_callback = None
         self.on_attach_callback = None
-        self.on_quit_callback = None
+        self.on_close_project_callback = None
         self.is_hanged = False  # State flag: True when in stack, False when floating
         
         # Category frames
@@ -570,7 +570,7 @@ class FilePanelLoader:
         """
         try:
             self.project_controller = ProjectActionsController(self.builder, parent_window=None)
-            self.project_controller.on_quit_requested = self._on_quit_requested
+            self.project_controller.on_close_project_requested = self._on_close_project_requested
             
             # Wire project controller callbacks to propagate project to all components
             self.project_controller.on_project_opened = self._on_project_opened_handler
@@ -620,12 +620,37 @@ class FilePanelLoader:
             # Collapse all expanded folders
             self.file_explorer.tree_view.collapse_all()
     
-    def _on_quit_requested(self):
-        """Handle quit request from project controller."""
-        if self.on_quit_callback:
-            self.on_quit_callback()
+    def _on_close_project_requested(self):
+        """Handle close project request from project controller."""
+        if self.on_close_project_callback:
+            self.on_close_project_callback()
         else:
-            Gtk.main_quit()
+            # Default behavior: close current project
+            from ..data.project_models import get_project_manager
+            project_manager = get_project_manager()
+            if project_manager.current_project:
+                # Check for unsaved changes
+                has_unsaved = False  # TODO: Implement unsaved changes detection
+                
+                if has_unsaved:
+                    # Show confirmation dialog
+                    from ..helpers.project_dialog_manager import ProjectDialogManager
+                    dialog_manager = ProjectDialogManager(self.parent_window)
+                    action = dialog_manager.confirm_close_with_unsaved_changes()
+                    
+                    if action == 'cancel':
+                        return
+                    elif action == 'save':
+                        project_manager.close_current_project(save=True)
+                    else:  # 'discard'
+                        project_manager.close_current_project(save=False)
+                else:
+                    # No unsaved changes, close directly
+                    project_manager.close_current_project(save=True)
+                
+                # Refresh the file panel to show no project loaded
+                if hasattr(self, '_refresh_file_tree'):
+                    self._refresh_file_tree()
     
     # Panel management methods (same as original)
     

@@ -65,7 +65,7 @@ Where:
 - **M₀: P → ℝ⁺**: Initial marking (concentrations in mol/L or token counts)
 - **K: T → {stochastic, continuous, timed}**: Transition type
 - **Φ: T → (ℝⁿ → ℝ)**: Rate functions (mass-action, Michaelis-Menten, Hill)
-- **Σ: P → 2^T**: Regulatory structure (places influencing transitions without arcs)
+- **Σ: T → 2^P**: Regulatory structure (T → set of places influencing transition without arcs)
 - **Θ: P → {source, sink, internal}**: Environmental exchange classification
 - **Δ: T × T → {independent, competitive, convergent, regulatory}**: Dependency classification
 

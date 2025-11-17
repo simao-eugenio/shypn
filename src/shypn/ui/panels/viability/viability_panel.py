@@ -117,13 +117,15 @@ class ViabilityPanel(Gtk.Box):
         header_label.set_markup("<b>VIABILITY</b>")
         header_label.set_halign(Gtk.Align.START)
         header_label.set_valign(Gtk.Align.CENTER)
-        header_label.set_tooltip_text("Model viability analysis and suggestions")
+        # Tooltip disabled - only show tooltips on canvas network objects
+        # header_label.set_tooltip_text("Model viability analysis and suggestions")
         header_box.pack_start(header_label, True, True, 0)
         
         # Float button (right) - match Topology/Analyses icon and style
         self.float_button = Gtk.ToggleButton()
         self.float_button.set_label("⬈")
-        self.float_button.set_tooltip_text("Detach panel to floating window")
+        # Tooltip disabled - only show tooltips on canvas network objects
+        # self.float_button.set_tooltip_text("Detach panel to floating window")
         self.float_button.set_relief(Gtk.ReliefStyle.NONE)  # Flat button
         self.float_button.set_valign(Gtk.Align.CENTER)
         header_box.pack_end(self.float_button, False, False, 0)
@@ -210,8 +212,6 @@ class ViabilityPanel(Gtk.Box):
         # Connect experiment management signals
         self.simulation_toolbar.add_exp_button.connect("clicked", self._on_add_experiment)
         self.simulation_toolbar.copy_exp_button.connect("clicked", self._on_copy_experiment)
-        self.simulation_toolbar.save_exp_button.connect("clicked", self._on_save_experiments)
-        self.simulation_toolbar.load_exp_button.connect("clicked", self._on_load_experiments)
         self.simulation_toolbar.experiment_combo.connect("changed", self._on_experiment_changed)
         
         # === SECTION 2: SUBNET PARAMETERS EXPANDER ===
@@ -319,108 +319,6 @@ class ViabilityPanel(Gtk.Box):
         sep3.set_margin_top(10)
         main_box.pack_start(sep3, False, False, 0)
         
-        # === SECTION 3: DIAGNOSIS SUMMARY EXPANDER ===
-        self.summary_expander = Gtk.Expander()
-        self.summary_expander.set_expanded(False)
-        self.summary_expander.set_margin_start(10)
-        self.summary_expander.set_margin_end(10)
-        self.summary_expander.set_margin_top(10)
-        
-        summary_label = Gtk.Label()
-        summary_label.set_xalign(0)
-        summary_label.set_markup("<b>DIAGNOSIS SUMMARY</b>")
-        self.summary_expander.set_label_widget(summary_label)
-        
-        # Summary content
-        self.summary_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        self.summary_box.set_margin_start(12)
-        self.summary_box.set_margin_top(6)
-        self.summary_box.set_margin_bottom(6)
-        
-        summary_placeholder = Gtk.Label(label="Run diagnosis to see summary")
-        summary_placeholder.set_xalign(0)
-        summary_placeholder.get_style_context().add_class("dim-label")
-        self.summary_box.pack_start(summary_placeholder, False, False, 0)
-        
-        self.summary_expander.add(self.summary_box)
-        main_box.pack_start(self.summary_expander, False, False, 0)
-        
-        # === SECTION 4: STRUCTURAL SUGGESTIONS EXPANDER ===
-        self.structural_expander = Gtk.Expander()
-        self.structural_expander.set_expanded(False)
-        self.structural_expander.set_margin_start(10)
-        self.structural_expander.set_margin_end(10)
-        self.structural_expander.set_margin_top(6)
-        
-        structural_label = Gtk.Label()
-        structural_label.set_xalign(0)
-        structural_label.set_markup("<b>STRUCTURAL SUGGESTIONS</b>")
-        self.structural_expander.set_label_widget(structural_label)
-        
-        # Structural content - TreeView
-        structural_scroll = Gtk.ScrolledWindow()
-        structural_scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-        structural_scroll.set_size_request(-1, 200)
-        structural_scroll.set_margin_start(12)
-        structural_scroll.set_margin_top(6)
-        structural_scroll.set_margin_bottom(6)
-        
-        self.structural_treeview, self.structural_store = self._create_suggestions_treeview()
-        structural_scroll.add(self.structural_treeview)
-        self.structural_expander.add(structural_scroll)
-        main_box.pack_start(self.structural_expander, False, False, 0)
-        
-        # === SECTION 5: BIOLOGICAL SUGGESTIONS EXPANDER ===
-        self.biological_expander = Gtk.Expander()
-        self.biological_expander.set_expanded(False)
-        self.biological_expander.set_margin_start(10)
-        self.biological_expander.set_margin_end(10)
-        self.biological_expander.set_margin_top(6)
-        
-        biological_label = Gtk.Label()
-        biological_label.set_xalign(0)
-        biological_label.set_markup("<b>BIOLOGICAL SUGGESTIONS</b>")
-        self.biological_expander.set_label_widget(biological_label)
-        
-        # Biological content - TreeView
-        biological_scroll = Gtk.ScrolledWindow()
-        biological_scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-        biological_scroll.set_size_request(-1, 200)
-        biological_scroll.set_margin_start(12)
-        biological_scroll.set_margin_top(6)
-        biological_scroll.set_margin_bottom(6)
-        
-        self.biological_treeview, self.biological_store = self._create_suggestions_treeview()
-        biological_scroll.add(self.biological_treeview)
-        self.biological_expander.add(biological_scroll)
-        main_box.pack_start(self.biological_expander, False, False, 0)
-        
-        # === SECTION 6: KINETIC SUGGESTIONS EXPANDER ===
-        self.kinetic_expander = Gtk.Expander()
-        self.kinetic_expander.set_expanded(False)
-        self.kinetic_expander.set_margin_start(10)
-        self.kinetic_expander.set_margin_end(10)
-        self.kinetic_expander.set_margin_top(6)
-        self.kinetic_expander.set_margin_bottom(10)
-        
-        kinetic_label = Gtk.Label()
-        kinetic_label.set_xalign(0)
-        kinetic_label.set_markup("<b>KINETIC SUGGESTIONS</b>")
-        self.kinetic_expander.set_label_widget(kinetic_label)
-        
-        # Kinetic content - TreeView
-        kinetic_scroll = Gtk.ScrolledWindow()
-        kinetic_scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-        kinetic_scroll.set_size_request(-1, 200)
-        kinetic_scroll.set_margin_start(12)
-        kinetic_scroll.set_margin_top(6)
-        kinetic_scroll.set_margin_bottom(6)
-        
-        self.kinetic_treeview, self.kinetic_store = self._create_suggestions_treeview()
-        kinetic_scroll.add(self.kinetic_treeview)
-        self.kinetic_expander.add(kinetic_scroll)
-        main_box.pack_start(self.kinetic_expander, False, False, 0)
-
         # === SECTION 7: INVESTIGATION RESULTS CONTAINER ===
         # Dedicated container managed by _show_investigation_view.
         # This isolates dynamic results from the static sections above.
@@ -1909,23 +1807,8 @@ class ViabilityPanel(Gtk.Box):
         # Populate summary
         self._populate_summary(total_issues, all_suggestions_by_category, len(checked_transitions))
         
-        # Populate category TreeViews
-        self._populate_suggestions_treeview(self.structural_store, all_suggestions_by_category['structural'])
-        self._populate_suggestions_treeview(self.biological_store, all_suggestions_by_category['biological'])
-        self._populate_suggestions_treeview(self.kinetic_store, all_suggestions_by_category['kinetic'])
-        
-        # Expand summary expander
-        self.summary_expander.set_expanded(True)
-        
-        # Expand category with most suggestions
-        max_category = max(all_suggestions_by_category.items(), key=lambda x: len(x[1]))
-        if max_category[1]:  # If there are suggestions
-            if max_category[0] == 'structural':
-                self.structural_expander.set_expanded(True)
-            elif max_category[0] == 'biological':
-                self.biological_expander.set_expanded(True)
-            elif max_category[0] == 'kinetic':
-                self.kinetic_expander.set_expanded(True)
+        # REMOVED: Category TreeViews (structural/biological/kinetic suggestions)
+        # These sections have been removed from the UI
         
         self._show_feedback(f"Diagnosis complete: {total_issues} issues, {sum(len(s) for s in all_suggestions_by_category.values())} suggestions", "info")
     
@@ -2012,114 +1895,35 @@ class ViabilityPanel(Gtk.Box):
         self._show_feedback("All localities cleared", "info")
     
     def _clear_results(self):
-        """Clear all results from summary and suggestion TreeViews."""
-        # Clear stores
-        self.structural_store.clear()
-        self.biological_store.clear()
-        self.kinetic_store.clear()
-        
-        # Clear summary (rebuild placeholder)
-        for child in list(self.summary_box.get_children()):
-            self.summary_box.remove(child)
-        
-        summary_placeholder = Gtk.Label(label="Run diagnosis to see summary")
-        summary_placeholder.set_xalign(0)
-        summary_placeholder.get_style_context().add_class("dim-label")
-        self.summary_box.pack_start(summary_placeholder, False, False, 0)
-        if self.get_parent() is not None:
-            self.summary_box.show_all()
-        
-        # Collapse all expanders
-        self.summary_expander.set_expanded(False)
-        self.structural_expander.set_expanded(False)
-        self.biological_expander.set_expanded(False)
-        self.kinetic_expander.set_expanded(False)
+        """Clear all results (simplified - removed sections no longer exist)."""
+        # REMOVED: structural_store, biological_store, kinetic_store
+        # REMOVED: summary_box, summary_expander
+        # These sections have been removed from the UI
+        pass
     
     def _populate_summary(self, total_issues, suggestions_by_category, num_transitions):
-        """Populate diagnosis summary section.
+        """Populate diagnosis summary section (REMOVED - UI section no longer exists).
         
         Args:
             total_issues: Total number of issues found
             suggestions_by_category: Dict of suggestions by category
             num_transitions: Number of transitions analyzed
         """
-        # Clear existing content
-        for child in list(self.summary_box.get_children()):
-            self.summary_box.remove(child)
-        
-        # Timestamp
-        from datetime import datetime
-        timestamp_label = Gtk.Label()
-        timestamp_label.set_markup(f"<small><i>Diagnosed at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</i></small>")
-        timestamp_label.set_xalign(0)
-        timestamp_label.set_margin_bottom(6)
-        self.summary_box.pack_start(timestamp_label, False, False, 0)
-        
-        # Stats
-        stats_label = Gtk.Label()
-        stats_label.set_markup(
-            f"<b>Analyzed:</b> {num_transitions} transition(s)\n"
-            f"<b>Issues Found:</b> {total_issues}\n"
-            f"<b>Suggestions:</b> {sum(len(s) for s in suggestions_by_category.values())}"
-        )
-        stats_label.set_xalign(0)
-        stats_label.set_margin_bottom(10)
-        self.summary_box.pack_start(stats_label, False, False, 0)
-        
-        # Health bars (simplified - just counts for now)
-        structural_count = len(suggestions_by_category.get('structural', []))
-        biological_count = len(suggestions_by_category.get('biological', []))
-        kinetic_count = len(suggestions_by_category.get('kinetic', []))
-        
-        health_grid = Gtk.Grid()
-        health_grid.set_column_spacing(10)
-        health_grid.set_row_spacing(6)
-        
-        # Structural
-        structural_label = Gtk.Label(label="Structural:")
-        structural_label.set_xalign(0)
-        health_grid.attach(structural_label, 0, 0, 1, 1)
-        structural_count_label = Gtk.Label(label=f"{structural_count} suggestion(s)")
-        structural_count_label.set_xalign(0)
-        health_grid.attach(structural_count_label, 1, 0, 1, 1)
-        
-        # Biological
-        biological_label = Gtk.Label(label="Biological:")
-        biological_label.set_xalign(0)
-        health_grid.attach(biological_label, 0, 1, 1, 1)
-        biological_count_label = Gtk.Label(label=f"{biological_count} suggestion(s)")
-        biological_count_label.set_xalign(0)
-        health_grid.attach(biological_count_label, 1, 1, 1, 1)
-        
-        # Kinetic
-        kinetic_label = Gtk.Label(label="Kinetic:")
-        kinetic_label.set_xalign(0)
-        health_grid.attach(kinetic_label, 0, 2, 1, 1)
-        kinetic_count_label = Gtk.Label(label=f"{kinetic_count} suggestion(s)")
-        kinetic_count_label.set_xalign(0)
-        health_grid.attach(kinetic_count_label, 1, 2, 1, 1)
-        
-        self.summary_box.pack_start(health_grid, False, False, 0)
-        if self.get_parent() is not None:
-            self.summary_box.show_all()
+        # REMOVED: This method previously populated the Diagnosis Summary expander
+        # which has been removed from the UI. Keeping stub for backward compatibility.
+        pass
     
     def _populate_suggestions_treeview(self, store, suggestions):
-        """Populate a suggestions TreeView with data.
+        """Populate a suggestions TreeView with data (REMOVED - UI sections no longer exist).
         
         Args:
             store: Gtk.ListStore to populate
             suggestions: List of Suggestion objects
         """
-        store.clear()
-        
-        for suggestion in suggestions:
-            # Extract fields (handle both old and new formats)
-            priority = getattr(suggestion, 'priority', 'Medium')
-            issue = getattr(suggestion, 'issue_summary', suggestion.action)
-            suggestion_text = getattr(suggestion, 'impact', getattr(suggestion, 'message', suggestion.action))
-            confidence = getattr(suggestion, 'confidence', 'N/A')
-            
-            store.append([str(priority), str(issue), str(suggestion_text), str(confidence)])
+        # REMOVED: This method previously populated suggestion TreeViews for
+        # structural/biological/kinetic categories which have been removed.
+        # Keeping stub for backward compatibility.
+        pass
     
     def add_object_for_analysis(self, obj):
         """Add object for analysis with visual highlight.
@@ -2228,13 +2032,8 @@ class ViabilityPanel(Gtk.Box):
         if hasattr(self, 'subnet_io_store') and self.subnet_io_store:
             self.subnet_io_store.clear()
         
-        # Clear suggestions stores
-        if hasattr(self, 'structural_store') and self.structural_store:
-            self.structural_store.clear()
-        if hasattr(self, 'biological_store') and self.biological_store:
-            self.biological_store.clear()
-        if hasattr(self, 'kinetic_store') and self.kinetic_store:
-            self.kinetic_store.clear()
+        # REMOVED: Clear suggestions stores (structural/biological/kinetic)
+        # These sections have been removed from the UI
         
         # Clear investigation
         self.current_investigation = None
@@ -2735,76 +2534,14 @@ class ViabilityPanel(Gtk.Box):
         else:
             self._append_diagnostics_log("⚠ No experiment to copy")
     
-    def _on_save_experiments(self, button):
-        """Export experiments to JSON file."""
-        if not self.experiment_manager.snapshots:
-            self._append_diagnostics_log("⚠ No experiments to save")
-            return
-        
-        dialog = Gtk.FileChooserDialog(
-            title="Save Experiments",
-            action=Gtk.FileChooserAction.SAVE
-        )
-        dialog.add_buttons(
-            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
-            Gtk.STOCK_SAVE, Gtk.ResponseType.OK
-        )
-        dialog.set_current_name("viability_experiments.json")
-        
-        # Add JSON filter
-        filter_json = Gtk.FileFilter()
-        filter_json.set_name("JSON files")
-        filter_json.add_pattern("*.json")
-        dialog.add_filter(filter_json)
-        
-        response = dialog.run()
-        if response == Gtk.ResponseType.OK:
-            filepath = dialog.get_filename()
-            if not filepath.endswith('.json'):
-                filepath += '.json'
-            
-            try:
-                self.experiment_manager.export_to_json(filepath)
-                self._append_diagnostics_log(f"💾 Saved experiments to {filepath}")
-            except Exception as e:
-                self._append_diagnostics_log(f"✗ Save failed: {e}")
-        
-        dialog.destroy()
+    # REMOVED: Save/Load experiment buttons
+    # def _on_save_experiments(self, button):
+    #     """Export experiments to JSON file."""
+    #     ...
     
-    def _on_load_experiments(self, button):
-        """Import experiments from JSON file."""
-        dialog = Gtk.FileChooserDialog(
-            title="Load Experiments",
-            action=Gtk.FileChooserAction.OPEN
-        )
-        dialog.add_buttons(
-            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
-            Gtk.STOCK_OPEN, Gtk.ResponseType.OK
-        )
-        
-        # Add JSON filter
-        filter_json = Gtk.FileFilter()
-        filter_json.set_name("JSON files")
-        filter_json.add_pattern("*.json")
-        dialog.add_filter(filter_json)
-        
-        response = dialog.run()
-        if response == Gtk.ResponseType.OK:
-            filepath = dialog.get_filename()
-            
-            try:
-                if self.experiment_manager.import_from_json(filepath):
-                    # Rebuild combo
-                    names = self.experiment_manager.get_snapshot_names()
-                    self.simulation_toolbar.populate_experiment_combo(names)
-                    
-                    self._append_diagnostics_log(f"📂 Loaded {len(names)} experiments from {filepath}")
-                else:
-                    self._append_diagnostics_log(f"✗ Load failed: Invalid file format")
-            except Exception as e:
-                self._append_diagnostics_log(f"✗ Load failed: {e}")
-        
-        dialog.destroy()
+    # def _on_load_experiments(self, button):
+    #     """Import experiments from JSON file."""
+    #     ...
     
     def _on_experiment_changed(self, combo):
         """Switch between experiment snapshots."""

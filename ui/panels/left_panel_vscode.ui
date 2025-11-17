@@ -374,8 +374,8 @@
     <child>
       <object class="GtkButton" id="quit_button">
         <property name="visible">True</property>
-        <property name="label">Quit Application</property>
-        <property name="tooltip-text">Exit shypn (prompts to save unsaved changes)</property>
+        <property name="label">Close Project</property>
+        <property name="tooltip-text">Close the current project (prompts to save unsaved changes)</property>
       </object>
       <packing>
         <property name="expand">False</property>

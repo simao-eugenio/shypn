@@ -69,7 +69,8 @@ class SwissKnifePaletteUI:
         
         for cat_id, cat_info in self.categories.items():
             button = Gtk.Button(label=cat_info['label'])
-            button.set_tooltip_text(cat_info['tooltip'])
+            # Tooltip disabled - only show tooltips on canvas network objects
+            # button.set_tooltip_text(cat_info['tooltip'])
             button.get_style_context().add_class('category-button')
             
             category_box.pack_start(button, False, False, 0)

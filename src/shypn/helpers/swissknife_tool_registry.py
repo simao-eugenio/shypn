@@ -40,7 +40,8 @@ class SwissKnifeTool(GObject.Object):
         
         # Create button
         self._button = Gtk.Button(label=label)
-        self._button.set_tooltip_text(tooltip)
+        # Tooltip disabled - only show tooltips on canvas network objects
+        # self._button.set_tooltip_text(tooltip)
         self._button.set_size_request(40, 40)
         self._button.get_style_context().add_class('swissknife-tool')
         

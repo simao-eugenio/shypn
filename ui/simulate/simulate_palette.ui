@@ -17,7 +17,6 @@
       <object class="GtkToggleButton" id="simulate_toggle_button">
         <property name="visible">True</property>
         <property name="label">S</property>
-        <property name="tooltip-text">Toggle Simulation Tools (Run, Stop, Reset)</property>
         <property name="width-request">36</property>
         <property name="height-request">36</property>
         <style>

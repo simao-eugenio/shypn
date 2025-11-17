@@ -74,7 +74,7 @@ class ProjectActionsController:
         self.on_project_created = None  # Callback(project)
         self.on_project_opened = None   # Callback(project)
         self.on_project_closed = None   # Callback()
-        self.on_quit_requested = None   # Callback()
+        self.on_close_project_requested = None   # Callback()
         
         # Connect buttons
         self._connect_buttons()
@@ -98,7 +98,7 @@ class ProjectActionsController:
         # Quit button
         self.quit_button = self.builder.get_object('quit_button')
         if self.quit_button:
-            self.quit_button.connect('clicked', self._on_quit_clicked)
+            self.quit_button.connect('clicked', self._on_close_project_clicked)
     
     # Button Click Handlers
     
@@ -136,17 +136,20 @@ class ProjectActionsController:
         else:
             pass  # No current project
     
-    def _on_quit_clicked(self, button):
-        """Handle Quit button click."""
+    def _on_close_project_clicked(self, button):
+        """Handle Close Project button click."""
         # Check for unsaved changes
         # TODO: Implement proper unsaved changes detection
         
-        if self.on_quit_requested:
-            # Let the owner handle quit (e.g., main window)
-            self.on_quit_requested()
+        if self.on_close_project_requested:
+            # Let the owner handle project closing (e.g., main window)
+            self.on_close_project_requested()
         else:
-            # Default: quit immediately
-            Gtk.main_quit()
+            # Default: close current project if one is open
+            from ..data.project_models import get_project_manager
+            project_manager = get_project_manager()
+            if project_manager.current_project:
+                project_manager.close_current_project(save=True)
     
     # Project Lifecycle Callbacks (from DialogManager)
     

@@ -155,7 +155,8 @@ class FloatingButtonsManager(GObject.GObject):
             Gtk.Button: Configured button widget
         """
         btn = Gtk.Button(label=label)
-        btn.set_tooltip_text(tooltip)
+        # Tooltip disabled - only show tooltips on canvas network objects
+        # btn.set_tooltip_text(tooltip)
         btn.set_size_request(40, 40)
         btn.set_sensitive(sensitive)
         
@@ -196,7 +197,8 @@ class FloatingButtonsManager(GObject.GObject):
             Gtk.ToggleButton: Configured toggle button widget
         """
         btn = Gtk.ToggleButton(label=label)
-        btn.set_tooltip_text(tooltip)
+        # Tooltip disabled - only show tooltips on canvas network objects
+        # btn.set_tooltip_text(tooltip)
         btn.set_size_request(40, 40)
         
         # Position: bottom with horizontal offset from center

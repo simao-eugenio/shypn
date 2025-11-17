@@ -78,75 +78,92 @@ UI_PATH = Path(__file__).parents[3] / 'ui' / 'palettes' / 'master_palette.ui'
 
 
 # Material Design inspired CSS for master palette - high contrast, bold colors
-# Width: 48px = 40px button + 6px margin + 2px padding
+# Width: 56px = 48px button + 6px margin + 2px padding
 PALETTE_CSS = """
-/* Master Palette Container - 48px total width */
+/* Master Palette Container - 56px total width */
 #master_palette_container {
-    background-color: #263238;
-    border-right: 2px solid #37474F;
-    padding: 2px;
+    background-color: #1a1f24;
+    background-image: linear-gradient(to bottom, #1a2229 0%, #263238 50%, #1e272e 100%);
+    border-right: 4px solid #37474F;
+    border-left: 1px solid #0d1216;
+    padding: 4px 2px;
 }
 
-/* Palette Buttons - Base State (squared 40x40px buttons) */
+/* Master Palette Panel (outer box in UI file) */
+#master_palette_slot {
+    background-color: #141a1f;
+    background-image: linear-gradient(to bottom, #0f1419, #1a2229);
+    border-right: 2px solid #263238;
+}
+
+/* Palette Buttons - Base State (squared 48x48px buttons) */
 .palette-button {
     background-color: #37474F;
-    border: 2px solid #455A64;
-    border-radius: 4px;
+    background-image: linear-gradient(to bottom, #455A64, #37474F);
+    border: 2px solid #546E7A;
+    border-radius: 8px;
     color: #FFFFFF;
-    transition: all 200ms cubic-bezier(0.4, 0.0, 0.2, 1);
     margin: 3px;
-    min-width: 40px;
-    min-height: 40px;
+    min-width: 48px;
+    min-height: 48px;
     padding: 0;
 }
 
-/* Hover State - Bright highlight */
+/* Hover State - Bright highlight with glow */
 .palette-button:hover {
     background-color: #4CAF50;
-    border-color: #66BB6A;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4),
-                0 0 0 1px rgba(76, 175, 80, 0.5);
+    background-image: linear-gradient(to bottom, #66BB6A, #4CAF50);
+    border: 3px solid #81C784;
+    color: #FFFFFF;
 }
 
 /* Pressed State */
 .palette-button:active {
-    background-color: #388E3C;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    background-color: #2E7D32;
+    background-image: linear-gradient(to bottom, #388E3C, #2E7D32);
+    border: 2px solid #66BB6A;
 }
 
-/* Active/Checked State (toggled on) - Bold orange */
+/* Active/Checked State (toggled on) - Bold orange with glow */
 .palette-button:checked,
 .palette-button-active {
     background-color: #FF9800;
-    border-color: #FFB74D;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5),
-                inset 0 0 0 2px #FFA726,
-                0 0 0 1px rgba(255, 152, 0, 0.6);
+    background-image: linear-gradient(to bottom, #FFB74D, #FF9800);
+    border: 3px solid #FFA726;
+    color: #FFFFFF;
 }
 
 /* Active Hover State */
 .palette-button:checked:hover,
 .palette-button-active:hover {
     background-color: #FB8C00;
-    border-color: #FFA726;
-    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.5),
-                inset 0 0 0 2px #FFB74D,
-                0 0 0 1px rgba(251, 140, 0, 0.7);
+    background-image: linear-gradient(to bottom, #FFA726, #FB8C00);
+    border: 3px solid #FFB74D;
 }
 
 /* Disabled State */
 .palette-button:disabled {
-    opacity: 0.35;
-    background-color: #37474F;
+    opacity: 0.4;
+    background-color: #2C393F;
+    background-image: none;
     border-color: #455A64;
-    color: #78909C;
-    box-shadow: none;
+    color: #546E7A;
 }
 
 /* Icon styling */
 .palette-button image {
-    min-width: 32px;
-    min-height: 32px;
+    min-width: 40px;
+    min-height: 40px;
+    -gtk-icon-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.palette-button:hover image {
+    -gtk-icon-shadow: 0 2px 4px rgba(255, 255, 255, 0.2);
+}
+
+.palette-button:checked image,
+.palette-button-active image {
+    -gtk-icon-shadow: 0 2px 4px rgba(255, 255, 255, 0.3);
 }
 """
 
@@ -202,10 +219,10 @@ class MasterPalette:
 
         if not self.container:
             # Create fallback container
-            # Width calculation: 40px button + 6px margin (3px each) + 2px padding (1px each) = 48px
+            # Width calculation: 48px button + 6px margin (3px each) + 2px padding (1px each) = 56px
             self.container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
             self.container.set_name('master_palette_container')
-            self.container.set_size_request(48, -1)
+            self.container.set_size_request(56, -1)
             self.container.set_spacing(0)
             self.container.set_hexpand(False)
             self.container.set_vexpand(True)
