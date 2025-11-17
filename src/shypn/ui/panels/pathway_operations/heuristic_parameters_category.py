@@ -64,16 +64,27 @@ class HeuristicParametersCategory(BasePathwayCategory):
         
         # Description
         desc = Gtk.Label()
-        desc.set_text("Intelligent parameter defaults based on transition type and biological context")
+        desc.set_text("Intelligent parameter defaults based on transition type and biological context.\nLearns from your enrichment history to improve over time.")
         desc.set_halign(Gtk.Align.START)
         desc.set_line_wrap(True)
         desc.get_style_context().add_class('dim-label')
         content_box.pack_start(desc, False, False, 0)
         
+        # Button box for actions
+        button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
+        
         # Analyze button
         self.analyze_button = Gtk.Button(label="Analyze & Infer Parameters")
         self.analyze_button.connect('clicked', self._on_analyze_clicked)
-        content_box.pack_start(self.analyze_button, False, False, 0)
+        button_box.pack_start(self.analyze_button, True, True, 0)
+        
+        # Refresh Patterns button (Phase 3)
+        self.refresh_patterns_button = Gtk.Button(label="Refresh Learned Patterns")
+        self.refresh_patterns_button.connect('clicked', self._on_refresh_patterns)
+        self.refresh_patterns_button.set_tooltip_text("Update learned patterns from enrichment history")
+        button_box.pack_start(self.refresh_patterns_button, True, True, 0)
+        
+        content_box.pack_start(button_box, False, False, 0)
         
         # Results view
         results_scroll = Gtk.ScrolledWindow()
@@ -141,6 +152,34 @@ class HeuristicParametersCategory(BasePathwayCategory):
         
         results_scroll.add(self.results_tree)
         content_box.pack_start(results_scroll, True, True, 0)
+        
+        # Override options
+        override_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
+        override_box.set_margin_top(10)
+        override_box.set_margin_bottom(5)
+        
+        override_label = Gtk.Label()
+        override_label.set_markup("<b>Override Options:</b>")
+        override_label.set_halign(Gtk.Align.START)
+        override_box.pack_start(override_label, False, False, 0)
+        
+        self.override_sbml_check = Gtk.CheckButton(label="Override SBML curated data (NOT recommended - curated models have real kinetics)")
+        self.override_sbml_check.set_active(False)
+        self.override_sbml_check.set_tooltip_text("SBML imports have curated kinetic parameters from literature. Only enable if you want to replace them with heuristic estimates.")
+        override_box.pack_start(self.override_sbml_check, False, False, 0)
+        
+        self.override_enriched_check = Gtk.CheckButton(label="Override BRENDA/SABIO-RK enriched data (use with caution)")
+        self.override_enriched_check.set_active(False)
+        self.override_enriched_check.set_tooltip_text("Transitions enriched with BRENDA or SABIO-RK have experimental kinetic data. Only enable if you want to replace them with heuristic estimates.")
+        override_box.pack_start(self.override_enriched_check, False, False, 0)
+        
+        info_label = Gtk.Label()
+        info_label.set_markup("<small><i>Heuristic will always apply to KEGG imports and transitions without kinetic data.</i></small>")
+        info_label.set_halign(Gtk.Align.START)
+        info_label.get_style_context().add_class('dim-label')
+        override_box.pack_start(info_label, False, False, 0)
+        
+        content_box.pack_start(override_box, False, False, 0)
         
         # Action buttons
         action_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
@@ -382,7 +421,15 @@ class HeuristicParametersCategory(BasePathwayCategory):
         self.logger.info("[APPLY] Apply Selected button clicked!")
         self.logger.info("=" * 60)
         
+        # Get override settings
+        override_sbml = self.override_sbml_check.get_active()
+        override_enriched = self.override_enriched_check.get_active()
+        
+        self.logger.info(f"[APPLY] Override SBML: {override_sbml}")
+        self.logger.info(f"[APPLY] Override Enriched: {override_enriched}")
+        
         applied_count = 0
+        skipped_count = 0
         total_rows = 0
         selected_count = 0
         
@@ -400,30 +447,41 @@ class HeuristicParametersCategory(BasePathwayCategory):
                 
                 self.logger.info(f"Applying parameters to {result.transition_id}")
                 
-                # Apply parameters
+                # Apply parameters with override settings
                 success = self.controller.apply_parameters(
                     result.transition_id,
-                    result.parameters.to_dict()
+                    result.parameters.to_dict(),
+                    override_sbml=override_sbml,
+                    override_enriched=override_enriched
                 )
                 
                 if success:
                     applied_count += 1
                     self.logger.info(f"Successfully applied to {result.transition_id}")
+                elif success is None:
+                    # None means skipped due to override settings
+                    skipped_count += 1
+                    self.logger.info(f"Skipped {result.transition_id} (existing kinetics protected)")
                 else:
                     self.logger.warning(f"Failed to apply to {result.transition_id}")
             
             iter = self.results_store.iter_next(iter)
         
-        self.logger.info(f"Total rows: {total_rows}, Selected: {selected_count}, Applied: {applied_count}")
+        self.logger.info(f"Total rows: {total_rows}, Selected: {selected_count}, Applied: {applied_count}, Skipped: {skipped_count}")
         
         # CRITICAL: Reset simulation state after applying parameters
         # This clears cached behaviors that might have old parameter values
         # See: CANVAS_STATE_ISSUES_COMPARISON.md for historical context
         if applied_count > 0:
             self._reset_simulation_after_parameter_changes()
-            self.status_label.set_text(f"Applied parameters to {applied_count} transition(s)")
+            if skipped_count > 0:
+                self.status_label.set_text(f"Applied to {applied_count} transition(s), skipped {skipped_count} (enable override to replace)")
+            else:
+                self.status_label.set_text(f"Applied parameters to {applied_count} transition(s)")
         else:
-            if selected_count > 0:
+            if skipped_count > 0:
+                self.status_label.set_text(f"Skipped {skipped_count} transition(s) with existing kinetics (enable override to replace)")
+            elif selected_count > 0:
                 self.status_label.set_text(f"Failed to apply {selected_count} selected transition(s)")
             else:
                 self.status_label.set_text("No transitions selected")
@@ -511,4 +569,43 @@ class HeuristicParametersCategory(BasePathwayCategory):
                 
         except Exception as e:
             self.logger.error(f"Error resetting simulation after parameter changes: {e}", exc_info=True)
-
+    
+    def _on_refresh_patterns(self, button):
+        """Handle refresh learned patterns button click (Phase 3)."""
+        self.refresh_patterns_button.set_sensitive(False)
+        self.status_label.set_text("Learning patterns from enrichment history...")
+        
+        # Run learning in background
+        GLib.idle_add(self._do_pattern_learning)
+    
+    def _do_pattern_learning(self):
+        """Perform pattern learning (called from idle handler)."""
+        try:
+            # Create learner
+            from shypn.crossfetch.learning.heuristic_learner import HeuristicLearner
+            from shypn.crossfetch.database.heuristic_db import HeuristicDatabase
+            
+            db = HeuristicDatabase()
+            learner = HeuristicLearner(db=db, min_sample_size=5)
+            
+            # Learn from history
+            summary = learner.learn_from_history()
+            
+            # Get statistics
+            stats = db.get_learning_statistics()
+            
+            # Update status
+            self.status_label.set_text(
+                f"Learned {stats['total_patterns']} patterns from {summary['total_samples_processed']} enrichments "
+                f"(avg confidence: {stats['avg_confidence']:.0%})"
+            )
+            
+            self.logger.info(f"Pattern learning complete: {summary}")
+            
+        except Exception as e:
+            self.logger.error(f"Pattern learning failed: {e}", exc_info=True)
+            self.status_label.set_text(f"Learning failed: {str(e)}")
+        finally:
+            self.refresh_patterns_button.set_sensitive(True)
+        
+        return False  # Don't repeat

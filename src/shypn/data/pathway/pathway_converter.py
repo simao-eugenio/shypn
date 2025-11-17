@@ -483,9 +483,23 @@ class ReactionConverter(BaseConverter):
             transition.properties['rate_function'] = rate_func
             transition.rate = params.get('vmax', 1.0)  # Fallback for display
             
+            # Store heuristic parameters in metadata with units
+            if not hasattr(transition, 'metadata') or transition.metadata is None:
+                transition.metadata = {}
+            
+            transition.metadata['Vmax'] = params.get('vmax', 10.0)
+            transition.metadata['Vmax_units'] = 'mM/s'
+            transition.metadata['Vmax_source'] = 'kegg_heuristic'
+            
+            transition.metadata['Km'] = params.get('km', 5.0)
+            transition.metadata['Km_units'] = 'mM'
+            transition.metadata['Km_source'] = 'kegg_heuristic'
+            
+            transition.metadata['rate_function_source'] = 'kegg_heuristic'
+            
             self.logger.info(
                 f"  Heuristic estimation (Michaelis-Menten): "
-                f"Vmax={params.get('vmax'):.2f}, Km={params.get('km'):.2f}"
+                f"Vmax={params.get('vmax'):.2f} mM/s, Km={params.get('km'):.2f} mM"
             )
             self.logger.info(
                 f"    Rate function: '{rate_func}'"

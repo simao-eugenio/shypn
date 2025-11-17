@@ -34,6 +34,7 @@ class HeuristicDatabase:
     - Type-aware parameter storage (JSON blobs)
     - Usage tracking and learning
     - Query caching for performance
+    - Phase 3: Pattern learning from enrichment history
     
     Attributes:
         db_path: Path to SQLite database file
@@ -41,7 +42,7 @@ class HeuristicDatabase:
     """
     
     # Database version for schema migrations
-    SCHEMA_VERSION = 1
+    SCHEMA_VERSION = 3
     
     def __init__(self, db_path: Optional[str] = None):
         """Initialize database connection.
@@ -159,8 +160,12 @@ class HeuristicDatabase:
                 import_date TEXT NOT NULL,  -- ISO8601 timestamp
                 last_used TEXT,             -- ISO8601 timestamp
                 usage_count INTEGER DEFAULT 0,
-                user_rating INTEGER CHECK(user_rating >= 1 AND user_rating <= 5),
-                notes TEXT
+                user_rating INTEGER CHECK(user_rating >= -1 AND user_rating <= 1),
+                notes TEXT,
+                
+                -- Phase 2: Undo Support
+                undone INTEGER DEFAULT 0,   -- Boolean: 0=active, 1=undone
+                undo_timestamp TEXT         -- ISO8601 timestamp when undone
             )
         """)
         
@@ -311,7 +316,77 @@ class HeuristicDatabase:
             ON brenda_statistics(ec_number, parameter_type, organism)
         """)
         
-        # Table 7: Schema Version
+        # Table 7: Learned Patterns (Phase 3)
+        cursor.execute("""
+            CREATE TABLE learned_patterns (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                
+                -- Pattern Classification
+                pattern_type TEXT NOT NULL CHECK(pattern_type IN ('ec_class', 'ec_specific', 'organism', 'pathway')),
+                ec_class TEXT,           -- e.g., '2.7' for transferases
+                ec_number TEXT,          -- Full EC number for specific patterns
+                organism_group TEXT,     -- e.g., 'mammals', 'yeast', 'bacteria'
+                organism TEXT,           -- Specific organism
+                pathway_context TEXT,    -- Optional pathway classification
+                
+                -- Parameter Statistics
+                param_type TEXT NOT NULL CHECK(param_type IN ('vmax', 'km', 'kcat', 'lambda', 'delay')),
+                param_mean REAL NOT NULL,
+                param_std_dev REAL NOT NULL,
+                param_median REAL,
+                param_min REAL,
+                param_max REAL,
+                
+                -- Confidence Metrics
+                sample_size INTEGER NOT NULL,
+                confidence_score REAL NOT NULL CHECK(confidence_score >= 0.0 AND confidence_score <= 1.0),
+                variance_penalty REAL DEFAULT 0.0,  -- Penalty for high variance
+                
+                -- Source Tracking
+                source_ids TEXT,         -- JSON array of parameter IDs used to learn pattern
+                last_updated TEXT NOT NULL,
+                
+                UNIQUE(pattern_type, ec_class, ec_number, organism_group, organism, pathway_context, param_type)
+            )
+        """)
+        
+        cursor.execute("""
+            CREATE INDEX idx_learned_ec
+            ON learned_patterns(ec_class, param_type)
+        """)
+        
+        cursor.execute("""
+            CREATE INDEX idx_learned_organism
+            ON learned_patterns(organism, param_type)
+        """)
+        
+        # Table 8: Pattern Performance (Phase 3)
+        cursor.execute("""
+            CREATE TABLE pattern_performance (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                pattern_id INTEGER NOT NULL,
+                
+                -- Usage Statistics
+                applications INTEGER DEFAULT 0,
+                success_count INTEGER DEFAULT 0,  -- user_rating >= 0
+                failure_count INTEGER DEFAULT 0,  -- user_rating < 0
+                avg_user_rating REAL,
+                
+                -- Performance Metrics
+                last_applied TEXT,
+                last_rating_date TEXT,
+                
+                FOREIGN KEY (pattern_id) REFERENCES learned_patterns(id) ON DELETE CASCADE,
+                UNIQUE(pattern_id)
+            )
+        """)
+        
+        cursor.execute("""
+            CREATE INDEX idx_pattern_perf
+            ON pattern_performance(pattern_id, avg_user_rating DESC)
+        """)
+        
+        # Table 9: Schema Version
         cursor.execute("""
             CREATE TABLE schema_version (
                 version INTEGER PRIMARY KEY
@@ -375,11 +450,113 @@ class HeuristicDatabase:
             conn: Database connection
             from_version: Current schema version
         """
-        # Future migrations will go here
-        # Example:
-        # if from_version < 2:
-        #     cursor.execute("ALTER TABLE ...")
-        pass
+        cursor = conn.cursor()
+        
+        # Migration v1 -> v2: Phase 2 user feedback support
+        if from_version < 2:
+            self.logger.info("Migrating to schema v2: Adding undo columns")
+            
+            # Add undone column
+            try:
+                cursor.execute("""
+                    ALTER TABLE transition_parameters 
+                    ADD COLUMN undone INTEGER DEFAULT 0
+                """)
+            except sqlite3.OperationalError:
+                pass  # Column might already exist
+            
+            # Add undo_timestamp column
+            try:
+                cursor.execute("""
+                    ALTER TABLE transition_parameters 
+                    ADD COLUMN undo_timestamp TEXT
+                """)
+            except sqlite3.OperationalError:
+                pass  # Column might already exist
+            
+            # Note: Cannot modify CHECK constraint on existing table
+            # user_rating constraint will only apply to new databases
+            # Existing databases will need to manually handle -1/0/1 validation
+            
+            # Update schema version
+            cursor.execute("UPDATE schema_version SET version = 2")
+            self.logger.info("Migration to v2 complete")
+        
+        # Migration v2 -> v3: Phase 3 intelligent learning support
+        if from_version < 3:
+            self.logger.info("Migrating to schema v3: Adding learned patterns tables")
+            
+            # Add learned_patterns table
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS learned_patterns (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    
+                    -- Pattern Classification
+                    pattern_type TEXT NOT NULL CHECK(pattern_type IN ('ec_class', 'ec_specific', 'organism', 'pathway')),
+                    ec_class TEXT,
+                    ec_number TEXT,
+                    organism_group TEXT,
+                    organism TEXT,
+                    pathway_context TEXT,
+                    
+                    -- Parameter Statistics
+                    param_type TEXT NOT NULL CHECK(param_type IN ('vmax', 'km', 'kcat', 'lambda', 'delay')),
+                    param_mean REAL NOT NULL,
+                    param_std_dev REAL NOT NULL,
+                    param_median REAL,
+                    param_min REAL,
+                    param_max REAL,
+                    
+                    -- Confidence Metrics
+                    sample_size INTEGER NOT NULL,
+                    confidence_score REAL NOT NULL CHECK(confidence_score >= 0.0 AND confidence_score <= 1.0),
+                    variance_penalty REAL DEFAULT 0.0,
+                    
+                    -- Source Tracking
+                    source_ids TEXT,
+                    last_updated TEXT NOT NULL,
+                    
+                    UNIQUE(pattern_type, ec_class, ec_number, organism_group, organism, pathway_context, param_type)
+                )
+            """)
+            
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_learned_ec
+                ON learned_patterns(ec_class, param_type)
+            """)
+            
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_learned_organism
+                ON learned_patterns(organism, param_type)
+            """)
+            
+            # Add pattern_performance table
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS pattern_performance (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    pattern_id INTEGER NOT NULL,
+                    
+                    applications INTEGER DEFAULT 0,
+                    success_count INTEGER DEFAULT 0,
+                    failure_count INTEGER DEFAULT 0,
+                    avg_user_rating REAL,
+                    
+                    last_applied TEXT,
+                    last_rating_date TEXT,
+                    
+                    FOREIGN KEY (pattern_id) REFERENCES learned_patterns(id) ON DELETE CASCADE,
+                    UNIQUE(pattern_id)
+                )
+            """)
+            
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_pattern_perf
+                ON pattern_performance(pattern_id, avg_user_rating DESC)
+            """)
+            
+            # Update schema version
+            cursor.execute("UPDATE schema_version SET version = 3")
+            self.logger.info("Migration to v3 complete")
     
     # ==================== Parameter Storage ====================
     
@@ -1093,6 +1270,227 @@ class HeuristicDatabase:
         if 'parameters' in result and result['parameters']:
             result['parameters'] = json.loads(result['parameters'])
         return result
+    
+    # ==================== Learned Patterns (Phase 3) ====================
+    
+    def store_learned_pattern(self,
+                             pattern_type: str,
+                             param_type: str,
+                             param_mean: float,
+                             param_std_dev: float,
+                             sample_size: int,
+                             confidence_score: float,
+                             source_ids: List[int],
+                             ec_class: Optional[str] = None,
+                             ec_number: Optional[str] = None,
+                             organism_group: Optional[str] = None,
+                             organism: Optional[str] = None,
+                             pathway_context: Optional[str] = None,
+                             param_median: Optional[float] = None,
+                             param_min: Optional[float] = None,
+                             param_max: Optional[float] = None,
+                             variance_penalty: float = 0.0) -> int:
+        """Store a learned parameter pattern.
+        
+        Args:
+            pattern_type: 'ec_class', 'ec_specific', 'organism', or 'pathway'
+            param_type: 'vmax', 'km', 'kcat', 'lambda', or 'delay'
+            param_mean: Mean parameter value
+            param_std_dev: Standard deviation
+            sample_size: Number of samples used
+            confidence_score: Overall confidence (0.0-1.0)
+            source_ids: List of parameter IDs used to learn pattern
+            ec_class: Optional EC class (e.g., '2.7')
+            ec_number: Optional full EC number
+            organism_group: Optional organism group
+            organism: Optional specific organism
+            pathway_context: Optional pathway context
+            param_median: Optional median value
+            param_min: Optional minimum value
+            param_max: Optional maximum value
+            variance_penalty: Penalty for high variance (default 0.0)
+            
+        Returns:
+            Pattern ID
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Convert source_ids to JSON
+            source_ids_json = json.dumps(source_ids)
+            
+            cursor.execute("""
+                INSERT OR REPLACE INTO learned_patterns
+                (pattern_type, ec_class, ec_number, organism_group, organism, pathway_context,
+                 param_type, param_mean, param_std_dev, param_median, param_min, param_max,
+                 sample_size, confidence_score, variance_penalty, source_ids, last_updated)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+            """, (
+                pattern_type, ec_class, ec_number, organism_group, organism, pathway_context,
+                param_type, param_mean, param_std_dev, param_median, param_min, param_max,
+                sample_size, confidence_score, variance_penalty, source_ids_json
+            ))
+            
+            pattern_id = cursor.lastrowid
+            
+            # Initialize performance tracking
+            cursor.execute("""
+                INSERT OR IGNORE INTO pattern_performance (pattern_id, applications)
+                VALUES (?, 0)
+            """, (pattern_id,))
+            
+            conn.commit()
+            self.logger.info(f"Stored learned pattern {pattern_id} ({pattern_type}, {param_type})")
+            return pattern_id
+    
+    def query_learned_pattern(self,
+                             param_type: str,
+                             ec_number: Optional[str] = None,
+                             organism: Optional[str] = None,
+                             min_confidence: float = 0.5) -> Optional[Dict[str, Any]]:
+        """Query for best matching learned pattern.
+        
+        Tries in order:
+        1. Exact EC + organism match
+        2. EC class + organism match
+        3. Exact EC match (any organism)
+        4. EC class match (any organism)
+        5. Organism match (any EC)
+        
+        Args:
+            param_type: Parameter type to query
+            ec_number: Optional EC number
+            organism: Optional organism
+            min_confidence: Minimum confidence threshold
+            
+        Returns:
+            Pattern dict or None
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Try exact match first
+            if ec_number and organism:
+                cursor.execute("""
+                    SELECT * FROM learned_patterns
+                    WHERE param_type = ?
+                      AND ec_number = ?
+                      AND organism = ?
+                      AND confidence_score >= ?
+                    ORDER BY confidence_score DESC, sample_size DESC
+                    LIMIT 1
+                """, (param_type, ec_number, organism, min_confidence))
+                
+                row = cursor.fetchone()
+                if row:
+                    return dict(row)
+            
+            # Try EC class + organism
+            if ec_number and organism:
+                ec_class = '.'.join(ec_number.split('.')[:2])
+                cursor.execute("""
+                    SELECT * FROM learned_patterns
+                    WHERE param_type = ?
+                      AND ec_class = ?
+                      AND organism = ?
+                      AND confidence_score >= ?
+                    ORDER BY confidence_score DESC, sample_size DESC
+                    LIMIT 1
+                """, (param_type, ec_class, organism, min_confidence))
+                
+                row = cursor.fetchone()
+                if row:
+                    return dict(row)
+            
+            # Try EC-specific (any organism)
+            if ec_number:
+                cursor.execute("""
+                    SELECT * FROM learned_patterns
+                    WHERE param_type = ?
+                      AND ec_number = ?
+                      AND confidence_score >= ?
+                    ORDER BY confidence_score DESC, sample_size DESC
+                    LIMIT 1
+                """, (param_type, ec_number, min_confidence))
+                
+                row = cursor.fetchone()
+                if row:
+                    return dict(row)
+            
+            # Try EC class (any organism)
+            if ec_number:
+                ec_class = '.'.join(ec_number.split('.')[:2])
+                cursor.execute("""
+                    SELECT * FROM learned_patterns
+                    WHERE param_type = ?
+                      AND ec_class = ?
+                      AND confidence_score >= ?
+                    ORDER BY confidence_score DESC, sample_size DESC
+                    LIMIT 1
+                """, (param_type, ec_class, min_confidence))
+                
+                row = cursor.fetchone()
+                if row:
+                    return dict(row)
+            
+            # Try organism match (any EC)
+            if organism:
+                cursor.execute("""
+                    SELECT * FROM learned_patterns
+                    WHERE param_type = ?
+                      AND organism = ?
+                      AND confidence_score >= ?
+                    ORDER BY confidence_score DESC, sample_size DESC
+                    LIMIT 1
+                """, (param_type, organism, min_confidence))
+                
+                row = cursor.fetchone()
+                if row:
+                    return dict(row)
+            
+            return None
+    
+    def get_learning_statistics(self) -> Dict[str, Any]:
+        """Get statistics about learned patterns.
+        
+        Returns:
+            Statistics dict
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Count patterns by type
+            cursor.execute("""
+                SELECT pattern_type, COUNT(*) as count
+                FROM learned_patterns
+                GROUP BY pattern_type
+            """)
+            patterns_by_type = {row['pattern_type']: row['count'] for row in cursor.fetchall()}
+            
+            # Total sample size
+            cursor.execute("SELECT SUM(sample_size) as total FROM learned_patterns")
+            total_samples = cursor.fetchone()['total'] or 0
+            
+            # Average confidence
+            cursor.execute("SELECT AVG(confidence_score) as avg_conf FROM learned_patterns")
+            avg_confidence = cursor.fetchone()['avg_conf'] or 0.0
+            
+            # Best patterns
+            cursor.execute("""
+                SELECT param_type, ec_class, organism, confidence_score, sample_size
+                FROM learned_patterns
+                ORDER BY confidence_score DESC, sample_size DESC
+                LIMIT 10
+            """)
+            best_patterns = [dict(row) for row in cursor.fetchall()]
+            
+            return {
+                'total_patterns': sum(patterns_by_type.values()),
+                'patterns_by_type': patterns_by_type,
+                'total_samples_used': total_samples,
+                'avg_confidence': avg_confidence,
+                'best_patterns': best_patterns
+            }
     
     def close(self):
         """Close database connection (if needed).

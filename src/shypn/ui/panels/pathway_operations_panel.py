@@ -27,21 +27,24 @@ from .pathway_operations.sbml_category import SBMLCategory
 from .pathway_operations.brenda_category import BRENDACategory
 from .pathway_operations.sabio_rk_category import SabioRKCategory
 from .pathway_operations.heuristic_parameters_category import HeuristicParametersCategory
+from .pathway_operations.enrichment_history_category import EnrichmentHistoryCategory
 
 
 class PathwayOperationsPanel(Gtk.Box):
     """Main Pathway Operations panel container.
     
-    Assembles five categories:
+    Assembles six categories:
     1. KEGG - Import pathways from KEGG database
     2. SBML - Import models from SBML files or BioModels
     3. BRENDA - Enrich models with kinetic parameters from BRENDA
     4. SABIO-RK - Enrich models with kinetic parameters from SABIO-RK
     5. Heuristic Parameters - Type-aware parameter inference from multiple sources
+    6. Enrichment History - View, rate, and undo parameter enrichments (Phase 2)
     
     Data flow:
       KEGG import → BRENDA/SABIO-RK/Heuristic (EC numbers)
       SBML import → BRENDA/SABIO-RK/Heuristic (reaction IDs)
+      All enrichments → History tracking (KB)
     
     Attributes:
         kegg_category: KEGGCategory instance
@@ -49,6 +52,7 @@ class PathwayOperationsPanel(Gtk.Box):
         brenda_category: BRENDACategory instance
         sabio_rk_category: SabioRKCategory instance
         heuristic_params_category: HeuristicParametersCategory instance
+        enrichment_history_category: EnrichmentHistoryCategory instance (Phase 2)
         project: Current project
         model_canvas: Current model canvas
     """
@@ -98,6 +102,12 @@ class PathwayOperationsPanel(Gtk.Box):
         # Heuristic Parameters category - Type-aware parameter inference
         self.heuristic_params_category = HeuristicParametersCategory(
             model_canvas_loader=model_canvas
+        )
+        
+        # Phase 2: Enrichment History category - View, rate, undo enrichments
+        self.enrichment_history_category = EnrichmentHistoryCategory(
+            model_canvas_loader=model_canvas,
+            expanded=False
         )
         
         # Set initial project and canvas if provided
@@ -155,6 +165,7 @@ class PathwayOperationsPanel(Gtk.Box):
         categories_box.pack_start(self.brenda_category, False, False, 0)
         categories_box.pack_start(self.sabio_rk_category, False, False, 0)
         categories_box.pack_start(self.heuristic_params_category, False, False, 0)
+        categories_box.pack_start(self.enrichment_history_category, False, False, 0)  # Phase 2
         
         scrolled.add(categories_box)
         self.pack_start(scrolled, True, True, 0)
@@ -202,6 +213,7 @@ class PathwayOperationsPanel(Gtk.Box):
         self.sbml_category.set_project(project)
         self.brenda_category.set_project(project)
         self.sabio_rk_category.set_project(project)
+        self.enrichment_history_category.set_project(project)  # Phase 2
         
         self.logger.info(f"Project set: {project.name if project else None}")
     
@@ -218,6 +230,7 @@ class PathwayOperationsPanel(Gtk.Box):
         self.sbml_category.set_model_canvas(model_canvas)
         self.brenda_category.set_model_canvas(model_canvas)
         self.sabio_rk_category.set_model_canvas(model_canvas)
+        self.enrichment_history_category.set_model_canvas(model_canvas)  # Phase 2
         
         self.logger.info("Model canvas updated for all categories")
     

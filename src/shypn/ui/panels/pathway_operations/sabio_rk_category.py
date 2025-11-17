@@ -220,7 +220,7 @@ class SabioRKCategory(BasePathwayCategory):
         self.organism_combo.append_text("Mus musculus")
         self.organism_combo.append_text("Saccharomyces cerevisiae")
         self.organism_combo.append_text("Escherichia coli")
-        self.organism_combo.set_active(0)
+        self.organism_combo.set_active(1)  # Default to Homo sapiens to avoid timeouts
         organism_box.pack_start(self.organism_combo, True, True, 0)
         
         box.pack_start(organism_box, False, False, 0)
@@ -244,25 +244,13 @@ class SabioRKCategory(BasePathwayCategory):
         container.set_margin_top(10)
         container.set_margin_bottom(10)
         
-        # Header with results counter and Select All/Deselect All buttons
+        # Header with results counter
         header_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         
         self.results_count_label = Gtk.Label()
         self.results_count_label.set_markup("<i>0 results</i>")
         self.results_count_label.set_xalign(0.0)
         header_box.pack_start(self.results_count_label, True, True, 0)
-        
-        self.select_all_button = Gtk.Button(label="Select All")
-        self.select_all_button.set_sensitive(False)
-        self.select_all_button.set_tooltip_text("Select all results")
-        self.select_all_button.connect('clicked', self._on_select_all_clicked)
-        header_box.pack_end(self.select_all_button, False, False, 0)
-        
-        self.deselect_all_button = Gtk.Button(label="Deselect All")
-        self.deselect_all_button.set_sensitive(False)
-        self.deselect_all_button.set_tooltip_text("Deselect all results")
-        self.deselect_all_button.connect('clicked', self._on_deselect_all_clicked)
-        header_box.pack_end(self.deselect_all_button, False, False, 0)
         
         container.pack_start(header_box, False, False, 0)
         
@@ -273,42 +261,54 @@ class SabioRKCategory(BasePathwayCategory):
         
         # Create tree view with parameters as columns
         self.results_store = Gtk.ListStore(
-            bool,    # 0: Select checkbox
+            bool,    # 0: Select checkbox (radio button style - only 1 per transition)
             str,     # 1: Transition ID (internal model ID)
-            str,     # 2: Reaction ID (KEGG R-ID)
-            str,     # 3: EC Number
-            str,     # 4: Vmax
-            str,     # 5: Km
-            str,     # 6: Kcat
-            str,     # 7: Ki
-            str,     # 8: Organism
-            object   # 9: Result data (hidden)
+            str,     # 2: Organism
+            str,     # 3: Substrate
+            str,     # 4: Temperature
+            str,     # 5: pH
+            str,     # 6: Km
+            str,     # 7: Vmax
+            str,     # 8: Kcat
+            str,     # 9: Ki
+            str,     # 10: Score
+            object   # 11: Parameter set data (hidden)
         )
         
         self.results_tree = Gtk.TreeView(model=self.results_store)
         self.results_tree.set_grid_lines(Gtk.TreeViewGridLines.BOTH)
         
-        # Checkbox column
+        # Connect row-activated for double-click behavior
+        self.results_tree.connect('row-activated', self._on_row_activated)
+        
+        # Checkbox column with clickable header for Select All/Deselect All
         checkbox_renderer = Gtk.CellRendererToggle()
         checkbox_renderer.connect('toggled', self._on_result_toggled)
-        checkbox_col = Gtk.TreeViewColumn("☑", checkbox_renderer, active=0)
+        checkbox_col = Gtk.TreeViewColumn("☐", checkbox_renderer, active=0)
         checkbox_col.set_fixed_width(40)
+        checkbox_col.set_clickable(True)
+        checkbox_col.connect('clicked', self._on_select_all_header_clicked)
         self.results_tree.append_column(checkbox_col)
+        self.select_column = checkbox_col
+        self._all_selected = False
         
         # Parameter columns with better sizing
         columns = [
             ("ID", 1, 80),           # Transition internal ID
-            ("Reaction", 2, 100),    # KEGG R-ID
-            ("EC", 3, 90),           # EC number
-            ("Vmax", 4, 120),        # Vmax value + units
-            ("Km", 5, 120),          # Km value + units
-            ("Kcat", 6, 120),        # Kcat value + units
-            ("Ki", 7, 120),          # Ki value + units
-            ("Organism", 8, 150)     # Organism name
+            ("Organism", 2, 140),    # Organism name
+            ("Substrate", 3, 100),   # Substrate name
+            ("Temp", 4, 60),         # Temperature
+            ("pH", 5, 50),           # pH value
+            ("Km", 6, 100),          # Km value + units
+            ("Vmax", 7, 100),        # Vmax value + units
+            ("Kcat", 8, 100),        # Kcat value + units
+            ("Ki", 9, 100),          # Ki value + units
+            ("Score", 10, 60)        # Completeness score
         ]
         
         for title, col_id, width in columns:
             renderer = Gtk.CellRendererText()
+            renderer.set_property('ellipsize', 3)  # ELLIPSIZE_END
             column = Gtk.TreeViewColumn(title, renderer, text=col_id)
             column.set_resizable(True)
             column.set_fixed_width(width)
@@ -465,23 +465,34 @@ class SabioRKCategory(BasePathwayCategory):
                     # Create pseudo transition info for display
                     # Use stored transition ID from context menu if available
                     transition_id = self._context_transition_id or f'EC_{ec_number}'
+                    transition_obj = self._context_transition  # Get stored transition object
+                    
+                    self.logger.info(f"[SABIO-RK] Creating result with transition_obj: {transition_obj}")
+                    if transition_obj:
+                        self.logger.info(f"[SABIO-RK] Transition ID: {transition_obj.id if hasattr(transition_obj, 'id') else 'NO ID'}")
+                    
+                    # Get current params if we have the transition object
+                    current_params = {}
+                    if transition_obj and hasattr(self.sabio_controller, '_get_current_params'):
+                        current_params = self.sabio_controller._get_current_params(transition_obj)
                     
                     results = [{
                         'transition_id': transition_id,
                         'transition_name': f'EC {ec_number}',
                         'identifiers': {'ec_number': ec_number},
                         'sabio_data': result,
-                        'transition': None  # Manual query, no transition
+                        'transition': transition_obj,  # Use stored transition from context menu
+                        'current_params': current_params
                     }]
                     GLib.idle_add(self._populate_results, results, button)
                     
-                    # Clear stored transition ID after use
-                    self._context_transition_id = None
+                    # DON'T clear context transition yet - we need it for Apply Selected
+                    # It will be cleared in _on_apply_clicked after parameters are applied
                 else:
                     # Show more specific error message
                     if organism:
                         msg = f"<span foreground='red'>No data found for EC {ec_number} in {organism}. "\
-                              f"Query may have too many results (&gt;150) or no data available.</span>"
+                              f"Query may have too many results (&gt;200) or no data available.</span>"
                     else:
                         msg = f"<span foreground='red'>No data found for EC {ec_number}. "\
                               f"Try selecting a specific organism to reduce results.</span>"
@@ -500,56 +511,122 @@ class SabioRKCategory(BasePathwayCategory):
         self.results_store[path][0] = not self.results_store[path][0]
         self._update_apply_button()
     
-    def _on_select_all_clicked(self, button):
-        """Select all results."""
+    def _on_select_all_header_clicked(self, column):
+        """Handle click on checkbox column header to select/deselect all.
+        
+        Toggles between selecting all rows and deselecting all rows.
+        Updates header icon to show current state (☐ = none selected, ☑ = all selected).
+        """
+        # Toggle state
+        self._all_selected = not self._all_selected
+        
+        # Update all rows
         iter = self.results_store.get_iter_first()
         while iter:
-            self.results_store.set_value(iter, 0, True)
+            self.results_store.set_value(iter, 0, self._all_selected)
             iter = self.results_store.iter_next(iter)
+        
+        # Update header icon
+        if self._all_selected:
+            column.set_title("☑")
+        else:
+            column.set_title("☐")
+        
+        # Update apply button state
         self._update_apply_button()
     
-    def _on_deselect_all_clicked(self, button):
-        """Deselect all results."""
-        iter = self.results_store.get_iter_first()
-        while iter:
-            self.results_store.set_value(iter, 0, False)
-            iter = self.results_store.iter_next(iter)
-        self._update_apply_button()
+    def _on_row_activated(self, tree_view, path, column):
+        """Handle double-click on a result row to apply parameters immediately.
+        
+        This matches BRENDA behavior: double-clicking a row toggles its selection.
+        """
+        try:
+            # Toggle selection on double-click
+            self.results_store[path][0] = not self.results_store[path][0]
+            self._update_apply_button()
+        except Exception as e:
+            self.logger.error(f"Error handling row activation: {e}")
+    
+
     
     def _on_apply_clicked(self, button):
         """Handle Apply Selected button click."""
-        # Get selected results
+        # Get selected parameter options
         selected = []
         iter = self.results_store.get_iter_first()
         while iter:
             if self.results_store.get_value(iter, 0):  # Checkbox selected
-                result_data = self.results_store.get_value(iter, 6)
-                selected.append(result_data)
+                transition_id = self.results_store.get_value(iter, 1)
+                param_set = self.results_store.get_value(iter, 11)  # Column 11 has parameter set
+                selected.append({
+                    'transition_id': transition_id,
+                    'param_set': param_set
+                })
             iter = self.results_store.iter_next(iter)
         
         if not selected:
-            self._show_error("No results selected")
+            self._show_error("No parameter options selected")
             return
         
         # Get override settings
         override_kegg = self.override_kegg_check.get_active()
         override_sbml = self.override_sbml_check.get_active()
         
-        # Get selected transition IDs
-        selected_ids = [r['transition_id'] for r in selected]
+        # Apply each selected parameter set
+        success_count = 0
+        failed_count = 0
         
-        # Apply parameters
-        summary = self.sabio_controller.apply_batch(
-            selected,
-            selected_ids,
-            override_kegg,
-            override_sbml
-        )
+        for item in selected:
+            transition_id = item['transition_id']
+            param_set = item['param_set']
+            
+            # Find transition_info from current_results
+            transition_info = None
+            for result in self.current_results:
+                if result['transition_id'] == transition_id:
+                    transition_info = result
+                    break
+            
+            if not transition_info:
+                self.logger.error(f"[SABIO-RK UI] No transition_info found for {transition_id}")
+                failed_count += 1
+                continue
+            
+            # Apply selected parameter set
+            try:
+                success = self.sabio_controller.apply_selected_parameter_set(
+                    transition_info,
+                    param_set,
+                    override_kegg,
+                    override_sbml
+                )
+                
+                if success:
+                    success_count += 1
+                    self.logger.info(f"[SABIO-RK UI] Applied parameters to {transition_id}")
+                else:
+                    failed_count += 1
+                    self.logger.warning(f"[SABIO-RK UI] Failed to apply parameters to {transition_id}")
+            except Exception as e:
+                failed_count += 1
+                self.logger.error(f"[SABIO-RK UI] Error applying parameters to {transition_id}: {e}")
+        
+        # Build summary
+        summary = {
+            'success': success_count,
+            'failed': failed_count,
+            'skipped': 0,
+            'total': len(selected)
+        }
+        
+        # Clear context transition after apply
+        self._context_transition_id = None
+        self._context_transition = None
         
         # CRITICAL: Reset simulation state after applying parameters
         # This clears cached behaviors that might have old parameter values
         # See: CANVAS_STATE_ISSUES_COMPARISON.md for historical context
-        if summary.get('success', 0) > 0:
+        if success_count > 0:
             self._reset_simulation_after_parameter_changes()
         
         # Show summary dialog
@@ -559,15 +636,17 @@ class SabioRKCategory(BasePathwayCategory):
         self._trigger_report_refresh()
     
     def _populate_results(self, results: List[Dict[str, Any]], button=None):
-        """Populate results table with SABIO-RK data.
+        """Populate results table with parameter options (up to 15 per transition).
         
         Args:
-            results: List of enrichment results
+            results: List of enrichment results from query_all_transitions
             button: Optional button to re-enable
         """
         # Clear existing results
         self.results_store.clear()
         self.current_results = results
+        
+        self.logger.info(f"[SABIO-RK UI] Populating results table with {len(results)} results")
         
         if not results:
             self.status_label.set_markup("<i>No results found</i>")
@@ -575,122 +654,96 @@ class SabioRKCategory(BasePathwayCategory):
                 button.set_sensitive(True)
             return
         
-        # Populate table - DEDUPLICATE by (EC number, Organism) to reduce confusion
-        # Group ALL parameters by unique (EC, Organism) combination
-        from collections import defaultdict
+        # Get all transition IDs from results
+        all_transition_ids = [r['transition_id'] for r in results]
         
-        # Key: (ec_number, organism), Value: aggregated data
-        unique_entries = defaultdict(lambda: {
-            'transition_id': None,
-            'kegg_reaction_ids': set(),  # Collect all KEGG R-IDs
-            'ec_number': None,
-            'organism': None,
-            'Vmax': [],
-            'Km': [],
-            'Kcat': [],
-            'Ki': [],
-            'raw_parameters': []  # Store ALL numeric parameters for Apply Selected
-        })
+        # Get override settings (use current UI state)
+        override_kegg = self.override_kegg_check.get_active()
+        override_sbml = self.override_sbml_check.get_active()
         
-        for result in results:
-            sabio_data = result.get('sabio_data', {})
-            parameters = sabio_data.get('parameters', [])
-            query_organism = sabio_data.get('query_organism')  # Organism from query filter
-            ec_number = result.get('identifiers', {}).get('ec_number', 'N/A')
-            transition_id = result.get('transition_id', 'N/A')
-            
-            if not parameters:
-                continue
-            
-            for param in parameters:
-                param_type = param.get('parameter_type', 'other')
-                param_organism = param.get('organism')
-                organism = param_organism or query_organism or 'Unknown'
-                
-                # Create unique key: (EC, Organism)
-                key = (ec_number, organism)
-                
-                # Store metadata (first occurrence)
-                if not unique_entries[key]['transition_id']:
-                    unique_entries[key]['transition_id'] = transition_id
-                    unique_entries[key]['ec_number'] = ec_number
-                    unique_entries[key]['organism'] = organism
-                
-                # Collect KEGG reaction IDs
-                kegg_id = param.get('kegg_reaction_id')
-                if kegg_id:
-                    unique_entries[key]['kegg_reaction_ids'].add(kegg_id)
-                
-                # Collect parameter values by type (with units)
-                value = param.get('value')
-                units = param.get('units', '')
-                if value is not None:
-                    # Store formatted value for display
-                    if param_type in unique_entries[key]:
-                        unique_entries[key][param_type].append(f"{value:.3g} {units}".strip())
-                    
-                    # Store raw numeric parameter for Apply Selected
-                    unique_entries[key]['raw_parameters'].append(param)
+        # Call apply_batch to get parameter options (up to 15 per transition)
+        self.logger.info(f"[SABIO-RK UI] Getting parameter options for {len(all_transition_ids)} transitions")
+        parameter_options_result = self.sabio_controller.apply_batch(
+            results,
+            all_transition_ids,
+            override_kegg,
+            override_sbml
+        )
         
-        # Add one row per unique (EC, Organism) combination
-        for (ec_number, organism), entry_data in unique_entries.items():
-            # Skip entries with no parameters
-            if not any([entry_data['Vmax'], entry_data['Km'], 
-                       entry_data['Kcat'], entry_data['Ki']]):
-                continue
+        parameter_options = parameter_options_result.get('parameter_options', [])
+        
+        if not parameter_options:
+            self.status_label.set_markup("<i>No parameter options available</i>")
+            if button:
+                button.set_sensitive(True)
+            return
+        
+        # Flatten parameter options into table rows
+        total_rows = 0
+        for option in parameter_options:
+            transition_id = option['transition_id']
+            parameter_sets = option['parameter_sets']
             
-            # Format KEGG reaction IDs (show up to 3)
-            kegg_ids = sorted(entry_data['kegg_reaction_ids'])
-            kegg_display = ', '.join(kegg_ids[:3])
-            if len(kegg_ids) > 3:
-                kegg_display += f' (+{len(kegg_ids)-3} more)'
-            kegg_display = kegg_display or 'N/A'
+            self.logger.info(f"[SABIO-RK UI] {transition_id}: Adding {len(parameter_sets)} parameter options")
             
-            # Format parameter columns (show first 2 values if multiple)
-            vmax = ', '.join(entry_data['Vmax'][:2]) if entry_data['Vmax'] else '-'
-            km = ', '.join(entry_data['Km'][:2]) if entry_data['Km'] else '-'
-            kcat = ', '.join(entry_data['Kcat'][:2]) if entry_data['Kcat'] else '-'
-            ki = ', '.join(entry_data['Ki'][:2]) if entry_data['Ki'] else '-'
-            
-            # Add count if more parameters available
-            if len(entry_data['Vmax']) > 2:
-                vmax += f' (+{len(entry_data["Vmax"])-2})'
-            if len(entry_data['Km']) > 2:
-                km += f' (+{len(entry_data["Km"])-2})'
-            if len(entry_data['Kcat']) > 2:
-                kcat += f' (+{len(entry_data["Kcat"])-2})'
-            if len(entry_data['Ki']) > 2:
-                ki += f' (+{len(entry_data["Ki"])-2})'
-            
-            # Truncate long values
-            vmax = vmax[:35] + '...' if len(vmax) > 35 else vmax
-            km = km[:35] + '...' if len(km) > 35 else km
-            kcat = kcat[:35] + '...' if len(kcat) > 35 else kcat
-            ki = ki[:35] + '...' if len(ki) > 35 else ki
-            
-            self.results_store.append([
-                True,  # Selected by default
-                entry_data['transition_id'],  # Internal model transition ID (T32, etc.)
-                kegg_display,  # KEGG R-IDs (may be multiple)
-                ec_number,  # EC number
-                vmax,
-                    km,
-                    kcat,
-                    ki,
-                    organism[:30],  # Organism (truncated)
-                    result  # Store full result data
+            for param_set in parameter_sets:
+                # Extract display values
+                organism = param_set.get('organism', 'Unknown')[:30]
+                substrate = param_set.get('substrate', 'Unknown')[:25]
+                temperature = param_set.get('temperature', 'N/A')
+                ph = param_set.get('pH', 'N/A')
+                score = param_set.get('completeness_score', 0)
+                
+                # Format temperature (only if numeric)
+                if temperature != 'N/A' and isinstance(temperature, (int, float)):
+                    temperature = f"{temperature}\u00b0C"
+                else:
+                    temperature = str(temperature)
+                
+                # Extract parameters
+                params = param_set.get('parameters', {})
+                
+                def format_param(param_dict):
+                    if not param_dict:
+                        return '-'
+                    value = param_dict.get('value')
+                    units = param_dict.get('units', '')
+                    if value is None:
+                        return '-'
+                    return f"{value:.3g} {units}".strip()
+                
+                km_str = format_param(params.get('Km'))
+                vmax_str = format_param(params.get('Vmax'))
+                kcat_str = format_param(params.get('Kcat'))
+                ki_str = format_param(params.get('Ki'))
+                score_str = str(score)
+                
+                # Add row to table
+                self.results_store.append([
+                    False,  # Checkbox (user selects which to apply)
+                    transition_id,
+                    organism,
+                    substrate,
+                    temperature,
+                    str(ph),
+                    km_str,
+                    vmax_str,
+                    kcat_str,
+                    ki_str,
+                    score_str,
+                    param_set  # Store full parameter set for apply
                 ])
+                total_rows += 1
+        
+        self.logger.info(f"[SABIO-RK UI] Added {total_rows} parameter option rows")
         
         # Update status
-        self.status_label.set_markup(f"<b>Found {len(results)} transitions with SABIO-RK data</b>")
+        self.status_label.set_markup(
+            f"<b>Found {len(parameter_options)} transitions with {total_rows} parameter options</b>"
+        )
         
         # Update results counter
-        self.results_count_label.set_markup(f"<i>{len(results)} results</i>")
-        
-        # Enable Select All/Deselect All buttons
-        has_results = len(results) > 0
-        self.select_all_button.set_sensitive(has_results)
-        self.deselect_all_button.set_sensitive(has_results)
+        self.results_count_label.set_markup(f"<i>{total_rows} parameter options</i>")
         
         # Enable apply button
         self._update_apply_button()
@@ -727,7 +780,7 @@ class SabioRKCategory(BasePathwayCategory):
     def _show_apply_summary(self, summary: Dict[str, Any]):
         """Show summary dialog after applying parameters."""
         dialog = Gtk.MessageDialog(
-            parent=self.parent_window,
+            transient_for=self.parent_window,
             modal=True,
             message_type=Gtk.MessageType.INFO,
             buttons=Gtk.ButtonsType.OK,
@@ -774,7 +827,7 @@ class SabioRKCategory(BasePathwayCategory):
         pass
     
     def set_query_from_transition(self, ec_number: str = "", reaction_id: str = "", 
-                                   organism: str = "", transition_id: str = ""):
+                                   organism: str = "", transition_id: str = "", transition=None):
         """Pre-fill query fields from transition metadata (context menu).
         
         This method is called from the context menu handler when user
@@ -785,11 +838,18 @@ class SabioRKCategory(BasePathwayCategory):
             reaction_id: KEGG reaction ID or other identifier
             organism: Organism name (e.g., "Homo sapiens")
             transition_id: Transition ID for reference
+            transition: Actual transition object (needed for Apply)
         """
         self.logger.info(f"[SABIO-RK] Pre-filling query from transition {transition_id}")
         
-        # Store transition ID for use in search results
+        # Clear previous results table
+        self.results_store.clear()
+        self.current_results = []
+        self.status_label.set_markup("<i>Ready to query</i>")
+        
+        # Store transition ID and object for use in search results
         self._context_transition_id = transition_id if transition_id else None
+        self._context_transition = transition  # Store actual transition object
         
         # Pre-fill EC number (use reaction_id if it looks like EC format)
         if ec_number:
@@ -809,8 +869,11 @@ class SabioRKCategory(BasePathwayCategory):
             self.ec_entry.set_text("")
             self.logger.warning(f"[SABIO-RK] No EC number or reaction_id for transition {transition_id}")
         
-        # Pre-fill organism if provided and valid
-        if organism and hasattr(self, 'organism_combo'):
+        # Keep current organism selection - DON'T change it
+        # User may have selected a specific organism they want to use for all queries
+        # Only set organism if explicitly provided AND it's different from current
+        current_organism = self.organism_combo.get_active_text()
+        if organism and organism != current_organism and hasattr(self, 'organism_combo'):
             # Try to find matching organism in combo box
             model = self.organism_combo.get_model()
             found = False
@@ -869,22 +932,22 @@ class SabioRKCategory(BasePathwayCategory):
         """
         try:
             # Get current document and canvas manager
-            if not self.canvas_loader:
-                self.logger.warning("No canvas loader available for simulation reset")
+            if not hasattr(self, 'model_canvas') or not self.model_canvas:
+                self.logger.warning("No model canvas available for simulation reset")
                 return
             
-            drawing_area = self.canvas_loader.get_current_document()
+            drawing_area = self.model_canvas.get_current_document()
             if not drawing_area:
                 self.logger.warning("No active document for simulation reset")
                 return
             
             # Find simulation controller for this drawing area
-            if hasattr(self.canvas_loader, 'simulation_controllers'):
-                if drawing_area in self.canvas_loader.simulation_controllers:
-                    controller = self.canvas_loader.simulation_controllers[drawing_area]
+            if hasattr(self.model_canvas, 'simulation_controllers'):
+                if drawing_area in self.model_canvas.simulation_controllers:
+                    controller = self.model_canvas.simulation_controllers[drawing_area]
                     
                     # Get the canvas manager
-                    canvas_manager = self.canvas_loader.canvas_managers.get(drawing_area)
+                    canvas_manager = self.model_canvas.canvas_managers.get(drawing_area)
                     
                     if canvas_manager:
                         # CRITICAL: Use reset_for_new_model() instead of reset()

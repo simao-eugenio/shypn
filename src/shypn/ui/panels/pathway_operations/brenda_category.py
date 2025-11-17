@@ -1862,18 +1862,21 @@ class BRENDACategory(BasePathwayCategory):
                 if isinstance(param, dict):
                     # Grouped result (single search/grouping): may contain km/kcat/ki keys
                     if any(k in param for k in ('km', 'kcat', 'ki', 'vmax')):
-                        _try_set_numeric(params_dict, 'km', param.get('km'))
-                        _try_set_numeric(params_dict, 'kcat', param.get('kcat'))
-                        _try_set_numeric(params_dict, 'ki', param.get('ki'))
-                        _try_set_numeric(params_dict, 'vmax', param.get('vmax'))
+                        # Use capital-case to match controller and property dialog expectations
+                        _try_set_numeric(params_dict, 'Km', param.get('km'))
+                        _try_set_numeric(params_dict, 'Kcat', param.get('kcat'))
+                        _try_set_numeric(params_dict, 'Ki', param.get('ki'))
+                        _try_set_numeric(params_dict, 'Vmax', param.get('vmax'))
                     else:
                         # Batch-style row: expects 'type' + 'value'
                         ptype = str(param.get('type', ''))
                         pvalue = param.get('value')
                         if ptype:
                             key = ptype.strip().lower()
-                            if key in ('km', 'kcat', 'ki', 'vmax'):
-                                _try_set_numeric(params_dict, key, pvalue)
+                            # Map to capital-case for consistency with controller
+                            key_mapping = {'km': 'Km', 'kcat': 'Kcat', 'ki': 'Ki', 'vmax': 'Vmax'}
+                            if key in key_mapping:
+                                _try_set_numeric(params_dict, key_mapping[key], pvalue)
 
             self.logger.info(f"[SINGLE_APPLY] Final params_dict: {params_dict}")
             

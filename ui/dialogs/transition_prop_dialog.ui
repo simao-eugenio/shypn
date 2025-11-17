@@ -904,6 +904,154 @@
               </packing>
             </child>
             
+            <!-- Kinetics Tab - Display kinetic parameters -->
+            <child>
+              <object class="GtkScrolledWindow" id="kinetics_scrolled_window">
+                <property name="visible">True</property>
+                <property name="can-focus">True</property>
+                <property name="hscrollbar-policy">automatic</property>
+                <property name="vscrollbar-policy">automatic</property>
+                <property name="shadow-type">in</property>
+                <child>
+                  <object class="GtkBox" id="kinetics_tab_container">
+                    <property name="visible">True</property>
+                    <property name="can-focus">False</property>
+                    <property name="orientation">vertical</property>
+                    <property name="margin">12</property>
+                    <property name="spacing">12</property>
+                    
+                    <!-- Source Info Frame -->
+                    <child>
+                      <object class="GtkFrame" id="kinetics_source_frame">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="label-xalign">0</property>
+                        <property name="shadow-type">in</property>
+                        <child>
+                          <object class="GtkBox" id="kinetics_source_box">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="orientation">vertical</property>
+                            <property name="margin">8</property>
+                            <property name="spacing">6</property>
+                            
+                            <child>
+                              <object class="GtkLabel" id="kinetics_source_label">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="xalign">0</property>
+                                <property name="label">Source: N/A</property>
+                              </object>
+                            </child>
+                            
+                            <child>
+                              <object class="GtkLabel" id="kinetics_confidence_label">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="xalign">0</property>
+                                <property name="label">Confidence: N/A</property>
+                              </object>
+                            </child>
+                            
+                            <child>
+                              <object class="GtkLabel" id="kinetics_rate_type_label">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="xalign">0</property>
+                                <property name="label">Rate Type: N/A</property>
+                              </object>
+                            </child>
+                            
+                          </object>
+                        </child>
+                        <child type="label">
+                          <object class="GtkLabel">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="label" translatable="yes">&lt;b&gt;Kinetic Metadata&lt;/b&gt;</property>
+                            <property name="use-markup">True</property>
+                          </object>
+                        </child>
+                      </object>
+                      <packing>
+                        <property name="expand">False</property>
+                        <property name="fill">True</property>
+                        <property name="position">0</property>
+                      </packing>
+                    </child>
+                    
+                    <!-- Parameters Frame -->
+                    <child>
+                      <object class="GtkFrame" id="kinetics_parameters_frame">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="label-xalign">0</property>
+                        <property name="shadow-type">in</property>
+                        <child>
+                          <object class="GtkScrolledWindow" id="parameters_scrolled">
+                            <property name="visible">True</property>
+                            <property name="can-focus">True</property>
+                            <property name="hscrollbar-policy">automatic</property>
+                            <property name="vscrollbar-policy">automatic</property>
+                            <property name="min-content-height">150</property>
+                            <child>
+                              <object class="GtkTreeView" id="kinetics_parameters_treeview">
+                                <property name="visible">True</property>
+                                <property name="can-focus">True</property>
+                                <property name="headers-visible">True</property>
+                                <property name="enable-search">True</property>
+                                <property name="search-column">0</property>
+                              </object>
+                            </child>
+                          </object>
+                        </child>
+                        <child type="label">
+                          <object class="GtkLabel">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="label" translatable="yes">&lt;b&gt;Parameters&lt;/b&gt;</property>
+                            <property name="use-markup">True</property>
+                          </object>
+                        </child>
+                      </object>
+                      <packing>
+                        <property name="expand">True</property>
+                        <property name="fill">True</property>
+                        <property name="position">1</property>
+                      </packing>
+                    </child>
+                    
+                    <!-- No Data Message -->
+                    <child>
+                      <object class="GtkLabel" id="kinetics_no_data_label">
+                        <property name="visible">False</property>
+                        <property name="can-focus">False</property>
+                        <property name="label" translatable="yes">&lt;i&gt;No kinetic metadata available for this transition.&lt;/i&gt;</property>
+                        <property name="use-markup">True</property>
+                        <property name="margin">20</property>
+                      </object>
+                      <packing>
+                        <property name="expand">True</property>
+                        <property name="fill">True</property>
+                        <property name="position">2</property>
+                      </packing>
+                    </child>
+                    
+                  </object>
+                </child>
+              </object>
+            </child>
+            <child type="tab">
+              <object class="GtkLabel" id="kinetics_tab_label">
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="label" translatable="yes">Kinetics</property>
+              </object>
+              <packing>
+                <property name="tab-fill">False</property>
+              </packing>
+            </child>
+            
           </object>
           <packing>
             <property name="expand">True</property>

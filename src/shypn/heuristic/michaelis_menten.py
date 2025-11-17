@@ -2,6 +2,12 @@
 Michaelis-Menten kinetic parameter estimator.
 
 Estimates Vmax and Km from reaction stoichiometry and substrate concentrations.
+
+Default Heuristic Units (STANDARD):
+- Vmax: mM/s (millimolar per second)
+- Km: mM (millimolar)
+
+These match SABIO-RK and BRENDA standard units for consistency.
 """
 
 from typing import Dict, List, Any
@@ -13,16 +19,21 @@ class MichaelisMentenEstimator(KineticEstimator):
     Estimates Michaelis-Menten parameters (Vmax, Km).
     
     Heuristic Rules:
-    - Vmax = 10.0 * max(product_stoichiometry)
-    - Km = mean(substrate_concentrations) / 2
+    - Vmax = 10.0 mM/s * max(product_stoichiometry)
+    - Km = mean(substrate_concentrations) / 2 mM
     - Adjustments for reversibility
+    
+    Units:
+    - Vmax: mM/s (millimolar per second)
+    - Km: mM (millimolar)
     """
     
     def __init__(self, add_stochastic_noise: bool = False, noise_amplitude: float = 0.1):
         super().__init__(add_stochastic_noise=add_stochastic_noise, 
                         noise_amplitude=noise_amplitude)
-        self.default_vmax = 10.0
-        self.default_km = 5.0
+        # Default values in STANDARD UNITS (mM/s and mM)
+        self.default_vmax = 10.0  # mM/s
+        self.default_km = 5.0  # mM
     
     def estimate_parameters(
         self,
