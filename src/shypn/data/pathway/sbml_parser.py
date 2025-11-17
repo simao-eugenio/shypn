@@ -417,15 +417,15 @@ class SBMLParser:
                 "Install with: pip3 install --user python-libsbml"
             )
     
-    def parse_file(self, filepath: str, filter_isolated_species: bool = True) -> PathwayData:
+    def parse_file(self, filepath: str, filter_isolated_species: bool = False) -> PathwayData:
         """
         Parse SBML file and extract pathway data.
         
         Args:
             filepath: Path to SBML file (.sbml or .xml)
-            filter_isolated_species: If True, exclude species with no connections (default: True)
-                                    Isolated species (e.g., conservation constraints like TotalCdc13)
-                                    are excluded to prevent layout algorithm issues.
+            filter_isolated_species: If True, exclude species with no connections (default: False)
+                                    WARNING: Filtering may break simulations if isolated species
+                                    are referenced in rate equations. Keep False unless you're sure.
             
         Returns:
             PathwayData object with parsed information
@@ -569,13 +569,13 @@ class SBMLParser:
             metadata=metadata
         )
     
-    def parse_string(self, sbml_string: str, filter_isolated_species: bool = True) -> PathwayData:
+    def parse_string(self, sbml_string: str, filter_isolated_species: bool = False) -> PathwayData:
         """
         Parse SBML from string.
         
         Args:
             sbml_string: SBML XML as string
-            filter_isolated_species: If True, exclude species with no connections (default: True)
+            filter_isolated_species: If True, exclude species with no connections (default: False)
             
         Returns:
             PathwayData object
