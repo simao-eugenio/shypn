@@ -509,7 +509,8 @@ class ContextMenuHandler:
                     ec_number=ec_number,
                     reaction_id=reaction_id,
                     organism=organism,
-                    transition_id=transition.id
+                    transition_id=transition.id,
+                    transition=transition  # Pass actual transition object
                 )
             
             # Switch to Pathway Operations panel and expand SABIO-RK category

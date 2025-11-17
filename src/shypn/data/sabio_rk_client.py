@@ -98,20 +98,27 @@ class SabioRKClient:
                 self.logger.info(f"[SABIO-RK] No results found for EC {ec_number}" + (f" in {organism}" if organism else ""))
                 return None
             
-            # Batch optimization: Reject large result sets to prevent timeouts
-            # Note: Manual queries (single EC) can handle more results than batch queries
-            if count > 150:
-                self.logger.warning(f"[SABIO-RK] Query would return {count} results - likely to timeout!")
+            # Batch optimization: Handle large result sets carefully
+            # SABIO-RK has no pagination, so large queries will timeout
+            if count > 200:
+                # Skip extremely large result sets (>200) to avoid timeouts
+                self.logger.warning(f"[SABIO-RK] EC {ec_number}: {count} results - TOO MANY, skipping")
                 if organism:
-                    self.logger.warning(f"[SABIO-RK] Even with organism filter '{organism}', too many results")
-                    self.logger.warning(f"[SABIO-RK] Try a more specific organism or contact database administrators")
+                    self.logger.info(f"[SABIO-RK] Even with organism '{organism}', this enzyme is heavily studied")
                 else:
-                    self.logger.warning(f"[SABIO-RK] Please specify organism filter to reduce results")
+                    self.logger.info(f"[SABIO-RK] Try specifying organism filter to reduce results")
                 return None
-            
-            self.logger.info(f"[SABIO-RK] Found {count} results for EC {ec_number}" + (f" in {organism}" if organism else ""))
+            elif count > 100:
+                # Warn about large result sets (100-200) but still attempt fetch
+                self.logger.warning(f"[SABIO-RK] EC {ec_number}: {count} results - LARGE, may be slow (60-120s)")
+                if organism:
+                    self.logger.info(f"[SABIO-RK] Attempting fetch with organism filter '{organism}'...")
+            else:
+                # Normal result size
+                self.logger.info(f"[SABIO-RK] Found {count} results for EC {ec_number}" + (f" in {organism}" if organism else ""))
             
             # Step 2: Fetch SBML data (with increased timeout for large results)
+            # Scale timeout based on result count: small queries = 60s, large queries = 120s
             timeout = self.timeout if count < 20 else min(count * 2, 120)
             result = self._fetch_sbml(query, ec_number, timeout)
             
@@ -196,11 +203,12 @@ class SabioRKClient:
             self.logger.error(f"[SABIO-RK] Error fetching SBML: {e}")
             return None
     
-    def query_by_reaction_id(self, kegg_reaction_id: str) -> Optional[Dict[str, Any]]:
+    def query_by_reaction_id(self, kegg_reaction_id: str, organism: str = None) -> Optional[Dict[str, Any]]:
         """Query SABIO-RK by KEGG reaction ID.
         
         Args:
             kegg_reaction_id: KEGG reaction ID (e.g., "R00200" or "200")
+            organism: Optional organism filter to reduce results
         
         Returns:
             Dict with kinetic parameters or None if query fails
@@ -216,18 +224,30 @@ class SabioRKClient:
             elif kegg_reaction_id.startswith('R') and len(kegg_reaction_id) < 6:
                 kegg_reaction_id = f"R{int(kegg_reaction_id[1:]):05d}"
             
-            query = f'KeggReactionID:"{kegg_reaction_id}"'
+            # Build query with optional organism filter
+            query_parts = [f'KeggReactionID:"{kegg_reaction_id}"']
+            if organism:
+                query_parts.append(f'Organism:"{organism}"')
+            query = " AND ".join(query_parts)
             
             # Check count first
             count = self._get_result_count(query)
             if count is None or count == 0:
-                self.logger.info(f"[SABIO-RK] No results found for {kegg_reaction_id}")
+                self.logger.info(f"[SABIO-RK] No results found for {kegg_reaction_id}" + (f" in {organism}" if organism else ""))
                 return None
             
-            if count > 150:
-                self.logger.warning(f"[SABIO-RK] {count} results - may timeout. Consider adding organism filter.")
-            
-            self.logger.info(f"[SABIO-RK] Found {count} results for {kegg_reaction_id}")
+            # Use same thresholds as EC number queries
+            if count > 200:
+                self.logger.warning(f"[SABIO-RK] Reaction {kegg_reaction_id}: {count} results - TOO MANY, skipping")
+                if organism:
+                    self.logger.info(f"[SABIO-RK] Even with organism '{organism}', too many results")
+                else:
+                    self.logger.info(f"[SABIO-RK] Try specifying organism filter to reduce results")
+                return None
+            elif count > 100:
+                self.logger.warning(f"[SABIO-RK] Reaction {kegg_reaction_id}: {count} results - LARGE, may be slow")
+            else:
+                self.logger.info(f"[SABIO-RK] Found {count} results for {kegg_reaction_id}" + (f" in {organism}" if organism else ""))
             
             # Fetch data
             timeout = self.timeout if count < 50 else min(count * 2, 120)
@@ -286,7 +306,8 @@ class SabioRKClient:
                 reactions = root.findall('.//sbml:reaction', namespaces_l2)
             
             # Use the correct namespace for the rest of parsing
-            namespaces = namespaces_l3 if root.find('.//{http://www.sbml.org/sbml/level3/version1/core}reaction') else namespaces_l2
+            # Fix: Use 'is not None' instead of testing element truth value
+            namespaces = namespaces_l3 if root.find('.//{http://www.sbml.org/sbml/level3/version1/core}reaction') is not None else namespaces_l2
             
             if not reactions:
                 self.logger.debug(f"[SABIO-RK] No reactions found in SBML for {identifier}")
@@ -356,11 +377,13 @@ class SabioRKClient:
                             value_float = float(param_value)
                             
                             # Store parameter with metadata
+                            # Keep organism as None if not found (don't convert to 'Unknown')
+                            # This allows controller to use query_organism as fallback
                             all_parameters.append({
                                 'reaction_id': reaction_id,
                                 'reaction_name': reaction_name,
                                 'kegg_reaction_id': kegg_reaction_id,
-                                'organism': organism or 'Unknown',
+                                'organism': organism,  # May be None
                                 'parameter_id': param_id,
                                 'parameter_name': param_name,
                                 'value': value_float,

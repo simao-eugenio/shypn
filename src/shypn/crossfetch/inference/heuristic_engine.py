@@ -19,6 +19,7 @@ from ..models.transition_types import (
 )
 from ..fetchers.sabio_rk_kinetics_fetcher import SabioRKKineticsFetcher
 from ..database.heuristic_db import HeuristicDatabase
+from ..learning.heuristic_learner import HeuristicLearner
 
 
 # Reaction mechanism patterns (learned from KEGG, applicable to any source)
@@ -275,7 +276,13 @@ class HeuristicInferenceEngine:
     - Optionally enhances with database data in background
     - Builds local cache over time through platform use
     
+    **Phase 3: Intelligent Learning:**
+    - Queries learned patterns from enrichment history
+    - Blends learned patterns with hardcoded defaults
+    - Improves accuracy over time as users enrich pathways
+    
     Data sources (progressive enhancement):
+    - Learned patterns: From enrichment history (Phase 3)
     - Heuristic defaults: Instant, 40-70% confidence
     - Local cache: Fast lookup from previous fetches
     - SABIO-RK: Background fetch, 80-95% confidence
@@ -296,6 +303,9 @@ class HeuristicInferenceEngine:
         
         # Initialize database
         self.db = HeuristicDatabase(db_path)
+        
+        # Initialize learner (Phase 3)
+        self.learner = HeuristicLearner(db=self.db)
         
         # Initialize fetchers (lazy - only if needed)
         self._sabio_rk_fetcher = None
@@ -767,8 +777,98 @@ class HeuristicInferenceEngine:
                              organism: str) -> Tuple[float, float, float]:
         """Get default kinetic parameters by EC class.
         
+        **Phase 3: Intelligent Learning Integration**
+        1. Query learned patterns from enrichment history
+        2. If high-confidence pattern found, use it
+        3. Otherwise, blend learned pattern with hardcoded default
+        4. Fall back to pure hardcoded default if no learned data
+        
         Returns:
             Tuple of (vmax, km, kcat) based on enzyme class and label
+        """
+        # Phase 3: Try learned patterns first
+        learned_params = self._get_learned_kinetics(ec_number, organism)
+        
+        if learned_params:
+            vmax_learned, km_learned, kcat_learned, confidence = learned_params
+            
+            # High confidence (≥0.70): Use learned values directly
+            if confidence >= 0.70:
+                self.logger.info(
+                    f"Using learned pattern (conf={confidence:.2f}): "
+                    f"Vmax={vmax_learned:.3g}, Km={km_learned:.3g}"
+                )
+                return (vmax_learned, km_learned, kcat_learned)
+            
+            # Medium confidence (0.50-0.70): Blend with hardcoded defaults
+            # Get hardcoded defaults
+            vmax_default, km_default, kcat_default = self._get_hardcoded_defaults(
+                ec_number, label
+            )
+            
+            # Weighted blend (confidence determines weight)
+            # conf=0.70 → 70% learned, 30% default
+            # conf=0.50 → 50% learned, 50% default
+            blend_weight = confidence
+            
+            vmax_blended = (blend_weight * vmax_learned + 
+                           (1 - blend_weight) * vmax_default)
+            km_blended = (blend_weight * km_learned + 
+                         (1 - blend_weight) * km_default)
+            kcat_blended = (blend_weight * kcat_learned + 
+                           (1 - blend_weight) * kcat_default)
+            
+            self.logger.info(
+                f"Blending learned pattern (conf={confidence:.2f}, weight={blend_weight:.2f}): "
+                f"Vmax={vmax_blended:.3g}, Km={km_blended:.3g}"
+            )
+            return (vmax_blended, km_blended, kcat_blended)
+        
+        # No learned data: Use pure hardcoded defaults
+        return self._get_hardcoded_defaults(ec_number, label)
+    
+    def _get_learned_kinetics(self, 
+                             ec_number: Optional[str],
+                             organism: str) -> Optional[Tuple[float, float, float, float]]:
+        """Query learned kinetic parameters from enrichment history.
+        
+        Args:
+            ec_number: EC number
+            organism: Organism name
+            
+        Returns:
+            Tuple of (vmax, km, kcat, confidence) or None
+        """
+        if not ec_number:
+            return None
+        
+        # Query learned patterns
+        vmax_pattern = self.learner.get_learned_parameter('vmax', ec_number, organism)
+        km_pattern = self.learner.get_learned_parameter('km', ec_number, organism)
+        kcat_pattern = self.learner.get_learned_parameter('kcat', ec_number, organism)
+        
+        # Need at least Vmax and Km
+        if not vmax_pattern or not km_pattern:
+            return None
+        
+        vmax = vmax_pattern['param_mean']
+        km = km_pattern['param_mean']
+        kcat = kcat_pattern['param_mean'] if kcat_pattern else vmax / 10.0  # Estimate
+        
+        # Use minimum confidence from Vmax and Km patterns
+        confidence = min(vmax_pattern['confidence_score'], km_pattern['confidence_score'])
+        
+        return (vmax, km, kcat, confidence)
+    
+    def _get_hardcoded_defaults(self, 
+                               ec_number: Optional[str],
+                               label: str) -> Tuple[float, float, float]:
+        """Get hardcoded default kinetic parameters.
+        
+        This is the original heuristic logic, now separated for blending.
+        
+        Returns:
+            Tuple of (vmax, km, kcat)
         """
         # EC class-specific defaults (literature averages)
         if ec_number:

@@ -172,15 +172,18 @@ class HeuristicParametersController:
             self.logger.error(f"Error inferring parameters: {e}")
             return None
     
-    def apply_parameters(self, transition_id: str, parameters: Dict[str, Any]) -> bool:
+    def apply_parameters(self, transition_id: str, parameters: Dict[str, Any], 
+                        override_sbml: bool = False, override_enriched: bool = False) -> bool:
         """Apply inferred parameters to a transition.
         
         Args:
             transition_id: Transition ID
             parameters: Parameters dictionary to apply
+            override_sbml: If True, override SBML curated kinetics
+            override_enriched: If True, override BRENDA/SABIO-RK enriched kinetics
             
         Returns:
-            True if successful
+            True if successful, False if failed, None if skipped (protected by override settings)
         """
         print(f"\n{'='*80}")
         print(f"{'='*80}")
@@ -208,6 +211,59 @@ class HeuristicParametersController:
             if not transition:
                 self.logger.error(f"Transition {transition_id} not found in canvas")
                 return False
+            
+            # CHECK OVERRIDE SETTINGS: Determine if we should apply based on data source
+            data_source = transition.metadata.get('data_source', 'unknown') if hasattr(transition, 'metadata') and transition.metadata else 'unknown'
+            has_kinetics = transition.metadata.get('has_kinetics', False) if hasattr(transition, 'metadata') and transition.metadata else False
+            
+            # Check for enriched data (BRENDA/SABIO-RK)
+            is_enriched = False
+            if hasattr(transition, 'metadata') and transition.metadata:
+                # Check if any parameter has enriched source
+                is_enriched = any(
+                    key.endswith('_source') and ('enriched' in str(value).lower() or 'sabio' in str(value).lower())
+                    for key, value in transition.metadata.items()
+                )
+            
+            should_apply = False
+            skip_reason = None
+            
+            if not has_kinetics:
+                # No kinetics at all - always apply
+                should_apply = True
+                self.logger.info(f"[OVERRIDE] Transition {transition_id} has no kinetics - applying heuristic")
+            elif data_source == 'sbml_import':
+                # SBML curated data - only apply if override enabled
+                if override_sbml:
+                    should_apply = True
+                    self.logger.info(f"[OVERRIDE] Transition {transition_id} has SBML curated data - applying (override enabled)")
+                else:
+                    skip_reason = "SBML curated data (enable override to replace)"
+                    self.logger.info(f"[OVERRIDE] Skipping {transition_id} - SBML curated data protected")
+            elif is_enriched:
+                # BRENDA/SABIO-RK enriched data - only apply if override enabled
+                if override_enriched:
+                    should_apply = True
+                    self.logger.info(f"[OVERRIDE] Transition {transition_id} has enriched data - applying (override enabled)")
+                else:
+                    skip_reason = "BRENDA/SABIO-RK enriched data (enable override to replace)"
+                    self.logger.info(f"[OVERRIDE] Skipping {transition_id} - enriched data protected")
+            elif data_source in ['kegg_import', 'unknown']:
+                # KEGG import or unknown source - always apply (heuristic should replace basic KEGG)
+                should_apply = True
+                self.logger.info(f"[OVERRIDE] Transition {transition_id} has KEGG/unknown data - applying heuristic")
+            else:
+                # Unknown data source with kinetics - be cautious, don't apply by default
+                if override_enriched:
+                    should_apply = True
+                    self.logger.info(f"[OVERRIDE] Transition {transition_id} has unknown kinetics - applying (override enabled)")
+                else:
+                    skip_reason = f"existing kinetics from {data_source} (enable override to replace)"
+                    self.logger.info(f"[OVERRIDE] Skipping {transition_id} - unknown kinetics protected")
+            
+            if not should_apply:
+                self.logger.info(f"[OVERRIDE] Skipped {transition_id}: {skip_reason}")
+                return None  # None indicates skipped (not an error)
             
             # CRITICAL: Populate input_arcs and output_arcs for rate_function generation
             # The canvas transition objects don't have these by default, but we need them

@@ -1756,7 +1756,17 @@ class SimulationController:
             for t in enabled_transitions:
                 pass
                 # Use transition rate if available, otherwise default to 1.0
-                rate = float(getattr(t, 'rate', 1.0)) if hasattr(t, 'rate') and t.rate else 1.0
+                # Handle legacy case where rate might be a string (should be rate_function)
+                try:
+                    rate_value = getattr(t, 'rate', 1.0)
+                    if isinstance(rate_value, str):
+                        # Legacy: rate was mistakenly set to rate_function string
+                        rate = 1.0  # Use default
+                    else:
+                        rate = float(rate_value) if rate_value else 1.0
+                except (ValueError, TypeError):
+                    rate = 1.0
+                
                 if rate > 0:
                     delay = np.random.exponential(1.0 / rate)
                     if delay < min_delay:

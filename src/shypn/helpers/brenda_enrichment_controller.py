@@ -25,6 +25,17 @@ from typing import Dict, List, Optional, Any, Tuple
 from ..data.enrichment_document import EnrichmentDocument
 from ..data.project_models import Project
 from ..data.kegg_ec_fetcher import KEGGECFetcher
+from .kinetic_unit_converter import get_unit_converter
+from ..crossfetch.database.heuristic_db import HeuristicDatabase
+from ..crossfetch.cache.brenda_cache_manager import BRENDACacheManager
+from ..crossfetch.tracking.parameter_tracker import ParameterTracker
+
+# Phase 2: Rating dialog integration
+try:
+    from ..ui.dialogs.parameter_rating_dialog import ParameterRatingDialog
+    RATING_DIALOG_AVAILABLE = True
+except ImportError:
+    RATING_DIALOG_AVAILABLE = False
 
 # Import BRENDA API client
 try:
@@ -61,6 +72,21 @@ class BRENDAEnrichmentController:
         self.project = project
         self.current_enrichment = None
         self.kegg_ec_fetcher = KEGGECFetcher()  # For fetching EC numbers from KEGG reaction IDs
+        self.unit_converter = get_unit_converter()  # For unit validation and conversion
+        
+        # Initialize KB components
+        try:
+            self.db = HeuristicDatabase()
+            self.cache_manager = BRENDACacheManager(self.db)
+            self.tracker = ParameterTracker(self.db)
+            import logging
+            logging.getLogger(self.__class__.__name__).info("KB integration enabled (cache + tracking)")
+        except Exception as e:
+            import logging
+            logging.getLogger(self.__class__.__name__).warning(f"KB integration disabled: {e}")
+            self.db = None
+            self.cache_manager = None
+            self.tracker = None
         
         # Initialize BRENDA API client (will be authenticated when user provides credentials)
         self.brenda_api = None
@@ -365,29 +391,48 @@ class BRENDAEnrichmentController:
             override_mode = parameters.get('_override_rate_function', False)
             
             
-            # Add/update kinetic parameters with source tracking
+            # Add/update kinetic parameters with source tracking and unit conversion
             for param_name, param_value in parameters.items():
-                pass
                 # Skip internal flags
                 if param_name.startswith('_'):
                     continue
                 
+                # Get units if provided (BRENDA may include units in data)
+                param_units = parameters.get(f'{param_name}_units', '')
+                
+                # Convert to standard units if it's a kinetic parameter
+                if param_name in ['Km', 'Vmax', 'Kcat', 'Ki'] and isinstance(param_value, (int, float)):
+                    converted_value, converted_units, warning = self.unit_converter.validate_parameter_units(
+                        param_name, param_value, param_units, 'brenda'
+                    )
+                    
+                    if warning:
+                        import logging
+                        logger = logging.getLogger(self.__class__.__name__)
+                        logger.warning(warning)
+                    
+                    # Store both converted and original values
+                    param_value = converted_value
+                    param_units = converted_units
+                
                 param_exists = param_name in transition_obj.metadata
                 
                 if not param_exists:
-                    pass
                     # New parameter - always add
                     transition_obj.metadata[param_name] = param_value
                     transition_obj.metadata[f'{param_name}_source'] = 'brenda_enriched'
+                    if param_units:
+                        transition_obj.metadata[f'{param_name}_units'] = param_units
                 elif override_mode:
-                    pass
                     # Parameter exists but override is enabled - replace it
                     old_value = transition_obj.metadata[param_name]
                     transition_obj.metadata[param_name] = param_value
                     transition_obj.metadata[f'{param_name}_source'] = 'brenda_enriched'
+                    if param_units:
+                        transition_obj.metadata[f'{param_name}_units'] = param_units
                 else:
-                    pass
                     # Parameter exists and override disabled - skip
+                    pass
             
             # Mark that enrichment occurred (don't overwrite original data_source)
             # Original data_source stays as 'kegg_import' or 'sbml_import'
@@ -404,6 +449,20 @@ class BRENDAEnrichmentController:
                 pass
                 import traceback
                 traceback.print_exc()
+            
+            # Phase 2: Track application and show rating dialog
+            if self.tracker:
+                applied_params = [k for k in parameters.keys() if not k.startswith('_')]
+                if applied_params:
+                    param_id = self._track_brenda_application(
+                        transition_id, 
+                        transition_obj, 
+                        parameters
+                    )
+                    
+                    # Show rating dialog if tracking succeeded
+                    if param_id and RATING_DIALOG_AVAILABLE:
+                        self._show_rating_dialog(param_id, transition_id, applied_params)
 
     
     def _generate_rate_function_from_parameters(self, transition, parameters: Dict[str, Any], override: bool = False):
@@ -435,10 +494,11 @@ class BRENDAEnrichmentController:
 
         
         # Need at least Vmax (or Kcat) and Km
-        vmax = parameters.get('vmax')
-        km = parameters.get('km')
-        ki = parameters.get('ki')
-        kcat = parameters.get('kcat')
+        # Use capital-case to match property dialog and metadata storage
+        vmax = parameters.get('Vmax')
+        km = parameters.get('Km')
+        ki = parameters.get('Ki')
+        kcat = parameters.get('Kcat')
         
         if not km:
             return
@@ -457,7 +517,7 @@ class BRENDAEnrichmentController:
             existing_vmax = None
             
             if hasattr(transition, 'metadata') and transition.metadata:
-                existing_vmax = transition.metadata.get('vmax') or transition.metadata.get('Vmax')
+                existing_vmax = transition.metadata.get('Vmax') or transition.metadata.get('vmax')
             
             if not existing_vmax and hasattr(transition, 'properties') and transition.properties:
                 pass
@@ -521,12 +581,19 @@ class BRENDAEnrichmentController:
             # Simple Michaelis-Menten with named parameters
             rate_function = f"michaelis_menten({substrate_place}, vmax={vmax}, km={km})"
         
-        # Set rate function in transition properties
+        # Set rate function in transition properties AND as attribute
         if not hasattr(transition, 'properties'):
             transition.properties = {}
         
         transition.properties['rate_function'] = rate_function
         transition.properties['rate_function_source'] = 'brenda_auto_generated'
+        transition.rate_function = rate_function  # Set as attribute for property dialog
+        
+        # Also store in metadata for consistency with SABIO-RK
+        if not hasattr(transition, 'metadata'):
+            transition.metadata = {}
+        transition.metadata['rate_function'] = rate_function
+        transition.metadata['rate_function_source'] = 'brenda_auto_generated'
         
         # Ensure transition is continuous (needed for rate functions)
         if not hasattr(transition, 'transition_type') or transition.transition_type != 'continuous':
@@ -902,3 +969,101 @@ class BRENDAEnrichmentController:
             pass
         
         return params
+    
+    def _track_brenda_application(self, 
+                                  transition_id: str, 
+                                  transition_obj, 
+                                  parameters: Dict[str, Any]) -> Optional[int]:
+        """Track BRENDA parameter application (Phase 2).
+        
+        Args:
+            transition_id: Transition ID
+            transition_obj: Transition object
+            parameters: Applied parameters dict
+        
+        Returns:
+            Parameter tracking ID or None if tracking failed
+        """
+        try:
+            metadata = getattr(transition_obj, 'metadata', {}) or {}
+            
+            param_id = self.tracker.track_application(
+                transition_id=transition_id,
+                parameters={
+                    'km': parameters.get('Km') or parameters.get('km'),
+                    'vmax': parameters.get('Vmax') or parameters.get('vmax'),
+                    'kcat': parameters.get('Kcat') or parameters.get('kcat'),
+                    'ki': parameters.get('Ki') or parameters.get('ki')
+                },
+                source='BRENDA',
+                transition_type='continuous',
+                ec_number=metadata.get('ec_number'),
+                reaction_id=metadata.get('kegg_reaction_id'),
+                organism=parameters.get('organism') or metadata.get('organism')
+            )
+            
+            import logging
+            logging.getLogger(self.__class__.__name__).debug(
+                f"Tracked BRENDA application (param_id={param_id})"
+            )
+            
+            return param_id
+            
+        except Exception as e:
+            import logging
+            logging.getLogger(self.__class__.__name__).warning(
+                f"Failed to track BRENDA application: {e}"
+            )
+            return None
+    
+    def _show_rating_dialog(self, 
+                           param_id: int, 
+                           transition_id: str, 
+                           applied_params: List[str]):
+        """Show rating dialog for BRENDA parameter application (Phase 2).
+        
+        Args:
+            param_id: Parameter tracking ID
+            transition_id: Transition ID
+            applied_params: List of applied parameter names
+        """
+        try:
+            # Create dialog
+            dialog = ParameterRatingDialog(
+                parent=None,
+                transition_name=transition_id,
+                parameters=applied_params,
+                source='BRENDA'
+            )
+            
+            # Show dialog and get feedback
+            feedback = dialog.run_and_get_feedback()
+            
+            if feedback:
+                rating = feedback.get('rating')
+                comment = feedback.get('comment', '')
+                
+                # Store rating via tracker
+                success = self.tracker.update_rating(
+                    parameter_id=param_id,
+                    rating=rating,
+                    comment=comment
+                )
+                
+                if success:
+                    import logging
+                    logging.getLogger(self.__class__.__name__).info(
+                        f"Stored user rating: {rating} for param_id={param_id}"
+                    )
+                else:
+                    import logging
+                    logging.getLogger(self.__class__.__name__).warning(
+                        f"Failed to store rating for param_id={param_id}"
+                    )
+            else:
+                import logging
+                logging.getLogger(self.__class__.__name__).debug("User skipped rating")
+                
+        except Exception as e:
+            import logging
+            logging.getLogger(self.__class__.__name__).error(f"Rating dialog error: {e}")

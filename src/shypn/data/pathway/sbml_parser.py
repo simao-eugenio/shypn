@@ -417,12 +417,15 @@ class SBMLParser:
                 "Install with: pip3 install --user python-libsbml"
             )
     
-    def parse_file(self, filepath: str) -> PathwayData:
+    def parse_file(self, filepath: str, filter_isolated_species: bool = True) -> PathwayData:
         """
         Parse SBML file and extract pathway data.
         
         Args:
             filepath: Path to SBML file (.sbml or .xml)
+            filter_isolated_species: If True, exclude species with no connections (default: True)
+                                    Isolated species (e.g., conservation constraints like TotalCdc13)
+                                    are excluded to prevent layout algorithm issues.
             
         Returns:
             PathwayData object with parsed information
@@ -455,7 +458,7 @@ class SBMLParser:
             raise ValueError("SBML file contains no model")
         
         # Extract all elements using specialized extractors
-        pathway_data = self._extract_pathway_data(model, filepath)
+        pathway_data = self._extract_pathway_data(model, filepath, filter_isolated_species)
         
         self.logger.info(
             f"Successfully parsed: "
@@ -468,7 +471,8 @@ class SBMLParser:
     def _extract_pathway_data(
         self,
         model,
-        filepath: Path
+        filepath: Path,
+        filter_isolated_species: bool = True
     ) -> PathwayData:
         """
         Extract all pathway data from SBML model.
@@ -478,6 +482,7 @@ class SBMLParser:
         Args:
             model: libsbml Model object
             filepath: Path to original file
+            filter_isolated_species: If True, exclude species not used in reactions
             
         Returns:
             PathwayData object
@@ -489,10 +494,43 @@ class SBMLParser:
         parameter_extractor = ParameterExtractor(model)
         
         # Extract all elements
-        species = species_extractor.extract()
+        all_species = species_extractor.extract()
         reactions = reaction_extractor.extract()
         compartments = compartment_extractor.extract()
         parameters = parameter_extractor.extract()
+        
+        # Filter isolated species if requested (similar to KEGG filtering)
+        if filter_isolated_species:
+            # Build set of species IDs that are actually used in reactions
+            used_species_ids = set()
+            for reaction in reactions:
+                # Add reactants
+                for species_id, _ in reaction.reactants:
+                    used_species_ids.add(species_id)
+                # Add products
+                for species_id, _ in reaction.products:
+                    used_species_ids.add(species_id)
+                # Add modifiers (catalysts)
+                if hasattr(reaction, 'modifiers'):
+                    for modifier_id in reaction.modifiers:
+                        used_species_ids.add(modifier_id)
+            
+            # Filter species to only include those used in reactions
+            species = [s for s in all_species if s.id in used_species_ids]
+            
+            # Log filtering results
+            num_filtered = len(all_species) - len(species)
+            if num_filtered > 0:
+                filtered_ids = [s.id for s in all_species if s.id not in used_species_ids]
+                self.logger.info(
+                    f"Filtered {num_filtered} isolated species not used in reactions: "
+                    f"{', '.join(filtered_ids[:5])}"
+                    + ("..." if len(filtered_ids) > 5 else "")
+                )
+        else:
+            # Include all species (old behavior)
+            species = all_species
+            self.logger.debug("Including all species (no filtering)")
         
         # Extract compartment sizes and merge into parameters
         # This makes compartment sizes available in kinetic formulas
@@ -531,12 +569,13 @@ class SBMLParser:
             metadata=metadata
         )
     
-    def parse_string(self, sbml_string: str) -> PathwayData:
+    def parse_string(self, sbml_string: str, filter_isolated_species: bool = True) -> PathwayData:
         """
         Parse SBML from string.
         
         Args:
             sbml_string: SBML XML as string
+            filter_isolated_species: If True, exclude species with no connections (default: True)
             
         Returns:
             PathwayData object
@@ -559,7 +598,7 @@ class SBMLParser:
         if model is None:
             raise ValueError("SBML contains no model")
         
-        return self._extract_pathway_data(model, Path("(string)"))
+        return self._extract_pathway_data(model, Path("(string)"), filter_isolated_species)
 
 
 # Example usage
