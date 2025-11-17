@@ -161,7 +161,8 @@ class SwissKnifePalette(GObject.GObject):
         # Create category buttons
         for cat_id, cat_info in self.categories.items():
             button = Gtk.Button(label=cat_info['label'])
-            button.set_tooltip_text(cat_info['tooltip'])
+            # Tooltip disabled - only show tooltips on canvas network objects
+            # button.set_tooltip_text(cat_info['tooltip'])
             button.get_style_context().add_class('category-button')
             button.connect('clicked', self._on_category_clicked, cat_id)
             

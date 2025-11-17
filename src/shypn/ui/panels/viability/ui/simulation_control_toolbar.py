@@ -60,16 +60,8 @@ class SimulationControlToolbar(Gtk.Box):
         self.copy_exp_button = Gtk.Button(label="Copy")
         self.copy_exp_button.set_tooltip_text("Duplicate current experiment for variation")
         row.pack_start(self.copy_exp_button, False, False, 0)
-        
-        self.save_exp_button = Gtk.Button(label="Save")
-        self.save_exp_button.set_tooltip_text("Export experiments to JSON file")
-        row.pack_start(self.save_exp_button, False, False, 0)
-        
-        self.load_exp_button = Gtk.Button(label="Load")
-        self.load_exp_button.set_tooltip_text("Import experiments from JSON file")
-        row.pack_start(self.load_exp_button, False, False, 0)
 
-        # Settings moved here: Time and Steps beside Load
+        # Settings moved here: Time and Steps beside Copy
         row.pack_start(Gtk.Separator(orientation=Gtk.Orientation.VERTICAL), False, False, 6)
 
         # Time limit
@@ -193,8 +185,6 @@ class SimulationControlToolbar(Gtk.Box):
         self.experiment_combo.set_sensitive(not is_running)
         self.add_exp_button.set_sensitive(not is_running)
         self.copy_exp_button.set_sensitive(not is_running)
-        self.save_exp_button.set_sensitive(not is_running)
-        self.load_exp_button.set_sensitive(not is_running)
     
     def get_simulation_settings(self):
         """Get current simulation settings.

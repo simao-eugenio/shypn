@@ -167,7 +167,7 @@ class StochasticBehavior(TransitionBehavior):
                     f"Stochastic transition '{self.transition.name}' formula evaluated to "
                     f"non-positive rate {rate:.3f}. This indicates a reversible reaction "
                     f"that should be modeled as continuous (not stochastic), or the formula is incorrect. "
-                    f"Expression: {self.rate_function_expr}, Context: {context}"
+                    f"Expression: {self.rate_function_expr}"
                 )
             
             return rate

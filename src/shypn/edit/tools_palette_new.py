@@ -77,7 +77,8 @@ class ToolsPalette(BasePalette):
             GtkToggleButton: Configured button
         """
         button = Gtk.ToggleButton(label=label)
-        button.set_tooltip_text(tooltip)
+        # Tooltip disabled - only show tooltips on canvas network objects
+        # button.set_tooltip_text(tooltip)
         button.set_size_request(40, 40)
         button.get_style_context().add_class('tool-button')
         button.set_visible(True)  # Ensure button is visible

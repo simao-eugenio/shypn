@@ -60,9 +60,10 @@ class TopologyPanel(Gtk.Box):
         header_box.pack_start(header_label, True, True, 0)
         
         # Float button on the far right (icon only)
-        self.float_button = Gtk.ToggleButton()
-        self.float_button.set_label("⬈")
-        self.float_button.set_tooltip_text("Detach panel to floating window")
+        self.float_button = Gtk.ToggleButton(label="⬈")
+        # Tooltip disabled - only show tooltips on canvas network objects
+        # self.float_button.set_tooltip_text("Detach panel to floating window")
+        self.float_button.get_style_context().add_class('float-button')
         self.float_button.set_relief(Gtk.ReliefStyle.NONE)  # Flat button
         self.float_button.set_valign(Gtk.Align.CENTER)
         header_box.pack_end(self.float_button, False, False, 0)

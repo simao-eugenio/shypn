@@ -79,7 +79,8 @@ class OperationsPalette(BasePalette):
             GtkToggleButton: Configured select button
         """
         button = Gtk.ToggleButton(label='S')
-        button.set_tooltip_text('Select Mode (Ctrl+S)\n\nActivate selection mode')
+        # Tooltip disabled - only show tooltips on canvas network objects
+        # button.set_tooltip_text('Select Mode (Ctrl+S)\n\nActivate selection mode')
         button.set_size_request(40, 40)
         button.get_style_context().add_class('operation-button')
         button.get_style_context().add_class('select-button')
@@ -99,7 +100,8 @@ class OperationsPalette(BasePalette):
             GtkButton: Configured button
         """
         button = Gtk.Button(label=label)
-        button.set_tooltip_text(tooltip)
+        # Tooltip disabled - only show tooltips on canvas network objects
+        # button.set_tooltip_text(tooltip)
         button.set_size_request(40, 40)
         button.set_sensitive(sensitive)
         button.get_style_context().add_class('operation-button')

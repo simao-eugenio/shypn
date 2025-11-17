@@ -3008,14 +3008,15 @@ class ModelCanvasLoader:
         if hovered_obj:
             from shypn.netobjs import Place, Transition, Arc
             if isinstance(hovered_obj, (Place, Transition, Arc)):
-                # Show ID-Name tooltip with green background and white text (styled via CSS)
+                # Show ID-Name tooltip with green background and black text (styled via CSS)
+                # ONLY show tooltips for network objects (places, transitions, arcs)
                 obj_id = hovered_obj.id if hasattr(hovered_obj, 'id') else "?"
                 obj_name = hovered_obj.name if hasattr(hovered_obj, 'name') else ""
                 if obj_name and obj_name != obj_id:
                     tooltip = f"{obj_id} - {obj_name}"
                 else:
                     tooltip = obj_id
-                # Use set_tooltip_text - CSS will apply green background and white text
+                # Use set_tooltip_text - CSS will apply green background and black text
                 widget.set_tooltip_text(tooltip)
         else:
             # Clear tooltip when not hovering over any object

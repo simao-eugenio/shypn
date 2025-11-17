@@ -251,9 +251,9 @@ class FilesPanelController(BasePanel):
         self._container.pack_start(frame, False, True, 0)
     
     def _build_quit_button(self):
-        """Build quit application button."""
-        self.quit_button = Gtk.Button(label="Quit Application")
-        self.quit_button.set_tooltip_text("Exit shypn (prompts to save unsaved changes)")
+        """Build close project button."""
+        self.quit_button = Gtk.Button(label="Close Project")
+        self.quit_button.set_tooltip_text("Close the current project (prompts to save unsaved changes)")
         self.quit_button.set_margin_start(6)
         self.quit_button.set_margin_end(6)
         self.quit_button.set_margin_top(3)

@@ -42,7 +42,8 @@ class PaletteButton:
         self._button.set_name(f'palette_button_{name}')
         self._button.set_relief(Gtk.ReliefStyle.NONE)
         self._button.set_size_request(self.BUTTON_SIZE, self.BUTTON_SIZE)
-        self._button.set_tooltip_text(tooltip)
+        # Tooltip disabled - only show tooltips on canvas network objects
+        # self._button.set_tooltip_text(tooltip)
         
         # Add CSS class for styling
         style_context = self._button.get_style_context()
