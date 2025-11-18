@@ -9,7 +9,7 @@
     "object_counts": {
       "places": 5,
       "transitions": 2,
-      "arcs": 7
+      "arcs": 6
     }
   },
   "view_state": {
@@ -238,26 +238,6 @@
       "source_type": "place",
       "target_id": "T1",
       "target_type": "transition",
-      "weight": 1,
-      "threshold": null,
-      "color": [
-        0.0,
-        0.0,
-        0.0
-      ],
-      "width": 3.0,
-      "control_points": []
-    },
-    {
-      "id": "A3",
-      "name": "A3",
-      "label": "",
-      "object_type": "arc",
-      "arc_type": "test",
-      "source_id": "T1",
-      "source_type": "transition",
-      "target_id": "P3",
-      "target_type": "place",
       "weight": 1,
       "threshold": null,
       "color": [
