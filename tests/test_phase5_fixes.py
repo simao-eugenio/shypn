@@ -113,7 +113,7 @@ def test_sbml_import():
     try:
         # Find an SBML test file
         test_files = [
-            'data/biomodels_test/BIOMD0000000001.xml',
+            'tests/fixtures/BIOMD0000000001.xml',
             'examples/simple_sbml.xml',
         ]
         

@@ -125,7 +125,7 @@ def test_file_operations():
     
     # Test 3: Double-click simulation (open specific file)
     print("\n6. Testing _open_file_from_path() (double-click simulation)...")
-    test_file = "models/teste.shy"
+    test_file = "tests/fixtures/teste.shy"
     if os.path.exists(test_file):
         try:
             file_explorer._open_file_from_path(os.path.abspath(test_file))

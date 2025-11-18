@@ -79,7 +79,7 @@ def test_quick_load(sbml_file):
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         # Use default test file
-        sbml_file = "data/biomodels_test/BIOMD0000000001.xml"
+        sbml_file = "tests/fixtures/BIOMD0000000001.xml"
     else:
         sbml_file = sys.argv[1]
     

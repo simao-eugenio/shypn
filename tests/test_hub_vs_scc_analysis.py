@@ -314,7 +314,7 @@ if __name__ == '__main__':
     if len(sys.argv) < 2:
         print("Usage: python3 test_hub_vs_scc_analysis.py <sbml_file>")
         print("\nExample:")
-        print("  python3 tests/test_hub_vs_scc_analysis.py data/biomodels_test/BIOMD0000000001.xml")
+        print("  python3 tests/test_hub_vs_scc_analysis.py tests/fixtures/BIOMD0000000001.xml")
         sys.exit(1)
     
     sbml_file = sys.argv[1]

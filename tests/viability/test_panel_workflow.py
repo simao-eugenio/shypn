@@ -75,7 +75,7 @@ def run_manual_test():
     print()
     print("STEP 1: Load a Model")
     print("  ☐ Click Files panel (folder icon)")
-    print("  ☐ Open a model from data/biomodels_test/")
+    print("  ☐ Open a model from tests/fixtures/")
     print()
     print("STEP 2: Open Viability Panel")
     print("  ☐ Click Viability button in Master Palette")

@@ -17,7 +17,7 @@ def test_duplicate_id_fix():
     """Test that ID counters are properly updated after loading a file."""
     
     # Load a .shy file to test (using Hynne model as example)
-    model_path = "models/Hynne2001_Glycolysis.shy"
+    model_path = "tests/fixtures/Hynne2001_Glycolysis.shy"
     
     print(f"Loading {model_path}...")
     doc = DocumentModel.load_from_file(model_path)

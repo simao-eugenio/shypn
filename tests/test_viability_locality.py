@@ -2,14 +2,18 @@
 """Test viability panel locality detection."""
 
 import sys
-sys.path.insert(0, '/home/simao/projetos/shypn/src')
+from pathlib import Path
+
+# Get repo root (parent of tests directory)
+repo_root = Path(__file__).parent.parent
+sys.path.insert(0, str(repo_root / 'src'))
 
 from shypn.loaders import load_model
 from shypn.diagnostic import LocalityDetector
 from shypn.knowledge import KnowledgeBase
 
-# Load a model
-model_path = '/home/simao/projetos/shypn/data/biomodels_test/BIOMD0000000003.xml'
+# Load a model - Note: BIOMD0000000003.xml not in fixtures, using BIOMD0000000001.xml
+model_path = repo_root / 'tests/fixtures/BIOMD0000000001.xml'
 print(f"Loading model: {model_path}")
 model = load_model(model_path)
 

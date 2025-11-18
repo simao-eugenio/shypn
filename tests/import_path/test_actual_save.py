@@ -59,7 +59,7 @@ def test_actual_save():
     
     # Test 1: Open an existing file
     print("\n3. Opening existing file...")
-    test_file = "models/teste.shy"
+    test_file = "tests/fixtures/teste.shy"
     if not os.path.exists(test_file):
         print(f"   ERROR: Test file not found: {test_file}")
         return False

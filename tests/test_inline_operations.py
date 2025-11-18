@@ -130,7 +130,7 @@ def test_inline_operations():
     print("\n5. Testing inline open (selected file, no dialog)...")
     
     # First, we need to select a file in the tree
-    test_file = "models/teste.shy"
+    test_file = "tests/fixtures/teste.shy"
     if os.path.exists(test_file):
         abs_path = os.path.abspath(test_file)
         

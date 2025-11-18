@@ -409,7 +409,7 @@ if __name__ == '__main__':
         print(f"   python3 {sys.argv[0]} <path_to_sbml_file>")
         print()
         print("Example:")
-        print(f"   python3 {sys.argv[0]} data/biomodels_test/BIOMD0000000001.xml")
+        print(f"   python3 {sys.argv[0]} tests/fixtures/BIOMD0000000001.xml")
         sys.exit(1)
     
     success = test_biomodel_layout(model_path)

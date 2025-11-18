@@ -28,7 +28,7 @@ def test_formula_translation():
     print("=" * 80)
     
     # Path to SBML file
-    sbml_file = Path("data/biomodels_test/BIOMD0000000001.xml")
+    sbml_file = Path("tests/fixtures/BIOMD0000000001.xml")
     
     if not sbml_file.exists():
         print(f"❌ SBML file not found: {sbml_file}")

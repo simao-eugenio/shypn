@@ -300,7 +300,7 @@ def test_hub_based_layout(sbml_file):
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Usage: python3 test_hub_based_layout.py <sbml_file>")
-        print("Example: python3 test_hub_based_layout.py data/biomodels_test/BIOMD0000000001.xml")
+        print("Example: python3 test_hub_based_layout.py tests/fixtures/BIOMD0000000001.xml")
         sys.exit(1)
     
     sbml_file = sys.argv[1]

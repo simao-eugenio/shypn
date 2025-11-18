@@ -185,7 +185,7 @@ class SBMLImportFlowTest:
         # Use a test SBML file if available
         test_files = [
             "examples/sbml/BIOMD0000000001.xml",
-            "data/biomodels_test/BIOMD0000000001.xml",
+            "tests/fixtures/BIOMD0000000001.xml",
         ]
         
         test_file = None
