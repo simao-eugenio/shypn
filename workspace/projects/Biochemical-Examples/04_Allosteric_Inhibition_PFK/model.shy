@@ -274,7 +274,7 @@
       "source_type": "place",
       "target_id": "T1",
       "target_type": "transition",
-      "weight": 10000,
+      "weight": 4,
       "threshold": null,
       "color": [
         0.0,
