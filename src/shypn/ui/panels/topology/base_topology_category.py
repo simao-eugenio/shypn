@@ -1622,7 +1622,23 @@ class BaseTopologyCategory:
         if n_places == 0:
             return (True, 0, 0, None)
         
-        # Estimate state space size (same heuristic as ReachabilityAnalyzer)
+        # Check if model is continuous (all transitions are continuous)
+        is_continuous = all(
+            hasattr(t, 'transition_type') and t.transition_type == 'continuous' 
+            for t in model.transitions
+        )
+        
+        # For continuous models, skip state space estimation
+        # Continuous Petri nets don't have discrete state spaces
+        if is_continuous:
+            # Small continuous models are always safe
+            if n_places <= 30:
+                return (True, 0, n_places, None)
+            else:
+                reason = f"{n_places} places (>30 place limit)"
+                return (False, 0, n_places, reason)
+        
+        # For discrete models, estimate state space size
         avg_tokens_per_place = sum(p.tokens for p in model.places) / n_places
         estimated_states = int((avg_tokens_per_place + 1) ** n_places)
         

@@ -84,7 +84,17 @@ def main(argv=None):
 		logging.getLogger(__name__).error('Main UI file not found: %s', UI_PATH)
 		sys.exit(2)
 
-	app = Gtk.Application(application_id='org.shypn.dockdemo')
+	# Create application with file handling support
+	from gi.repository import Gio
+	app = Gtk.Application(
+		application_id='org.shypn.dockdemo',
+		flags=Gio.ApplicationFlags.HANDLES_OPEN
+	)
+	
+	# Store file to open if provided via command line
+	file_to_open = None
+	if len(argv) > 1:
+		file_to_open = os.path.abspath(argv[1])
 
 	def on_activate(a):
 		
@@ -910,6 +920,17 @@ def main(argv=None):
 		# Store main window reference in model_canvas_loader for per-document Report panels
 		if model_canvas_loader:
 			model_canvas_loader.main_window = window
+
+		# ====================================================================
+		# Open file from command line if provided
+		# ====================================================================
+		if file_to_open and os.path.exists(file_to_open):
+			# Use GLib.idle_add to defer file loading until after UI is fully initialized
+			def open_file_delayed():
+				if file_explorer:
+					file_explorer._open_file_from_path(file_to_open)
+				return False  # Don't repeat
+			GLib.idle_add(open_file_delayed)
 
 		# Define toggle handlers (show/hide panel windows as transient windows)
 		# ====================================================================

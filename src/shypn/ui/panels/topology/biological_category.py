@@ -161,17 +161,16 @@ class BiologicalCategory(BaseTopologyCategory):
                     'Share enzyme, no conflict'
                 ))
             
-            # Process strongly independent pairs (optional - may create too many rows)
-            # Uncomment if you want to see independent pairs
-            # for t1_id, t2_id, details in classifications.get('strongly_independent', []):
-            #     rows.append((
-            #         'Independent',
-            #         f'({t1_id}, {t2_id})',
-            #         '-',
-            #         0.0,
-            #         'No Coupling',
-            #         'No shared places'
-            #     ))
+            # Process strongly independent pairs
+            for t1_id, t2_id, details in classifications.get('strongly_independent', []):
+                rows.append((
+                    'Independent',
+                    f'({t1_id}, {t2_id})',
+                    '-',
+                    0.0,
+                    'No Coupling',
+                    'No shared places (parallel or sequential)'
+                ))
         
         elif analyzer_name == 'regulatory_structure':
             # Result format: {'test_arcs': [...], 'inhibitor_arcs': [...], 'catalyst_map': {...}, 'inhibitor_map': {...}}

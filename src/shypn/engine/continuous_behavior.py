@@ -85,8 +85,8 @@ class ContinuousBehavior(TransitionBehavior):
                 if isinstance(rate, dict) and 'rate' in rate:
                     rate_expr = rate['rate']
                 else:
-                    # Convert simple rate to rate function string
-                    rate_expr = str(rate) if isinstance(rate, (int, float)) else '1.0'
+                    # Accept string expressions or numeric constants
+                    rate_expr = str(rate)
             else:
                 rate_expr = '1.0'  # Default constant rate
         
