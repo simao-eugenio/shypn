@@ -115,7 +115,7 @@ class Place(PetriNetObject):
         
         # Font size compensated for zoom (14pt constant screen size)
         cr.set_font_size(14 / zoom)
-        text = str(self.tokens) if isinstance(self.tokens, int) else f"{self.tokens:.1f}"
+        text = str(self.tokens) if isinstance(self.tokens, int) else f"{self.tokens:.3f}"
         extents = cr.text_extents(text)
         text_x = x - extents.width / 2
         text_y = y + extents.height / 2
