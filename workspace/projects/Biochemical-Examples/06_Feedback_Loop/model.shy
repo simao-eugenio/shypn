@@ -24,13 +24,13 @@
     {
       "id": "P1",
       "name": "Threonine",
-      "label": "Threonine\n5.0 mM",
+      "label": "Threonine\n20 mM",
       "object_type": "place",
       "x": 140.0,
       "y": 50.0,
       "radius": 30.0,
-      "marking": 5,
-      "initial_marking": 5,
+      "marking": 20,
+      "initial_marking": 20,
       "capacity": Infinity,
       "border_color": [
         0.0,
@@ -436,7 +436,7 @@
       "source_type": "place",
       "target_id": "T1",
       "target_type": "transition",
-      "weight": 50,
+      "weight": 2,
       "threshold": null,
       "color": [
         0.0,
