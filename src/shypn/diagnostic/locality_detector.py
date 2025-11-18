@@ -220,9 +220,15 @@ class LocalityDetector:
         # Scan all arcs in model
         # Model uses lists, not dictionaries
         for arc in self.model.arcs:
-            # CRITICAL: Skip test arcs (catalysts)
-            # Test arcs don't define locality membership (non-consuming semantics)
-            if hasattr(arc, 'consumes_tokens') and not arc.consumes_tokens():
+            # CRITICAL: Skip test/catalyst arcs but INCLUDE inhibitor arcs
+            # Test arcs (catalysts/enzymes) don't define locality membership
+            # Inhibitor arcs DO participate in locality (regulatory control)
+            arc_type = getattr(arc, 'arc_type', 'normal')
+            if arc_type == 'test':
+                continue  # Skip test arcs (catalyst semantics)
+            
+            # Also skip if it's a catalyst-like arc (consumes_tokens=False AND not inhibitor)
+            if hasattr(arc, 'consumes_tokens') and not arc.consumes_tokens() and arc_type != 'inhibitor':
                 continue
             
             # CRITICAL: Skip arcs involving catalyst places
