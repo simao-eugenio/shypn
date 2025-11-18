@@ -253,12 +253,23 @@ class ContinuousBehavior(TransitionBehavior):
             return True, "enabled-continuous-no-inputs"
         
         # Check each input place for positive tokens
+        # Separate handling for normal/test arcs vs. inhibitor arcs
+        from shypn.netobjs.inhibitor_arc import InhibitorArc
+        
         for arc in input_arcs:
-            # Check ALL input arcs (normal, test, inhibitor) for token presence
-            # All arc types require tokens > min_token_threshold for continuous enablement
             source_place = self._get_place(arc.source_id)
             if source_place is None:
                 return False, f"missing-source-place-{arc.source_id}"
+            
+            # Inhibitor arcs: DISABLED when tokens >= weight (negative feedback)
+            if isinstance(arc, InhibitorArc):
+                if source_place.tokens >= arc.weight:
+                    return False, f"inhibited-by-P{arc.source_id}"
+                # If tokens < weight, inhibitor allows transition (continue to next arc)
+                continue
+            
+            # Normal/Test arcs: Require positive tokens for continuous enablement
+            # All arc types require tokens > min_token_threshold for continuous enablement
             
             # Continuous requires tokens above threshold
             # Default threshold is 0.0 (strict zero check)
