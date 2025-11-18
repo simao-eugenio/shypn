@@ -78,15 +78,15 @@ UI_PATH = Path(__file__).parents[3] / 'ui' / 'palettes' / 'master_palette.ui'
 
 
 # Material Design inspired CSS for master palette - high contrast, bold colors
-# Width: 56px = 48px button + 6px margin + 2px padding
+# Width: 98px = 90px button + 8px margin
 PALETTE_CSS = """
-/* Master Palette Container - 56px total width */
+/* Master Palette Container - 98px total width */
 #master_palette_container {
     background-color: #1a1f24;
     background-image: linear-gradient(to bottom, #1a2229 0%, #263238 50%, #1e272e 100%);
     border-right: 4px solid #37474F;
     border-left: 1px solid #0d1216;
-    padding: 4px 2px;
+    padding: 4px;
 }
 
 /* Master Palette Panel (outer box in UI file) */
@@ -96,17 +96,19 @@ PALETTE_CSS = """
     border-right: 2px solid #263238;
 }
 
-/* Palette Buttons - Base State (squared 48x48px buttons) */
+/* Palette Buttons - Base State (90x32px buttons for full text) */
 .palette-button {
     background-color: #37474F;
     background-image: linear-gradient(to bottom, #455A64, #37474F);
     border: 2px solid #546E7A;
-    border-radius: 8px;
+    border-radius: 6px;
     color: #FFFFFF;
-    margin: 3px;
-    min-width: 48px;
-    min-height: 48px;
-    padding: 0;
+    margin: 4px;
+    min-width: 90px;
+    min-height: 32px;
+    padding: 4px 8px;
+    font-size: 11px;
+    font-weight: bold;
 }
 
 /* Hover State - Bright highlight with glow */
@@ -150,20 +152,20 @@ PALETTE_CSS = """
     color: #546E7A;
 }
 
-/* Icon styling */
-.palette-button image {
-    min-width: 40px;
-    min-height: 40px;
-    -gtk-icon-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+/* Text label styling */
+.palette-button label {
+    color: #FFFFFF;
+    font-weight: bold;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
-.palette-button:hover image {
-    -gtk-icon-shadow: 0 2px 4px rgba(255, 255, 255, 0.2);
+.palette-button:hover label {
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
 }
 
-.palette-button:checked image,
-.palette-button-active image {
-    -gtk-icon-shadow: 0 2px 4px rgba(255, 255, 255, 0.3);
+.palette-button:checked label,
+.palette-button-active label {
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
 }
 """
 
@@ -219,10 +221,10 @@ class MasterPalette:
 
         if not self.container:
             # Create fallback container
-            # Width calculation: 48px button + 6px margin (3px each) + 2px padding (1px each) = 56px
+            # Width calculation: 90px button + 8px margin (4px each) = 98px
             self.container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
             self.container.set_name('master_palette_container')
-            self.container.set_size_request(56, -1)
+            self.container.set_size_request(98, -1)
             self.container.set_spacing(0)
             self.container.set_hexpand(False)
             self.container.set_vexpand(True)

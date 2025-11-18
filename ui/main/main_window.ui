@@ -356,13 +356,13 @@
             <property name="hexpand">True</property>
             <property name="vexpand">True</property>
             
-            <!-- Master Palette slot (56px vertical toolbar, far left) -->
+            <!-- Master Palette slot (98px vertical toolbar, far left) -->
         <child>
           <object class="GtkBox" id="master_palette_slot">
             <property name="name">master_palette_slot</property>
             <property name="orientation">vertical</property>
             <property name="visible">True</property>
-            <property name="width-request">56</property>
+            <property name="width-request">98</property>
             <property name="vexpand">True</property>
             <property name="hexpand">False</property>
             <!-- Master Palette widget will be added programmatically in Phase 3 -->
