@@ -1,0 +1,352 @@
+{
+  "version": "2.0",
+  "metadata": {
+    "created": "2025-11-18T00:00:00.000000",
+    "description": "Example 5: Competitive Inhibition - Succinate dehydrogenase with malonate inhibitor",
+    "author": "SHYpn Foundation Examples",
+    "organism": "Homo sapiens",
+    "compartment": "mitochondrial matrix",
+    "object_counts": {
+      "places": 5,
+      "transitions": 2,
+      "arcs": 7
+    }
+  },
+  "view_state": {
+    "zoom": 1.0,
+    "pan_x": 0.0,
+    "pan_y": 0.0,
+    "transformations": {
+      "rotation": {
+        "type": "rotation",
+        "angle_degrees": 0.0,
+        "enabled": true
+      }
+    }
+  },
+  "places": [
+    {
+      "id": "P1",
+      "name": "Succinate",
+      "label": "Succinate\n3.0 mM",
+      "object_type": "place",
+      "x": 150.0,
+      "y": 150.0,
+      "radius": 30.0,
+      "marking": 3000,
+      "initial_marking": 3000,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.5,
+        0.8
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "metadata": {
+        "kegg_id": "C00042",
+        "chebi_id": "CHEBI:30031",
+        "compound_name": "Succinate"
+      }
+    },
+    {
+      "id": "P2",
+      "name": "Malonate",
+      "label": "Malonate\n2.0 mM",
+      "object_type": "place",
+      "x": 150.0,
+      "y": 350.0,
+      "radius": 30.0,
+      "marking": 2000,
+      "initial_marking": 2000,
+      "capacity": Infinity,
+      "border_color": [
+        0.8,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "metadata": {
+        "kegg_id": "C00383",
+        "chebi_id": "CHEBI:30794",
+        "compound_name": "Malonate",
+        "role": "competitive_inhibitor"
+      }
+    },
+    {
+      "id": "P3",
+      "name": "SDH",
+      "label": "SDH\n0.01 mM",
+      "object_type": "place",
+      "x": 350.0,
+      "y": 250.0,
+      "radius": 30.0,
+      "marking": 10,
+      "initial_marking": 10,
+      "capacity": Infinity,
+      "border_color": [
+        0.0,
+        0.7,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": true,
+      "metadata": {
+        "ec_number": "1.3.5.1",
+        "kegg_enzyme": "K00239",
+        "enzyme_name": "Succinate dehydrogenase",
+        "role": "enzyme_catalyst"
+      }
+    },
+    {
+      "id": "P4",
+      "name": "Fumarate",
+      "label": "Fumarate\n0.1 mM",
+      "object_type": "place",
+      "x": 550.0,
+      "y": 150.0,
+      "radius": 30.0,
+      "marking": 100,
+      "initial_marking": 100,
+      "capacity": Infinity,
+      "border_color": [
+        0.8,
+        0.5,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "metadata": {
+        "kegg_id": "C00122",
+        "chebi_id": "CHEBI:18012",
+        "compound_name": "Fumarate"
+      }
+    },
+    {
+      "id": "P5",
+      "name": "Blocked",
+      "label": "Blocked\n0.0 mM",
+      "object_type": "place",
+      "x": 550.0,
+      "y": 350.0,
+      "radius": 30.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "capacity": Infinity,
+      "border_color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "metadata": {
+        "compound_name": "Blocked state marker",
+        "role": "tracking_place"
+      }
+    }
+  ],
+  "transitions": [
+    {
+      "id": "T1",
+      "name": "Productive",
+      "label": "Succinate\n\u2192 Fumarate",
+      "object_type": "transition",
+      "transition_type": "continuous",
+      "x": 350.0,
+      "y": 150.0,
+      "width": 15.0,
+      "height": 60.0,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "fill_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "priority": 0,
+      "rate": "0.5 * Succinate * SDH / (0.5 + Succinate)",
+      "is_timed": false,
+      "metadata": {
+        "reaction_type": "productive",
+        "description": "Succinate oxidation to fumarate"
+      }
+    },
+    {
+      "id": "T2",
+      "name": "Inhibited",
+      "label": "Malonate\nBinding",
+      "object_type": "transition",
+      "transition_type": "continuous",
+      "x": 350.0,
+      "y": 350.0,
+      "width": 15.0,
+      "height": 60.0,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "fill_color": [
+        0.9,
+        0.9,
+        0.9
+      ],
+      "priority": 0,
+      "rate": "0.8 * Malonate * SDH / (0.3 + Malonate)",
+      "is_timed": false,
+      "metadata": {
+        "reaction_type": "competitive_inhibition",
+        "description": "Malonate competes for enzyme active site"
+      }
+    }
+  ],
+  "arcs": [
+    {
+      "id": "A1",
+      "name": "A1",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P1",
+      "source_type": "place",
+      "target_id": "T1",
+      "target_type": "transition",
+      "weight": 1,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A2",
+      "name": "A2",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "test",
+      "source_id": "P3",
+      "source_type": "place",
+      "target_id": "T1",
+      "target_type": "transition",
+      "weight": 1,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A3",
+      "name": "A3",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "test",
+      "source_id": "T1",
+      "source_type": "transition",
+      "target_id": "P3",
+      "target_type": "place",
+      "weight": 1,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A4",
+      "name": "A4",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T1",
+      "source_type": "transition",
+      "target_id": "P4",
+      "target_type": "place",
+      "weight": 1,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A5",
+      "name": "A5",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P2",
+      "source_type": "place",
+      "target_id": "T2",
+      "target_type": "transition",
+      "weight": 1,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A6",
+      "name": "A6",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "test",
+      "source_id": "P3",
+      "source_type": "place",
+      "target_id": "T2",
+      "target_type": "transition",
+      "weight": 1,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A7",
+      "name": "A7",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T2",
+      "source_type": "transition",
+      "target_id": "P5",
+      "target_type": "place",
+      "weight": 1,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    }
+  ]
+}
