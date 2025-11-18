@@ -170,7 +170,7 @@
         1.0
       ],
       "priority": 0,
-      "rate": "0.5 * Succinate * SDH / (0.5 + Succinate)",
+      "rate": "50 * Succinate * SDH / (0.5 + Succinate)",
       "is_timed": false,
       "metadata": {
         "reaction_type": "productive",
@@ -199,7 +199,7 @@
         0.9
       ],
       "priority": 0,
-      "rate": "0.8 * Malonate * SDH / (0.3 + Malonate)",
+      "rate": "80 * Malonate * SDH / (0.3 + Malonate)",
       "is_timed": false,
       "metadata": {
         "reaction_type": "competitive_inhibition",
