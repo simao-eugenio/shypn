@@ -23,15 +23,15 @@ class PaletteButton:
         .connect_toggled(callback)
         .set_sensitive(bool)
     
-    Dimensions optimized for 32x32px icons:
-        - ICON_SIZE = 32px (icon itself)
-        - BUTTON_SIZE = 40px (icon + 4px padding each side)
-        - Margin = 3px (defined in CSS)
-        - Total container width = 48px (40 + 6 margin + 2 padding)
+    Dimensions optimized for full text labels:
+        - BUTTON_WIDTH = 90px (text + padding)
+        - BUTTON_HEIGHT = 32px
+        - Margin = 4px (defined in CSS)
+        - Total container width = 98px (90 + 8 margin)
     """
 
-    BUTTON_SIZE = 40  # 32px icon + 8px padding (4px each side)
-    ICON_SIZE = 32    # Standard icon size
+    BUTTON_WIDTH = 90   # Width for full category names
+    BUTTON_HEIGHT = 32  # Comfortable height for text
 
     def __init__(self, name: str, icon_name: str, tooltip: str = ""):
         self.name = name
@@ -41,7 +41,7 @@ class PaletteButton:
         self._button = Gtk.ToggleButton()
         self._button.set_name(f'palette_button_{name}')
         self._button.set_relief(Gtk.ReliefStyle.NONE)
-        self._button.set_size_request(self.BUTTON_SIZE, self.BUTTON_SIZE)
+        self._button.set_size_request(self.BUTTON_WIDTH, self.BUTTON_HEIGHT)
         # Tooltip disabled - only show tooltips on canvas network objects
         self._button.set_has_tooltip(False)
         # self._button.set_tooltip_text(tooltip)
@@ -50,22 +50,19 @@ class PaletteButton:
         style_context = self._button.get_style_context()
         style_context.add_class('palette-button')
 
-        # TEMPORARY: Use text labels instead of icons
-        # Map button names to display text
+        # Full category names
         text_labels = {
             'files': 'Files',
-            'pathways': 'Path',
-            'analyses': 'Anal',
-            'topology': 'Topo',
-            'viability': 'Viab',
-            'report': 'Rept'
+            'pathways': 'Pathways',
+            'analyses': 'Analyses',
+            'topology': 'Topology',
+            'viability': 'Viability',
+            'report': 'Report'
         }
         
-        label_text = text_labels.get(name, name[:4].title())
+        label_text = text_labels.get(name, name.title())
         label = Gtk.Label(label=label_text)
         label.set_justify(Gtk.Justification.CENTER)
-        label.set_line_wrap(True)
-        label.set_max_width_chars(5)
         self._button.add(label)
 
         # Connect to toggled to manage CSS classes
