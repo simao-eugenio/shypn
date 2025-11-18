@@ -171,7 +171,7 @@
         1.0
       ],
       "priority": 0,
-      "rate": "(0.8 * F6P * ATP / (1.0 + F6P + ATP)) / (1.0 + (ATP_high / 2.0)^4)",
+      "rate": "(0.8 * F6P * ATP / (1.0 + F6P + ATP)) / (1.0 + (ATP_high / 2.0)**4)",
       "is_timed": false,
       "metadata": {
         "ec_number": "2.7.1.11",

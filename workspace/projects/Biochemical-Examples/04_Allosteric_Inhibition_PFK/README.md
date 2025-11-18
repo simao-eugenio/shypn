@@ -41,7 +41,7 @@ F6P + ATP → F1,6BP + ADP
 ## Rate Expression
 
 ```
-rate = (0.8 * F6P * ATP / (1.0 + F6P + ATP)) / (1.0 + (ATP_high / 2.0)^4)
+rate = (0.8 * F6P * ATP / (1.0 + F6P + ATP)) / (1.0 + (ATP_high / 2.0)**4)
 ```
 
 **Components**:
