@@ -186,12 +186,12 @@ class MasterPalette:
     """
 
     BUTTON_ORDER = [
-        ('files', 'folder-symbolic', 'File Operations'),
-        ('pathways', 'network-workgroup-symbolic', 'Pathway Import'),
-        ('analyses', 'utilities-system-monitor-symbolic', 'Dynamic Analyses'),
-        ('topology', 'applications-science-symbolic', 'Topology Analysis'),
-        ('viability', 'dialog-warning-symbolic', 'Model Viability & Repair'),
-        ('report', 'document-properties-symbolic', 'Report Generation'),
+        ('files', 'folder-symbolic', ''),
+        ('pathways', 'network-workgroup-symbolic', ''),
+        ('analyses', 'utilities-system-monitor-symbolic', ''),
+        ('topology', 'applications-science-symbolic', ''),
+        ('viability', 'dialog-warning-symbolic', ''),
+        ('report', 'document-properties-symbolic', ''),
     ]
 
     def __init__(self, builder: Gtk.Builder = None):

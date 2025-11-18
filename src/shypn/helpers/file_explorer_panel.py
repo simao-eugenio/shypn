@@ -557,7 +557,10 @@ class FileExplorerPanel:
             directories = []
             files = []
             for item in items:
+                # Skip hidden files (starting with .) and project state files
                 if not self.explorer.show_hidden and item.startswith('.'):
+                    continue
+                if item in ('project_state.json', 'project_index.json', 'recent.json'):
                     continue
                 full_path = os.path.join(directory, item)
                 try:
@@ -573,7 +576,7 @@ class FileExplorerPanel:
                 icon = self.explorer._get_icon_name(name, True)
                 is_project, display_name = self._check_if_project(path, True, name)
                 weight = 700 if is_project else 400  # Bold for projects
-                bg_color = '#e8e8e8' if is_project else None  # Darker background for projects
+                bg_color = None  # No background color for directories
                 dir_iter = self.store.append(parent_iter, [icon, display_name, path, True, is_project, weight, bg_color])
                 self._load_directory_tree(path, dir_iter)
             for name, path in files:

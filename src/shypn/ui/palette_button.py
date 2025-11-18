@@ -43,6 +43,7 @@ class PaletteButton:
         self._button.set_relief(Gtk.ReliefStyle.NONE)
         self._button.set_size_request(self.BUTTON_SIZE, self.BUTTON_SIZE)
         # Tooltip disabled - only show tooltips on canvas network objects
+        self._button.set_has_tooltip(False)
         # self._button.set_tooltip_text(tooltip)
         
         # Add CSS class for styling
@@ -55,7 +56,9 @@ class PaletteButton:
             'files': 'Files',
             'pathways': 'Path',
             'analyses': 'Anal',
-            'topology': 'Topo'
+            'topology': 'Topo',
+            'viability': 'Viab',
+            'report': 'Rept'
         }
         
         label_text = text_labels.get(name, name[:4].title())
