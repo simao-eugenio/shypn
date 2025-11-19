@@ -369,11 +369,30 @@ class ContinuousBehavior(TransitionBehavior):
         if not check_arcs:
             return True, "enabled-continuous-no-inputs"
         
-        # Check each arc in the flow direction
-        # Separate handling for normal/test arcs vs. inhibitor arcs
+        # CRITICAL: Always check inhibitor arcs regardless of direction filtering
+        # Inhibitor arcs provide regulatory control and must always be evaluated
         from shypn.netobjs.inhibitor_arc import InhibitorArc
         
+        # Get all input arcs to check for inhibitors
+        all_input_arcs = self.get_input_arcs()
+        inhibitor_arcs = [arc for arc in all_input_arcs if isinstance(arc, InhibitorArc)]
+        
+        # Check inhibitor arcs first (they can block transition regardless of direction)
+        for arc in inhibitor_arcs:
+            source_place = self._get_place(arc.source_id)
+            if source_place is None:
+                return False, f"missing-place-{arc.source_id}"
+            
+            # Inhibitor arcs: DISABLED when tokens >= weight (negative feedback)
+            if source_place.tokens >= arc.weight:
+                return False, f"inhibited-by-{arc.source_id}"
+        
+        # Now check normal/test arcs in the flow direction
         for arc in check_arcs:
+            # Skip inhibitor arcs (already checked above)
+            if isinstance(arc, InhibitorArc):
+                continue
+                
             # Get the place we're consuming from
             if reverse_direction:
                 # Consuming from output arcs (target is the place)
@@ -385,13 +404,6 @@ class ContinuousBehavior(TransitionBehavior):
             source_place = self._get_place(place_id)
             if source_place is None:
                 return False, f"missing-place-{place_id}"
-            
-            # Inhibitor arcs: DISABLED when tokens >= weight (negative feedback)
-            if isinstance(arc, InhibitorArc):
-                if source_place.tokens >= arc.weight:
-                    return False, f"inhibited-by-{place_id}"
-                # If tokens < weight, inhibitor allows transition (continue to next arc)
-                continue
             
             # Normal/Test arcs: Require positive tokens for continuous enablement
             # Continuous requires tokens above threshold
