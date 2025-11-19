@@ -615,8 +615,8 @@
                                     <property name="visible">True</property>
                                     <property name="can-focus">True</property>
                                     <property name="shadow-type">in</property>
-                                    <property name="min-content-height">80</property>
-                                    <property name="max-content-height">150</property>
+                                    <property name="min-content-height">50</property>
+                                    <property name="max-content-height">60</property>
                                     <property name="hscrollbar-policy">automatic</property>
                                     <property name="vscrollbar-policy">automatic</property>
                                     <child>
@@ -676,8 +676,8 @@
                                   <object class="GtkLabel" id="rate_description_label">
                                     <property name="visible">True</property>
                                     <property name="can-focus">False</property>
-                                    <property name="label">Rate Function: Overall consumption/production behavior over time
-• Defines firing rate and token flow dynamics
+                                    <property name="label">Rate Function: Defines firing rate and token flow
+• For reversible reactions, this is the forward rate
 • Examples: 'lambda * tokens(P1)', '0.5 * time', 'min(P1, P2)'</property>
                                     <property name="use-markup">True</property>
                                     <property name="xalign">0</property>
@@ -739,31 +739,46 @@
                           </packing>
                         </child>
                         
-                        <!-- Reversible Reaction (Directional Rates) Section -->
+                        <!-- Reversible Reaction: Checkbox and Reverse Rate -->
                         <child>
-                          <object class="GtkFrame" id="reversible_section_frame">
+                          <object class="GtkBox" id="reversible_section_box">
                             <property name="visible">True</property>
                             <property name="can-focus">False</property>
-                            <property name="label-xalign">0</property>
-                            <property name="shadow-type">none</property>
+                            <property name="orientation">vertical</property>
+                            <property name="spacing">8</property>
+                            <property name="margin-top">5</property>
+                            
+                            <!-- Toggle checkbox -->
                             <child>
-                              <object class="GtkBox" id="reversible_section_box">
+                              <object class="GtkCheckButton" id="reversible_check">
                                 <property name="visible">True</property>
+                                <property name="can-focus">True</property>
+                                <property name="label" translatable="yes">⇌ Reversible: Rate above is forward, specify reverse rate below</property>
+                                <property name="tooltip-text">Enable for reversible reactions. Net rate = rate_forward - rate_reverse. Example: Forward='0.41*G6P', Reverse='0.14*F6P'</property>
+                              </object>
+                              <packing>
+                                <property name="expand">False</property>
+                                <property name="fill">True</property>
+                                <property name="position">0</property>
+                              </packing>
+                            </child>
+                            
+                            <!-- Reverse Rate field (shown only when checked) -->
+                            <child>
+                              <object class="GtkBox" id="rate_reverse_box">
+                                <property name="visible">False</property>
                                 <property name="can-focus">False</property>
                                 <property name="orientation">vertical</property>
-                                <property name="spacing">10</property>
-                                <property name="margin-top">10</property>
-                                <property name="margin-left">10</property>
-                                <property name="margin-right">10</property>
-                                <property name="margin-bottom">10</property>
-                                
-                                <!-- Toggle checkbox -->
+                                <property name="spacing">3</property>
                                 <child>
-                                  <object class="GtkCheckButton" id="reversible_check">
+                                  <object class="GtkLabel" id="rate_reverse_label">
                                     <property name="visible">True</property>
-                                    <property name="can-focus">True</property>
-                                    <property name="label" translatable="yes">Use directional rates (reversible reaction)</property>
-                                    <property name="tooltip-text">Enable to specify separate forward and reverse rate functions. Net rate = forward - reverse.</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="label" translatable="yes">Reverse Rate (product → substrate):</property>
+                                    <property name="xalign">0</property>
+                                    <attributes>
+                                      <attribute name="scale" value="0.9"/>
+                                    </attributes>
                                   </object>
                                   <packing>
                                     <property name="expand">False</property>
@@ -771,22 +786,24 @@
                                     <property name="position">0</property>
                                   </packing>
                                 </child>
-                                
-                                <!-- Help text -->
                                 <child>
-                                  <object class="GtkLabel" id="reversible_help_label">
+                                  <object class="GtkScrolledWindow" id="rate_reverse_scrolled">
                                     <property name="visible">True</property>
-                                    <property name="can-focus">False</property>
-                                    <property name="label">For reversible reactions: specify forward (substrate → product) and reverse (product → substrate) rates separately.
-Net rate = rate_forward - rate_reverse
-Example: Forward = '0.41 * G6P', Reverse = '0.14 * F6P'</property>
-                                    <property name="use-markup">True</property>
-                                    <property name="xalign">0</property>
-                                    <property name="wrap">True</property>
-                                    <attributes>
-                                      <attribute name="style" value="italic"/>
-                                      <attribute name="scale" value="0.8"/>
-                                    </attributes>
+                                    <property name="can-focus">True</property>
+                                    <property name="shadow-type">in</property>
+                                    <property name="min-content-height">50</property>
+                                    <property name="max-content-height">80</property>
+                                    <child>
+                                      <object class="GtkTextView" id="rate_reverse_textview">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">True</property>
+                                        <property name="wrap-mode">word</property>
+                                        <property name="left-margin">5</property>
+                                        <property name="right-margin">5</property>
+                                        <property name="top-margin">5</property>
+                                        <property name="bottom-margin">5</property>
+                                      </object>
+                                    </child>
                                   </object>
                                   <packing>
                                     <property name="expand">False</property>
@@ -794,122 +811,14 @@ Example: Forward = '0.41 * G6P', Reverse = '0.14 * F6P'</property>
                                     <property name="position">1</property>
                                   </packing>
                                 </child>
-                                
-                                <!-- Forward Rate -->
-                                <child>
-                                  <object class="GtkBox" id="rate_forward_box">
-                                    <property name="visible">False</property>
-                                    <property name="can-focus">False</property>
-                                    <property name="orientation">vertical</property>
-                                    <property name="spacing">5</property>
-                                    <child>
-                                      <object class="GtkLabel" id="rate_forward_label">
-                                        <property name="visible">True</property>
-                                        <property name="can-focus">False</property>
-                                        <property name="label" translatable="yes">Forward Rate (substrate → product):</property>
-                                        <property name="xalign">0</property>
-                                      </object>
-                                      <packing>
-                                        <property name="expand">False</property>
-                                        <property name="fill">True</property>
-                                        <property name="position">0</property>
-                                      </packing>
-                                    </child>
-                                    <child>
-                                      <object class="GtkScrolledWindow" id="rate_forward_scrolled">
-                                        <property name="visible">True</property>
-                                        <property name="can-focus">True</property>
-                                        <property name="shadow-type">in</property>
-                                        <property name="min-content-height">60</property>
-                                        <property name="max-content-height">100</property>
-                                        <child>
-                                          <object class="GtkTextView" id="rate_forward_textview">
-                                            <property name="visible">True</property>
-                                            <property name="can-focus">True</property>
-                                            <property name="wrap-mode">word</property>
-                                            <property name="left-margin">5</property>
-                                            <property name="right-margin">5</property>
-                                            <property name="top-margin">5</property>
-                                            <property name="bottom-margin">5</property>
-                                          </object>
-                                        </child>
-                                      </object>
-                                      <packing>
-                                        <property name="expand">True</property>
-                                        <property name="fill">True</property>
-                                        <property name="position">1</property>
-                                      </packing>
-                                    </child>
-                                  </object>
-                                  <packing>
-                                    <property name="expand">False</property>
-                                    <property name="fill">True</property>
-                                    <property name="position">2</property>
-                                  </packing>
-                                </child>
-                                
-                                <!-- Reverse Rate -->
-                                <child>
-                                  <object class="GtkBox" id="rate_reverse_box">
-                                    <property name="visible">False</property>
-                                    <property name="can-focus">False</property>
-                                    <property name="orientation">vertical</property>
-                                    <property name="spacing">5</property>
-                                    <child>
-                                      <object class="GtkLabel" id="rate_reverse_label">
-                                        <property name="visible">True</property>
-                                        <property name="can-focus">False</property>
-                                        <property name="label" translatable="yes">Reverse Rate (product → substrate):</property>
-                                        <property name="xalign">0</property>
-                                      </object>
-                                      <packing>
-                                        <property name="expand">False</property>
-                                        <property name="fill">True</property>
-                                        <property name="position">0</property>
-                                      </packing>
-                                    </child>
-                                    <child>
-                                      <object class="GtkScrolledWindow" id="rate_reverse_scrolled">
-                                        <property name="visible">True</property>
-                                        <property name="can-focus">True</property>
-                                        <property name="shadow-type">in</property>
-                                        <property name="min-content-height">60</property>
-                                        <property name="max-content-height">100</property>
-                                        <child>
-                                          <object class="GtkTextView" id="rate_reverse_textview">
-                                            <property name="visible">True</property>
-                                            <property name="can-focus">True</property>
-                                            <property name="wrap-mode">word</property>
-                                            <property name="left-margin">5</property>
-                                            <property name="right-margin">5</property>
-                                            <property name="top-margin">5</property>
-                                            <property name="bottom-margin">5</property>
-                                          </object>
-                                        </child>
-                                      </object>
-                                      <packing>
-                                        <property name="expand">True</property>
-                                        <property name="fill">True</property>
-                                        <property name="position">1</property>
-                                      </packing>
-                                    </child>
-                                  </object>
-                                  <packing>
-                                    <property name="expand">False</property>
-                                    <property name="fill">True</property>
-                                    <property name="position">3</property>
-                                  </packing>
-                                </child>
-                                
                               </object>
+                              <packing>
+                                <property name="expand">False</property>
+                                <property name="fill">True</property>
+                                <property name="position">1</property>
+                              </packing>
                             </child>
-                            <child type="label">
-                              <object class="GtkLabel" id="reversible_section_label">
-                                <property name="visible">True</property>
-                                <property name="can-focus">False</property>
-                                <property name="label" translatable="yes">Reversible Reaction (Directional Rates)</property>
-                              </object>
-                            </child>
+                            
                           </object>
                           <packing>
                             <property name="expand">False</property>
