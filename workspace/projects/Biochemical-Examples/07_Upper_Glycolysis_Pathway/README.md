@@ -1,133 +1,129 @@
 # Example 07: Upper Glycolysis Mini-Pathway
 
-**Phase 3: Integration - Complete Pathways**
+## Overview
+Demonstrates pathway connectivity and **reversible reactions** using the first three steps of glycolysis:
+1. **Hexokinase (T1)**: Glucose + ATP → G6P + ADP
+2. **Phosphoglucose Isomerase (T2)**: G6P ⇌ F6P (reversible)
+3. **Phosphofructokinase (T3)**: F6P + ATP → F-1,6-BP + ADP
 
-## Biological Context
+## Key Features
 
-The first three steps of glycolysis form the "preparatory phase" where glucose is phosphorylated twice and then split:
+### Reversible Transition (T2 - PGI)
+Uses **directional rate functions** to make reversible behavior explicit:
 
-1. **Hexokinase (HK)**: Glucose + ATP → Glucose-6-phosphate + ADP
-2. **Phosphoglucose Isomerase (PGI)**: G6P ⇌ Fructose-6-phosphate  
-3. **Phosphofructokinase-1 (PFK)**: F6P + ATP → Fructose-1,6-bisphosphate + ADP
+```json
+{
+  "id": "T2",
+  "name": "PGI",
+  "rate_forward": "0.41 * G6P",
+  "rate_reverse": "0.14 * F6P"
+}
+```
 
-This mini-pathway demonstrates:
-- **Sequential enzyme reactions** with shared intermediates
-- **Metabolite channeling** (G6P flows from HK to PGI to PFK)
-- **Energy investment** (2 ATP consumed in preparatory phase)
-- **Pathway flux** analysis and steady-state behavior
+**Net Rate Calculation:**
+```
+net_rate = rate_forward - rate_reverse
+net_rate = 0.41 * G6P - 0.14 * F6P
+```
 
-## Learning Objectives
+**Flow Direction:**
+- When `net_rate > 0`: Forward flow (G6P → F6P)
+- When `net_rate < 0`: Reverse flow (F6P → G6P)
+- When `net_rate = 0`: Equilibrium state
 
-### Biochemistry
-- Understand the preparatory phase of glycolysis
-- Recognize the "energy investment" of 2 ATP molecules
-- See how intermediates connect sequential reactions
-- Observe pathway flux and metabolite pool sizes
+**Equilibrium:**
+```
+At equilibrium: 0.41 * [G6P] = 0.14 * [F6P]
+Therefore: [G6P]/[F6P] = 0.14/0.41 = 0.341
+Or: [F6P]/[G6P] = 2.93
+```
 
-### Petri Net Modeling
-- **Graph connectivity**: Places shared between multiple transitions
-- **Pathway topology**: Linear chain with cofactor cycles (ATP/ADP)
-- **P-invariants**: Conservation laws (ATP + ADP = constant)
-- **Flux analysis**: Steady-state flow through pathway
-- **Source/sink analysis**: Glucose source, F-1,6-BP sink
+### Arc Structure for Reversible Transitions
+T2 has only **forward arcs** (P2→T2→P3):
+- **A5**: P2 (G6P) → T2
+- **A6**: T2 → P3 (F6P)
 
-## Model Structure
+The engine automatically handles reverse flow when rate < 0:
+- Consumes from P3 (via A6 reversed)
+- Produces to P2 (via A5 reversed)
 
-### Places (Metabolites)
-1. **Glucose** (5 mM) - Blood glucose concentration
-2. **G6P** (Glucose-6-phosphate, 0.1 mM) - Branch point to pentose phosphate pathway
-3. **F6P** (Fructose-6-phosphate, 0.05 mM) - Precursor to F-1,6-BP
-4. **F-1,6-BP** (Fructose-1,6-bisphosphate, 0.01 mM) - Product of preparatory phase
-5. **ATP** (3 mM) - Energy currency
-6. **ADP** (0.5 mM) - Energy depleted form
-
-### Transitions (Enzymes)
-1. **Hexokinase**: First committed step, traps glucose in cell
-2. **PGI**: Rapid equilibrium, reversible isomerization
-3. **PFK-1**: Rate-limiting step, major regulatory point
-
-### Kinetic Parameters
-
-All parameters from validated biochemical literature:
-
-**Hexokinase (HK)**:
-- Vmax = 0.124 mM/s
-- Km(Glucose) = 0.1 mM
-- Km(ATP) = 0.4 mM
-
-**Phosphoglucose Isomerase (PGI)**:
-- k_forward = 0.41 s⁻¹  
-- k_reverse = 0.14 s⁻¹
-- Keq = 0.34 (favors G6P)
-
-**Phosphofructokinase-1 (PFK)**:
-- Vmax = 0.094 mM/s
-- Km(F6P) = 0.1 mM
-- Km(ATP) = 0.05 mM
+## Initial Conditions
+| Place | Compound | Concentration |
+|-------|----------|---------------|
+| P1 | Glucose | 5.0 mM |
+| P2 | G6P | 0.1 mM |
+| P3 | F6P | 0.05 mM |
+| P4 | F-1,6-BP | 0.01 mM |
+| P5 | ATP | 3.0 mM |
+| P6 | ADP | 0.5 mM |
 
 ## Expected Behavior
 
-### Initial Phase (t = 0-10s)
-- **Glucose** decreases steadily as HK consumes it
-- **G6P** accumulates initially (HK faster than PGI)
-- **F6P** rises slowly (PGI equilibrium favors G6P)
-- **F-1,6-BP** accumulates as pathway product
-- **ATP** decreases (2 ATP per glucose)
-- **ADP** increases correspondingly
+### Time Evolution (0-30 seconds)
+1. **Glucose (P1)**: Decreases as consumed by T1
+   - 5.0 → 4.8 → 4.5 mM
+2. **G6P (P2)**: Increases initially, then stabilizes
+   - 0.1 → 0.2 → 0.25 mM
+3. **F6P (P3)**: Increases slowly ✓
+   - 0.05 → 0.06 → 0.08 mM
+4. **F-1,6-BP (P4)**: Increases as pathway flows
+   - 0.01 → 0.015 → 0.03 mM
 
-### Steady State (t > 30s)
-- Intermediate concentrations stabilize
-- Flux = limiting rate (usually PFK, rate-limiting step)
-- ATP/ADP ratio reaches quasi-steady state
-- Pathway demonstrates "metabolite channeling"
+### Rate Analysis at t=0
+```
+T1 (HK) rate = 0.124 * (5.0/5.1) * (3.0/3.4) = 0.107 mM/s
+T2 (PGI):
+  - Forward rate = 0.41 * 0.1 = 0.041 mM/s
+  - Reverse rate = 0.14 * 0.05 = 0.007 mM/s
+  - Net rate = 0.041 - 0.007 = 0.034 mM/s (FORWARD)
+T3 (PFK) rate = 0.094 * (0.05/0.15) * (3.0/3.05) = 0.031 mM/s
+```
 
-### Key Observations
-1. **G6P pool larger than F6P** (PGI equilibrium constant = 0.34)
-2. **PFK is rate-limiting** (lowest Vmax among the three)
-3. **ATP depletion** shows energy investment phase
-4. **Smooth flux** through all three steps at steady state
+### Steady State Expectations
+- **G6P/F6P ratio**: Approaches ~2.93 (equilibrium constant)
+- **Pathway flux**: Limited by slowest step (likely T3 at low F6P)
+- **ATP depletion**: Slows all reactions as ATP decreases
 
-## Topology Features to Explore
+## Directional Rates vs Combined Rate
 
-### Conservation Laws (P-invariants)
-- **Adenine nucleotide**: ATP + ADP = 3.5 mM (constant)
-- **Hexose phosphates**: G6P + F6P + F-1,6-BP (sum varies with consumption)
+### Old Format (Combined)
+```json
+{
+  "rate": "0.41 * G6P - 0.14 * F6P"
+}
+```
+✗ Less clear which direction is forward
+✗ Hard to identify individual rate constants
+✗ Reversibility is implicit
 
-### Graph Properties
-- **Type**: Linear pathway with cofactor cycles
-- **Source**: Glucose (external input)
-- **Sink**: F-1,6-BP (feeds into lower glycolysis)
-- **Cycles**: ATP ⇄ ADP (cofactor regeneration)
+### New Format (Directional)
+```json
+{
+  "rate_forward": "0.41 * G6P",
+  "rate_reverse": "0.14 * F6P"
+}
+```
+✓ Explicit forward and reverse directions
+✓ Clear rate constants (k_f = 0.41, k_r = 0.14)
+✓ Better for teaching and documentation
+✓ Compatible with both formats
 
-### Pathway Analysis
-- **Flux**: Measure steady-state flow rate through pathway
-- **Bottleneck**: Identify rate-limiting step (PFK)
-- **Accumulation**: Observe which intermediates build up (G6P > F6P)
+## Usage
+1. Load model in SHyPN
+2. Set playback speed to 0.1x - 1.0x
+3. Run simulation for 30-60 seconds
+4. Observe:
+   - P3 (F6P) should **increase** (not decrease)
+   - G6P/F6P ratio approaches 2.93
+   - Smooth continuous flow through pathway
 
-## Validation Checklist
-
-- [ ] Glucose decreases over time
-- [ ] G6P accumulates to higher level than F6P (Keq = 0.34)
-- [ ] F-1,6-BP increases steadily
-- [ ] ATP decreases by ~2× the F-1,6-BP produced
-- [ ] Steady-state flux through all steps converges to PFK rate
-- [ ] No deadlocks or spurious equilibria
-- [ ] P-invariant for ATP + ADP conserved
+## Educational Value
+- **Pathway Connectivity**: How metabolites flow through sequential reactions
+- **Reversible Reactions**: Bidirectional flux based on concentration gradients
+- **Equilibrium Dynamics**: System approaches thermodynamic equilibrium
+- **Rate Constants**: How k_forward and k_reverse determine equilibrium ratio
 
 ## References
-
-1. **Berg, J.M., Tymoczko, J.L., Stryer, L.** (2012). *Biochemistry*, 7th ed. W.H. Freeman. Chapter 16: Glycolysis.
-
-2. **Newsholme, E.A., Crabtree, B.** (1986). Maximum catalytic activity of some key enzymes in provision of physiologically useful information about metabolic fluxes. *J Exp Biol* 115:305-324.
-
-3. **Teusink, B., et al.** (2000). Can yeast glycolysis be understood in terms of in vitro kinetics of the constituent enzymes? Testing biochemistry. *Eur J Biochem* 267:5313-5329.
-
-## Next Steps
-
-After mastering this example:
-- Proceed to **Example 08**: Regulatory motifs (ATP/AMP energy sensing)
-- Explore how energy charge coordinates PFK and PK
-- Build toward **Example 09**: Complete 10-step glycolysis pathway
-
----
-*Part of the SHYpn Biochemical Examples - Progressive Learning Series*
+- Hexokinase: KEGG EC 2.7.1.1
+- Phosphoglucose Isomerase: KEGG EC 5.3.1.9
+- Phosphofructokinase: KEGG EC 2.7.1.11
