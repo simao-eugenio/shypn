@@ -295,9 +295,10 @@ class ArcPropDialogLoader(GObject.GObject):
         if weight_entry and hasattr(self.arc_obj, 'weight'):
             try:
                 weight_text = weight_entry.get_text().strip()
-                weight_value = int(weight_text) if weight_text else 1
+                weight_value = float(weight_text) if weight_text else 1.0
                 old_weight = self.arc_obj.weight
-                self.arc_obj.weight = max(1, weight_value)
+                # Allow float weights, minimum 0.0 (no negative weights)
+                self.arc_obj.weight = max(0.0, weight_value)
             except ValueError:
                 pass
         line_width_spin = self.builder.get_object('prop_arc_line_width_spin')
