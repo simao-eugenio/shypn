@@ -181,7 +181,7 @@
     {
       "id": "T2",
       "name": "PGI",
-      "label": "PGI\n\u21cc",
+      "label": "PGI\n\u21cc\n(directional)",
       "object_type": "transition",
       "x": 400.0,
       "y": 200.0,
@@ -206,7 +206,8 @@
       "is_source": false,
       "is_sink": false,
       "guard": 1,
-      "rate": "0.41 * G6P - 0.14 * F6P"
+      "rate_forward": "0.41 * G6P",
+      "rate_reverse": "0.14 * F6P"
     },
     {
       "id": "T3",

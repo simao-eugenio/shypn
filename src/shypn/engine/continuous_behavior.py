@@ -67,34 +67,51 @@ class ContinuousBehavior(TransitionBehavior):
         # 1. properties['rate_function'] = string expression
         # 2. properties['rate_function'] = callable
         # 3. properties = {'rate': lambda places, t: ...}  (dict format)
-        # 4. transition.rate attribute (UI simple value)
+        # 4. transition.rate attribute (UI stores simple value)
+        # 5. DIRECTIONAL: rate_forward + rate_reverse (new format)
         
         rate_expr = None
+        rate_forward_expr = None
+        rate_reverse_expr = None
         
-        if 'rate_function' in props:
-            # Explicit rate function in properties
-            rate_expr = props.get('rate_function')
-        elif 'rate' in props and callable(props['rate']):
-            # Dict format with callable: {'rate': lambda ...}
-            rate_expr = props['rate']
+        # Check for directional rate functions first
+        if 'rate_forward' in props or 'rate_reverse' in props:
+            rate_forward_expr = props.get('rate_forward')
+            rate_reverse_expr = props.get('rate_reverse')
+            self.use_directional_rates = True
         else:
-            # Fallback: Use transition.rate attribute (UI stores simple rate here)
-            rate = getattr(transition, 'rate', None)
-            if rate is not None:
-                # Check if it's a dict with 'rate' key
-                if isinstance(rate, dict) and 'rate' in rate:
-                    rate_expr = rate['rate']
-                else:
-                    # Accept string expressions or numeric constants
-                    rate_expr = str(rate)
+            self.use_directional_rates = False
+            
+            if 'rate_function' in props:
+                # Explicit rate function in properties
+                rate_expr = props.get('rate_function')
+            elif 'rate' in props and callable(props['rate']):
+                # Dict format with callable: {'rate': lambda ...}
+                rate_expr = props['rate']
             else:
-                rate_expr = '1.0'  # Default constant rate
+                # Fallback: Use transition.rate attribute (UI stores simple value)
+                rate = getattr(transition, 'rate', None)
+                if rate is not None:
+                    # Check if it's a dict with 'rate' key
+                    if isinstance(rate, dict) and 'rate' in rate:
+                        rate_expr = rate['rate']
+                    else:
+                        # Accept string expressions or numeric constants
+                        rate_expr = str(rate)
+                else:
+                    rate_expr = '1.0'  # Default constant rate
         
         self.max_rate = float(props.get('max_rate', float('inf')))
         self.min_rate = float(props.get('min_rate', -float('inf')))  # Allow negative for reversible
         
-        # Compile rate function
-        self.rate_function = self._compile_rate_function(rate_expr)
+        # Compile rate functions
+        if self.use_directional_rates:
+            self.rate_forward_function = self._compile_rate_function(rate_forward_expr) if rate_forward_expr else lambda p, t: 0.0
+            self.rate_reverse_function = self._compile_rate_function(rate_reverse_expr) if rate_reverse_expr else lambda p, t: 0.0
+            # Combined rate = forward - reverse
+            self.rate_function = lambda places, t: self.rate_forward_function(places, t) - self.rate_reverse_function(places, t)
+        else:
+            self.rate_function = self._compile_rate_function(rate_expr)
         
         # Integration parameters
         self.integration_method = 'rk4'  # Runge-Kutta 4th order
@@ -407,8 +424,21 @@ class ContinuousBehavior(TransitionBehavior):
                     f"Cannot gather places for rate function evaluation in transition {self.transition.id}"
                 )
             
-            # Evaluate rate function
-            rate = self.rate_function(places_dict, current_time)
+            # Evaluate rate function(s)
+            if self.use_directional_rates:
+                # Directional rates: evaluate both directions
+                rate_forward = self.rate_forward_function(places_dict, current_time)
+                rate_reverse = self.rate_reverse_function(places_dict, current_time)
+                rate = rate_forward - rate_reverse
+                # Store for debugging/visualization
+                self._last_rate_forward = rate_forward
+                self._last_rate_reverse = rate_reverse
+            else:
+                # Single combined rate function
+                rate = self.rate_function(places_dict, current_time)
+                self._last_rate_forward = max(0, rate)
+                self._last_rate_reverse = max(0, -rate)
+            
             rate = max(self.min_rate, min(self.max_rate, rate))
             
             # Check if rate is effectively zero
@@ -421,6 +451,8 @@ class ContinuousBehavior(TransitionBehavior):
                     'produced': {},
                     'continuous_mode': True,
                     'rate': rate,
+                    'rate_forward': getattr(self, '_last_rate_forward', 0.0),
+                    'rate_reverse': getattr(self, '_last_rate_reverse', 0.0),
                     'dt': dt,
                     'method': 'rk4',
                     'reason': 'rate-below-threshold'
@@ -508,11 +540,14 @@ class ContinuousBehavior(TransitionBehavior):
                 mode='continuous',
                 transition_type='continuous',
                 rate=rate,
+                rate_forward=getattr(self, '_last_rate_forward', 0.0),
+                rate_reverse=getattr(self, '_last_rate_reverse', 0.0),
                 actual_rate=(actual_flow / dt if dt > 0 else 0.0) * (1 if not reverse_direction else -1),
                 dt=dt,
                 method='rk4',
                 clamped=(actual_flow < flow_magnitude),
-                reverse_direction=reverse_direction
+                reverse_direction=reverse_direction,
+                use_directional_rates=self.use_directional_rates
             )
             
             return True, {
@@ -520,9 +555,12 @@ class ContinuousBehavior(TransitionBehavior):
                 'produced': produced_map,
                 'continuous_mode': True,
                 'rate': rate,
+                'rate_forward': getattr(self, '_last_rate_forward', 0.0),
+                'rate_reverse': getattr(self, '_last_rate_reverse', 0.0),
                 'actual_rate': (actual_flow / dt if dt > 0 else 0.0) * (1 if not reverse_direction else -1),
                 'dt': dt,
                 'method': 'rk4',
+                'use_directional_rates': self.use_directional_rates,
                 'transition_type': 'continuous',
                 'time': current_time,
                 'clamped': (actual_flow < flow_magnitude),
