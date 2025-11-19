@@ -1,6 +1,25 @@
 {
-  "model_name": "Energy Sensing Regulatory Motif",
-  "description": "Feed-forward loop with ATP/AMP energy charge regulation",
+  "version": "2.0",
+  "metadata": {
+    "created": "2025-11-18T22:01:19.634775",
+    "object_counts": {
+      "places": 7,
+      "transitions": 2,
+      "arcs": 10
+    }
+  },
+  "view_state": {
+    "zoom": 2.1766965428937257,
+    "pan_x": -73.0099048823531,
+    "pan_y": 21.534993058823495,
+    "transformations": {
+      "rotation": {
+        "type": "rotation",
+        "angle_degrees": 0.0,
+        "enabled": true
+      }
+    }
+  },
   "places": [
     {
       "id": "P1",
@@ -30,14 +49,14 @@
       "name": "ATP",
       "label": "ATP\n3.0 mM",
       "object_type": "place",
-      "x": 280.0,
+      "x": 290.0,
       "y": 80.0,
       "radius": 28.0,
       "marking": 3.0,
       "initial_marking": 3.0,
       "capacity": Infinity,
       "border_color": [
-        0.8,
+        0.0,
         0.0,
         0.0
       ],
@@ -53,14 +72,14 @@
       "name": "ADP",
       "label": "ADP\n0.5 mM",
       "object_type": "place",
-      "x": 280.0,
-      "y": 320.0,
+      "x": 430.0,
+      "y": 200.0,
       "radius": 28.0,
       "marking": 0.5,
       "initial_marking": 0.5,
       "capacity": Infinity,
       "border_color": [
-        0.8,
+        0.0,
         0.0,
         0.0
       ],
@@ -76,16 +95,16 @@
       "name": "AMP",
       "label": "AMP\n0.05 mM",
       "object_type": "place",
-      "x": 420.0,
-      "y": 320.0,
+      "x": 560.0,
+      "y": 180.0,
       "radius": 25.0,
       "marking": 0.05,
       "initial_marking": 0.05,
       "capacity": Infinity,
       "border_color": [
-        0.6,
         0.0,
-        0.2
+        0.0,
+        0.0
       ],
       "border_width": 3.0,
       "is_catalyst": false,
@@ -100,15 +119,15 @@
       "label": "F-1,6-BP\n0.01 mM",
       "object_type": "place",
       "x": 430.0,
-      "y": 200.0,
+      "y": 280.0,
       "radius": 30.0,
       "marking": 0.01,
       "initial_marking": 0.01,
       "capacity": Infinity,
       "border_color": [
         0.0,
-        0.5,
-        0.8
+        0.0,
+        0.0
       ],
       "border_width": 4.0,
       "is_catalyst": false,
@@ -123,8 +142,8 @@
       "name": "PEP",
       "label": "PEP\n0.05 mM",
       "object_type": "place",
-      "x": 600.0,
-      "y": 200.0,
+      "x": 560.0,
+      "y": 100.0,
       "radius": 28.0,
       "marking": 0.05,
       "initial_marking": 0.05,
@@ -146,8 +165,8 @@
       "name": "Pyruvate",
       "label": "Pyruvate\n0.1 mM",
       "object_type": "place",
-      "x": 780.0,
-      "y": 200.0,
+      "x": 560.0,
+      "y": 20.0,
       "radius": 30.0,
       "marking": 0.1,
       "initial_marking": 0.1,
@@ -194,15 +213,15 @@
       "is_source": false,
       "is_sink": false,
       "guard": 1,
-      "rate": "0.094 * (F6P / (0.1 + F6P)) * (ATP / (0.05 + ATP)) * (1 + AMP/0.02) / (1 + (ATP/0.5)**2.5) * (1 + F16BP/0.01)"
+      "rate": "0.094 * (F6P / (0.1 + F6P)) * (ATP / (0.05 + ATP))"
     },
     {
       "id": "T2",
       "name": "PK",
       "label": "Pyruvate\nKinase",
       "object_type": "transition",
-      "x": 690.0,
-      "y": 200.0,
+      "x": 430.0,
+      "y": 80.0,
       "width": 15.0,
       "height": 60.0,
       "horizontal": true,
@@ -224,7 +243,7 @@
       "is_source": false,
       "is_sink": false,
       "guard": 1,
-      "rate": "0.15 * (PEP / (0.05 + PEP)) * (ADP / (0.5 + ADP)) * (1 + F16BP/0.01) / (1 + ATP/1.0)"
+      "rate": "0.15 * (PEP / (0.05 + PEP)) * (ADP / (0.5 + ADP))"
     }
   ],
   "arcs": [
@@ -252,7 +271,7 @@
       "id": "A2",
       "name": "A2",
       "label": "",
-      "object_type": "arc",
+      "object_type": "curved_arc",
       "arc_type": "normal",
       "source_id": "P2",
       "source_type": "place",
@@ -372,7 +391,7 @@
       "id": "A8",
       "name": "A8",
       "label": "",
-      "object_type": "arc",
+      "object_type": "curved_arc",
       "arc_type": "normal",
       "source_id": "T2",
       "source_type": "transition",
@@ -392,16 +411,16 @@
       "id": "A9",
       "name": "A9",
       "label": "",
-      "object_type": "arc",
+      "object_type": "curved_inhibitor_arc",
       "arc_type": "inhibitor",
       "source_id": "P2",
       "source_type": "place",
       "target_id": "T1",
       "target_type": "transition",
-      "weight": 0.5,
+      "weight": 2.5,
       "threshold": null,
       "color": [
-        0.8,
+        0.0,
         0.0,
         0.0
       ],
@@ -412,16 +431,16 @@
       "id": "A10",
       "name": "A10",
       "label": "",
-      "object_type": "arc",
+      "object_type": "curved_inhibitor_arc",
       "arc_type": "inhibitor",
       "source_id": "P2",
       "source_type": "place",
       "target_id": "T2",
       "target_type": "transition",
-      "weight": 1.0,
+      "weight": 2.0,
       "threshold": null,
       "color": [
-        0.8,
+        0.0,
         0.0,
         0.0
       ],

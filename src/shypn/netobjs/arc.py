@@ -43,7 +43,7 @@ class Arc(PetriNetObject):
         # Connection (references to object instances)
         self.source = source
         self.target = target
-        self.weight = int(weight)
+        self.weight = float(weight)  # Float for precise thresholds (e.g., 2.5 mM)
         
         # Styling
         self.color = self.DEFAULT_COLOR
@@ -759,7 +759,7 @@ class Arc(PetriNetObject):
             target=target,
             id=arc_id,  # String ID
             name=arc_name,
-            weight=int(data.get("weight", 1))
+            weight=float(data.get("weight", 1))
         )
         
         # Restore optional properties
