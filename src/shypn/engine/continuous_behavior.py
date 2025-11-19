@@ -221,11 +221,15 @@ class ContinuousBehavior(TransitionBehavior):
         return evaluate_rate
     
     def can_fire(self) -> Tuple[bool, str]:
-        """Check if continuous transition is enabled.
+        """Check if transition can fire in continuous mode.
         
-        Continuous transitions are enabled if:
-        1. Guard condition passes (if defined)
-        2. All input places have positive token counts (> 0, not >= weight like discrete)
+        For continuous transitions:
+        - Check if rate != 0 (reversible transitions need rate evaluation)
+        - For reversible transitions: only check arcs in current flow direction
+        - All required input places must have positive tokens (>0)
+        - Guard condition must be satisfied
+        - Test arcs don't consume tokens but check for presence
+        - Inhibitor arcs disable transition when source >= weight
         
         Source transitions are always enabled (they generate tokens externally).
         
@@ -246,42 +250,75 @@ class ContinuousBehavior(TransitionBehavior):
         if not guard_passes:
             return False, guard_reason
         
-        input_arcs = self.get_input_arcs()
+        # For reversible transitions, we need to evaluate rate to know direction
+        # This is necessary because bidirectional arcs exist, but only one direction fires
+        try:
+            # Gather places for rate evaluation
+            places_dict = {}
+            if hasattr(self.model, 'places'):
+                if isinstance(self.model.places, dict):
+                    places_dict = self.model.places.copy()
+                elif isinstance(self.model.places, list):
+                    for place in self.model.places:
+                        if hasattr(place, 'id'):
+                            places_dict[place.id] = place
+            elif hasattr(self.model, 'get_all_places'):
+                for place in self.model.get_all_places():
+                    places_dict[place.id] = place
+            
+            # Evaluate rate to determine direction
+            current_time = self._get_current_time()
+            rate = self.rate_function(places_dict, current_time)
+            
+            # Determine which arcs to check based on rate direction
+            input_arcs = self.get_input_arcs()
+            output_arcs = self.get_output_arcs()
+            
+            # For reversible: if rate < 0, consume from outputs (reverse flow)
+            reverse_direction = (rate < 0)
+            if reverse_direction:
+                check_arcs = output_arcs  # Will consume from these
+            else:
+                check_arcs = input_arcs   # Normal forward flow
+                
+        except Exception:
+            # Fallback: check all input arcs (old behavior)
+            input_arcs = self.get_input_arcs()
+            check_arcs = input_arcs
+            reverse_direction = False
         
-        # No inputs means always enabled (if guard passes)
-        if not input_arcs:
+        # No arcs to check means always enabled
+        if not check_arcs:
             return True, "enabled-continuous-no-inputs"
         
-        # Check each input place for positive tokens
+        # Check each arc in the flow direction
         # Separate handling for normal/test arcs vs. inhibitor arcs
         from shypn.netobjs.inhibitor_arc import InhibitorArc
         
-        for arc in input_arcs:
-            source_place = self._get_place(arc.source_id)
+        for arc in check_arcs:
+            # Get the place we're consuming from
+            if reverse_direction:
+                # Consuming from output arcs (target is the place)
+                place_id = arc.target_id
+            else:
+                # Normal: consuming from input arcs (source is the place)
+                place_id = arc.source_id
+                
+            source_place = self._get_place(place_id)
             if source_place is None:
-                return False, f"missing-source-place-{arc.source_id}"
+                return False, f"missing-place-{place_id}"
             
             # Inhibitor arcs: DISABLED when tokens >= weight (negative feedback)
             if isinstance(arc, InhibitorArc):
                 if source_place.tokens >= arc.weight:
-                    return False, f"inhibited-by-P{arc.source_id}"
+                    return False, f"inhibited-by-{place_id}"
                 # If tokens < weight, inhibitor allows transition (continue to next arc)
                 continue
             
             # Normal/Test arcs: Require positive tokens for continuous enablement
-            # All arc types require tokens > min_token_threshold for continuous enablement
-            
             # Continuous requires tokens above threshold
-            # Default threshold is 0.0 (strict zero check)
-            # Can be set higher (e.g., 1e-6) to prevent numerical precision issues
             if source_place.tokens <= self.min_token_threshold:
-                # Debug: Show when transitions become disabled due to token depletion
-                if source_place.tokens > 0 and source_place.tokens < 1e-6:
-                    import logging
-                    logging.getLogger(__name__).debug(
-                        f"[CONTINUOUS] Transition disabled: {arc.source_id} has {source_place.tokens:.10f} tokens (below threshold {self.min_token_threshold})"
-                    )
-                return False, f"input-place-below-threshold-P{arc.source_id}"
+                return False, f"place-below-threshold-{place_id}"
         
         return True, "enabled-continuous"
     
