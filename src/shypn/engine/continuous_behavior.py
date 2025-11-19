@@ -533,14 +533,77 @@ class ContinuousBehavior(TransitionBehavior):
             reverse_direction = (rate < 0)
             flow_magnitude = abs(rate) * dt
             
-            if reverse_direction:
-                # Swap arc roles for negative rate
-                consume_arcs = output_arcs
-                produce_arcs = input_arcs
+            # For directional rates with bidirectional arcs, filter arcs based on substrates/products
+            if self.use_directional_rates:
+                # Parse rate formulas to identify which places are substrates vs products
+                import re
+                substrate_places = set()
+                product_places = set()
+                
+                # Get places dict for name lookup
+                places_dict_for_lookup = {}
+                if hasattr(self.model, 'places'):
+                    if isinstance(self.model.places, dict):
+                        places_dict_for_lookup = self.model.places
+                    elif isinstance(self.model.places, list):
+                        for place in self.model.places:
+                            if hasattr(place, 'id'):
+                                places_dict_for_lookup[place.id] = place
+                elif hasattr(self.model, 'get_all_places'):
+                    for place in self.model.get_all_places():
+                        places_dict_for_lookup[place.id] = place
+                
+                # Forward rate mentions substrates
+                if hasattr(self.transition, 'rate_forward'):
+                    fwd_expr = str(self.transition.rate_forward)
+                    # Extract compound names (uppercase words that aren't math functions)
+                    compound_names = re.findall(r'\b([A-Z][A-Za-z0-9_-]*)\b', fwd_expr)
+                    for cname in compound_names:
+                        if cname in ['P', 'E']:  # Skip single letters
+                            continue
+                        # Find place with matching name
+                        for place_id, place_obj in places_dict_for_lookup.items():
+                            if hasattr(place_obj, 'name') and place_obj.name == cname:
+                                substrate_places.add(place_id)
+                
+                # Reverse rate mentions products
+                if hasattr(self.transition, 'rate_reverse'):
+                    rev_expr = str(self.transition.rate_reverse)
+                    compound_names = re.findall(r'\b([A-Z][A-Za-z0-9_-]*)\b', rev_expr)
+                    for cname in compound_names:
+                        if cname in ['P', 'E']:
+                            continue
+                        for place_id, place_obj in places_dict_for_lookup.items():
+                            if hasattr(place_obj, 'name') and place_obj.name == cname:
+                                product_places.add(place_id)
+                
+                # Filter arcs based on direction
+                if reverse_direction:
+                    # Reverse: consume from products, produce to substrates
+                    consume_arcs = [arc for arc in output_arcs if arc.target_id in product_places]
+                    produce_arcs = [arc for arc in input_arcs if arc.source_id in substrate_places]
+                    # Fallback if filtering gives empty results
+                    if not consume_arcs:
+                        consume_arcs = output_arcs
+                    if not produce_arcs:
+                        produce_arcs = input_arcs
+                else:
+                    # Forward: consume from substrates, produce to products
+                    consume_arcs = [arc for arc in input_arcs if arc.source_id in substrate_places]
+                    produce_arcs = [arc for arc in output_arcs if arc.target_id in product_places]
+                    # Fallback if filtering gives empty results
+                    if not consume_arcs:
+                        consume_arcs = input_arcs
+                    if not produce_arcs:
+                        produce_arcs = output_arcs
             else:
-                # Normal forward direction
-                consume_arcs = input_arcs
-                produce_arcs = output_arcs
+                # Non-directional: use simple swap logic
+                if reverse_direction:
+                    consume_arcs = output_arcs
+                    produce_arcs = input_arcs
+                else:
+                    consume_arcs = input_arcs
+                    produce_arcs = output_arcs
             
             # Phase 1: Clamp flow to available tokens
             actual_flow = flow_magnitude
