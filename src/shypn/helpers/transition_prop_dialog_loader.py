@@ -198,13 +198,13 @@ class TransitionPropDialogLoader(GObject.GObject):
             if rate_value is not None:
                 rate_entry.set_text(str(rate_value))
         
-        # Directional rates (for reversible reactions)
-        rate_forward_entry = self.builder.get_object('rate_forward_entry')
-        rate_reverse_entry = self.builder.get_object('rate_reverse_entry')
+        # Directional rates (for reversible reactions) - use TextViews in Behavior tab
+        rate_forward_textview = self.builder.get_object('rate_forward_textview')
+        rate_reverse_textview = self.builder.get_object('rate_reverse_textview')
         reversible_check = self.builder.get_object('reversible_check')
         
         has_directional = False
-        if rate_forward_entry and rate_reverse_entry:
+        if rate_forward_textview and rate_reverse_textview:
             # Check if transition has directional rates
             rate_fwd = getattr(self.transition_obj, 'rate_forward', None)
             rate_rev = getattr(self.transition_obj, 'rate_reverse', None)
@@ -212,9 +212,11 @@ class TransitionPropDialogLoader(GObject.GObject):
             if rate_fwd or rate_rev:
                 has_directional = True
                 if rate_fwd:
-                    rate_forward_entry.set_text(str(rate_fwd))
+                    buffer_fwd = rate_forward_textview.get_buffer()
+                    buffer_fwd.set_text(str(rate_fwd))
                 if rate_rev:
-                    rate_reverse_entry.set_text(str(rate_rev))
+                    buffer_rev = rate_reverse_textview.get_buffer()
+                    buffer_rev.set_text(str(rate_rev))
         
         # Set reversible checkbox state
         if reversible_check:
@@ -333,7 +335,7 @@ class TransitionPropDialogLoader(GObject.GObject):
         reversible_check = self.builder.get_object('reversible_check')
         rate_forward_box = self.builder.get_object('rate_forward_box')
         rate_reverse_box = self.builder.get_object('rate_reverse_box')
-        rate_entry = self.builder.get_object('rate_entry')
+        rate_textview = self.builder.get_object('rate_textview')
         
         if reversible_check and rate_forward_box and rate_reverse_box:
             is_reversible = reversible_check.get_active()
@@ -342,11 +344,13 @@ class TransitionPropDialogLoader(GObject.GObject):
             rate_forward_box.set_visible(is_reversible)
             rate_reverse_box.set_visible(is_reversible)
             
-            # Hide regular rate entry when using directional rates
-            if rate_entry:
-                rate_entry_box = rate_entry.get_parent()
-                if rate_entry_box:
-                    rate_entry_box.set_visible(not is_reversible)
+            # Hide regular rate TextView when using directional rates
+            if rate_textview:
+                rate_scrolled = rate_textview.get_parent()
+                if rate_scrolled:
+                    rate_section_box = rate_scrolled.get_parent()
+                    if rate_section_box:
+                        rate_section_box.set_visible(not is_reversible)
     
     def _update_type_description(self):
         """Update type description label based on current type."""
@@ -557,12 +561,14 @@ class TransitionPropDialogLoader(GObject.GObject):
             
             # Check if using directional rates
             if reversible_check and reversible_check.get_active():
-                # Save directional rates
-                rate_forward_entry = self.builder.get_object('rate_forward_entry')
-                rate_reverse_entry = self.builder.get_object('rate_reverse_entry')
+                # Save directional rates from TextViews
+                rate_forward_textview = self.builder.get_object('rate_forward_textview')
+                rate_reverse_textview = self.builder.get_object('rate_reverse_textview')
                 
-                if rate_forward_entry:
-                    rate_fwd_text = rate_forward_entry.get_text().strip()
+                if rate_forward_textview:
+                    buffer = rate_forward_textview.get_buffer()
+                    start, end = buffer.get_bounds()
+                    rate_fwd_text = buffer.get_text(start, end, True).strip()
                     if rate_fwd_text:
                         # Validate
                         is_valid, error_msg = self._validate_rate_function_runtime(rate_fwd_text)
@@ -574,8 +580,10 @@ class TransitionPropDialogLoader(GObject.GObject):
                         if hasattr(self.transition_obj, 'rate_forward'):
                             delattr(self.transition_obj, 'rate_forward')
                 
-                if rate_reverse_entry:
-                    rate_rev_text = rate_reverse_entry.get_text().strip()
+                if rate_reverse_textview:
+                    buffer = rate_reverse_textview.get_buffer()
+                    start, end = buffer.get_bounds()
+                    rate_rev_text = buffer.get_text(start, end, True).strip()
                     if rate_rev_text:
                         # Validate
                         is_valid, error_msg = self._validate_rate_function_runtime(rate_rev_text)
