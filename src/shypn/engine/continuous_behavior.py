@@ -91,7 +91,7 @@ class ContinuousBehavior(TransitionBehavior):
                 rate_expr = '1.0'  # Default constant rate
         
         self.max_rate = float(props.get('max_rate', float('inf')))
-        self.min_rate = float(props.get('min_rate', 0.0))
+        self.min_rate = float(props.get('min_rate', -float('inf')))  # Allow negative for reversible
         
         # Compile rate function
         self.rate_function = self._compile_rate_function(rate_expr)
@@ -374,11 +374,11 @@ class ContinuousBehavior(TransitionBehavior):
             rate = self.rate_function(places_dict, current_time)
             rate = max(self.min_rate, min(self.max_rate, rate))
             
-            # If rate is effectively zero or too small, nothing to integrate
-            # Use min_token_threshold as minimum meaningful rate to prevent
-            # transitions from firing with infinitesimally small rates
-            effective_min_rate = max(self.min_rate, self.min_token_threshold * 1e-3)
-            if rate <= effective_min_rate:
+            # Check if rate is effectively zero
+            # For reversible reactions, rate can be negative (reverse flow)
+            # Only skip if abs(rate) is too small
+            effective_min_rate = self.min_token_threshold * 1e-3
+            if abs(rate) <= effective_min_rate:
                 return True, {
                     'consumed': {},
                     'produced': {},
@@ -396,23 +396,33 @@ class ContinuousBehavior(TransitionBehavior):
             consumed_map = {}
             produced_map = {}
             
-            # RK4 Integration (simplified for linear flow)
-            # For continuous Petri nets, we approximate: flow = rate * dt
-            # Full RK4 would require multiple rate evaluations at different points
+            # REVERSIBLE REACTION SUPPORT
+            # If rate < 0, reverse the flow direction:
+            # - Consume from output_arcs (normally products)
+            # - Produce to input_arcs (normally reactants)
+            reverse_direction = (rate < 0)
+            flow_magnitude = abs(rate) * dt
             
-            # Calculate intended flow amount
-            intended_flow = rate * dt
+            if reverse_direction:
+                # Swap arc roles for negative rate
+                consume_arcs = output_arcs
+                produce_arcs = input_arcs
+            else:
+                # Normal forward direction
+                consume_arcs = input_arcs
+                produce_arcs = output_arcs
             
-            # Phase 1: Clamp flow to available tokens (skip if source)
-            # Bug fix: Prevent transferring more tokens than available
-            actual_flow = intended_flow
+            # Phase 1: Clamp flow to available tokens
+            actual_flow = flow_magnitude
             if not is_source:
-                for arc in input_arcs:
+                for arc in consume_arcs:
                     # Skip test arcs - they check enablement but don't consume tokens
                     if hasattr(arc, 'consumes_tokens') and not arc.consumes_tokens():
                         continue
                     
-                    source_place = self._get_place(arc.source_id)
+                    # For reversed flow, get source from arc.target_id (normally output)
+                    place_id = arc.source_id if not reverse_direction else arc.target_id
+                    source_place = self._get_place(place_id)
                     if source_place is None:
                         continue
                     
@@ -420,14 +430,15 @@ class ContinuousBehavior(TransitionBehavior):
                     max_flow_from_arc = source_place.tokens / arc.weight if arc.weight > 0 else float('inf')
                     actual_flow = min(actual_flow, max_flow_from_arc)
             
-            # Phase 2: Consume tokens continuously from input places (skip if source)
+            # Phase 2: Consume tokens continuously
             if not is_source and actual_flow > 0:
-                for arc in input_arcs:
+                for arc in consume_arcs:
                     # Skip test arcs - they check enablement but don't consume tokens
                     if hasattr(arc, 'consumes_tokens') and not arc.consumes_tokens():
                         continue
                     
-                    source_place = self._get_place(arc.source_id)
+                    place_id = arc.source_id if not reverse_direction else arc.target_id
+                    source_place = self._get_place(place_id)
                     if source_place is None:
                         continue
                     
@@ -436,12 +447,13 @@ class ContinuousBehavior(TransitionBehavior):
                     
                     if consumption > 0:
                         source_place.set_tokens(source_place.tokens - consumption)
-                        consumed_map[arc.source_id] = consumption
+                        consumed_map[place_id] = consumption
             
-            # Phase 3: Produce tokens continuously to output places (skip if sink)
+            # Phase 3: Produce tokens continuously
             if not is_sink and actual_flow > 0:
-                for arc in output_arcs:
-                    target_place = self._get_place(arc.target_id)
+                for arc in produce_arcs:
+                    place_id = arc.target_id if not reverse_direction else arc.source_id
+                    target_place = self._get_place(place_id)
                     if target_place is None:
                         continue
                     
@@ -450,7 +462,7 @@ class ContinuousBehavior(TransitionBehavior):
                     
                     if production > 0:
                         target_place.set_tokens(target_place.tokens + production)
-                        produced_map[arc.target_id] = production
+                        produced_map[place_id] = production
             
             # Phase 4: Record continuous flow event
             self._record_event(
@@ -459,10 +471,11 @@ class ContinuousBehavior(TransitionBehavior):
                 mode='continuous',
                 transition_type='continuous',
                 rate=rate,
-                actual_rate=actual_flow / dt if dt > 0 else 0.0,
+                actual_rate=(actual_flow / dt if dt > 0 else 0.0) * (1 if not reverse_direction else -1),
                 dt=dt,
                 method='rk4',
-                clamped=(actual_flow < intended_flow)
+                clamped=(actual_flow < flow_magnitude),
+                reverse_direction=reverse_direction
             )
             
             return True, {
@@ -470,12 +483,13 @@ class ContinuousBehavior(TransitionBehavior):
                 'produced': produced_map,
                 'continuous_mode': True,
                 'rate': rate,
-                'actual_rate': actual_flow / dt if dt > 0 else 0.0,
+                'actual_rate': (actual_flow / dt if dt > 0 else 0.0) * (1 if not reverse_direction else -1),
                 'dt': dt,
                 'method': 'rk4',
                 'transition_type': 'continuous',
                 'time': current_time,
-                'clamped': (actual_flow < intended_flow)
+                'clamped': (actual_flow < flow_magnitude),
+                'reverse_direction': reverse_direction
             }
             
         except Exception as e:
