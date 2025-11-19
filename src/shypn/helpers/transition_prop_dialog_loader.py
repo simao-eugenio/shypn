@@ -585,7 +585,9 @@ class TransitionPropDialogLoader(GObject.GObject):
                             delattr(self.transition_obj, 'rate_reverse')
                 
                 # Clear regular rate and properties when using directional
-                self.transition_obj.set_rate(None)
+                # Don't use set_rate(None) as it raises error for continuous transitions
+                # Just clear the rate attribute directly
+                self.transition_obj.rate = None
                 if hasattr(self.transition_obj, 'properties'):
                     if 'rate_function' in self.transition_obj.properties:
                         del self.transition_obj.properties['rate_function']
