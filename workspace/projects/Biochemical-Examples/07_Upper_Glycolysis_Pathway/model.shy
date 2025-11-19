@@ -439,6 +439,46 @@
       ],
       "width": 3.0,
       "control_points": []
+    },
+    {
+      "id": "A7",
+      "name": "A7",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P3",
+      "source_type": "place",
+      "target_id": "T2",
+      "target_type": "transition",
+      "weight": 1,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A8",
+      "name": "A8",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T2",
+      "source_type": "transition",
+      "target_id": "P2",
+      "target_type": "place",
+      "weight": 1,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
     }
   ]
 }
