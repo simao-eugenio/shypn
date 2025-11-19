@@ -504,6 +504,13 @@ class Transition(PetriNetObject):
             data["guard"] = self.guard
         if self.rate is not None:
             data["rate"] = self.rate
+        
+        # Serialize directional rates for reversible reactions
+        if hasattr(self, 'rate_forward') and self.rate_forward is not None:
+            data["rate_forward"] = self.rate_forward
+        if hasattr(self, 'rate_reverse') and self.rate_reverse is not None:
+            data["rate_reverse"] = self.rate_reverse
+            
         if hasattr(self, 'properties') and self.properties:
             data["properties"] = self.properties
         
@@ -659,6 +666,13 @@ class Transition(PetriNetObject):
             transition.guard = 1 if guard_value is None else guard_value
         if "rate" in data:
             transition.rate = data["rate"]
+        
+        # Restore directional rates for reversible reactions
+        if "rate_forward" in data:
+            transition.rate_forward = data["rate_forward"]
+        if "rate_reverse" in data:
+            transition.rate_reverse = data["rate_reverse"]
+            
         if "properties" in data:
             transition.properties = data["properties"]
         
