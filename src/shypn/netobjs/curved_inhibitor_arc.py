@@ -23,7 +23,7 @@ class CurvedInhibitorArc(CurvedArc):
     # Marker size (same as InhibitorArc)
     MARKER_RADIUS = 8.0
     
-    def __init__(self, source, target, id: int, name: str, weight: int = 1):
+    def __init__(self, source, target, id: int, name: str, weight: float = 1):
         """Initialize a curved inhibitor arc.
         
         Args:

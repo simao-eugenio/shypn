@@ -89,7 +89,7 @@ class TestArc(Arc):
         >>> print(enzyme_place.tokens)  # Still 10 (unchanged)
     """
     
-    def __init__(self, source, target, id: str, name: str, weight: int = 1):
+    def __init__(self, source, target, id: str, name: str, weight: float = 1):
         """Initialize a test (read) arc.
         
         Args:

@@ -23,7 +23,7 @@ class CurvedArc(Arc):
     # Curve offset as percentage of line length
     CURVE_OFFSET_RATIO = 0.20  # 20% of line length
     
-    def __init__(self, source, target, id: int, name: str, weight: int = 1):
+    def __init__(self, source, target, id: int, name: str, weight: float = 1):
         """Initialize a curved arc.
         
         Args:
