@@ -75,9 +75,11 @@ class ContinuousBehavior(TransitionBehavior):
         rate_reverse_expr = None
         
         # Check for directional rate functions first
-        if 'rate_forward' in props or 'rate_reverse' in props:
-            rate_forward_expr = props.get('rate_forward')
-            rate_reverse_expr = props.get('rate_reverse')
+        # Check both props dict AND transition attributes
+        rate_forward_expr = props.get('rate_forward') or getattr(transition, 'rate_forward', None)
+        rate_reverse_expr = props.get('rate_reverse') or getattr(transition, 'rate_reverse', None)
+        
+        if rate_forward_expr or rate_reverse_expr:
             self.use_directional_rates = True
         else:
             self.use_directional_rates = False
@@ -310,18 +312,34 @@ class ContinuousBehavior(TransitionBehavior):
             if self.use_directional_rates:
                 # Parse rate formulas to identify substrates vs products
                 # Forward formula mentions substrates, reverse formula mentions products
-                # This is a heuristic - works for simple cases like "k * P2"
                 import re
                 
                 if hasattr(self, 'rate_forward_function'):
-                    # Extract place IDs from forward rate expression
+                    # Extract both place IDs (P\d+) and compound names from forward rate
                     fwd_expr = str(getattr(self.transition, 'rate_forward', ''))
                     substrate_places.update(re.findall(r'\b(P\d+)\b', fwd_expr))
+                    
+                    # Also try to map compound names to place IDs
+                    # Extract compound names (words that aren't keywords)
+                    compound_names = re.findall(r'\b([A-Z][A-Za-z0-9_-]*)\b', fwd_expr)
+                    for cname in compound_names:
+                        # Find place with matching name
+                        for place_id, place_obj in places_dict.items():
+                            if hasattr(place_obj, 'name') and place_obj.name == cname:
+                                substrate_places.add(place_id)
                 
                 if hasattr(self, 'rate_reverse_function'):
-                    # Extract place IDs from reverse rate expression  
+                    # Extract both place IDs and compound names from reverse rate
                     rev_expr = str(getattr(self.transition, 'rate_reverse', ''))
                     product_places.update(re.findall(r'\b(P\d+)\b', rev_expr))
+                    
+                    # Also try to map compound names to place IDs
+                    compound_names = re.findall(r'\b([A-Z][A-Za-z0-9_-]*)\b', rev_expr)
+                    for cname in compound_names:
+                        # Find place with matching name
+                        for place_id, place_obj in places_dict.items():
+                            if hasattr(place_obj, 'name') and place_obj.name == cname:
+                                product_places.add(place_id)
             
             # Filter arcs based on direction
             if reverse_direction and product_places:
