@@ -456,7 +456,8 @@ class Arc(PetriNetObject):
         # Legacy style: Bold Arial 12pt (compensated for zoom)
         cr.select_font_face("Arial", 0, 1)  # Normal slant, Bold weight
         cr.set_font_size(12 / zoom)
-        text = str(self.weight)
+        # Format weight: remove trailing zeros (2.5 not 2.50, 2 not 2.0)
+        text = f"{self.weight:g}"
         extents = cr.text_extents(text)
         
         # Calculate perpendicular offset (11px screen size = 11/zoom world space)
