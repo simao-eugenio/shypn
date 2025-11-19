@@ -198,27 +198,58 @@ class TransitionPropDialogLoader(GObject.GObject):
             if rate_value is not None:
                 rate_entry.set_text(str(rate_value))
         
-        # Directional rates (for reversible reactions) - use rate_textview as forward, add reverse field
+        # Guard function (TextView)
+        guard_textview = self.builder.get_object('guard_textview')
+        if guard_textview and hasattr(self.transition_obj, 'guard'):
+            buffer = guard_textview.get_buffer()
+            guard_value = self.transition_obj.guard
+            if guard_value is not None:
+                buffer.set_text(str(guard_value))
+        
+        # Check for directional rates first (reversible reactions)
         rate_textview = self.builder.get_object('rate_textview')
         rate_reverse_textview = self.builder.get_object('rate_reverse_textview')
         reversible_check = self.builder.get_object('reversible_check')
         
-        has_directional = False
-        if rate_textview and rate_reverse_textview:
-            # Check if transition has directional rates
-            rate_fwd = getattr(self.transition_obj, 'rate_forward', None)
-            rate_rev = getattr(self.transition_obj, 'rate_reverse', None)
-            
-            if rate_fwd or rate_rev:
-                has_directional = True
-                # Forward rate goes in the main rate_textview
-                if rate_fwd and rate_textview:
-                    buffer_fwd = rate_textview.get_buffer()
-                    buffer_fwd.set_text(str(rate_fwd))
-                # Reverse rate goes in the reverse field
-                if rate_rev:
-                    buffer_rev = rate_reverse_textview.get_buffer()
-                    buffer_rev.set_text(str(rate_rev))
+        rate_fwd = getattr(self.transition_obj, 'rate_forward', None)
+        rate_rev = getattr(self.transition_obj, 'rate_reverse', None)
+        has_directional = bool(rate_fwd or rate_rev)
+        
+        if has_directional:
+            # Populate forward rate in main rate field
+            if rate_fwd and rate_textview:
+                buffer_fwd = rate_textview.get_buffer()
+                buffer_fwd.set_text(str(rate_fwd))
+            # Populate reverse rate in reverse field
+            if rate_rev and rate_reverse_textview:
+                buffer_rev = rate_reverse_textview.get_buffer()
+                buffer_rev.set_text(str(rate_rev))
+        else:
+            # No directional rates - check other rate sources for rate_textview
+            if rate_textview:
+                buffer = rate_textview.get_buffer()
+                rate_func = None
+                
+                # Priority 1: Check properties['rate_function_display'] (SBML biological names for UI)
+                if hasattr(self.transition_obj, 'properties') and 'rate_function_display' in self.transition_obj.properties:
+                    rate_func = self.transition_obj.properties['rate_function_display']
+                
+                # Priority 2: Check transition.properties['rate_function'] (SBML formulas stored here)
+                elif hasattr(self.transition_obj, 'properties') and 'rate_function' in self.transition_obj.properties:
+                    rate_func = self.transition_obj.properties['rate_function']
+                
+                # Priority 3: Check kinetic_metadata.formula (backup for SBML)
+                elif hasattr(self.transition_obj, 'kinetic_metadata') and self.transition_obj.kinetic_metadata:
+                    if hasattr(self.transition_obj.kinetic_metadata, 'formula'):
+                        rate_func = self.transition_obj.kinetic_metadata.formula
+                
+                # Priority 4: Fall back to simple rate value
+                elif hasattr(self.transition_obj, 'rate') and self.transition_obj.rate is not None:
+                    rate_func = str(self.transition_obj.rate)
+                
+                # Set the text if we found something
+                if rate_func is not None:
+                    buffer.set_text(str(rate_func))
         
         # Set reversible checkbox state
         if reversible_check:
@@ -228,41 +259,6 @@ class TransitionPropDialogLoader(GObject.GObject):
         
         # Update visibility of reverse rate field
         self._update_reversible_fields_visibility()
-        
-        # Guard function (TextView)
-        guard_textview = self.builder.get_object('guard_textview')
-        if guard_textview and hasattr(self.transition_obj, 'guard'):
-            buffer = guard_textview.get_buffer()
-            guard_value = self.transition_obj.guard
-            if guard_value is not None:
-                buffer.set_text(str(guard_value))
-        
-        # Rate function (TextView) - check multiple sources
-        rate_textview = self.builder.get_object('rate_textview')
-        if rate_textview:
-            buffer = rate_textview.get_buffer()
-            rate_func = None
-            
-            # Priority 1: Check properties['rate_function_display'] (SBML biological names for UI)
-            if hasattr(self.transition_obj, 'properties') and 'rate_function_display' in self.transition_obj.properties:
-                rate_func = self.transition_obj.properties['rate_function_display']
-            
-            # Priority 2: Check transition.properties['rate_function'] (SBML formulas stored here)
-            elif hasattr(self.transition_obj, 'properties') and 'rate_function' in self.transition_obj.properties:
-                rate_func = self.transition_obj.properties['rate_function']
-            
-            # Priority 3: Check kinetic_metadata.formula (backup for SBML)
-            elif hasattr(self.transition_obj, 'kinetic_metadata') and self.transition_obj.kinetic_metadata:
-                if hasattr(self.transition_obj.kinetic_metadata, 'formula'):
-                    rate_func = self.transition_obj.kinetic_metadata.formula
-            
-            # Priority 4: Fall back to simple rate value
-            elif hasattr(self.transition_obj, 'rate') and self.transition_obj.rate is not None:
-                rate_func = str(self.transition_obj.rate)
-            
-            # Set the text if we found something
-            if rate_func is not None:
-                buffer.set_text(str(rate_func))
         
         # Line Width
         width_entry = self.builder.get_object('prop_transition_width_entry')
