@@ -21,7 +21,7 @@ class Arc(PetriNetObject):
     DEFAULT_WIDTH = 3.0  # Legacy: 3.0px line width
     ARROW_SIZE = 15.0    # Legacy: 15px arrowhead length
     
-    def __init__(self, source, target, id: str, name: str, weight: int = 1):
+    def __init__(self, source, target, id: str, name: str, weight: float = 1):
         """Initialize an Arc.
         
         Args:
@@ -647,7 +647,7 @@ class Arc(PetriNetObject):
         """
         pass  # Arcs move when their source/target objects move
     
-    def set_weight(self, weight: int):
+    def set_weight(self, weight: float):
         """Set the arc weight.
         
         Args:

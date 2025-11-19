@@ -57,7 +57,7 @@ class InhibitorArc(Arc):
     # Marker size for the inhibitor circle (legacy: 6-12px range)
     MARKER_RADIUS = 8.0
     
-    def __init__(self, source, target, id: int, name: str, weight: int = 1):
+    def __init__(self, source, target, id: int, name: str, weight: float = 1):
         """
         Initialize an inhibitor arc.
         
