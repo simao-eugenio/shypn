@@ -285,18 +285,61 @@ class ContinuousBehavior(TransitionBehavior):
             
             # Evaluate rate to determine direction
             current_time = self._get_current_time()
-            rate = self.rate_function(places_dict, current_time)
+            
+            # For directional rates, evaluate forward and reverse separately
+            if self.use_directional_rates:
+                rate_forward = self.rate_forward_function(places_dict, current_time)
+                rate_reverse = self.rate_reverse_function(places_dict, current_time)
+                rate = rate_forward - rate_reverse
+            else:
+                rate = self.rate_function(places_dict, current_time)
             
             # Determine which arcs to check based on rate direction
             input_arcs = self.get_input_arcs()
             output_arcs = self.get_output_arcs()
             
-            # For reversible: if rate < 0, consume from outputs (reverse flow)
+            # For reversible transitions with bidirectional arcs:
+            # Only check substrate places for current direction
             reverse_direction = (rate < 0)
-            if reverse_direction:
-                check_arcs = output_arcs  # Will consume from these
+            
+            # Identify substrate and product places from rate formula
+            # For directional rates, we can determine this from the formulas
+            substrate_places = set()
+            product_places = set()
+            
+            if self.use_directional_rates:
+                # Parse rate formulas to identify substrates vs products
+                # Forward formula mentions substrates, reverse formula mentions products
+                # This is a heuristic - works for simple cases like "k * P2"
+                import re
+                
+                if hasattr(self, 'rate_forward_function'):
+                    # Extract place IDs from forward rate expression
+                    fwd_expr = str(getattr(self.transition, 'rate_forward', ''))
+                    substrate_places.update(re.findall(r'\b(P\d+)\b', fwd_expr))
+                
+                if hasattr(self, 'rate_reverse_function'):
+                    # Extract place IDs from reverse rate expression  
+                    rev_expr = str(getattr(self.transition, 'rate_reverse', ''))
+                    product_places.update(re.findall(r'\b(P\d+)\b', rev_expr))
+            
+            # Filter arcs based on direction
+            if reverse_direction and product_places:
+                # Reverse: only check arcs consuming from product places
+                check_arcs = [arc for arc in output_arcs 
+                             if arc.target_id in product_places]
+                if not check_arcs:
+                    check_arcs = output_arcs  # Fallback
+            elif not reverse_direction and substrate_places:
+                # Forward: only check arcs consuming from substrate places
+                check_arcs = [arc for arc in input_arcs 
+                             if arc.source_id in substrate_places]
+                if not check_arcs:
+                    check_arcs = input_arcs  # Fallback
+            elif reverse_direction:
+                check_arcs = output_arcs
             else:
-                check_arcs = input_arcs   # Normal forward flow
+                check_arcs = input_arcs
                 
         except Exception:
             # Fallback: check all input arcs (old behavior)
