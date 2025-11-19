@@ -198,6 +198,33 @@ class TransitionPropDialogLoader(GObject.GObject):
             if rate_value is not None:
                 rate_entry.set_text(str(rate_value))
         
+        # Directional rates (for reversible reactions)
+        rate_forward_entry = self.builder.get_object('rate_forward_entry')
+        rate_reverse_entry = self.builder.get_object('rate_reverse_entry')
+        reversible_check = self.builder.get_object('reversible_check')
+        
+        has_directional = False
+        if rate_forward_entry and rate_reverse_entry:
+            # Check if transition has directional rates
+            rate_fwd = getattr(self.transition_obj, 'rate_forward', None)
+            rate_rev = getattr(self.transition_obj, 'rate_reverse', None)
+            
+            if rate_fwd or rate_rev:
+                has_directional = True
+                if rate_fwd:
+                    rate_forward_entry.set_text(str(rate_fwd))
+                if rate_rev:
+                    rate_reverse_entry.set_text(str(rate_rev))
+        
+        # Set reversible checkbox state
+        if reversible_check:
+            reversible_check.set_active(has_directional)
+            # Connect signal to toggle visibility of directional rate fields
+            reversible_check.connect('toggled', self._on_reversible_toggled)
+        
+        # Update visibility of directional rate fields
+        self._update_reversible_fields_visibility()
+        
         # Guard function (TextView)
         guard_textview = self.builder.get_object('guard_textview')
         if guard_textview and hasattr(self.transition_obj, 'guard'):
@@ -281,6 +308,45 @@ class TransitionPropDialogLoader(GObject.GObject):
     def _on_firing_policy_changed(self, combo):
         """Handle firing policy combo box changes."""
         self._update_priority_field_visibility()
+    
+    def _on_reversible_toggled(self, checkbox):
+        """Handle reversible checkbox toggle."""
+        self._update_reversible_fields_visibility()
+    
+    def _show_error_dialog(self, title, message):
+        """Show error dialog with given title and message."""
+        error_dialog = Gtk.MessageDialog(
+            transient_for=self.dialog,
+            modal=True,
+            message_type=Gtk.MessageType.ERROR,
+            buttons=Gtk.ButtonsType.OK,
+            text=title
+        )
+        error_dialog.format_secondary_text(
+            f"{message}\n\nPlease correct the expression before applying."
+        )
+        error_dialog.run()
+        error_dialog.destroy()
+    
+    def _update_reversible_fields_visibility(self):
+        """Show/hide directional rate fields based on reversible checkbox."""
+        reversible_check = self.builder.get_object('reversible_check')
+        rate_forward_box = self.builder.get_object('rate_forward_box')
+        rate_reverse_box = self.builder.get_object('rate_reverse_box')
+        rate_entry = self.builder.get_object('rate_entry')
+        
+        if reversible_check and rate_forward_box and rate_reverse_box:
+            is_reversible = reversible_check.get_active()
+            
+            # Show directional rate fields when reversible is checked
+            rate_forward_box.set_visible(is_reversible)
+            rate_reverse_box.set_visible(is_reversible)
+            
+            # Hide regular rate entry when using directional rates
+            if rate_entry:
+                rate_entry_box = rate_entry.get_parent()
+                if rate_entry_box:
+                    rate_entry_box.set_visible(not is_reversible)
     
     def _update_type_description(self):
         """Update type description label based on current type."""
@@ -487,7 +553,56 @@ class TransitionPropDialogLoader(GObject.GObject):
             
             # Rate function - validate and save to both rate and properties['rate_function']
             rate_textview = self.builder.get_object('rate_textview')
-            if rate_textview:
+            reversible_check = self.builder.get_object('reversible_check')
+            
+            # Check if using directional rates
+            if reversible_check and reversible_check.get_active():
+                # Save directional rates
+                rate_forward_entry = self.builder.get_object('rate_forward_entry')
+                rate_reverse_entry = self.builder.get_object('rate_reverse_entry')
+                
+                if rate_forward_entry:
+                    rate_fwd_text = rate_forward_entry.get_text().strip()
+                    if rate_fwd_text:
+                        # Validate
+                        is_valid, error_msg = self._validate_rate_function_runtime(rate_fwd_text)
+                        if not is_valid:
+                            self._show_error_dialog("Invalid Forward Rate", error_msg)
+                            return False
+                        self.transition_obj.rate_forward = rate_fwd_text
+                    else:
+                        if hasattr(self.transition_obj, 'rate_forward'):
+                            delattr(self.transition_obj, 'rate_forward')
+                
+                if rate_reverse_entry:
+                    rate_rev_text = rate_reverse_entry.get_text().strip()
+                    if rate_rev_text:
+                        # Validate
+                        is_valid, error_msg = self._validate_rate_function_runtime(rate_rev_text)
+                        if not is_valid:
+                            self._show_error_dialog("Invalid Reverse Rate", error_msg)
+                            return False
+                        self.transition_obj.rate_reverse = rate_rev_text
+                    else:
+                        if hasattr(self.transition_obj, 'rate_reverse'):
+                            delattr(self.transition_obj, 'rate_reverse')
+                
+                # Clear regular rate when using directional
+                self.transition_obj.set_rate(None)
+                if hasattr(self.transition_obj, 'properties'):
+                    if 'rate_function' in self.transition_obj.properties:
+                        del self.transition_obj.properties['rate_function']
+                    if 'rate_function_display' in self.transition_obj.properties:
+                        del self.transition_obj.properties['rate_function_display']
+            
+            elif rate_textview:
+                # Use regular rate function
+                # Clear directional rates
+                if hasattr(self.transition_obj, 'rate_forward'):
+                    delattr(self.transition_obj, 'rate_forward')
+                if hasattr(self.transition_obj, 'rate_reverse'):
+                    delattr(self.transition_obj, 'rate_reverse')
+                
                 buffer = rate_textview.get_buffer()
                 start, end = buffer.get_bounds()
                 rate_text = buffer.get_text(start, end, True).strip()
@@ -497,20 +612,7 @@ class TransitionPropDialogLoader(GObject.GObject):
                     is_valid, error_msg = self._validate_rate_function_runtime(rate_text)
                     
                     if not is_valid:
-                        # Show error dialog and refuse to apply
-                        error_dialog = Gtk.MessageDialog(
-                            transient_for=self.dialog,
-                            modal=True,
-                            message_type=Gtk.MessageType.ERROR,
-                            buttons=Gtk.ButtonsType.OK,
-                            text="Invalid Rate Function"
-                        )
-                        error_dialog.format_secondary_text(
-                            f"The rate function cannot be applied:\n\n{error_msg}\n\n"
-                            f"Please correct the expression before applying."
-                        )
-                        error_dialog.run()
-                        error_dialog.destroy()
+                        self._show_error_dialog("Invalid Rate Function", error_msg)
                         return False  # Validation failed, don't apply changes
                     
                     # Save to properties for complex expressions/formulas

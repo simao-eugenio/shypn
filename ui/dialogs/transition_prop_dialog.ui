@@ -487,6 +487,107 @@
                           </packing>
                         </child>
                         
+                        <!-- Reversible Reaction: Forward Rate -->
+                        <child>
+                          <object class="GtkBox" id="rate_forward_box">
+                            <property name="visible">False</property>
+                            <property name="can-focus">False</property>
+                            <property name="orientation">horizontal</property>
+                            <property name="spacing">10</property>
+                            <child>
+                              <object class="GtkLabel" id="rate_forward_label">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="label" translatable="yes">Forward Rate:</property>
+                                <property name="xalign">1</property>
+                                <property name="tooltip-text">Forward reaction rate (substrate → product)</property>
+                              </object>
+                              <packing>
+                                <property name="expand">False</property>
+                                <property name="fill">True</property>
+                                <property name="position">0</property>
+                              </packing>
+                            </child>
+                            <child>
+                              <object class="GtkEntry" id="rate_forward_entry">
+                                <property name="visible">True</property>
+                                <property name="can-focus">True</property>
+                                <property name="hexpand">True</property>
+                                <property name="tooltip-text">Forward rate expression (e.g., '0.41 * G6P')</property>
+                                <property name="placeholder-text">e.g., 0.41 * G6P</property>
+                              </object>
+                              <packing>
+                                <property name="expand">True</property>
+                                <property name="fill">True</property>
+                                <property name="position">1</property>
+                              </packing>
+                            </child>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">True</property>
+                            <property name="position">2</property>
+                          </packing>
+                        </child>
+                        
+                        <!-- Reversible Reaction: Reverse Rate -->
+                        <child>
+                          <object class="GtkBox" id="rate_reverse_box">
+                            <property name="visible">False</property>
+                            <property name="can-focus">False</property>
+                            <property name="orientation">horizontal</property>
+                            <property name="spacing">10</property>
+                            <child>
+                              <object class="GtkLabel" id="rate_reverse_label">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="label" translatable="yes">Reverse Rate:</property>
+                                <property name="xalign">1</property>
+                                <property name="tooltip-text">Reverse reaction rate (product → substrate)</property>
+                              </object>
+                              <packing>
+                                <property name="expand">False</property>
+                                <property name="fill">True</property>
+                                <property name="position">0</property>
+                              </packing>
+                            </child>
+                            <child>
+                              <object class="GtkEntry" id="rate_reverse_entry">
+                                <property name="visible">True</property>
+                                <property name="can-focus">True</property>
+                                <property name="hexpand">True</property>
+                                <property name="tooltip-text">Reverse rate expression (e.g., '0.14 * F6P')</property>
+                                <property name="placeholder-text">e.g., 0.14 * F6P</property>
+                              </object>
+                              <packing>
+                                <property name="expand">True</property>
+                                <property name="fill">True</property>
+                                <property name="position">1</property>
+                              </packing>
+                            </child>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">True</property>
+                            <property name="position">3</property>
+                          </packing>
+                        </child>
+                        
+                        <!-- Reversible Toggle Button -->
+                        <child>
+                          <object class="GtkCheckButton" id="reversible_check">
+                            <property name="visible">True</property>
+                            <property name="can-focus">True</property>
+                            <property name="label" translatable="yes">Reversible reaction (use directional rates)</property>
+                            <property name="tooltip-text">Enable to use separate forward and reverse rate functions</property>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">True</property>
+                            <property name="position">4</property>
+                          </packing>
+                        </child>
+                        
                         <!-- Help Text -->
                         <child>
                           <object class="GtkLabel" id="type_parameters_help">
@@ -494,6 +595,7 @@
                             <property name="can-focus">False</property>
                             <property name="label">• Policy: Firing policy for conflict resolution (Random, Earliest, Latest, Priority, Race, Age, Preemptive-Priority)
 • Rate: Basic numeric value or expression
+• Reversible: Check to use separate forward/reverse rates for equilibrium reactions
 • For complex rate functions, use the Behavior tab</property>
                             <property name="use-markup">True</property>
                             <property name="xalign">0</property>
