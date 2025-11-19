@@ -372,10 +372,22 @@ class ContinuousBehavior(TransitionBehavior):
         # CRITICAL: Always check inhibitor arcs regardless of direction filtering
         # Inhibitor arcs provide regulatory control and must always be evaluated
         from shypn.netobjs.inhibitor_arc import InhibitorArc
+        from shypn.netobjs.curved_inhibitor_arc import CurvedInhibitorArc
         
         # Get all input arcs to check for inhibitors
         all_input_arcs = self.get_input_arcs()
-        inhibitor_arcs = [arc for arc in all_input_arcs if isinstance(arc, InhibitorArc)]
+        inhibitor_arcs = [arc for arc in all_input_arcs 
+                         if isinstance(arc, (InhibitorArc, CurvedInhibitorArc))]
+        
+        # DEBUG: Log inhibitor arc checks for Example 08
+        if self.transition.id in ['T1', 'T2'] and len(inhibitor_arcs) > 0:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"[INHIBITOR CHECK] Transition {self.transition.id} has {len(inhibitor_arcs)} inhibitor arcs")
+            for arc in inhibitor_arcs:
+                source_place = self._get_place(arc.source_id)
+                if source_place:
+                    logger.info(f"  Arc {arc.id}: {source_place.id} tokens={source_place.tokens:.4f}, weight={arc.weight}, blocked={source_place.tokens >= arc.weight}")
         
         # Check inhibitor arcs first (they can block transition regardless of direction)
         for arc in inhibitor_arcs:
@@ -390,7 +402,7 @@ class ContinuousBehavior(TransitionBehavior):
         # Now check normal/test arcs in the flow direction
         for arc in check_arcs:
             # Skip inhibitor arcs (already checked above)
-            if isinstance(arc, InhibitorArc):
+            if isinstance(arc, (InhibitorArc, CurvedInhibitorArc)):
                 continue
                 
             # Get the place we're consuming from
