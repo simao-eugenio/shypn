@@ -1,0 +1,249 @@
+{
+  "model_name": "Energy Sensing Regulatory Motif",
+  "description": "PFK-1 and Pyruvate Kinase coordinated by ATP/AMP ratio and F-1,6-BP feed-forward",
+  "pathway": "Human glycolysis (regulatory motif)",
+  "organism": "Homo sapiens",
+  "tissue": "Muscle",
+  
+  "regulatory_motif": {
+    "type": "Feed-forward loop (Type 1 - Coherent)",
+    "components": ["PFK-1", "F-1,6-BP", "Pyruvate Kinase"],
+    "description": "F-1,6-BP activates both its producing enzyme (PFK) and downstream enzyme (PK)",
+    "function": "Coordinates upper and lower glycolysis based on substrate availability"
+  },
+  
+  "enzymes": {
+    "phosphofructokinase_1": {
+      "ec_number": "EC 2.7.1.11",
+      "name": "Phosphofructokinase-1",
+      "gene": "PFKM",
+      "reaction": "Fructose-6-phosphate + ATP → Fructose-1,6-bisphosphate + ADP",
+      "kinetics": {
+        "type": "Michaelis-Menten with allosteric regulation",
+        "Vmax": {
+          "value": 0.094,
+          "unit": "mM/s",
+          "source": "Newsholme & Crabtree 1986"
+        },
+        "Km_F6P": {
+          "value": 0.1,
+          "unit": "mM"
+        },
+        "Km_ATP": {
+          "value": 0.05,
+          "unit": "mM"
+        }
+      },
+      "regulation": {
+        "inhibitors": [
+          {
+            "molecule": "ATP",
+            "Ki": {
+              "value": 0.5,
+              "unit": "mM",
+              "note": "High ATP inhibits (energy sufficient)"
+            },
+            "Hill_coefficient": 2.5,
+            "mechanism": "Allosteric, cooperative"
+          }
+        ],
+        "activators": [
+          {
+            "molecule": "AMP",
+            "Ka": {
+              "value": 0.02,
+              "unit": "mM",
+              "note": "Low energy signal"
+            },
+            "mechanism": "Allosteric, relieves ATP inhibition"
+          },
+          {
+            "molecule": "F-1,6-BP",
+            "Ka": {
+              "value": 0.01,
+              "unit": "mM",
+              "note": "Product activation (positive feedback)"
+            },
+            "mechanism": "Allosteric"
+          }
+        ]
+      }
+    },
+    
+    "pyruvate_kinase": {
+      "ec_number": "EC 2.7.1.40",
+      "name": "Pyruvate Kinase",
+      "gene": "PKM",
+      "reaction": "Phosphoenolpyruvate + ADP → Pyruvate + ATP",
+      "kinetics": {
+        "type": "Michaelis-Menten with allosteric regulation",
+        "Vmax": {
+          "value": 0.15,
+          "unit": "mM/s",
+          "source": "Newsholme & Crabtree 1986"
+        },
+        "Km_PEP": {
+          "value": 0.05,
+          "unit": "mM"
+        },
+        "Km_ADP": {
+          "value": 0.5,
+          "unit": "mM"
+        }
+      },
+      "regulation": {
+        "inhibitors": [
+          {
+            "molecule": "ATP",
+            "Ki": {
+              "value": 1.0,
+              "unit": "mM",
+              "note": "High ATP inhibits (energy sufficient)"
+            },
+            "mechanism": "Allosteric"
+          }
+        ],
+        "activators": [
+          {
+            "molecule": "F-1,6-BP",
+            "Ka": {
+              "value": 0.01,
+              "unit": "mM",
+              "note": "Feed-forward activation from PFK"
+            },
+            "mechanism": "Allosteric, coordinates with upper glycolysis"
+          }
+        ]
+      }
+    }
+  },
+  
+  "metabolites": {
+    "F6P": {
+      "name": "β-D-Fructose 6-phosphate",
+      "chebi_id": "CHEBI:61529",
+      "kegg_id": "C00085",
+      "initial_concentration": {
+        "value": 0.1,
+        "unit": "mM"
+      }
+    },
+    
+    "ATP": {
+      "name": "Adenosine 5'-triphosphate",
+      "chebi_id": "CHEBI:30616",
+      "kegg_id": "C00002",
+      "initial_concentration": {
+        "value": 3.0,
+        "unit": "mM",
+        "note": "High energy state"
+      }
+    },
+    
+    "ADP": {
+      "name": "Adenosine 5'-diphosphate",
+      "chebi_id": "CHEBI:456216",
+      "kegg_id": "C00008",
+      "initial_concentration": {
+        "value": 0.5,
+        "unit": "mM"
+      }
+    },
+    
+    "AMP": {
+      "name": "Adenosine 5'-monophosphate",
+      "chebi_id": "CHEBI:456215",
+      "kegg_id": "C00020",
+      "initial_concentration": {
+        "value": 0.05,
+        "unit": "mM",
+        "note": "Low energy signal (appears before significant ATP drop)"
+      }
+    },
+    
+    "F16BP": {
+      "name": "β-D-Fructose 1,6-bisphosphate",
+      "chebi_id": "CHEBI:28013",
+      "kegg_id": "C00354",
+      "initial_concentration": {
+        "value": 0.01,
+        "unit": "mM",
+        "note": "Activates both PFK (feedback) and PK (feed-forward)"
+      }
+    },
+    
+    "PEP": {
+      "name": "Phosphoenolpyruvate",
+      "chebi_id": "CHEBI:44897",
+      "kegg_id": "C00074",
+      "initial_concentration": {
+        "value": 0.05,
+        "unit": "mM"
+      }
+    },
+    
+    "Pyruvate": {
+      "name": "Pyruvate",
+      "chebi_id": "CHEBI:15361",
+      "kegg_id": "C00022",
+      "initial_concentration": {
+        "value": 0.1,
+        "unit": "mM"
+      }
+    }
+  },
+  
+  "energy_charge": {
+    "definition": "EC = (ATP + 0.5*ADP) / (ATP + ADP + AMP)",
+    "initial": {
+      "ATP": 3.0,
+      "ADP": 0.5,
+      "AMP": 0.05,
+      "EC": 0.929,
+      "note": "Very high energy state"
+    },
+    "biological_range": {
+      "high": 0.85,
+      "normal": 0.7,
+      "low": 0.5,
+      "critical": 0.3
+    },
+    "response": {
+      "high_EC": "Glycolysis inhibited (conserve glucose)",
+      "low_EC": "Glycolysis activated (generate ATP)"
+    }
+  },
+  
+  "stoichiometry": {
+    "PFK": "F6P + ATP → F-1,6-BP + ADP",
+    "PK": "PEP + ADP → Pyruvate + ATP",
+    "net_ATP": "PK generates ATP, PFK consumes it"
+  },
+  
+  "references": [
+    {
+      "authors": "Newsholme EA, Crabtree B",
+      "title": "Maximum catalytic activity of some key enzymes in provision of physiologically useful information about metabolic fluxes",
+      "journal": "J Exp Biol",
+      "year": 1986,
+      "volume": 115,
+      "pages": "305-324"
+    },
+    {
+      "authors": "Mangan S, Alon U",
+      "title": "Structure and function of the feed-forward loop network motif",
+      "journal": "Proc Natl Acad Sci USA",
+      "year": 2003,
+      "volume": 100,
+      "pages": "11980-11985",
+      "doi": "10.1073/pnas.2133841100"
+    },
+    {
+      "authors": "Fell DA",
+      "title": "Understanding the Control of Metabolism",
+      "publisher": "Portland Press",
+      "year": 1997,
+      "note": "Chapter 4: Regulation of enzyme activity"
+    }
+  ]
+}
