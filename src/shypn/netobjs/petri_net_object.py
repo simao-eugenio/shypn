@@ -48,7 +48,7 @@ class PetriNetObject:
     
     @property
     def id(self) -> str:
-        """Get the unique identifier (read-only).
+        """Get the unique identifier (read-only, managed by IDManager).
         
         Returns:
             str: Unique internal identifier
@@ -57,12 +57,23 @@ class PetriNetObject:
     
     @property
     def name(self) -> str:
-        """Get the unique name (read-only).
+        """Get the name (user-editable alias).
         
         Returns:
-            str: Unique name like "P1", "T1", "A1"
+            str: User-assigned name or default like "P1", "T1", "A1"
         """
         return self._name
+    
+    @name.setter
+    def name(self, value: str):
+        """Set the name (user-editable alias).
+        
+        Args:
+            value: New name for the object
+        """
+        if value and isinstance(value, str):
+            self._name = value.strip()
+            self._trigger_redraw()
     
     def _trigger_redraw(self):
         """Request a redraw if callback is set.

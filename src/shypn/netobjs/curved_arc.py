@@ -269,8 +269,9 @@ class CurvedArc(Arc):
         # Draw arrowhead at target boundary (visible on top of target)
         self._render_arrowhead(cr, arrowhead_x, arrowhead_y, dx_end, dy_end, zoom)
         
-        # Draw weight label if > 1
-        if self.weight > 1:
+        # Draw weight label if different from 1 (convention: weight=1 is implicit)
+        # This includes stoichiometric coefficients and inhibitor thresholds (Ki values)
+        if abs(self.weight - 1.0) > 1e-6:
             # Use curved arc specific weight rendering (calculates position on curve)
             # Pass offset information to ensure text goes on outer side
             offset_distance = None

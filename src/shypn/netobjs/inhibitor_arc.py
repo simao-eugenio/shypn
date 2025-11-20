@@ -227,8 +227,9 @@ class InhibitorArc(Arc):
         # Draw hollow circle with edge touching target boundary
         self._render_arrowhead(cr, marker_x, marker_y, dx_world, dy_world, zoom)
         
-        # Draw weight label if > 1
-        if self.weight > 1:
+        # Draw weight label if different from 1 (convention: weight=1 is implicit)
+        # This includes inhibitor thresholds (Ki values)
+        if abs(self.weight - 1.0) > 1e-6:
             self._render_weight(cr, start_world_x, start_world_y, marker_x, marker_y, zoom)
         
         # Ensure clean state for next rendering operation
@@ -335,8 +336,9 @@ class InhibitorArc(Arc):
         # Draw hollow circle at target boundary
         self._render_arrowhead(cr, marker_x, marker_y, dx_end, dy_end, zoom)
         
-        # Draw weight label if > 1
-        if self.weight > 1:
+        # Draw weight label if different from 1 (convention: weight=1 is implicit)
+        # This includes inhibitor thresholds (Ki values)
+        if abs(self.weight - 1.0) > 1e-6:
             self._render_weight_curved(cr, start_world_x, start_world_y, 
                                       end_world_x, end_world_y, 
                                       cp_x, cp_y, zoom)

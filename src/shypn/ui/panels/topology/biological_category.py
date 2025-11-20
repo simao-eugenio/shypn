@@ -23,6 +23,11 @@ from gi.repository import Gtk
 from shypn.ui.panels.topology.base_topology_category import BaseTopologyCategory
 from shypn.topology.biological.dependency_coupling import DependencyAndCouplingAnalyzer
 from shypn.topology.biological.regulatory_structure import RegulatoryStructureAnalyzer
+from shypn.topology.biological.mass_balance import MassBalanceAnalyzer
+from shypn.topology.biological.stoichiometry import StoichiometryAnalyzer
+from shypn.topology.biological.flux_balance import FluxBalanceAnalyzer
+from shypn.topology.biological.thermodynamics import ThermodynamicAnalyzer
+from shypn.topology.biological.thermodynamics import ThermodynamicAnalyzer
 
 
 class BiologicalCategory(BaseTopologyCategory):
@@ -61,8 +66,12 @@ class BiologicalCategory(BaseTopologyCategory):
             dict: {analyzer_name: AnalyzerClass}
         """
         return {
+            'mass_balance': MassBalanceAnalyzer,
+            'stoichiometry': StoichiometryAnalyzer,
+            'flux_balance': FluxBalanceAnalyzer,
             'dependency_coupling': DependencyAndCouplingAnalyzer,
             'regulatory_structure': RegulatoryStructureAnalyzer,
+            'thermodynamics': ThermodynamicAnalyzer,
         }
     
     def _build_content(self):
@@ -220,3 +229,51 @@ class BiologicalCategory(BaseTopologyCategory):
                 ))
         
         return rows
+    
+    def _format_error_row(self, analyzer_name, error_message):
+        """Format error message as table row matching biological table structure.
+        
+        Overrides base class to return 6 columns instead of 3.
+        
+        Args:
+            analyzer_name: Name of analyzer
+            error_message: Error message
+            
+        Returns:
+            tuple: Row with 6 columns
+        """
+        title = self._format_analyzer_title(analyzer_name)
+        message = f"❌ Error: {error_message[:100]}"
+        return (
+            'Error',           # Type
+            title,             # Transition Pair (analyzer name)
+            message,           # Shared Elements (error message)
+            0.0,               # Conflict Score
+            '⚠️ ERROR',        # Classification
+            ''                 # Notes
+        )
+    
+    def _format_timeout_row(self, analyzer_name, timeout_seconds, complexity):
+        """Format timeout message as table row matching biological table structure.
+        
+        Overrides base class to return 6 columns instead of 3.
+        
+        Args:
+            analyzer_name: Name of analyzer
+            timeout_seconds: Timeout value
+            complexity: Algorithm complexity
+            
+        Returns:
+            tuple: Row with 6 columns
+        """
+        title = self._format_analyzer_title(analyzer_name)
+        message = f"⏱️ Timeout ({timeout_seconds}s) - Model too complex for {complexity} algorithm"
+        return (
+            'Timeout',         # Type
+            title,             # Transition Pair (analyzer name)
+            message,           # Shared Elements (timeout message)
+            0.0,               # Conflict Score
+            '⚠️ TIMEOUT',      # Classification
+            ''                 # Notes
+        )
+

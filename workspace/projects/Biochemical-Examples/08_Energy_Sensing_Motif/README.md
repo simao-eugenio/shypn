@@ -43,41 +43,48 @@ This creates a **feed-forward loop**: F-1,6-BP (product of PFK) activates PK dow
 7. **Pyruvate** (0.1 mM) - Final product
 
 ### Transitions (Enzymes)
-1. **PFK-1**: F6P + ATP → F-1,6-BP + ADP
-   - Rate affected by: ATP (−), AMP (+), F-1,6-BP (+)
+1. **PFK-1** (T1): F6P + ATP → F-1,6-BP + ADP
+   - Inhibitor arc: ATP ⊸ PFK-1 (weight = 2.5 mM threshold)
+   - Blocked when ATP ≥ 2.5 mM
    
-2. **PK**: PEP + ADP → Pyruvate + ATP
-   - Rate affected by: ATP (−), F-1,6-BP (+)
+2. **PK** (T2): PEP + ADP → Pyruvate + ATP
+   - Inhibitor arc: ATP ⊸ PK (weight = 2.0 mM threshold)
+   - Blocked when ATP ≥ 2.0 mM
+
+3. **ATPase** (T3): ATP → (consumed) - SINK transition
+   - Simulates basal ATP consumption by cellular processes
+   - Constant rate = 0.05 mM/s
+   - Allows ATP to decrease, relieving inhibition
 
 ### Regulatory Logic
 
-**PFK-1 Rate Formula** (with allosteric regulation):
+**Simplified Rate Formulas** (for Petri net foundation testing):
 ```
-Vmax * (F6P / (Km_F6P + F6P)) * (ATP / (Km_ATP + ATP))
-  * (1 + AMP/Ka_AMP)              # AMP activation
-  / (1 + (ATP/Ki_ATP)^2.5)        # ATP inhibition (Hill coefficient)
-  * (1 + F16BP/Ka_F16BP)          # F-1,6-BP activation (positive feedback)
+PFK-1: 0.094 * (F6P / (0.1 + F6P)) * (ATP / (0.05 + ATP))
+PK:    0.15 * (PEP / (0.05 + PEP)) * (ADP / (0.5 + ADP))
 ```
 
-**PK Rate Formula** (with feed-forward activation):
-```
-Vmax * (PEP / (Km_PEP + PEP)) * (ADP / (Km_ADP + ADP))
-  * (1 + F16BP/Ka_F16BP)          # F-1,6-BP activation (feed-forward)
-  / (1 + ATP/Ki_ATP)              # ATP inhibition
-```
+**Inhibitor Arc Semantics**:
+- **PFK-1 blocked**: When ATP ≥ 2.5 mM (transition cannot fire)
+- **PK blocked**: When ATP ≥ 2.0 mM (transition cannot fire)
+- **Both active**: When ATP < 2.0 mM
 
 ## Expected Behavior
 
-### High Energy State (ATP = 3 mM, AMP = 0.05 mM)
-- **Energy charge = ATP/(ATP+ADP+AMP) = 0.84** (high)
-- **PFK**: Strongly inhibited by high ATP
-- **PK**: Inhibited by ATP
-- **Result**: Glycolysis slows down, conserves glucose
+### Initial State (ATP = 3.0 mM)
+- **Both transitions BLOCKED** by inhibitor arcs
+- ATP slowly drains via ATPase sink (0.05 mM/s)
+- F6P and PEP remain unchanged
 
-### Low Energy State (ATP drops to 1 mM, AMP rises to 0.5 mM)
-- **Energy charge = 0.5** (low)
-- **PFK**: Relieved from ATP inhibition, activated by AMP
-- **PK**: Less inhibited by ATP
+### ATP drops below 2.5 mM
+- **PFK-1 activates** (inhibition relieved)
+- Begins consuming F6P and ATP, producing F-1,6-BP and ADP
+- PK still blocked (ATP still ≥ 2.0 mM)
+
+### ATP drops below 2.0 mM
+- **Both transitions active**
+- Full glycolysis pathway operating
+- ATP production by PK now active
 - **Result**: Glycolysis accelerates, generates more ATP
 
 ### Feed-Forward Activation

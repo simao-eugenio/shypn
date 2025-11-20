@@ -61,6 +61,7 @@ class TopologySummaryGenerator:
         structural = self._summarize_structural(all_results)
         graph = self._summarize_graph(all_results)
         behavioral = self._summarize_behavioral(all_results)
+        biological = self._summarize_biological(all_results)
         
         # Build summary lines (max 5-7 lines for Report Panel)
         summary_lines = []
@@ -108,6 +109,32 @@ class TopologySummaryGenerator:
         if graph_parts:
             summary_lines.append(f"✓ Graph: {', '.join(graph_parts)}")
         
+        # Biological summary
+        biological_parts = []
+        if biological['mass_balance_passed'] is True:
+            biological_parts.append("mass balanced")
+        elif biological['mass_balance_passed'] is False:
+            biological_parts.append("mass imbalance")
+        
+        if biological['stoichiometry_valid'] is True:
+            biological_parts.append("stoichiometry valid")
+        elif biological['stoichiometry_valid'] is False:
+            biological_parts.append("stoichiometry invalid")
+        
+        if biological['flux_balance_feasible'] is True:
+            biological_parts.append("FBA feasible")
+        elif biological['flux_balance_feasible'] is False:
+            biological_parts.append("FBA infeasible")
+        
+        if biological['thermodynamics_warnings'] > 0:
+            biological_parts.append(f"{biological['thermodynamics_warnings']} thermo warnings")
+        
+        if biological_parts:
+            icon = "✓" if (biological['mass_balance_passed'] is not False and 
+                          biological['stoichiometry_valid'] is not False and
+                          biological['flux_balance_feasible'] is not False) else "⚠️"
+            summary_lines.append(f"{icon} Biological: {', '.join(biological_parts)}")
+        
         # Warnings for blocked analyses
         blocked = []
         if structural['siphons_status'] == 'blocked':
@@ -131,7 +158,9 @@ class TopologySummaryGenerator:
         # Build statistics dict (for programmatic access)
         statistics = {
             'p_invariants': structural['p_invariants_count'],
+            'p_invariant_coverage': structural['p_invariants_coverage'],
             't_invariants': structural['t_invariants_count'],
+            't_invariant_coverage': structural['t_invariants_coverage'],
             'siphons': structural['siphons_count'] if structural['siphons_status'] != 'blocked' else 'blocked',
             'traps': structural['traps_count'] if structural['traps_status'] != 'blocked' else 'blocked',
             'cycles': graph['cycles_count'],
@@ -139,7 +168,14 @@ class TopologySummaryGenerator:
             'is_live': behavioral['is_live'],
             'is_bounded': behavioral['is_bounded'],
             'has_deadlock': behavioral['has_deadlock'],
-            'reachable_states': behavioral['reachable_states']
+            'is_deadlock_free': not behavioral['has_deadlock'] if behavioral['has_deadlock'] is not None else None,
+            'reachable_states': behavioral['reachable_states'],
+            'mass_balance': biological['mass_balance_passed'],
+            'stoichiometry': biological['stoichiometry_valid'],
+            'flux_balance': biological['flux_balance_feasible'],
+            'dependency_score': biological['dependency_score'],
+            'regulatory_patterns': biological['regulatory_patterns_count'],
+            'thermodynamics_warnings': biological['thermodynamics_warnings']
         }
         
         return {
@@ -266,6 +302,67 @@ class TopologySummaryGenerator:
             elif result.get('success', True):
                 summary['reachable_states'] = result.get('total_states', 0)
                 summary['reachability_status'] = 'success'
+        
+        return summary
+    
+    def _summarize_biological(self, all_results: Dict) -> Dict:
+        """Summarize biological analysis results."""
+        summary = {
+            'mass_balance_passed': None,
+            'stoichiometry_valid': None,
+            'flux_balance_feasible': None,
+            'dependency_score': None,
+            'regulatory_patterns_count': None,
+            'thermodynamics_warnings': 0
+        }
+        
+        # Mass Balance
+        if 'mass_balance' in all_results:
+            result = self._extract_data(all_results['mass_balance'])
+            if result.get('success', True):
+                # Check if passed based on statistics
+                stats = result.get('statistics', {})
+                balanced = stats.get('balanced', 0)
+                total = stats.get('total_transitions', 0)
+                if total > 0:
+                    summary['mass_balance_passed'] = (balanced == total)
+        
+        # Stoichiometry
+        if 'stoichiometry' in all_results:
+            result = self._extract_data(all_results['stoichiometry'])
+            if result.get('success', True):
+                # Check if valid based on passed flag
+                summary['stoichiometry_valid'] = result.get('passed', True)
+        
+        # Flux Balance Analysis
+        if 'flux_balance' in all_results:
+            result = self._extract_data(all_results['flux_balance'])
+            if result.get('success', True):
+                # Check if feasible
+                summary['flux_balance_feasible'] = result.get('passed', True)
+        
+        # Dependency & Coupling
+        if 'dependency_coupling' in all_results:
+            result = self._extract_data(all_results['dependency_coupling'])
+            if result.get('success', True):
+                # Extract dependency score if available
+                summary['dependency_score'] = result.get('dependency_score')
+        
+        # Regulatory Structure
+        if 'regulatory_structure' in all_results:
+            result = self._extract_data(all_results['regulatory_structure'])
+            if result.get('success', True):
+                # Count regulatory patterns
+                patterns = result.get('regulatory_patterns', [])
+                summary['regulatory_patterns_count'] = len(patterns) if isinstance(patterns, list) else patterns
+        
+        # Thermodynamics
+        if 'thermodynamics' in all_results:
+            result = self._extract_data(all_results['thermodynamics'])
+            if result.get('success', True):
+                # Count warnings
+                stats = result.get('statistics', {})
+                summary['thermodynamics_warnings'] = stats.get('warnings', 0)
         
         return summary
     

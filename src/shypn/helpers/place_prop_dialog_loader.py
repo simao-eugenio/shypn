@@ -86,11 +86,16 @@ class PlacePropDialogLoader(GObject.GObject):
 
     def _populate_fields(self):
         """Populate dialog fields with current Place properties."""
+        # ID (read-only, managed by IDManager)
+        id_entry = self.builder.get_object('id_entry')
+        if id_entry and hasattr(self.place_obj, 'id'):
+            id_entry.set_text(str(self.place_obj.id))
+        
+        # Name (editable - user-created alias)
         name_entry = self.builder.get_object('name_entry')
         if name_entry and hasattr(self.place_obj, 'name'):
             name_entry.set_text(str(self.place_obj.name))
-            name_entry.set_editable(False)
-            name_entry.set_can_focus(False)
+            # Name is editable - user-created alias
         tokens_entry = self.builder.get_object('prop_place_tokens_entry')
         if tokens_entry and hasattr(self.place_obj, 'tokens'):
             tokens_entry.set_text(str(self.place_obj.tokens))
@@ -100,7 +105,9 @@ class PlacePropDialogLoader(GObject.GObject):
         capacity_entry = self.builder.get_object('prop_place_capacity_entry')
         if capacity_entry and hasattr(self.place_obj, 'capacity'):
             capacity_value = self.place_obj.capacity
-            if capacity_value == float('inf'):
+            if capacity_value is None:
+                capacity_entry.set_text('')
+            elif capacity_value == float('inf'):
                 capacity_entry.set_text('inf')
             else:
                 capacity_entry.set_text(str(int(capacity_value)))
@@ -128,6 +135,13 @@ class PlacePropDialogLoader(GObject.GObject):
 
     def _apply_changes(self):
         """Apply changes from dialog fields to Place object."""
+        # Name (user-editable alias)
+        name_entry = self.builder.get_object('name_entry')
+        if name_entry and hasattr(self.place_obj, 'name'):
+            new_name = name_entry.get_text().strip()
+            if new_name:  # Only update if non-empty
+                self.place_obj.name = new_name
+        
         tokens_entry = self.builder.get_object('prop_place_tokens_entry')
         if tokens_entry and hasattr(self.place_obj, 'tokens'):
             try:

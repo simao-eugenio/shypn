@@ -192,10 +192,13 @@ class LocalityDetector:
         3. Extract places from arcs (avoiding duplicates)
         4. Build Locality object
         
-        IMPORTANT: Excludes catalyst places (is_catalyst=True) from locality.
-        Catalysts are connected via test arcs (non-consuming) and should NOT
-        be considered part of the locality membership. They're "decorations"
-        showing enzyme presence, not participants in token flow.
+        IMPORTANT: Includes ALL arc types that affect transition behavior:
+        - Normal arcs: Material flow (substrates → transition → products)
+        - Test arcs: Catalytic control (enzymes/cofactors that enable reaction)
+        - Inhibitor arcs: Regulatory control (products that inhibit reaction)
+        
+        Excludes only legacy catalyst places (is_catalyst=True flag), which is
+        a deprecated decoration system separate from test arc semantics.
         
         Args:
             transition: Transition object to analyze
@@ -220,19 +223,14 @@ class LocalityDetector:
         # Scan all arcs in model
         # Model uses lists, not dictionaries
         for arc in self.model.arcs:
-            # CRITICAL: Skip test/catalyst arcs but INCLUDE inhibitor arcs
-            # Test arcs (catalysts/enzymes) don't define locality membership
-            # Inhibitor arcs DO participate in locality (regulatory control)
-            arc_type = getattr(arc, 'arc_type', 'normal')
-            if arc_type == 'test':
-                continue  # Skip test arcs (catalyst semantics)
+            # INCLUDE ALL arc types that affect transition behavior:
+            # - Normal arcs: material flow (consume/produce tokens)
+            # - Test arcs: catalytic control (affect rate without consumption)
+            # - Inhibitor arcs: negative feedback (block when product accumulates)
+            # All three arc types define the transition's regulatory context
             
-            # Also skip if it's a catalyst-like arc (consumes_tokens=False AND not inhibitor)
-            if hasattr(arc, 'consumes_tokens') and not arc.consumes_tokens() and arc_type != 'inhibitor':
-                continue
-            
-            # CRITICAL: Skip arcs involving catalyst places
-            # Catalysts are "decorations" and not part of locality
+            # ONLY skip arcs involving catalyst places marked with is_catalyst=True
+            # (legacy decoration system - different from test arc semantics)
             if getattr(arc.source, 'is_catalyst', False) or getattr(arc.target, 'is_catalyst', False):
                 continue
             
