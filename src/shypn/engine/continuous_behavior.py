@@ -60,6 +60,10 @@ class ContinuousBehavior(TransitionBehavior):
         """
         super().__init__(transition, model)
         
+        # Track if rate function has failed (to prevent repeated errors)
+        self._rate_function_failed = False
+        self._rate_function_error = None
+        
         # Extract continuous parameters
         props = getattr(transition, 'properties', {})
         
@@ -199,38 +203,47 @@ class ContinuousBehavior(TransitionBehavior):
                 result = eval(expr, {"__builtins__": {}}, context)
                 return float(result)
             except Exception as e:
-                # FAIL LOUDLY - do not use silent fallbacks in development
-                print(f"   Transition: {self.transition.name} ({self.transition.id})")
-                print(f"   Expression: {expr}")
-                print(f"   Error: {e}")
+                # Check if this is first error for this transition
+                if not self._rate_function_failed:
+                    self._rate_function_failed = True
+                    self._rate_function_error = str(e)
+                    
+                    # FAIL LOUDLY - print error once
+                    print(f"\n❌ Rate Function Error - Simulation Stopped")
+                    print(f"   Transition: {self.transition.name} ({self.transition.id})")
+                    print(f"   Expression: {expr}")
+                    print(f"   Error: {e}")
+                    
+                    # If NameError, suggest similar function names
+                    if isinstance(e, NameError):
+                        try:
+                            import re
+                            import difflib
+                            # Import at module level to avoid UnboundLocalError
+                            from shypn.engine import function_catalog
+                            
+                            # Extract undefined name from error message
+                            match = re.search(r"name '(\w+)' is not defined", str(e))
+                            if match:
+                                undefined_name = match.group(1)
+                                # Find close matches (case-insensitive)
+                                close_matches = difflib.get_close_matches(
+                                    undefined_name.lower(), 
+                                    [name.lower() for name in function_catalog.FUNCTION_CATALOG.keys()],
+                                    n=3,
+                                    cutoff=0.6
+                                )
+                                if close_matches:
+                                    # Get actual function names (preserving case)
+                                    actual_names = [name for name in function_catalog.FUNCTION_CATALOG.keys() 
+                                                  if name.lower() in close_matches]
+                                    print(f"   💡 Did you mean: {', '.join(actual_names)}?")
+                        except Exception:
+                            pass  # Silently skip suggestion if import fails
+                    
+                    print(f"\n   Fix the rate expression before running simulation.\n")
                 
-                # If NameError, suggest similar function names
-                if isinstance(e, NameError):
-                    try:
-                        import re
-                        import difflib
-                        # Import at module level to avoid UnboundLocalError
-                        from shypn.engine import function_catalog
-                        
-                        # Extract undefined name from error message
-                        match = re.search(r"name '(\w+)' is not defined", str(e))
-                        if match:
-                            undefined_name = match.group(1)
-                            # Find close matches (case-insensitive)
-                            close_matches = difflib.get_close_matches(
-                                undefined_name.lower(), 
-                                [name.lower() for name in function_catalog.FUNCTION_CATALOG.keys()],
-                                n=3,
-                                cutoff=0.6
-                            )
-                            if close_matches:
-                                # Get actual function names (preserving case)
-                                actual_names = [name for name in function_catalog.FUNCTION_CATALOG.keys() 
-                                              if name.lower() in close_matches]
-                                print(f"   💡 Did you mean: {', '.join(actual_names)}?")
-                    except Exception:
-                        pass  # Silently skip suggestion if import fails
-                
+                # Raise error to stop simulation
                 raise RuntimeError(
                     f"Failed to evaluate rate function for transition {self.transition.name}: {e}\n"
                     f"Expression: {expr}\n"

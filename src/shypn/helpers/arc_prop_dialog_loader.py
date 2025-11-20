@@ -115,7 +115,7 @@ class ArcPropDialogLoader(GObject.GObject):
         name_entry = self.builder.get_object('name_entry')
         if name_entry and hasattr(self.arc_obj, 'name'):
             name_entry.set_text(str(self.arc_obj.name))
-            name_entry.set_editable(False)
+            # Name is editable - user-created alias
         
         # Populate ID field (read-only)
         id_entry = self.builder.get_object('id_entry')
@@ -233,6 +233,13 @@ class ArcPropDialogLoader(GObject.GObject):
         Note: Arc type changes require transformation which creates a new arc object.
         The caller should check if the arc object reference changed and update accordingly.
         """
+        # Name (user-editable alias)
+        name_entry = self.builder.get_object('name_entry')
+        if name_entry and hasattr(self.arc_obj, 'name'):
+            new_name = name_entry.get_text().strip()
+            if new_name:  # Only update if non-empty
+                self.arc_obj.name = new_name
+        
         # Check if arc type needs to change
         type_combo = self.builder.get_object('prop_arc_type_combo')
         if type_combo:

@@ -131,14 +131,16 @@ class CurvedInhibitorArc(CurvedArc):
         
         # For inhibitor arc: hollow circle must be entirely outside target
         # The circle's outer edge touches the target boundary (edge-to-edge)
-        # Position circle center INWARD (away from target) by marker radius
+        # Position circle center OUTWARD (away from target) by marker radius
+        # Use -dx_end, -dy_end since that points away from target
         marker_radius = self.MARKER_RADIUS / zoom
         marker_x = boundary_x - dx_end * marker_radius
         marker_y = boundary_y - dy_end * marker_radius
         
-        # Curve draws to target center, will be cropped by target and circle
-        end_world_x = tgt_world_x
-        end_world_y = tgt_world_y
+        # Curve should stop before the hollow circle with a small gap
+        gap = 2.0 / zoom  # 2px gap for clean appearance
+        end_world_x = marker_x - dx_end * (marker_radius + gap)
+        end_world_y = marker_y - dy_end * (marker_radius + gap)
         
         # Add glow effect for colored arcs
         if self.color != self.DEFAULT_COLOR:
@@ -159,8 +161,9 @@ class CurvedInhibitorArc(CurvedArc):
         # Draw hollow circle at target boundary (not pulled back)
         self._render_arrowhead(cr, marker_x, marker_y, dx_end, dy_end, zoom)
         
-        # Draw weight label if > 1
-        if self.weight > 1:
+        # Draw weight label if different from 1 (convention: weight=1 is implicit)
+        # This includes inhibitor thresholds (Ki values)
+        if abs(self.weight - 1.0) > 1e-6:
             # Use curved arc specific weight rendering (calculates position on curve)
             # Pass offset information to ensure text goes on outer side
             offset_distance = None
@@ -280,6 +283,17 @@ class CurvedInhibitorArc(CurvedArc):
         
         # Restore context (clear any paths/state)
         cr.restore()
+    
+    def consumes_tokens(self) -> bool:
+        """Check if this arc consumes tokens on firing.
+        
+        Inhibitor arcs are read-only regulatory checks (like test arcs).
+        They check the enabling condition but do NOT consume tokens.
+        
+        Returns:
+            bool: False - curved inhibitor arcs never consume (regulatory check only)
+        """
+        return False
     
     def to_dict(self) -> dict:
         """Serialize curved inhibitor arc to dictionary for persistence.

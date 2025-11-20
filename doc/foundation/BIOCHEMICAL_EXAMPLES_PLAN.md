@@ -267,58 +267,197 @@ F6P → F-1,6-BP → ... → PEP → Pyruvate
 
 ---
 
-## Phase 4: Advanced Topics (Examples 10-12)
+## Phase 4: Metabolic Integration (Examples 10-13)
 
-### Example 10: Compartmentalization
-**Concept**: Cytosol vs. Mitochondria
-**Biological Context**: Glycolysis (cytosol) → TCA cycle (mitochondria)
+### Example 10: Citric Acid Cycle (TCA Cycle)
+**Concept**: Central metabolic hub with reversible reactions
+**Biological Context**: Acetyl-CoA → CO₂ + NADH/FADH₂ (8 steps)
 
 ```
-Glucose (cytosol) → Pyruvate (cytosol) 
-                      ↓ [transport]
-                    Pyruvate (mitochondria) → Acetyl-CoA
+Acetyl-CoA + Oxaloacetate → Citrate → Isocitrate → α-Ketoglutarate
+→ Succinyl-CoA → Succinate → Fumarate → Malate → Oxaloacetate
 ```
+
+**Learning Objectives**:
+- Cyclic pathways
+- NAD⁺/NADH cycling
+- Reversible vs. irreversible steps
+- Multiple inhibitor arcs
+
+**Parameters** (mitochondrial matrix):
+- 8 enzymatic steps with literature kinetics
+- Cofactor cycling (NAD⁺/NADH)
+- Allosteric regulation by ATP, NADH
 
 **SHYpn Features Demonstrated**:
-- Compartment modeling
-- Transport reactions
-- Place coloring by compartment
-- Spatial organization
+- Cyclic topology
+- Curved arcs for visual clarity
+- Inhibitor arcs (5 regulatory points)
+- Reversible transitions (ACO, FH)
+- Complex rate expressions
+
+**Status**: ✅ Implemented and tested
 
 ---
 
-### Example 11: Crosstalk with Pentose Phosphate Pathway
-**Concept**: Branching pathways
-**Biological Context**: G6P can enter PPP or glycolysis
+### Example 11: Glycolysis-TCA Connection
+**Concept**: Pathway integration via pyruvate dehydrogenase
+**Biological Context**: Glycolysis → Pyruvate → Acetyl-CoA → TCA
 
 ```
-        ┌─→ PPP → NADPH + Ribose-5-P
-Glucose─┤
+Glucose → ... → Pyruvate --[PDH]--> Acetyl-CoA → TCA Cycle
+                              ↑
+                              ⊣ (NADH, Acetyl-CoA)
+```
+
+**Learning Objectives**:
+- Pathway connectivity
+- Compartmentalization (cytosol → mitochondria)
+- Pyruvate dehydrogenase complex regulation
+- Metabolite transport
+
+**SHYpn Features Demonstrated**:
+- Inter-pathway connections
+- Transport reactions
+- Multi-step enzyme complexes
+- Compartment boundaries (visual grouping)
+
+**Status**: 🔄 Next to implement
+
+---
+
+### Example 12: Oxidative Phosphorylation
+**Concept**: Electron transport chain + ATP synthase
+**Biological Context**: NADH/FADH₂ → O₂ + H₂O → ATP
+
+```
+NADH → Complex I → CoQ → Complex III → Cytochrome c 
+→ Complex IV → O₂ + H₂O
+
+Proton gradient → ATP Synthase → ATP
+```
+
+**Learning Objectives**:
+- Electron transport
+- Chemiosmotic coupling
+- P/O ratio
+- Respiratory control
+
+**SHYpn Features Demonstrated**:
+- Coupled reactions (redox + phosphorylation)
+- Stoichiometric coefficients (10 H⁺ per NADH)
+- Energy transduction
+- Inhibitor modeling (oligomycin, rotenone)
+
+**Status**: 📋 Planned
+
+---
+
+### Example 13: Complete Cellular Respiration
+**Concept**: Glucose → CO₂ + H₂O + 30-32 ATP
+**Biological Context**: Glycolysis + TCA + OxPhos integrated
+
+**Components**:
+- Glycolysis (10 steps, cytosol)
+- Pyruvate transport
+- TCA cycle (8 steps, mitochondria)
+- Electron transport chain (4 complexes)
+- ATP synthase
+- Cofactor shuttles (malate-aspartate, glycerol-3-phosphate)
+
+**Learning Objectives**:
+- Complete metabolic integration
+- ATP yield calculation
+- Respiratory control ratio
+- Metabolic states (State 3, State 4)
+
+**SHYpn Features Demonstrated**:
+- Large-scale pathway modeling
+- Multi-compartment simulation
+- Flux balance analysis
+- Metabolic control analysis
+- Energy efficiency calculation
+
+**Status**: 📋 Planned
+
+---
+
+## Phase 5: Advanced Regulation (Examples 14-16)
+
+### Example 14: Pentose Phosphate Pathway
+**Concept**: Branching pathway from glycolysis
+**Biological Context**: G6P can enter PPP or continue glycolysis
+
+```
+        ┌─→ PPP (Oxidative) → NADPH + Ribose-5-P
+Glucose─┤        (Non-oxidative) ⇌ Glycolytic intermediates
         └─→ Glycolysis → ATP + Pyruvate
 ```
 
+**Learning Objectives**:
+- Pathway branching and flux distribution
+- NADPH production for biosynthesis
+- Metabolic flexibility
+
 **SHYpn Features Demonstrated**:
-- Pathway branching
-- Flux distribution
-- Multi-objective optimization
+- Multi-pathway models
+- Flux distribution analysis
 - Pathway comparison
+- Optimization (maximize NADPH vs. ATP)
+
+**Status**: 📋 Planned
 
 ---
 
-### Example 12: Hormonal Regulation
-**Concept**: External signals affecting pathway
-**Biological Context**: Insulin stimulates glucose uptake and glycolysis
+### Example 15: Gluconeogenesis
+**Concept**: Reverse glycolysis with bypass reactions
+**Biological Context**: Lactate/Amino acids → Glucose
 
 ```
-Insulin → [GLUT4 translocation] → ↑ Glucose uptake
-       → [PFK-2 activation] → ↑ F-2,6-BP → ⊕ PFK-1
+Pyruvate --[PC + PEPCK]--> PEP → ... → F-1,6-BP --[FBPase]--> 
+F6P → G6P --[G6Pase]--> Glucose
 ```
+
+**Learning Objectives**:
+- Reciprocal regulation (glycolysis vs. gluconeogenesis)
+- Futile cycles prevention
+- Hormonal control (insulin vs. glucagon)
 
 **SHYpn Features Demonstrated**:
-- Signal transduction
-- Time-dependent parameters
-- Switching behavior
-- Logical regulation (Boolean)
+- Pathway antagonism
+- Conditional activation/inhibition
+- Metabolic switching
+- Energy cost analysis
+
+**Status**: 📋 Planned
+
+---
+
+### Example 16: Fed vs. Fasted Metabolic States
+**Concept**: Global metabolic regulation by hormones
+**Biological Context**: Insulin (anabolic) vs. Glucagon (catabolic)
+
+```
+Fed State (Insulin):
+  ↑ Glucose uptake → ↑ Glycolysis → ↑ TCA → ↓ Gluconeogenesis
+
+Fasted State (Glucagon):
+  ↓ Glucose uptake → ↓ Glycolysis → ↓ TCA → ↑ Gluconeogenesis
+```
+
+**Learning Objectives**:
+- Systems-level regulation
+- Hormonal signal transduction
+- Metabolic state transitions
+- Enzyme phosphorylation cascades
+
+**SHYpn Features Demonstrated**:
+- Time-dependent parameter changes
+- Boolean logic (AND/OR gates)
+- State machines
+- Dynamic pathway activation/deactivation
+
+**Status**: 📋 Planned
 
 ---
 
@@ -327,21 +466,25 @@ Insulin → [GLUT4 translocation] → ↑ Glucose uptake
 ### Directory Structure
 ```
 workspace/projects/Biochemical-Examples/
-├── 01_ATP_Hydrolysis/
+├── 01_ATP_Hydrolysis/            [✅ Phase 1]
 │   ├── model.shy
 │   ├── README.md
 │   └── parameters.json
-├── 02_PGI_Equilibrium/
-├── 03_Hexokinase_MM/
-├── 04_G6P_Inhibition/
-├── 05_PFK_Allosteric/
-├── 06_PGK_Coupling/
-├── 07_Upper_Glycolysis/
-├── 08_Energy_Sensing/
-├── 09_Complete_Glycolysis/
-├── 10_Compartments/
-├── 11_PPP_Crosstalk/
-└── 12_Hormonal_Control/
+├── 02_PGI_Equilibrium/           [✅ Phase 1]
+├── 03_Hexokinase_MM/             [✅ Phase 1]
+├── 04_Allosteric_Inhibition_PFK/ [✅ Phase 2]
+├── 05_Competitive_Inhibition/    [✅ Phase 2]
+├── 06_Feedback_Loop/             [✅ Phase 2]
+├── 07_Upper_Glycolysis_Pathway/  [✅ Phase 3]
+├── 08_Energy_Sensing_Motif/      [✅ Phase 3]
+├── 09_Complete_Glycolysis/       [✅ Phase 3]
+├── 10_Citric_Acid_Cycle/         [✅ Phase 4]
+├── 11_Glycolysis_TCA_Connection/ [🔄 Phase 4 - Next]
+├── 12_Oxidative_Phosphorylation/ [📋 Phase 4]
+├── 13_Complete_Respiration/      [📋 Phase 4]
+├── 14_Pentose_Phosphate_Pathway/ [📋 Phase 5]
+├── 15_Gluconeogenesis/           [📋 Phase 5]
+└── 16_Fed_Fasted_States/         [📋 Phase 5]
 ```
 
 ### Documentation for Each Example
@@ -431,12 +574,14 @@ For each example:
 
 ## Timeline
 
-- **Week 1-2**: Examples 1-3 (Foundation)
-- **Week 3-4**: Examples 4-6 (Regulation)
-- **Week 5-6**: Examples 7-9 (Integration)
-- **Week 7-8**: Examples 10-12 (Advanced)
-- **Week 9**: Documentation and testing
-- **Week 10**: Review and refinement
+- **Week 1-2**: Examples 1-3 (Foundation) ✅
+- **Week 3-4**: Examples 4-6 (Regulation) ✅
+- **Week 5-6**: Examples 7-9 (Integration) ✅
+- **Week 7**: Example 10 (Citric Acid Cycle) ✅
+- **Week 8-9**: Examples 11-13 (Metabolic Integration) 🔄
+- **Week 10-11**: Examples 14-16 (Advanced Regulation) 📋
+- **Week 12**: Documentation and comprehensive testing
+- **Week 13**: Review, validation, and refinement
 
 ---
 

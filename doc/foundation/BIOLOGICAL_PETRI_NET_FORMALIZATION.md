@@ -446,15 +446,17 @@ The Topology Panel should have **4 categories**:
 
 **Status**: ⚠️ Use with caution, many checks don't apply.
 
-#### Category 4: Biological Analysis (NEW - Bio-PN Specific) ✨
-- **Mass Balance**: Atom conservation (C, H, O, N, P, S)
-- **Stoichiometric Consistency**: Valid chemical reactions
-- **Flux Balance**: Steady-state feasibility (FBA)
-- **Dependency & Coupling**: Classify place-sharing relationships (competitive vs convergent)
-- **Regulatory Structure**: Catalysts, inhibitors (places in formulas, not arcs)
-- **Thermodynamic Feasibility**: ∆G checks (future)
+#### Category 4: Biological Analysis (Bio-PN Specific) ✨
+- **Mass Balance**: Atom conservation (C, H, O, N, P, S) ✅ IMPLEMENTED
+- **Stoichiometric Consistency**: Valid chemical reactions ✅ IMPLEMENTED
+- **Flux Balance**: Steady-state feasibility (FBA) ✅ IMPLEMENTED
+- **Dependency & Coupling**: Classify place-sharing relationships (competitive vs convergent) ✅ IMPLEMENTED
+- **Regulatory Structure**: Catalysts, inhibitors (places in formulas, not arcs) ✅ IMPLEMENTED
+- **Thermodynamic Feasibility**: ∆G checks ⚙️ BASIC (heuristic-based, database integration future)
 
-**Status**: ❌ Not yet implemented → **This document proposes implementation**.
+**Status**: ✅ **6/6 analyzers implemented** (100% complete). 
+- Thermodynamic analyzer provides basic checks (reversibility, ATP coupling, futile cycles)
+- Full ∆G°' calculations require chemical database (ChEBI/MetaCyc) - future enhancement
 
 ### 5.2 Analyzer Specifications
 
@@ -639,11 +641,13 @@ Sources and sinks are special cases of convergent (source) or competitive (sink)
   - Hide classical metrics (liveness, boundedness) with explanation
 
 ### Phase 3: Core Biological Analyzers (Week 3-4)
-⬜ **Task 3.1**: Implement `mass_balance.py` (Priority: HIGH)
-⬜ **Task 3.2**: Implement `stoichiometry.py` (Priority: HIGH)
-⬜ **Task 3.3**: Implement `sources_sinks.py` (Priority: MEDIUM)
-⬜ **Task 3.4**: Implement `regulation.py` (Priority: MEDIUM)
-⬜ **Task 3.5**: Implement `flux_balance.py` (Priority: LOW - requires optimization library)
+✅ **Task 3.1**: Implement `mass_balance.py` (Priority: HIGH) - **COMPLETED November 20, 2025**
+✅ **Task 3.2**: Implement `stoichiometry.py` (Priority: HIGH) - **COMPLETED November 20, 2025**
+✅ **Task 3.3**: Implement `sources_sinks.py` (Priority: MEDIUM) - **Integrated into dependency_coupling.py**
+✅ **Task 3.4**: Implement `regulation.py` (Priority: MEDIUM) - **Implemented as regulatory_structure.py**
+✅ **Task 3.5**: Implement `flux_balance.py` (Priority: LOW - requires optimization library) - **COMPLETED November 20, 2025**
+
+**Status**: ✅ All core analyzers implemented! 5/5 complete (100%)
 
 ### Phase 4: Testing and Validation (Week 5)
 ⬜ **Task 4.1**: Create `tests/test_biological_topology.py`

@@ -75,11 +75,17 @@ class Arc(PetriNetObject):
         """Get the arc type identifier.
         
         Returns:
-            str: Arc type - "normal", "inhibitor", "test"
+            str: Arc type - "normal", "inhibitor", "test", "curved_arc", "curved_inhibitor_arc"
         """
         from shypn.netobjs.inhibitor_arc import InhibitorArc
         from shypn.netobjs.test_arc import TestArc
+        from shypn.netobjs.curved_arc import CurvedArc
+        from shypn.netobjs.curved_inhibitor_arc import CurvedInhibitorArc
         
+        if isinstance(self, CurvedInhibitorArc):
+            return "curved_inhibitor_arc"
+        if isinstance(self, CurvedArc):
+            return "curved_arc"
         if isinstance(self, TestArc):
             return "test"
         if isinstance(self, InhibitorArc):
@@ -298,8 +304,9 @@ class Arc(PetriNetObject):
         # Draw arrowhead at target (with zoom compensation)
         self._render_arrowhead(cr, display_end_x, display_end_y, arrow_dx, arrow_dy, zoom)
         
-        # Draw weight label if > 1
-        if self.weight > 1:
+        # Draw weight label if different from 1 (convention: weight=1 is implicit)
+        # This includes stoichiometric coefficients and inhibitor thresholds (Ki values)
+        if abs(self.weight - 1.0) > 1e-6:
             self._render_weight(cr, display_start_x, display_start_y, display_end_x, display_end_y, zoom)
         
         # Ensure clean state for next rendering operation
@@ -671,7 +678,7 @@ class Arc(PetriNetObject):
         data = super().to_dict()  # Get base properties (id, name, label)
         data.update({
             "object_type": "arc",  # Renamed from "type" to avoid confusion
-            "arc_type": "normal",  # CRITICAL: Mark as normal arc (subclasses override)
+            "arc_type": self.arc_type,  # Use property to get correct type for subclasses
             "source_id": self.source.id,
             "source_type": "place" if isinstance(self.source, Place) else "transition",
             "target_id": self.target.id,
@@ -714,6 +721,12 @@ class Arc(PetriNetObject):
         elif arc_type == 'inhibitor':
             from shypn.netobjs.inhibitor_arc import InhibitorArc
             arc_class = InhibitorArc
+        elif arc_type in ('curved_arc', 'curved'):  # Support both for backward compatibility
+            from shypn.netobjs.curved_arc import CurvedArc
+            arc_class = CurvedArc
+        elif arc_type == 'curved_inhibitor_arc':
+            from shypn.netobjs.curved_inhibitor_arc import CurvedInhibitorArc
+            arc_class = CurvedInhibitorArc
         else:
             arc_class = cls  # Use the class this method was called on (Arc)
         

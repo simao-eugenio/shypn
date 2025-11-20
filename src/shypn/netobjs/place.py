@@ -178,7 +178,8 @@ class Place(PetriNetObject):
             count: Token count (non-negative, will be capped at capacity)
         """
         count = max(0, count)
-        if self.capacity != float('inf'):
+        # Handle capacity: None and float('inf') both mean unlimited
+        if self.capacity is not None and self.capacity != float('inf'):
             count = min(count, int(self.capacity))
         self.tokens = count
         self._trigger_redraw()

@@ -378,28 +378,60 @@ class TopologyAnalysesCategory(BaseReportCategory):
         Args:
             stats: statistics dict from summary
         """
+        # Get all biological analysis results
+        mass_balance = stats.get('mass_balance')
+        stoichiometry = stats.get('stoichiometry')
+        flux_balance = stats.get('flux_balance')
         dep_score = stats.get('dependency_score')
         reg_patterns = stats.get('regulatory_patterns', 0)
+        thermo_warnings = stats.get('thermodynamics_warnings', 0)
         
-        if dep_score is not None or reg_patterns > 0:
-            lines = []
-            
-            if dep_score is not None:
-                # Interpret dependency score
-                if dep_score < 0.3:
-                    interp = "low coupling"
-                elif dep_score < 0.6:
-                    interp = "moderate coupling"
-                else:
-                    interp = "high coupling"
-                lines.append(f"✓ Dependency score: {dep_score:.2f} ({interp})")
-            
-            if reg_patterns > 0:
-                lines.append(f"✓ {reg_patterns} regulatory pattern(s)")
-            
+        lines = []
+        
+        # Mass Balance
+        if mass_balance is True:
+            lines.append("✓ Mass Balance: Passed (all reactions balanced)")
+        elif mass_balance is False:
+            lines.append("✗ Mass Balance: Failed (unbalanced reactions)")
+        
+        # Stoichiometry
+        if stoichiometry is True:
+            lines.append("✓ Stoichiometry: Valid")
+        elif stoichiometry is False:
+            lines.append("✗ Stoichiometry: Invalid")
+        
+        # Flux Balance Analysis
+        if flux_balance is True:
+            lines.append("✓ Flux Balance: Feasible")
+        elif flux_balance is False:
+            lines.append("✗ Flux Balance: Infeasible")
+        
+        # Dependency & Coupling
+        if dep_score is not None:
+            # Interpret dependency score
+            if dep_score < 0.3:
+                interp = "low coupling"
+            elif dep_score < 0.6:
+                interp = "moderate coupling"
+            else:
+                interp = "high coupling"
+            lines.append(f"✓ Dependency score: {dep_score:.2f} ({interp})")
+        
+        # Regulatory Structure
+        if reg_patterns and reg_patterns > 0:
+            lines.append(f"✓ Regulatory patterns: {reg_patterns}")
+        
+        # Thermodynamics
+        if thermo_warnings is not None:
+            if thermo_warnings == 0:
+                lines.append("✓ Thermodynamics: No warnings")
+            else:
+                lines.append(f"⚠️ Thermodynamics: {thermo_warnings} warning(s)")
+        
+        if lines:
             self.biological_summary_label.set_text("\n".join(lines))
         else:
-                        self.biological_summary_label.set_text("○ No biological analysis performed")
+            self.biological_summary_label.set_text("○ No biological analysis performed")
     
     def get_structured_data(self):
         """Get structured topology analysis data for document generation.

@@ -1831,30 +1831,25 @@ class ViabilityPanel(Gtk.Box):
                 if not locality_ids:
                     continue
                 
-                print(f"  Resetting colors for {transition_id}:")
-                
                 # Reset transition color
-                print(f"    - Transition: {locality_ids.transition.id}")
                 locality_ids.transition.border_color = Transition.DEFAULT_BORDER_COLOR
                 locality_ids.transition.fill_color = Transition.DEFAULT_COLOR
                 
                 # Reset input place colors
                 for p_obj in locality_ids.input_places:
-                    print(f"    - Input place: {p_obj.id}")
                     p_obj.border_color = Place.DEFAULT_BORDER_COLOR
                 
                 # Reset output place colors
                 for p_obj in locality_ids.output_places:
-                    print(f"    - Output place: {p_obj.id}")
                     p_obj.border_color = Place.DEFAULT_BORDER_COLOR
                 
                 # Reset input arc colors
                 for arc_obj in locality_ids.input_arcs:
-                    print(f"    - Input arc: {arc_obj.id}")
+                    pass
                 
                 # Reset output arc colors
                 for arc_obj in locality_ids.output_arcs:
-                    print(f"    - Output arc: {arc_obj.id}")
+                    pass
         
         
         # Clear localities list

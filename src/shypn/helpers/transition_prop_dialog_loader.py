@@ -120,12 +120,16 @@ class TransitionPropDialogLoader(GObject.GObject):
     
     def _populate_fields(self):
         """Populate dialog fields with current Transition properties."""
-        # Name (read-only system identifier)
+        # ID (read-only, managed by IDManager)
+        id_entry = self.builder.get_object('id_entry')
+        if id_entry and hasattr(self.transition_obj, 'id'):
+            id_entry.set_text(str(self.transition_obj.id))
+        
+        # Name (editable - user-created alias)
         name_entry = self.builder.get_object('name_entry')
         if name_entry and hasattr(self.transition_obj, 'name'):
             name_entry.set_text(str(self.transition_obj.name))
-            name_entry.set_editable(False)
-            name_entry.set_can_focus(False)
+            # Name is editable - user-created alias
         
         # Label (user-editable)
         label_entry = self.builder.get_object('transition_label_entry')
@@ -265,6 +269,21 @@ class TransitionPropDialogLoader(GObject.GObject):
         if width_entry and hasattr(self.transition_obj, 'border_width'):
             width_entry.set_text(str(self.transition_obj.border_width))
         
+        # Rectangle Width
+        rect_width_entry = self.builder.get_object('rect_width_entry')
+        if rect_width_entry and hasattr(self.transition_obj, 'width'):
+            rect_width_entry.set_text(str(self.transition_obj.width))
+        
+        # Rectangle Height
+        rect_height_entry = self.builder.get_object('rect_height_entry')
+        if rect_height_entry and hasattr(self.transition_obj, 'height'):
+            rect_height_entry.set_text(str(self.transition_obj.height))
+        
+        # Setup flip orientation button
+        flip_button = self.builder.get_object('flip_orientation_button')
+        if flip_button:
+            flip_button.connect('clicked', self._on_flip_orientation_clicked)
+        
         # Update type description
         self._update_type_description()
     
@@ -312,6 +331,44 @@ class TransitionPropDialogLoader(GObject.GObject):
     def _on_reversible_toggled(self, checkbox):
         """Handle reversible checkbox toggle."""
         self._update_reversible_fields_visibility()
+    
+    def _on_flip_orientation_clicked(self, button):
+        """Handle flip orientation button click - swap width and height."""
+        rect_width_entry = self.builder.get_object('rect_width_entry')
+        rect_height_entry = self.builder.get_object('rect_height_entry')
+        
+        if rect_width_entry and rect_height_entry:
+            # Get current values
+            width_text = rect_width_entry.get_text().strip()
+            height_text = rect_height_entry.get_text().strip()
+            
+            # Swap them
+            rect_width_entry.set_text(height_text)
+            rect_height_entry.set_text(width_text)
+            
+            # Apply immediately to transition object if valid
+            try:
+                if width_text and height_text:
+                    width_val = float(width_text)
+                    height_val = float(height_text)
+                    
+                    # Swap in the transition object
+                    if hasattr(self.transition_obj, 'width') and hasattr(self.transition_obj, 'height'):
+                        self.transition_obj.width = height_val
+                        self.transition_obj.height = width_val
+                        
+                        # Mark document dirty
+                        if self.persistency_manager:
+                            self.persistency_manager.mark_dirty()
+                        
+                        # Trigger canvas redraw immediately
+                        if self.model and hasattr(self.model, '_drawing_area') and self.model._drawing_area:
+                            self.model._drawing_area.queue_draw()
+                        
+                        # Emit change signal for other listeners
+                        self.emit('properties-changed')
+            except ValueError:
+                pass  # Invalid values, just swap the text
     
     def _show_error_dialog(self, title, message):
         """Show error dialog with given title and message."""
@@ -499,6 +556,13 @@ class TransitionPropDialogLoader(GObject.GObject):
             bool: True if successful, False if validation failed
         """
         try:
+            # Name (user-editable alias)
+            name_entry = self.builder.get_object('name_entry')
+            if name_entry and hasattr(self.transition_obj, 'name'):
+                new_name = name_entry.get_text().strip()
+                if new_name:  # Only update if non-empty
+                    self.transition_obj.name = new_name
+            
             # Label
             label_entry = self.builder.get_object('transition_label_entry')
             if label_entry:
@@ -681,6 +745,28 @@ class TransitionPropDialogLoader(GObject.GObject):
                     if width_text:
                         width_value = float(width_text)
                         self.transition_obj.border_width = max(0.5, width_value)
+                except ValueError:
+                    pass  # Keep current value if invalid
+            
+            # Rectangle Width
+            rect_width_entry = self.builder.get_object('rect_width_entry')
+            if rect_width_entry and hasattr(self.transition_obj, 'width'):
+                try:
+                    width_text = rect_width_entry.get_text().strip()
+                    if width_text:
+                        width_value = float(width_text)
+                        self.transition_obj.width = max(1.0, width_value)
+                except ValueError:
+                    pass  # Keep current value if invalid
+            
+            # Rectangle Height
+            rect_height_entry = self.builder.get_object('rect_height_entry')
+            if rect_height_entry and hasattr(self.transition_obj, 'height'):
+                try:
+                    height_text = rect_height_entry.get_text().strip()
+                    if height_text:
+                        height_value = float(height_text)
+                        self.transition_obj.height = max(1.0, height_value)
                 except ValueError:
                     pass  # Keep current value if invalid
             
