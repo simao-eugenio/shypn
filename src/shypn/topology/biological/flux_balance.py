@@ -58,8 +58,11 @@ class FluxBalanceAnalyzer(TopologyAnalyzer):
         self.name = "Flux Balance Analysis"
         self.description = "Checks steady-state feasibility using constraint-based modeling"
     
-    def analyze(self) -> AnalysisResult:
+    def analyze(self, **kwargs) -> AnalysisResult:
         """Perform flux balance analysis.
+        
+        Args:
+            **kwargs: Optional parameters (unused, for compatibility)
         
         Returns:
             AnalysisResult: Contains feasibility, flux ranges, blocked reactions
@@ -83,18 +86,16 @@ class FluxBalanceAnalyzer(TopologyAnalyzer):
                 result_data = self._analyze_with_scipy(N, place_ids, transition_ids)
             
             result = AnalysisResult(
-                analyzer_name=self.name,
                 success=True,
                 data=result_data,
-                message=self._format_summary(result_data['statistics'])
+                summary=self._format_summary(result_data['statistics'])
             )
             
             return result
             
         except Exception as e:
             raise TopologyAnalysisError(
-                f"Flux balance analysis failed: {str(e)}",
-                analyzer=self.name
+                f"Flux balance analysis failed: {str(e)}"
             )
     
     def _build_stoichiometric_matrix(self) -> Tuple[np.ndarray, List[str], List[str]]:

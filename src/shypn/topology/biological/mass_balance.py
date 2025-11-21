@@ -59,8 +59,11 @@ class MassBalanceAnalyzer(TopologyAnalyzer):
         self.name = "Mass Balance"
         self.description = "Validates atom conservation (C, H, O, N, P, S) across reactions"
     
-    def analyze(self) -> AnalysisResult:
+    def analyze(self, **kwargs) -> AnalysisResult:
         """Analyze mass balance for all transitions.
+        
+        Args:
+            **kwargs: Optional parameters (unused, for compatibility)
         
         Returns:
             AnalysisResult: Contains balanced/unbalanced transitions, atom counts
@@ -95,7 +98,6 @@ class MassBalanceAnalyzer(TopologyAnalyzer):
             
             # Create result
             result = AnalysisResult(
-                analyzer_name=self.name,
                 success=True,
                 data={
                     'balanced_transitions': balanced_transitions,
@@ -103,15 +105,14 @@ class MassBalanceAnalyzer(TopologyAnalyzer):
                     'place_formulas': place_formulas,
                     'statistics': statistics,
                 },
-                message=self._format_summary(statistics)
+                summary=self._format_summary(statistics)
             )
             
             return result
             
         except Exception as e:
             raise TopologyAnalysisError(
-                f"Mass balance analysis failed: {str(e)}",
-                analyzer=self.name
+                f"Mass balance analysis failed: {str(e)}"
             )
     
     def _parse_place_formulas(self) -> Dict[str, Dict[str, int]]:

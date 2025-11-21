@@ -54,8 +54,11 @@ class StoichiometryAnalyzer(TopologyAnalyzer):
         self.name = "Stoichiometric Consistency"
         self.description = "Validates stoichiometric matrix structure and conservation laws"
     
-    def analyze(self) -> AnalysisResult:
+    def analyze(self, **kwargs) -> AnalysisResult:
         """Analyze stoichiometric consistency.
+        
+        Args:
+            **kwargs: Optional parameters (unused, for compatibility)
         
         Returns:
             AnalysisResult: Contains stoichiometric matrix, rank, conservation laws
@@ -93,7 +96,6 @@ class StoichiometryAnalyzer(TopologyAnalyzer):
             }
             
             result = AnalysisResult(
-                analyzer_name=self.name,
                 success=True,
                 data={
                     'stoichiometric_matrix': N.tolist(),
@@ -105,15 +107,14 @@ class StoichiometryAnalyzer(TopologyAnalyzer):
                     'fractional_arcs': fractional_arcs,
                     'statistics': statistics,
                 },
-                message=self._format_summary(statistics)
+                summary=self._format_summary(statistics)
             )
             
             return result
             
         except Exception as e:
             raise TopologyAnalysisError(
-                f"Stoichiometry analysis failed: {str(e)}",
-                analyzer=self.name
+                f"Stoichiometry analysis failed: {str(e)}"
             )
     
     def _build_stoichiometric_matrix(self) -> Tuple[np.ndarray, List[str], List[str]]:

@@ -545,13 +545,16 @@ class ModelCanvasLoader:
                             break
                 
                 # Reset colors for all selected transitions
+                # NOTE: Only reset if object doesn't have a custom color from file
                 for obj in transition_panel.selected_objects:
                     old_callback = obj.on_changed if hasattr(obj, 'on_changed') else None
                     obj.on_changed = None
                     
-                    if isinstance(obj, Transition):
-                        obj.border_color = Transition.DEFAULT_BORDER_COLOR
-                        obj.fill_color = Transition.DEFAULT_COLOR
+                    # SKIP: Don't reset colors - they may be custom colors from the loaded file
+                    # The Analyses panel should restore original colors instead of forcing black
+                    # if isinstance(obj, Transition):
+                    #     obj.border_color = Transition.DEFAULT_BORDER_COLOR
+                    #     obj.fill_color = Transition.DEFAULT_COLOR
                     
                     obj.on_changed = old_callback
                 
@@ -567,12 +570,15 @@ class ModelCanvasLoader:
             if hasattr(self.right_panel_loader, 'place_panel') and self.right_panel_loader.place_panel:
                 place_panel = self.right_panel_loader.place_panel
                 # Reset colors for all selected places
+                # NOTE: Only reset if object doesn't have a custom color from file
                 for obj in place_panel.selected_objects:
                     old_callback = obj.on_changed if hasattr(obj, 'on_changed') else None
                     obj.on_changed = None
                     
-                    if isinstance(obj, Place):
-                        obj.border_color = Place.DEFAULT_BORDER_COLOR
+                    # SKIP: Don't reset colors - they may be custom colors from the loaded file
+                    # The Analyses panel should restore original colors instead of forcing black
+                    # if isinstance(obj, Place):
+                    #     obj.border_color = Place.DEFAULT_BORDER_COLOR
                     
                     obj.on_changed = old_callback
                 
