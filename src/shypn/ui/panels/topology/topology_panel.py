@@ -250,7 +250,7 @@ class TopologyPanel(Gtk.Box):
             try:
                 self._report_refresh_callback()
             except Exception as e:
-                print(f"Warning: Could not refresh report panel: {e}")
+                pass  # Silently ignore report panel refresh failures
     
     def get_all_results(self):
         """Get all analyzer results from all categories.
