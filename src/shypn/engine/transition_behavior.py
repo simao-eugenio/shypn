@@ -139,32 +139,53 @@ class TransitionBehavior(ABC):
         """Manual enablement check with proper handling of ALL arc types.
         
         SHYPN Arc Semantics:
-        - Normal arcs: tokens >= weight (standard enablement, CONSUMES)
-        - Test arcs: tokens >= weight (catalyst presence, NON-CONSUMING)
-        - Inhibitor arcs: tokens < weight (INVERTED - negative feedback)
+        - Normal arcs: tokens >= threshold (standard enablement, CONSUMES)
+        - Test arcs: tokens >= threshold (catalyst presence, NON-CONSUMING)
+        - Inhibitor arcs: tokens < threshold (INVERTED - negative feedback)
+        
+        **Dynamic Threshold Support** (NEW):
+        When arc.threshold is set, it SUPERSEDES arc.weight for enablement checking.
+        The arc.weight property is still used for token consumption.
+        
+        Threshold types:
+        - None: Use arc.weight (backward compatible)
+        - Numeric: Fixed threshold value
+        - Expression: Dynamic formula (e.g., "4.0 * (1.0 + AMP / 0.1)")
+        - Function: Lambda with dependencies
         
         Biological Semantics:
-        - Normal arc: "I need weight tokens to function" (substrate requirement)
+        - Normal arc: "I need threshold tokens to function" (substrate requirement)
         - Test arc: "Catalyst/enzyme must be present" (non-consuming check)
-        - Inhibitor arc: "Inhibit reaction when product >= weight" (negative feedback)
+        - Inhibitor arc: "Inhibit reaction when product >= threshold" (negative feedback)
         
         Example with weight=10:
         - Normal arc: enabled at 10+ tokens, CONSUMES 10 tokens on fire
         - Test arc: enabled at 10+ tokens, DOES NOT consume on fire
         - Inhibitor arc: DISABLED at 10+ tokens (product inhibition)
         
+        Example with dynamic threshold:
+        - arc.weight = 1 (consumption)
+        - arc.threshold = "4.0 * (1.0 + AMP / 0.1)" (enablement)
+        - At AMP=0.05: threshold=6.0, enabled if tokens >= 6.0
+        
         This models biological reactions correctly:
         - Substrates are consumed (normal arcs)
         - Enzymes enable but aren't consumed (test arcs)
         - Products can inhibit their own production (inhibitor arcs)
+        - Inhibition thresholds adapt to cellular state (dynamic thresholds)
         
         Returns:
             bool: True if enabled, False otherwise
         """
         from shypn.netobjs.inhibitor_arc import InhibitorArc
         from shypn.netobjs.test_arc import TestArc
+        from shypn.utils.threshold_evaluator import ThresholdEvaluator
         
         input_arcs = self.get_input_arcs()
+        
+        # Create threshold evaluator for dynamic threshold support
+        evaluator = ThresholdEvaluator(self.model)
+        context = {'time': self._get_current_time()}
         
         for arc in input_arcs:
             # Get source place directly from arc reference
@@ -172,23 +193,26 @@ class TransitionBehavior(ABC):
             if source_place is None:
                 raise ValueError(f"Arc {arc.id if hasattr(arc, 'id') else 'unknown'} has no source place")
             
+            # Evaluate effective threshold (supersedes weight if threshold is set)
+            effective_threshold = evaluator.evaluate(arc, context)
+            
             # Check based on arc type
             if isinstance(arc, InhibitorArc):
-                # Inhibitor: INVERTED check (tokens < weight)
+                # Inhibitor: INVERTED check (tokens < threshold)
                 # Transition DISABLED when place has too many tokens (negative feedback)
                 # Transition ENABLED when place has few tokens (allows production)
-                if source_place.tokens >= arc.weight:
+                if source_place.tokens >= effective_threshold:
                     return False  # INHIBITED by excess product
             elif isinstance(arc, TestArc):
-                # Test arc: Same enablement as normal (tokens >= weight)
+                # Test arc: Same enablement as normal (tokens >= threshold)
                 # BUT does NOT consume tokens on fire (catalyst behavior)
                 # This is checked separately in fire() methods via consumes_tokens()
-                if source_place.tokens < arc.weight:
+                if source_place.tokens < effective_threshold:
                     return False  # Catalyst not present in sufficient quantity
             else:
-                # Normal: Standard check (tokens >= weight)
+                # Normal: Standard check (tokens >= threshold)
                 # Transition enabled when enough substrate available
-                if source_place.tokens < arc.weight:
+                if source_place.tokens < effective_threshold:
                     return False
         
         return True

@@ -386,11 +386,16 @@ class ContinuousBehavior(TransitionBehavior):
         # Inhibitor arcs provide regulatory control and must always be evaluated
         from shypn.netobjs.inhibitor_arc import InhibitorArc
         from shypn.netobjs.curved_inhibitor_arc import CurvedInhibitorArc
+        from shypn.utils.threshold_evaluator import ThresholdEvaluator  # NEW
         
         # Get all input arcs to check for inhibitors
         all_input_arcs = self.get_input_arcs()
         inhibitor_arcs = [arc for arc in all_input_arcs 
                          if isinstance(arc, (InhibitorArc, CurvedInhibitorArc))]
+        
+        # Create threshold evaluator for dynamic threshold support
+        evaluator = ThresholdEvaluator(self.model)
+        context = {'time': current_time}
         
         # DEBUG: Log inhibitor arc checks for Example 08
         if self.transition.id in ['T1', 'T2'] and len(inhibitor_arcs) > 0:
@@ -400,7 +405,8 @@ class ContinuousBehavior(TransitionBehavior):
             for arc in inhibitor_arcs:
                 source_place = self._get_place(arc.source_id)
                 if source_place:
-                    logger.info(f"  Arc {arc.id}: {source_place.id} tokens={source_place.tokens:.4f}, weight={arc.weight}, blocked={source_place.tokens >= arc.weight}")
+                    effective_threshold = evaluator.evaluate(arc, context)
+                    logger.info(f"  Arc {arc.id}: {source_place.id} tokens={source_place.tokens:.4f}, threshold={effective_threshold}, blocked={source_place.tokens >= effective_threshold}")
         
         # Check inhibitor arcs first (they can block transition regardless of direction)
         for arc in inhibitor_arcs:
@@ -408,8 +414,11 @@ class ContinuousBehavior(TransitionBehavior):
             if source_place is None:
                 return False, f"missing-place-{arc.source_id}"
             
-            # Inhibitor arcs: DISABLED when tokens >= weight (negative feedback)
-            if source_place.tokens >= arc.weight:
+            # Evaluate dynamic threshold (supersedes weight if threshold is set)
+            effective_threshold = evaluator.evaluate(arc, context)
+            
+            # Inhibitor arcs: DISABLED when tokens >= threshold (negative feedback)
+            if source_place.tokens >= effective_threshold:
                 return False, f"inhibited-by-{arc.source_id}"
         
         # Now check normal/test arcs in the flow direction
