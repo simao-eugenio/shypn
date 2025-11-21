@@ -98,8 +98,11 @@ class ThermodynamicAnalyzer(TopologyAnalyzer):
             'Pi', 'PPi', 'Phosphate'      # Inorganic phosphate
         }
     
-    def analyze(self) -> AnalysisResult:
+    def analyze(self, **kwargs) -> AnalysisResult:
         """Perform thermodynamic analysis.
+        
+        Args:
+            **kwargs: Optional parameters (unused, for compatibility)
         
         Returns:
             AnalysisResult with formatted report
@@ -117,9 +120,8 @@ class ThermodynamicAnalyzer(TopologyAnalyzer):
         report = self._format_report()
         
         return AnalysisResult(
-            analyzer_name="Thermodynamic Feasibility",
-            passed=len([i for i in self.issues if i.severity == 'error']) == 0,
-            report=report,
+            success=len([i for i in self.issues if i.severity == 'error']) == 0,
+            summary=report,
             data={
                 'issues': [
                     {
@@ -156,7 +158,7 @@ class ThermodynamicAnalyzer(TopologyAnalyzer):
         CURRENT: Heuristic-based on keywords and reaction patterns
         FUTURE: Calculate from ΔG°' database
         """
-        for transition in self.model.transitions.values():
+        for transition in self.model.transitions:
             is_reversible = self._is_reversible(transition)
             should_be_reversible = self._should_be_reversible(transition)
             
@@ -198,7 +200,7 @@ class ThermodynamicAnalyzer(TopologyAnalyzer):
         CURRENT: Pattern matching for biosynthetic reactions without ATP
         FUTURE: Calculate ΔG and determine coupling requirements
         """
-        for transition in self.model.transitions.values():
+        for transition in self.model.transitions:
             reactants = self._get_reactants(transition)
             products = self._get_products(transition)
             
@@ -238,7 +240,8 @@ class ThermodynamicAnalyzer(TopologyAnalyzer):
             has_net_product = False
             
             for transition_id in cycle:
-                transition = self.model.transitions.get(transition_id)
+                # Find transition by ID
+                transition = next((t for t in self.model.transitions if t.id == transition_id), None)
                 if not transition:
                     continue
                 
@@ -276,7 +279,7 @@ class ThermodynamicAnalyzer(TopologyAnalyzer):
             'isomerization'
         ]
         
-        for transition in self.model.transitions.values():
+        for transition in self.model.transitions:
             label_lower = transition.label.lower()
             
             if any(keyword in label_lower for keyword in equilibrium_keywords):
@@ -301,7 +304,7 @@ class ThermodynamicAnalyzer(TopologyAnalyzer):
         atp_producers = []
         atp_consumers = []
         
-        for transition in self.model.transitions.values():
+        for transition in self.model.transitions:
             reactants = self._get_reactants(transition)
             products = self._get_products(transition)
             
@@ -400,9 +403,10 @@ class ThermodynamicAnalyzer(TopologyAnalyzer):
     def _get_reactants(self, transition) -> List[str]:
         """Get reactant place IDs."""
         reactants = []
-        for arc in self.model.arcs.values():
+        for arc in self.model.arcs:
             if arc.target_id == transition.id:
-                place = self.model.places.get(arc.source_id)
+                # Find place by ID
+                place = next((p for p in self.model.places if p.id == arc.source_id), None)
                 if place:
                     reactants.append(place.label)
         return reactants
@@ -410,9 +414,10 @@ class ThermodynamicAnalyzer(TopologyAnalyzer):
     def _get_products(self, transition) -> List[str]:
         """Get product place IDs."""
         products = []
-        for arc in self.model.arcs.values():
+        for arc in self.model.arcs:
             if arc.source_id == transition.id:
-                place = self.model.places.get(arc.target_id)
+                # Find place by ID
+                place = next((p for p in self.model.places if p.id == arc.target_id), None)
                 if place:
                     products.append(place.label)
         return products
@@ -434,13 +439,13 @@ class ThermodynamicAnalyzer(TopologyAnalyzer):
         # Simplified cycle detection (only immediate loops)
         cycles = []
         
-        for place in self.model.places.values():
+        for place in self.model.places:
             # Find transitions that consume this place
-            consumers = [arc.target_id for arc in self.model.arcs.values() 
+            consumers = [arc.target_id for arc in self.model.arcs 
                         if arc.source_id == place.id]
             
             # Find transitions that produce this place
-            producers = [arc.source_id for arc in self.model.arcs.values() 
+            producers = [arc.source_id for arc in self.model.arcs 
                         if arc.target_id == place.id]
             
             # Check for immediate cycles (T1 → P → T2 → P)
