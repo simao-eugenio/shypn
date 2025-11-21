@@ -415,8 +415,6 @@ class HeuristicParametersCategory(BasePathwayCategory):
     
     def _on_apply_selected(self, button):
         """Handle apply selected button click."""
-        print("=" * 60)
-        print("=" * 60)
         self.logger.info("=" * 60)
         self.logger.info("[APPLY] Apply Selected button clicked!")
         self.logger.info("=" * 60)

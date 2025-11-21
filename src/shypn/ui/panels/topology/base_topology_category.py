@@ -663,9 +663,6 @@ class BaseTopologyCategory:
         # Sort by priority (ascending: 1, 2, 3, 4...)
         analyzer_list.sort(key=lambda x: x[0])
         
-        for priority, name in analyzer_list:
-            print(f"  Priority {priority}: {name}")
-        
         # Run analyzers in priority order with staggered delays
         # This ensures fast algorithms complete and display results first
         for i, (priority, analyzer_name) in enumerate(analyzer_list):
@@ -845,7 +842,6 @@ class BaseTopologyCategory:
                         )
                         invariants.append(inv)
                     kb.update_p_invariants(invariants)
-                    print(f"✓ Knowledge Base updated: {len(invariants)} P-invariants")
             
             elif analyzer_name == 't_invariants':
                 # Result format: {'t_invariants': [{'vector': [1, 2], 'transitions': ['T1', 'T2'], ...}]}
@@ -861,7 +857,6 @@ class BaseTopologyCategory:
                         )
                         invariants.append(inv)
                     kb.update_t_invariants(invariants)
-                    print(f"✓ Knowledge Base updated: {len(invariants)} T-invariants")
             
             elif analyzer_name == 'liveness':
                 # Result format: {'liveness_levels': {tid: 'L1', tid2: 'L2', ...}}
@@ -869,7 +864,6 @@ class BaseTopologyCategory:
                 if liveness_levels:
                     # Already in correct format: dict mapping tid -> level string
                     kb.update_liveness(liveness_levels)
-                    print(f"✓ Knowledge Base updated: Liveness for {len(liveness_levels)} transitions")
             
             elif analyzer_name == 'siphons':
                 # Result format: {'siphons': [{place_ids: [...], is_minimal: bool, ...}]}
@@ -886,7 +880,6 @@ class BaseTopologyCategory:
                         )
                         siphons.append(siphon)
                     kb.update_siphons_traps(siphons, [])  # Only siphons for now
-                    print(f"✓ Knowledge Base updated: {len(siphons)} siphons")
             
             elif analyzer_name == 'traps':
                 # Result format: {'traps': [{place_ids: [...], is_minimal: bool, ...}]}
@@ -903,7 +896,6 @@ class BaseTopologyCategory:
                         )
                         traps.append(trap)
                     kb.update_siphons_traps([], traps)  # Only traps for now
-                    print(f"✓ Knowledge Base updated: {len(traps)} traps")
             
             elif analyzer_name == 'deadlocks':
                 # Result format: {'deadlock_states': [...], 'has_deadlocks': bool}
@@ -911,7 +903,6 @@ class BaseTopologyCategory:
                 has_deadlocks = result_data.get('has_deadlocks', False)
                 if deadlock_states or has_deadlocks:
                     kb.update_deadlocks(deadlock_states)
-                    print(f"✓ Knowledge Base updated: Deadlocks ({len(deadlock_states)} states)")
             
             elif analyzer_name == 'boundedness':
                 # Result format: {'bounded': bool, 'unbounded_places': [...], 'bounds': {...}}
@@ -920,12 +911,9 @@ class BaseTopologyCategory:
                     # All places bounded to default (e.g., 1)
                     bounds = {}  # Empty means all bounded
                 kb.update_boundedness(bounds)
-                print(f"✓ Knowledge Base updated: Boundedness")
             
         except Exception as e:
-            import traceback
-            print(f"Warning: Failed to update Knowledge Base for {analyzer_name}: {e}")
-            traceback.print_exc()
+            pass  # Silently ignore KB update failures
         
         return False  # Don't repeat
     
