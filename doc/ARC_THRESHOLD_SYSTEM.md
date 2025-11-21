@@ -426,38 +426,251 @@ arc.threshold = "P1.tokens * 0.5"  # OVERRIDES weight=10 for enablement
 # If P1.tokens = 100, threshold = 50 (not 10!)
 ```
 
-## Implementation Status
+## Implementation Status (Foundation-Testing Branch)
 
-- ✅ **Data Structure**: `threshold` property exists in Arc class
-- ✅ **Documentation**: Comprehensive guides created
-- ⏳ **Evaluation Engine**: Needs implementation
-- ⏳ **Integration**: Update enablement logic
-- ⏳ **UI Support**: Properties dialog for threshold editing
-- ⏳ **Testing**: Comprehensive test suite
+| Component | Status | Location | Notes |
+|-----------|--------|----------|-------|
+| **Arc `threshold` property** | ✅ Exists | Arc base class | Property defined but not evaluated |
+| **Fixed numeric thresholds** | ✅ Working | Via `weight` property | Default behavior |
+| **Expression-based thresholds** | 📝 Documented | This file | Awaiting implementation |
+| **Function-based thresholds** | 📝 Documented | This file | Awaiting implementation |
+| **ThresholdEvaluator class** | ⏳ To implement | `src/shypn/utils/` | See Phase 1 below |
+| **Engine integration** | ⏳ To implement | `transition_behavior.py` | See Phase 2 below |
+| **JSON serialization** | ⏳ To implement | Model loaders | See Phase 3 below |
+| **UI threshold editor** | ⏳ To implement | Properties dialog | See Phase 4 below |
+| **Test suite** | ⏳ To implement | `tests/` | See Phase 5 below |
 
-## Next Steps
+**Related Documentation**:
+- Multi-level inhibition: `doc/foundation/DUAL_LAYER_INHIBITION.md` (Section 6)
+- Inhibitor arc logic: `doc/INHIBITOR_ARC_SIMULATION_LOGIC.md`
+- Continuous behavior: `doc/CONTINUOUS_TRANSITION_RATE_FUNCTIONS.md`
 
-1. **Implement ThresholdEvaluator class**
-   - Expression parser
-   - Function executor
-   - Context management
+## Implementation Roadmap
 
-2. **Update Enablement Logic**
-   - Integrate threshold evaluation in `_check_enablement_manual()`
-   - Support all transition behaviors
+### Phase 1: Core Threshold Evaluator (Priority: HIGH)
 
-3. **UI Integration**
-   - Add threshold field to arc properties dialog
-   - Expression syntax highlighting
-   - Validation and preview
+**Create**: `src/shypn/utils/threshold_evaluator.py`
 
-4. **Testing**
-   - Unit tests for evaluator
-   - Integration tests with simulation
-   - Example models demonstrating features
+**Purpose**: Evaluate dynamic thresholds with expression/function support
 
-5. **Documentation**
-   - User guide for threshold syntax
+**Key Features**:
+- Parse string expressions (`"4.0 * (1.0 + AMP / 0.1)"`)
+- Execute lambda functions with dependencies
+- Resolve place references (P1, P2, names)
+- Safe evaluation context (no arbitrary code execution)
+- Caching for repeated expressions
+
+**Implementation Outline**:
+```python
+class ThresholdEvaluator:
+    def __init__(self, model):
+        self.model = model
+        self._expression_cache = {}
+    
+    def evaluate(self, arc, context: Dict) -> float:
+        """Returns effective threshold (supersedes weight if threshold set)."""
+        if arc.threshold is None:
+            return arc.weight  # Backward compatible
+        
+        if isinstance(arc.threshold, (int, float)):
+            return float(arc.threshold)
+        elif isinstance(arc.threshold, str):
+            return self._evaluate_expression(arc.threshold, context)
+        elif isinstance(arc.threshold, dict):
+            return self._evaluate_function(arc.threshold, context)
+        else:
+            raise ValueError(f"Invalid threshold type")
+    
+    def _evaluate_expression(self, expr: str, context: Dict) -> float:
+        # Build context: places (P1, P2, names), time, math functions
+        # Use eval() with restricted builtins
+        pass
+    
+    def _evaluate_function(self, func_spec: Dict, context: Dict) -> float:
+        # Extract formula, dependencies
+        # Resolve dependencies to place objects
+        # Execute lambda
+        pass
+```
+
+**Dependencies**: None (pure Python, uses standard library)
+
+**Testing**: Unit tests in `tests/utils/test_threshold_evaluator.py`
+
+### Phase 2: Engine Integration (Priority: HIGH)
+
+**Modify**: `src/shypn/engine/transition_behavior.py`
+
+**Changes**:
+1. Import `ThresholdEvaluator` in `_check_enablement_manual()`
+2. Create evaluator instance with model reference
+3. Replace `arc.weight` with `evaluator.evaluate(arc, context)`
+4. Preserve backward compatibility (threshold=None → use weight)
+
+**Code Changes**:
+```python
+def _check_enablement_manual(self) -> bool:
+    from shypn.utils.threshold_evaluator import ThresholdEvaluator
+    
+    evaluator = ThresholdEvaluator(self.model)
+    context = {'time': self._get_current_time()}
+    
+    for arc in input_arcs:
+        effective_threshold = evaluator.evaluate(arc, context)  # NEW
+        
+        if isinstance(arc, InhibitorArc):
+            if source_place.tokens >= effective_threshold:  # Was arc.weight
+                return False
+        # ... rest of checks
+```
+
+**Also Update**:
+- `continuous_behavior.py:can_fire()` (line 404-419) - inhibitor arc checks
+- `immediate_behavior.py` - if custom enablement exists
+- `timed_behavior.py` - if custom enablement exists
+- `stochastic_behavior.py` - if custom enablement exists
+
+**Testing**: Integration tests in `tests/engine/test_threshold_evaluation.py`
+
+### Phase 3: File Format Support (Priority: MEDIUM)
+
+**Modify**: `src/shypn/io/model_canvas_loader.py`
+
+**Add to `_arc_to_dict()`**:
+```python
+def _arc_to_dict(self, arc) -> dict:
+    data = {
+        # ... existing fields ...
+        'weight': arc.weight,
+    }
+    
+    # NEW: Serialize threshold if present
+    if hasattr(arc, 'threshold') and arc.threshold is not None:
+        data['threshold'] = arc.threshold
+    
+    return data
+```
+
+**Add to `_dict_to_arc()`**:
+```python
+def _dict_to_arc(self, data: dict, places, transitions):
+    # ... existing arc creation ...
+    
+    # NEW: Deserialize threshold
+    if 'threshold' in data:
+        arc.threshold = data['threshold']
+        # Validate threshold format
+        self._validate_threshold(arc.threshold)
+    
+    return arc
+```
+
+**Validation**:
+```python
+def _validate_threshold(self, threshold_spec) -> bool:
+    """Validate threshold specification on load."""
+    if isinstance(threshold_spec, (int, float)):
+        return threshold_spec >= 0
+    elif isinstance(threshold_spec, str):
+        try:
+            compile(threshold_spec, '<threshold>', 'eval')
+            return True
+        except SyntaxError:
+            raise ValueError(f"Invalid threshold expression: {threshold_spec}")
+    elif isinstance(threshold_spec, dict):
+        required = {'type', 'formula'}
+        if not required.issubset(threshold_spec.keys()):
+            raise ValueError(f"Threshold function missing required keys: {required}")
+        return True
+    return False
+```
+
+**Testing**: File I/O tests in `tests/io/test_threshold_persistence.py`
+
+### Phase 4: UI Properties Dialog (Priority: LOW)
+
+**Modify**: `src/shypn/ui/properties/arc_properties.py` (or similar)
+
+**Add Threshold Editor Panel**:
+```python
+class ArcPropertiesDialog:
+    def _build_threshold_section(self):
+        # Threshold type selector
+        self.threshold_type = ComboBoxText()
+        self.threshold_type.append_text("Use weight (default)")
+        self.threshold_type.append_text("Expression")
+        self.threshold_type.append_text("Function")
+        
+        # Expression editor
+        self.expression_entry = Entry()
+        self.expression_entry.set_placeholder_text("4.0 * (1.0 + AMP / 0.1)")
+        
+        # Place name autocomplete
+        self.place_completion = EntryCompletion()
+        # Populate with available place names
+        
+        # Real-time validation
+        self.expression_entry.connect('changed', self._validate_threshold)
+        
+        # Preview evaluation
+        self.preview_button = Button("Test Evaluation")
+        self.preview_button.connect('clicked', self._preview_threshold)
+    
+    def _validate_threshold(self, entry):
+        """Show validation status."""
+        expr = entry.get_text()
+        try:
+            compile(expr, '<threshold>', 'eval')
+            self.validation_icon.set_from_icon_name("emblem-ok")
+        except SyntaxError as e:
+            self.validation_icon.set_from_icon_name("dialog-error")
+            self.validation_label.set_text(str(e))
+```
+
+**Testing**: UI tests (manual or automated with GTK test framework)
+
+### Phase 5: Comprehensive Testing (Priority: MEDIUM)
+
+**Test Files**:
+1. `tests/utils/test_threshold_evaluator.py` - Evaluator unit tests
+2. `tests/engine/test_threshold_integration.py` - Engine integration tests
+3. `tests/io/test_threshold_persistence.py` - File I/O tests
+4. `tests/examples/test_dynamic_threshold_models.py` - Example models
+
+**Test Coverage**:
+- ✅ Fixed numeric thresholds
+- ✅ Expression evaluation (place references, math functions)
+- ✅ Function evaluation (dependencies, lambdas)
+- ✅ Threshold supersedes weight for enablement
+- ✅ Weight still used for consumption
+- ✅ Backward compatibility (threshold=None)
+- ✅ Error handling (invalid expressions, missing places)
+- ✅ Persistence (save/load with threshold)
+
+## Next Steps Summary
+
+1. **Implement ThresholdEvaluator** (`src/shypn/utils/threshold_evaluator.py`)
+   - Expression parser with place resolution
+   - Function executor with dependency injection
+   - Safe evaluation context
+
+2. **Integrate with Engine** (`src/shypn/engine/transition_behavior.py`)
+   - Modify `_check_enablement_manual()` to use evaluator
+   - Update all behavior classes (continuous, immediate, timed, stochastic)
+
+3. **Add File Format Support** (`src/shypn/io/model_canvas_loader.py`)
+   - Serialize/deserialize threshold property
+   - Validation on load
+
+4. **Build UI Editor** (properties dialog)
+   - Threshold specification interface
+   - Syntax validation and preview
+
+5. **Create Test Suite**
+   - Unit, integration, and example tests
+   - Document test models demonstrating features
+
+**Estimated Effort**: 2-3 days for full implementation and testing
    - Example library
    - Best practices
 
