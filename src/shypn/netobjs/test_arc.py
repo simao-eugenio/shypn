@@ -14,13 +14,15 @@ class TestArc(Arc):
     
     **BIOLOGICAL SEMANTICS** (Catalyst/Enzyme Behavior):
     A test arc allows a transition to fire based on the presence of tokens
-    WITHOUT consuming them. This models catalysts that enable reactions but
-    are not consumed in the process.
+    WITHOUT consuming them **in that specific reaction**. This models catalysts
+    that enable reactions but are not consumed in the process.
     
     **Key Properties**:
     - **Enabling Condition**: source.tokens >= weight (must have enough)
-    - **Token Transfer**: NO - tokens are NOT consumed (catalyst behavior)
+    - **Token Transfer**: NO - tokens are NOT consumed by THIS transition
     - **Read-Only**: Catalyst concentration affects rate but remains unchanged
+    - **Mixed Roles**: Same species can be catalyst (test arc) in one reaction,
+      substrate (normal arc) in another reaction (biochemically valid)
     
     **Visual Rendering**:
     - Dashed line with hollow diamond at target end
@@ -44,6 +46,17 @@ class TestArc(Arc):
        ```
        Gene --[TF: p53]--> mRNA
        p53 presence enables transcription but isn't consumed
+       ```
+    
+    4. **Mixed-Role Species**: Compound acts as both catalyst and substrate
+       ```
+       # AMP in yeast glycolysis (BIOMD0000000061):
+       vPFK: F6P + ATP --[activator: AMP]--> FBP + ADP  (test arc)
+       vAK:  ATP + AMP ----------------------> 2 ADP     (normal arc)
+       
+       AMP is NOT consumed in vPFK (allosteric activator)
+       AMP IS consumed in vAK (adenylate kinase substrate)
+       Both roles are biochemically correct!
        ```
     
     **Rate Formula Integration**:

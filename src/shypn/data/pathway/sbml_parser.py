@@ -109,12 +109,22 @@ class SpeciesExtractor(BaseExtractor):
         elif sbml_species.isSetInitialAmount():
             initial_concentration = sbml_species.getInitialAmount()
         else:
-            initial_concentration = 0.0
+            # No initial value specified - use physiological default
+            # Assumption: mM scale (millimolar, typical for cellular metabolites)
+            # Default: 1.0 mM (reasonable for most metabolites)
+            initial_concentration = 1.0
+            self.logger.debug(
+                f"Species '{species_id}' has no initial concentration, "
+                f"using default 1.0 mM (physiological scale)"
+            )
         
         # Extract annotation data (ChEBI, KEGG IDs)
         metadata = self._extract_species_annotations(sbml_species)
         chebi_id = metadata.get('chebi_id')
         kegg_id = metadata.get('kegg_id')
+        
+        # Mark as SBML import (so converter knows to preserve original names)
+        metadata['data_source'] = 'sbml_import'
         
         # Get compartment volume for unit conversion
         compartment_obj = self.model.getCompartment(compartment)

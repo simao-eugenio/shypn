@@ -66,7 +66,7 @@ class MassBalanceAnalyzer(TopologyAnalyzer):
             **kwargs: Optional parameters (unused, for compatibility)
         
         Returns:
-            AnalysisResult: Contains balanced/unbalanced transitions, atom counts
+            AnalysisResult: Contains balanced/unbalanced/incomplete transitions, atom counts
         """
         try:
             # Parse chemical formulas for all places
@@ -75,13 +75,16 @@ class MassBalanceAnalyzer(TopologyAnalyzer):
             # Check each transition for mass balance
             balanced_transitions = []
             unbalanced_transitions = []
+            incomplete_transitions = []
             
             for transition in self.model.transitions:
                 balance_check = self._check_transition_balance(
                     transition, place_formulas
                 )
                 
-                if balance_check['balanced']:
+                if balance_check['incomplete']:
+                    incomplete_transitions.append(balance_check)
+                elif balance_check['balanced']:
                     balanced_transitions.append(balance_check)
                 else:
                     unbalanced_transitions.append(balance_check)
@@ -91,6 +94,7 @@ class MassBalanceAnalyzer(TopologyAnalyzer):
                 'total_transitions': len(self.model.transitions),
                 'balanced': len(balanced_transitions),
                 'unbalanced': len(unbalanced_transitions),
+                'incomplete': len(incomplete_transitions),
                 'balance_rate': len(balanced_transitions) / len(self.model.transitions) if self.model.transitions else 0,
                 'places_with_formulas': len(place_formulas),
                 'places_without_formulas': len(self.model.places) - len(place_formulas),
@@ -102,6 +106,7 @@ class MassBalanceAnalyzer(TopologyAnalyzer):
                 data={
                     'balanced_transitions': balanced_transitions,
                     'unbalanced_transitions': unbalanced_transitions,
+                    'incomplete_transitions': incomplete_transitions,
                     'place_formulas': place_formulas,
                     'statistics': statistics,
                 },
@@ -157,6 +162,8 @@ class MassBalanceAnalyzer(TopologyAnalyzer):
             'Glucose_C6H12O6' → 'C6H12O6'
             'ATP (C10H16N5O13P3)' → 'C10H16N5O13P3'
             'G6P' → None (no formula in name)
+            'C00293' → None (KEGG ID, not a formula)
+            'C000469' → None (KEGG ID variation)
         
         Args:
             name: Place name
@@ -164,15 +171,27 @@ class MassBalanceAnalyzer(TopologyAnalyzer):
         Returns:
             str or None: Chemical formula if found
         """
+        # CRITICAL: Filter out KEGG compound IDs (C00001-C99999 and variations)
+        # Pattern: C followed by 3-6 digits (with or without leading zeros)
+        if re.match(r'^C0*\d{1,6}$', name):
+            return None
+        
         # Pattern: letters followed by numbers (chemical formula)
         # Look for patterns like C6H12O6, C10H16N5O13P3
         match = re.search(r'[_\s(]([A-Z][a-z]?\d+(?:[A-Z][a-z]?\d+)*)[_\s)]', name)
         if match:
-            return match.group(1)
+            candidate = match.group(1)
+            # Double-check it's not a KEGG ID
+            if not re.match(r'^C0*\d{1,6}$', candidate):
+                return candidate
         
         # Also check if entire name is a formula
         if re.match(r'^[A-Z][a-z]?\d+(?:[A-Z][a-z]?\d+)*$', name):
-            return name
+            # Must have at least 2 different elements to be a valid formula
+            # E.g., C6H12O6 is valid, but C293 (single element) is likely garbage
+            elements = re.findall(r'[A-Z][a-z]?', name)
+            if len(set(elements)) >= 2:  # At least 2 different elements
+                return name
         
         return None
     
@@ -292,7 +311,7 @@ class MassBalanceAnalyzer(TopologyAnalyzer):
             place_formulas: Dict of place formulas
             
         Returns:
-            dict: Balance check result
+            dict: Balance check result with 'balanced', 'incomplete', or 'unbalanced' status
         """
         # Get input and output places
         input_atoms = defaultdict(float)
@@ -300,40 +319,58 @@ class MassBalanceAnalyzer(TopologyAnalyzer):
         
         input_places = []
         output_places = []
+        input_places_with_formula = 0
+        output_places_with_formula = 0
+        total_input_places = 0
+        total_output_places = 0
         
         # Count atoms from inputs
         for arc in self.model.arcs:
-            if arc.target == transition and arc.source.id in place_formulas:
-                # This is an input arc
-                weight = getattr(arc, 'weight', 1.0)
-                formula = place_formulas[arc.source.id]
-                
-                for element, count in formula.items():
-                    input_atoms[element] += count * weight
-                
-                input_places.append({
-                    'id': arc.source.id,
-                    'name': getattr(arc.source, 'name', arc.source.id),
-                    'formula': formula,
-                    'weight': weight
-                })
+            if arc.target == transition:
+                total_input_places += 1
+                if arc.source.id in place_formulas:
+                    # This is an input arc WITH formula
+                    input_places_with_formula += 1
+                    weight = getattr(arc, 'weight', 1.0)
+                    formula = place_formulas[arc.source.id]
+                    
+                    for element, count in formula.items():
+                        input_atoms[element] += count * weight
+                    
+                    input_places.append({
+                        'id': arc.source.id,
+                        'name': getattr(arc.source, 'name', arc.source.id),
+                        'formula': formula,
+                        'weight': weight
+                    })
         
         # Count atoms from outputs
         for arc in self.model.arcs:
-            if arc.source == transition and arc.target.id in place_formulas:
-                # This is an output arc
-                weight = getattr(arc, 'weight', 1.0)
-                formula = place_formulas[arc.target.id]
-                
-                for element, count in formula.items():
-                    output_atoms[element] += count * weight
-                
-                output_places.append({
-                    'id': arc.target.id,
-                    'name': getattr(arc.target, 'name', arc.target.id),
-                    'formula': formula,
-                    'weight': weight
-                })
+            if arc.source == transition:
+                total_output_places += 1
+                if arc.target.id in place_formulas:
+                    # This is an output arc WITH formula
+                    output_places_with_formula += 1
+                    weight = getattr(arc, 'weight', 1.0)
+                    formula = place_formulas[arc.target.id]
+                    
+                    for element, count in formula.items():
+                        output_atoms[element] += count * weight
+                    
+                    output_places.append({
+                        'id': arc.target.id,
+                        'name': getattr(arc.target, 'name', arc.target.id),
+                        'formula': formula,
+                        'weight': weight
+                    })
+        
+        # Check if we have complete information
+        has_complete_info = (
+            input_places_with_formula == total_input_places and
+            output_places_with_formula == total_output_places and
+            total_input_places > 0 and
+            total_output_places > 0
+        )
         
         # Check balance for each element
         all_elements = set(input_atoms.keys()) | set(output_atoms.keys())
@@ -356,12 +393,17 @@ class MassBalanceAnalyzer(TopologyAnalyzer):
         return {
             'transition_id': transition.id,
             'transition_name': getattr(transition, 'name', transition.id),
-            'balanced': balanced,
+            'balanced': balanced and has_complete_info,
+            'incomplete': not has_complete_info,
             'input_places': input_places,
             'output_places': output_places,
             'input_atoms': dict(input_atoms),
             'output_atoms': dict(output_atoms),
-            'imbalances': imbalances,
+            'imbalances': imbalances if has_complete_info else {},
+            'total_input_places': total_input_places,
+            'input_places_with_formula': input_places_with_formula,
+            'total_output_places': total_output_places,
+            'output_places_with_formula': output_places_with_formula,
         }
     
     def _format_summary(self, statistics: Dict[str, Any]) -> str:
@@ -376,6 +418,7 @@ class MassBalanceAnalyzer(TopologyAnalyzer):
         total = statistics['total_transitions']
         balanced = statistics['balanced']
         unbalanced = statistics['unbalanced']
+        incomplete = statistics.get('incomplete', 0)
         rate = statistics['balance_rate'] * 100
         
         lines = [
@@ -383,12 +426,15 @@ class MassBalanceAnalyzer(TopologyAnalyzer):
             f"  Total transitions: {total}",
             f"  Balanced: {balanced} ({rate:.1f}%)",
             f"  Unbalanced: {unbalanced}",
+            f"  Incomplete data: {incomplete}",
             f"  Places with formulas: {statistics['places_with_formulas']}",
             f"  Places without formulas: {statistics['places_without_formulas']}",
         ]
         
         if unbalanced > 0:
-            lines.append(f"\n⚠️ {unbalanced} reaction(s) violate atom conservation")
+            lines.append(f"\n❌ {unbalanced} reaction(s) violate atom conservation!")
+        elif incomplete > 0:
+            lines.append(f"\n⚠️ {incomplete} reaction(s) cannot be verified (missing formulas)")
         else:
             lines.append(f"\n✓ All reactions are balanced")
         

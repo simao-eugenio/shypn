@@ -46,9 +46,96 @@ class StandardCompoundMapper(CompoundMapper):
     - Preserves KEGG metadata
     """
     
+    # Common metabolite abbreviations (prioritized for naming)
+    COMMON_ABBREVIATIONS = {
+        'C00002': 'ATP',
+        'C00008': 'ADP',
+        'C00020': 'AMP',
+        'C00001': 'H2O',
+        'C00003': 'NAD+',
+        'C00004': 'NADH',
+        'C00005': 'NADPH',
+        'C00006': 'NADP+',
+        'C00009': 'Pi',
+        'C00010': 'CoA',
+        'C00013': 'PPi',
+        'C00014': 'NH3',
+        'C00015': 'UDP',
+        'C00016': 'FAD',
+        'C00024': 'Acetyl-CoA',
+        'C00035': 'GDP',
+        'C00044': 'GTP',
+        'C00055': 'CTP',
+        'C00063': 'CMP',
+        'C00075': 'UTP',
+        'C00080': 'H+',
+        'C00081': 'ITP',
+        'C00104': 'IDP',
+        'C00131': 'dATP',
+        'C00144': 'GMP',
+        'C00206': 'UTP',
+    }
+    
     def __init__(self):
         """Initialize compound mapper."""
         pass
+    
+    def _get_biological_name(self, entry: KEGGEntry) -> str:
+        """Extract biological name from KEGG entry.
+        
+        CRITICAL: Names must be biological identifiers, NOT database codes!
+        Names represent actual biochemical entities (glucose, ATP, pyruvate).
+        
+        Priority order (AGGRESSIVE - biological names only):
+        1. Common abbreviation from KEGG code (ATP, ADP, NAD+, etc.)
+        2. Graphics display name - actual compound name (Glucose, Pyruvate, etc.)
+        3. Entry name cleaned (if not a code)
+        4. KEGG compound ID ONLY as absolute last resort
+        
+        Args:
+            entry: KEGG compound entry
+            
+        Returns:
+            Biological name for the compound (metabolite name, NOT database code)
+        """
+        # Extract KEGG compound ID from entry.name (e.g., "cpd:C00002" -> "C00002")
+        compound_id = entry.name.split(':')[-1].strip() if ':' in entry.name else entry.name.strip()
+        
+        # 1. Check for common abbreviation (ATP, not C00002)
+        if compound_id in self.COMMON_ABBREVIATIONS:
+            return self.COMMON_ABBREVIATIONS[compound_id]
+        
+        # 2. Try graphics display name (actual compound name - HIGHEST PRIORITY)
+        if entry.graphics and entry.graphics.name:
+            display_name = entry.graphics.name.strip()
+            if display_name and display_name.lower() not in ('undefined', 'unknown', ''):
+                # Take first word if multi-word name
+                first_word = display_name.split()[0] if ' ' in display_name else display_name
+                # Remove common prefixes/suffixes
+                first_word = first_word.rstrip(',;:')
+                # Must be actual name, not a code
+                if first_word and len(first_word) > 1 and not (first_word.startswith('C') and first_word[1:].isdigit()):
+                    return first_word
+        
+        # 3. Try entry name if it's not a compound code
+        if hasattr(entry, 'data') and entry.data:
+            # Entry.data might contain actual names
+            for line in str(entry.data).split('\n')[:3]:  # Check first few lines
+                if 'NAME' in line:
+                    name_part = line.split('NAME')[-1].strip()
+                    if name_part and len(name_part) > 2 and not name_part.startswith('C'):
+                        # Extract first word
+                        first_word = name_part.split()[0].split(';')[0].rstrip(',;:')
+                        if first_word and not (first_word.startswith('C') and len(first_word) == 6):
+                            return first_word
+        
+        # 4. LAST RESORT: Use KEGG compound ID (but this is NOT ideal)
+        # This means we couldn't find the actual biological name
+        if compound_id.startswith('C') and len(compound_id) == 6:
+            return compound_id
+        
+        # 5. Final fallback
+        return f"C{entry.id}"
     
     def should_include(self, entry: KEGGEntry, options: ConversionOptions) -> bool:
         """Determine if a compound should be included.
@@ -90,11 +177,12 @@ class StandardCompoundMapper(CompoundMapper):
         # Create place ID using IDManager if available
         if id_manager:
             place_id = id_manager.generate_place_id()
-            place_name = place_id
         else:
             # Fallback to old behavior for backwards compatibility
             place_id = f"P{entry.id}"
-            place_name = f"P{entry.id}"  # Name should match ID for KEGG compounds
+        
+        # Get biological name for the place
+        place_name = self._get_biological_name(entry)
         
         # Determine initial marking
         marking = options.initial_tokens if options.add_initial_marking else 0

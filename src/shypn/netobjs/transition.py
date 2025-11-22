@@ -24,9 +24,9 @@ class Transition(PetriNetObject):
     """
     
     # Default styling (proportional to Place circle)
-    # Width = Place diameter (50.0), Height = Place radius (25.0)
-    DEFAULT_WIDTH = 50.0   # Equal to Place diameter
-    DEFAULT_HEIGHT = 25.0  # Equal to Place radius
+    # Width = Place diameter (60.0), Height adjustable
+    DEFAULT_WIDTH = 60.0   # Equal to Place diameter
+    DEFAULT_HEIGHT = 20.0  # Thinner bar for better visibility
     DEFAULT_COLOR = (0.0, 0.0, 0.0)  # Black fill
     DEFAULT_BORDER_COLOR = (0.0, 0.0, 0.0)  # Black border
     DEFAULT_BORDER_WIDTH = 3.0  # 3px for better visibility

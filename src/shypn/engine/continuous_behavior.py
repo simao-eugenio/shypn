@@ -185,19 +185,23 @@ class ContinuousBehavior(TransitionBehavior):
                 
                 context.update(params)                # Add place tokens as P1, P2, ... (or P88, P105 if ID already has P)
                 # IMPORTANT: Also add by place.name for SBML formulas that use names
+                # Add small epsilon to prevent division by zero in rate formulas
                 for place_id, place in places.items():
+                    # Use max() to ensure at least epsilon value to prevent division by zero
+                    tokens_safe = max(place.tokens, 1e-10)
+                    
                     # Add by ID (for numeric IDs like 1, 2, 3)
                     if isinstance(place_id, str) and place_id.startswith('P'):
                         # ID already has P prefix (e.g., "P105")
-                        context[place_id] = place.tokens
+                        context[place_id] = tokens_safe
                     else:
                         # Numeric ID needs P prefix (e.g., 1 → P1)
-                        context[f'P{place_id}'] = place.tokens
+                        context[f'P{place_id}'] = tokens_safe
                     
                     # ALSO add by place name (for SBML formulas)
                     # Place name might be "P1", "P5", etc. from SBML conversion
                     if hasattr(place, 'name') and place.name:
-                        context[place.name] = place.tokens
+                        context[place.name] = tokens_safe
                 
                 # Evaluate expression safely
                 result = eval(expr, {"__builtins__": {}}, context)

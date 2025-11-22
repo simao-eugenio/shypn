@@ -177,8 +177,13 @@ class ThresholdEvaluator:
         places_dict = self._get_places_dict()
         
         for place_id, place in places_dict.items():
-            # Add as P1, P2, P3, ... (by ID)
-            eval_context[f'P{place_id}'] = place.tokens
+            # Add by ID (handles both "P1" strings and integer IDs)
+            if isinstance(place_id, str):
+                # ID is already a string like "P1" - use as-is
+                eval_context[place_id] = place.tokens
+            else:
+                # ID is an integer - add with P prefix
+                eval_context[f'P{place_id}'] = place.tokens
             
             # Add by name (if available)
             if hasattr(place, 'name') and place.name:
@@ -196,7 +201,10 @@ class ThresholdEvaluator:
         
         except NameError as e:
             # Provide helpful error message with available names
-            available_places = [f'P{pid}' for pid in places_dict.keys()]
+            available_places = [
+                place_id if isinstance(place_id, str) else f'P{place_id}' 
+                for place_id in places_dict.keys()
+            ]
             available_names = [p.name for p in places_dict.values() if hasattr(p, 'name') and p.name]
             
             raise RuntimeError(
@@ -345,21 +353,21 @@ class ThresholdEvaluator:
         """
         if hasattr(self.model, 'places'):
             if isinstance(self.model.places, dict):
-                # Already a dict, but may be keyed by string IDs
+                # Already a dict - use place IDs as-is (can be strings like "P1" or integers)
                 result = {}
                 for key, place in self.model.places.items():
                     if hasattr(place, 'id'):
-                        # Use place's actual ID
-                        result[place.id if isinstance(place.id, int) else int(place.id)] = place
+                        # Use place's actual ID (string or int)
+                        result[place.id] = place
                     else:
                         # Use dict key as ID
-                        result[int(key) if isinstance(key, str) and key.isdigit() else key] = place
+                        result[key] = place
                 return result
             
             elif isinstance(self.model.places, list):
-                # Convert list to dict
+                # Convert list to dict using place IDs (string or int)
                 return {
-                    p.id if isinstance(p.id, int) else int(p.id): p 
+                    p.id: p 
                     for p in self.model.places 
                     if hasattr(p, 'id')
                 }
@@ -368,7 +376,7 @@ class ThresholdEvaluator:
             # Use model method
             places = self.model.get_all_places()
             return {
-                p.id if isinstance(p.id, int) else int(p.id): p 
+                p.id: p 
                 for p in places 
                 if hasattr(p, 'id')
             }

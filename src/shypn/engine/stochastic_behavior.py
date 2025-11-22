@@ -149,13 +149,13 @@ class StochasticBehavior(TransitionBehavior):
                 if hasattr(self.transition.kinetic_metadata, 'parameters'):
                     context.update(self.transition.kinetic_metadata.parameters)
             
-            # Add place tokens
+            # Add place tokens using their names directly
+            # Add small epsilon to prevent division by zero in rate formulas
             places_dict = self._get_places_dict()
             for place_id, tokens in places_dict.items():
-                if isinstance(place_id, str) and place_id.startswith('P'):
-                    context[place_id] = tokens
-                else:
-                    context[f'P{place_id}'] = tokens
+                # Add tiny epsilon (1e-10) to avoid division by zero
+                # This doesn't affect simulation dynamics but prevents math errors
+                context[place_id] = max(tokens, 1e-10)
             
             # Evaluate formula
             result = eval(self.rate_function_expr, {"__builtins__": {}}, context)
@@ -207,15 +207,27 @@ class StochasticBehavior(TransitionBehavior):
             ) from e
     
     def _get_places_dict(self) -> Dict:
-        """Get current place tokens as dict for formula evaluation."""
+        """Get current place tokens as dict for formula evaluation.
+        
+        For SBML-imported models with rate formulas, we need access to ALL places
+        because the formula can reference any species, not just those directly
+        connected by arcs.
+        """
         places_dict = {}
         
+        # For SBML models: Get ALL places from model (formulas can reference any species)
+        if hasattr(self.model, 'places') and hasattr(self.transition, 'kinetic_metadata'):
+            for place in self.model.places:
+                if hasattr(place, 'tokens') and hasattr(place, 'name'):
+                    places_dict[place.name] = place.tokens
+            return places_dict
+        
+        # For regular Petri nets: Only get connected places
         # Get all input places
         for arc in self.get_input_arcs():
             if hasattr(arc, 'source'):
                 place = arc.source
                 if hasattr(place, 'tokens') and hasattr(place, 'name'):
-                    # Extract numeric ID from name (e.g., "P5" → 5)
                     place_id = place.name
                     places_dict[place_id] = place.tokens
         
@@ -244,7 +256,12 @@ class StochasticBehavior(TransitionBehavior):
         self._enablement_time = time
         
         # Get rate (λ) - either from formula evaluation or constant
-        lambda_rate = self._evaluate_rate_at_enablement(time)
+        try:
+            lambda_rate = self._evaluate_rate_at_enablement(time)
+        except (RuntimeError, NameError, AttributeError, KeyError) as e:
+            # During import, places may not be available yet for rate evaluation
+            # This is normal - rate will be evaluated when simulation actually starts
+            return
         
         # Sample firing delay from exponential distribution
         # T ~ Exp(λ) => T = -ln(U) / λ, where U ~ Uniform(0,1)

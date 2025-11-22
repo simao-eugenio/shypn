@@ -201,13 +201,16 @@ class SBMLKineticsIntegrationService:
         """
         Build mapping from SBML species IDs to Petri net place names.
         
-        Uses place.metadata['species_id'] to map biological names to P1, P2, P3...
+        For SBML imports, place names are biological identifiers (e.g., "Glucose", "ATP", "GlcX")
+        not system IDs (e.g., "P1", "P2"), matching manual model behavior.
+        
+        Uses place.metadata['species_id'] to map species IDs → place names.
         
         Args:
             document: DocumentModel with places
         
         Returns:
-            Dict mapping species_id (e.g., "ADP") → place_name (e.g., "P5")
+            Dict mapping species_id (e.g., "GlcX") → place_name (e.g., "GlcX" or "Glucose")
         """
         species_map = {}
         
@@ -215,7 +218,7 @@ class SBMLKineticsIntegrationService:
             # Check if place has species_id in metadata
             if hasattr(place, 'metadata') and 'species_id' in place.metadata:
                 species_id = place.metadata['species_id']
-                place_name = place.name  # e.g., "P1", "P2", "P3"
+                place_name = place.name  # Biological name (e.g., "Glucose", "GlcX", "ATP")
                 species_map[species_id] = place_name
                 
                 self.logger.debug(f"Mapped species '{species_id}' → place '{place_name}'")
@@ -224,35 +227,52 @@ class SBMLKineticsIntegrationService:
     
     def _translate_formula_to_petri_net(self, formula: str) -> str:
         """
-        Translate SBML formula from biological names to Petri net place names.
+        Translate SBML formula from species IDs to Petri net place names.
+        
+        For SBML imports with data_source='sbml_import', place names are biological
+        identifiers (e.g., "Glucose", "ATP", "GlcX"), matching manual model behavior.
+        
+        This ensures SBML formulas work the same way as manually created models:
+        - Manual model: "Glucose * ATP" (uses place.name directly)
+        - SBML import: "GlcX * ATP" (species.id mapped to place.name)
+        
+        Also converts SBML math operators to Python:
+        - ^ (exponentiation) → ** (Python power operator)
         
         Example:
-            Input:  "cytosol * V10m * ADP * PEP / ((K10PEP + PEP) * (K10ADP + ADP))"
-            Output: "cytosol * V10m * P5 * P8 / ((K10PEP + P8) * (K10ADP + P5))"
+            Input:  "cytosol * V10m * ADP^2 / ((K10PEP + PEP) * (K10ADP + ADP))"
+            Output: "cytosol * V10m * ADP**2 / ((K10PEP + PEP) * (K10ADP + ADP))"
+            (Note: If ADP's place.name is "ADP", formula uses "ADP" not "P5")
         
         Args:
-            formula: SBML formula with species names
+            formula: SBML formula with species IDs and SBML operators
         
         Returns:
-            Translated formula with place names (P1, P2, P3...)
+            Translated formula with place names and Python operators
         """
-        if not formula or not self.species_to_place_map:
+        if not formula:
             return formula
         
         translated = formula
         
-        # Sort species by length (descending) to avoid partial replacements
-        # Example: Replace "ATP" before "AT" to avoid "ATP" → "P3P"
-        sorted_species = sorted(self.species_to_place_map.keys(), key=len, reverse=True)
-        
-        for species_id in sorted_species:
-            place_name = self.species_to_place_map[species_id]
+        # First, replace species names with place names
+        if self.species_to_place_map:
+            # Sort species by length (descending) to avoid partial replacements
+            # Example: Replace "ATP" before "AT" to avoid "ATP" → "P3P"
+            sorted_species = sorted(self.species_to_place_map.keys(), key=len, reverse=True)
             
-            # Use word boundary replacement to avoid partial matches
-            # Replace "ADP" but not "ADPK" or "mADP"
-            import re
-            pattern = r'\b' + re.escape(species_id) + r'\b'
-            translated = re.sub(pattern, place_name, translated)
+            for species_id in sorted_species:
+                place_name = self.species_to_place_map[species_id]
+                
+                # Use word boundary replacement to avoid partial matches
+                # Replace "ADP" but not "ADPK" or "mADP"
+                import re
+                pattern = r'\b' + re.escape(species_id) + r'\b'
+                translated = re.sub(pattern, place_name, translated)
+        
+        # Convert SBML operators to Python operators
+        # ^ (exponentiation) → ** (Python power)
+        translated = translated.replace('^', '**')
         
         return translated
     
@@ -334,14 +354,21 @@ class SBMLKineticsIntegrationService:
             transition.kinetic_metadata = metadata
             
             # Set rate_function from SBML formula for evaluation during simulation
-            # Store BOTH biological (display) and computational (Petri net) versions
+            # Store formulas using biological place names (matching manual model behavior)
             if kinetic_law.formula:
-                # Store original formula with biological names (for UI display)
-                transition.properties['rate_function_display'] = kinetic_law.formula
-                
-                # Translate formula to Petri net notation (for simulation)
+                # Translate formula to use place names (e.g., "GlcX", "ATP", "Glucose")
+                # NOT system IDs (P1, P2, P3), matching how manual models work
                 translated_formula = self._translate_formula_to_petri_net(kinetic_law.formula)
+                
+                # Store in transition.rate (like manual models do)
+                # This makes SBML imports consistent with interactive creation
+                transition.rate = translated_formula
+                
+                # Also store in properties for backward compatibility
                 transition.properties['rate_function'] = translated_formula
+                
+                # Store original SBML formula for reference (display in UI)
+                transition.properties['rate_function_display'] = kinetic_law.formula
                 
                 # Store species mapping for reference
                 if self.species_to_place_map:
@@ -350,8 +377,8 @@ class SBMLKineticsIntegrationService:
                 self.logger.debug(
                     f"Set rate formulas for {transition.name}:"
                 )
-                self.logger.debug(f"  Display: {kinetic_law.formula[:60]}...")
-                self.logger.debug(f"  Computational: {translated_formula[:60]}...")
+                self.logger.debug(f"  Original SBML: {kinetic_law.formula[:60]}...")
+                self.logger.debug(f"  Petri net: {translated_formula[:60]}...")
             
             # Also update transition.rate if parameters available
             if kinetic_law.parameters:
