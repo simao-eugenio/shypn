@@ -718,14 +718,23 @@ class HeuristicInferenceEngine:
         name = getattr(transition, 'name', '').lower()
         
         # CRITICAL FIX: Extract EC number from name if not in attribute
-        # KEGG enrichment puts EC numbers in name like "EC_1.2.1.3"
+        # KEGG enrichment can return:
+        #   1. EC numbers with prefix: "EC_1.2.1.3" or "EC 1.2.1.3"
+        #   2. Plain EC numbers: "1.2.1.3" (when no enzyme abbreviation available)
         if not ec_number:
             import re
-            # Try name first (e.g., "EC_1.2.1.3")
+            # Pattern 1: EC number with prefix (EC_x.x.x.x or EC x.x.x.x)
             ec_match = re.search(r'EC[_\s]*([\d\.]+)', name, re.IGNORECASE)
             if not ec_match:
-                # Try label (e.g., "R00710" → look in name)
+                # Pattern 2: Plain EC number (x.x.x.x format, typically 4 parts)
+                # Must be strict to avoid matching version numbers, IDs, etc.
+                ec_match = re.match(r'^(\d+\.\d+\.\d+\.\d+)$', name.strip())
+            
+            if not ec_match:
+                # Try label as fallback
                 ec_match = re.search(r'EC[_\s]*([\d\.]+)', label, re.IGNORECASE)
+                if not ec_match:
+                    ec_match = re.match(r'^(\d+\.\d+\.\d+\.\d+)$', label.strip())
             
             if ec_match:
                 ec_number = ec_match.group(1)
