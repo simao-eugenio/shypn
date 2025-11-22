@@ -10,6 +10,7 @@ Date: November 2025
 
 from typing import Dict, List, Optional, Any
 import logging
+import re
 
 from ..inference import HeuristicInferenceEngine
 from ..models import InferenceResult
@@ -45,6 +46,52 @@ class HeuristicParametersController:
         """
         self.inference_engine.use_background_fetch = use_background_fetch
         self.logger.info(f"Database fetch mode: {'Enhanced' if use_background_fetch else 'Fast'}")
+    
+    @staticmethod
+    def _sanitize_place_name(name: str) -> str:
+        """Sanitize place name for use in eval() rate functions.
+        
+        Converts biological names to valid Python identifiers:
+        - Removes spaces: "D-Glucose 6-phosphate" → "DGlucose6phosphate"
+        - Removes special chars: "NAD+" → "NADplus", "CoA-SH" → "CoASH"
+        - Preserves underscores: "Acetyl_CoA" → "Acetyl_CoA"
+        - Ensures starts with letter: "2-Phosphoglycerate" → "P2Phosphoglycerate"
+        
+        Args:
+            name: Original place name
+            
+        Returns:
+            Sanitized name safe for eval()
+        """
+        if not name:
+            return "P_unknown"
+        
+        # Replace common special notations
+        sanitized = name.replace('+', 'plus')
+        sanitized = sanitized.replace('-', '')
+        sanitized = sanitized.replace('(', '_')
+        sanitized = sanitized.replace(')', '_')
+        sanitized = sanitized.replace('[', '_')
+        sanitized = sanitized.replace(']', '_')
+        sanitized = sanitized.replace(',', '_')
+        sanitized = sanitized.replace("'", '')
+        sanitized = sanitized.replace('"', '')
+        
+        # Remove spaces
+        sanitized = sanitized.replace(' ', '')
+        
+        # Remove any remaining non-alphanumeric (except underscore)
+        sanitized = re.sub(r'[^a-zA-Z0-9_]', '', sanitized)
+        
+        # Ensure starts with letter (Python identifier requirement)
+        if sanitized and sanitized[0].isdigit():
+            sanitized = 'P' + sanitized
+        
+        # Ensure not empty after sanitization
+        if not sanitized:
+            sanitized = 'P_unknown'
+        
+        return sanitized
     
     def analyze_model(self, organism: str = "Homo sapiens") -> Dict[str, List[InferenceResult]]:
         """Analyze current model and classify transitions by type.
@@ -335,22 +382,26 @@ class HeuristicParametersController:
                         # Multi-substrate (3+): Use product form A*B*C*k
                         substrate_names = []
                         for place in substrate_places:
-                            name = place.name if hasattr(place, 'name') else f"P{place.id}"
-                            substrate_names.append(name)
+                            raw_name = place.name if hasattr(place, 'name') else f"P{place.id}"
+                            sanitized_name = self._sanitize_place_name(raw_name)
+                            substrate_names.append(sanitized_name)
                         substrate_expr = '*'.join(substrate_names)
                         rate_function = f"{substrate_expr}*{k}"
                         transition.properties['rate_function'] = rate_function
                         self.logger.info(f"✅ Generated multi-substrate rate_function: {rate_function} ({len(substrate_places)} substrates)")
                     elif len(substrate_places) == 2:
                         # Bimolecular: mass_action(A, B, rate_constant=k)
-                        sub1_name = substrate_places[0].name if hasattr(substrate_places[0], 'name') else f"P{substrate_places[0].id}"
-                        sub2_name = substrate_places[1].name if hasattr(substrate_places[1], 'name') else f"P{substrate_places[1].id}"
+                        raw1 = substrate_places[0].name if hasattr(substrate_places[0], 'name') else f"P{substrate_places[0].id}"
+                        raw2 = substrate_places[1].name if hasattr(substrate_places[1], 'name') else f"P{substrate_places[1].id}"
+                        sub1_name = self._sanitize_place_name(raw1)
+                        sub2_name = self._sanitize_place_name(raw2)
                         rate_function = f"mass_action({sub1_name}, {sub2_name}, rate_constant={k})"
                         transition.properties['rate_function'] = rate_function
                         self.logger.info(f"✅ Generated bimolecular rate_function: {rate_function}")
                     elif len(substrate_places) == 1:
                         # Unimolecular: mass_action(A, reactant2=1.0, rate_constant=k)
-                        sub_name = substrate_places[0].name if hasattr(substrate_places[0], 'name') else f"P{substrate_places[0].id}"
+                        raw_name = substrate_places[0].name if hasattr(substrate_places[0], 'name') else f"P{substrate_places[0].id}"
+                        sub_name = self._sanitize_place_name(raw_name)
                         rate_function = f"mass_action({sub_name}, reactant2=1.0, rate_constant={k})"
                         transition.properties['rate_function'] = rate_function
                         self.logger.info(f"✅ Generated unimolecular rate_function: {rate_function}")
@@ -386,10 +437,12 @@ class HeuristicParametersController:
                     
                     if substrate_places:
                         # Build substrate expression: P1*P2*P3 for multi-substrate reactions
+                        # Sanitize names to be eval-safe (remove spaces, special chars)
                         substrate_names = []
                         for place in substrate_places:
-                            name = place.name if hasattr(place, 'name') else f"P{place.id}"
-                            substrate_names.append(name)
+                            raw_name = place.name if hasattr(place, 'name') else f"P{place.id}"
+                            sanitized_name = self._sanitize_place_name(raw_name)
+                            substrate_names.append(sanitized_name)
                         
                         # Join with multiplication for multi-substrate
                         substrate_expr = '*'.join(substrate_names)
