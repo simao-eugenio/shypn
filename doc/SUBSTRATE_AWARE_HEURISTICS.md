@@ -2,7 +2,25 @@
 
 ## Overview
 
-After KEGG name enrichment, places have **biological names** (ATP, glucose, NAD+) instead of KEGG codes (C00002, C00008, C00003). This enables **substrate-aware heuristic refinement** that produces significantly more accurate kinetic parameters.
+After KEGG name enrichment, places have **biological names** (ATP, glucose, NAD+) instead of KEGG codes (C00002, C00008, C00003). Transitions get **EC numbers** or **enzyme abbreviations** (1.2.1.12, HK, GAPDH) instead of KEGG reaction codes (R00710). This enables **substrate-aware heuristic refinement** that produces significantly more accurate kinetic parameters.
+
+## Critical Fix: EC Number Extraction
+
+KEGG enrichment returns EC numbers in different formats:
+- **With prefix**: "EC_1.2.1.3" or "EC 1.2.1.3" (when explicitly formatted)
+- **Plain format**: "1.2.1.12" (when no enzyme abbreviation available - Priority 3 fallback)
+
+The heuristic engine now extracts EC numbers from **both formats**:
+```python
+# Pattern 1: EC with prefix (EC_ or EC )
+ec_match = re.search(r'EC[_\s]*([\d\.]+)', name, re.IGNORECASE)
+
+# Pattern 2: Plain EC number (strict 4-part format)
+if not ec_match:
+    ec_match = re.match(r'^(\d+\.\d+\.\d+\.\d+)$', name.strip())
+```
+
+This fixes the issue where all transitions got default Vmax=70, Km=0.1 because EC numbers weren't recognized.
 
 ## How It Works
 

@@ -331,7 +331,17 @@ class HeuristicParametersController:
                     
                     k = params.get('k_forward') or params.get('lambda')
                     
-                    if len(substrate_places) >= 2:
+                    if len(substrate_places) >= 3:
+                        # Multi-substrate (3+): Use product form A*B*C*k
+                        substrate_names = []
+                        for place in substrate_places:
+                            name = place.name if hasattr(place, 'name') else f"P{place.id}"
+                            substrate_names.append(name)
+                        substrate_expr = '*'.join(substrate_names)
+                        rate_function = f"{substrate_expr}*{k}"
+                        transition.properties['rate_function'] = rate_function
+                        self.logger.info(f"✅ Generated multi-substrate rate_function: {rate_function} ({len(substrate_places)} substrates)")
+                    elif len(substrate_places) == 2:
                         # Bimolecular: mass_action(A, B, rate_constant=k)
                         sub1_name = substrate_places[0].name if hasattr(substrate_places[0], 'name') else f"P{substrate_places[0].id}"
                         sub2_name = substrate_places[1].name if hasattr(substrate_places[1], 'name') else f"P{substrate_places[1].id}"
@@ -367,18 +377,25 @@ class HeuristicParametersController:
                 if 'rate_function' in params and params['rate_function']:
                     transition.properties['rate_function'] = params['rate_function']
                 elif params.get('vmax') and params.get('km'):
-                    # Auto-generate rate_function using actual substrate place name with NAMED PARAMETERS
-                    # Get substrate place from transition's input arcs
+                    # Auto-generate rate_function using ALL substrate places (multi-substrate support)
+                    # Get substrate places from transition's input arcs
                     substrate_places = []
                     for arc in getattr(transition, 'input_arcs', []):
                         if hasattr(arc, 'source'):
                             substrate_places.append(arc.source)
                     
                     if substrate_places:
-                        substrate_name = substrate_places[0].name if hasattr(substrate_places[0], 'name') else f"P{substrate_places[0].id}"
-                        rate_function = f"michaelis_menten({substrate_name}, vmax={params['vmax']}, km={params['km']})"
+                        # Build substrate expression: P1*P2*P3 for multi-substrate reactions
+                        substrate_names = []
+                        for place in substrate_places:
+                            name = place.name if hasattr(place, 'name') else f"P{place.id}"
+                            substrate_names.append(name)
+                        
+                        # Join with multiplication for multi-substrate
+                        substrate_expr = '*'.join(substrate_names)
+                        rate_function = f"michaelis_menten({substrate_expr}, vmax={params['vmax']}, km={params['km']})"
                         transition.properties['rate_function'] = rate_function
-                        self.logger.info(f"✅ Generated rate_function: {rate_function}")
+                        self.logger.info(f"✅ Generated rate_function: {rate_function} ({len(substrate_names)} substrates)")
                     else:
                         self.logger.warning(f"No substrate place found for {transition_id}, using constant rate")
                         transition.rate = params['vmax']
