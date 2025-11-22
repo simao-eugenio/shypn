@@ -726,7 +726,7 @@ class HeuristicInferenceEngine:
                 return cached
         
         # Fast heuristic defaults by EC class and label
-        vmax, km, kcat = self._get_default_kinetics(ec_number, label, organism)
+        vmax, km, kcat = self._get_default_kinetics(ec_number, label, organism, transition)
         
         # Determine confidence based on specificity
         if ec_number and len(ec_number.split('.')) == 4:
@@ -774,7 +774,8 @@ class HeuristicInferenceEngine:
     
     def _get_default_kinetics(self, ec_number: Optional[str], 
                              label: str, 
-                             organism: str) -> Tuple[float, float, float]:
+                             organism: str,
+                             transition: Any = None) -> Tuple[float, float, float]:
         """Get default kinetic parameters by EC class.
         
         **Phase 3: Intelligent Learning Integration**
@@ -782,6 +783,17 @@ class HeuristicInferenceEngine:
         2. If high-confidence pattern found, use it
         3. Otherwise, blend learned pattern with hardcoded default
         4. Fall back to pure hardcoded default if no learned data
+        
+        **Phase 4: Substrate-Aware Refinement** (Post-Enrichment Enhancement)
+        - Uses substrate names (now biological names after enrichment)
+        - Adjusts Km based on known substrate affinities
+        - Examples: ATP → Km~0.05mM, Glucose → Km~0.1mM
+        
+        Args:
+            ec_number: EC number
+            label: Transition label/name
+            organism: Organism name
+            transition: Optional transition object for substrate analysis
         
         Returns:
             Tuple of (vmax, km, kcat) based on enzyme class and label
@@ -803,7 +815,7 @@ class HeuristicInferenceEngine:
             # Medium confidence (0.50-0.70): Blend with hardcoded defaults
             # Get hardcoded defaults
             vmax_default, km_default, kcat_default = self._get_hardcoded_defaults(
-                ec_number, label
+                ec_number, label, transition
             )
             
             # Weighted blend (confidence determines weight)
@@ -825,7 +837,7 @@ class HeuristicInferenceEngine:
             return (vmax_blended, km_blended, kcat_blended)
         
         # No learned data: Use pure hardcoded defaults
-        return self._get_hardcoded_defaults(ec_number, label)
+        return self._get_hardcoded_defaults(ec_number, label, transition)
     
     def _get_learned_kinetics(self, 
                              ec_number: Optional[str],
@@ -862,10 +874,21 @@ class HeuristicInferenceEngine:
     
     def _get_hardcoded_defaults(self, 
                                ec_number: Optional[str],
-                               label: str) -> Tuple[float, float, float]:
+                               label: str,
+                               transition: Any = None) -> Tuple[float, float, float]:
         """Get hardcoded default kinetic parameters.
         
         This is the original heuristic logic, now separated for blending.
+        
+        **Phase 4 Enhancement: Substrate-Aware Adjustment**
+        After KEGG enrichment, places have biological names (ATP, glucose, etc.)
+        instead of codes (C00002, C00008). We can use these names to refine Km
+        based on known substrate affinities.
+        
+        Args:
+            ec_number: EC number
+            label: Transition label
+            transition: Optional transition object for substrate analysis
         
         Returns:
             Tuple of (vmax, km, kcat)
@@ -965,7 +988,213 @@ class HeuristicInferenceEngine:
             return (100.0, 0.2, 10.0)  # Degradation
         
         # Generic enzymatic reaction
-        return (100.0, 0.1, 10.0)
+        vmax, km, kcat = (100.0, 0.1, 10.0)
+        
+        # ============================================================
+        # Phase 4: Substrate-Aware Refinement (Post-Enrichment)
+        # ============================================================
+        # After KEGG name enrichment, substrate places have biological names
+        # (ATP, glucose, NAD+, etc.) instead of KEGG codes (C00002, C00008).
+        # We can use these names to adjust Km based on known substrate affinities.
+        
+        if transition is not None:
+            substrate_names = self._extract_substrate_names(transition)
+            if substrate_names:
+                km = self._adjust_km_by_substrates(km, substrate_names, ec_number, label)
+        
+        return (vmax, km, kcat)
+    
+    def _extract_substrate_names(self, transition: Any) -> List[str]:
+        """Extract substrate (input place) names from transition.
+        
+        After KEGG enrichment, places have biological names instead of codes.
+        
+        Args:
+            transition: Transition object
+            
+        Returns:
+            List of substrate names (lowercased, cleaned)
+        """
+        substrate_names = []
+        
+        try:
+            if hasattr(transition, 'input_arcs'):
+                for arc in transition.input_arcs:
+                    if hasattr(arc, 'source'):
+                        place = arc.source
+                        # Try multiple name attributes (label, name, id)
+                        name = (getattr(place, 'label', None) or 
+                               getattr(place, 'name', None) or 
+                               getattr(place, 'id', None))
+                        
+                        if name and isinstance(name, str):
+                            # Clean and normalize
+                            cleaned = name.strip().lower()
+                            
+                            # Skip KEGG codes (not enriched yet)
+                            if not (cleaned.startswith('c') and cleaned[1:].isdigit()):
+                                substrate_names.append(cleaned)
+        
+        except Exception as e:
+            self.logger.debug(f"Failed to extract substrate names: {e}")
+        
+        return substrate_names
+    
+    def _adjust_km_by_substrates(self, 
+                                 base_km: float,
+                                 substrate_names: List[str],
+                                 ec_number: Optional[str],
+                                 label: str) -> float:
+        """Adjust Km based on known substrate affinities.
+        
+        Uses literature-known Km values for common metabolites to refine
+        the base Km estimate.
+        
+        Common substrate Km ranges (mM):
+        - ATP: 0.01-0.2 (high affinity, ubiquitous)
+        - ADP: 0.02-0.3
+        - Glucose: 0.05-5.0 (varies by enzyme)
+        - NAD+/NADH: 0.01-0.1 (high affinity cofactors)
+        - Pyruvate: 0.1-1.0
+        - CoA compounds: 0.005-0.05 (very high affinity)
+        
+        Strategy:
+        1. Check if substrate is ATP/ADP → Km ~ 0.05 (typical for kinases)
+        2. Check if substrate is NAD/NADH → Km ~ 0.05 (dehydrogenases)
+        3. Check if substrate is Glucose → Adjust by enzyme class
+        4. Check for CoA compounds → Very low Km
+        5. Otherwise keep base Km
+        
+        Args:
+            base_km: Base Km from enzyme class/label heuristics
+            substrate_names: List of substrate names (enriched biological names)
+            ec_number: EC number if available
+            label: Transition label
+            
+        Returns:
+            Adjusted Km value
+        """
+        # Known substrate patterns and their typical Km values
+        SUBSTRATE_KM_PATTERNS = {
+            # Nucleotides (phosphate donors/acceptors)
+            'atp': 0.05,      # ATP for kinases
+            'adp': 0.08,      # ADP
+            'gtp': 0.05,      # GTP
+            'gdp': 0.08,      # GDP
+            'amp': 0.10,      # AMP
+            'ctp': 0.05,      # CTP
+            'utp': 0.05,      # UTP
+            
+            # NAD/NADP cofactors (redox reactions)
+            'nad': 0.05,      # NAD+ for dehydrogenases
+            'nad+': 0.05,
+            'nadh': 0.03,     # NADH (often higher affinity)
+            'nadp': 0.05,     # NADP+
+            'nadp+': 0.05,
+            'nadph': 0.03,    # NADPH
+            
+            # CoA compounds (very high affinity)
+            'coa': 0.02,      # Coenzyme A
+            'acetyl-coa': 0.01,
+            'acetylcoa': 0.01,
+            'succinyl-coa': 0.01,
+            'succinylcoa': 0.01,
+            
+            # Common sugars
+            'glucose': 0.15,  # Glucose (varies widely)
+            'd-glucose': 0.15,
+            'fructose': 0.20,
+            'galactose': 0.20,
+            
+            # Phosphorylated sugars
+            'glucose-6-phosphate': 0.10,
+            'glucose-6p': 0.10,
+            'g6p': 0.10,
+            'fructose-6-phosphate': 0.10,
+            'fructose-6p': 0.10,
+            'f6p': 0.10,
+            'fructose-1,6-bisphosphate': 0.05,
+            'f16bp': 0.05,
+            'fbp': 0.05,
+            
+            # Glycolysis intermediates
+            'pyruvate': 0.30,
+            'lactate': 0.50,
+            'phosphoenolpyruvate': 0.08,
+            'pep': 0.08,
+            '3-phosphoglycerate': 0.15,
+            '3pg': 0.15,
+            '2-phosphoglycerate': 0.15,
+            '2pg': 0.15,
+            
+            # TCA cycle intermediates
+            'citrate': 0.20,
+            'isocitrate': 0.15,
+            'α-ketoglutarate': 0.20,
+            'ketoglutarate': 0.20,
+            '2-oxoglutarate': 0.20,
+            'succinate': 0.30,
+            'fumarate': 0.25,
+            'malate': 0.20,
+            'oxaloacetate': 0.10,
+            
+            # Amino acids (generally higher Km)
+            'glutamate': 0.50,
+            'aspartate': 0.50,
+            'alanine': 0.80,
+            'glycine': 1.00,
+        }
+        
+        # Check each substrate against patterns
+        matched_kms = []
+        for substrate in substrate_names:
+            # Direct match
+            if substrate in SUBSTRATE_KM_PATTERNS:
+                matched_kms.append(SUBSTRATE_KM_PATTERNS[substrate])
+                self.logger.debug(f"Substrate '{substrate}' matched → Km={SUBSTRATE_KM_PATTERNS[substrate]}")
+            # Partial match (e.g., "atp" in "atp:d-glucose")
+            else:
+                for pattern, km_value in SUBSTRATE_KM_PATTERNS.items():
+                    if pattern in substrate:
+                        matched_kms.append(km_value)
+                        self.logger.debug(f"Substrate '{substrate}' contains '{pattern}' → Km={km_value}")
+                        break
+        
+        if not matched_kms:
+            # No recognized substrates, keep base Km
+            return base_km
+        
+        # Strategy: Use geometric mean of matched Km values
+        # (Geometric mean better for parameters spanning orders of magnitude)
+        import math
+        geom_mean_km = math.exp(sum(math.log(km) for km in matched_kms) / len(matched_kms))
+        
+        # EC class-specific adjustments
+        if ec_number:
+            ec_class = ec_number.split('.')[0] if '.' in ec_number else None
+            
+            # Kinases with ATP/ADP → Km often lower (0.02-0.05)
+            if ec_class == '2' and any('atp' in s or 'adp' in s for s in substrate_names):
+                geom_mean_km *= 0.5  # Kinases have high affinity for ATP
+            
+            # Dehydrogenases with NAD/NADH → Km often lower
+            elif ec_class == '1' and any('nad' in s for s in substrate_names):
+                geom_mean_km *= 0.7  # Dehydrogenases have decent affinity
+            
+            # Hydrolases often have higher Km (broad specificity)
+            elif ec_class == '3':
+                geom_mean_km *= 1.3
+        
+        # Blend substrate-based Km with base Km (60% substrate, 40% base)
+        # This prevents over-correction from uncertain substrate matches
+        adjusted_km = 0.6 * geom_mean_km + 0.4 * base_km
+        
+        self.logger.info(
+            f"Adjusted Km: {base_km:.3g} → {adjusted_km:.3g} "
+            f"(substrates: {', '.join(substrate_names[:3])})"
+        )
+        
+        return adjusted_km
     
     def infer_from_stoichiometry(self, transition: Any, base_params: TransitionParameters) -> TransitionParameters:
         """Refine parameters using stoichiometry and network structure.
