@@ -717,6 +717,20 @@ class HeuristicInferenceEngine:
         label = getattr(transition, 'label', '').lower()
         name = getattr(transition, 'name', '').lower()
         
+        # CRITICAL FIX: Extract EC number from name if not in attribute
+        # KEGG enrichment puts EC numbers in name like "EC_1.2.1.3"
+        if not ec_number:
+            import re
+            # Try name first (e.g., "EC_1.2.1.3")
+            ec_match = re.search(r'EC[_\s]*([\d\.]+)', name, re.IGNORECASE)
+            if not ec_match:
+                # Try label (e.g., "R00710" → look in name)
+                ec_match = re.search(r'EC[_\s]*([\d\.]+)', label, re.IGNORECASE)
+            
+            if ec_match:
+                ec_number = ec_match.group(1)
+                self.logger.debug(f"{transition.id}: Extracted EC {ec_number} from name/label")
+        
         # Check cache first
         cache_key = (ec_number or reaction_id or 'generic', organism)
         if cache_key in self._parameter_cache:
