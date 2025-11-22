@@ -894,6 +894,11 @@ class HeuristicInferenceEngine:
         
         This is the original heuristic logic, now separated for blending.
         
+        **Units (Standard SABIO-RK/BRENDA convention):**
+        - Vmax: mM/s (millimolar per second)
+        - Km: mM (millimolar)
+        - kcat: 1/s (per second)
+        
         **Phase 4 Enhancement: Substrate-Aware Adjustment**
         After KEGG enrichment, places have biological names (ATP, glucose, etc.)
         instead of codes (C00002, C00008). We can use these names to refine Km
@@ -905,9 +910,10 @@ class HeuristicInferenceEngine:
             transition: Optional transition object for substrate analysis
         
         Returns:
-            Tuple of (vmax, km, kcat)
+            Tuple of (vmax, km, kcat) in units (mM/s, mM, 1/s)
         """
         # EC class-specific defaults (literature averages)
+        # Units: Vmax (mM/s), Km (mM), kcat (1/s)
         if ec_number:
             ec_class = ec_number.split('.')[0] if '.' in ec_number else None
             
