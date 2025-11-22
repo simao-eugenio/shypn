@@ -113,12 +113,16 @@ This allows UI to:
 
 1. Import KEGG pathway → Get topology + clues
 2. System marks transitions as `needs_enrichment`
-3. User reviews enzyme names (may be "UnknownEnzyme", "T1", etc.)
-4. User **manually adds kinetics**:
+3. **OPTIONAL:** User triggers KEGG name enrichment (see `KEGG_NAME_ENRICHMENT_GUIDE.md`)
+   - Fetches biological names from KEGG API
+   - Replaces C##### and R##### codes with actual names
+   - Slow operation (~1.5s per item) but improves naming quality
+4. User reviews enzyme names (may still be incomplete after enrichment)
+5. User **manually adds kinetics**:
    - Research enzyme parameters (Km, Vmax)
    - Define rate functions
-   - Add proper biological names if missing
-5. Model becomes simulation-ready
+   - Add proper biological names if still missing
+6. Model becomes simulation-ready
 
 ### For SBML Imports
 
