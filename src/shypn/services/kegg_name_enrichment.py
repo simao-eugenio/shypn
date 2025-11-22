@@ -44,6 +44,24 @@ class KEGGNameEnricher:
     # Pattern to detect KEGG codes
     COMPOUND_CODE_PATTERN = re.compile(r'^C\d{5}$')
     REACTION_CODE_PATTERN = re.compile(r'^R\d{5}$')
+    EC_NUMBER_PATTERN = re.compile(r'^EC_[\d\.]+$')  # Match EC_x.x.x.x format
+    
+    # Common enzyme abbreviations (same as reaction_mapper.py)
+    ENZYME_ABBREVIATIONS = {
+        '2.7.1.1': 'HK',      # Hexokinase
+        '2.7.1.11': 'PFK',    # Phosphofructokinase
+        '2.7.1.40': 'PK',     # Pyruvate kinase
+        '5.3.1.9': 'PGI',     # Phosphoglucose isomerase
+        '4.1.2.13': 'ALDO',   # Aldolase
+        '5.3.1.1': 'TPI',     # Triose phosphate isomerase
+        '1.2.1.12': 'GAPDH',  # Glyceraldehyde-3-phosphate dehydrogenase
+        '2.7.2.3': 'PGK',     # Phosphoglycerate kinase
+        '5.4.2.11': 'PGM',    # Phosphoglycerate mutase
+        '4.2.1.11': 'ENO',    # Enolase
+        '1.1.1.1': 'ADH',     # Alcohol dehydrogenase
+        '1.1.1.27': 'LDH',    # Lactate dehydrogenase
+        '2.7.1.2': 'GK',      # Glucokinase
+    }
     
     def __init__(self, api_client: Optional[KEGGAPIClient] = None, 
                  progress_callback=None):
@@ -127,13 +145,28 @@ class KEGGNameEnricher:
             if self.progress_callback:
                 self.progress_callback(current, total_items, f"Enriching transition {transition.name}")
             
-            new_name = self._fetch_reaction_name(transition.name)
-            api_calls += 1
+            # Get KEGG reaction ID from metadata (format: "rn:R00710")
+            reaction_id = None
+            if hasattr(transition, 'metadata') and transition.metadata:
+                kegg_name = transition.metadata.get('kegg_reaction_name', '')
+                if kegg_name:
+                    # Remove "rn:" prefix if present
+                    reaction_id = kegg_name.replace('rn:', '').strip()
             
-            if new_name and new_name != transition.name:
-                details[transition.name] = new_name
-                transition.name = new_name
-                transitions_enriched += 1
+            # If no metadata, try to extract from name (if it's R#####)
+            if not reaction_id and self.REACTION_CODE_PATTERN.match(transition.name):
+                reaction_id = transition.name
+            
+            if reaction_id:
+                new_name = self._fetch_reaction_name(reaction_id)
+                api_calls += 1
+                
+                if new_name and new_name != transition.name:
+                    details[transition.name] = new_name
+                    transition.name = new_name
+                    transitions_enriched += 1
+                else:
+                    transitions_failed += 1
             else:
                 transitions_failed += 1
         
@@ -174,7 +207,7 @@ class KEGGNameEnricher:
             transition: Transition to check
             
         Returns:
-            True if transition has KEGG reaction code as name
+            True if transition has KEGG reaction code OR EC number as name
         """
         # Must be KEGG import
         if not hasattr(transition, 'metadata') or not transition.metadata:
@@ -182,8 +215,10 @@ class KEGGNameEnricher:
         if transition.metadata.get('data_source') != 'kegg_import':
             return False
         
-        # Must have KEGG reaction code as name
-        return bool(self.REACTION_CODE_PATTERN.match(transition.name))
+        # Check for KEGG reaction code OR EC number format
+        # This allows enrichment of EC numbers that might have better enzyme names
+        return (bool(self.REACTION_CODE_PATTERN.match(transition.name)) or
+                bool(self.EC_NUMBER_PATTERN.match(transition.name)))
     
     def _fetch_compound_name(self, compound_id: str) -> Optional[str]:
         """Fetch compound name from KEGG API.
@@ -254,7 +289,7 @@ class KEGGNameEnricher:
             reaction_id: KEGG reaction ID (e.g., "R00001")
             
         Returns:
-            Biological name (enzyme name) or None if fetch fails
+            Biological name (enzyme abbreviation or enzyme name) or None if fetch fails
         """
         try:
             # Query KEGG API
@@ -263,31 +298,47 @@ class KEGGNameEnricher:
             if not response:
                 return None
             
-            # Parse NAME field (enzyme name)
+            # Parse ENZYME field first (most reliable for enzyme abbreviations)
             # Format:
-            # NAME        polyphosphate polyphosphohydrolase
-            # ENZYME      3.6.1.10
+            # NAME        long systematic name...
+            # ENZYME      4.1.2.13 2.7.1.105
             
             lines = response.split('\n')
+            ec_numbers = []
             enzyme_name = None
-            ec_number = None
             
             for line in lines:
-                if line.startswith('NAME'):
-                    enzyme_name = line[12:].strip()  # Skip "NAME        "
-                elif line.startswith('ENZYME'):
-                    ec_number = line[12:].strip()  # Skip "ENZYME      "
+                if line.startswith('ENZYME'):
+                    # Can have multiple EC numbers
+                    ec_part = line[12:].strip()
+                    ec_numbers.extend([ec.strip() for ec in ec_part.split()])
+                elif line.startswith('NAME'):
+                    enzyme_name = line[12:].strip()  # Fallback
             
-            # Prefer enzyme name over EC number
+            # Priority 1: Check if we have a common abbreviation for the EC number
+            for ec in ec_numbers:
+                if ec in self.ENZYME_ABBREVIATIONS:
+                    return self.ENZYME_ABBREVIATIONS[ec]
+            
+            # Priority 2: Try to extract a good word from enzyme name
             if enzyme_name:
-                # Extract first word (usually good enzyme name)
-                first_word = enzyme_name.split()[0]
-                if len(first_word) >= 3 and not first_word.startswith('R'):
-                    return first_word
+                # Try each word in the enzyme name
+                words = enzyme_name.split()
+                for word in words:
+                    # Clean up word
+                    clean_word = word.rstrip(';,.-').strip()
+                    # Good enzyme name: at least 4 chars, starts with uppercase, not a formula
+                    if (len(clean_word) >= 4 and 
+                        clean_word[0].isupper() and
+                        not clean_word.startswith('D-') and
+                        not clean_word.startswith('L-') and
+                        not clean_word[0].isdigit() and
+                        '-' not in clean_word):  # Avoid compound names
+                        return clean_word
             
-            # Fallback to EC number
-            if ec_number:
-                return f"EC_{ec_number}"
+            # Priority 3: Return first EC number (clean format without EC_ prefix)
+            if ec_numbers:
+                return ec_numbers[0]
             
             return None
             
