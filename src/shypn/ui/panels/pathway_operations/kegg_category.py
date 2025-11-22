@@ -250,6 +250,34 @@ class KEGGCategory(BasePathwayCategory):
         )
         box.pack_start(self.show_catalysts_check, False, False, 0)
         
+        # Separator before enrichment section
+        separator = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
+        box.pack_start(separator, False, False, 6)
+        
+        # Enrichment button for post-import name fetching
+        enrich_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        
+        self.enrich_button = Gtk.Button(label="Enrich Names from KEGG API")
+        self.enrich_button.set_sensitive(False)  # Enabled after import
+        self.enrich_button.set_tooltip_text(
+            "Fetch biological names from KEGG API to replace codes (C#####, R#####).\n\n"
+            "This is a SLOW operation (~1.5s per item) that queries KEGG database\n"
+            "to get actual compound and enzyme names.\n\n"
+            "Only run this when you need biological names for publication/presentation.\n"
+            "Import remains fast because this is opt-in post-processing."
+        )
+        self.enrich_button.connect('clicked', self._on_enrich_names_clicked)
+        enrich_box.pack_start(self.enrich_button, False, False, 0)
+        
+        # Enrich status label
+        self.enrich_status_label = Gtk.Label()
+        self.enrich_status_label.set_xalign(0)
+        self.enrich_status_label.set_line_wrap(True)
+        self.enrich_status_label.get_style_context().add_class("dim-label")
+        enrich_box.pack_start(self.enrich_status_label, True, True, 0)
+        
+        box.pack_start(enrich_box, False, False, 0)
+        
         return box
     
     def _build_preview(self):
@@ -587,10 +615,11 @@ class KEGGCategory(BasePathwayCategory):
             
             self.logger.info(f"Import complete, saving files...")
             
-            # Store current data
+            # Store current data (including document_model for enrichment)
             self.current_pathway_id = pathway_id
             self.current_kgml = kgml_data
             self.current_pathway = parsed_pathway
+            self.current_pathway_doc = document_model  # Store for enrichment
             
             # Update preview
             self._update_preview(parsed_pathway)
@@ -776,6 +805,10 @@ class KEGGCategory(BasePathwayCategory):
             # Re-enable button
             self.import_button.set_sensitive(True)
             self.import_in_progress = False
+            
+            # Enable enrichment button now that we have a model
+            self.enrich_button.set_sensitive(True)
+            self._check_enrichment_candidates()
             
             # Notify parent panel (for BRENDA integration)
             imported_data = {
@@ -964,4 +997,169 @@ class KEGGCategory(BasePathwayCategory):
             import traceback
             traceback.print_exc()
             self._show_status(f"❌ Failed to save files: {save_error}", error=True)
-            return None
+    
+    def _check_enrichment_candidates(self):
+        """Check how many items can be enriched and update status label."""
+        if not self.current_pathway_doc:
+            self.enrich_status_label.set_text("")
+            return
+        
+        import re
+        
+        # Count places with KEGG compound codes
+        compound_pattern = re.compile(r'^C\d{5}$')
+        places_to_enrich = [
+            p for p in self.current_pathway_doc.places
+            if compound_pattern.match(p.name) and
+               hasattr(p, 'metadata') and p.metadata and
+               p.metadata.get('data_source') == 'kegg_import'
+        ]
+        
+        # Count transitions with KEGG reaction codes
+        reaction_pattern = re.compile(r'^R\d{5}$')
+        transitions_to_enrich = [
+            t for t in self.current_pathway_doc.transitions
+            if reaction_pattern.match(t.name) and
+               hasattr(t, 'metadata') and t.metadata and
+               t.metadata.get('data_source') == 'kegg_import'
+        ]
+        
+        total = len(places_to_enrich) + len(transitions_to_enrich)
+        
+        if total > 0:
+            est_time = total * 1.5  # ~1.5s per item
+            self.enrich_status_label.set_markup(
+                f'<span size="small">{total} items can be enriched '
+                f'(~{est_time:.0f}s)</span>'
+            )
+        else:
+            self.enrich_status_label.set_markup(
+                '<span size="small">No KEGG codes to enrich</span>'
+            )
+    
+    def _on_enrich_names_clicked(self, button):
+        """Handle enrichment button click.
+        
+        Fetches biological names from KEGG API to replace codes (C#####, R#####).
+        """
+        if not self.current_pathway_doc:
+            self._show_error("No imported model available. Import a pathway first.")
+            return
+        
+        # Import enrichment service
+        try:
+            from shypn.services import enrich_kegg_names
+        except ImportError as e:
+            self._show_error(f"Enrichment service not available: {e}")
+            return
+        
+        # Disable button during enrichment
+        self.enrich_button.set_sensitive(False)
+        self.enrich_status_label.set_text("Enriching...")
+        
+        def enrich_in_thread():
+            """Run enrichment in background thread."""
+            try:
+                # Progress callback to update UI
+                def progress(current, total, message):
+                    GLib.idle_add(
+                        self.enrich_status_label.set_text,
+                        f"[{current}/{total}] {message[:30]}..."
+                    )
+                
+                # Run enrichment
+                result = enrich_kegg_names(
+                    self.current_pathway_doc,
+                    progress_callback=progress
+                )
+                
+                return result
+                
+            except Exception as e:
+                self.logger.error(f"Enrichment failed: {e}")
+                import traceback
+                traceback.print_exc()
+                raise
+        
+        # Run in background with callbacks
+        self._run_in_thread(
+            enrich_in_thread,
+            on_complete=self._on_enrichment_complete,
+            on_error=self._on_enrichment_error
+        )
+    
+    def _on_enrichment_complete(self, result):
+        """Called when enrichment completes successfully.
+        
+        Args:
+            result: EnrichmentResult object
+        """
+        self.logger.info(
+            f"Enrichment complete: {result.places_enriched} places, "
+            f"{result.transitions_enriched} transitions in {result.duration_seconds:.1f}s"
+        )
+        
+        # Re-enable button
+        self.enrich_button.set_sensitive(True)
+        
+        # Update status
+        total_enriched = result.places_enriched + result.transitions_enriched
+        total_failed = result.places_failed + result.transitions_failed
+        
+        if total_enriched > 0:
+            self.enrich_status_label.set_markup(
+                f'<span size="small">✅ Enriched {total_enriched} items '
+                f'in {result.duration_seconds:.0f}s</span>'
+            )
+            
+            # Update main status
+            self._show_status(
+                f"✅ Name enrichment complete!\n"
+                f"Enriched: {result.places_enriched} places, {result.transitions_enriched} transitions\n"
+                f"Failed: {result.places_failed} places, {result.transitions_failed} transitions\n"
+                f"Duration: {result.duration_seconds:.1f}s\n"
+                f"💡 Model updated in memory. Save to persist changes."
+            )
+            
+            # Trigger canvas redraw if model is loaded
+            if self.model_canvas:
+                try:
+                    canvas_manager = None
+                    if hasattr(self.model_canvas, 'get_current_model'):
+                        canvas_manager = self.model_canvas.get_current_model()
+                    else:
+                        canvas_manager = self.model_canvas
+                    
+                    if canvas_manager and hasattr(canvas_manager, 'mark_needs_redraw'):
+                        canvas_manager.mark_needs_redraw()
+                        canvas_manager.mark_dirty()  # Mark as needing save
+                        self.logger.info("Canvas redrawn after enrichment")
+                except Exception as e:
+                    self.logger.warning(f"Could not redraw canvas: {e}")
+        else:
+            self.enrich_status_label.set_markup(
+                '<span size="small">No items were enriched</span>'
+            )
+            self._show_status("No KEGG codes found to enrich")
+        
+        return False  # Don't repeat
+    
+    def _on_enrichment_error(self, error):
+        """Called when enrichment encounters an error.
+        
+        Args:
+            error: Exception object
+        """
+        self.logger.error(f"Enrichment error: {error}")
+        
+        # Re-enable button
+        self.enrich_button.set_sensitive(True)
+        
+        # Update status
+        self.enrich_status_label.set_markup(
+            '<span size="small">❌ Enrichment failed</span>'
+        )
+        
+        self._show_error(f"Enrichment failed: {error}")
+        
+        return False  # Don't repeat
