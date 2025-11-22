@@ -81,6 +81,11 @@ class SpeciesConverter(BaseConverter):
         """
         Convert all species to places.
         
+        Uses biological naming pattern:
+        - Place ID: System-generated (P1, P2, ...)
+        - Place name: Biological code (KEGG ID, common abbreviation, or species name)
+        - Place label: Display name (compound name + concentration)
+        
         Returns:
             Dictionary mapping species ID to Place object
         """
@@ -106,12 +111,18 @@ class SpeciesConverter(BaseConverter):
             # Convert hex color to RGB tuple (not used for now - colors too light)
             # border_color = self._hex_to_rgb(color_hex)
             
-            # Create place
+            # Determine biological name (following SHYPN naming pattern)
+            biological_name = self._get_biological_name(species)
+            
+            # Create place with biological name
             place = self.document.create_place(
                 x=x,
                 y=y,
                 label=species.name or species.id
             )
+            
+            # Override system-generated name with biological name
+            place.name = biological_name
             
             # Set initial marking (from normalized tokens)
             place.set_tokens(species.initial_tokens)
@@ -127,7 +138,12 @@ class SpeciesConverter(BaseConverter):
             place.metadata['species_id'] = species.id
             place.metadata['concentration'] = species.initial_concentration
             place.metadata['compartment'] = species.compartment
-            place.metadata['data_source'] = 'sbml_import'  # For Report panel colored rendering
+            
+            # Copy data_source from species if available (set by SBML parser)
+            # Manual models won't have this, so they remain untagged
+            if hasattr(species, 'metadata') and species.metadata:
+                if 'data_source' in species.metadata:
+                    place.metadata['data_source'] = species.metadata['data_source']
             
             # Transfer database IDs if available (for Report panel Database ID column)
             if hasattr(species, 'kegg_id') and species.kegg_id:
@@ -141,12 +157,72 @@ class SpeciesConverter(BaseConverter):
             
             species_to_place[species.id] = place
             self.logger.debug(
-                f"Converted species '{species.id}' to place '{place.name}' "
+                f"Converted species '{species.id}' to place '{place.name}' (ID: {place.id}) "
                 f"with {place.tokens} tokens"
             )
         
         self.logger.info(f"Converted {len(species_to_place)} species to places")
         return species_to_place
+    
+    def _get_biological_name(self, species: Species) -> str:
+        """
+        Generate biological name for a place following SHYPN pattern.
+        
+        Priority order for SBML imports (preserve original names):
+        1. Common abbreviation from species name (ATP, ADP, NAD, etc.)
+        2. First word of species name (if ≤10 chars)
+        3. Species ID (preserve SBML identifier)
+        
+        Priority order for KEGG imports (use database codes):
+        1. Common abbreviation
+        2. KEGG compound ID (C00002, etc.)
+        3. First word of name
+        
+        Args:
+            species: The species data
+            
+        Returns:
+            Biological name string (e.g., "ATP", "GlcX", "Glucose")
+        """
+        # Detect data source (SBML vs KEGG)
+        is_sbml_import = False
+        if hasattr(species, 'metadata') and species.metadata:
+            is_sbml_import = species.metadata.get('data_source') == 'sbml_import'
+        
+        # Try to extract common abbreviation from name
+        if species.name:
+            name_clean = species.name.strip()
+            
+            # Check if name is already a known abbreviation (3-6 uppercase letters)
+            if len(name_clean) <= 6 and name_clean.replace('-', '').replace('+', '').isalpha():
+                # Common metabolites: ATP, ADP, AMP, NAD, NADH, FAD, etc.
+                return name_clean.upper()
+            
+            # For SBML imports, prioritize original names over KEGG IDs
+            if is_sbml_import:
+                # Extract first word if compound name
+                first_word = name_clean.split()[0].split('(')[0].split('[')[0]
+                if len(first_word) <= 10:
+                    return first_word.capitalize()
+                
+                # Fallback to species ID (preserve original SBML identifier)
+                species_base = species.id.split('_')[0].split('[')[0]
+                return species_base
+        
+        # For KEGG imports, use KEGG ID if available (preferred database standard)
+        if hasattr(species, 'kegg_id') and species.kegg_id:
+            # Extract compound code (C00002 from cpd:C00002)
+            kegg_clean = species.kegg_id.replace('cpd:', '').replace('gl:', '')
+            return kegg_clean
+        
+        # Use ChEBI ID if available
+        if hasattr(species, 'chebi_id') and species.chebi_id:
+            # Keep full ChEBI format (CHEBI:15422)
+            return species.chebi_id
+        
+        # Final fallback to species ID
+        species_base = species.id.split('_')[0].split('[')[0]
+        return species_base
     
     @staticmethod
     def _hex_to_rgb(hex_color: str) -> tuple:
@@ -201,6 +277,11 @@ class ReactionConverter(BaseConverter):
         """
         Convert all reactions to transitions.
         
+        Uses biological naming pattern:
+        - Transition ID: System-generated (T1, T2, ...)
+        - Transition name: Biological code (EC number, KEGG reaction, or enzyme abbreviation)
+        - Transition label: Display name (reaction name or equation)
+        
         Returns:
             Dictionary mapping reaction ID to Transition object
         """
@@ -214,12 +295,18 @@ class ReactionConverter(BaseConverter):
                 )
             x, y = self.pathway.positions.get(reaction.id, (200.0, 200.0))
             
-            # Create transition
+            # Determine biological name for transition
+            biological_name = self._get_biological_name(reaction)
+            
+            # Create transition with biological name
             transition = self.document.create_transition(
                 x=x,
                 y=y,
                 label=reaction.name or reaction.id
             )
+            
+            # Override system-generated name with biological name
+            transition.name = biological_name
             
             # Initialize properties dict if not exists
             if not hasattr(transition, 'properties'):
@@ -241,12 +328,75 @@ class ReactionConverter(BaseConverter):
             
             reaction_to_transition[reaction.id] = transition
             self.logger.debug(
-                f"Converted reaction '{reaction.id}' to transition '{transition.name}' "
+                f"Converted reaction '{reaction.id}' to transition '{transition.name}' (ID: {transition.id}) "
                 f"(type: {transition.transition_type}, rate: {getattr(transition, 'rate', 'N/A')})"
             )
         
         self.logger.info(f"Converted {len(reaction_to_transition)} reactions to transitions")
         return reaction_to_transition
+    
+    def _get_biological_name(self, reaction: Reaction) -> str:
+        """
+        Generate biological name for a transition following SHYPN pattern.
+        
+        Priority order:
+        1. Enzyme abbreviation from reaction name (HK, PFK, PGI, etc.)
+        2. EC number from metadata (EC 2.7.1.1, EC 1.1.1.27, etc.)
+        3. KEGG reaction ID (R00002, R00010, etc.)
+        4. Truncated reaction name (first word, max 10 chars)
+        5. Fallback to reaction ID
+        
+        Args:
+            reaction: The reaction data
+            
+        Returns:
+            Biological name string (e.g., "HK", "EC_2.7.1.1", "R00002")
+        """
+        # PRIORITY 1: Try to extract enzyme abbreviation from reaction name
+        if reaction.name:
+            name_clean = reaction.name.strip()
+            
+            # Known enzyme abbreviations (2-4 uppercase letters)
+            if len(name_clean) <= 4 and name_clean.replace('-', '').isalpha():
+                # Examples: HK, PFK, PGI, GAPDH, etc.
+                return name_clean.upper()
+            
+            # Extract acronym from multi-word names (e.g., "Phosphoglucose Isomerase" → "PGI")
+            words = name_clean.split()
+            if len(words) >= 2 and len(words) <= 4:
+                acronym = ''.join(w[0].upper() for w in words if w[0].isupper() or len(w) > 3)
+                if 2 <= len(acronym) <= 5:
+                    return acronym
+        
+        # PRIORITY 2: Check for EC number in metadata or kinetic law
+        if hasattr(reaction, 'ec_number') and reaction.ec_number:
+            # Format: EC_2.7.1.1 (underscore for valid Python identifier)
+            return f"EC_{reaction.ec_number.replace('EC ', '').replace('EC:', '')}"
+        
+        # Check kinetic law metadata for EC number
+        if reaction.kinetic_law and hasattr(reaction.kinetic_law, 'parameters'):
+            for key, value in reaction.kinetic_law.parameters.items():
+                if 'ec' in key.lower() and isinstance(value, str):
+                    ec_clean = value.replace('EC ', '').replace('EC:', '').strip()
+                    if ec_clean:
+                        return f"EC_{ec_clean}"
+        
+        # PRIORITY 3: Use KEGG reaction ID if available
+        if hasattr(reaction, 'kegg_id') and reaction.kegg_id:
+            # Extract reaction code (R00002 from rn:R00002)
+            kegg_clean = reaction.kegg_id.replace('rn:', '').replace('R:', '')
+            return kegg_clean
+        
+        # PRIORITY 4: Extract first word if compound name
+        if reaction.name:
+            name_clean = reaction.name.strip()
+            first_word = name_clean.split()[0].split('(')[0].split('[')[0]
+            if len(first_word) <= 10:
+                return first_word.capitalize()
+        
+        # PRIORITY 5: Fallback to reaction ID (remove pathway prefix if present)
+        reaction_base = reaction.id.split('_')[0].split('[')[0]
+        return reaction_base
     
     def _configure_transition_kinetics(self, transition: Transition, reaction: Reaction) -> None:
         """
@@ -421,16 +571,54 @@ class ReactionConverter(BaseConverter):
         """
         Setup kinetics using heuristic parameter estimation.
         
-        When no kinetic law is provided in SBML, use intelligent heuristics
-        to estimate parameters from stoichiometry and initial concentrations.
+        CRITICAL: Heuristics only work for MANUAL models with well-formed biological names.
         
-        Default: Michaelis-Menten for biochemical reactions (most common)
+        Why heuristics DON'T work for imports:
+        - KEGG: Incomplete names (mix of enzyme names, EC numbers, IDs), no kinetics
+        - SBML: Already has kinetics from curators, or intentionally missing
+        
+        Heuristics require:
+        - Proper biological names (glucose, ATP, hexokinase)
+        - Manual model creation (user-controlled naming)
+        
+        For imports without kinetics, mark for user enrichment instead.
         
         Args:
             transition: Transition to configure
             reaction: Reaction data (without kinetic law)
         """
-        # Get substrate and product places
+        # DISABLE heuristics for ALL imports (KEGG and SBML)
+        # Check if this is an imported model by looking at species metadata
+        is_imported = False
+        for species_id, _ in reaction.reactants + reaction.products:
+            place = self.species_to_place.get(species_id)
+            if place and hasattr(place, 'metadata') and place.metadata:
+                data_source = place.metadata.get('data_source')
+                if data_source in ('sbml_import', 'kegg_import'):
+                    is_imported = True
+                    break
+        
+        if is_imported:
+            # Imported model - DO NOT apply heuristics
+            # Mark for manual enrichment by user
+            transition.transition_type = "continuous"
+            transition.rate = 1.0
+            
+            if not hasattr(transition, 'properties'):
+                transition.properties = {}
+            transition.properties['needs_enrichment'] = True
+            transition.properties['enrichment_reason'] = (
+                "Imported model without kinetics - requires user enrichment "
+                "(heuristics unreliable with import naming conventions)"
+            )
+            
+            self.logger.info(
+                f"  Imported model without kinetics: Marked for user enrichment "
+                f"(heuristics disabled for imports)"
+            )
+            return
+        
+        # Get substrate and product places (manual models only)
         substrate_places = []
         product_places = []
         
@@ -627,9 +815,14 @@ class ModifierConverter(BaseConverter):
     - Inhibitors
     
     In Biological Petri Nets, these are modeled as test arcs (read arcs):
-    - Non-consuming arcs from catalyst place to transition
-    - Enable reaction without token consumption
+    - Non-consuming arcs from catalyst place to transition (for THAT reaction)
+    - Enable reaction without token consumption (in THAT reaction)
     - Visual: dashed line with hollow diamond
+    
+    Important: A species can have mixed roles across reactions:
+    - Test arc (non-consuming) in one reaction (e.g., AMP → vPFK)
+    - Normal arc (consuming) in another reaction (e.g., AMP → vAK)
+    This is biochemically correct (e.g., AMP as allosteric activator + substrate).
     
     This implements the Σ component from the Biological PN formalization:
     Σ(t) = {p | arc(p,t) is test arc}

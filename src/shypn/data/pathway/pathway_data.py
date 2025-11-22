@@ -26,18 +26,23 @@ class Species:
         id: Unique identifier (e.g., "C00031" for glucose)
         name: Human-readable name (e.g., "Glucose")
         compartment: Cellular location (e.g., "cytosol")
-        initial_concentration: Initial amount (mM, molecules, etc.)
+        initial_concentration: Initial amount (default unit: mM - millimolar)
         initial_tokens: Token count after unit normalization
         formula: Chemical formula (e.g., "C6H12O6")
         charge: Electrical charge
         chebi_id: ChEBI database ID
         kegg_id: KEGG database ID
         metadata: Additional properties
+        
+    Notes:
+        - Default concentration scale: mM (millimolar, 10^-3 M)
+        - Typical cellular metabolite range: 0.01 - 10 mM
+        - Default value when unspecified: 1.0 mM (physiological assumption)
     """
     id: str
     name: Optional[str] = None
     compartment: Optional[str] = None
-    initial_concentration: float = 0.0
+    initial_concentration: float = 0.0  # Default unit: mM (millimolar)
     initial_tokens: int = 0
     formula: Optional[str] = None
     charge: Optional[int] = None

@@ -124,10 +124,13 @@ class BiologicalCategory(BaseTopologyCategory):
         rows = []
         
         if analyzer_name == 'mass_balance':
-            # Result format: {'balanced_transitions': [...], 'unbalanced_transitions': [...], 'statistics': {...}}
+            # Result format: {'balanced_transitions': [...], 'unbalanced_transitions': [...], 'incomplete_transitions': [...], 'statistics': {...}}
             statistics = result.get('statistics', {})
             unbalanced = result.get('unbalanced_transitions', [])
+            incomplete = result.get('incomplete_transitions', [])
+            balanced = result.get('balanced_transitions', [])
             
+            # Show truly unbalanced (violation)
             if unbalanced:
                 for trans_info in unbalanced:
                     trans_name = trans_info.get('transition_name', trans_info.get('transition_id', 'Unknown'))
@@ -146,18 +149,28 @@ class BiologicalCategory(BaseTopologyCategory):
                         '❌ Mass Error',
                         'Atoms not conserved'
                     ))
-            else:
-                # All balanced - show summary
-                num_balanced = statistics.get('num_balanced', 0)
-                if num_balanced > 0:
-                    rows.append((
-                        'Mass Balance',
-                        'All Transitions',
-                        f'{num_balanced} reaction(s)',
-                        0.0,
-                        '✓ Balanced',
-                        'All atoms conserved'
-                    ))
+            
+            # Show balanced (success)
+            if balanced and not unbalanced:
+                rows.append((
+                    'Mass Balance',
+                    'Verified',
+                    f'{len(balanced)} reaction(s)',
+                    0.0,
+                    '✓ Balanced',
+                    'All atoms conserved'
+                ))
+            
+            # Show incomplete (informational)
+            if incomplete:
+                rows.append((
+                    'Mass Balance',
+                    'Incomplete Data',
+                    f'{len(incomplete)} reaction(s)',
+                    0.3,  # Low severity (info only)
+                    'ℹ️ Cannot Verify',
+                    f'{statistics.get("places_without_formulas", 0)} places lack formulas'
+                ))
         
         elif analyzer_name == 'stoichiometry':
             # Result format: {'stoichiometric_matrix': [...], 'conservation_laws': [...], 'blocked_transitions': [...]}
@@ -178,7 +191,16 @@ class BiologicalCategory(BaseTopologyCategory):
             
             if conservation_laws:
                 for law in conservation_laws[:5]:  # Show first 5
-                    place_str = ', '.join([f"{pid}×{coef:.2f}" for pid, coef in law.items() if coef != 0])
+                    # Handle both numeric and string coefficients
+                    place_parts = []
+                    for pid, coef in law.items():
+                        if coef != 0:
+                            # Try to format as float, fallback to string
+                            try:
+                                place_parts.append(f"{pid}×{float(coef):.2f}")
+                            except (ValueError, TypeError):
+                                place_parts.append(f"{pid}×{coef}")
+                    place_str = ', '.join(place_parts)
                     rows.append((
                         'Conservation Law',
                         'Invariant',
@@ -241,13 +263,16 @@ class BiologicalCategory(BaseTopologyCategory):
                     
                     severity_icon = '❌' if severity == 'error' else '⚠️'
                     
+                    # Handle None suggestion safely
+                    suggestion = issue.get('suggestion', '') or ''
+                    
                     rows.append((
                         f'{severity_icon} {issue_type.replace("_", " ").title()}',
                         trans_name,
                         description[:60],
                         1.0 if severity == 'error' else 0.5,
                         severity.title(),
-                        issue.get('suggestion', '')[:40]
+                        suggestion[:40]
                     ))
             else:
                 total_transitions = statistics.get('total_transitions', 0)

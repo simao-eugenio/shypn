@@ -383,22 +383,34 @@ def is_test_arc(self) -> bool:
 **Biological Petri Net Theory**:
 
 - **Normal Arc**: P → T (consumes tokens, participates in locality)
-- **Test Arc**: P → T (checks presence, doesn't consume, NOT in locality)
+- **Test Arc**: P → T (checks presence, doesn't consume in THIS reaction, NOT in locality)
 - **Catalyst Place**: Place with `is_catalyst=True` (connected via test arcs)
 
 **Key Properties**:
-1. Catalysts enable reactions without being consumed
-2. Test arcs are non-consuming (enzyme concentration stays constant)
+1. Catalysts enable reactions without being consumed **in that specific reaction**
+2. Test arcs are non-consuming (enzyme concentration stays constant during that reaction)
 3. Catalysts are NOT locality members (no token flow relationship)
 4. Catalysts are PLACES (not transitions) - positioned at place layer
 5. Catalysts are "decorations" showing enzyme presence
+
+**Mixed-Role Species** (Important):
+A species can have **both roles in different reactions**:
+- **Catalyst** in one reaction (test arc, non-consuming)
+- **Substrate** in another reaction (normal arc, consuming)
+
+Example from BIOMD0000000061 (yeast glycolysis):
+```
+vPFK:  F6P + ATP → FBP + ADP  (AMP as allosteric activator - test arc)
+vAK:   ATP + AMP → 2 ADP      (AMP as substrate - normal arc)
+```
+AMP is NOT consumed in vPFK but IS consumed in vAK. This is biochemically correct.
 
 **Formula Semantics**:
 ```
 Rate = f(substrate_conc, enzyme_conc)
       ↑              ↑
    normal arc    test arc
-   (consumed)  (non-consuming)
+   (consumed)  (non-consuming in this reaction)
 ```
 
 ---

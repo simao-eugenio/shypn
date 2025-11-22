@@ -147,9 +147,14 @@ N · v = 0  where v = [Φ(t₁), Φ(t₂), ..., Φ(tₙ)]^T
 Locality(t) = (•t, t, t•, Σ(t))
 ```
 Where:
-- `•t` = preset (input places that are consumed)
-- `t•` = postset (output places that are produced)
-- `Σ(t)` = regulatory places (referenced in rate formula, not consumed)
+- `•t` = preset (input places that are consumed by THIS transition)
+- `t•` = postset (output places that are produced by THIS transition)
+- `Σ(t)` = regulatory places (referenced in rate formula, not consumed by THIS transition)
+
+**Important**: A place can be regulatory (Σ) for one transition and consumable (•) for another:
+- Example: AMP ∈ Σ(vPFK) - allosteric activator (test arc, not consumed)
+- Example: AMP ∈ •(vAK) - substrate (normal arc, consumed)
+This reflects biochemical reality where metabolites have multiple roles.
 
 **REFINED Independence Theory** (Biological PN Contribution):
 

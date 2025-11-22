@@ -124,9 +124,10 @@ def test_stoichiometry_preservation():
 ```
 
 #### Test Arcs (Catalyst/Modifier)
-- **Do NOT consume tokens** when transition fires
+- **Do NOT consume tokens** when their connected transition fires
 - Represent enzymes, catalysts, modulators
 - Enable biological regulation without resource depletion
+- **Important**: A species can have both roles - catalyst in one reaction, substrate in another
 
 **Test Cases**:
 ```python
@@ -135,7 +136,7 @@ def test_test_arc_non_consumption():
     enzyme.tokens = 1
     test_arc.weight = 1
     transition.fire()
-    assert enzyme.tokens == 1  # Unchanged
+    assert enzyme.tokens == 1  # Unchanged by THIS reaction
 
 def test_catalyst_enablement():
     """Verify catalyst test arcs enable transitions."""
@@ -143,6 +144,19 @@ def test_catalyst_enablement():
     assert not transition.is_enabled()
     enzyme.tokens = 1
     assert transition.is_enabled()
+
+def test_mixed_role_species():
+    """Verify species can be catalyst in one reaction, substrate in another."""
+    # Example: AMP is catalyst for vPFK, substrate for vAK
+    amp.tokens = 10
+    
+    # Reaction 1: AMP as catalyst (test arc)
+    pfk.fire()  # AMP enables but not consumed
+    assert amp.tokens == 10  # Unchanged
+    
+    # Reaction 2: AMP as substrate (normal arc)
+    ak.fire()  # AMP consumed
+    assert amp.tokens == 9  # Decreased by 1
 ```
 
 ### Test Transition Types

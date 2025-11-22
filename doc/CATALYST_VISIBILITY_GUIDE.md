@@ -158,10 +158,22 @@ When catalysts ARE visible, you should see:
 
 **Visual Characteristics**:
 - ✅ Enzyme place: Circle (like other places)
-- ✅ Test arc: Dashed line (indicates non-consuming)
+- ✅ Test arc: Dashed line (indicates non-consuming in THIS reaction)
 - ✅ Endpoint: Hollow diamond (catalyst symbol)
 - ✅ Color: Gray (less prominent than normal arcs)
 - ✅ Connection: Perimeter-to-perimeter (fixed in latest patch)
+
+**Important Note on Mixed Roles**:
+A species can have BOTH test arcs (catalyst) and normal arcs (substrate):
+```
+     [AMP]
+    ╱  |  ╲
+   ╱   |   ╲ (solid line)
+ (dashed)  |
+  ╱        ↓
+[vPFK]   [vAK]  ← AMP is activator for vPFK, substrate for vAK
+```
+This is biochemically correct - metabolites often serve dual roles.
 
 ---
 

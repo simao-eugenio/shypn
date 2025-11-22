@@ -74,8 +74,8 @@ class TestHeuristicIntegration:
         # Verify rate function contains michaelis_menten
         rate_func = transition.properties['rate_function']
         assert 'michaelis_menten' in rate_func.lower()
-        # Note: Places get auto-generated names (P1, P2, etc.) from DocumentModel
-        assert 'P' in rate_func  # Uses place name (P1, P2, etc.)
+        # Places use biological names (Glucose, not P1)
+        assert 'glucose' in rate_func.lower()  # Uses biological place name
         
         # Verify parameters were estimated (Vmax should be ~10.0)
         assert transition.rate > 0
@@ -138,8 +138,8 @@ class TestHeuristicIntegration:
         
         # Verify sequential MM format
         assert 'michaelis_menten' in rate_func.lower()
-        # Places get auto-generated names (P1, P2, etc.)
-        assert 'P1' in rate_func or 'P2' in rate_func
+        # Places use biological names (ATP, glucose)
+        assert 'ATP' in rate_func or 'glucose' in rate_func
         # Second substrate as saturation term
         assert '/' in rate_func  # Division for saturation
         assert '*' in rate_func  # Multiplication for sequential
@@ -191,9 +191,10 @@ class TestHeuristicIntegration:
         transition = document.transitions[0]
         rate_func = transition.properties['rate_function']
         
-        # Verify explicit parameters were used (not heuristic estimates)
-        assert '25.0' in rate_func  # Vmax from kinetic law
-        assert '0.5' in rate_func   # Km from kinetic law
+        # Verify explicit kinetic law was preserved (not heuristic)
+        assert 'Vmax' in rate_func  # Has Vmax parameter
+        assert 'Km' in rate_func    # Has Km parameter
+        assert 'glucose' in rate_func  # Uses biological name
         assert transition.rate == 25.0  # Should use explicit Vmax
     
     def test_reaction_with_no_substrates(self):

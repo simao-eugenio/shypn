@@ -806,10 +806,6 @@ class BaseTopologyCategory:
         try:
             kb = self.get_knowledge_base()
             if not kb:
-                print(f"  - self.parent_panel: {self.parent_panel}")
-                print(f"  - self.model_canvas: {self.model_canvas}")
-                if self.model_canvas:
-                    print(f"  - has get_current_knowledge_base: {hasattr(self.model_canvas, 'get_current_knowledge_base')}")
                 return False  # No KB available
             
             
