@@ -46,6 +46,65 @@ class KEGGNameEnricher:
     REACTION_CODE_PATTERN = re.compile(r'^R\d{5}$')
     EC_NUMBER_PATTERN = re.compile(r'^EC_[\d\.]+$')  # Match EC_x.x.x.x format
     
+    # Short, eval-safe names for common metabolites
+    # These override KEGG API results for better simulation compatibility
+    COMPOUND_SHORT_NAMES = {
+        'C00002': 'ATP',
+        'C00008': 'ADP',
+        'C00020': 'AMP',
+        'C00044': 'GTP',
+        'C00035': 'GDP',
+        'C00144': 'GMP',
+        'C00063': 'CTP',
+        'C00112': 'CDP',
+        'C00055': 'CMP',
+        'C00075': 'UTP',
+        'C00015': 'UDP',
+        'C00105': 'UMP',
+        'C00003': 'NADplus',      # NAD+
+        'C00004': 'NADH',
+        'C00006': 'NADPplus',     # NADP+
+        'C00005': 'NADPH',
+        'C00016': 'FAD',
+        'C00010': 'CoA',
+        'C00024': 'AcetylCoA',
+        'C00001': 'H2O',
+        'C00007': 'O2',
+        'C00011': 'CO2',
+        'C00014': 'NH3',
+        'C00009': 'Pi',            # Orthophosphate
+        'C00013': 'PPi',           # Pyrophosphate
+        'C00080': 'Hplus',         # H+
+        'C00031': 'Glucose',       # D-Glucose
+        'C00221': 'Glucose1P',     # alpha-D-Glucose 1-phosphate
+        'C00668': 'Glucose6P',     # alpha-D-Glucose 6-phosphate
+        'C00103': 'Glucose1P',     # D-Glucose 1-phosphate
+        'C05345': 'Fructose6P',    # beta-D-Fructose 6-phosphate
+        'C00085': 'Fructose6P',    # D-Fructose 6-phosphate
+        'C00354': 'Fructose1P',    # D-Fructose 1-phosphate
+        'C05378': 'Fructose16BP',  # beta-D-Fructose 1,6-bisphosphate
+        'C00199': 'Fructose16BP',  # D-Fructose 1,6-bisphosphate
+        'C00111': 'DHAP',          # Dihydroxyacetone phosphate
+        'C00118': 'GAP',           # D-Glyceraldehyde 3-phosphate
+        'C00236': 'BPG13',         # 3-Phospho-D-glyceroyl phosphate (1,3-BPG)
+        'C00197': 'PG3',           # 3-Phospho-D-glycerate
+        'C00631': 'PG2',           # 2-Phospho-D-glycerate
+        'C00074': 'PEP',           # Phosphoenolpyruvate
+        'C00022': 'Pyruvate',
+        'C00186': 'Lactate',       # (S)-Lactate
+        'C00025': 'Glutamate',     # L-Glutamate
+        'C00026': 'Ketoglutarate', # 2-Oxoglutarate
+        'C00036': 'Oxaloacetate',
+        'C00042': 'Succinate',
+        'C00122': 'Fumarate',
+        'C00149': 'Malate',        # (S)-Malate
+        'C00158': 'Citrate',
+        'C00311': 'Isocitrate',
+        'C00417': 'Isocitrate',    # cis-Aconitate
+        'C00091': 'SuccinylCoA',
+        'C00026': 'Akg',           # Alpha-ketoglutarate
+    }
+    
     # Common enzyme abbreviations (same as reaction_mapper.py)
     ENZYME_ABBREVIATIONS = {
         '2.7.1.1': 'HK',      # Hexokinase
@@ -229,6 +288,10 @@ class KEGGNameEnricher:
         Returns:
             Biological name or None if fetch fails
         """
+        # First, check if we have a curated short name
+        if compound_id in self.COMPOUND_SHORT_NAMES:
+            return self.COMPOUND_SHORT_NAMES[compound_id]
+        
         try:
             # Query KEGG API
             response = self.client._make_request(f"https://rest.kegg.jp/get/{compound_id}")
