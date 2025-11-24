@@ -64,6 +64,37 @@ class BaseConverter:
             Dictionary with mapping information (species_id → Place, etc.)
         """
         raise NotImplementedError("Subclasses must implement convert()")
+    
+    @staticmethod
+    def sanitize_identifier(name: str) -> str:
+        """
+        Sanitize identifier to be Python-compatible.
+        
+        Replaces characters that are invalid in Python variable names:
+        - Hyphens (-) → underscores (_)
+        - Other invalid chars → underscores
+        
+        This ensures species IDs like 'MOS-P', 'Erk2-pp' become 'MOS_P', 'Erk2_pp'
+        which can be used in rate expressions without syntax errors.
+        
+        Args:
+            name: Original identifier (may contain hyphens)
+            
+        Returns:
+            Sanitized identifier (Python-compatible)
+        """
+        if not name:
+            return name
+        
+        # Replace hyphens with underscores
+        sanitized = name.replace('-', '_')
+        
+        # Replace other problematic characters
+        import re
+        # Keep only alphanumeric, underscores
+        sanitized = re.sub(r'[^a-zA-Z0-9_]', '_', sanitized)
+        
+        return sanitized
 
 
 class SpeciesConverter(BaseConverter):
@@ -114,6 +145,9 @@ class SpeciesConverter(BaseConverter):
             # Determine biological name (following SHYPN naming pattern)
             biological_name = self._get_biological_name(species)
             
+            # Sanitize name to be Python-compatible (replace hyphens with underscores)
+            biological_name = self.sanitize_identifier(biological_name)
+            
             # Create place with biological name
             place = self.document.create_place(
                 x=x,
@@ -135,7 +169,9 @@ class SpeciesConverter(BaseConverter):
             # Store metadata for traceability
             if not hasattr(place, 'metadata'):
                 place.metadata = {}
-            place.metadata['species_id'] = species.id
+            # Sanitize species_id for use in formulas (replace hyphens with underscores)
+            place.metadata['species_id'] = self.sanitize_identifier(species.id)
+            place.metadata['original_species_id'] = species.id  # Keep original for reference
             place.metadata['concentration'] = species.initial_concentration
             place.metadata['compartment'] = species.compartment
             

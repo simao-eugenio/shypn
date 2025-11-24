@@ -40,6 +40,8 @@ class Locality:
     - Output places (places that receive tokens FROM the transition)
     - Input arcs (place → transition)
     - Output arcs (transition → place)
+    - Catalyst places (non-consuming, connected via TestArcs)
+    - Catalyst-substrate places (dual role: catalyst + substrate)
     
     Attributes:
         transition: The central transition object
@@ -47,15 +49,20 @@ class Locality:
         output_places: List of places that receive FROM transition
         input_arcs: List of arcs (place → transition)
         output_arcs: List of arcs (transition → place)
+        catalyst_places: List of places connected via TestArcs (non-consuming)
+        catalyst_arcs: List of TestArcs (place ⋯→ transition)
+        dual_role_places: List of places that are BOTH catalyst AND substrate
     
     Example:
-        # Valid locality: P1 → T1 → P2
+        # Valid locality: P1 → T1 → P2, with enzyme E1
         locality = Locality(
             transition=t1,
             input_places=[p1],
             output_places=[p2],
             input_arcs=[arc1],
-            output_arcs=[arc2]
+            output_arcs=[arc2],
+            catalyst_places=[e1],
+            catalyst_arcs=[test_arc1]
         )
         
         assert locality.is_valid  # True (has inputs AND outputs)
@@ -65,6 +72,9 @@ class Locality:
     output_places: List[Any] = field(default_factory=list)
     input_arcs: List[Any] = field(default_factory=list)
     output_arcs: List[Any] = field(default_factory=list)
+    catalyst_places: List[Any] = field(default_factory=list)
+    catalyst_arcs: List[Any] = field(default_factory=list)
+    dual_role_places: List[Any] = field(default_factory=list)
     
     @property
     def is_valid(self) -> bool:
@@ -115,33 +125,67 @@ class Locality:
     
     @property
     def place_count(self) -> int:
-        """Total number of places in locality.
+        """Total number of unique places in locality.
+        
+        Counts all unique places (input + output + catalyst-only).
+        Dual-role places are counted once.
         
         Returns:
-            Sum of input and output places
+            Count of unique places
         """
-        return len(self.input_places) + len(self.output_places)
+        # Use set to avoid counting dual-role places twice
+        all_places = set(self.input_places) | set(self.output_places) | set(self.catalyst_places)
+        return len(all_places)
+    
+    @property
+    def catalyst_count(self) -> int:
+        """Total number of catalyst places.
+        
+        Returns:
+            Count of catalyst places (including dual-role)
+        """
+        return len(self.catalyst_places)
+    
+    @property
+    def dual_role_count(self) -> int:
+        """Number of places that are BOTH catalyst AND substrate.
+        
+        Returns:
+            Count of dual-role places
+        """
+        return len(self.dual_role_places)
     
     def get_summary(self) -> str:
-        """Get human-readable summary with source/sink awareness.
+        """Get human-readable summary with catalyst information.
         
         Returns:
-            String like "2 inputs → TransitionName → 3 outputs"
-            Or "TransitionName (source) → 2 outputs"
-            Or "1 input → TransitionName (sink)"
+            String like "2 inputs → TransitionName → 3 outputs [+1 catalyst]"
+            Or "1 input → TransitionName → 2 outputs [+2 catalysts, 1 dual-role]"
         """
         locality_type = self.locality_type
         
+        # Build catalyst suffix
+        catalyst_info = []
+        if self.catalyst_count > 0:
+            catalyst_info.append(f"{self.catalyst_count} catalyst{'s' if self.catalyst_count != 1 else ''}")
+        if self.dual_role_count > 0:
+            catalyst_info.append(f"{self.dual_role_count} dual-role")
+        
+        catalyst_suffix = f" [+{', '.join(catalyst_info)}]" if catalyst_info else ""
+        
         if locality_type == 'source':
             return (f"{self.transition.name} (source) → "
-                    f"{len(self.output_places)} output{'s' if len(self.output_places) != 1 else ''}")
+                    f"{len(self.output_places)} output{'s' if len(self.output_places) != 1 else ''}"
+                    f"{catalyst_suffix}")
         elif locality_type == 'sink':
             return (f"{len(self.input_places)} input{'s' if len(self.input_places) != 1 else ''} → "
-                    f"{self.transition.name} (sink)")
+                    f"{self.transition.name} (sink)"
+                    f"{catalyst_suffix}")
         else:
             return (f"{len(self.input_places)} input{'s' if len(self.input_places) != 1 else ''} → "
                     f"{self.transition.name} → "
-                    f"{len(self.output_places)} output{'s' if len(self.output_places) != 1 else ''}")
+                    f"{len(self.output_places)} output{'s' if len(self.output_places) != 1 else ''}"
+                    f"{catalyst_suffix}")
 
 
 class LocalityDetector:
@@ -188,9 +232,18 @@ class LocalityDetector:
         
         Algorithm:
         1. Scan all arcs in model
-        2. Classify arcs as input (place → transition) or output (transition → place)
-        3. Extract places from arcs (avoiding duplicates)
-        4. Build Locality object
+        2. Classify arcs by type and direction:
+           - Normal input arcs: substrate consumption (place → transition)
+           - Normal output arcs: product formation (transition → place)
+           - Test arcs: catalyst/enzyme (place ⋯→ transition, non-consuming)
+           - Inhibitor arcs: regulatory control (place ⊣ transition)
+        3. Identify dual-role places (both catalyst AND substrate)
+        4. Build comprehensive Locality object
+        
+        CATALYST DETECTION:
+        - Test arcs (arc_type == 'test'): Pure catalysts (enzymes, cofactors)
+        - Dual-role detection: Place connected by BOTH TestArc AND normal Arc
+          Example: AMP in yeast glycolysis (activator + substrate)
         
         IMPORTANT: Includes ALL arc types that affect transition behavior:
         - Normal arcs: Material flow (substrates → transition → products)
@@ -204,21 +257,26 @@ class LocalityDetector:
             transition: Transition object to analyze
             
         Returns:
-            Locality object (may be invalid if no inputs/outputs)
+            Locality object with catalyst information (may be invalid if no inputs/outputs)
             
         Example:
             locality = detector.get_locality_for_transition(t1)
             
             if locality.is_valid:
-                pass
-            else:
-                      f"{len(locality.output_places)} outputs")
+                print(f"Catalysts: {len(locality.catalyst_places)}")
+                print(f"Dual-role: {len(locality.dual_role_places)}")
         """
+        from shypn.netobjs.test_arc import TestArc
+        
         locality = Locality(transition=transition)
         
         # Check if model has arcs
         if not hasattr(self.model, 'arcs'):
             return locality
+        
+        # Track places by their roles for dual-role detection
+        substrate_places = set()  # Places with normal input arcs
+        catalyst_places_set = set()  # Places with test arcs
         
         # Scan all arcs in model
         # Model uses lists, not dictionaries
@@ -229,22 +287,35 @@ class LocalityDetector:
             # - Inhibitor arcs: negative feedback (block when product accumulates)
             # All three arc types define the transition's regulatory context
             
-            # ONLY skip arcs involving catalyst places marked with is_catalyst=True
-            # (legacy decoration system - different from test arc semantics)
-            if getattr(arc.source, 'is_catalyst', False) or getattr(arc.target, 'is_catalyst', False):
-                continue
+            # NOTE: Removed legacy is_catalyst flag check - it conflicts with TestArc semantics
+            # The proper way to mark catalysts is using TestArc class, not is_catalyst flag
             
-            # Input arc: place → transition
+            # Check if arc targets this transition
             if arc.target == transition:
-                locality.input_arcs.append(arc)
-                if arc.source not in locality.input_places:
-                    locality.input_places.append(arc.source)
+                # Test arc: Catalyst (non-consuming)
+                if isinstance(arc, TestArc):
+                    locality.catalyst_arcs.append(arc)
+                    if arc.source not in locality.catalyst_places:
+                        locality.catalyst_places.append(arc.source)
+                    catalyst_places_set.add(arc.source)
+                else:
+                    # Normal or inhibitor input arc: Substrate/Regulator (consuming)
+                    locality.input_arcs.append(arc)
+                    if arc.source not in locality.input_places:
+                        locality.input_places.append(arc.source)
+                    # Track for dual-role detection (only normal arcs, not inhibitors)
+                    if arc.arc_type == 'normal':
+                        substrate_places.add(arc.source)
             
             # Output arc: transition → place
             elif arc.source == transition:
                 locality.output_arcs.append(arc)
                 if arc.target not in locality.output_places:
                     locality.output_places.append(arc.target)
+        
+        # Identify dual-role places: in BOTH catalyst_places_set AND substrate_places
+        dual_role_set = catalyst_places_set & substrate_places
+        locality.dual_role_places = list(dual_role_set)
         
         return locality
     

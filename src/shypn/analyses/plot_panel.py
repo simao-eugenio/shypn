@@ -462,6 +462,12 @@ class AnalysisPlotPanel(Gtk.Box):
                     for arc in self._model_manager.arcs:
                         if arc.source.id == transition_id and arc.target.id == place.id:
                             arc.color = Arc.DEFAULT_COLOR
+                
+                # Reset colors of catalyst arcs (test arcs from catalyst places to transition)
+                for place in locality_data.get('catalyst_places', []):
+                    for arc in self._model_manager.arcs:
+                        if arc.source.id == place.id and arc.target.id == transition_id:
+                            arc.color = Arc.DEFAULT_COLOR
             
             # Clear locality data
             self._locality_places.clear()
