@@ -260,93 +260,72 @@ class ModelCanvasLoader:
         # Intercept page creation so page 0 runs the same init flow
         self.notebook.connect('page-added', self._on_notebook_page_added)
         
-        # Create fresh default tab using add_document() for consistent initialization
-        # This ensures the default tab follows the SAME path as File→New
-        # NO XML/notebook content is loaded - canvas starts completely empty
-        # NOTE: Can be deferred if caller needs to set dependencies first (e.g., left_dock_stack)
+        # ═══════════════════════════════════════════════════════════════════
+        # GLOBAL CANVAS STATE CYCLE: Default Canvas Creation
+        # ═══════════════════════════════════════════════════════════════════
+        # Create fresh default tab using add_document() for consistent initialization.
+        # This ensures the default tab follows the SAME normalized path as File→New.
+        # 
+        # The notebook itself is defined in XML UI file (model_canvas.ui), but we
+        # ALWAYS remove any pre-baked tabs and create programmatically to ensure:
+        # 1. NO XML/notebook content is loaded from UI file
+        # 2. Canvas starts completely empty
+        # 3. Consistent initialization via _on_notebook_page_added() hook
+        # 
+        # ARCHITECTURE: All canvas initialization is handled by the page-added hook.
+        # The hook fires when add_document() calls notebook.append_page() and performs:
+        # - Data collector wiring
+        # - Right panel model setup
+        # - Context menu handler setup
+        # - Lifecycle activation (switch_to_canvas, set_scope)
+        # - Sets _first_page_initialized = True
+        # 
+        # This is the SINGLE SOURCE OF TRUTH for first-page initialization.
+        # No manual wiring is needed here - trust the normalized flow.
+        # ═══════════════════════════════════════════════════════════════════
         if create_initial_document:
             page_index, drawing_area = self.add_document(filename='default')
-        
-        # After creation, ensure lifecycle global manager and scope are active
-        try:
-            import logging
-            lg = logging.getLogger(__name__)
-            if self.lifecycle_manager and hasattr(self.lifecycle_manager, 'id_manager'):
-                from shypn.data.canvas.id_manager import set_lifecycle_scope_manager
-                # Re-assert global delegator in case earlier init was skipped
-                set_lifecycle_scope_manager(self.lifecycle_manager.id_manager)
-                # Explicitly set scope to the first canvas
-                self.lifecycle_manager.id_manager.set_scope(f"canvas_{id(drawing_area)}")
-                lg.debug(f"[CANVAS_INIT] Activated ID scope for first canvas: canvas_{id(drawing_area)}")
-        except Exception:
-            pass
-
-        # Wire data collector for the initial default tab
-        # The switch-page signal doesn't fire for the initially displayed page,
-        # so we need to manually wire the data collector for tab 0
-        if create_initial_document and self.notebook.get_n_pages() > 0:
-            initial_page = self.notebook.get_nth_page(0)
-            self._wire_data_collector_for_page(initial_page)
             
-            # ============================================================
-            # CRITICAL: Set model and context menu handler for first tab
-            # This is normally done in _on_notebook_page_changed, but that signal
-            # doesn't fire for the initially displayed tab
-            # ============================================================
-            if self.right_panel_loader and drawing_area:
-                if drawing_area in self.canvas_managers:
-                    manager = self.canvas_managers[drawing_area]
-                    self.right_panel_loader.set_model(manager)
-                    
-                    # CRITICAL: Explicitly ensure context menu handler has the correct model
-                    # This ensures "Add to Transition Analyses" works from app startup
-                    if self.right_panel_loader.context_menu_handler:
-                        self.right_panel_loader.context_menu_handler.set_model(manager)
-                        
-                        # CRITICAL: Set context menu handler on model_canvas_loader
-                        # This enables the "Add to Analysis" menu items to appear on canvas objects
-                        # Without this, right-click context menus won't have analysis options
-                        if not self.context_menu_handler:
-                            self.set_context_menu_handler(self.right_panel_loader.context_menu_handler)
-
-            # Notify Pathway Operations panel so categories (e.g., BRENDA)
-            # can resolve the current model manager on startup
+            # Set context menu handler on model_canvas_loader for canvas object menus
+            if self.right_panel_loader and self.right_panel_loader.context_menu_handler:
+                if not self.context_menu_handler:
+                    self.set_context_menu_handler(self.right_panel_loader.context_menu_handler)
+            
+            # Notify Pathway Operations panel for BRENDA/KEGG category model resolution
             try:
                 if self.pathway_panel_loader and hasattr(self.pathway_panel_loader, 'set_model_canvas'):
                     self.pathway_panel_loader.set_model_canvas(self)
             except Exception:
                 pass
-
-            # CRITICAL: Ensure lifecycle sets active canvas for the first tab
-            # switch-page doesn't fire for page 0, so ID scope and context
-            # need to be explicitly activated here for consistency.
-            if self.lifecycle_adapter and drawing_area:
-                try:
-                    self.lifecycle_adapter.switch_to_canvas(drawing_area)
-                except Exception:
-                    pass
         
         return self.container
 
     def _on_notebook_page_added(self, notebook, child, page_num):
         """Ensure newly added pages (especially page 0) get full initialization.
-
-        GtkNotebook does not emit switch-page for the initially displayed tab.
-        This hook guarantees page 0 runs the same wiring as later tabs.
+        
+        ═══════════════════════════════════════════════════════════════════
+        GLOBAL CANVAS STATE CYCLE: Single Source of Truth for First Page
+        ═══════════════════════════════════════════════════════════════════
+        This hook is called when a page is added to the notebook, but it fires
+        TOO EARLY - before _setup_canvas_manager() completes. Therefore, this
+        hook cannot access the manager from canvas_managers dictionary.
+        
+        The actual first-page initialization (context menu handler wiring, etc.)
+        happens at the END of add_document() after the manager is fully created.
+        
+        This hook is kept for future extensibility and to maintain the page-added
+        signal connection, but the heavy lifting is done in add_document().
+        ═══════════════════════════════════════════════════════════════════
         """
         try:
             # Only do this once for the first page
             if page_num == 0 and not getattr(self, '_first_page_initialized', False):
-                # Wire data collector and right panel model
+                # Wire data collector (this can happen early)
                 self._wire_data_collector_for_page(child)
 
-                drawing_area = self._get_drawing_area_from_page(child)
-                if drawing_area and drawing_area in self.canvas_managers:
-                    manager = self.canvas_managers[drawing_area]
-                    if self.right_panel_loader:
-                        self.right_panel_loader.set_model(manager)
-                        if self.right_panel_loader.context_menu_handler:
-                            self.right_panel_loader.context_menu_handler.set_model(manager)
+                # Note: Context menu handler wiring happens in add_document()
+                # after _setup_canvas_manager() completes, because the manager
+                # doesn't exist in canvas_managers yet when this hook fires.
 
                 # Ensure lifecycle active canvas and ID scope are set
                 if drawing_area:
@@ -1051,25 +1030,27 @@ class ModelCanvasLoader:
             # Cleanup knowledge base
             del self.knowledge_bases[drawing_area]
         if self.notebook.get_n_pages() == 0:
+            # ═══════════════════════════════════════════════════════════════════
+            # GLOBAL CANVAS STATE CYCLE: Auto-Recreation After Last Tab Close
+            # ═══════════════════════════════════════════════════════════════════
             # When the last tab is closed, recreate a fresh default canvas.
-            # Reset the first-page initialization flag so the page-added hook
-            # runs full initialization (same as initial startup) and ensure
-            # the recreation follows the exact File→New code path.
+            # This follows the EXACT SAME normalized flow as File→New:
+            # 
+            # 1. Reset _first_page_initialized to allow hook to fire
+            # 2. Call add_document() which triggers _on_notebook_page_added()
+            # 3. Hook performs COMPLETE initialization (see lines 331-371):
+            #    - Data collector wiring
+            #    - Right panel model setup
+            #    - Context menu handler setup
+            #    - Lifecycle activation (switch_to_canvas, set_scope)
+            #    - Sets _first_page_initialized = True
+            # 
+            # NO manual wiring is performed here - trust the normalized flow.
+            # This ensures the auto-recreated canvas behaves IDENTICALLY to
+            # the startup default canvas and File→New canvases.
+            # ═══════════════════════════════════════════════════════════════════
             self._first_page_initialized = False
             page_index, new_drawing = self.add_document(filename='default')
-            # Explicitly activate lifecycle context and focus for the new canvas
-            try:
-                if self.lifecycle_adapter and new_drawing:
-                    self.lifecycle_adapter.switch_to_canvas(new_drawing)
-                if self.lifecycle_manager and hasattr(self.lifecycle_manager, 'id_manager') and new_drawing:
-                    from shypn.data.canvas.id_manager import set_lifecycle_scope_manager
-                    set_lifecycle_scope_manager(self.lifecycle_manager.id_manager)
-                    self.lifecycle_manager.id_manager.set_scope(f"canvas_{id(new_drawing)}")
-                if new_drawing:
-                    new_drawing.set_can_focus(True)
-                    new_drawing.grab_focus()
-            except Exception:
-                pass
         return True
 
     def is_current_tab_empty_default(self):
@@ -1318,6 +1299,34 @@ class ModelCanvasLoader:
         # CRITICAL: Reset simulation to initial state after creating new document
         # Ensures clean slate with no stale cached behaviors
         self._ensure_simulation_reset(drawing)
+        
+        # ═══════════════════════════════════════════════════════════════════
+        # CRITICAL: Wire context menu handler for first page (page 0)
+        # ═══════════════════════════════════════════════════════════════════
+        # The page-added hook fires TOO EARLY (before _setup_canvas_manager),
+        # so the manager doesn't exist yet in canvas_managers dictionary.
+        # Instead, we do the wiring HERE, after the manager is fully set up.
+        # 
+        # This ensures the first page gets the same context menu handler wiring
+        # as tab-switched pages (which get wired via _on_notebook_page_changed).
+        # ═══════════════════════════════════════════════════════════════════
+        if page_index == 0 and not getattr(self, '_first_page_initialized', False):
+            if self.right_panel_loader and drawing in self.canvas_managers:
+                manager = self.canvas_managers[drawing]
+                
+                # Set model on right panel loader
+                self.right_panel_loader.set_model(manager)
+                
+                # Set model on context menu handler to enable locality detection
+                if self.right_panel_loader.context_menu_handler:
+                    self.right_panel_loader.context_menu_handler.set_model(manager)
+                
+                # Set context menu handler on model_canvas_loader
+                if self.right_panel_loader.context_menu_handler:
+                    self.set_context_menu_handler(self.right_panel_loader.context_menu_handler)
+            
+            # Mark that we've initialized the first page
+            self._first_page_initialized = True
         
         # Switch to the newly created tab to give it focus (AFTER setup is complete)
         self.notebook.set_current_page(page_index)
@@ -3669,7 +3678,7 @@ class ModelCanvasLoader:
                 menu_item.show()
             menu.append(menu_item)
         if self.context_menu_handler:
-            self.context_menu_handler.add_analysis_menu_items(menu, obj)        # Store reference to active menu for cleanup before dialogs
+            self.context_menu_handler.add_analysis_menu_items(menu, obj)
         self._active_context_menu = menu
         
         # Attach menu to drawing_area for proper Wayland parent window handling
