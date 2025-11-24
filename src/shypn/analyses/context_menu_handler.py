@@ -269,7 +269,7 @@ class ContextMenuHandler:
         # Detect locality
         logger.debug(f"[CTX_MENU] Detecting locality for transition {transition.id}")
         locality = self.locality_detector.get_locality_for_transition(transition)
-        logger.debug(f"[CTX_MENU] Locality valid={locality.is_valid}, inputs={len(locality.input_places)}, outputs={len(locality.output_places)}")
+        logger.debug(f"[CTX_MENU] Locality valid={locality.is_valid}, inputs={len(locality.input_places)}, outputs={len(locality.output_places)}, catalysts={len(locality.catalyst_places)}")
         
         if not locality.is_valid:
             # No valid locality, add simple menu item

@@ -1,0 +1,1351 @@
+\hypertarget{chapter-3-the-integration-challenge}{%
+\chapter{Chapter 3: The Integration
+Challenge}\label{chapter-3-the-integration-challenge}}
+
+\hypertarget{introduction}{%
+\section{3.1 Introduction}\label{introduction}}
+
+Systems biology seeks to understand living systems through
+\textbf{integration} of multiple biological scales: - Molecular
+interactions (protein-protein, enzyme-substrate) - Metabolic networks
+(glycolysis, TCA cycle, respiration) - Gene regulatory networks
+(transcription, translation, feedback) - Signaling pathways (MAPK,
+PI3K/AKT, cAMP signaling) - Cellular processes (cell cycle, apoptosis,
+differentiation)
+
+\textbf{The challenge}: These scales operate with \textbf{fundamentally
+different dynamics}: - \textbf{Fast}: Enzyme kinetics (milliseconds to
+seconds) - \textbf{Medium}: Metabolic fluxes (seconds to minutes) -
+\textbf{Slow}: Gene expression (minutes to hours) - \textbf{Ultra-slow}:
+Cell cycle (hours to days)
+
+\textbf{Traditional approach}: Model each scale separately - Metabolic
+model: ODE system for enzyme kinetics - Genetic model: Stochastic
+simulation for gene expression - Signaling model: Boolean network or
+ODEs
+
+\textbf{Problem}: Real biology is \textbf{integrated} - Metabolite
+concentrations regulate gene expression (e.g., glucose represses lac
+operon) - Proteins regulate metabolic fluxes (e.g., allosteric feedback
+inhibition) - Gene expression produces enzymes that catalyze metabolism
+- \textbf{Cross-scale regulation} is pervasive, not exceptional
+
+\textbf{This chapter}: - Presents a \textbf{motivating example}
+(cAMP-CRP regulation of lac operon) demonstrating all four required
+capabilities - Derives \textbf{eight formal requirements} (R1-R8) for
+integrated biological modeling - Shows why \textbf{existing formalisms
+fail} to meet these requirements - Motivates the \textbf{Extended
+Bio-Petri Net formalism} presented in Chapters 4-6
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\hypertarget{motivating-example-camp-crp-regulation-of-lac-operon}{%
+\section{3.2 Motivating Example: cAMP-CRP Regulation of Lac
+Operon}\label{motivating-example-camp-crp-regulation-of-lac-operon}}
+
+\hypertarget{biological-background}{%
+\subsection{3.2.1 Biological Background}\label{biological-background}}
+
+The \textbf{lac operon} in \emph{E. coli} is a classic model of gene
+regulation:
+
+\textbf{Components}: - \textbf{lacZ gene}: Encodes β-galactosidase
+(cleaves lactose \textrightarrow glucose + galactose) - \textbf{lacY gene}: Encodes
+permease (imports lactose into cell) - \textbf{lacI gene}: Encodes
+repressor (blocks transcription) - \textbf{Promoter}: DNA binding site
+for RNA polymerase - \textbf{Operator}: DNA binding site for repressor
+(overlaps promoter)
+
+\textbf{Regulation} (simplified): 1. \textbf{No lactose}: Repressor
+binds operator \textrightarrow transcription blocked 2. \textbf{Lactose present}:
+Lactose binds repressor \textrightarrow repressor releases \textrightarrow transcription ON 3.
+\textbf{Glucose present}: cAMP low \textrightarrow CRP inactive \textrightarrow transcription LOW
+(even with lactose) 4. \textbf{No glucose}: cAMP high \textrightarrow CRP-cAMP complex
+binds promoter \textrightarrow transcription HIGH
+
+\textbf{Biological interpretation}: - \textbf{Lactose} is the
+\textbf{inducer} (removes repression) - \textbf{Glucose} is the
+\textbf{preferred substrate} (via cAMP-CRP catabolite repression) -
+\textbf{Logic}: Use glucose first (high ATP yield), then lactose if
+glucose depleted - \textbf{Cross-scale regulation}: - Metabolite
+(glucose) regulates signaling (cAMP) - Signaling (cAMP-CRP) regulates
+transcription (lac genes) - Transcription produces enzyme
+(β-galactosidase) - Enzyme regulates metabolism (lactose \textrightarrow glucose)
+
+\hypertarget{detailed-mechanistic-model}{%
+\subsection{3.2.2 Detailed Mechanistic
+Model}\label{detailed-mechanistic-model}}
+
+\textbf{Species} (11 places): 1. \textbf{Glucose} (metabolite,
+continuous concentration) 2. \textbf{Lactose} (metabolite, continuous
+concentration) 3. \textbf{cAMP} (signaling molecule, continuous) 4.
+\textbf{CRP} (catabolite repressor protein, continuous) 5.
+\textbf{CRP-cAMP} complex (active transcription factor, continuous) 6.
+\textbf{lac\_gene} (DNA, discrete count = 1) 7. \textbf{mRNA\_lac}
+(messenger RNA, discrete count, stochastic) 8. \textbf{BetaGal}
+(β-galactosidase enzyme, continuous) 9. \textbf{Repressor} (LacI
+protein, continuous) 10. \textbf{Repressor-Lactose} complex (inactive
+repressor, continuous) 11. \textbf{ATP} (energy currency, continuous)
+
+\textbf{Transitions} (9 reactions):
+
+\textbf{T1: Glucose consumption} (continuous, Michaelis-Menten)
+
+\begin{lstlisting}
+Glucose + ATP \textrightarrow G6P + ADP  (rate: v = V_max · [Glucose] / (K_m + [Glucose]))
+\end{lstlisting}
+
+\begin{itemize}
+\tightlist
+\item
+  Consumes glucose (normal arc)
+\item
+  Produces G6P (enters glycolysis)
+\item
+  Continuous transition (ODE integration)
+\end{itemize}
+
+\textbf{T2: cAMP synthesis} (continuous, inhibited by glucose)
+
+\begin{lstlisting}
+ATP \textrightarrow cAMP  (rate: v = k_syn / (1 + [Glucose]/K_i))
+\end{lstlisting}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Inhibitor arc}: Glucose ⊸ T2 (threshold: K\_i = 0.5 mM)
+\item
+  When {[}Glucose{]} \textgreater{} K\_i: cAMP synthesis reduced
+\item
+  When {[}Glucose{]} \textless{} K\_i: cAMP synthesis increased
+\item
+  \textbf{Cross-scale coupling}: Metabolite (glucose) regulates
+  signaling (cAMP)
+\end{itemize}
+
+\textbf{T3: CRP-cAMP complex formation} (continuous, mass action)
+
+\begin{lstlisting}
+CRP + cAMP ⇌ CRP-cAMP  (rate forward: k_f · [CRP] · [cAMP], reverse: k_r · [CRP-cAMP])
+\end{lstlisting}
+
+\begin{itemize}
+\tightlist
+\item
+  Reversible reaction (two transitions, or single with negative flux)
+\item
+  Fast equilibrium (K\_d = k\_r / k\_f ≈ 1 μM)
+\end{itemize}
+
+\textbf{T4: Repressor-Lactose binding} (continuous, fast equilibrium)
+
+\begin{lstlisting}
+Repressor + Lactose ⇌ Repressor-Lactose  (inactive repressor)
+\end{lstlisting}
+
+\begin{itemize}
+\tightlist
+\item
+  Lactose inactivates repressor (allosteric binding)
+\item
+  Fast equilibrium
+\end{itemize}
+
+\textbf{T5: lac operon transcription} (stochastic, burst mode)
+
+\begin{lstlisting}
+lac_gene \textrightarrow lac_gene + mRNA_lac  (burstiness: transcription in pulses)
+\end{lstlisting}
+
+\begin{itemize}
+\item
+  \textbf{Test arc}: lac\_gene ⤏ T5 (gene not consumed, catalytic role)
+\item
+  \textbf{Test arc}: CRP-cAMP ⤏ T5 (transcription factor enhances rate)
+\item
+  \textbf{Inhibitor arc}: Repressor ⊸ T5 (repressor blocks
+  transcription)
+\item
+  \textbf{Stochastic transition}: Gillespie algorithm, propensity:
+
+\begin{lstlisting}
+a = k_basal + k_enhanced · [CRP-cAMP]  if [Repressor] < threshold
+a = 0                                    if [Repressor] ≥ threshold
+\end{lstlisting}
+\item
+  \textbf{Burst mode} (τ = Burst): Produces 5-10 mRNA copies per event
+\item
+  \textbf{Cross-scale coupling}: Signaling (cAMP-CRP) regulates genetics
+  (transcription)
+\end{itemize}
+
+\textbf{T6: mRNA translation} (stochastic, discrete)
+
+\begin{lstlisting}
+mRNA_lac \textrightarrow mRNA_lac + BetaGal  (ribosome catalyzes)
+\end{lstlisting}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Test arc}: mRNA\_lac ⤏ T6 (mRNA template not consumed during
+  translation)
+\item
+  Stochastic transition: Each mRNA produces \textasciitilde100 proteins
+  over lifetime
+\item
+  Propensity: a = k\_translate · {[}mRNA\_lac{]}
+\end{itemize}
+
+\textbf{T7: mRNA degradation} (stochastic, first-order)
+
+\begin{lstlisting}
+mRNA_lac \textrightarrow ∅  (RNase degrades)
+\end{lstlisting}
+
+\begin{itemize}
+\tightlist
+\item
+  Exponential lifetime: t\_half ≈ 3 minutes
+\item
+  Propensity: a = k\_deg · {[}mRNA\_lac{]}
+\end{itemize}
+
+\textbf{T8: Lactose import} (continuous, enzyme-catalyzed)
+
+\begin{lstlisting}
+Lactose_ext \textrightarrow Lactose  (Permease catalyzes)
+\end{lstlisting}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Test arc}: BetaGal ⤏ T8 (enzyme not consumed)
+\item
+  Wait, BetaGal is β-galactosidase (cleaves lactose), not permease!
+\item
+  Correction: Should be \textbf{Permease} enzyme (product of lacY gene)
+\item
+  For simplicity, assume Permease ∝ BetaGal (both from lac operon)
+\end{itemize}
+
+\textbf{T9: Lactose cleavage} (continuous, Michaelis-Menten)
+
+\begin{lstlisting}
+Lactose \textrightarrow Glucose + Galactose  (BetaGal catalyzes)
+\end{lstlisting}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Test arc}: BetaGal ⤏ T9 (enzyme not consumed)
+\item
+  \textbf{Cross-scale coupling}: Enzyme (from genetics) regulates
+  metabolism
+\item
+  Rate: v = V\_max · {[}BetaGal{]} · {[}Lactose{]} / (K\_m +
+  {[}Lactose{]})
+\end{itemize}
+
+\hypertarget{system-dynamics}{%
+\subsection{3.2.3 System Dynamics}\label{system-dynamics}}
+
+\textbf{Initial state} (t=0): - {[}Glucose{]} = 5 mM (high, preferred
+substrate) - {[}Lactose{]} = 10 mM (available, but unused) - {[}cAMP{]}
+= 0.1 μM (low, due to glucose) - {[}CRP-cAMP{]} ≈ 0 (low cAMP \textrightarrow no
+complex) - {[}mRNA\_lac{]} = 0 (transcription repressed) - {[}BetaGal{]}
+= 10 molecules (basal level)
+
+\textbf{Phase 1: Glucose consumption} (t=0 to t=20 min) - T1 fires
+continuously: Glucose \textrightarrow G6P (glycolysis) - {[}Glucose{]} decreases: 5 mM
+\textrightarrow 0.1 mM - T2 (cAMP synthesis) gradually activated as glucose drops -
+{[}cAMP{]} increases: 0.1 μM \textrightarrow 10 μM (100-fold) - T3: CRP + cAMP \textrightarrow
+CRP-cAMP - {[}CRP-cAMP{]} increases: 0 \textrightarrow 5 μM
+
+\textbf{Phase 2: Lac operon induction} (t=20 to t=40 min) -
+{[}CRP-cAMP{]} high \textrightarrow T5 (transcription) activated - T5 fires
+stochastically: Bursts of 5-10 mRNA copies - {[}mRNA\_lac{]} increases:
+0 \textrightarrow 50 molecules (stochastic fluctuations) - T6 fires stochastically:
+mRNA \textrightarrow BetaGal - {[}BetaGal{]} increases: 10 \textrightarrow 5000 molecules (500-fold
+induction)
+
+\textbf{Phase 3: Lactose utilization} (t=40 to t=80 min) - {[}BetaGal{]}
+high \textrightarrow T9 activated - T9 fires continuously: Lactose \textrightarrow Glucose +
+Galactose - {[}Lactose{]} decreases: 10 mM \textrightarrow 0 mM - {[}Glucose{]}
+increases: 0.1 mM \textrightarrow 5 mM (replenished from lactose) - \textbf{Feedback}:
+Glucose rise \textrightarrow {[}cAMP{]} drops \textrightarrow transcription reduced - System returns
+to low basal state
+
+\textbf{Steady state} (t \textgreater{} 80 min): - {[}Glucose{]} = 5 mM
+(maintained by lactose cleavage) - {[}Lactose{]} = 0 mM (depleted) -
+{[}BetaGal{]} = 5000 molecules (stable, long protein half-life) -
+{[}mRNA\_lac{]} = 5 molecules (basal level, transcription off)
+
+\hypertarget{four-capabilities-required}{%
+\subsection{3.2.4 Four Capabilities
+Required}\label{four-capabilities-required}}
+
+\textbf{Capability 1: Weak independence \& cooperative parallelism}
+
+Multiple transitions share places but remain parallelizable: -
+\textbf{T2 (cAMP synthesis)} and \textbf{T3 (CRP-cAMP formation)} both
+interact with cAMP place - T2 produces cAMP (output) - T3 consumes cAMP
+(input) - But T3 also produces cAMP (reversible reaction, back-reaction)
+- Shared place: cAMP - Weak independence: No (T3 consumes T2's product \textrightarrow
+sequential dependency)
+
+Better example: - \textbf{T5 (transcription)} and \textbf{T6
+(translation)} both interact with mRNA\_lac - T5 produces mRNA (output)
+- T6 uses mRNA as template (test arc, non-consumptive) - \textbf{Weak
+independence}: YES (T6 does not consume mRNA, test arc) - Can execute in
+parallel (superposition: multiple ribosomes translate same mRNA)
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{T9 (lactose cleavage)} produces Glucose
+\item
+  \textbf{T1 (glucose consumption)} consumes Glucose
+\item
+  Shared place: Glucose (convergent flux)
+\item
+  Weak independence: Only if T9 produces to Glucose and T1 consumes from
+  Glucose (disjoint input sets for each)
+\item
+  Actually, T1 consumes Glucose (input), T9 produces Glucose (output) \textrightarrow
+  NOT weakly independent (T1 consumes T9's product)
+\end{itemize}
+
+\textbf{Clearer example for weak independence}: - Suppose we have
+\textbf{two pathways producing ATP}: - Glycolysis: Glucose \textrightarrow ATP (via
+T1') - Oxidative phosphorylation: O2 \textrightarrow ATP (via T\_oxphos) - Both
+produce ATP (shared output) - Disjoint inputs: Glucose ≠ O2 -
+\textbf{Weakly independent}: Can compute both fluxes in parallel,
+effects add to ATP pool
+
+\textbf{Capability 2: Heterogeneous transition types coexistence}
+
+The lac operon model requires \textbf{four transition types} in a single
+network: - \textbf{Continuous}: T1 (glucose consumption), T2 (cAMP
+synthesis), T3 (complex formation), T9 (lactose cleavage) - ODE
+integration: dM/dt = Φ(M) - Fast equilibrium reactions (T3) use stiff
+ODE solvers - \textbf{Stochastic}: T5 (transcription), T6 (translation),
+T7 (mRNA degradation) - Gillespie algorithm: Discrete events,
+exponentially distributed intervals - Low copy numbers (mRNA: 0-50
+molecules) - \textbf{Burst}: T5 specifically uses \textbf{burst mode} -
+Transcription occurs in pulses (RNA polymerase processivity) - Each
+burst produces 5-10 mRNA copies (geometric distribution) - Inter-burst
+intervals: Exponential with rate λ\_burst - \textbf{Timed}: Not used in
+this example, but could model: - Cell cycle checkpoints (G1 \textrightarrow S
+transition after fixed delay) - Scheduled degradation (programmed
+protein turnover)
+
+\textbf{Challenge}: Synchronize all four types - Continuous ODE step: Δt
+= 0.01 s (adaptive) - Stochastic Gillespie: τ\_next = -ln(rand()) /
+a\_total (event-driven) - Burst events: Independent exponential process
+- \textbf{Hybrid scheduler} required (see Chapter 11)
+
+\textbf{Capability 3: Arc-level regulation with biochemical semantics}
+
+Regulatory logic is \textbf{embedded in the topology} (not hidden in
+code):
+
+\textbf{Test arcs} (non-consumptive catalysis): -
+\passthrough{\lstinline!lac\_gene ⤏ T5!}: Gene is template for
+transcription (not consumed) - \passthrough{\lstinline!CRP-cAMP ⤏ T5!}:
+Transcription factor enhances rate (not consumed) -
+\passthrough{\lstinline!mRNA\_lac ⤏ T6!}: mRNA is template for
+translation (not consumed) - \passthrough{\lstinline!BetaGal ⤏ T9!}:
+Enzyme catalyzes reaction (not consumed)
+
+\textbf{Inhibitor arcs} (threshold-based blocking): -
+\passthrough{\lstinline!Glucose ⊸ T2!}: High glucose inhibits cAMP
+synthesis - Threshold formula: Δ(Glucose, T2) = K\_i = 0.5 mM - Enabling
+condition: {[}Glucose{]} \textless{} 0.5 mM -
+\passthrough{\lstinline!Repressor ⊸ T5!}: Repressor blocks transcription
+- Threshold: Δ(Repressor, T5) = 10 nM - Enabling condition:
+{[}Repressor{]} \textless{} 10 nM
+
+\textbf{Hill equation} (cooperative regulation): - Could use Hill
+equation for CRP-cAMP activation of T5: - Δ(CRP-cAMP, T5) = K\^{}n /
+(K\^{}n + {[}CRP-cAMP{]}\^{}n) - Cooperative binding (n=2 for CRP dimer)
+
+\textbf{Visual representation}:
+
+\begin{lstlisting}
+         Glucose
+            |
+            ⊸ (inhibitor, blocks when high)
+            |
+         [T2: cAMP_synthesis]
+            |
+            \textrightarrow cAMP \textrightarrow [T3] \textrightarrow CRP-cAMP
+                                |
+                                ⤏ (test arc, activates)
+                                |
+    lac_gene ⤏ [T5: Transcription] \textleftarrow ⊸ Repressor
+                                |
+                                \textrightarrow mRNA_lac
+                                    |
+                                    ⤏ (test arc, template)
+                                    |
+                                 [T6: Translation]
+                                    |
+                                    \textrightarrow BetaGal
+                                        |
+                                        ⤏ (test arc, catalyst)
+                                        |
+                                     [T9: Lactose_cleavage]
+                                        |
+                                        \textrightarrow Glucose (feedback loop!)
+\end{lstlisting}
+
+\textbf{Key insight}: The entire regulatory logic is visible in the
+\textbf{network topology}. An external viewer can understand: - Glucose
+inhibits cAMP synthesis (inhibitor arc) - CRP-cAMP activates
+transcription (test arc) - Repressor blocks transcription (inhibitor
+arc) - BetaGal catalyzes lactose cleavage (test arc) - Glucose
+production feeds back to cAMP inhibition (cycle)
+
+\textbf{Capability 4: Atomic conservation \& biochemical formula
+tracking}
+
+Each place has \textbf{elemental composition}: - \textbf{Glucose}:
+C₆H₁₂O₆ - \textbf{Lactose}: C₁₂H₂₂O₁₁ (disaccharide: Glucose + Galactose
+- H₂O) - \textbf{cAMP}: C₁₀H₁₂N₅O₆P - \textbf{ATP}: C₁₀H₁₆N₅O₁₃P₃ -
+\textbf{mRNA\_lac}: Sequence-based formula (e.g., 3000 nt \textrightarrow
+C₃₀₀₀₀H₃₅₀₀₀N₁₂₀₀₀O₂₀₀₀₀P₃₀₀₀) - \textbf{BetaGal}: Protein formula (1023
+amino acids \textrightarrow C₄₉₈₀H₇₇₆₀N₁₃₃₀O₁₄₆₀S₂₀)
+
+\textbf{Elemental balance verification}:
+
+\textbf{T9: Lactose cleavage}
+
+\begin{lstlisting}
+C₁₂H₂₂O₁₁ + H₂O \textrightarrow C₆H₁₂O₆ + C₆H₁₂O₆
+(Lactose + Water \textrightarrow Glucose + Galactose)
+\end{lstlisting}
+
+Balance check: - \textbf{C}: 12 = 6 + 6 \checkmark - \textbf{H}: 22 + 2 = 12 + 12
+\checkmark (24 = 24) - \textbf{O}: 11 + 1 = 6 + 6 \checkmark (12 = 12)
+
+\textbf{T1: Glucose phosphorylation}
+
+\begin{lstlisting}
+C₆H₁₂O₆ + C₁₀H₁₆N₅O₁₃P₃ \textrightarrow C₆H₁₁O₉P + C₁₀H₁₆N₅O₁₀P₂ + H⁺
+(Glucose + ATP \textrightarrow G6P + ADP + H⁺)
+\end{lstlisting}
+
+Balance check: - \textbf{C}: 6 + 10 = 6 + 10 \checkmark (16 = 16) - \textbf{H}:
+12 + 16 = 11 + 16 + 1 \checkmark (28 = 28) - \textbf{O}: 6 + 13 = 9 + 10 \checkmark (19 =
+19) - \textbf{N}: 0 + 5 = 0 + 5 \checkmark (5 = 5) - \textbf{P}: 0 + 3 = 1 + 2 \checkmark
+(3 = 3)
+
+\textbf{T5: Transcription} (simplified)
+
+\begin{lstlisting}
+n·NTP \textrightarrow mRNA_lac + n·PPi
+(Nucleotide triphosphates polymerize, release pyrophosphate)
+\end{lstlisting}
+
+For 3000 nt mRNA (25\% A, 25\% C, 25\% G, 25\% U): - Input: 750 ATP +
+750 CTP + 750 GTP + 750 UTP - Output: 1 mRNA
+(C₃₀₀₀₀H₃₅₀₀₀N₁₂₀₀₀O₂₀₀₀₀P₃₀₀₀) + 3000 PPi - Balance check: (complex,
+but verifiable)
+
+\textbf{Purpose}: Elemental balance ensures \textbf{mass conservation}
+at the atomic level, not just token counting.
+
+\hypertarget{summary-of-requirements}{%
+\subsection{3.2.5 Summary of
+Requirements}\label{summary-of-requirements}}
+
+The lac operon example demonstrates the need for: 1. \checkmark \textbf{Weak
+independence}: mRNA template shared via test arc (parallel translation)
+2. \checkmark \textbf{Heterogeneous transitions}: Continuous (metabolism) +
+Stochastic (transcription) + Burst (mRNA bursts) 3. \checkmark \textbf{Arc-level
+regulation}: Glucose ⊸ cAMP synthesis, CRP-cAMP ⤏ transcription,
+Repressor ⊸ transcription 4. \checkmark \textbf{Atomic conservation}: Glucose
+(C₆H₁₂O₆), ATP (C₁₀H₁₆N₅O₁₃P₃), elemental balance verified
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\hypertarget{eight-formal-requirements-for-integrated-biological-modeling}{%
+\section{3.3 Eight Formal Requirements for Integrated Biological
+Modeling}\label{eight-formal-requirements-for-integrated-biological-modeling}}
+
+Based on the lac operon example and broader analysis of systems biology
+models, we derive \textbf{eight formal requirements} (R1-R8):
+
+\hypertarget{r1-multi-scale-temporal-dynamics-milliseconds-to-hours}{%
+\subsection{\texorpdfstring{\textbf{R1: Multi-scale temporal dynamics}
+(milliseconds to
+hours)}{R1: Multi-scale temporal dynamics (milliseconds to hours)}}\label{r1-multi-scale-temporal-dynamics-milliseconds-to-hours}}
+
+\textbf{Requirement}: Formalism must support processes spanning 6+
+orders of magnitude in timescale.
+
+\textbf{Justification}: - Enzyme kinetics: 10⁻³ - 10⁰ seconds
+(milliseconds to seconds) - Metabolic steady state: 10⁰ - 10² seconds
+(seconds to minutes) - Gene expression: 10² - 10⁴ seconds (minutes to
+hours) - Cell cycle: 10⁴ - 10⁵ seconds (hours to days)
+
+\textbf{Example} (lac operon): - cAMP-CRP binding: t\_equilibrium ≈ 0.1
+s (fast) - mRNA half-life: t\_half ≈ 180 s (3 minutes) - Lac operon
+induction: t\_response ≈ 1200 s (20 minutes)
+
+\textbf{Implication}: Single timescale models (e.g., fixed Δt ODE)
+cannot capture both fast equilibria and slow gene expression.
+
+\textbf{Solution}: Heterogeneous transition types (Continuous for fast,
+Stochastic for slow, adaptive time steps).
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\hypertarget{r2-discrete-and-continuous-state-variables-hybrid-semantics}{%
+\subsection{\texorpdfstring{\textbf{R2: Discrete and continuous state
+variables} (hybrid
+semantics)}{R2: Discrete and continuous state variables (hybrid semantics)}}\label{r2-discrete-and-continuous-state-variables-hybrid-semantics}}
+
+\textbf{Requirement}: Formalism must support both discrete counts
+(genes, mRNA copies) and continuous concentrations (metabolites,
+proteins).
+
+\textbf{Justification}: - Genes: Discrete (1 copy per cell for bacterial
+chromosome, 2 copies for diploid) - mRNA: Discrete (0-100 copies,
+stochastic fluctuations) - Proteins: Continuous (1000-1,000,000 copies,
+law of large numbers applies) - Metabolites: Continuous (millimolar
+concentrations, millions of molecules)
+
+\textbf{Example} (lac operon): - lac\_gene: Discrete (1 copy) -
+mRNA\_lac: Discrete (0-50 copies, Poisson-like distribution) - BetaGal:
+Continuous (10-10,000 molecules, treat as concentration) - Glucose:
+Continuous (0-10 mM = 10¹⁶ molecules per cell, deterministic)
+
+\textbf{Implication}: Pure discrete models (e.g., Gillespie for entire
+network) are computationally intractable for high-copy metabolites. Pure
+continuous models (ODEs) miss stochastic gene expression noise.
+
+\textbf{Solution}: Hybrid semantics (discrete marking for low-copy,
+continuous marking for high-copy).
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\hypertarget{r3-non-consumptive-participation-catalysis-templating}{%
+\subsection{\texorpdfstring{\textbf{R3: Non-consumptive participation}
+(catalysis,
+templating)}{R3: Non-consumptive participation (catalysis, templating)}}\label{r3-non-consumptive-participation-catalysis-templating}}
+
+\textbf{Requirement}: Formalism must distinguish between consumptive
+reactions (substrates) and non-consumptive roles (enzymes, genes,
+transcription factors).
+
+\textbf{Justification}: - Enzymes: Participate in reactions but are not
+consumed (k\_cat turnover, enzyme released) - Genes: Serve as templates
+for transcription (DNA not depleted) - mRNA: Templates for translation
+(mRNA produces many proteins before degradation) - Transcription
+factors: Bind DNA, enhance transcription, but are not degraded
+
+\textbf{Example} (lac operon): - lac\_gene ⤏ Transcription: Gene is
+template (test arc, non-consumptive) - BetaGal ⤏ Lactose\_cleavage:
+Enzyme catalyzes (test arc, non-consumptive) - If modeled with normal
+arcs: Gene and enzyme would deplete after single firing \texttimes
+
+\textbf{Implication}: Classical Petri nets (only normal arcs) cannot
+model catalysis without artificial workarounds (e.g., enzyme \textrightarrow enzyme +
+product, doubling token count).
+
+\textbf{Solution}: Test arcs (p ⤏ t) with semantics: M'(p) = M(p)
+(unchanged after firing).
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\hypertarget{r4-threshold-based-regulation-inhibition-activation-thresholds}{%
+\subsection{\texorpdfstring{\textbf{R4: Threshold-based regulation}
+(inhibition, activation
+thresholds)}{R4: Threshold-based regulation (inhibition, activation thresholds)}}\label{r4-threshold-based-regulation-inhibition-activation-thresholds}}
+
+\textbf{Requirement}: Formalism must support enabling conditions based
+on \textbf{place markings exceeding or falling below thresholds}.
+
+\textbf{Justification}: - Allosteric inhibition: Product inhibits enzyme
+when {[}Product{]} \textgreater{} K\_i (e.g., ATP inhibits PFK) -
+Transcriptional repression: Repressor blocks transcription when
+{[}Repressor{]} \textgreater{} threshold - Ultrasensitivity: Sigmoidal
+response curves (Hill equation) require threshold-like behavior
+
+\textbf{Example} (lac operon): - Glucose ⊸ cAMP\_synthesis: Transition
+blocked when {[}Glucose{]} \textgreater{} 0.5 mM - Repressor ⊸
+Transcription: Transition blocked when {[}Repressor{]} \textgreater{} 10
+nM - CRP-cAMP ⤏ Transcription: Rate enhanced when {[}CRP-cAMP{]}
+\textgreater{} threshold (could use Hill equation)
+
+\textbf{Implication}: Classical Petri nets have binary enabling (M(p) ≥
+W(p,t) or not). Cannot express ``fire only if M(p) \textless{}
+threshold''.
+
+\textbf{Solution}: Inhibitor arcs (p ⊸ t) with threshold functions
+Δ(p,t). Enabling condition: M(p) \textless{} Δ(p,t).
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\hypertarget{r5-cooperative-and-convergent-processes-shared-outputs-superposition}{%
+\subsection{\texorpdfstring{\textbf{R5: Cooperative and convergent
+processes} (shared outputs,
+superposition)}{R5: Cooperative and convergent processes (shared outputs, superposition)}}\label{r5-cooperative-and-convergent-processes-shared-outputs-superposition}}
+
+\textbf{Requirement}: Formalism must allow multiple transitions to
+\textbf{produce to the same place} without conflict (additive effects).
+
+\textbf{Justification}: - Convergent metabolism: Multiple pathways
+produce same metabolite (e.g., pyruvate from glycolysis, lactate,
+alanine) - Parallel enzyme activity: Multiple enzyme copies act on same
+substrate pool (effects add) - Multiple transcription factors: Several
+activators enhance same promoter (additive or synergistic)
+
+\textbf{Example} (lac operon): - Lactose cleavage produces Glucose -
+Glycolysis consumes Glucose - But also: External glucose import produces
+Glucose - Two sources (lactose cleavage + import) \textrightarrow single Glucose pool
+(convergent)
+
+\textbf{More general example} (pyruvate):
+
+\begin{lstlisting}
+Glycolysis \textrightarrow Pyruvate (flux v₁)
+Lactate_oxidation \textrightarrow Pyruvate (flux v₂)
+Alanine_transamination \textrightarrow Pyruvate (flux v₃)
+Net: dM(Pyruvate)/dt = v₁ + v₂ + v₃ (superposition)
+\end{lstlisting}
+
+\textbf{Implication}: Classical strong independence rejects transitions
+with shared outputs (conflict condition). But biologically, shared
+outputs are \textbf{cooperative}, not conflicting.
+
+\textbf{Solution}: Weak independence (disjoint inputs, shared outputs
+allowed). Parallel execution with synchronized accumulation.
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\hypertarget{r6-multi-type-kinetics-mass-action-michaelis-menten-hill-stochastic-propensities}{%
+\subsection{\texorpdfstring{\textbf{R6: Multi-type kinetics} (mass
+action, Michaelis-Menten, Hill, stochastic
+propensities)}{R6: Multi-type kinetics (mass action, Michaelis-Menten, Hill, stochastic propensities)}}\label{r6-multi-type-kinetics-mass-action-michaelis-menten-hill-stochastic-propensities}}
+
+\textbf{Requirement}: Formalism must support diverse rate functions
+within a single model.
+
+\textbf{Justification}: - Fast binding: Mass action (k · {[}A{]} ·
+{[}B{]}) - Enzyme kinetics: Michaelis-Menten (V\_max · {[}S{]} / (K\_m +
+{[}S{]})) - Cooperative regulation: Hill equation (V\_max · {[}S{]}ⁿ /
+(K\^{}n + {[}S{]}ⁿ)) - Stochastic gene expression: Propensity functions
+(a = k\_basal + k\_induced · {[}TF{]}) - Bursts: Geometric distribution
+for burst size, exponential inter-burst intervals
+
+\textbf{Example} (lac operon): - T1 (glucose consumption):
+Michaelis-Menten (saturable enzyme kinetics) - T2 (cAMP synthesis):
+Inhibited synthesis (k / (1 + {[}Glucose{]}/K\_i)) - T3 (complex
+formation): Mass action (k\_f · {[}CRP{]} · {[}cAMP{]}) - T5
+(transcription): Stochastic propensity + burst mode - T9 (lactose
+cleavage): Michaelis-Menten with enzyme term (V\_max · {[}E{]} · {[}S{]}
+/ (K\_m + {[}S{]}))
+
+\textbf{Implication}: Formalism must provide \textbf{rate function
+library} Φ and allow \textbf{per-transition customization}.
+
+\textbf{Solution}: Rate function map Φ: T \textrightarrow RateFunction. Each
+transition has type τ(t) and associated kinetic parameters.
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\hypertarget{r7-elemental-conservation-mass-balance-at-atomic-level}{%
+\subsection{\texorpdfstring{\textbf{R7: Elemental conservation} (mass
+balance at atomic
+level)}{R7: Elemental conservation (mass balance at atomic level)}}\label{r7-elemental-conservation-mass-balance-at-atomic-level}}
+
+\textbf{Requirement}: Formalism must track \textbf{elemental
+composition} (C, H, O, N, P, S) and verify conservation laws.
+
+\textbf{Justification}: - Fundamental physics: Atoms are neither created
+nor destroyed (non-nuclear biochemistry) - Debugging: Elemental
+imbalance indicates modeling error (missing cofactor, wrong
+stoichiometry) - Redox balance: Electron conservation in
+oxidation-reduction reactions - ATP budget: Phosphate balance in energy
+metabolism
+
+\textbf{Example} (lac operon): - Lactose (C₁₂H₂₂O₁₁) \textrightarrow Glucose (C₆H₁₂O₆)
++ Galactose (C₆H₁₂O₆) - Check: 12 = 6+6 (C), 22+2 = 12+12 (H), 11+1 =
+6+6 (O) \checkmark - If forgot water: 12=12 (C) \checkmark, but 22 ≠ 24 (H) \texttimes \textrightarrow Error
+detected
+
+\textbf{Implication}: Classical Petri nets use abstract tokens (no
+chemical identity). Cannot verify conservation.
+
+\textbf{Solution}: Biochemical formula map ρ: T \textrightarrow Formula. Elemental
+balance matrix S\_e. Verify: S\_e · v = 0 (steady state).
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\hypertarget{r8-parallelism-for-computational-efficiency-simulation-performance}{%
+\subsection{\texorpdfstring{\textbf{R8: Parallelism for computational
+efficiency} (simulation
+performance)}{R8: Parallelism for computational efficiency (simulation performance)}}\label{r8-parallelism-for-computational-efficiency-simulation-performance}}
+
+\textbf{Requirement}: Formalism must enable \textbf{parallel execution}
+of independent processes to achieve scalable performance.
+
+\textbf{Justification}: - Large models: Genome-scale metabolism (1000+
+reactions), whole-cell models (5000+ processes) - Real-time simulation:
+Parameter sweeps (100+ conditions), sensitivity analysis (1000+ samples)
+- Multi-core hardware: Modern CPUs (8-64 cores), GPUs (1000+ cores)
+
+\textbf{Example} (lac operon): - Sequential simulation: 9 transitions ×
+τ = 9τ per time step - Parallel (2 cores): - Set 1: \{T1, T5\} (glucose
+consumption + transcription, independent) - Set 2: \{T2, T6\} (cAMP
+synthesis + translation, independent) - Set 3: \{T3, T9\} (complex
+formation + lactose cleavage) - Set 4: \{T4, T7\} (repressor binding +
+mRNA degradation) - Total: 5 sequential sets \textrightarrow 5τ (speedup: 9/5 = 1.8×)
+
+\textbf{Better example} (genome-scale): - 1000 transitions, 650 weakly
+independent pairs - Classical strong independence: 200 pairs \textrightarrow 5
+parallel sets (speedup: 5×) - Weak independence: 650 pairs \textrightarrow 3 parallel
+sets (speedup: 10×) - \textbf{Result}: 2× speedup improvement by
+recognizing biological cooperativity
+
+\textbf{Implication}: Formalism must provide \textbf{dependency
+analysis} (which transitions conflict) and \textbf{parallel execution
+semantics} (safe concurrent firing).
+
+\textbf{Solution}: Weak independence theory (Chapter 5). Dependency
+classification algorithm. Parallel scheduler.
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\hypertarget{why-existing-formalisms-fail}{%
+\section{3.4 Why Existing Formalisms
+Fail}\label{why-existing-formalisms-fail}}
+
+\hypertarget{classical-petri-nets-place-transition-nets}{%
+\subsection{3.4.1 Classical Petri Nets (Place-Transition
+Nets)}\label{classical-petri-nets-place-transition-nets}}
+
+\textbf{Definition}: 5-tuple (P, T, F, W, M₀) - Only normal arcs
+(consumptive) - Homogeneous transitions (no types) - Abstract tokens (no
+chemical identity)
+
+\textbf{Limitations}:
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 4\tabcolsep) * \real{0.4062}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 4\tabcolsep) * \real{0.4375}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 4\tabcolsep) * \real{0.1562}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Requirement
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Classical PN
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Gap
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\textbf{R1}: Multi-scale dynamics & \texttimes Homogeneous transitions & No
+distinction between continuous/stochastic/timed \\
+\textbf{R2}: Hybrid discrete-continuous & \texttimes Abstract tokens & Marking
+is ℕ₀ (discrete only) or ℝ₀⁺ (continuous only), not both \\
+\textbf{R3}: Non-consumptive participation & \texttimes Only normal arcs &
+Cannot model catalysis without artificial doubling \\
+\textbf{R4}: Threshold regulation & \texttimes Binary enabling & M(p) ≥ W(p,t)
+only, no M(p) \textless{} threshold \\
+\textbf{R5}: Cooperative processes & \textwarning Shared outputs allowed & But
+strong independence rejects them (conservative) \\
+\textbf{R6}: Multi-type kinetics & \texttimes No rate functions & Classical PNs
+are qualitative (reachability only) \\
+\textbf{R7}: Elemental conservation & \texttimes Abstract tokens & No chemical
+formula, no mass balance \\
+\textbf{R8}: Parallelism & \textwarning Strong independence & Only 20\% of
+biological pairs, misses cooperativity \\
+\end{longtable}
+
+\textbf{Verdict}: Classical Petri nets provide the \textbf{topological
+foundation} (bipartite graph, firing rules) but lack \textbf{biochemical
+semantics} and \textbf{hybrid dynamics}.
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\hypertarget{stochastic-petri-nets-spns}{%
+\subsection{3.4.2 Stochastic Petri Nets
+(SPNs)}\label{stochastic-petri-nets-spns}}
+
+\textbf{Definition}: Classical PN + rate functions Φ: T \textrightarrow ℝ⁺ -
+Transitions fire stochastically (exponential distribution) -
+Gillespie-like simulation
+
+\textbf{Additions}: - \checkmark \textbf{R6} partially addressed: Rate functions
+(but homogeneous, all stochastic)
+
+\textbf{Limitations}:
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 4\tabcolsep) * \real{0.5652}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 4\tabcolsep) * \real{0.2174}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 4\tabcolsep) * \real{0.2174}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Requirement
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+SPN
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Gap
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\textbf{R1}: Multi-scale dynamics & \texttimes All stochastic & Cannot mix
+continuous (ODE) and stochastic \\
+\textbf{R2}: Hybrid discrete-continuous & \textwarning Discrete marking only &
+Stochastic simulation for high-copy metabolites intractable \\
+\textbf{R3}: Non-consumptive participation & \texttimes Only normal arcs & Still
+no test/inhibitor arcs \\
+\textbf{R4}: Threshold regulation & \texttimes Binary enabling & No
+threshold-based inhibition \\
+\textbf{R5}: Cooperative processes & \textwarning Shared outputs allowed & But not
+exploited for parallelism \\
+\textbf{R6}: Multi-type kinetics & \textwarning Stochastic only & No
+Michaelis-Menten, no Hill equation (unless encoded in propensity) \\
+\textbf{R7}: Elemental conservation & \texttimes Abstract tokens & No chemical
+formula \\
+\textbf{R8}: Parallelism & \texttimes Gillespie sequential & Next-reaction
+method inherently sequential \\
+\end{longtable}
+
+\textbf{Verdict}: SPNs add stochastic dynamics but remain
+\textbf{homogeneous} (all transitions stochastic) and lack
+\textbf{biochemical semantics}.
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\hypertarget{continuous-petri-nets-cpns}{%
+\subsection{3.4.3 Continuous Petri Nets
+(CPNs)}\label{continuous-petri-nets-cpns}}
+
+\textbf{Definition}: Classical PN + continuous marking (M: P \textrightarrow ℝ₀⁺) +
+rate functions Φ - Transitions fire continuously (ODE: dM/dt = C · Φ(M))
+- Incidence matrix C
+
+\textbf{Additions}: - \checkmark \textbf{R2} partially addressed: Continuous
+state (but no discrete) - \checkmark \textbf{R6} partially addressed: Rate
+functions (Michaelis-Menten, mass action)
+
+\textbf{Limitations}:
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 4\tabcolsep) * \real{0.5652}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 4\tabcolsep) * \real{0.2174}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 4\tabcolsep) * \real{0.2174}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Requirement
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+CPN
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Gap
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\textbf{R1}: Multi-scale dynamics & \texttimes All continuous & Cannot model
+discrete stochastic gene expression \\
+\textbf{R2}: Hybrid discrete-continuous & \textwarning Continuous only & No
+discrete tokens (genes, mRNA) \\
+\textbf{R3}: Non-consumptive participation & \texttimes Only normal arcs & No
+test/inhibitor arcs \\
+\textbf{R4}: Threshold regulation & \texttimes Binary enabling & Enabling: M(p)
+≥ ε (near-zero), not threshold-based \\
+\textbf{R5}: Cooperative processes & \checkmark Shared outputs OK & Fluxes add
+naturally (dM/dt = Σ v\_i) \\
+\textbf{R6}: Multi-type kinetics & \checkmark Rich rate functions &
+Michaelis-Menten, Hill, mass action supported \\
+\textbf{R7}: Elemental conservation & \texttimes Abstract tokens & No chemical
+formula \\
+\textbf{R8}: Parallelism & \textwarning ODE parallelism & Standard ODE solvers
+parallelize poorly (stiff systems) \\
+\end{longtable}
+
+\textbf{Verdict}: CPNs are excellent for \textbf{metabolic networks}
+(continuous, deterministic) but cannot model \textbf{stochastic gene
+expression} or \textbf{discrete molecular counts}.
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\hypertarget{hybrid-petri-nets-hpns}{%
+\subsection{3.4.4 Hybrid Petri Nets
+(HPNs)}\label{hybrid-petri-nets-hpns}}
+
+\textbf{Definition}: Classical PN + discrete places (P\_d) + continuous
+places (P\_c) + hybrid transitions - Combines discrete and continuous
+semantics - Hybrid firing rules (discrete \textrightarrow discrete, continuous \textrightarrow
+continuous, discrete \textrightarrow continuous)
+
+\textbf{Additions}: - \checkmark \textbf{R1} partially addressed: Can mix
+discrete and continuous - \checkmark \textbf{R2} addressed: Hybrid marking M:
+P\_d \textrightarrow ℕ₀, P\_c \textrightarrow ℝ₀⁺
+
+\textbf{Limitations}:
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 4\tabcolsep) * \real{0.5652}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 4\tabcolsep) * \real{0.2174}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 4\tabcolsep) * \real{0.2174}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Requirement
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+HPN
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Gap
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\textbf{R1}: Multi-scale dynamics & \textwarning Discrete + continuous & But no
+stochastic transitions (Gillespie), no burst mode \\
+\textbf{R2}: Hybrid discrete-continuous & \checkmark Fully supported & Discrete
+and continuous places coexist \\
+\textbf{R3}: Non-consumptive participation & \texttimes Only normal arcs &
+Standard HPNs lack test/inhibitor arcs \\
+\textbf{R4}: Threshold regulation & \texttimes Binary enabling & No inhibitor
+arcs in standard HPN \\
+\textbf{R5}: Cooperative processes & \checkmark Shared outputs OK & Continuous
+fluxes add \\
+\textbf{R6}: Multi-type kinetics & \textwarning ODE-based & Gillespie stochastic
+not standard in HPN \\
+\textbf{R7}: Elemental conservation & \texttimes Abstract tokens & No chemical
+formula \\
+\textbf{R8}: Parallelism & \textwarning Hybrid solvers complex & Synchronizing
+discrete events + ODE steps challenging \\
+\end{longtable}
+
+\textbf{Verdict}: HPNs address \textbf{hybrid state} but lack
+\textbf{stochastic transitions}, \textbf{test/inhibitor arcs}, and
+\textbf{biochemical semantics}.
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\hypertarget{colored-petri-nets-cpns-different-meaning}{%
+\subsection{3.4.5 Colored Petri Nets (CPNs, different
+meaning)}\label{colored-petri-nets-cpns-different-meaning}}
+
+\textbf{Note}: ``CPN'' commonly means ``Colored Petri Net'' (not
+Continuous). Avoid confusion.
+
+\textbf{Definition}: Classical PN + token colors (data types) - Tokens
+carry data: M(p) = multiset of colored tokens - Transitions have guards
+(firing conditions on token colors) - Arc expressions (functions
+transforming token colors)
+
+\textbf{Example}: - Token:
+\passthrough{\lstinline!(Glucose, conc=5.0, location=cytoplasm)!} -
+Guard: Fire if \passthrough{\lstinline!conc > 1.0!}
+
+\textbf{Additions}: - \checkmark \textbf{R7} potentially addressed: Tokens can
+carry chemical formulas as data
+
+\textbf{Limitations}:
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 4\tabcolsep) * \real{0.4333}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 4\tabcolsep) * \real{0.4000}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 4\tabcolsep) * \real{0.1667}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Requirement
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Colored PN
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Gap
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\textbf{R1}: Multi-scale dynamics & \texttimes Homogeneous transitions & No
+transition types \\
+\textbf{R2}: Hybrid discrete-continuous & \textwarning Tokens carry data & But
+semantics still discrete (multiset) \\
+\textbf{R3}: Non-consumptive participation & \texttimes Only normal arcs & No
+test/inhibitor arcs in standard colored PN \\
+\textbf{R4}: Threshold regulation & \textwarning Guards & Can encode thresholds in
+guards, but not topological \\
+\textbf{R5}: Cooperative processes & \textwarning Complex arc expressions &
+Requires manual encoding \\
+\textbf{R6}: Multi-type kinetics & \texttimes Qualitative & Colored PNs
+typically used for verification, not simulation \\
+\textbf{R7}: Elemental conservation & \textwarning Can encode formulas & But not
+automatic, requires manual arc expressions \\
+\textbf{R8}: Parallelism & \textwarning Colored tokens complex & Conflict
+detection harder with guards \\
+\end{longtable}
+
+\textbf{Verdict}: Colored Petri nets provide \textbf{expressive power}
+(token data, guards) but are \textbf{overly complex} for biological
+modeling and lack \textbf{built-in biochemical semantics}.
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\hypertarget{rule-based-models-kappa-bionetgen}{%
+\subsection{3.4.6 Rule-Based Models (Kappa,
+BioNetGen)}\label{rule-based-models-kappa-bionetgen}}
+
+\textbf{Definition}: Specify molecular species as \textbf{graphs}
+(proteins with binding sites) and \textbf{rules} (binding, unbinding,
+phosphorylation).
+
+\textbf{Example} (Kappa):
+
+\begin{lstlisting}
+Receptor(ligand), Ligand(receptor) -> Receptor(ligand!1), Ligand(receptor!1)  @ k_bind
+\end{lstlisting}
+
+\textbf{Strengths}: - \checkmark \textbf{Combinatorial complexity}: Handle
+millions of potential species (e.g., phosphorylation patterns) - \checkmark
+\textbf{Site-specific interactions}: Model protein domains,
+post-translational modifications - \checkmark \textbf{Stochastic simulation}:
+Gillespie-like simulation of rule firings
+
+\textbf{Limitations}:
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 4\tabcolsep) * \real{0.4333}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 4\tabcolsep) * \real{0.4000}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 4\tabcolsep) * \real{0.1667}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Requirement
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Rule-Based
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Gap
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\textbf{R1}: Multi-scale dynamics & \textwarning Mostly stochastic & Continuous
+kinetics less common \\
+\textbf{R2}: Hybrid discrete-continuous & \texttimes Discrete only & Stochastic
+simulation, no hybrid \\
+\textbf{R3}: Non-consumptive participation & \textwarning Implicit & Catalysts not
+consumed, but not explicit in topology \\
+\textbf{R4}: Threshold regulation & \textwarning Rule conditions & Can encode
+thresholds in rules, but not graphical \\
+\textbf{R5}: Cooperative processes & \texttimes Sequential rule firing & No
+parallelism (Gillespie sequential) \\
+\textbf{R6}: Multi-type kinetics & \textwarning Rate constants & Mass action, but
+Michaelis-Menten requires approximation \\
+\textbf{R7}: Elemental conservation & \texttimes Abstract species & Molecular
+graphs, but no elemental formulas \\
+\textbf{R8}: Parallelism & \texttimes Gillespie sequential & Next-reaction
+method not parallel \\
+\end{longtable}
+
+\textbf{Verdict}: Rule-based models excel at \textbf{combinatorial
+complexity} (signaling networks with many phosphorylation states) but
+are \textbf{sequential}, \textbf{discrete-only}, and \textbf{lack
+elemental conservation}.
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\hypertarget{ode-systems-sbml-models}{%
+\subsection{3.4.7 ODE Systems (SBML
+Models)}\label{ode-systems-sbml-models}}
+
+\textbf{Definition}: Systems of ordinary differential equations:
+
+\begin{lstlisting}
+dM(Glucose)/dt = -v_HK + v_import
+dM(G6P)/dt = v_HK - v_PGI
+...
+\end{lstlisting}
+
+\textbf{Strengths}: - \checkmark \textbf{R1} partially: Continuous dynamics
+(deterministic) - \checkmark \textbf{R2} partially: Continuous state - \checkmark
+\textbf{R5}: Convergent fluxes add naturally - \checkmark \textbf{R6}: Rich
+kinetics (Michaelis-Menten, Hill, etc.) - \checkmark \textbf{R7} potentially:
+Can track elemental formulas (if manually encoded)
+
+\textbf{Limitations}:
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 4\tabcolsep) * \real{0.4194}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 4\tabcolsep) * \real{0.4194}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 4\tabcolsep) * \real{0.1613}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Requirement
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+ODE Systems
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Gap
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\textbf{R1}: Multi-scale dynamics & \texttimes Continuous only & Cannot model
+discrete stochastic gene expression \\
+\textbf{R2}: Hybrid discrete-continuous & \texttimes Continuous only & No
+discrete counts \\
+\textbf{R3}: Non-consumptive participation & \textwarning Implicit & Enzyme
+appears in rate, but not topologically explicit \\
+\textbf{R4}: Threshold regulation & \textwarning Implicit & Inhibition encoded in
+rate function, not visible in topology \\
+\textbf{R5}: Cooperative processes & \checkmark Fluxes add & dM/dt = Σ v\_i \\
+\textbf{R6}: Multi-type kinetics & \checkmark Full flexibility & Any rate
+function \\
+\textbf{R7}: Elemental conservation & \textwarning Manual & Can encode, but not
+automatic \\
+\textbf{R8}: Parallelism & \textwarning ODE solver parallelism & Stiff systems
+parallelize poorly \\
+\end{longtable}
+
+\textbf{Verdict}: ODE systems are the \textbf{standard} for metabolic
+modeling but lack \textbf{stochastic gene expression},
+\textbf{topological visibility} of regulation, and \textbf{automatic
+elemental balance}.
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\hypertarget{comparison-summary-table}{%
+\subsection{3.4.8 Comparison Summary
+Table}\label{comparison-summary-table}}
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 18\tabcolsep) * \real{0.2200}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 18\tabcolsep) * \real{0.0800}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 18\tabcolsep) * \real{0.0800}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 18\tabcolsep) * \real{0.0800}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 18\tabcolsep) * \real{0.0800}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 18\tabcolsep) * \real{0.0800}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 18\tabcolsep) * \real{0.0800}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 18\tabcolsep) * \real{0.0800}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 18\tabcolsep) * \real{0.0800}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 18\tabcolsep) * \real{0.1400}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Formalism
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+R1
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+R2
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+R3
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+R4
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+R5
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+R6
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+R7
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+R8
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Score
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\textbf{Classical PN} & \texttimes & \texttimes & \texttimes & \texttimes & \textwarning & \texttimes & \texttimes & \textwarning & 1/8 \\
+\textbf{Stochastic PN} & \texttimes & \textwarning & \texttimes & \texttimes & \textwarning & \textwarning & \texttimes & \texttimes & 2/8 \\
+\textbf{Continuous PN} & \texttimes & \textwarning & \texttimes & \texttimes & \checkmark & \checkmark & \texttimes & \textwarning & 3/8 \\
+\textbf{Hybrid PN} & \textwarning & \checkmark & \texttimes & \texttimes & \checkmark & \textwarning & \texttimes & \textwarning & 4/8 \\
+\textbf{Colored PN} & \texttimes & \textwarning & \texttimes & \textwarning & \textwarning & \texttimes & \textwarning & \textwarning & 2/8 \\
+\textbf{Rule-Based} & \textwarning & \texttimes & \textwarning & \textwarning & \texttimes & \textwarning & \texttimes & \texttimes & 2/8 \\
+\textbf{ODE Systems} & \texttimes & \texttimes & \textwarning & \textwarning & \checkmark & \checkmark & \textwarning & \textwarning & 4/8 \\
+\textbf{Extended Bio-PN} & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark &
+\textbf{8/8} \\
+\end{longtable}
+
+\textbf{Legend}: \checkmark Fully addressed, \textwarning Partially addressed, \texttimes Not
+addressed
+
+\textbf{Key insight}: No existing formalism addresses \textbf{all eight
+requirements}. Extended Bio-Petri Nets are designed to fill this gap.
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\hypertarget{the-integration-gap}{%
+\section{3.5 The Integration Gap}\label{the-integration-gap}}
+
+\hypertarget{current-practice-separate-models}{%
+\subsection{3.5.1 Current Practice: Separate
+Models}\label{current-practice-separate-models}}
+
+\textbf{Standard approach} in systems biology: 1. \textbf{Metabolic
+model}: SBML ODE system (continuous, deterministic) 2. \textbf{Gene
+regulatory model}: Boolean network or stochastic simulation (discrete,
+probabilistic) 3. \textbf{Signaling model}: ODE system or rule-based
+(Kappa)
+
+\textbf{Integration attempt}: - Run metabolic model \textrightarrow compute
+{[}Glucose{]} - Use {[}Glucose{]} as input to gene regulatory model \textrightarrow
+compute {[}mRNA\_lac{]} - Use {[}mRNA\_lac{]} to update enzyme levels in
+metabolic model \textrightarrow update {[}BetaGal{]} - \textbf{Problem}: Loose
+coupling, manual synchronization, no formal semantics
+
+\textbf{Example} (lac operon): - \textbf{File 1}:
+\passthrough{\lstinline!metabolism.xml!} (SBML) - Species: Glucose,
+Lactose, G6P, ATP, ADP - Reactions: Hexokinase, PFK, Lactose\_cleavage -
+Enzyme parameters: V\_max = f({[}BetaGal{]}) (imported from File 2)
+
+\begin{itemize}
+\item
+  \textbf{File 2}: \passthrough{\lstinline!gene\_regulation.py!}
+  (Gillespie script)
+
+  \begin{itemize}
+  \tightlist
+  \item
+    Species: lac\_gene, mRNA\_lac, BetaGal
+  \item
+    Reactions: Transcription, Translation, Degradation
+  \item
+    Regulation: Transcription rate = f({[}cAMP-CRP{]}, {[}Glucose{]})
+    (imported from File 1)
+  \end{itemize}
+\item
+  \textbf{File 3}: \passthrough{\lstinline!integrate.py!} (custom
+  script)
+
+\begin{lstlisting}[language=Python]
+for t in time_steps:
+    # Step 1: Run metabolism (SBML)
+    glucose, lactose = run_metabolism_ode(t, dt, beta_gal)
+
+    # Step 2: Run gene regulation (Gillespie)
+    mrna_lac, beta_gal = run_gillespie(t, dt, glucose, lactose)
+
+    # Step 3: Synchronize (manual)
+    # Update BetaGal in metabolism model
+    # Update Glucose in gene regulation model
+\end{lstlisting}
+\end{itemize}
+
+\textbf{Problems}: 1. \textbf{Manual synchronization}: Requires custom
+glue code for every model pair 2. \textbf{No formal semantics}: When to
+synchronize? What if Gillespie event occurs mid-ODE step? 3.
+\textbf{Error-prone}: Easy to miss feedback loops (e.g., Glucose \textrightarrow cAMP
+\textrightarrow Transcription \textrightarrow BetaGal \textrightarrow Lactose \textrightarrow Glucose) 4. \textbf{Not reusable}:
+Custom integration script per model 5. \textbf{No topological
+visibility}: Regulation hidden in code, not visible in network
+
+\hypertarget{the-need-for-unified-formalism}{%
+\subsection{3.5.2 The Need for Unified
+Formalism}\label{the-need-for-unified-formalism}}
+
+\textbf{Goal}: Single model representation capturing all scales and
+semantics.
+
+\textbf{Requirements for unified formalism}: 1. \textbf{Single network}:
+All species (genes, mRNA, proteins, metabolites) as nodes 2.
+\textbf{Hybrid dynamics}: Discrete (genes, mRNA) + continuous
+(metabolites) 3. \textbf{Heterogeneous transitions}: Continuous
+(metabolism) + stochastic (gene expression) + burst (transcription) 4.
+\textbf{Topological regulation}: Inhibitor/test arcs visible in network
+5. \textbf{Automatic synchronization}: Built-in hybrid scheduler 6.
+\textbf{Elemental conservation}: Automatic verification
+
+\textbf{Extended Bio-PN achieves this} (see Chapters 4-6).
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\hypertarget{summary}{%
+\section{3.6 Summary}\label{summary}}
+
+This chapter established the \textbf{integration challenge} in systems
+biology:
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{Motivating example}: cAMP-CRP regulation of lac operon
+  demonstrates:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    Cross-scale regulation (metabolite \textrightarrow signaling \textrightarrow genetics \textrightarrow
+    metabolism)
+  \item
+    Heterogeneous dynamics (continuous metabolism + stochastic
+    transcription + burst mode)
+  \item
+    Diverse arc types (test arcs for catalysis, inhibitor arcs for
+    regulation)
+  \item
+    Elemental conservation (glucose, lactose, ATP formulas)
+  \end{itemize}
+\item
+  \textbf{Eight formal requirements} (R1-R8):
+
+  \begin{itemize}
+  \tightlist
+  \item
+    R1: Multi-scale temporal dynamics
+  \item
+    R2: Hybrid discrete-continuous state
+  \item
+    R3: Non-consumptive participation (catalysis)
+  \item
+    R4: Threshold-based regulation (inhibition)
+  \item
+    R5: Cooperative and convergent processes (shared outputs)
+  \item
+    R6: Multi-type kinetics (Michaelis-Menten, Hill, stochastic)
+  \item
+    R7: Elemental conservation (mass balance)
+  \item
+    R8: Parallelism for computational efficiency
+  \end{itemize}
+\item
+  \textbf{Existing formalisms fail}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    Classical Petri nets: Topological foundation, but lack biochemical
+    semantics (1/8 requirements)
+  \item
+    ODEs: Excellent for metabolism, but no discrete stochastic (4/8
+    requirements)
+  \item
+    Hybrid Petri nets: Close, but lack test/inhibitor arcs and
+    biochemical formulas (4/8 requirements)
+  \item
+    Rule-based models: Good for combinatorial complexity, but sequential
+    and discrete-only (2/8 requirements)
+  \end{itemize}
+\item
+  \textbf{Integration gap}: Current practice uses separate models with
+  manual coupling. Need \textbf{unified formalism}.
+\end{enumerate}
+
+\textbf{Next chapters}: - \textbf{Chapter 4}: Extended Bio-PN definition
+(12-tuple formalism addressing all 8 requirements) - \textbf{Chapter 5}:
+Weak independence theory (requirement R8, parallelism) - \textbf{Chapter
+6}: Biochemical formula tracking (requirement R7, elemental
+conservation)
+
+\textbf{The solution}: Extended Bio-Petri Nets provide the \textbf{first
+unified formalism} for integrated systems biology, addressing all eight
+requirements through four core innovations: 1. Weak independence \&
+cooperative parallelism (R5, R8) 2. Heterogeneous transition types (R1,
+R2, R6) 3. Arc-level regulation (R3, R4) 4. Atomic conservation (R7)

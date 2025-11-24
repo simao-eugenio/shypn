@@ -109,8 +109,13 @@ class PlacePropDialogLoader(GObject.GObject):
                 capacity_entry.set_text('')
             elif capacity_value == float('inf'):
                 capacity_entry.set_text('inf')
+            elif isinstance(capacity_value, str) and capacity_value.lower() in ('infinity', 'inf'):
+                capacity_entry.set_text('inf')
             else:
-                capacity_entry.set_text(str(int(capacity_value)))
+                try:
+                    capacity_entry.set_text(str(int(capacity_value)))
+                except (ValueError, TypeError):
+                    capacity_entry.set_text('inf')
         width_entry = self.builder.get_object('prop_place_width_entry')
         if width_entry and hasattr(self.place_obj, 'border_width'):
             width_entry.set_text(str(self.place_obj.border_width))

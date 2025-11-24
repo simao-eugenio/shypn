@@ -239,6 +239,9 @@ class SBMLKineticsIntegrationService:
         Also converts SBML math operators to Python:
         - ^ (exponentiation) → ** (Python power operator)
         
+        IMPORTANT: Species IDs with hyphens (e.g., MOS-P, Erk2-pp) are sanitized
+        to underscores (MOS_P, Erk2_pp) for Python compatibility.
+        
         Example:
             Input:  "cytosol * V10m * ADP^2 / ((K10PEP + PEP) * (K10ADP + ADP))"
             Output: "cytosol * V10m * ADP**2 / ((K10PEP + PEP) * (K10ADP + ADP))"
@@ -255,7 +258,11 @@ class SBMLKineticsIntegrationService:
         
         translated = formula
         
-        # First, replace species names with place names
+        # First, sanitize any hyphens in the formula to underscores
+        # This handles species IDs that appear in the formula before replacement
+        import re
+        
+        # Replace species names with place names
         if self.species_to_place_map:
             # Sort species by length (descending) to avoid partial replacements
             # Example: Replace "ATP" before "AT" to avoid "ATP" → "P3P"
@@ -264,11 +271,19 @@ class SBMLKineticsIntegrationService:
             for species_id in sorted_species:
                 place_name = self.species_to_place_map[species_id]
                 
+                # Handle both original (with hyphens) and sanitized (with underscores) versions
+                # Original: MOS-P, Sanitized: MOS_P
+                species_id_sanitized = species_id.replace('-', '_')
+                
                 # Use word boundary replacement to avoid partial matches
                 # Replace "ADP" but not "ADPK" or "mADP"
-                import re
-                pattern = r'\b' + re.escape(species_id) + r'\b'
-                translated = re.sub(pattern, place_name, translated)
+                # Try sanitized version first (what's in the formula)
+                pattern_sanitized = r'\b' + re.escape(species_id_sanitized) + r'\b'
+                translated = re.sub(pattern_sanitized, place_name, translated)
+                
+                # Also try original version (for backwards compatibility)
+                pattern_original = r'\b' + re.escape(species_id) + r'\b'
+                translated = re.sub(pattern_original, place_name, translated)
         
         # Convert SBML operators to Python operators
         # ^ (exponentiation) → ** (Python power)

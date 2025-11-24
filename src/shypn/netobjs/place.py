@@ -211,7 +211,7 @@ class Place(PetriNetObject):
             "radius": self.radius,
             "marking": self.tokens,  # Use 'marking' for compatibility
             "initial_marking": self.initial_marking,  # Store initial marking for reset
-            "capacity": self.capacity,  # Store capacity constraint
+            "capacity": "Infinity" if self.capacity == float('inf') else self.capacity,  # Normalize infinity to string for JSON
             "border_color": list(self.border_color),
             "border_width": self.border_width,
             "is_catalyst": getattr(self, 'is_catalyst', False)  # Save catalyst flag
@@ -271,7 +271,12 @@ class Place(PetriNetObject):
         # Restore catalyst flag (for hierarchical layout)
         place.is_catalyst = data.get("is_catalyst", False)
         if "capacity" in data:
-            place.capacity = data["capacity"]
+            capacity_value = data["capacity"]
+            # Normalize capacity: handle string "Infinity" or "inf"
+            if isinstance(capacity_value, str) and capacity_value.lower() in ('infinity', 'inf'):
+                place.capacity = float('inf')
+            else:
+                place.capacity = capacity_value
         if "border_color" in data:
             place.border_color = tuple(data["border_color"])
         if "border_width" in data:

@@ -1,0 +1,100 @@
+%*******************************************************
+% Extended Biological Petri Nets PhD Thesis
+% Based on ClassicThesis by André Miede
+%*******************************************************
+\documentclass[
+    twoside,openright,titlepage,numbers=noenddot,
+    headinclude,footinclude,cleardoublepage=empty,
+    paper=a4,fontsize=11pt
+]{scrreprt}
+
+%*******************************************************
+% Note: Make all your adjustments in here
+%*******************************************************
+\input{classicthesis-config}
+
+%*******************************************************
+% Bibliographies
+%*******************************************************
+\addbibresource{Bibliography.bib}
+
+%*******************************************************
+% Hyphenation
+%*******************************************************
+\hyphenation{systems biology Petri networks}
+
+%*******************************************************
+% GO! GO! GO!
+%*******************************************************
+\begin{document}
+\frenchspacing
+\raggedbottom
+\selectlanguage{american}
+\pagenumbering{roman}
+\pagestyle{plain}
+
+%*******************************************************
+% Frontmatter
+%*******************************************************
+\include{FrontBackmatter/Titlepage}
+\include{FrontBackmatter/Titleback}
+\cleardoublepage\include{FrontBackmatter/Abstract}
+\cleardoublepage\include{FrontBackmatter/Acknowledgments}
+\cleardoublepage\include{FrontBackmatter/Contents}
+
+%*******************************************************
+% Mainmatter
+%*******************************************************
+\cleardoublepage
+\pagestyle{scrheadings}
+\pagenumbering{arabic}
+
+% Part I: Introduction and Foundations
+\part{Introduction and Foundations}
+\include{Chapters/chapter_01}
+\include{Chapters/chapter_02}
+
+% Part II: Core Theory
+\part{Core Theory}
+\include{Chapters/chapter_03}
+\include{Chapters/chapter_04}
+\include{Chapters/chapter_05}
+\include{Chapters/chapter_06}
+
+% Part III: Validation
+\part{Validation}
+\include{Chapters/chapter_07}
+
+% Part IV: Implementation
+\part{Implementation}
+\include{Chapters/chapter_08}
+\include{Chapters/chapter_09}
+\include{Chapters/chapter_10}
+\include{Chapters/chapter_11}
+
+% Part V: Evaluation
+\part{Evaluation}
+\include{Chapters/chapter_12}
+\include{Chapters/chapter_13}
+
+% Part VI: Synthesis
+\part{Synthesis}
+\include{Chapters/chapter_14}
+\include{Chapters/chapter_15}
+
+%*******************************************************
+% Backmatter
+%*******************************************************
+\appendix
+\cleardoublepage
+\part{Appendix}
+% \include{Chapters/appendix_a}
+
+%*******************************************************
+% Other Stuff in the Back
+%*******************************************************
+\cleardoublepage\include{FrontBackmatter/Bibliography}
+% \cleardoublepage\include{FrontBackmatter/Declaration}
+% \cleardoublepage\include{FrontBackmatter/Colophon}
+
+\end{document}

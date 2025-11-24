@@ -277,6 +277,10 @@ class ReactionExtractor(BaseExtractor):
         math_ast = sbml_kinetic_law.getMath()
         formula = libsbml.formulaToL3String(math_ast)
         
+        # Sanitize formula to replace hyphens with underscores in species IDs
+        # This prevents Python syntax errors like "MOS-P" being parsed as "MOS - P"
+        formula = self._sanitize_formula(formula)
+        
         # Extract parameters
         parameters = {}
         for i in range(sbml_kinetic_law.getNumParameters()):
@@ -307,6 +311,39 @@ class ReactionExtractor(BaseExtractor):
         kinetic_law.sbml_metadata = sbml_metadata
         
         return kinetic_law
+    
+    def _sanitize_formula(self, formula: str) -> str:
+        """
+        Sanitize formula by replacing hyphens with underscores in identifiers.
+        
+        This prevents Python syntax errors when species IDs contain hyphens
+        (e.g., "MOS-P" would be parsed as "MOS - P" subtraction).
+        
+        Uses regex to identify word boundaries and replace hyphens only within
+        identifiers, not in mathematical operators.
+        
+        Args:
+            formula: Original formula from SBML
+            
+        Returns:
+            Sanitized formula with underscores instead of hyphens
+        """
+        if not formula:
+            return formula
+        
+        import re
+        
+        # Replace hyphens with underscores in identifiers
+        # Match word characters followed by hyphen followed by word characters
+        # This preserves mathematical operators like minus signs
+        # Pattern: word boundary, alphanumeric+hyphen+alphanumeric, word boundary
+        def replace_hyphen(match):
+            return match.group(0).replace('-', '_')
+        
+        # Match identifiers with hyphens (e.g., MOS-P, Erk2-pp, Mek1-p)
+        sanitized = re.sub(r'\b\w+(?:-\w+)+\b', replace_hyphen, formula)
+        
+        return sanitized
     
     def _detect_rate_type(self, formula: str) -> str:
         """

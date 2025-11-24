@@ -227,10 +227,11 @@ class InhibitorArc(Arc):
         # Draw hollow circle with edge touching target boundary
         self._render_arrowhead(cr, marker_x, marker_y, dx_world, dy_world, zoom)
         
-        # Draw weight label if different from 1 (convention: weight=1 is implicit)
-        # This includes inhibitor thresholds (Ki values)
-        if abs(self.weight - 1.0) > 1e-6:
-            self._render_weight(cr, start_world_x, start_world_y, marker_x, marker_y, zoom)
+        # Draw threshold label if different from 1 (show inhibition threshold)
+        # For inhibitor arcs, threshold is stored in 'threshold' attribute or 'weight' as fallback
+        threshold_value = getattr(self, 'threshold', self.weight)
+        if threshold_value and abs(threshold_value - 1.0) > 1e-6:
+            self._render_threshold_label(cr, start_world_x, start_world_y, marker_x, marker_y, threshold_value, zoom)
         
         # Ensure clean state for next rendering operation
         cr.new_path()
@@ -336,12 +337,13 @@ class InhibitorArc(Arc):
         # Draw hollow circle at target boundary
         self._render_arrowhead(cr, marker_x, marker_y, dx_end, dy_end, zoom)
         
-        # Draw weight label if different from 1 (convention: weight=1 is implicit)
-        # This includes inhibitor thresholds (Ki values)
-        if abs(self.weight - 1.0) > 1e-6:
-            self._render_weight_curved(cr, start_world_x, start_world_y, 
-                                      end_world_x, end_world_y, 
-                                      cp_x, cp_y, zoom)
+        # Draw threshold label if different from 1 (show inhibition threshold)
+        # For inhibitor arcs, threshold is stored in 'threshold' attribute or 'weight' as fallback
+        threshold_value = getattr(self, 'threshold', self.weight)
+        if threshold_value and abs(threshold_value - 1.0) > 1e-6:
+            self._render_threshold_label_curved(cr, start_world_x, start_world_y, 
+                                               end_world_x, end_world_y, 
+                                               cp_x, cp_y, threshold_value, zoom)
         
         # Ensure clean state for next rendering operation
         cr.new_path()
@@ -418,6 +420,115 @@ class InhibitorArc(Arc):
         offset = 11 / zoom
         text_x = mid_x + perp_x * offset - extents.width / 2
         text_y = mid_y + perp_y * offset + extents.height / 2
+        
+        # Draw white background
+        padding = 2 / zoom
+        cr.rectangle(text_x - padding, text_y - extents.height - padding,
+                    extents.width + 2 * padding, extents.height + 2 * padding)
+        cr.set_source_rgba(1.0, 1.0, 1.0, 0.8)
+        cr.fill()
+        
+        # Draw text
+        cr.move_to(text_x, text_y)
+        cr.set_source_rgb(0, 0, 0)
+        cr.show_text(text)
+        
+        cr.new_path()
+        cr.restore()
+    
+    def _render_threshold_label(self, cr, x1: float, y1: float, x2: float, y2: float, 
+                                threshold_value: float, zoom: float = 1.0):
+        """Render threshold label near the arc midpoint.
+        
+        Args:
+            cr: Cairo context
+            x1, y1: Start point (world coords)
+            x2, y2: End point (world coords)
+            threshold_value: Threshold value to display
+            zoom: Current zoom level for font/offset compensation
+        """
+        cr.save()
+        
+        # Calculate midpoint
+        mid_x = (x1 + x2) / 2
+        mid_y = (y1 + y2) / 2
+        
+        # Set font
+        cr.select_font_face("Arial", 0, 1)  # Bold
+        cr.set_font_size(12 / zoom)
+        text = f"{threshold_value:g}"
+        extents = cr.text_extents(text)
+        
+        # Calculate perpendicular offset
+        offset = 11 / zoom
+        dx = y2 - y1
+        dy = x1 - x2
+        length = math.sqrt(dx * dx + dy * dy)
+        if length > 0:
+            dx = dx / length * offset
+            dy = dy / length * offset
+        
+        # Text position
+        text_x = mid_x + dx - extents.width / 2
+        text_y = mid_y + dy + extents.height / 2
+        
+        # Draw white background
+        padding = 2 / zoom
+        cr.rectangle(text_x - padding, text_y - extents.height - padding,
+                    extents.width + 2 * padding, extents.height + 2 * padding)
+        cr.set_source_rgba(1.0, 1.0, 1.0, 0.8)
+        cr.fill()
+        
+        # Draw text
+        cr.move_to(text_x, text_y)
+        cr.set_source_rgb(0, 0, 0)
+        cr.show_text(text)
+        
+        cr.new_path()
+        cr.restore()
+    
+    def _render_threshold_label_curved(self, cr, x1: float, y1: float, x2: float, y2: float,
+                                       cp_x: float, cp_y: float, threshold_value: float, zoom: float = 1.0):
+        """Render threshold label on curved arc at the bezier curve midpoint.
+        
+        Args:
+            cr: Cairo context
+            x1, y1: Start point (world coords)
+            x2, y2: End point (world coords)
+            cp_x, cp_y: Control point (world coords)
+            threshold_value: Threshold value to display
+            zoom: Current zoom level
+        """
+        cr.save()
+        
+        # Calculate point on bezier curve at t=0.5
+        t = 0.5
+        mid_x = (1-t)**2 * x1 + 2*(1-t)*t * cp_x + t**2 * x2
+        mid_y = (1-t)**2 * y1 + 2*(1-t)*t * cp_y + t**2 * y2
+        
+        # Calculate tangent at t=0.5
+        tangent_x = 2*(1-t)*(cp_x - x1) + 2*t*(x2 - cp_x)
+        tangent_y = 2*(1-t)*(cp_y - y1) + 2*t*(y2 - cp_y)
+        
+        # Set font
+        cr.select_font_face("Arial", 0, 1)  # Bold
+        cr.set_font_size(12 / zoom)
+        text = f"{threshold_value:g}"
+        extents = cr.text_extents(text)
+        
+        # Perpendicular offset
+        offset = 11 / zoom
+        length = math.sqrt(tangent_x**2 + tangent_y**2)
+        if length > 1e-6:
+            perp_x = -tangent_y / length * offset
+            perp_y = tangent_x / length * offset
+        else:
+            perp_x = 0
+            perp_y = offset
+        
+        # Text position
+        text_x = mid_x + perp_x - extents.width / 2
+        text_y = mid_y + perp_y + extents.height / 2
         
         # Draw white background
         padding = 2 / zoom

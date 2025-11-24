@@ -144,24 +144,29 @@ class TransitionRatePanel(AnalysisPlotPanel):
             logger.debug(f"[COLOR] Calling mark_needs_redraw()")
             self._model_manager.mark_needs_redraw()
         
-        # Notify Report panel of selection change (if callback is set)
-        if self.on_selection_changed_callback:
-            # Detect locality for this transition
-            from shypn.diagnostic import LocalityDetector
-            if self._model_manager:
-                detector = LocalityDetector(self._model_manager)
-                locality = detector.get_locality_for_transition(obj)
+        # Detect locality and add locality places
+        from shypn.diagnostic import LocalityDetector
+        if self._model_manager:
+            detector = LocalityDetector(self._model_manager)
+            locality = detector.get_locality_for_transition(obj)
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(f"[LOCALITY] Transition {obj.name} added, locality valid: {locality.is_valid if locality else False}")
+            
+            # Add locality places to PlaceRatePanel
+            if locality and locality.is_valid:
+                self.add_locality_places(obj, locality)
+            
+            # Notify Report panel of selection change (if callback is set)
+            if self.on_selection_changed_callback:
                 if logger.isEnabledFor(logging.DEBUG):
-                    logger.debug(f"[LOCALITY_SYNC] Transition {obj.name} added, locality valid: {locality.is_valid if locality else False}")
                     logger.debug(f"[LOCALITY_SYNC] Calling callback with transition {obj.id} and locality")
-                # Notify callback with transition and its locality
                 self.on_selection_changed_callback(obj, locality)
                 if logger.isEnabledFor(logging.DEBUG):
                     logger.debug("[LOCALITY_SYNC] Callback completed")
             else:
-                logger.debug("[LOCALITY_SYNC] No model_manager, cannot detect locality")
+                logger.debug("[LOCALITY_SYNC] No callback set for transition selection")
         else:
-            logger.debug("[LOCALITY_SYNC] No callback set for transition selection")
+            logger.debug("[LOCALITY] No model_manager, cannot detect locality")
     
     def _get_rate_data(self, transition_id: Any) -> List[Tuple[float, float]]:
         """Get behavior-specific data for a transition.
@@ -728,13 +733,14 @@ class TransitionRatePanel(AnalysisPlotPanel):
             logger.warning(f"[LOCALITY] Locality is invalid, skipping")
             return
         
-        # Store locality information
+        # Store locality information (including catalysts)
         self._locality_places[transition.id] = {
             'input_places': list(locality.input_places),
             'output_places': list(locality.output_places),
+            'catalyst_places': list(locality.catalyst_places),
             'transition': transition
         }
-        logger.debug(f"[LOCALITY] Stored locality: {len(locality.input_places)} inputs, {len(locality.output_places)} outputs")
+        logger.debug(f"[LOCALITY] Stored locality: {len(locality.input_places)} inputs, {len(locality.output_places)} outputs, {len(locality.catalyst_places)} catalysts")
         
         # Get transition's plot color (should already be set from add_object)
         transition_color = getattr(transition, 'border_color', None)
@@ -742,7 +748,7 @@ class TransitionRatePanel(AnalysisPlotPanel):
         
         # Actually add the locality places to the PlaceRatePanel for plotting
         if self._place_panel is not None:
-            logger.debug(f"[LOCALITY] Adding {len(locality.input_places)} input places and {len(locality.output_places)} output places to PlaceRatePanel")
+            logger.debug(f"[LOCALITY] Adding {len(locality.input_places)} input places, {len(locality.output_places)} output places, and {len(locality.catalyst_places)} catalyst places to PlaceRatePanel")
             # Add input places
             for place in locality.input_places:
                 logger.debug(f"[LOCALITY] Adding input place {place.id} to place_panel")
@@ -752,6 +758,12 @@ class TransitionRatePanel(AnalysisPlotPanel):
             for place in locality.output_places:
                 logger.debug(f"[LOCALITY] Adding output place {place.id} to place_panel")
                 self._place_panel.add_object(place)
+            
+            # Add catalyst places (enzymes, cofactors - non-consuming)
+            for place in locality.catalyst_places:
+                logger.debug(f"[LOCALITY] Adding catalyst place {place.id} to place_panel")
+                self._place_panel.add_object(place)
+            
             logger.debug(f"[LOCALITY] All places added to PlaceRatePanel")
         else:
             logger.warning(f"[LOCALITY] _place_panel is None! Cannot add locality places to place panel")
@@ -768,6 +780,12 @@ class TransitionRatePanel(AnalysisPlotPanel):
             for place in locality.output_places:
                 for arc in self._model_manager.arcs:
                     if arc.source.id == transition.id and arc.target.id == place.id:
+                        arc.color = transition_color
+            
+            # Find and color catalyst arcs (test arcs from catalyst places to transition)
+            for place in locality.catalyst_places:
+                for arc in self._model_manager.arcs:
+                    if arc.source.id == place.id and arc.target.id == transition.id:
                         arc.color = transition_color
         
         # Update the UI list to show locality places under the transition
@@ -809,6 +827,15 @@ class TransitionRatePanel(AnalysisPlotPanel):
                         from shypn.netobjs.arc import Arc
                         arc.color = Arc.DEFAULT_COLOR
                         logger.debug(f"[ARC_COLOR] Reset output arc {arc.id} to default")
+            
+            # Reset colors of catalyst arcs (test arcs from catalyst places to transition)
+            if 'catalyst_places' in locality_data:
+                for place in locality_data['catalyst_places']:
+                    for arc in self._model_manager.arcs:
+                        if arc.source.id == place.id and arc.target.id == obj.id:
+                            from shypn.netobjs.arc import Arc
+                            arc.color = Arc.DEFAULT_COLOR
+                            logger.debug(f"[ARC_COLOR] Reset catalyst arc {arc.id} to default")
             
             # Remove locality data
             del self._locality_places[obj.id]
@@ -921,6 +948,11 @@ class TransitionRatePanel(AnalysisPlotPanel):
                         for place in locality_data['output_places']:
                             self._add_locality_place_row_to_list(
                                 place, color, "→ Output:", is_output=True
+                            )
+                        # Add catalyst places
+                        for place in locality_data.get('catalyst_places', []):
+                            self._add_locality_place_row_to_list(
+                                place, color, "⋯ Catalyst:", is_output=False
                             )
         
         self.objects_listbox.show_all()
