@@ -1,0 +1,958 @@
+\chapter{Background and Related Work}
+\label{ch:background}
+
+\section{Petri Net Fundamentals}
+\label{sec:pn-fundamentals}
+
+\subsection{Classical Petri Nets}
+\label{subsec:classical-pn}
+
+\textbf{Petri nets}, introduced by Carl Adam Petri in 1962 \citep{Petri1962}, are a mathematical formalism for modeling concurrent systems. A \textbf{classical Petri net} is a 5-tuple:
+
+\begin{equation}
+PN = (P, T, F, W, M_0)
+\end{equation}
+
+Where:
+
+\begin{itemize}
+    \item $P$: Finite set of \textbf{places} (circles, represent conditions or resources)
+    \item $T$: Finite set of \textbf{transitions} (rectangles, represent events or actions)
+    \item $F \subseteq (P \times T) \cup (T \times P)$: \textbf{Flow relation} (arcs connecting places to transitions and vice versa)
+    \item $W: F \to \mathbb{N}^+$: \textbf{Weight function} (arc multiplicities, stoichiometric coefficients)
+    \item $M_0: P \to \mathbb{N}$: \textbf{Initial marking} (token distribution at time $t=0$)
+\end{itemize}
+
+\textbf{Graphical notation}:
+
+\begin{itemize}
+    \item \textbf{Places}: Circles containing tokens (black dots)
+    \item \textbf{Transitions}: Rectangles or bars
+    \item \textbf{Arcs}: Arrows with weights (omitted if weight = 1)
+\end{itemize}
+
+\textbf{Example} (Simple chemical reaction \ce{A + B -> C}):
+
+\begin{itemize}
+    \item Places: $P = \{A, B, C\}$
+    \item Transitions: $T = \{T_1\}$
+    \item Arcs: $F = \{(A,T_1), (B,T_1), (T_1,C)\}$
+    \item Weights: $W(A,T_1)=1$, $W(B,T_1)=1$, $W(T_1,C)=1$
+    \item Initial marking: $M_0(A)=2$, $M_0(B)=1$, $M_0(C)=0$
+\end{itemize}
+
+\subsection{Petri Net Semantics}
+\label{subsec:pn-semantics}
+
+\textbf{Enabling}: Transition $t$ is \textbf{enabled} at marking $M$ if:
+
+\begin{equation}
+\forall p \in \bullet t: M(p) \geq W(p,t)
+\end{equation}
+
+Where $\bullet t$ denotes the \textbf{preset} (input places) of $t$.
+
+\textbf{Firing}: When enabled transition $t$ fires:
+
+\begin{enumerate}
+    \item \textbf{Consume tokens} from input places: $M'(p) = M(p) - W(p,t)$ for all $p \in \bullet t$
+    \item \textbf{Produce tokens} at output places: $M'(p) = M(p) + W(t,p)$ for all $p \in t\bullet$
+\end{enumerate}
+
+Where $t\bullet$ denotes the \textbf{postset} (output places) of $t$.
+
+\textbf{Example} (\ce{A + B -> C}):
+
+\begin{itemize}
+    \item \textbf{Before firing}: $M = \{A:2, B:1, C:0\}$
+    \item \textbf{$T_1$ enabled?} Yes ($M(A)=2 \geq 1$, $M(B)=1 \geq 1$)
+    \item \textbf{$T_1$ fires}: Consume 1 token from A, 1 from B, produce 1 at C
+    \item \textbf{After firing}: $M' = \{A:1, B:0, C:1\}$
+\end{itemize}
+
+\subsection{Petri Net Properties}
+\label{subsec:pn-properties}
+
+\textbf{Behavioral properties}:
+
+\begin{itemize}
+    \item \textbf{Reachability}: Can marking $M'$ be reached from $M_0$?
+    \item \textbf{Boundedness}: Is there a maximum token count per place?
+    \item \textbf{Liveness}: Can all transitions eventually fire?
+    \item \textbf{Deadlock-freedom}: Does the net avoid states where no transition is enabled?
+\end{itemize}
+
+\textbf{Structural properties} (independent of $M_0$):
+
+\begin{itemize}
+    \item \textbf{P-invariants} (place invariants): Token-conserving sets of places
+    \begin{itemize}
+        \item Linear combination: $y^T \cdot M = y^T \cdot M_0$ (constant sum)
+        \item Example: Enzyme conservation ($E_{\text{free}} + E_{\text{bound}} = \text{constant}$)
+    \end{itemize}
+    \item \textbf{T-invariants} (transition invariants): Firing sequences returning to same marking
+    \begin{itemize}
+        \item Example: Catalytic cycles (net effect = 0)
+    \end{itemize}
+\end{itemize}
+
+\textbf{Complexity}:
+
+\begin{itemize}
+    \item \textbf{Reachability}: EXPSPACE-complete (decidable but computationally hard)
+    \item \textbf{Boundedness}: EXPSPACE-complete
+    \item \textbf{Liveness}: EXPSPACE-complete
+\end{itemize}
+
+\subsection{Limitations for Biological Modeling}
+\label{subsec:pn-limitations}
+
+\textbf{Classical Petri nets have fundamental limitations}:
+
+\begin{enumerate}
+    \item \textbf{No regulatory arcs}: Cannot represent catalysis (enzyme unchanged) or inhibition (threshold blocking) without encoding in external code
+    \item \textbf{Homogeneous transitions}: All transitions fire instantaneously (no continuous kinetics) or all are timed (no stochastic bursts)
+    \item \textbf{Strong independence only}: Parallelism requires disjoint neighborhoods (no shared places)
+    \item \textbf{Token abstraction}: Tokens are abstract units (not molecules with formulas)
+    \item \textbf{No rate semantics}: Firing frequency is non-deterministic or requires external rate assignment
+\end{enumerate}
+
+\textbf{These gaps motivate extensions} for systems biology.
+
+\section{Petri Net Extensions}
+\label{sec:pn-extensions}
+
+\subsection{Colored Petri Nets (CPN)}
+\label{subsec:colored-pn}
+
+\citet{Jensen1981} introduced \textbf{colored Petri nets} where tokens have \textbf{data types} (colors):
+
+\begin{itemize}
+    \item Places hold \textbf{multisets of colored tokens} (e.g., \{glucose:5, fructose:2\})
+    \item Transitions have \textbf{guards} (boolean predicates) and \textbf{arc expressions} (token transformations)
+    \item Enables modeling complex data structures (proteins with phosphorylation states)
+\end{itemize}
+
+\textbf{Advantages}:
+
+\begin{itemize}
+    \item \textbf{Compactness}: One place can represent multiple species (different colors)
+    \item \textbf{Data manipulation}: Arc expressions compute token transformations
+\end{itemize}
+
+\textbf{Limitations for biology}:
+
+\begin{itemize}
+    \item \textbf{Complexity}: Guards and expressions are code (not visual arcs)
+    \item \textbf{Analysis difficulty}: Structural properties (P-invariants) are harder to compute
+    \item \textbf{No heterogeneous dynamics}: Still lacks native continuous/stochastic/burst transitions
+\end{itemize}
+
+\subsection{Timed Petri Nets}
+\label{subsec:timed-pn}
+
+\citet{Ramchandani1974} added \textbf{time delays} to transitions:
+
+\begin{itemize}
+    \item Transitions fire after a \textbf{deterministic delay} (e.g., 5 seconds)
+    \item Models sequential processes with known durations
+\end{itemize}
+
+\citet{Merlin1974} introduced \textbf{time intervals}:
+
+\begin{itemize}
+    \item Transitions fire within a time window $[t_{\min}, t_{\max}]$
+    \item Non-deterministic timing
+\end{itemize}
+
+\textbf{Limitations}:
+
+\begin{itemize}
+    \item \textbf{Still discrete}: No continuous state evolution (ODEs)
+    \item \textbf{Homogeneous}: All transitions timed (cannot mix with stochastic)
+\end{itemize}
+
+\subsection{Stochastic Petri Nets (SPN)}
+\label{subsec:stochastic-pn}
+
+\citet{Molloy1981} introduced \textbf{stochastic Petri nets}:
+
+\begin{itemize}
+    \item Transitions fire after \textbf{exponentially distributed delays} (rate $\lambda$)
+    \item Equivalent to continuous-time Markov chains (CTMC)
+    \item Enables performance analysis (throughput, mean response time)
+\end{itemize}
+
+\textbf{Generalized Stochastic Petri Nets (GSPN)} \citep{Ajmone1984}:
+
+\begin{itemize}
+    \item \textbf{Immediate transitions} (fire instantly, priority 0)
+    \item \textbf{Timed transitions} (exponential delays)
+\end{itemize}
+
+\textbf{Applications to biology}:
+
+\begin{itemize}
+    \item \textbf{Gene expression}: Transcription/translation as stochastic events
+    \item \textbf{Molecular interactions}: Binding/unbinding with rate constants
+\end{itemize}
+
+\textbf{Limitations}:
+
+\begin{itemize}
+    \item \textbf{Exponential assumption}: Not all biological processes are memoryless
+    \item \textbf{State space explosion}: Large models ($>100$ places) are intractable
+    \item \textbf{No continuous kinetics}: Cannot model enzyme saturation (Michaelis-Menten)
+\end{itemize}
+
+\subsection{Hybrid Petri Nets}
+\label{subsec:hybrid-pn}
+
+\citet{David1992} introduced \textbf{continuous and hybrid Petri nets}:
+
+\begin{itemize}
+    \item \textbf{Continuous places}: Hold real-valued token counts (not integers)
+    \item \textbf{Continuous transitions}: Fire continuously with rate $dM/dt = v(M)$
+    \item \textbf{Hybrid nets}: Mix discrete and continuous places/transitions
+\end{itemize}
+
+\textbf{Semantics}:
+
+\begin{equation}
+\frac{dM(p)}{dt} = \sum_{t} v_t \cdot W(t,p) - \sum_{t} v_t \cdot W(p,t)
+\end{equation}
+
+where rate function $v_t$ depends on marking (e.g., mass action: $v = k \cdot M(\text{substrate})$).
+
+\textbf{Advantages for biology}:
+
+\begin{itemize}
+    \item \textbf{Enzyme kinetics}: Continuous transitions model Michaelis-Menten rates
+    \item \textbf{Multi-scale}: Proteins (discrete) + metabolites (continuous) in one model
+\end{itemize}
+
+\textbf{Limitations}:
+
+\begin{itemize}
+    \item \textbf{No weak independence theory}: Parallel execution with shared places undefined
+    \item \textbf{Limited arc types}: No explicit test/inhibitor arc semantics
+    \item \textbf{No biochemical formulas}: Tokens are still abstract (no elemental composition)
+\end{itemize}
+
+\subsection{Comparison Summary}
+\label{subsec:pn-comparison}
+
+Table~\ref{tab:pn-extensions} summarizes key features of Petri net extensions.
+
+\begin{table}[htbp]
+\centering
+\caption{Comparison of Petri net extensions for biological modeling.}
+\label{tab:pn-extensions}
+\begin{tabular}{lccccc}
+\toprule
+\textbf{Feature} & \textbf{Classical} & \textbf{Colored} & \textbf{Timed} & \textbf{Stochastic} & \textbf{Hybrid} \\
+\midrule
+Token types & Abstract & Data types & Abstract & Abstract & Real-valued \\
+Dynamics & Discrete & Discrete & Timed & Stochastic & Continuous + Discrete \\
+Regulation & No & Guards (code) & No & No & Rate functions \\
+Parallelism & Strong indep. & Strong indep. & Strong indep. & Strong indep. & Undefined \\
+Biological fit & Low & Medium & Medium & Medium & High \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Gap}: No existing extension provides \textbf{weak independence}, \textbf{arc-level regulation}, \textbf{biochemical formulas}, and \textbf{heterogeneous transition coexistence}.
+
+\section{Biological Petri Nets (Bio-PN)}
+\label{sec:bio-pn}
+
+\subsection{Early Work (1990s)}
+\label{subsec:early-bio-pn}
+
+\textbf{\citet{Reddy1993}}: ``Petri Net Representations in Metabolic Pathways''
+
+\begin{itemize}
+    \item First formal application of Petri nets to biochemistry
+    \item Modeled glycolysis (10 reactions) as classical Petri net
+    \item \textbf{Contribution}: Showed Petri nets can represent metabolic stoichiometry
+    \item \textbf{Limitation}: No kinetics (only qualitative), no regulation
+\end{itemize}
+
+\textbf{\citet{Hofestaedt1994}}: ``A Petri Net Application to Model Metabolic Processes''
+
+\begin{itemize}
+    \item Extended Reddy's work with enzyme catalysis
+    \item Used \textbf{colored tokens} to distinguish substrates/products
+    \item \textbf{Limitation}: Still no quantitative kinetics
+\end{itemize}
+
+\subsection{Qualitative Bio-PNs (2000s)}
+\label{subsec:qualitative-bio-pn}
+
+\textbf{\citet{Heiner2008}}: ``Petri Nets for Systems and Synthetic Biology''
+
+\begin{itemize}
+    \item Developed \textbf{qualitative Bio-PNs} for signaling networks
+    \item Encoded regulatory logic (activation, inhibition) as arc types
+    \item \textbf{Tool}: Snoopy software (still actively maintained)
+    \item \textbf{Contribution}: Standardized notation for biological arcs
+    \item \textbf{Limitation}: Qualitative only (no kinetic parameters)
+\end{itemize}
+
+\textbf{\citet{Koch2011}}: ``Modeling Threshold Effects in Biological Systems''
+
+\begin{itemize}
+    \item Introduced \textbf{read arcs} (test arcs) and \textbf{inhibitor arcs}
+    \item Threshold values for inhibition (e.g., $M(p) < 5$ blocks transition)
+    \item \textbf{Limitation}: Thresholds are constants (not Hill equations), no heterogeneous transitions
+\end{itemize}
+
+\subsection{Quantitative Bio-PNs}
+\label{subsec:quantitative-bio-pn}
+
+\textbf{\citet{Matsuno2003}}: ``Hybrid Petri Net Representation of Gene Regulatory Networks''
+
+\begin{itemize}
+    \item Hybrid Petri nets for gene regulation
+    \item Continuous places (protein concentrations) + discrete places (gene states)
+    \item \textbf{Tool}: Cell Illustrator (commercial)
+    \item \textbf{Contribution}: First hybrid Bio-PN with kinetics
+    \item \textbf{Limitation}: Proprietary formalism, no weak independence theory
+\end{itemize}
+
+\textbf{\citet{Gilbert2006}}: ``From Petri Nets to Differential Equations''
+
+\begin{itemize}
+    \item Automatic translation of continuous Petri nets to ODE systems
+    \item Mass action kinetics assumed
+    \item \textbf{Contribution}: Formalized PN$\to$ODE mapping
+    \item \textbf{Limitation}: Only mass action (no Michaelis-Menten, Hill), no stochastic bursts
+\end{itemize}
+
+\subsection{Recent Developments (2010s-2020s)}
+\label{subsec:recent-bio-pn}
+
+\textbf{\citet{Blaetke2015}}: ``BioModel Engineering with Petri Nets''
+
+\begin{itemize}
+    \item Comprehensive survey of Bio-PN tools and applications
+    \item Case studies: Signaling (MAPK), metabolism (TCA), gene circuits
+    \item \textbf{Contribution}: Unified terminology, best practices
+    \item \textbf{Gap identified}: ``No tool integrates metabolic kinetics with gene regulation''
+\end{itemize}
+
+\textbf{\citet{Liu2013}}: ``Multiscale Modeling with Hybrid Petri Nets''
+
+\begin{itemize}
+    \item Proposed framework for enzyme-catalyzed reactions + gene expression
+    \item \textbf{Limitation}: Still requires two separate models (metabolism PN + regulation PN)
+\end{itemize}
+
+\textbf{\citet{Marwan2011}}: ``Petri Nets in Snoopy: A Unifying Framework''
+
+\begin{itemize}
+    \item Extended Snoopy with stochastic and hybrid PNs
+    \item \textbf{Contribution}: Tool supporting multiple PN classes
+    \item \textbf{Limitation}: No biochemical formula tracking, no weak independence analysis
+\end{itemize}
+
+\subsection{Gap Analysis}
+\label{subsec:bio-pn-gap}
+
+\textbf{What existing Bio-PNs provide}:
+
+\begin{itemize}
+    \item[$\checkmark$] Stoichiometric modeling (metabolic pathways)
+    \item[$\checkmark$] Qualitative regulation (activation/inhibition arcs)
+    \item[$\checkmark$] Hybrid dynamics (continuous + discrete)
+    \item[$\checkmark$] Stochastic simulation (Gillespie algorithm)
+\end{itemize}
+
+\textbf{What is missing} (addressed by this thesis):
+
+\begin{itemize}
+    \item[$\times$] \textbf{Weak independence theory}: Parallel execution with shared catalysts/outputs
+    \item[$\times$] \textbf{Heterogeneous coexistence}: Continuous + stochastic + timed + burst in single model
+    \item[$\times$] \textbf{Arc-level regulatory semantics}: Hill equations on inhibitor arcs (not just constants)
+    \item[$\times$] \textbf{Biochemical formula tracking}: Elemental composition, atomic conservation
+    \item[$\times$] \textbf{Integrated metabolic-genetic models}: Single formalism spanning both layers
+\end{itemize}
+
+\section{Multi-Scale Biological Modeling}
+\label{sec:multiscale-modeling}
+
+\subsection{Genome-Scale Metabolic Models (GSMM)}
+\label{subsec:gsmm}
+
+\textbf{Flux Balance Analysis (FBA)} \citep{Varma1994}:
+
+\begin{itemize}
+    \item Models metabolism as \textbf{stoichiometric matrix} $S$ (metabolites $\times$ reactions)
+    \item \textbf{Steady-state assumption}: $S \cdot v = 0$ (no accumulation)
+    \item \textbf{Optimization}: Maximize biomass flux subject to constraints
+    \item \textbf{Databases}: BiGG Models (7000+ curated GSMMs for bacteria, yeast, human)
+\end{itemize}
+
+\textbf{Advantages}:
+
+\begin{itemize}
+    \item \textbf{Scalability}: Models 1000+ reactions (entire metabolism)
+    \item \textbf{Predictive power}: Predicts growth rates, gene essentiality
+\end{itemize}
+
+\textbf{Limitations}:
+
+\begin{itemize}
+    \item \textbf{No regulation}: Enzyme expression levels ignored (assumes all enzymes present)
+    \item \textbf{No kinetics}: Flux directions but not rates (no time dynamics)
+    \item \textbf{Steady-state only}: Cannot model transient responses
+\end{itemize}
+
+\subsection{Gene Regulatory Networks (GRN)}
+\label{subsec:grn}
+
+\textbf{Boolean networks} \citep{Kauffman1969}:
+
+\begin{itemize}
+    \item Genes are binary (on/off)
+    \item Update rules: $\text{Gene}_i(t+1) = f(\text{Gene}_j(t), \text{Gene}_k(t), \ldots)$
+    \item \textbf{Applications}: Cell differentiation, synthetic circuits
+\end{itemize}
+
+\textbf{Limitations}:
+
+\begin{itemize}
+    \item \textbf{No concentrations}: Cannot represent ``high vs. low ATP''
+    \item \textbf{Discrete time}: Cannot model continuous dynamics
+    \item \textbf{No metabolism}: Genes regulate each other, but metabolites absent
+\end{itemize}
+
+\textbf{Differential equation models}:
+
+\begin{itemize}
+    \item Genes/proteins as continuous variables
+    \item Example: $\frac{d[X]}{dt} = k_{\text{synth}} - k_{\text{deg}} \cdot [X]$
+    \item \textbf{Advantages}: Quantitative, captures kinetics
+\end{itemize}
+
+\textbf{Limitations}:
+
+\begin{itemize}
+    \item \textbf{Not compositional}: Adding genes requires rewriting equations
+    \item \textbf{No visual topology}: Regulatory structure hidden in code
+    \item \textbf{Separate from metabolism}: Metabolites not integrated
+\end{itemize}
+
+\subsection{Integrated Approaches}
+\label{subsec:integrated-approaches}
+
+\textbf{E-Cell} \citep{Tomita1999}:
+
+\begin{itemize}
+    \item Software platform simulating whole-cell models
+    \item Combines multiple formalisms (ODEs, Gillespie, rule-based)
+    \item \textbf{Contribution}: Demonstrated feasibility of multi-scale simulation
+    \item \textbf{Limitation}: Not a formal modeling language (software tool, not formalism)
+\end{itemize}
+
+\textbf{Virtual Cell} \citep{Schaff1997}:
+
+\begin{itemize}
+    \item Spatial models with reaction-diffusion PDEs
+    \item Compartments (cytoplasm, nucleus, membrane)
+    \item \textbf{Contribution}: Spatial resolution
+    \item \textbf{Limitation}: Computationally expensive, no formal analysis (P-invariants)
+\end{itemize}
+
+\textbf{Rule-based modeling} (BioNetGen, Kappa):
+
+\begin{itemize}
+    \item Molecular interactions as rewrite rules
+    \item Compactly represents protein complexes with many states
+    \item \textbf{Contribution}: Handles combinatorial complexity (phosphorylation sites)
+    \item \textbf{Limitation}: Not Petri nets (different formalism), no elemental balance
+\end{itemize}
+
+\subsection{Why Current Approaches Fall Short}
+\label{subsec:multiscale-shortcomings}
+
+\textbf{Fundamental issue}: Existing multi-scale approaches either:
+
+\begin{enumerate}
+    \item \textbf{Separate models}: Build metabolism model + regulation model, integrate ad-hoc (no formal semantics)
+    \item \textbf{Software-specific}: Tools provide integration (E-Cell, Virtual Cell) but no underlying formalism
+    \item \textbf{Limited scope}: Focus on one layer (GSMM for metabolism, GRN for regulation)
+\end{enumerate}
+
+\textbf{This thesis provides}: A \textbf{formal Petri net extension} enabling integrated modeling with well-defined semantics, analyzability, and visual topology.
+
+\section{Systems Biology Standards and Databases}
+\label{sec:standards-databases}
+
+\subsection{SBML (Systems Biology Markup Language)}
+\label{subsec:sbml}
+
+\textbf{\citet{Hucka2003}}: XML format for biochemical models
+
+\begin{itemize}
+    \item \textbf{Core}: Species, reactions, compartments, parameters
+    \item \textbf{Extensions}: SBML-qual (qualitative GRNs), SBML-comp (model composition)
+    \item \textbf{Support}: 300+ tools read/write SBML
+\end{itemize}
+
+\textbf{Advantages}:
+
+\begin{itemize}
+    \item \textbf{Interoperability}: Exchange models between tools
+    \item \textbf{Standardization}: Widely adopted ($>10,000$ models)
+\end{itemize}
+
+\textbf{Limitations}:
+
+\begin{itemize}
+    \item \textbf{Not a formalism}: SBML is a data format, not a modeling language
+    \item \textbf{Separate qualitative/quantitative}: SBML (kinetics) vs. SBML-qual (Boolean logic) are disconnected
+    \item \textbf{No formal semantics}: Tool-dependent interpretation
+\end{itemize}
+
+\subsection{KEGG (Kyoto Encyclopedia of Genes and Genomes)}
+\label{subsec:kegg}
+
+\textbf{\citet{Kanehisa2000}}: Database of biological pathways
+
+\begin{itemize}
+    \item \textbf{KEGG COMPOUND}: 18,000+ metabolites (formulas, structures)
+    \item \textbf{KEGG REACTION}: 11,000+ reactions (stoichiometry, EC numbers)
+    \item \textbf{KEGG PATHWAY}: 500+ reference pathways (glycolysis, TCA, etc.)
+    \item \textbf{REST API}: Programmatic access (Chapter~\ref{ch:kegg} uses this)
+\end{itemize}
+
+\textbf{Usage in modeling}:
+
+\begin{itemize}
+    \item Import pathways (reaction stoichiometry)
+    \item Fetch compound formulas (\ce{C6H12O6} for glucose)
+    \item Link to enzymes (EC numbers)
+\end{itemize}
+
+\textbf{Limitations}:
+
+\begin{itemize}
+    \item \textbf{Incomplete stoichiometry}: Often omits cofactors (\ce{H2O}, \ce{H+})
+    \item \textbf{No kinetics}: Reaction topology only, no rate constants
+\end{itemize}
+
+\subsection{BRENDA (Enzyme Database)}
+\label{subsec:brenda}
+
+\textbf{\citet{Schomburg2004}}: Comprehensive enzyme kinetics
+
+\begin{itemize}
+    \item \textbf{2.7 million} parameter entries ($K_m$, $k_{cat}$, $K_i$, pH optima)
+    \item \textbf{83,000+ enzymes} classified by EC number
+    \item \textbf{Organism-specific}: Data from bacteria, yeast, human, etc.
+    \item \textbf{SOAP API}: Programmatic access (Chapter~\ref{ch:brenda} uses this)
+\end{itemize}
+
+\textbf{Applications}:
+
+\begin{itemize}
+    \item Parameter inference for models ($K_m$ for glucose $\approx 0.1$ mM)
+    \item Organism-specific parameterization (yeast vs. human kinetics)
+\end{itemize}
+
+\textbf{Challenges}:
+
+\begin{itemize}
+    \item \textbf{High variance}: Same enzyme, different labs $\to$ 10$\times$ differences
+    \item \textbf{Incomplete coverage}: Not all enzymes have kinetic data
+\end{itemize}
+
+\subsection{Other Databases}
+\label{subsec:other-databases}
+
+\textbf{ChEBI} (Chemical Entities of Biological Interest):
+
+\begin{itemize}
+    \item Molecular structures, formulas, synonyms
+    \item More detailed than KEGG (includes protonation states)
+\end{itemize}
+
+\textbf{SABIO-RK} (Reaction Kinetics Database):
+
+\begin{itemize}
+    \item Curated kinetic laws (full rate equations, not just $K_m$)
+    \item Smaller than BRENDA (50,000 entries) but higher quality
+\end{itemize}
+
+\textbf{BiGG Models}:
+
+\begin{itemize}
+    \item Genome-scale metabolic reconstructions
+    \item Flux constraints, gene-protein-reaction associations
+\end{itemize}
+
+\textbf{Integration in this thesis}:
+
+\begin{itemize}
+    \item \textbf{KEGG}: Formula retrieval (Chapter~\ref{ch:kegg})
+    \item \textbf{BRENDA}: Parameter inference (Chapter~\ref{ch:brenda})
+    \item \textbf{ChEBI}: Fallback for formulas (future work)
+\end{itemize}
+
+\section{Related Tools}
+\label{sec:related-tools}
+
+\subsection{Snoopy (Brandenburg University of Technology)}
+\label{subsec:snoopy}
+
+\textbf{\citet{Heiner2012}}: ``Snoopy - A Unifying Petri Net Tool''
+
+\textbf{Supports}: Classical, timed, stochastic, hybrid Petri nets
+
+\textbf{Features}:
+
+\begin{itemize}
+    \item Graphical editor (drag-and-drop)
+    \item Simulation (ODE, Gillespie, hybrid)
+    \item Model checking (CTL properties)
+    \item SBML import/export
+\end{itemize}
+
+\textbf{Biological focus}: Signaling networks, metabolic pathways
+
+\textbf{Strengths}:
+
+\begin{itemize}
+    \item Open-source, actively maintained
+    \item Excellent visualization
+    \item Structural analysis (P-invariants, reachability graph)
+\end{itemize}
+
+\textbf{Limitations}:
+
+\begin{itemize}
+    \item \textbf{No weak independence analysis}: Parallelism not exploited
+    \item \textbf{No biochemical formulas}: Tokens are abstract
+    \item \textbf{Limited regulation}: Inhibitor arcs have constant thresholds (no Hill equations)
+    \item \textbf{Separate models for metabolism/regulation}: No unified formalism
+\end{itemize}
+
+\subsection{Cell Illustrator (University of Tokyo)}
+\label{subsec:cell-illustrator}
+
+\textbf{\citet{Nagasaki2010}}: Hybrid Petri net tool
+
+\begin{itemize}
+    \item \textbf{Hybrid dynamics}: Continuous + discrete + stochastic
+    \item \textbf{Biological templates}: Gene expression, signaling cascades
+    \item \textbf{3D visualization}: Network layout algorithms
+\end{itemize}
+
+\textbf{Strengths}:
+
+\begin{itemize}
+    \item Powerful hybrid simulation
+    \item Large library of biological models
+\end{itemize}
+
+\textbf{Limitations}:
+
+\begin{itemize}
+    \item \textbf{Proprietary}: Commercial license required (not open-source)
+    \item \textbf{Custom formalism}: Not standard Petri nets (tool-specific notation)
+    \item \textbf{No KEGG/BRENDA integration}: Manual parameter entry
+\end{itemize}
+
+\subsection{COPASI (Complex Pathway Simulator)}
+\label{subsec:copasi}
+
+\textbf{\citet{Hoops2006}}: Biochemical system simulator
+
+\begin{itemize}
+    \item \textbf{ODE simulation}: Deterministic, stochastic (Gillespie), hybrid
+    \item \textbf{Parameter estimation}: Fit models to experimental data
+    \item \textbf{Optimization}: Metabolic flux optimization
+    \item \textbf{SBML support}: Import/export
+\end{itemize}
+
+\textbf{Strengths}:
+
+\begin{itemize}
+    \item Widely used (5000+ citations)
+    \item Parameter fitting (least-squares, genetic algorithms)
+    \item Sensitivity analysis
+\end{itemize}
+
+\textbf{Limitations}:
+
+\begin{itemize}
+    \item \textbf{Not Petri nets}: Reaction network formalism (different from PNs)
+    \item \textbf{No regulation arcs}: Inhibition encoded in rate laws (not topology)
+    \item \textbf{Single-scale}: Metabolism-focused (gene regulation requires separate SBML-qual model)
+\end{itemize}
+
+\subsection{CellDesigner (Systems Biology Institute)}
+\label{subsec:celldesigner}
+
+\textbf{\citet{Funahashi2003}}: Visual SBML editor
+
+\begin{itemize}
+    \item \textbf{Graphical notation}: Process diagrams (SBGN standard)
+    \item \textbf{SBML generation}: Automatically creates SBML from diagrams
+    \item \textbf{Simulation}: Integrates with COPASI, CellML
+\end{itemize}
+
+\textbf{Strengths}:
+
+\begin{itemize}
+    \item User-friendly visual editor
+    \item SBML standardization
+\end{itemize}
+
+\textbf{Limitations}:
+
+\begin{itemize}
+    \item \textbf{Not Petri nets}: Process diagrams (different semantics)
+    \item \textbf{No formal analysis}: Cannot compute P-invariants, reachability
+    \item \textbf{Separate regulation}: Metabolic and regulatory diagrams disconnected
+\end{itemize}
+
+\subsection{Charlie (Model Checker)}
+\label{subsec:charlie}
+
+\textbf{\citet{Heiner2015}}: Verification tool for Petri nets
+
+\begin{itemize}
+    \item \textbf{Model checking}: CTL, LTL temporal logic properties
+    \item \textbf{Symbolic methods}: BDDs for state space exploration
+    \item \textbf{Biological properties}: Verifies liveness, boundedness, reachability
+\end{itemize}
+
+\textbf{Strengths}:
+
+\begin{itemize}
+    \item Formal verification (prove properties hold)
+    \item Handles large state spaces (symbolic encoding)
+\end{itemize}
+
+\textbf{Limitations}:
+
+\begin{itemize}
+    \item \textbf{Verification only}: Not a modeling tool (requires Snoopy for model creation)
+    \item \textbf{No kinetics}: Qualitative properties only (not quantitative simulation)
+\end{itemize}
+
+\subsection{Comparison Summary}
+\label{subsec:tools-comparison}
+
+Table~\ref{tab:tools-comparison} compares related tools with SHYpn (this thesis).
+
+\begin{table}[htbp]
+\centering
+\caption{Comparison of biological modeling tools.}
+\label{tab:tools-comparison}
+\small
+\begin{tabular}{lcccccc}
+\toprule
+\textbf{Tool} & \textbf{Type} & \textbf{Hybrid} & \textbf{Regulation} & \textbf{KEGG/} & \textbf{Weak} & \textbf{Formula} \\
+ &  &  &  & \textbf{BRENDA} & \textbf{Indep.} & \textbf{Track.} \\
+\midrule
+Snoopy & Petri net & Yes & Limited & No & No & No \\
+Cell Ill. & Hybrid PN & Yes & Yes & No & No & No \\
+COPASI & ODE/Gill. & Yes & Rate laws & No & N/A & No \\
+CellDesigner & SBML ed. & Via tools & Proc. diag. & No & N/A & No \\
+Charlie & Model check & Yes & Yes & No & No & No \\
+\midrule
+\textbf{SHYpn} & Ext. Bio-PN & Yes & Arc-level & Yes & Yes & Yes \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Key differentiator}: SHYpn is the \textbf{first tool} providing:
+
+\begin{enumerate}
+    \item Weak independence-based parallelism
+    \item Arc-level regulation (Hill equations on inhibitor arcs)
+    \item Biochemical formula tracking (elemental balance)
+    \item Automated KEGG/BRENDA integration
+\end{enumerate}
+
+\section{Theoretical Foundations}
+\label{sec:theoretical-foundations}
+
+\subsection{Concurrency Theory}
+\label{subsec:concurrency-theory}
+
+\textbf{Independence of transitions} (classical definition):
+
+Transitions $t_1, t_2$ are \textbf{independent} if:
+
+\begin{equation}
+(\bullet t_1 \cup t_1\bullet) \cap (\bullet t_2 \cup t_2\bullet) = \emptyset
+\end{equation}
+
+(No shared places in neighborhoods)
+
+\textbf{Consequence}: Can fire \textbf{concurrently} without conflict
+
+\textbf{Diamond property} \citep{Mazurkiewicz1987}:
+
+If $t_1, t_2$ are independent and both enabled at $M$:
+
+\begin{align}
+M &\xrightarrow{t_1} M_1 \xrightarrow{t_2} M_{12} \\
+M &\xrightarrow{t_2} M_2 \xrightarrow{t_1} M_{12}
+\end{align}
+
+(Same final state $M_{12}$ regardless of order)
+
+\textbf{Limitation for biology}:
+
+\begin{itemize}
+    \item Enzymes catalyze multiple reactions (shared place) $\to$ Not independent by classical definition
+    \item But \textbf{biologically}, these reactions don't conflict (enzyme is preserved)
+\end{itemize}
+
+\textbf{This thesis contribution}: Weak independence relaxes the condition to allow shared test arcs and outputs while preserving diamond property.
+
+\subsection{Process Calculi}
+\label{subsec:process-calculi}
+
+\textbf{CCS} (Calculus of Communicating Systems) \citep{Milner1980}:
+
+\begin{itemize}
+    \item Algebraic formalism for concurrent processes
+    \item Composition operator ($P | Q$) runs $P$, $Q$ in parallel
+\end{itemize}
+
+\textbf{$\pi$-calculus} \citep{Milner1992}:
+
+\begin{itemize}
+    \item Extends CCS with mobile processes (channels can be passed)
+\end{itemize}
+
+\textbf{Stochastic $\pi$-calculus} \citep{Priami1995}:
+
+\begin{itemize}
+    \item Adds stochastic rates to reactions
+    \item Used in computational biology (BioAmbients, Beta-binders)
+\end{itemize}
+
+\textbf{Relation to Petri nets}:
+
+\begin{itemize}
+    \item Process calculi and Petri nets are \textbf{equivalent in expressiveness} (both Turing-complete)
+    \item Petri nets are \textbf{graphical} (visual topology), process calculi are \textbf{textual} (algebraic)
+    \item Choice: Petri nets preferred in systems biology for \textbf{visual reasoning}
+\end{itemize}
+
+\subsection{Chemical Reaction Network Theory}
+\label{subsec:crn-theory}
+
+\textbf{\citet{Feinberg1987}}: Deficiency theory
+
+\begin{itemize}
+    \item Analyzes steady states of reaction networks
+    \item \textbf{Deficiency zero theorem}: Networks with deficiency $\delta=0$ have unique positive steady state
+\end{itemize}
+
+\textbf{Relationship to Petri nets}:
+
+\begin{itemize}
+    \item Reaction networks are \textbf{continuous Petri nets} with mass action kinetics
+    \item Stoichiometric matrix $S$ corresponds to PN incidence matrix
+\end{itemize}
+
+\textbf{Limitation}:
+
+\begin{itemize}
+    \item Mass action only (no Michaelis-Menten, Hill)
+    \item No gene regulation (reactions among metabolites only)
+\end{itemize}
+
+\subsection{Stochastic Simulation}
+\label{subsec:stochastic-simulation}
+
+\textbf{\citet{Gillespie1977}}: Stochastic Simulation Algorithm (SSA)
+
+\begin{itemize}
+    \item \textbf{Exact algorithm} for simulating chemical master equation (CME)
+    \item Two random numbers per step:
+    \begin{enumerate}
+        \item When does next reaction occur? ($\tau \sim$ Exponential)
+        \item Which reaction fires? (Weighted choice by propensity)
+    \end{enumerate}
+\end{itemize}
+
+\textbf{$\tau$-leaping} \citep{Gillespie2001}:
+
+\begin{itemize}
+    \item Approximate method: Fire multiple reactions per step
+    \item Faster but loses exactness
+\end{itemize}
+
+\textbf{Hybrid methods} \citep{Haseltine2002}:
+
+\begin{itemize}
+    \item Fast reactions: Continuous (ODE)
+    \item Slow reactions: Stochastic (Gillespie)
+    \item \textbf{Challenge}: Partitioning (which reactions are fast?)
+\end{itemize}
+
+\textbf{This thesis contribution}: Hybrid scheduler coordinates ODE + Gillespie + Timed + Burst engines without manual partitioning (user specifies transition type explicitly).
+
+\section{Gap Summary}
+\label{sec:gap-summary}
+
+\textbf{Existing work provides}:
+
+\begin{itemize}
+    \item[$\checkmark$] Petri net theory (classical, timed, stochastic, hybrid)
+    \item[$\checkmark$] Biological applications (metabolic pathways, signaling networks)
+    \item[$\checkmark$] Tools (Snoopy, COPASI, CellDesigner)
+    \item[$\checkmark$] Databases (KEGG, BRENDA, SBML)
+    \item[$\checkmark$] Simulation algorithms (ODE, Gillespie, hybrid)
+\end{itemize}
+
+\textbf{What is missing} (this thesis addresses):
+
+\begin{enumerate}
+    \item \textbf{Weak independence theory}: Formal framework for parallel execution with shared catalysts/outputs
+    \item \textbf{Heterogeneous transition coexistence}: Continuous + stochastic + timed + burst in single model with unified semantics
+    \item \textbf{Arc-level regulatory semantics}: Hill equations, threshold formulas on arcs (not external code)
+    \item \textbf{Biochemical formula tracking}: Elemental composition, atomic conservation verification
+    \item \textbf{Integrated metabolic-genetic formalism}: Single framework spanning biochemistry and gene regulation
+    \item \textbf{Tool integration}: Automated KEGG (formulas) + BRENDA (parameters) enrichment
+\end{enumerate}
+
+\textbf{Positioning}: This thesis is the \textbf{first} to provide all six capabilities in a unified Petri net formalism.
+
+\section{Summary}
+\label{sec:ch2-summary}
+
+\textbf{This chapter surveyed foundational concepts and related work}:
+
+\begin{itemize}
+    \item \textbf{Section~\ref{sec:pn-fundamentals}}: Classical Petri nets (5-tuple, enabling, firing, properties)
+    \item \textbf{Section~\ref{sec:pn-extensions}}: Extensions (colored, timed, stochastic, hybrid)
+    \item \textbf{Section~\ref{sec:bio-pn}}: Biological Petri nets (Reddy 1993 $\to$ present, Snoopy tool)
+    \item \textbf{Section~\ref{sec:multiscale-modeling}}: Multi-scale modeling (GSMM, GRN, E-Cell, Virtual Cell)
+    \item \textbf{Section~\ref{sec:standards-databases}}: Standards and databases (SBML, KEGG, BRENDA)
+    \item \textbf{Section~\ref{sec:related-tools}}: Tools comparison (Snoopy, COPASI, CellDesigner, Charlie)
+    \item \textbf{Section~\ref{sec:theoretical-foundations}}: Theoretical foundations (concurrency, process calculi, Gillespie)
+    \item \textbf{Section~\ref{sec:gap-summary}}: Gap analysis (what is missing)
+\end{itemize}
+
+\textbf{Key findings}:
+
+\begin{itemize}
+    \item Petri nets are \textbf{well-suited} for biological modeling (visual, compositional, analyzable)
+    \item Existing Bio-PNs model \textbf{metabolism or regulation, not both} in integrated way
+    \item \textbf{No formalism} provides weak independence, arc-level regulation, and formula tracking together
+    \item \textbf{Tools} (Snoopy, COPASI) are powerful but lack these features
+\end{itemize}
+
+\textbf{Next chapter} (Chapter~\ref{ch:integration-challenge}) presents the \textbf{integration challenge} in depth, deriving formal requirements from the lac operon system.
+
+\textbf{Transition}: Background established $\to$ Now define the problem precisely.
