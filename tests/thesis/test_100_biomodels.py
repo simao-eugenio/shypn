@@ -212,7 +212,7 @@ class BioModels100TestSuite:
         # Initialize components
         self.parser = SBMLParser()
         self.converter = PathwayConverter()
-        self.postprocessor = PathwayPostProcessor(spacing=150.0, scale_factor=10.0)
+        self.postprocessor = PathwayPostProcessor(scale_factor=10.0)
         
     def test_single_model(self, model_id: str, model_name: str, complexity: str) -> ModelTestResult:
         """Test import of a single SBML model.
@@ -317,17 +317,34 @@ class BioModels100TestSuite:
                 if hasattr(reaction, 'reversible') and reaction.reversible:
                     result.has_reversible_reactions = True
             
-            # Step 3: Convert to Petri net
-            print(f"Step 3: Converting to Petri net...")
+            # Step 3: Post-process pathway data
+            print(f"Step 3: Post-processing pathway data...")
             
             try:
-                petri_net_data = self.converter.convert(pathway_data)
+                processed_data = self.postprocessor.process(pathway_data)
+                print(f"  ✓ Post-processed successfully")
                 
-                result.places_created = len(petri_net_data.places)
-                result.transitions_created = len(petri_net_data.transitions)
+            except Exception as e:
+                result.errors.append(f"Post-processing failed: {e}")
+                print(f"  ✗ Post-processing failed: {e}")
+                return result
+            
+            # Step 4: Convert to Petri net
+            print(f"Step 4: Converting to Petri net...")
+            
+            try:
+                document_model = self.converter.convert(processed_data)
+                
+                # Extract objects from document model
+                places = document_model.places
+                transitions = document_model.transitions
+                arcs = document_model.arcs
+                
+                result.places_created = len(places)
+                result.transitions_created = len(transitions)
                 
                 # Count arc types
-                for arc in petri_net_data.arcs:
+                for arc in arcs:
                     if hasattr(arc, 'arc_type'):
                         if arc.arc_type == 'test':
                             result.test_arcs_created += 1
@@ -349,10 +366,10 @@ class BioModels100TestSuite:
                 print(f"  ✗ Conversion failed: {e}")
                 return result
             
-            # Step 4: Analyze kinetics
-            print(f"Step 4: Analyzing kinetic parameters...")
+            # Step 5: Analyze kinetics
+            print(f"Step 5: Analyzing kinetic parameters...")
             
-            for transition in petri_net_data.transitions:
+            for transition in transitions:
                 if hasattr(transition, 'transition_type'):
                     if transition.transition_type == 'continuous':
                         result.continuous_transitions += 1
@@ -367,28 +384,19 @@ class BioModels100TestSuite:
             print(f"  Stochastic transitions: {result.stochastic_transitions}")
             print(f"  Kinetic laws parsed: {result.kinetic_laws_parsed}")
             
-            # Step 5: Generate layout
-            print(f"Step 5: Generating layout...")
-            layout_start = time.time()
+            # Step 6: Check layout
+            print(f"Step 6: Checking layout...")
             
-            try:
-                processed_data = self.postprocessor.process(petri_net_data)
-                result.layout_time = time.time() - layout_start
-                result.layout_generated = True
-                result.positions_assigned = len(processed_data.positions) if hasattr(processed_data, 'positions') else 0
-                
-                print(f"  ✓ Layout generated in {result.layout_time:.2f}s")
-                print(f"  ✓ Positions assigned: {result.positions_assigned}")
-                
-            except Exception as e:
-                result.layout_time = time.time() - layout_start
-                result.warnings.append(f"Layout generation failed: {e}")
-                print(f"  ⚠ Layout failed: {e}")
+            # Check if positions were assigned during post-processing
+            result.positions_assigned = len(processed_data.positions) if hasattr(processed_data, 'positions') else 0
+            result.layout_generated = result.positions_assigned > 0
             
-            # Step 6: Calculate initial tokens
-            print(f"Step 6: Checking initial markings...")
+            print(f"  ✓ Positions assigned: {result.positions_assigned}")
             
-            for place in petri_net_data.places:
+            # Step 7: Calculate initial tokens
+            print(f"Step 7: Checking initial markings...")
+            
+            for place in places:
                 if hasattr(place, 'initial_tokens'):
                     result.initial_tokens_sum += place.initial_tokens
             
