@@ -27,7 +27,7 @@
         {
             "id": "P1",
             "name": "S1",
-            "label": "S₁\n2",
+            "label": "S\u2081\n2",
             "object_type": "place",
             "x": 50.0,
             "y": 50.0,
@@ -35,14 +35,18 @@
             "marking": 2.0,
             "initial_marking": 2.0,
             "capacity": "Infinity",
-            "border_color": [0.0, 0.4, 0.8],
+            "border_color": [
+                0.0,
+                0.4,
+                0.8
+            ],
             "border_width": 3.0,
             "is_catalyst": false
         },
         {
             "id": "P2",
             "name": "S2",
-            "label": "S₂\n2",
+            "label": "S\u2082\n2",
             "object_type": "place",
             "x": 50.0,
             "y": 250.0,
@@ -50,7 +54,11 @@
             "marking": 2.0,
             "initial_marking": 2.0,
             "capacity": "Infinity",
-            "border_color": [0.0, 0.4, 0.8],
+            "border_color": [
+                0.0,
+                0.4,
+                0.8
+            ],
             "border_width": 3.0,
             "is_catalyst": false
         },
@@ -65,14 +73,18 @@
             "marking": 1.0,
             "initial_marking": 1.0,
             "capacity": "Infinity",
-            "border_color": [0.8, 0.4, 0.0],
+            "border_color": [
+                0.8,
+                0.4,
+                0.0
+            ],
             "border_width": 3.0,
             "is_catalyst": true
         },
         {
             "id": "P4",
             "name": "P1",
-            "label": "P₁\n0",
+            "label": "P\u2081\n0",
             "object_type": "place",
             "x": 400.0,
             "y": 50.0,
@@ -80,14 +92,18 @@
             "marking": 0.0,
             "initial_marking": 0.0,
             "capacity": "Infinity",
-            "border_color": [0.0, 0.4, 0.8],
+            "border_color": [
+                0.0,
+                0.4,
+                0.8
+            ],
             "border_width": 3.0,
             "is_catalyst": false
         },
         {
             "id": "P5",
             "name": "P2",
-            "label": "P₂\n0",
+            "label": "P\u2082\n0",
             "object_type": "place",
             "x": 400.0,
             "y": 250.0,
@@ -95,7 +111,11 @@
             "marking": 0.0,
             "initial_marking": 0.0,
             "capacity": "Infinity",
-            "border_color": [0.0, 0.4, 0.8],
+            "border_color": [
+                0.0,
+                0.4,
+                0.8
+            ],
             "border_width": 3.0,
             "is_catalyst": false
         }
@@ -104,7 +124,7 @@
         {
             "id": "T1",
             "name": "t1",
-            "label": "t₁",
+            "label": "t\u2081",
             "object_type": "transition",
             "x": 280.0,
             "y": 75.0,
@@ -118,7 +138,7 @@
         {
             "id": "T2",
             "name": "t2",
-            "label": "t₂",
+            "label": "t\u2082",
             "object_type": "transition",
             "x": 280.0,
             "y": 225.0,
@@ -138,7 +158,20 @@
             "arc_type": "normal",
             "weight": 1.0,
             "bidirectional": false,
-            "metadata": {}
+            "metadata": {},
+            "source_type": "place",
+            "target_type": "transition",
+            "name": "A1",
+            "label": "",
+            "object_type": "arc",
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "width": 3.0,
+            "control_points": [],
+            "threshold": null
         },
         {
             "id": "A2",
@@ -147,7 +180,20 @@
             "arc_type": "normal",
             "weight": 1.0,
             "bidirectional": false,
-            "metadata": {}
+            "metadata": {},
+            "source_type": "transition",
+            "target_type": "place",
+            "name": "A2",
+            "label": "",
+            "object_type": "arc",
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "width": 3.0,
+            "control_points": [],
+            "threshold": null
         },
         {
             "id": "A3",
@@ -156,7 +202,20 @@
             "arc_type": "normal",
             "weight": 1.0,
             "bidirectional": false,
-            "metadata": {}
+            "metadata": {},
+            "source_type": "place",
+            "target_type": "transition",
+            "name": "A3",
+            "label": "",
+            "object_type": "arc",
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "width": 3.0,
+            "control_points": [],
+            "threshold": null
         },
         {
             "id": "A4",
@@ -165,7 +224,20 @@
             "arc_type": "normal",
             "weight": 1.0,
             "bidirectional": false,
-            "metadata": {}
+            "metadata": {},
+            "source_type": "transition",
+            "target_type": "place",
+            "name": "A4",
+            "label": "",
+            "object_type": "arc",
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "width": 3.0,
+            "control_points": [],
+            "threshold": null
         },
         {
             "id": "A5",
@@ -174,7 +246,20 @@
             "arc_type": "test",
             "weight": 1.0,
             "bidirectional": false,
-            "metadata": {}
+            "metadata": {},
+            "source_type": "place",
+            "target_type": "transition",
+            "name": "A5",
+            "label": "",
+            "object_type": "arc",
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "width": 3.0,
+            "control_points": [],
+            "threshold": null
         },
         {
             "id": "A6",
@@ -183,7 +268,20 @@
             "arc_type": "test",
             "weight": 1.0,
             "bidirectional": false,
-            "metadata": {}
+            "metadata": {},
+            "source_type": "place",
+            "target_type": "transition",
+            "name": "A6",
+            "label": "",
+            "object_type": "arc",
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "width": 3.0,
+            "control_points": [],
+            "threshold": null
         }
     ]
 }

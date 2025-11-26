@@ -35,7 +35,11 @@
             "marking": 5.0,
             "initial_marking": 5.0,
             "capacity": "Infinity",
-            "border_color": [0.0, 0.4, 0.8],
+            "border_color": [
+                0.0,
+                0.4,
+                0.8
+            ],
             "border_width": 3.0,
             "is_catalyst": false
         },
@@ -50,7 +54,11 @@
             "marking": 3.0,
             "initial_marking": 3.0,
             "capacity": "Infinity",
-            "border_color": [0.0, 0.4, 0.8],
+            "border_color": [
+                0.0,
+                0.4,
+                0.8
+            ],
             "border_width": 3.0,
             "is_catalyst": false
         },
@@ -65,7 +73,11 @@
             "marking": 0.0,
             "initial_marking": 0.0,
             "capacity": "Infinity",
-            "border_color": [0.0, 0.4, 0.8],
+            "border_color": [
+                0.0,
+                0.4,
+                0.8
+            ],
             "border_width": 3.0,
             "is_catalyst": false
         }
@@ -74,7 +86,7 @@
         {
             "id": "T1",
             "name": "t1",
-            "label": "t₁",
+            "label": "t\u2081",
             "object_type": "transition",
             "x": 200.0,
             "y": 75.0,
@@ -88,7 +100,7 @@
         {
             "id": "T2",
             "name": "t2",
-            "label": "t₂",
+            "label": "t\u2082",
             "object_type": "transition",
             "x": 200.0,
             "y": 175.0,
@@ -108,7 +120,20 @@
             "arc_type": "normal",
             "weight": 1.0,
             "bidirectional": false,
-            "metadata": {}
+            "metadata": {},
+            "source_type": "place",
+            "target_type": "transition",
+            "name": "A1",
+            "label": "",
+            "object_type": "arc",
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "width": 3.0,
+            "control_points": [],
+            "threshold": null
         },
         {
             "id": "A2",
@@ -117,7 +142,20 @@
             "arc_type": "normal",
             "weight": 1.0,
             "bidirectional": false,
-            "metadata": {}
+            "metadata": {},
+            "source_type": "transition",
+            "target_type": "place",
+            "name": "A2",
+            "label": "",
+            "object_type": "arc",
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "width": 3.0,
+            "control_points": [],
+            "threshold": null
         },
         {
             "id": "A3",
@@ -126,7 +164,20 @@
             "arc_type": "normal",
             "weight": 1.0,
             "bidirectional": false,
-            "metadata": {}
+            "metadata": {},
+            "source_type": "place",
+            "target_type": "transition",
+            "name": "A3",
+            "label": "",
+            "object_type": "arc",
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "width": 3.0,
+            "control_points": [],
+            "threshold": null
         },
         {
             "id": "A4",
@@ -135,7 +186,20 @@
             "arc_type": "normal",
             "weight": 1.0,
             "bidirectional": false,
-            "metadata": {}
+            "metadata": {},
+            "source_type": "transition",
+            "target_type": "place",
+            "name": "A4",
+            "label": "",
+            "object_type": "arc",
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "width": 3.0,
+            "control_points": [],
+            "threshold": null
         }
     ]
 }
