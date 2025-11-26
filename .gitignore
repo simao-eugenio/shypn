@@ -78,8 +78,7 @@ brenda_credentials.txt
 
 # Workspace isolation (user-specific content)
 # workspace/examples/ is tracked (demo files)
-# workspace/projects/ and workspace/cache/ are user-specific
-workspace/projects/
+# workspace/cache/ is user-specific
 workspace/cache/
 
 # Legacy backups (pre-UI work safety backups)

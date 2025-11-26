@@ -1,0 +1,174 @@
+{
+    "version": "2.0",
+    "metadata": {
+        "created": "2025-11-26T09:00:00.000000",
+        "modified": "2025-11-26T09:00:00.000000",
+        "object_counts": {
+            "places": 4,
+            "transitions": 2,
+            "arcs": 6
+        },
+        "description": "Feedback regulation: ATP as both substrate and inhibitor. Used in Chapter 5 (Fig 5.4) to show complex regulatory patterns with heterogeneous arc types.",
+        "purpose": "Pedagogical - demonstrates dual role of metabolite (substrate + inhibitor)"
+    },
+    "view_state": {
+        "zoom": 1.0,
+        "pan_x": 0.0,
+        "pan_y": 0.0,
+        "transformations": {
+            "rotation": {
+                "type": "rotation",
+                "angle_degrees": 0.0,
+                "enabled": false
+            }
+        }
+    },
+    "places": [
+        {
+            "id": "P_Glucose",
+            "name": "Glucose",
+            "label": "Glc\n10",
+            "object_type": "place",
+            "x": 50.0,
+            "y": 100.0,
+            "radius": 30.0,
+            "marking": 10.0,
+            "initial_marking": 10.0,
+            "capacity": "Infinity",
+            "border_color": [0.0, 0.4, 0.8],
+            "border_width": 3.0,
+            "is_catalyst": false
+        },
+        {
+            "id": "P_ATP",
+            "name": "ATP",
+            "label": "ATP\n5",
+            "object_type": "place",
+            "x": 150.0,
+            "y": 200.0,
+            "radius": 30.0,
+            "marking": 5.0,
+            "initial_marking": 5.0,
+            "capacity": "Infinity",
+            "border_color": [0.8, 0.0, 0.0],
+            "border_width": 3.0,
+            "is_catalyst": false
+        },
+        {
+            "id": "P_G6P",
+            "name": "G6P",
+            "label": "G6P\n0",
+            "object_type": "place",
+            "x": 300.0,
+            "y": 100.0,
+            "radius": 30.0,
+            "marking": 0.0,
+            "initial_marking": 0.0,
+            "capacity": "Infinity",
+            "border_color": [0.0, 0.4, 0.8],
+            "border_width": 3.0,
+            "is_catalyst": false
+        },
+        {
+            "id": "P_F16BP",
+            "name": "F16BP",
+            "label": "F-1,6-BP\n0",
+            "object_type": "place",
+            "x": 550.0,
+            "y": 100.0,
+            "radius": 30.0,
+            "marking": 0.0,
+            "initial_marking": 0.0,
+            "capacity": "Infinity",
+            "border_color": [0.0, 0.4, 0.8],
+            "border_width": 3.0,
+            "is_catalyst": false
+        }
+    ],
+    "transitions": [
+        {
+            "id": "T_HK",
+            "name": "HK",
+            "label": "HK",
+            "object_type": "transition",
+            "x": 175.0,
+            "y": 100.0,
+            "width": 15.0,
+            "height": 40.0,
+            "kinetic_type": "mass_action",
+            "rate_constant": 0.5,
+            "rate_function": null,
+            "metadata": {}
+        },
+        {
+            "id": "T_PFK",
+            "name": "PFK",
+            "label": "PFK",
+            "object_type": "transition",
+            "x": 425.0,
+            "y": 100.0,
+            "width": 15.0,
+            "height": 40.0,
+            "kinetic_type": "mass_action",
+            "rate_constant": 0.5,
+            "rate_function": null,
+            "metadata": {}
+        }
+    ],
+    "arcs": [
+        {
+            "id": "A1",
+            "source_id": "P_Glucose",
+            "target_id": "T_HK",
+            "arc_type": "normal",
+            "weight": 1.0,
+            "bidirectional": false,
+            "metadata": {}
+        },
+        {
+            "id": "A2",
+            "source_id": "P_ATP",
+            "target_id": "T_HK",
+            "arc_type": "normal",
+            "weight": 1.0,
+            "bidirectional": false,
+            "metadata": {"role": "substrate"}
+        },
+        {
+            "id": "A3",
+            "source_id": "T_HK",
+            "target_id": "P_G6P",
+            "arc_type": "normal",
+            "weight": 1.0,
+            "bidirectional": false,
+            "metadata": {}
+        },
+        {
+            "id": "A4",
+            "source_id": "P_G6P",
+            "target_id": "T_PFK",
+            "arc_type": "normal",
+            "weight": 1.0,
+            "bidirectional": false,
+            "metadata": {}
+        },
+        {
+            "id": "A5",
+            "source_id": "T_PFK",
+            "target_id": "P_F16BP",
+            "arc_type": "normal",
+            "weight": 1.0,
+            "bidirectional": false,
+            "metadata": {}
+        },
+        {
+            "id": "A6",
+            "source_id": "P_ATP",
+            "target_id": "T_PFK",
+            "arc_type": "inhibitor",
+            "weight": 1.0,
+            "bidirectional": false,
+            "metadata": {"role": "inhibitor"}
+        }
+    ]
+}
