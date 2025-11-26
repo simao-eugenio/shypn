@@ -2986,11 +2986,14 @@ class ModelCanvasLoader:
                 multi_str = ' (multi)' if is_ctrl else ''
             state['is_rect_selecting'] = False
             widget.queue_draw()
-        if event.button == 3 and (not state['is_panning']):
+        if event.button == 3:
+            # Check if this was actually a pan or just a click with minor movement
+            # Use a more generous threshold for context menu (10px instead of is_panning flag)
+            # This prevents accidental mouse jitter from blocking the context menu
             dx = event.x - state['start_x']
             dy = event.y - state['start_y']
             distance = (dx * dx + dy * dy) ** 0.5
-            if distance < 5:
+            if distance < 10:  # Show context menu if movement < 10px
                 world_x, world_y = manager.screen_to_world(event.x, event.y)
                 clicked_obj = manager.find_object_at_position(world_x, world_y)
                 if clicked_obj:
