@@ -379,49 +379,15 @@ Regulatory logic is \textbf{embedded in the topology} (not hidden in code):
 
 \begin{figure}[htbp]
 \centering
-\begin{tikzpicture}[
-    node distance=2cm,
-    place/.style={circle,draw=blue!75,fill=blue!20,thick,minimum size=10mm},
-    transition/.style={rectangle,draw=black!75,fill=black!20,thick,minimum size=6mm},
-    >=stealth'
-]
-    % Top: Glucose inhibits cAMP synthesis
-    \node[place] (glucose) {Glc};
-    \node[transition, below=1.5cm of glucose] (t2) {T2};
-    \node[place, below=1.5cm of t2] (camp) {cAMP};
-    
-    % Middle: CRP-cAMP activates transcription
-    \node[place, right=4cm of camp] (crp_camp) {CRP-cAMP};
-    \node[place, right=2cm of glucose] (gene) {gene};
-    \node[place, right=5cm of glucose] (repressor) {Rep};
-    \node[transition, below=1.5cm of crp_camp] (t5) {T5};
-    \node[place, below=1.5cm of t5] (mrna) {mRNA};
-    
-    % Bottom: BetaGal catalyzes lactose cleavage
-    \node[transition, below=1.5cm of mrna] (t6) {T6};
-    \node[place, below=1.5cm of t6] (betagal) {BetaGal};
-    \node[place, left=3cm of betagal] (lactose) {Lac};
-    \node[transition, right=1.5cm of lactose] (t9) {T9};
-    
-    % Arcs
-    \draw[->,thick,red,dotted] (glucose) -- (t2) node[midway,left] {\scriptsize inhibitor};
-    \draw[->,thick] (t2) -- (camp);
-    
-    \draw[->,thick,dashed,green!70!black] (crp_camp) -- (t5) node[midway,left] {\scriptsize test};
-    \draw[->,thick,dashed,green!70!black] (gene) -- (t5) node[midway,above] {\scriptsize test};
-    \draw[->,thick,red,dotted] (repressor) -- (t5) node[midway,right] {\scriptsize inhibitor};
-    \draw[->,thick] (t5) -- (mrna);
-    
-    \draw[->,thick,dashed,green!70!black] (mrna) -- (t6) node[midway,left] {\scriptsize test};
-    \draw[->,thick] (t6) -- (betagal);
-    
-    \draw[->,thick] (lactose) -- (t9);
-    \draw[->,thick,dashed,green!70!black] (betagal) -- (t9) node[midway,below] {\scriptsize test};
-    \draw[->,thick] (t9) to[bend left=40] (glucose) node[midway,right] {\scriptsize feedback};
-\end{tikzpicture}
+\includegraphics[width=0.8\textwidth]{gfx/lac_operon.pdf}
 \caption{Lac operon network topology showing arc-level regulation. Solid arcs: normal (consumptive); Dashed green arcs: test (catalytic); Dotted red arcs: inhibitor (regulatory).}
 \label{fig:lac-topology}
 \end{figure}
+
+% Original TikZ code archived for reference:
+% \begin{tikzpicture}[...]
+% (TikZ code removed - figure now generated from SHYpn model)
+% \end{tikzpicture}
 
 \paragraph{Key insight:} The entire regulatory logic is visible in the \textbf{network topology}. An external viewer can understand:
 \begin{itemize}

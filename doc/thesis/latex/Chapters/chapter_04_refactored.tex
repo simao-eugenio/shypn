@@ -356,34 +356,15 @@ Consider hexokinase catalyzing glucose phosphorylation:
 
 \begin{figure}[htbp]
 \centering
-\begin{tikzpicture}[
-    node distance=2cm,
-    place/.style={circle,draw=blue!75,fill=blue!20,thick,minimum size=10mm},
-    transition/.style={rectangle,draw=black!75,fill=black!20,thick,minimum size=8mm},
-    >=stealth'
-]
-    % Places
-    \node[place] (glucose) {Glucose};
-    \node[place, right=of glucose] (atp) {ATP};
-    \node[place, below=of glucose] (enzyme) {Hexokinase};
-    \node[place, right=3cm of glucose] (g6p) {G6P};
-    \node[place, right=of g6p] (adp) {ADP};
-    
-    % Transition
-    \node[transition, right=1.5cm of glucose, yshift=-1cm] (t) {$t_1$};
-    
-    % Normal arcs (substrate/product)
-    \draw[->,thick] (glucose) -- (t) node[midway,above] {1};
-    \draw[->,thick] (atp) -- (t) node[midway,above right] {1};
-    \draw[->,thick] (t) -- (g6p) node[midway,above] {1};
-    \draw[->,thick] (t) -- (adp) node[midway,above right] {1};
-    
-    % Test arc (catalyst)
-    \draw[->,thick,dashed,red] (enzyme) -- (t) node[midway,left] {\scriptsize test};
-\end{tikzpicture}
+\includegraphics[width=0.7\textwidth]{gfx/hexokinase.pdf}
 \caption{Enzyme-catalyzed reaction with test arc. Hexokinase enables the reaction without being consumed.}
 \label{fig:enzyme-catalyzed-example}
 \end{figure}
+
+% Original TikZ code archived for reference:
+% \begin{tikzpicture}[...]
+% (TikZ code removed - figure now generated from SHYpn model)
+% \end{tikzpicture}
 
 \noindent\textbf{Enabling condition}:
 \begin{align}

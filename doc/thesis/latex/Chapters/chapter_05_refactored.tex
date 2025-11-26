@@ -73,33 +73,12 @@ In classical Petri net theory, two transitions $t_1, t_2$ are \emph{strongly ind
 
 \begin{figure}[htbp]
 \centering
-\begin{tikzpicture}[
-    node distance=2cm,
-    place/.style={circle,draw=blue!75,fill=blue!20,thick,minimum size=8mm},
-    transition/.style={rectangle,draw=black!75,fill=black!20,thick,minimum size=6mm},
-    >=stealth'
-]
-    % First independent subnet
-    \node[place] (p1) {$P_1$};
-    \node[transition, right=of p1] (t1) {$t_1$};
-    \node[place, right=of t1] (p2) {$P_2$};
-    
-    % Second independent subnet
-    \node[place, right=3cm of p2] (p3) {$P_3$};
-    \node[transition, right=of p3] (t2) {$t_2$};
-    \node[place, right=of t2] (p4) {$P_4$};
-    
-    \draw[->,thick] (p1) -- (t1);
-    \draw[->,thick] (t1) -- (p2);
-    \draw[->,thick] (p3) -- (t2);
-    \draw[->,thick] (t2) -- (p4);
-    
-    \node[below=0.3cm of t1] {\footnotesize No shared places};
-    \node[below=0.3cm of t2] {\footnotesize Strongly independent};
-\end{tikzpicture}
+\includegraphics[width=0.6\textwidth]{gfx/strong_independence.pdf}
 \caption{Strong independence: $t_1$ and $t_2$ share no places}
 \label{fig:strong-independence}
 \end{figure}
+
+% Original TikZ code archived
 
 \noindent\textbf{Properties}:
 \begin{itemize}
@@ -116,97 +95,36 @@ Multiple reactions produce the same metabolite:
 
 \begin{figure}[htbp]
 \centering
-\begin{tikzpicture}[
-    node distance=2cm,
-    place/.style={circle,draw=blue!75,fill=blue!20,thick,minimum size=10mm},
-    transition/.style={rectangle,draw=black!75,fill=black!20,thick,minimum size=6mm},
-    >=stealth'
-]
-    \node[place] (glucose) {Glucose};
-    \node[place, below=2cm of glucose] (lactate) {Lactate};
-    \node[place, right=3cm of glucose, yshift=-1cm] (pyruvate) {Pyruvate};
-    
-    \node[transition, right=1.5cm of glucose] (t1) {$t_1$};
-    \node[transition, right=1.5cm of lactate] (t2) {$t_2$};
-    
-    \draw[->,thick] (glucose) -- (t1);
-    \draw[->,thick] (t1) -- (pyruvate);
-    \draw[->,thick] (lactate) -- (t2);
-    \draw[->,thick] (t2) -- (pyruvate);
-    
-    \node[right=0.1cm of pyruvate, text=red] {\footnotesize Shared output!};
-\end{tikzpicture}
+\includegraphics[width=0.6\textwidth]{gfx/convergent_synthesis.pdf}
 \caption{$t_1$ and $t_2$ share output place ``Pyruvate'' $\Rightarrow$ \textbf{NOT} strongly independent}
 \label{fig:convergent-example}
 \end{figure}
+
+% Original TikZ code archived
 
 \paragraph{Example 2: Shared Catalyst}
 Single enzyme catalyzes multiple reactions:
 
 \begin{figure}[htbp]
 \centering
-\begin{tikzpicture}[
-    node distance=2.5cm,
-    place/.style={circle,draw=blue!75,fill=blue!20,thick,minimum size=10mm},
-    transition/.style={rectangle,draw=black!75,fill=black!20,thick,minimum size=6mm},
-    >=stealth'
-]
-    \node[place] (s1) {$S_1$};
-    \node[place, below=3cm of s1] (s2) {$S_2$};
-    \node[place, right=1cm of s1, yshift=-1.5cm] (enzyme) {PGI};
-    
-    \node[transition, right=2.5cm of s1] (t1) {$t_1$};
-    \node[transition, right=2.5cm of s2] (t2) {$t_2$};
-    
-    \node[place, right=of t1] (p1) {$P_1$};
-    \node[place, right=of t2] (p2) {$P_2$};
-    
-    \draw[->,thick] (s1) -- (t1);
-    \draw[->,thick] (t1) -- (p1);
-    \draw[->,thick] (s2) -- (t2);
-    \draw[->,thick] (t2) -- (p2);
-    
-    \draw[->,thick,dashed,red] (enzyme) -- (t1) node[midway,above left] {\scriptsize test};
-    \draw[->,thick,dashed,red] (enzyme) -- (t2) node[midway,below left] {\scriptsize test};
-    
-    \node[right=0.1cm of enzyme, text=red] {\footnotesize Shared catalyst!};
-\end{tikzpicture}
+\includegraphics[width=0.7\textwidth]{gfx/shared_catalyst.pdf}
 \caption{Both transitions share test arc from ``PGI enzyme'' $\Rightarrow$ \textbf{NOT} strongly independent}
 \label{fig:shared-catalyst-example}
 \end{figure}
+
+% Original TikZ code archived
 
 \paragraph{Example 3: Feedback Regulation}
 Multiple transitions share ATP (substrate for some, inhibitor for others):
 
 \begin{figure}[htbp]
 \centering
-\begin{tikzpicture}[
-    node distance=1.8cm,
-    place/.style={circle,draw=blue!75,fill=blue!20,thick,minimum size=9mm},
-    transition/.style={rectangle,draw=black!75,fill=black!20,thick,minimum size=5mm},
-    >=stealth'
-]
-    \node[place] (glc) {Glc};
-    \node[transition, right=of glc] (hk) {HK};
-    \node[place, right=of hk] (g6p) {G6P};
-    \node[transition, right=of g6p] (pfk) {PFK};
-    \node[place, right=of pfk] (fbp) {F-1,6-BP};
-    
-    \node[place, below=1.5cm of hk] (atp) {ATP};
-    
-    \draw[->,thick] (glc) -- (hk);
-    \draw[->,thick] (hk) -- (g6p);
-    \draw[->,thick] (g6p) -- (pfk);
-    \draw[->,thick] (pfk) -- (fbp);
-    
-    \draw[->,thick] (atp) -- (hk) node[midway,left] {\scriptsize substrate};
-    \draw[->,thick,dotted,blue] (atp) to[bend left=30] (pfk) node[midway,below] {\scriptsize inhibitor};
-    
-    \node[below=0.1cm of atp, text=red] {\footnotesize Shared place, different roles};
-\end{tikzpicture}
+\includegraphics[width=0.8\textwidth]{gfx/feedback_regulation.pdf}
 \caption{ATP is substrate for hexokinase, inhibitor for PFK}
 \label{fig:feedback-regulation-example}
 \end{figure}
+
+% Original TikZ code archived
 
 \paragraph{Empirical Observation} (glycolysis model analysis):
 \begin{table}[htbp]
@@ -348,26 +266,12 @@ That is, strong independence implies weak independence.
 
 \begin{figure}[htbp]
 \centering
-\begin{tikzpicture}[
-    node distance=2cm,
-    place/.style={circle,draw=blue!75,fill=blue!20,thick,minimum size=10mm},
-    transition/.style={rectangle,draw=black!75,fill=black!20,thick,minimum size=6mm},
-    >=stealth'
-]
-    \node[place,tokens=3] (atp) {ATP};
-    \node[transition, above right=1cm and 2cm of atp] (t1) {$t_1$};
-    \node[transition, below right=1cm and 2cm of atp] (t2) {$t_2$};
-    \node[place, right=of t1] (p1) {$P_1$};
-    \node[place, right=of t2] (p2) {$P_2$};
-    
-    \draw[->,thick,red] (atp) -- (t1) node[midway,above left] {\color{red}conflict};
-    \draw[->,thick,red] (atp) -- (t2) node[midway,below left] {\color{red}conflict};
-    \draw[->,thick] (t1) -- (p1);
-    \draw[->,thick] (t2) -- (p2);
-\end{tikzpicture}
+\includegraphics[width=0.6\textwidth]{gfx/conflict_mode.pdf}
 \caption{Mode 1: Conflict -- shared input place (resource competition)}
 \label{fig:conflict-mode}
 \end{figure}
+
+% Original TikZ code archived
 
 \subsubsection{Mode 2: COUPLING -- Convergent (Shared Output Places)}
 
@@ -390,27 +294,12 @@ That is, strong independence implies weak independence.
 
 \begin{figure}[htbp]
 \centering
-\begin{tikzpicture}[
-    node distance=2cm,
-    place/.style={circle,draw=blue!75,fill=blue!20,thick,minimum size=10mm},
-    transition/.style={rectangle,draw=black!75,fill=black!20,thick,minimum size=6mm},
-    >=stealth'
-]
-    \node[place] (s1) {$S_1$};
-    \node[place, below=3cm of s1] (s2) {$S_2$};
-    \node[place, right=4cm of s1, yshift=-1.5cm] (p) {$P$};
-    
-    \node[transition, right=2cm of s1] (t1) {$t_1$};
-    \node[transition, right=2cm of s2] (t2) {$t_2$};
-    
-    \draw[->,thick] (s1) -- (t1);
-    \draw[->,thick] (s2) -- (t2);
-    \draw[->,thick,green!70!black] (t1) -- (p) node[midway,above right] {\color{green!70!black}superpose};
-    \draw[->,thick,green!70!black] (t2) -- (p) node[midway,below right] {\color{green!70!black}superpose};
-\end{tikzpicture}
+\includegraphics[width=0.7\textwidth]{gfx/convergent_mode.pdf}
 \caption{Mode 2: Convergent coupling -- shared output place (superposition)}
 \label{fig:convergent-mode}
 \end{figure}
+
+% Original TikZ code archived
 
 \subsubsection{Mode 3: COUPLING -- Regulatory (Shared Catalyst Places)}
 
@@ -433,33 +322,12 @@ That is, strong independence implies weak independence.
 
 \begin{figure}[htbp]
 \centering
-\begin{tikzpicture}[
-    node distance=2cm,
-    place/.style={circle,draw=blue!75,fill=blue!20,thick,minimum size=10mm},
-    transition/.style={rectangle,draw=black!75,fill=black!20,thick,minimum size=6mm},
-    >=stealth'
-]
-    \node[place] (s1) {$S_1$};
-    \node[place, below=3cm of s1] (s2) {$S_2$};
-    \node[place, right=1.5cm of s1, yshift=-1.5cm] (enzyme) {Enzyme};
-    
-    \node[transition, right=3.5cm of s1] (t1) {$t_1$};
-    \node[transition, right=3.5cm of s2] (t2) {$t_2$};
-    
-    \node[place, right=of t1] (p1) {$P_1$};
-    \node[place, right=of t2] (p2) {$P_2$};
-    
-    \draw[->,thick] (s1) -- (t1);
-    \draw[->,thick] (s2) -- (t2);
-    \draw[->,thick] (t1) -- (p1);
-    \draw[->,thick] (t2) -- (p2);
-    
-    \draw[->,thick,dashed,purple] (enzyme) -- (t1) node[near start,above] {\scriptsize\color{purple}test};
-    \draw[->,thick,dashed,purple] (enzyme) -- (t2) node[near start,below] {\scriptsize\color{purple}test};
-\end{tikzpicture}
+\includegraphics[width=0.7\textwidth]{gfx/regulatory_mode.pdf}
 \caption{Mode 3: Regulatory coupling -- shared catalyst (enzyme reuse)}
 \label{fig:regulatory-mode}
 \end{figure}
+
+% Original TikZ code archived
 
 %************************************************
 \section{Parallel Execution under Weak Independence}
