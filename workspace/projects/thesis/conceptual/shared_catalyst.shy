@@ -25,7 +25,7 @@
     },
     "places": [
         {
-            "id": "P_S1",
+            "id": "P1",
             "name": "S1",
             "label": "S₁\n2",
             "object_type": "place",
@@ -40,7 +40,7 @@
             "is_catalyst": false
         },
         {
-            "id": "P_S2",
+            "id": "P2",
             "name": "S2",
             "label": "S₂\n2",
             "object_type": "place",
@@ -55,7 +55,7 @@
             "is_catalyst": false
         },
         {
-            "id": "P_PGI",
+            "id": "P3",
             "name": "PGI",
             "label": "PGI\nenzyme\n1",
             "object_type": "place",
@@ -70,7 +70,7 @@
             "is_catalyst": true
         },
         {
-            "id": "P_P1",
+            "id": "P4",
             "name": "P1",
             "label": "P₁\n0",
             "object_type": "place",
@@ -85,7 +85,7 @@
             "is_catalyst": false
         },
         {
-            "id": "P_P2",
+            "id": "P5",
             "name": "P2",
             "label": "P₂\n0",
             "object_type": "place",
@@ -133,7 +133,7 @@
     "arcs": [
         {
             "id": "A1",
-            "source_id": "P_S1",
+            "source_id": "P1",
             "target_id": "T1",
             "arc_type": "normal",
             "weight": 1.0,
@@ -143,7 +143,7 @@
         {
             "id": "A2",
             "source_id": "T1",
-            "target_id": "P_P1",
+            "target_id": "P4",
             "arc_type": "normal",
             "weight": 1.0,
             "bidirectional": false,
@@ -151,7 +151,7 @@
         },
         {
             "id": "A3",
-            "source_id": "P_S2",
+            "source_id": "P2",
             "target_id": "T2",
             "arc_type": "normal",
             "weight": 1.0,
@@ -161,7 +161,7 @@
         {
             "id": "A4",
             "source_id": "T2",
-            "target_id": "P_P2",
+            "target_id": "P5",
             "arc_type": "normal",
             "weight": 1.0,
             "bidirectional": false,
@@ -169,7 +169,7 @@
         },
         {
             "id": "A5",
-            "source_id": "P_PGI",
+            "source_id": "P3",
             "target_id": "T1",
             "arc_type": "test",
             "weight": 1.0,
@@ -178,7 +178,7 @@
         },
         {
             "id": "A6",
-            "source_id": "P_PGI",
+            "source_id": "P3",
             "target_id": "T2",
             "arc_type": "test",
             "weight": 1.0,
