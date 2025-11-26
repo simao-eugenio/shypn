@@ -57,8 +57,7 @@ class ThesisFigureExporter:
         with open(filepath, 'r', encoding='utf-8') as f:
             data = json.load(f)
         
-        model = DocumentModel()
-        model.from_dict(data)
+        model = DocumentModel.from_dict(data)
         return model
     
     def calculate_bounds(self, model: DocumentModel) -> Tuple[float, float, float, float]:
