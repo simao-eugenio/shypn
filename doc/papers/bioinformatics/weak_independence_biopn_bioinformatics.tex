@@ -15,6 +15,7 @@
 \usepackage[margin=2cm,columnsep=0.5cm]{geometry}
 \usepackage{balance}  % Balance last page columns
 \usepackage{pifont}  % For checkmarks
+\usepackage{enumitem}  % For list customization
 \newcommand{\cmark}{\ding{51}}  % Checkmark
 
 % Compact spacing settings
@@ -28,6 +29,8 @@
 \setlength{\intextsep}{8pt plus 2pt minus 2pt}
 \setlength{\abovecaptionskip}{4pt}
 \setlength{\belowcaptionskip}{2pt}
+\setlist[itemize]{leftmargin=*,nosep}  % Zero indentation for lists
+\setlist[enumerate]{leftmargin=*,nosep}
 
 % Custom commands
 \newcommand{\preset}[1]{\ensuremath{{}^{\bullet}#1}}
@@ -63,12 +66,7 @@ Eugênio Simão\textsuperscript{1,*}\\
 
 \textbf{Metabolic convergence is ubiquitous in biological systems}. Central metabolism exemplifies this: glycogenolysis, gluconeogenesis, and starch degradation all converge to produce glucose; glycolysis and pentose phosphate pathway both consume it. Multi-enzyme complexes catalyze dozens of reactions simultaneously through shared active sites. Gene regulatory networks exhibit feedback loops where transcription factors regulate multiple genes while being products of other genes. This concurrency is not accidental---it enables homeostasis, rapid response to environmental changes, and efficient resource utilization~\cite{Alberts2015,Nelson2017}.
 
-Petri nets have been successfully applied to modeling biochemical pathways since Reddy et al.'s pioneering work in 1993~\cite{Reddy1993}. However, Biological Petri Nets (Bio-PNs) differ fundamentally from classical Petri nets in their treatment of \emph{shared places}. In biological systems, multiple reactions routinely affect the same metabolite through:
-\begin{itemize}
-    \item \textbf{Convergent production}: Glycogenolysis and gluconeogenesis both produce glucose
-    \item \textbf{Regulatory coupling}: Multiple reactions catalyzed by the same enzyme
-    \item \textbf{Competitive consumption}: Hexokinase and glucokinase competing for glucose
-\end{itemize}
+Petri nets have been successfully applied to modeling biochemical pathways since Reddy et al.'s pioneering work in 1993~\cite{Reddy1993}. However, Biological Petri Nets (Bio-PNs) differ fundamentally from classical Petri nets in their treatment of \emph{shared places}. In biological systems, multiple reactions routinely affect the same metabolite through (1) \textbf{Convergent production} (glycogenolysis and gluconeogenesis both produce glucose), (2) \textbf{Regulatory coupling} (multiple reactions catalyzed by the same enzyme), and (3) \textbf{Competitive consumption} (hexokinase and glucokinase competing for glucose).
 
 Classical Petri net theory treats all place-sharing as potential \emph{conflict}~\cite{Reisig2013}. This conservative view prevents parallel execution and flags biologically correct models as structurally problematic. We observe that in continuous Bio-PNs with ODE semantics, transitions can fire \emph{simultaneously} as long as they don't compete for input tokens---their rate contributions simply \emph{superpose}.
 
@@ -113,24 +111,13 @@ Biological reality: $T_1$ and $T_2$ \emph{can fire simultaneously}:
 This example illustrates \textbf{convergent coupling}---a form of weak independence missed by classical theory.
 
 \subsection{Contributions}
-
-We make four key contributions:
-
-\begin{enumerate}
-    \item \textbf{Weak Independence Theory}: Formalize two-tier independence (strong vs.\ weak), enabling parallel execution despite place-sharing.
-    
-    \item \textbf{Extended 12-tuple Definition}: Add regulatory structure ($\Sigma$), environmental exchange ($\Theta$), dependency classification ($\Delta$), heterogeneous transition types ($\tau$), and biochemical formula tracking ($\rho$) to Bio-PN formalism, enabling unified modeling of continuous, stochastic, and timed dynamics with atomic mass balance validation.
-    
-    \item \textbf{Dependency Classification Algorithm}: Systematically distinguish conflicts from coupling ($O(|T|^2 \cdot |P|)$ complexity).
-    
-    \item \textbf{Biological Topology Analyzers}: Domain-specific validation (mass balance, flux feasibility) avoiding false positives from classical checks.
-\end{enumerate}
+We make four key contributions: (1) \textbf{Weak Independence Theory} formalizes two-tier independence (strong vs.\ weak), enabling parallel execution despite place-sharing; (2) \textbf{Extended 12-tuple Definition} adds regulatory structure ($\Sigma$), environmental exchange ($\Theta$), dependency classification ($\Delta$), heterogeneous transition types ($\tau$), and biochemical formula tracking ($\rho$) to Bio-PN formalism, enabling unified modeling of continuous, stochastic, and timed dynamics with atomic mass balance validation; (3) \textbf{Dependency Classification Algorithm} systematically distinguishes conflicts from coupling ($O(|T|^2 \cdot |P|)$ complexity); (4) \textbf{Biological Topology Analyzers} provide domain-specific validation (mass balance, flux feasibility) avoiding false positives from classical checks.
 
 \textbf{Evaluation}: Analysis of 100 SBML models from BioModels shows 60--80\% of transition pairs are weakly independent, confirming the prevalence of biological coupling. SHYpn implementation achieves 2--4$\times$ speedup through parallel simulation.
 
 \section{Background and Related Work}
 
-\textbf{Historical Context}: Petri nets entered systems biology through Reddy's metabolic pathway modeling (1993)~\cite{Reddy1993}, followed by Hofestädt's binary PN models (1994) and Matsuno's hybrid approach (1998). The SBML standard (2003)~\cite{Hucka2003} enabled model exchange, spurring tool development (Snoopy, Cell Illustrator). However, no prior work addresses the fundamental mismatch between classical independence (Eq.~\ref{eq:classical_independence}) and biological coupling.
+Petri nets entered systems biology through Reddy's metabolic pathway modeling (1993)~\cite{Reddy1993}, followed by Hofestädt's binary PN models (1994) and Matsuno's hybrid approach (1998). The SBML standard (2003)~\cite{Hucka2003} enabled model exchange, spurring tool development (Snoopy, Cell Illustrator). However, no prior work addresses the fundamental mismatch between classical independence (Eq.~\ref{eq:classical_independence}) and biological coupling.
 
 \subsection{Classical Petri Nets}
 
@@ -146,12 +133,7 @@ This definition guarantees \emph{true parallelism}: no coordination needed.
 
 \subsection{Biological Petri Nets}
 
-\textbf{Foundation}~\cite{Reddy1993}: Places represent chemical species, transitions represent reactions, arc weights are stoichiometric coefficients. Key extensions:
-\begin{itemize}
-    \item \textbf{Continuous places}~\cite{Heiner2008}: $M: P \to \mathbb{R}^+$ (concentrations, not token counts)
-    \item \textbf{Rate functions}~\cite{Gilbert2006}: $\Phi: T \to (\mathbb{R}^n \to \mathbb{R})$ (mass action, Michaelis-Menten, Hill)
-    \item \textbf{ODE semantics}: $\frac{dM(p)}{dt} = \sum_{t \in \preset{p}} W(t,p) \cdot \Phi(t, M) - \sum_{t \in \postset{p}} W(p,t) \cdot \Phi(t, M)$
-\end{itemize}
+Places represent chemical species, transitions represent reactions, arc weights are stoichiometric coefficients~\cite{Reddy1993}. Key extensions include \textbf{continuous places}~\cite{Heiner2008} ($M: P \to \mathbb{R}^+$, concentrations not token counts), \textbf{rate functions}~\cite{Gilbert2006} ($\Phi: T \to (\mathbb{R}^n \to \mathbb{R})$, mass action/Michaelis-Menten/Hill), and \textbf{ODE semantics} ($\frac{dM(p)}{dt} = \sum_{t \in \preset{p}} W(t,p) \cdot \Phi(t, M) - \sum_{t \in \postset{p}} W(p,t) \cdot \Phi(t, M)$).
 
 \textbf{Test arcs}~\cite{Koch2011}: Graphical notation for catalysts/enzymes (read but not consumed). Prior work treats these informally; we formalize via $\Sigma$ function.
 
@@ -185,95 +167,55 @@ Bio. topology & --- & --- & --- & \cmark \\
 
 \subsubsection{12-tuple Formalization}
 
-\begin{quote}
+{\small
 \textbf{Definition 1 (Extended Biological Petri Net).}
 An \emph{Extended Biological Petri Net} is a 12-tuple:
 \begin{equation}
 \text{BioPN} = (P, T, F, W, M_0, K, \Phi, \Sigma, \Theta, \Delta, \tau, \rho)
 \end{equation}
-where:
-\begin{itemize}
-    \item $P$: Set of places (chemical species)
-    \item $T$: Set of transitions (biochemical reactions)
-    \item $F \subseteq (P \times T) \cup (T \times P)$: Flow relation (normal arcs)
-    \item $W: F \to \mathbb{R}^+$: Arc weights (stoichiometric coefficients)
-    \item $M_0: P \to \mathbb{N}_0 \cup \mathbb{R}_0^+$: Initial marking (discrete or continuous)
-    \item $K: P \to \mathbb{N} \cup \{\infty\}$: Capacity function (optional bounds)
-    \item $\Phi: T \to (\mathbb{R}^n \to \mathbb{R})$: Rate functions (kinetic laws)
-    \item $\Sigma \subseteq (P \times T) \setminus F$: Regulatory arcs (test/inhibitor)
-    \item $\Theta: T \to \{\text{INTERNAL, SOURCE, SINK, EXCHANGE}\}$: Environmental exchange
-    \item $\Delta: T \times T \to \{\text{INDEPENDENT, COMPETITIVE, CONVERGENT, REGULATORY}\}$: Dependency type
-    \item $\tau: T \to \{\text{CONTINUOUS, STOCHASTIC, TIMED, IMMEDIATE}\}$: Transition type
-    \item $\rho: P \to \text{Formula}$: Biochemical formulas (atomic composition)
-\end{itemize}
-\end{quote}
+where $P$ is the set of places (chemical species), $T$ is the set of transitions (biochemical reactions), $F \subseteq (P \times T) \cup (T \times P)$ is the flow relation (normal arcs), $W: F \to \mathbb{R}^+$ are arc weights (stoichiometric coefficients), $M_0: P \to \mathbb{N}_0 \cup \mathbb{R}_0^+$ is the initial marking (discrete or continuous), $K: P \to \mathbb{N} \cup \{\infty\}$ is the capacity function (optional bounds), $\Phi: T \to (\mathbb{R}^n \to \mathbb{R})$ are rate functions (kinetic laws), $\Sigma \subseteq (P \times T) \setminus F$ are regulatory arcs (test/inhibitor), $\Theta: T \to \{\text{INTERNAL, SOURCE, SINK, EXCHANGE}\}$ classifies environmental exchange, $\Delta: T \times T \to \{\text{INDEPENDENT, COMPETITIVE, CONVERGENT, REGULATORY}\}$ is the dependency type, $\tau: T \to \{\text{CONTINUOUS, STOCHASTIC, TIMED, IMMEDIATE}\}$ is the transition type, and $\rho: P \to \text{Formula}$ maps biochemical formulas (atomic composition).
+}
 
 \subsubsection{Novel Components}
-
-\textbf{Regulatory Structure ($\Sigma$)}: Non-consumptive arcs for catalysis (test arcs) and inhibition (inhibitor arcs).
-
-\textbf{Example}: Enzyme-catalyzed reaction with inhibition
-\begin{align}
-\Phi(t) &= \frac{V_{\max} [S] [E]}{(K_m + [S])(1 + [I]/K_i)} \\
-\Sigma(t) &= \{(E,t)_{\text{test}}, (I,t)_{\text{inhibit}}\}
-\end{align}
-
-\textbf{Environmental Exchange ($\Theta$)}: Classifies transitions by boundary interaction:
-\begin{align}
-\Theta(t) = \begin{cases}
-\text{SOURCE} & \text{if } \preset{t} = \emptyset \land \postset{t} \neq \emptyset \\
-\text{SINK} & \text{if } \preset{t} \neq \emptyset \land \postset{t} = \emptyset \\
-\text{INTERNAL} & \text{otherwise}
-\end{cases}
-\end{align}
-
-\textbf{Transition Type ($\tau$)}: Enables heterogeneous dynamics (continuous ODE + stochastic SSA + timed events).
-
-\textbf{Formula Mapping ($\rho$)}: Tracks atomic composition (e.g., $\rho(\text{Glucose}) = \text{C}_6\text{H}_{12}\text{O}_6$) for mass balance validation.
-
-\textbf{Dependency Classification ($\Delta$)}: Defined algorithmically in Section~3.3.
+\textbf{Regulatory Structure ($\Sigma$)} captures non-consumptive arcs for catalysis (test arcs) and inhibition (inhibitor arcs). Example: enzyme-catalyzed reaction with inhibition has $\Phi(t) = \frac{V_{\max} [S] [E]}{(K_m + [S])(1 + [I]/K_i)}$ and $\Sigma(t) = \{(E,t)_{\text{test}}, (I,t)_{\text{inhibit}}\}$.
+\textbf{Environmental Exchange ($\Theta$)} classifies transitions by boundary interaction: $\Theta(t) = \text{SOURCE}$ if $\preset{t} = \emptyset \land \postset{t} \neq \emptyset$, $\Theta(t) = \text{SINK}$ if $\preset{t} \neq \emptyset \land \postset{t} = \emptyset$, and $\Theta(t) = \text{INTERNAL}$ otherwise.
+\textbf{Transition Type ($\tau$)} enables heterogeneous dynamics (continuous ODE + stochastic SSA + timed events).
+\textbf{Formula Mapping ($\rho$)} tracks atomic composition (e.g., $\rho(\text{Glucose}) = \text{C}_6\text{H}_{12}\text{O}_6$) for mass balance validation.
+\textbf{Dependency Classification ($\Delta$)} is defined algorithmically in Section~3.3.
 
 \subsection{Weak Independence Theory}
 
 \subsubsection{Two-Tier Independence}
 
-\begin{quote}
+{\small
 \textbf{Definition 2 (Strong Independence).}
 Transitions $t_1, t_2 \in T$ are \emph{strongly independent} iff:
 \begin{equation}
 (\preset{t_1} \cup \postset{t_1} \cup \RegSet{t_1}) \cap (\preset{t_2} \cup \postset{t_2} \cup \RegSet{t_2}) = \emptyset
 \end{equation}
-\end{quote}
+}
 
-\begin{quote}
+{\small
 \textbf{Definition 3 (Weak Independence).}
 Transitions $t_1, t_2 \in T$ are \emph{weakly independent} iff:
 \begin{equation}
 \preset{t_1} \cap \preset{t_2} = \emptyset \quad \land \quad [(\postset{t_1} \cap \postset{t_2} \neq \emptyset) \lor (\RegSet{t_1} \cap \RegSet{t_2} \neq \emptyset)]
 \end{equation}
-\end{quote}
+}
 
 \textbf{Key Insight}: Weak independence allows place-sharing via \emph{output convergence} or \emph{regulatory coupling}, but forbids \emph{input competition}.
 
 \subsubsection{Three Coupling Modes}
-
-\begin{enumerate}
-    \item \textbf{Competitive (Conflict)}: $\preset{t_1} \cap \preset{t_2} \neq \emptyset$ \\
-    $\Rightarrow$ Sequential execution required (resource conflict)
-    
-    \item \textbf{Convergent (Weakly Independent)}: $\postset{t_1} \cap \postset{t_2} \neq \emptyset \land \preset{t_1} \cap \preset{t_2} = \emptyset$ \\
-    $\Rightarrow$ Parallel execution: $\frac{dM(p)}{dt} = r_1 + r_2$ (superposition)
-    
-    \item \textbf{Regulatory (Weakly Independent)}: $\RegSet{t_1} \cap \RegSet{t_2} \neq \emptyset \land \preset{t_1} \cap \preset{t_2} = \emptyset$ \\
-    $\Rightarrow$ Parallel execution (read-only access to catalyst)
-\end{enumerate}
+(1) \textbf{Competitive (Conflict)}: $\preset{t_1} \cap \preset{t_2} \neq \emptyset$ $\Rightarrow$ Sequential execution required (resource conflict).
+(2) \textbf{Convergent (Weakly Independent)}: $\postset{t_1} \cap \postset{t_2} \neq \emptyset \land \preset{t_1} \cap \preset{t_2} = \emptyset$ $\Rightarrow$ Parallel execution: $\frac{dM(p)}{dt} = r_1 + r_2$ (superposition).
+(3) \textbf{Regulatory (Weakly Independent)}: $\RegSet{t_1} \cap \RegSet{t_2} \neq \emptyset \land \preset{t_1} \cap \preset{t_2} = \emptyset$ $\Rightarrow$ Parallel execution (read-only access to catalyst).
 
 \subsubsection{Correctness of Parallel Execution}
 
-\begin{quote}
+{\small
 \textbf{Theorem 1 (Weak Independence Correctness).}
 If $\DepType{t_1}{t_2} \in \{\text{convergent, regulatory}\}$, then parallel execution of $t_1$ and $t_2$ is semantically equivalent to any sequential interleaving.
-\end{quote}
+}
 
 \textbf{Proof sketch.}
 \textbf{Case 1 (Convergent)}: Let $p \in \postset{t_1} \cap \postset{t_2}$. By ODE semantics:
@@ -323,24 +265,9 @@ The \emph{lac} operon encodes $\beta$-galactosidase (LacZ) which metabolizes lac
 
 \subsubsection{Model Structure}
 
-\textbf{Places} (10): \texttt{lacDNA}, \texttt{lacZ\_mRNA}, \texttt{LacZ\_enzyme}, \texttt{Lactose}, \texttt{Glucose}, \texttt{Galactose}, \texttt{LacI\_protein}, \texttt{lacI\_DNA}, \texttt{lacI\_mRNA}, \texttt{RNAP}
-
-\textbf{Transitions} (9):
-\begin{itemize}
-    \item $T_1$: Transcription (\texttt{lacDNA} $\to$ \texttt{lacZ\_mRNA}), stochastic
-    \item $T_2$: Translation (\texttt{lacZ\_mRNA} $\to$ \texttt{LacZ\_enzyme}), stochastic
-    \item $T_3$: Metabolism (\texttt{Lactose} $\to$ \texttt{Galactose}), continuous
-    \item $T_4$--$T_6$: LacI expression (repressor synthesis)
-    \item $T_7$--$T_9$: mRNA/protein degradation
-\end{itemize}
-
-\textbf{Regulatory arcs} ($\Sigma$):
-\begin{itemize}
-    \item $({\texttt{Glucose}}, T_1)_{\text{inhibit}}$ with $\theta = 5$ mM (catabolite repression)
-    \item $({\texttt{LacI}}, T_1)_{\text{inhibit}}$ with $\theta = 10$ molecules
-    \item $({\texttt{LacZ}}, T_3)_{\text{test}}$ (enzyme catalysis)
-    \item $({\texttt{RNAP}}, T_1)_{\text{test}}$, $({\texttt{RNAP}}, T_4)_{\text{test}}$ (shared RNA polymerase)
-\end{itemize}
+\textbf{Places} (10): \texttt{lacDNA}, \texttt{lacZ\_mRNA}, \texttt{LacZ\_enzyme}, \texttt{Lactose}, \texttt{Glucose}, \texttt{Galactose}, \texttt{LacI\_protein}, \texttt{lacI\_DNA}, \texttt{lacI\_mRNA}, \texttt{RNAP}.
+\textbf{Transitions} (9): $T_1$ (transcription, \texttt{lacDNA} $\to$ \texttt{lacZ\_mRNA}, stochastic), $T_2$ (translation, \texttt{lacZ\_mRNA} $\to$ \texttt{LacZ\_enzyme}, stochastic), $T_3$ (metabolism, \texttt{Lactose} $\to$ \texttt{Galactose}, continuous), $T_4$--$T_6$ (LacI expression), $T_7$--$T_9$ (mRNA/protein degradation).
+\textbf{Regulatory arcs} ($\Sigma$): $({\texttt{Glucose}}, T_1)_{\text{inhibit}}$ with $\theta = 5$ mM (catabolite repression), $({\texttt{LacI}}, T_1)_{\text{inhibit}}$ with $\theta = 10$ molecules, $({\texttt{LacZ}}, T_3)_{\text{test}}$ (enzyme catalysis), $({\texttt{RNAP}}, T_1)_{\text{test}}$ and $({\texttt{RNAP}}, T_4)_{\text{test}}$ (shared RNA polymerase).
 
 \subsubsection{Dependency Classification}
 
@@ -361,50 +288,18 @@ $(T_1, T_7)$ & Independent & Disjoint neighborhoods \\
 Classical topology checks (P-invariants, boundedness, liveness) produce \emph{false positives} on Bio-PNs~\cite{Chaouiya2007}. We propose domain-specific analyzers:
 
 \subsubsection{Mass Balance Analyzer}
-
-\textbf{Purpose}: Validate atom conservation (not token conservation).
-
-\textbf{Algorithm}: For each transition $t \in T$:
-\begin{equation}
-\sum_{p \in \preset{t}} W(p,t) \cdot \text{Atoms}(p) \stackrel{?}{=} \sum_{p \in \postset{t}} W(t,p) \cdot \text{Atoms}(p)
-\end{equation}
-Check equality for C, H, O, N, P, S.
-
+Validates atom conservation (not token conservation). For each transition $t \in T$, check $\sum_{p \in \preset{t}} W(p,t) \cdot \text{Atoms}(p) \stackrel{?}{=} \sum_{p \in \postset{t}} W(t,p) \cdot \text{Atoms}(p)$ for C, H, O, N, P, S.
 \subsubsection{Flux Balance Analyzer}
-
-\textbf{Purpose}: Check steady-state feasibility~\cite{Orth2010}.
-
-\textbf{Algorithm}: Solve $N \cdot v = 0$ subject to flux constraints, where $N$ is the stoichiometric matrix. Identify blocked reactions ($v_i = 0$ always).
-
+Checks steady-state feasibility~\cite{Orth2010}. Solve $N \cdot v = 0$ subject to flux constraints, where $N$ is the stoichiometric matrix, to identify blocked reactions ($v_i = 0$ always).
 \subsubsection{Regulatory Structure Analyzer}
-
-\textbf{Purpose}: Detect places in rate formulas without arcs (correct for Bio-PNs).
-
-\textbf{Algorithm}: For each transition $t$:
-\begin{enumerate}
-    \item Parse $\Phi(t)$ to extract variable names $V$
-    \item Compute $\RegSet{t} = V \setminus (\preset{t} \cup \postset{t})$
-    \item Classify: catalyst (unchanged), activator (positive coefficient), inhibitor (negative coefficient)
-\end{enumerate}
+Detects places in rate formulas without arcs (correct for Bio-PNs). For each transition $t$: (1) parse $\Phi(t)$ to extract variable names $V$, (2) compute $\RegSet{t} = V \setminus (\preset{t} \cup \postset{t})$, (3) classify as catalyst (unchanged), activator (positive coefficient), or inhibitor (negative coefficient).
 
 \section{Results}
 
 \subsection{Dataset}
 
-100 curated SBML models from BioModels database~\cite{Malik-Sheriff2020}:
-\begin{itemize}
-    \item BIOMD0000000001 (Edelstein 1996: Glycolysis oscillator)
-    \item BIOMD0000000010 (Kholodenko 2000: MAPK cascade)
-    \item BIOMD0000000012 (Elowitz 2000: Repressilator)
-    \item \ldots (97 additional models)
-\end{itemize}
-
-\textbf{Metrics}:
-\begin{itemize}
-    \item \% transition pairs in each dependency class
-    \item Parallel simulation speedup (wall-clock time)
-    \item False positive rate (classical vs.\ biological validation)
-\end{itemize}
+100 curated SBML models from BioModels database~\cite{Malik-Sheriff2020}: BIOMD0000000001 (Edelstein 1996: Glycolysis oscillator), BIOMD0000000010 (Kholodenko 2000: MAPK cascade), BIOMD0000000012 (Elowitz 2000: Repressilator), and 97 additional models.
+\textbf{Metrics}: \% transition pairs in each dependency class, parallel simulation speedup (wall-clock time), and false positive rate (classical vs.\ biological validation).
 
 \subsection{SBML Import Validation}
 
@@ -462,12 +357,7 @@ Competitive & 19.5 & No \\
 \label{fig:speedup}
 \end{figure}
 
-\textbf{Results} (Figure~\ref{fig:speedup}):
-\begin{itemize}
-    \item Mean speedup: $2.8\times$ on 4-core CPU
-    \item Best case: $4.1\times$ (BIOMD0000000010, MAPK cascade)
-    \item Overhead: 5--10\% (dependency classification + scheduling)
-\end{itemize}
+\textbf{Results} (Figure~\ref{fig:speedup}): Mean speedup is $2.8\times$ on 4-core CPU, best case is $4.1\times$ (BIOMD0000000010, MAPK cascade), and overhead is 5--10\% (dependency classification + scheduling).
 
 \subsection{Validation Accuracy}
 
@@ -504,23 +394,8 @@ Weak independence extends classical PN theory~\cite{Reisig2013,Murata1989} to co
 
 \subsection{Limitations and Future Work}
 
-\textbf{Current Limitations}:
-\begin{itemize}
-    \item Weak independence defined for continuous (ODE) semantics only
-    \item No thermodynamic feasibility checking (\(\Delta G\) constraints)
-    \item Manual parameter estimation (no automated fitting)
-\end{itemize}
-
-\textbf{Future Directions}:
-\begin{itemize}
-    \item \textbf{Stochastic Weak Independence}: Extend to \(\tau\)-leaping~\cite{Gillespie2001}. Biological motivation: molecular collisions occur simultaneously in solution (not sequential). Hypothesis: Convergent/regulatory coupling \(\to\) independent Poisson processes (parallelizable); competitive coupling \(\to\) resource conflict (sequential). Expected speedup: 2--4\(\times\) for hybrid models.
-    
-    \item \textbf{Thermodynamic Analyzer}: Integrate eQuilibrator~\cite{Flamholz2012} to check Gibbs free energy feasibility. Reject thermodynamically infeasible reaction directions.
-    
-    \item \textbf{Parallel Parameter Estimation}: Use weak independence to parallelize PSO/genetic algorithms. Expected speedup: 10--100\(\times\) over sequential optimization.
-    
-    \item \textbf{Distributed Simulation}: MPI/GPU acceleration for whole-cell models (10,000+ species). Target: genome-scale metabolic reconstructions.
-\end{itemize}
+\textbf{Current Limitations}: Weak independence defined for continuous (ODE) semantics only; no thermodynamic feasibility checking (\(\Delta G\) constraints); manual parameter estimation (no automated fitting).
+\textbf{Future Directions}: (1) \textbf{Stochastic Weak Independence} extending to \(\tau\)-leaping~\cite{Gillespie2001} (biological motivation: molecular collisions occur simultaneously in solution; hypothesis: convergent/regulatory coupling \(\to\) independent Poisson processes, competitive coupling \(\to\) resource conflict; expected speedup: 2--4\(\times\) for hybrid models); (2) \textbf{Thermodynamic Analyzer} integrating eQuilibrator~\cite{Flamholz2012} to check Gibbs free energy feasibility; (3) \textbf{Parallel Parameter Estimation} using weak independence to parallelize PSO/genetic algorithms (expected speedup: 10--100\(\times\)); (4) \textbf{Distributed Simulation} with MPI/GPU acceleration for whole-cell models (10,000+ species, targeting genome-scale metabolic reconstructions).
 
 \subsection{Related Work Comparison}
 

@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.25 (TeX Live 2023/Debian) (preloaded format=pdflatex 2025.11.17)  28 NOV 2025 13:10
+This is pdfTeX, Version 3.141592653-2.6-1.40.25 (TeX Live 2023/Debian) (preloaded format=pdflatex 2025.11.17)  28 NOV 2025 13:22
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -686,46 +686,55 @@ LaTeX Font Info:    Trying to load font information for U+psy on input line 64.
 (/usr/share/texlive/texmf-dist/tex/latex/psnfss/upsy.fd
 File: upsy.fd 2001/06/04 font definitions for U/psy.
 ))
+(/usr/share/texlive/texmf-dist/tex/latex/enumitem/enumitem.sty
+Package: enumitem 2019/06/20 v3.9 Customized lists
+\labelindent=\skip56
+\enit@outerparindent=\dimen293
+\enit@toks=\toks41
+\enit@inbox=\box66
+\enit@count@id=\count323
+\enitdp@description=\count324
+)
 (/usr/share/texlive/texmf-dist/tex/latex/l3backend/l3backend-pdftex.def
 File: l3backend-pdftex.def 2024-01-04 L3 backend support: PDF output (pdfTeX)
-\l__color_backend_stack_int=\count323
-\l__pdf_internal_box=\box66
+\l__color_backend_stack_int=\count325
+\l__pdf_internal_box=\box67
 )
 (./weak_independence_biopn_bioinformatics.aux)
 \openout1 = `weak_independence_biopn_bioinformatics.aux'.
 
-LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 50.
-LaTeX Font Info:    ... okay on input line 50.
-LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 50.
-LaTeX Font Info:    ... okay on input line 50.
-LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 50.
-LaTeX Font Info:    ... okay on input line 50.
-LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 50.
-LaTeX Font Info:    ... okay on input line 50.
-LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 50.
-LaTeX Font Info:    ... okay on input line 50.
-LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 50.
-LaTeX Font Info:    ... okay on input line 50.
-LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 50.
-LaTeX Font Info:    ... okay on input line 50.
-LaTeX Font Info:    Checking defaults for PD1/pdf/m/n on input line 50.
-LaTeX Font Info:    ... okay on input line 50.
-LaTeX Font Info:    Checking defaults for PU/pdf/m/n on input line 50.
-LaTeX Font Info:    ... okay on input line 50.
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 53.
+LaTeX Font Info:    ... okay on input line 53.
+LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 53.
+LaTeX Font Info:    ... okay on input line 53.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 53.
+LaTeX Font Info:    ... okay on input line 53.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 53.
+LaTeX Font Info:    ... okay on input line 53.
+LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 53.
+LaTeX Font Info:    ... okay on input line 53.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 53.
+LaTeX Font Info:    ... okay on input line 53.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 53.
+LaTeX Font Info:    ... okay on input line 53.
+LaTeX Font Info:    Checking defaults for PD1/pdf/m/n on input line 53.
+LaTeX Font Info:    ... okay on input line 53.
+LaTeX Font Info:    Checking defaults for PU/pdf/m/n on input line 53.
+LaTeX Font Info:    ... okay on input line 53.
 
 (/usr/share/texlive/texmf-dist/tex/context/base/mkii/supp-pdf.mkii
 [Loading MPS to PDF converter (version 2006.09.02).]
-\scratchcounter=\count324
-\scratchdimen=\dimen293
-\scratchbox=\box67
-\nofMPsegments=\count325
-\nofMParguments=\count326
-\everyMPshowfont=\toks41
-\MPscratchCnt=\count327
-\MPscratchDim=\dimen294
-\MPnumerator=\count328
-\makeMPintoPDFobject=\count329
-\everyMPtoPDFconversion=\toks42
+\scratchcounter=\count326
+\scratchdimen=\dimen294
+\scratchbox=\box68
+\nofMPsegments=\count327
+\nofMParguments=\count328
+\everyMPshowfont=\toks42
+\MPscratchCnt=\count329
+\MPscratchDim=\dimen295
+\MPnumerator=\count330
+\makeMPintoPDFobject=\count331
+\everyMPtoPDFconversion=\toks43
 ) (/usr/share/texlive/texmf-dist/tex/latex/epstopdf-pkg/epstopdf-base.sty
 Package: epstopdf-base 2020-01-24 v2.11 Base part for package epstopdf
 Package epstopdf-base Info: Redefining graphics rule for `.eps' on input line 4
@@ -735,7 +744,7 @@ Package epstopdf-base Info: Redefining graphics rule for `.eps' on input line 4
 File: epstopdf-sys.cfg 2010/07/13 v1.3 Configuration of (r)epstopdf for TeX Liv
 e
 ))
-Package hyperref Info: Link coloring OFF on input line 50.
+Package hyperref Info: Link coloring OFF on input line 53.
 
 (./weak_independence_biopn_bioinformatics.out)
 (./weak_independence_biopn_bioinformatics.out)
@@ -779,238 +788,232 @@ Package caption Info: End \AtBeginDocument code.
 * \@reversemarginfalse
 * (1in=72.27pt=25.4mm, 1cm=28.453pt)
 
-LaTeX Font Info:    Trying to load font information for U+msa on input line 53.
+LaTeX Font Info:    Trying to load font information for U+msa on input line 56.
 
 (/usr/share/texlive/texmf-dist/tex/latex/amsfonts/umsa.fd
 File: umsa.fd 2013/01/14 v3.01 AMS symbols A
 )
-LaTeX Font Info:    Trying to load font information for U+msb on input line 53.
+LaTeX Font Info:    Trying to load font information for U+msb on input line 56.
 
 
 (/usr/share/texlive/texmf-dist/tex/latex/amsfonts/umsb.fd
 File: umsb.fd 2013/01/14 v3.01 AMS symbols B
 )
-Underfull \hbox (badness 1939) in paragraph at lines 55--56
+Underfull \hbox (badness 1939) in paragraph at lines 58--59
 \T1/cmr/bx/n/10.95 Motivation: \T1/cmr/m/n/10.95 Bi-o-log-i-cal Petri Nets (Bio
 -PNs)
  []
 
-LaTeX Font Info:    Trying to load font information for T1+cmtt on input line 5
-9.
+LaTeX Font Info:    Trying to load font information for T1+cmtt on input line 6
+2.
 (/usr/share/texlive/texmf-dist/tex/latex/base/t1cmtt.fd
 File: t1cmtt.fd 2023/04/13 v2.5m Standard LaTeX font definitions
 )
-Underfull \hbox (badness 10000) in paragraph at lines 59--61
+Underfull \hbox (badness 10000) in paragraph at lines 62--64
 []\T1/cmr/bx/n/10.95 Availability and Im-ple-men-ta-tion:
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 59--61
+Underfull \hbox (badness 10000) in paragraph at lines 62--64
 \T1/cmr/m/n/10.95 Open-source im-ple-men-ta-tion avail-able at
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 59--61
+Underfull \hbox (badness 10000) in paragraph at lines 62--64
 []$\T1/cmtt/m/n/10.95 https : / / github . com / simao-[]eugenio / shypn$[]
  []
 
 
-LaTeX Warning: Citation `Alberts2015' on page 1 undefined on input line 64.
+LaTeX Warning: Citation `Alberts2015' on page 1 undefined on input line 67.
 
 
-LaTeX Warning: Citation `Nelson2017' on page 1 undefined on input line 64.
+LaTeX Warning: Citation `Nelson2017' on page 1 undefined on input line 67.
 
 
-LaTeX Warning: Citation `Reddy1993' on page 1 undefined on input line 66.
+LaTeX Warning: Citation `Reddy1993' on page 1 undefined on input line 69.
 
 
-Underfull \hbox (badness 2781) in paragraph at lines 68--69
-[]\T1/cmr/bx/n/10.95 Convergent pro-duc-tion\T1/cmr/m/n/10.95 : Glycogenol-y-si
-s
- []
+LaTeX Warning: Citation `Reisig2013' on page 1 undefined on input line 71.
 
 
-LaTeX Warning: Citation `Reisig2013' on page 1 undefined on input line 73.
+LaTeX Warning: Citation `Malik2020' on page 1 undefined on input line 73.
 
 
-LaTeX Warning: Citation `Malik2020' on page 1 undefined on input line 75.
+LaTeX Warning: Citation `Orth2011' on page 1 undefined on input line 73.
 
 
-LaTeX Warning: Citation `Orth2011' on page 1 undefined on input line 75.
-
-
-Underfull \hbox (badness 1708) in paragraph at lines 75--76
+Underfull \hbox (badness 1708) in paragraph at lines 73--74
 []\T1/cmr/bx/n/10.95 The com-pu-ta-tional chal-lenge is sig-nif-i-
  []
 
 
-Underfull \hbox (badness 1097) in paragraph at lines 75--76
+Underfull \hbox (badness 1097) in paragraph at lines 73--74
 \T1/cmr/bx/n/10.95 cant\T1/cmr/m/n/10.95 . The BioMod-els database con-tains ov
 er
  []
 
-[1{/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map}{/usr/share/texmf/fonts/en
-c/dvips/cm-super/cm-super-t1.enc}
+
+Underfull \vbox (badness 10000) has occurred while \output is active []
+
+ [1{/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map}{/usr/share/texmf/fonts/e
+nc/dvips/cm-super/cm-super-t1.enc}
 
 
-{/usr/share/texmf/fonts/enc/dvips/cm-super/cm-super-ts1.enc}]
-Underfull \hbox (badness 5302) in paragraph at lines 113--114
+]
+Underfull \hbox (badness 5302) in paragraph at lines 111--112
 []\T1/cmr/m/n/10.95 This ex-am-ple il-lus-trates \T1/cmr/bx/n/10.95 con-ver-gen
 t cou-
  []
 
 
-Underfull \hbox (badness 4181) in paragraph at lines 124--125
-[]\T1/cmr/bx/n/10.95 Dependency Clas-si-fi-ca-tion Al-go-rithm\T1/cmr/m/n/10.95
- :
- []
+LaTeX Warning: Citation `Reddy1993' on page 2 undefined on input line 120.
 
 
-LaTeX Warning: Citation `Reddy1993' on page 2 undefined on input line 133.
+LaTeX Warning: Citation `Hucka2003' on page 2 undefined on input line 120.
 
 
-LaTeX Warning: Citation `Hucka2003' on page 2 undefined on input line 133.
+LaTeX Warning: Citation `Murata1989' on page 2 undefined on input line 124.
 
 
-Underfull \hbox (badness 1515) in paragraph at lines 133--134
-\T1/cmr/bx/n/10.95 Historical Con-text\T1/cmr/m/n/10.95 : Petri nets en-tered s
-ys-
- []
+LaTeX Warning: Citation `Reisig2013' on page 2 undefined on input line 126.
 
 
-LaTeX Warning: Citation `Murata1989' on page 2 undefined on input line 137.
-
-
-LaTeX Warning: Citation `Reisig2013' on page 2 undefined on input line 139.
-
-
-Underfull \hbox (badness 1755) in paragraph at lines 139--140
+Underfull \hbox (badness 1755) in paragraph at lines 126--127
 []\T1/cmr/bx/n/10.95 Independence (Clas-si-cal) \T1/cmr/m/n/10.95 [[]]: Tran-si
 -tions
  []
 
 
-LaTeX Warning: Citation `Reddy1993' on page 2 undefined on input line 149.
+LaTeX Warning: Citation `Reddy1993' on page 2 undefined on input line 136.
 
 
-LaTeX Warning: Citation `Heiner2008' on page 2 undefined on input line 151.
+LaTeX Warning: Citation `Heiner2008' on page 2 undefined on input line 136.
 
 
-LaTeX Warning: Citation `Gilbert2006' on page 2 undefined on input line 152.
-
-[2]
-
-LaTeX Warning: Citation `Koch2011' on page 3 undefined on input line 156.
+LaTeX Warning: Citation `Gilbert2006' on page 2 undefined on input line 136.
 
 
-Overfull \hbox (13.40367pt too wide) in paragraph at lines 166--178
+LaTeX Warning: Citation `Koch2011' on page 2 undefined on input line 138.
+
+
+Overfull \hbox (13.40367pt too wide) in paragraph at lines 148--160
  [][] 
  []
 
-
-Underfull \hbox (badness 1769) in paragraph at lines 189--191
-[]\T1/cmr/bx/n/10.95 Definition 1 (Ex-tended Bi-o-log-i-cal
+[2]
+Underfull \hbox (badness 2334) in paragraph at lines 175--178
+\T1/cmr/m/n/10 where $\OML/cmm/m/it/10 P$ \T1/cmr/m/n/10 is the set of places (
+chem-i-cal species),
  []
 
 
-Overfull \hbox (10.48244pt too wide) detected at line 193
-[][][][] \OT1/cmr/m/n/10.95 = (\OML/cmm/m/it/10.95 P; T; F; W; M[]; K; \OT1/cmr
-/m/n/10.95 ^^H\OML/cmm/m/it/10.95 ; \OT1/cmr/m/n/10.95 ^^F\OML/cmm/m/it/10.95 ;
- \OT1/cmr/m/n/10.95 ^^B\OML/cmm/m/it/10.95 ; \OT1/cmr/m/n/10.95 ^^A\OML/cmm/m/i
-t/10.95 ; ^^\; ^^Z\OT1/cmr/m/n/10.95 )
+Underfull \hbox (badness 1436) in paragraph at lines 175--178
+\T1/cmr/m/n/10 rate func-tions (ki-netic laws), $\OT1/cmr/m/n/10 ^^F \OMS/cmsy/
+m/n/10 ^^R \OT1/cmr/m/n/10 (\OML/cmm/m/it/10 P \OMS/cmsy/m/n/10 ^^B \OML/cmm/m/
+it/10 T\OT1/cmr/m/n/10 ) \OMS/cmsy/m/n/10 n \OML/cmm/m/it/10 F$
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 204--205
-[]$\OT1/cmr/m/n/10.95 ^^B : \OML/cmm/m/it/10.95 T \OMS/cmsy/m/n/10.95 !
+Underfull \hbox (badness 3158) in paragraph at lines 175--178
+\T1/cmr/m/n/10 are reg-u-la-tory arcs (test/inhibitor), $\OT1/cmr/m/n/10 ^^B : 
+\OML/cmm/m/it/10 T \OMS/cmsy/m/n/10 !
  []
 
 
-Overfull \hbox (53.01753pt too wide) in paragraph at lines 204--205
-\OMS/cmsy/m/n/10.95 f[]g$\T1/cmr/m/n/10.95 :
+Underfull \hbox (badness 10000) in paragraph at lines 175--178
+\OMS/cmsy/m/n/10 f[]g$
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 205--206
-[]$\OT1/cmr/m/n/10.95 ^^A : \OML/cmm/m/it/10.95 T \OMS/cmsy/m/n/10.95 ^^B \OML/
-cmm/m/it/10.95 T \OMS/cmsy/m/n/10.95 !
+Underfull \hbox (badness 1142) in paragraph at lines 175--178
+\T1/cmr/m/n/10 clas-si-fies en-vi-ron-men-tal ex-change, $\OT1/cmr/m/n/10 ^^A :
+ \OML/cmm/m/it/10 T \OMS/cmsy/m/n/10 ^^B \OML/cmm/m/it/10 T \OMS/cmsy/m/n/10 !
  []
 
 
-Overfull \hbox (179.01268pt too wide) in paragraph at lines 205--206
-\OMS/cmsy/m/n/10.95 f[]g$\T1/cmr/m/n/10.95 :
+Overfull \hbox (79.43378pt too wide) in paragraph at lines 175--178
+\OMS/cmsy/m/n/10 f[]g$
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 206--207
-[]$\OML/cmm/m/it/10.95 ^^\ \OT1/cmr/m/n/10.95 : \OML/cmm/m/it/10.95 T \OMS/cmsy
-/m/n/10.95 !
+Underfull \hbox (badness 10000) in paragraph at lines 175--178
+\T1/cmr/m/n/10 is the de-pen-dency type, $\OML/cmm/m/it/10 ^^\ \OT1/cmr/m/n/10 
+: \OML/cmm/m/it/10 T \OMS/cmsy/m/n/10 !
  []
 
 
-Overfull \hbox (109.78645pt too wide) in paragraph at lines 206--207
-\OMS/cmsy/m/n/10.95 f[]g$\T1/cmr/m/n/10.95 :
+Overfull \hbox (15.8382pt too wide) in paragraph at lines 175--178
+\OMS/cmsy/m/n/10 f[]g$
  []
 
 
-Underfull \hbox (badness 2310) in paragraph at lines 221--222
-[]\T1/cmr/bx/n/10.95 Environmental Ex-change ($\OT1/cmr/m/n/10.95 ^^B$\T1/cmr/b
-x/n/10.95 )\T1/cmr/m/n/10.95 : Clas-si-fies
+Underfull \hbox (badness 10000) in paragraph at lines 180--185
+\T1/cmr/bx/n/10.95 Regulatory Struc-ture ($\OT1/cmr/m/n/10.95 ^^F$\T1/cmr/bx/n/
+10.95 ) \T1/cmr/m/n/10.95 cap-tures non-
  []
 
 
-Overfull \hbox (36.86426pt too wide) detected at line 253
-[][][][][]\OML/cmm/m/it/10.95 t[] \OMS/cmsy/m/n/10.95 \ [][]\OML/cmm/m/it/10.95
- t[] \OT1/cmr/m/n/10.95 = \OMS/cmsy/m/n/10.95 ;  ^  \OT1/cmr/m/n/10.95 [(\OML/c
-mm/m/it/10.95 t[] \OMS/cmsy/m/n/10.95 \ \OML/cmm/m/it/10.95 t[] \OMS/cmsy/m/n/1
-0.95 6\OT1/cmr/m/n/10.95 = \OMS/cmsy/m/n/10.95 ;\OT1/cmr/m/n/10.95 ) \OMS/cmsy/
-m/n/10.95 _ \OT1/cmr/m/n/10.95 (^^F(\OML/cmm/m/it/10.95 t[]\OT1/cmr/m/n/10.95 )
- \OMS/cmsy/m/n/10.95 \ \OT1/cmr/m/n/10.95 ^^F(\OML/cmm/m/it/10.95 t[]\OT1/cmr/m
-/n/10.95 ) \OMS/cmsy/m/n/10.95 6\OT1/cmr/m/n/10.95 = \OMS/cmsy/m/n/10.95 ;\OT1/
-cmr/m/n/10.95 )]
- []
-
-[3]
-Underfull \hbox (badness 10000) in paragraph at lines 267--269
-[]\T1/cmr/bx/n/10.95 Regulatory (Weakly In-de-pen-dent)\T1/cmr/m/n/10.95 :
+Underfull \hbox (badness 10000) in paragraph at lines 180--185
+\T1/cmr/m/n/10.95 consumptive arcs for catal-y-sis (test arcs)
  []
 
 
-Underfull \hbox (badness 1845) in paragraph at lines 267--269
-\OMS/cmsy/m/n/10.95 )$ \T1/cmr/m/n/10.95 Par-al-lel ex-e-cu-tion (read-only ac-
-cess to
+Underfull \hbox (badness 10000) in paragraph at lines 180--185
+\T1/cmr/m/n/10.95 and in-hi-bi-tion (in-hibitor arcs). Ex-am-
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 274--276
-[]\T1/cmr/bx/n/10.95 Theorem 1 (Weak In-de-pen-
+Underfull \hbox (badness 10000) in paragraph at lines 180--185
+\T1/cmr/m/n/10.95 ple: enzyme-catalyzed re-ac-tion with in-hi-
  []
 
 
-Underfull \hbox (badness 5652) in paragraph at lines 274--276
-\OMS/cmsy/m/n/10.95 f[]g$\T1/cmr/m/n/10.95 , then par-al-lel
+Underfull \hbox (badness 10000) in paragraph at lines 180--185
+\T1/cmr/m/n/10.95 bi-tion has $\OT1/cmr/m/n/10.95 ^^H(\OML/cmm/m/it/10.95 t\OT1
+/cmr/m/n/10.95 ) = []$ \T1/cmr/m/n/10.95 and
  []
 
 
-Overfull \hbox (49.47356pt too wide) detected at line 283
+Underfull \hbox (badness 1097) in paragraph at lines 180--185
+\OT1/cmr/m/n/10.95 ^^F(\OML/cmm/m/it/10.95 t\OT1/cmr/m/n/10.95 ) = \OMS/cmsy/m/
+n/10.95 f\OT1/cmr/m/n/10.95 (\OML/cmm/m/it/10.95 E; t\OT1/cmr/m/n/10.95 )[]\OML
+/cmm/m/it/10.95 ; \OT1/cmr/m/n/10.95 (\OML/cmm/m/it/10.95 I; t\OT1/cmr/m/n/10.9
+5 )[]\OMS/cmsy/m/n/10.95 g$\T1/cmr/m/n/10.95 . \T1/cmr/bx/n/10.95 En-vi-ron-men
+-
+ []
+
+
+Underfull \hbox (badness 5847) in paragraph at lines 180--185
+\T1/cmr/bx/n/10.95 tal Ex-change ($\OT1/cmr/m/n/10.95 ^^B$\T1/cmr/bx/n/10.95 ) 
+\T1/cmr/m/n/10.95 clas-si-fies tran-si-tions by
+ []
+
+
+Underfull \hbox (badness 3568) in paragraph at lines 180--185
+\T1/cmr/m/n/10.95 bound-ary in-ter-ac-tion: $\OT1/cmr/m/n/10.95 ^^B(\OML/cmm/m/
+it/10.95 t\OT1/cmr/m/n/10.95 ) = []$ \T1/cmr/m/n/10.95 if
+ []
+
+
+Overfull \hbox (49.47356pt too wide) detected at line 225
 []
  []
 
 
-Underfull \hbox (badness 1043) in paragraph at lines 283--285
+Underfull \hbox (badness 1043) in paragraph at lines 225--227
 \T1/cmr/m/n/10.95 Rate con-tri-bu-tions \T1/cmr/m/it/10.95 add lin-early \T1/cm
 r/m/n/10.95 (su-per-po-si-tion).
  []
 
-
-Underfull \hbox (badness 10000) in paragraph at lines 288--288
+[3]
+Underfull \hbox (badness 10000) in paragraph at lines 230--230
 []\T1/cmr/bx/n/12 Dependency Clas-si-fi-ca-tion Al-go-
  []
 
 Package hyperref Info: bookmark level for unknown algorithm defaults to 0 on in
-put line 291.
+put line 233.
 
-Overfull \hbox (6.35376pt too wide) in paragraph at lines 294--295
+Overfull \hbox (6.35376pt too wide) in paragraph at lines 236--237
 [] []\T1/cmr/m/n/10.95 BioPN $\OT1/cmr/m/n/10.95 (\OML/cmm/m/it/10.95 P; T; F; 
 W; M[]; K; \OT1/cmr/m/n/10.95 ^^H\OML/cmm/m/it/10.95 ; \OT1/cmr/m/n/10.95 ^^F\O
 ML/cmm/m/it/10.95 ; \OT1/cmr/m/n/10.95 ^^B\OML/cmm/m/it/10.95 ; \OT1/cmr/m/n/10
@@ -1018,57 +1021,73 @@ ML/cmm/m/it/10.95 ; \OT1/cmr/m/n/10.95 ^^B\OML/cmm/m/it/10.95 ; \OT1/cmr/m/n/10
  []
 
 
-Underfull \hbox (badness 1490) in paragraph at lines 318--319
+Underfull \hbox (badness 1490) in paragraph at lines 260--261
 \T1/cmr/m/n/10.95 We il-lus-trate weak in-de-pen-dence with the \T1/cmr/m/it/10
 .95 lac
  []
 
 
-Underfull \hbox (badness 3417) in paragraph at lines 326--327
+Underfull \hbox (badness 3417) in paragraph at lines 268--271
 \T1/cmtt/m/n/10.95 Lactose\T1/cmr/m/n/10.95 , \T1/cmtt/m/n/10.95 Glucose\T1/cmr
 /m/n/10.95 , \T1/cmtt/m/n/10.95 Galactose\T1/cmr/m/n/10.95 , \T1/cmtt/m/n/10.95
  LacI_protein\T1/cmr/m/n/10.95 ,
  []
 
 
-Underfull \hbox (badness 1092) in paragraph at lines 330--331
-[]$\OML/cmm/m/it/10.95 T[]$\T1/cmr/m/n/10.95 : Tran-scrip-tion (\T1/cmtt/m/n/10
-.95 lacDNA $\OMS/cmsy/m/n/10.95 !$ \T1/cmtt/m/n/10.95 lacZ_mRNA\T1/cmr/m/n/10.9
-5 ),
+Underfull \hbox (badness 6859) in paragraph at lines 268--271
+\OML/cmm/m/it/10.95 T[]$ \T1/cmr/m/n/10.95 (trans-la-tion, \T1/cmtt/m/n/10.95 l
+acZ_mRNA $\OMS/cmsy/m/n/10.95 !$ \T1/cmtt/m/n/10.95 LacZ_enzyme\T1/cmr/m/n/10.9
+5 ,
  []
 
-[4]
 
-LaTeX Warning: Citation `Chaouiya2007' on page 5 undefined on input line 361.
+Underfull \hbox (badness 10000) in paragraph at lines 268--271
+\T1/cmr/m/n/10.95 stochas-tic), $\OML/cmm/m/it/10.95 T[]$ \T1/cmr/m/n/10.95 (me
+tabolism, \T1/cmtt/m/n/10.95 Lactose $\OMS/cmsy/m/n/10.95 !$
+ []
 
 
-Underfull \hbox (badness 1270) in paragraph at lines 361--362
+Underfull \hbox (badness 1205) in paragraph at lines 268--271
+\OML/cmm/m/it/10.95 T[]$\T1/cmr/m/n/10.95 --$\OML/cmm/m/it/10.95 T[]$ \T1/cmr/m
+/n/10.95 (mRNA/protein degra-da-tion). \T1/cmr/bx/n/10.95 Reg-u-la-
+ []
+
+
+Underfull \hbox (badness 6236) in paragraph at lines 268--271
+\OT1/cmr/m/n/10.95 ([]\OML/cmm/m/it/10.95 ; T[]\OT1/cmr/m/n/10.95 )[]$ \T1/cmr/
+m/n/10.95 and $\OT1/cmr/m/n/10.95 ([]\OML/cmm/m/it/10.95 ; T[]\OT1/cmr/m/n/10.9
+5 )[]$ \T1/cmr/m/n/10.95 (shared RNA
+ []
+
+
+LaTeX Warning: Citation `Chaouiya2007' on page 4 undefined on input line 288.
+
+
+Underfull \hbox (badness 1270) in paragraph at lines 288--289
 \T1/cmr/m/n/10.95 Classical topol-ogy checks (P-invariants, bound-
  []
 
 
-LaTeX Warning: Citation `Orth2010' on page 5 undefined on input line 375.
+Underfull \hbox (badness 1796) in paragraph at lines 291--292
+\T1/cmr/m/n/10.95 va-tion). For each tran-si-tion $\OML/cmm/m/it/10.95 t \OMS/c
+msy/m/n/10.95 2 \OML/cmm/m/it/10.95 T$\T1/cmr/m/n/10.95 , check
+ []
 
 
-LaTeX Warning: Citation `Malik-Sheriff2020' on page 5 undefined on input line 3
-94.
+LaTeX Warning: Citation `Orth2010' on page 4 undefined on input line 293.
 
 
-Underfull \hbox (badness 6910) in paragraph at lines 394--395
+LaTeX Warning: Citation `Malik-Sheriff2020' on page 4 undefined on input line 3
+01.
+
+
+Underfull \hbox (badness 6910) in paragraph at lines 301--303
 \T1/cmr/m/n/10.95 100 cu-rated SBML mod-els from BioMod-els
  []
 
+[4]
 
-Underfull \hbox (badness 10000) in paragraph at lines 397--398
-[]\T1/cmr/m/n/10.95 BIOMD0000000010 (Kholo-denko 2000:
- []
-
-
-LaTeX Warning: Reference `tab:sbml-import-real' on page 5 undefined on input li
-ne 411.
-
-
-LaTeX Warning: File `figures/speedup_plot.pdf' not found on input line 460.
+LaTeX Warning: File `figures/speedup_plot.pdf' not found on input line 355.
 
 
 ! Package pdftex.def Error: File `figures/speedup_plot.pdf' not found: using dr
@@ -1078,62 +1097,55 @@ See the pdftex.def package documentation for explanation.
 Type  H <return>  for immediate help.
  ...                                              
                                                   
-l.460 ...=0.8\linewidth]{figures/speedup_plot.pdf}
+l.355 ...=0.8\linewidth]{figures/speedup_plot.pdf}
                                                   
 Try typing  <return>  to proceed.
 If that doesn't work, type  X <return>  to quit.
 
-[5]
 
-LaTeX Warning: Reference `fig:speedup' on page 6 undefined on input line 465.
-
-
-LaTeX Warning: Reference `alg:classify' on page 6 undefined on input line 495.
-
-
-Underfull \hbox (badness 2662) in paragraph at lines 495--496
-\T1/cmr/m/n/10.95 clas-si-fi-ca-tion (Al-go-rithm []), par-al-lel schedul-
+Underfull \hbox (badness 5533) in paragraph at lines 385--386
+\T1/cmr/m/n/10.95 clas-si-fi-ca-tion (Al-go-rithm []1[]), par-al-lel schedul-
  []
 
 
-Underfull \hbox (badness 1661) in paragraph at lines 495--496
+Underfull \hbox (badness 1661) in paragraph at lines 385--386
 \T1/cmr/m/n/10.95 source at []$\T1/cmtt/m/n/10.95 https : / / github . com / si
 mao-[]eugenio /
  []
 
 
-Underfull \vbox (badness 1082) has occurred while \output is active []
+Underfull \vbox (badness 1565) has occurred while \output is active []
 
 
 
-LaTeX Warning: Citation `Reisig2013' on page 6 undefined on input line 499.
+LaTeX Warning: Citation `Reisig2013' on page 5 undefined on input line 389.
 
 
-LaTeX Warning: Citation `Murata1989' on page 6 undefined on input line 499.
+LaTeX Warning: Citation `Murata1989' on page 5 undefined on input line 389.
 
 
-Underfull \hbox (badness 1082) in paragraph at lines 499--500
+Underfull \hbox (badness 1082) in paragraph at lines 389--390
 \T1/cmr/m/n/10.95 bi-o-log-i-cal cou-pling (con-ver-gent/regulatory) from
  []
 
+[5]
 
-Underfull \hbox (badness 1742) in paragraph at lines 509--510
-[]\T1/cmr/m/n/10.95 Weak in-de-pen-dence de-fined for con-tin-u-ous
+LaTeX Warning: Citation `Gillespie2001' on page 6 undefined on input line 398.
+
+
+LaTeX Warning: Citation `Flamholz2012' on page 6 undefined on input line 398.
+
+
+Underfull \hbox (badness 1931) in paragraph at lines 397--399
+\T1/cmr/m/n/10.95 ting). \T1/cmr/bx/n/10.95 Fu-ture Di-rec-tions\T1/cmr/m/n/10.
+95 : (1) \T1/cmr/bx/n/10.95 Stochas-tic
  []
 
-
-LaTeX Warning: Citation `Gillespie2001' on page 6 undefined on input line 516.
-
-
-LaTeX Warning: Citation `Flamholz2012' on page 6 undefined on input line 518.
-
-[6] (./weak_independence_biopn_bioinformatics.bbl
+(./weak_independence_biopn_bioinformatics.bbl
 
 LaTeX Warning: Empty `thebibliography' environment on input line 3.
 
-) [7
-
-] (./weak_independence_biopn_bioinformatics.aux)
+) [6] (./weak_independence_biopn_bioinformatics.aux)
  ***********
 LaTeX2e <2023-11-01> patch level 1
 L3 programming layer <2024-01-22>
@@ -1145,51 +1157,48 @@ LaTeX Warning: There were undefined references.
 
 LaTeX Warning: Label(s) may have changed. Rerun to get cross-references right.
 
-
-Package rerunfilecheck Warning: File `weak_independence_biopn_bioinformatics.ou
-t' has changed.
-(rerunfilecheck)                Rerun to get outlines right
-(rerunfilecheck)                or use package `bookmark'.
-
-Package rerunfilecheck Info: Checksums for `weak_independence_biopn_bioinformat
-ics.out':
-(rerunfilecheck)             Before: 5EB25D2446E4504B5BEC2D16867FE672;893
-(rerunfilecheck)             After:  05D2C110921AB4A3221034534B40ABB4;6160.
+Package rerunfilecheck Info: File `weak_independence_biopn_bioinformatics.out' 
+has not changed.
+(rerunfilecheck)             Checksum: 05D2C110921AB4A3221034534B40ABB4;6160.
  ) 
 Here is how much of TeX's memory you used:
- 23556 strings out of 476106
- 439034 string characters out of 5793932
- 1948975 words of memory out of 5000000
- 45072 multiletter control sequences out of 15000+600000
- 578995 words of font info for 89 fonts, out of 8000000 for 9000
+ 23893 strings out of 476106
+ 444839 string characters out of 5793932
+ 1947975 words of memory out of 5000000
+ 45419 multiletter control sequences out of 15000+600000
+ 580874 words of font info for 91 fonts, out of 8000000 for 9000
  59 hyphenation exceptions out of 8191
- 84i,16n,87p,941b,866s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 84i,12n,87p,1033b,866s stack positions out of 10000i,1000n,20000p,200000b,200000s
 </usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmex10.pfb></us
 r/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/shar
-e/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi8.pfb></usr/share/texli
-ve/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/share/texlive/texm
-f-dist/fonts/type1/public/amsfonts/cm/cmr7.pfb></usr/share/texlive/texmf-dist/f
-onts/type1/public/amsfonts/cm/cmr8.pfb></usr/share/texlive/texmf-dist/fonts/typ
-e1/public/amsfonts/cm/cmsy10.pfb></usr/share/texlive/texmf-dist/fonts/type1/pub
-lic/amsfonts/cm/cmsy6.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/ams
-fonts/cm/cmsy7.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/c
-m/cmsy8.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/symbols/
-msam10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/symbols/m
-sbm10.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfbx1000.pfb></usr/shar
-e/texmf/fonts/type1/public/cm-super/sfbx1095.pfb></usr/share/texmf/fonts/type1/
-public/cm-super/sfbx1200.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfbx
-1440.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfbx1728.pfb></usr/share
-/texmf/fonts/type1/public/cm-super/sfrm0800.pfb></usr/share/texmf/fonts/type1/p
-ublic/cm-super/sfrm0900.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfrm1
-000.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfrm1095.pfb></usr/share/
-texmf/fonts/type1/public/cm-super/sfrm1200.pfb></usr/share/texmf/fonts/type1/pu
-blic/cm-super/sfti1095.pfb></usr/share/texmf/fonts/type1/public/cm-super/sftt10
-95.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/zapfding/uzdr.pfb>
-Output written on weak_independence_biopn_bioinformatics.pdf (7 pages, 419062 b
+e/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi6.pfb></usr/share/texli
+ve/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi7.pfb></usr/share/texlive/texm
+f-dist/fonts/type1/public/amsfonts/cm/cmmi8.pfb></usr/share/texlive/texmf-dist/
+fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/share/texlive/texmf-dist/fonts/t
+ype1/public/amsfonts/cm/cmr6.pfb></usr/share/texlive/texmf-dist/fonts/type1/pub
+lic/amsfonts/cm/cmr7.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsf
+onts/cm/cmr8.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/
+cmsy10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy6.
+pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy7.pfb></u
+sr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy8.pfb></usr/shar
+e/texlive/texmf-dist/fonts/type1/public/amsfonts/symbols/msam10.pfb></usr/share
+/texlive/texmf-dist/fonts/type1/public/amsfonts/symbols/msbm10.pfb></usr/share/
+texmf/fonts/type1/public/cm-super/sfbx1000.pfb></usr/share/texmf/fonts/type1/pu
+blic/cm-super/sfbx1095.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfbx12
+00.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfbx1440.pfb></usr/share/t
+exmf/fonts/type1/public/cm-super/sfbx1728.pfb></usr/share/texmf/fonts/type1/pub
+lic/cm-super/sfrm0800.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfrm090
+0.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfrm1000.pfb></usr/share/te
+xmf/fonts/type1/public/cm-super/sfrm1095.pfb></usr/share/texmf/fonts/type1/publ
+ic/cm-super/sfrm1200.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfti1000
+.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfti1095.pfb></usr/share/tex
+mf/fonts/type1/public/cm-super/sftt1095.pfb></usr/share/texlive/texmf-dist/font
+s/type1/urw/zapfding/uzdr.pfb>
+Output written on weak_independence_biopn_bioinformatics.pdf (6 pages, 470459 b
 ytes).
 PDF statistics:
- 298 PDF objects out of 1000 (max. 8388607)
- 235 compressed objects within 3 object streams
- 90 named destinations out of 1000 (max. 500000)
- 61 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 389 PDF objects out of 1000 (max. 8388607)
+ 319 compressed objects within 4 object streams
+ 75 named destinations out of 1000 (max. 500000)
+ 309 words of extra memory for PDF output out of 10000 (max. 10000000)
 
