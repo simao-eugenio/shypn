@@ -230,8 +230,15 @@ class InhibitorArc(Arc):
         # Draw threshold label if different from 1 (show inhibition threshold)
         # For inhibitor arcs, threshold is stored in 'threshold' attribute or 'weight' as fallback
         threshold_value = getattr(self, 'threshold', self.weight)
-        if threshold_value and abs(threshold_value - 1.0) > 1e-6:
-            self._render_threshold_label(cr, start_world_x, start_world_y, marker_x, marker_y, threshold_value, zoom)
+        
+        # Handle dynamic threshold formulas (strings) vs numeric thresholds
+        if threshold_value:
+            if isinstance(threshold_value, str):
+                # Dynamic threshold formula - always display
+                self._render_threshold_label(cr, start_world_x, start_world_y, marker_x, marker_y, threshold_value, zoom)
+            elif isinstance(threshold_value, (int, float)) and abs(threshold_value - 1.0) > 1e-6:
+                # Numeric threshold different from 1
+                self._render_threshold_label(cr, start_world_x, start_world_y, marker_x, marker_y, threshold_value, zoom)
         
         # Ensure clean state for next rendering operation
         cr.new_path()
@@ -340,10 +347,19 @@ class InhibitorArc(Arc):
         # Draw threshold label if different from 1 (show inhibition threshold)
         # For inhibitor arcs, threshold is stored in 'threshold' attribute or 'weight' as fallback
         threshold_value = getattr(self, 'threshold', self.weight)
-        if threshold_value and abs(threshold_value - 1.0) > 1e-6:
-            self._render_threshold_label_curved(cr, start_world_x, start_world_y, 
-                                               end_world_x, end_world_y, 
-                                               cp_x, cp_y, threshold_value, zoom)
+        
+        # Handle dynamic threshold formulas (strings) vs numeric thresholds
+        if threshold_value:
+            if isinstance(threshold_value, str):
+                # Dynamic threshold formula - always display
+                self._render_threshold_label_curved(cr, start_world_x, start_world_y, 
+                                                   end_world_x, end_world_y, 
+                                                   cp_x, cp_y, threshold_value, zoom)
+            elif isinstance(threshold_value, (int, float)) and abs(threshold_value - 1.0) > 1e-6:
+                # Numeric threshold different from 1
+                self._render_threshold_label_curved(cr, start_world_x, start_world_y, 
+                                                   end_world_x, end_world_y, 
+                                                   cp_x, cp_y, threshold_value, zoom)
         
         # Ensure clean state for next rendering operation
         cr.new_path()
@@ -444,7 +460,7 @@ class InhibitorArc(Arc):
             cr: Cairo context
             x1, y1: Start point (world coords)
             x2, y2: End point (world coords)
-            threshold_value: Threshold value to display
+            threshold_value: Threshold value to display (numeric or formula string)
             zoom: Current zoom level for font/offset compensation
         """
         cr.save()
@@ -456,7 +472,13 @@ class InhibitorArc(Arc):
         # Set font
         cr.select_font_face("Arial", 0, 1)  # Bold
         cr.set_font_size(12 / zoom)
-        text = f"{threshold_value:g}"
+        
+        # Format threshold value - handle both numeric and string (formula) values
+        if isinstance(threshold_value, str):
+            text = threshold_value  # Display formula as-is
+        else:
+            text = f"{threshold_value:g}"  # Format numeric value
+        
         extents = cr.text_extents(text)
         
         # Calculate perpendicular offset
@@ -496,7 +518,7 @@ class InhibitorArc(Arc):
             x1, y1: Start point (world coords)
             x2, y2: End point (world coords)
             cp_x, cp_y: Control point (world coords)
-            threshold_value: Threshold value to display
+            threshold_value: Threshold value to display (numeric or formula string)
             zoom: Current zoom level
         """
         cr.save()
@@ -513,7 +535,13 @@ class InhibitorArc(Arc):
         # Set font
         cr.select_font_face("Arial", 0, 1)  # Bold
         cr.set_font_size(12 / zoom)
-        text = f"{threshold_value:g}"
+        
+        # Format threshold value - handle both numeric and string (formula) values
+        if isinstance(threshold_value, str):
+            text = threshold_value  # Display formula as-is
+        else:
+            text = f"{threshold_value:g}"  # Format numeric value
+        
         extents = cr.text_extents(text)
         
         # Perpendicular offset

@@ -1,0 +1,159 @@
+{
+  "model_name": "Phosphoglucose Isomerase Equilibrium",
+  "model_version": "1.0",
+  "organism": "Homo sapiens",
+  "compartment": "cytosol",
+  "temperature": 310.15,
+  "temperature_unit": "K",
+  "ph": 7.4,
+  
+  "species": {
+    "G6P": {
+      "name": "Glucose-6-phosphate",
+      "full_name": "α-D-Glucose 6-phosphate",
+      "initial_concentration_scenario1": 2.0,
+      "initial_concentration_scenario2": 0.0,
+      "concentration_unit": "mM",
+      "initial_tokens_scenario1": 2000,
+      "initial_tokens_scenario2": 0,
+      "chebi_id": "CHEBI:17665",
+      "notes": "First committed intermediate of glycolysis"
+    },
+    "F6P": {
+      "name": "Fructose-6-phosphate",
+      "full_name": "β-D-Fructose 6-phosphate",
+      "initial_concentration_scenario1": 0.0,
+      "initial_concentration_scenario2": 2.0,
+      "concentration_unit": "mM",
+      "initial_tokens_scenario1": 0,
+      "initial_tokens_scenario2": 2000,
+      "chebi_id": "CHEBI:16084",
+      "notes": "Substrate for phosphofructokinase"
+    }
+  },
+  
+  "reactions": {
+    "PGI_forward": {
+      "name": "Phosphoglucose isomerase (forward)",
+      "ec_number": "5.3.1.9",
+      "direction": "forward",
+      "substrates": ["G6P"],
+      "products": ["F6P"],
+      "stoichiometry": {
+        "G6P": -1,
+        "F6P": 1
+      },
+      "kinetics": {
+        "type": "mass_action",
+        "k_forward": 0.41,
+        "k_forward_unit": "1/s",
+        "rate_law": "k_forward * [G6P]",
+        "rate_law_continuous": "0.41 * G6P"
+      },
+      "references": [
+        {
+          "source": "Teusink et al. 2000",
+          "pmid": "10692304",
+          "organism": "Saccharomyces cerevisiae",
+          "parameter": "k_forward",
+          "notes": "Adapted for human enzyme"
+        }
+      ]
+    },
+    "PGI_reverse": {
+      "name": "Phosphoglucose isomerase (reverse)",
+      "ec_number": "5.3.1.9",
+      "direction": "reverse",
+      "substrates": ["F6P"],
+      "products": ["G6P"],
+      "stoichiometry": {
+        "F6P": -1,
+        "G6P": 1
+      },
+      "kinetics": {
+        "type": "mass_action",
+        "k_reverse": 0.14,
+        "k_reverse_unit": "1/s",
+        "rate_law": "k_reverse * [F6P]",
+        "rate_law_continuous": "0.14 * F6P"
+      }
+    }
+  },
+  
+  "thermodynamics": {
+    "delta_g_standard": -2.92,
+    "delta_g_standard_unit": "kJ/mol",
+    "keq": 2.93,
+    "keq_calculation": "k_forward / k_reverse = 0.41 / 0.14",
+    "keq_definition": "[F6P]eq / [G6P]eq",
+    "equilibrium_position": "favors_F6P",
+    "reversibility": "freely_reversible",
+    "notes": "Near-equilibrium reaction in vivo"
+  },
+  
+  "equilibrium": {
+    "scenario1": {
+      "initial": {
+        "G6P": 2.0,
+        "F6P": 0.0
+      },
+      "equilibrium": {
+        "G6P": 0.51,
+        "F6P": 1.49,
+        "unit": "mM",
+        "calculation": "Keq = [F6P]/[G6P] = 2.93"
+      }
+    },
+    "scenario2": {
+      "initial": {
+        "G6P": 0.0,
+        "F6P": 2.0
+      },
+      "equilibrium": {
+        "G6P": 0.51,
+        "F6P": 1.49,
+        "unit": "mM",
+        "notes": "Same equilibrium regardless of starting point"
+      }
+    }
+  },
+  
+  "conservation_laws": {
+    "hexose_phosphate_pool": {
+      "species": ["G6P", "F6P"],
+      "total": 2.0,
+      "unit": "mM",
+      "notes": "Total hexose-phosphate concentration is conserved"
+    }
+  },
+  
+  "simulation_parameters": {
+    "time_end": 20.0,
+    "time_unit": "s",
+    "time_step": 0.1,
+    "mode": "continuous",
+    "solver": "euler",
+    "notes": "Sufficient time to reach equilibrium"
+  },
+  
+  "validation": {
+    "equilibrium_tolerance": 0.01,
+    "equilibrium_tolerance_unit": "mM",
+    "time_to_equilibrium_approx": 10.0,
+    "time_to_equilibrium_unit": "s",
+    "keq_verification": {
+      "method": "ratio_at_equilibrium",
+      "expected": 2.93,
+      "tolerance": 0.05
+    }
+  },
+  
+  "metadata": {
+    "author": "SHYpn Foundation Examples",
+    "date_created": "2025-11-18",
+    "branch": "Foundation-Testing",
+    "phase": "Phase 1: Foundation",
+    "example_number": 2,
+    "difficulty": "beginner-intermediate"
+  }
+}

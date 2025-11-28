@@ -1,0 +1,122 @@
+{
+  "model_name": "ATP Hydrolysis",
+  "model_version": "1.0",
+  "organism": "Homo sapiens",
+  "compartment": "cytosol",
+  "temperature": 310.15,
+  "temperature_unit": "K",
+  "ph": 7.4,
+  
+  "species": {
+    "ATP": {
+      "name": "Adenosine triphosphate",
+      "initial_concentration": 3.0,
+      "concentration_unit": "mM",
+      "initial_tokens": 3000,
+      "chebi_id": "CHEBI:15422",
+      "notes": "Typical cytosolic ATP concentration in mammalian cells"
+    },
+    "ADP": {
+      "name": "Adenosine diphosphate",
+      "initial_concentration": 0.1,
+      "concentration_unit": "mM",
+      "initial_tokens": 100,
+      "chebi_id": "CHEBI:16761",
+      "notes": "Basal ADP concentration, maintained low by adenylate kinase"
+    },
+    "Pi": {
+      "name": "Inorganic phosphate",
+      "initial_concentration": 1.0,
+      "concentration_unit": "mM",
+      "initial_tokens": 1000,
+      "chebi_id": "CHEBI:43474",
+      "notes": "Free phosphate in cytosol"
+    }
+  },
+  
+  "reactions": {
+    "ATPase": {
+      "name": "ATP hydrolysis",
+      "ec_number": "3.6.1.3",
+      "substrates": ["ATP"],
+      "products": ["ADP", "Pi"],
+      "stoichiometry": {
+        "ATP": -1,
+        "ADP": 1,
+        "Pi": 1
+      },
+      "kinetics": {
+        "type": "mass_action",
+        "k_cat": 100,
+        "k_cat_unit": "1/s",
+        "rate_law": "k_cat * [ATP]",
+        "rate_law_continuous": "100 * ATP"
+      },
+      "thermodynamics": {
+        "delta_g_standard": -30.5,
+        "delta_g_standard_unit": "kJ/mol",
+        "delta_g_cellular": -50,
+        "delta_g_cellular_unit": "kJ/mol",
+        "reversibility": "irreversible",
+        "notes": "Highly exergonic under cellular conditions"
+      },
+      "references": [
+        {
+          "source": "BRENDA",
+          "ec": "3.6.1.3",
+          "organism": "Homo sapiens",
+          "k_cat_range": "50-200 s-1",
+          "url": "https://www.brenda-enzymes.org/enzyme.php?ecno=3.6.1.3"
+        },
+        {
+          "source": "Berg Biochemistry",
+          "edition": "8th",
+          "page": "434",
+          "table": "15.1",
+          "parameter": "delta_g_standard"
+        }
+      ]
+    }
+  },
+  
+  "conservation_laws": {
+    "adenylate_pool": {
+      "species": ["ATP", "ADP"],
+      "total": 3.1,
+      "unit": "mM",
+      "notes": "Total adenylate concentration is conserved"
+    }
+  },
+  
+  "simulation_parameters": {
+    "time_end": 0.05,
+    "time_unit": "s",
+    "time_step": 0.001,
+    "mode": "continuous",
+    "solver": "euler",
+    "notes": "Short simulation to observe exponential decay"
+  },
+  
+  "validation": {
+    "expected_steady_state": {
+      "ATP": 0.0,
+      "ADP": 3.1,
+      "Pi": 4.0,
+      "unit": "mM"
+    },
+    "half_life": {
+      "value": 0.00693,
+      "unit": "s",
+      "calculation": "ln(2) / k_cat = 0.693 / 100"
+    }
+  },
+  
+  "metadata": {
+    "author": "SHYpn Foundation Examples",
+    "date_created": "2025-11-18",
+    "branch": "Foundation-Testing",
+    "phase": "Phase 1: Foundation",
+    "example_number": 1,
+    "difficulty": "beginner"
+  }
+}

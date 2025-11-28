@@ -1,0 +1,347 @@
+{
+  "model_name": "Glycolysis-TCA Connection via PDH",
+  "version": "1.0",
+  "author": "SHYpn Foundation Examples",
+  "date": "2025-11-20",
+  "organism": "Homo sapiens",
+  "tissue": "Heart mitochondria",
+  "temperature": 37,
+  "pH": 7.4,
+  "compartments": {
+    "cytosol": {
+      "volume": "1.0 L",
+      "description": "Cytoplasmic compartment where glycolysis occurs"
+    },
+    "mitochondria": {
+      "volume": "0.2 L",
+      "description": "Mitochondrial matrix where PDH and TCA cycle operate"
+    }
+  },
+  "metabolites": {
+    "Pyruvate_cytosol": {
+      "kegg_id": "C00022",
+      "chebi_id": "CHEBI:15361",
+      "name": "Pyruvate (cytosol)",
+      "molecular_weight": 88.06,
+      "initial_concentration": 0.5,
+      "unit": "mM",
+      "compartment": "cytosol",
+      "notes": "End product of glycolysis"
+    },
+    "Pyruvate_mito": {
+      "kegg_id": "C00022",
+      "chebi_id": "CHEBI:15361",
+      "name": "Pyruvate (mitochondria)",
+      "molecular_weight": 88.06,
+      "initial_concentration": 0.1,
+      "unit": "mM",
+      "compartment": "mitochondria",
+      "notes": "Transported form, rapidly oxidized"
+    },
+    "CoA": {
+      "kegg_id": "C00010",
+      "chebi_id": "CHEBI:15346",
+      "name": "Coenzyme A",
+      "molecular_weight": 767.53,
+      "initial_concentration": 1.0,
+      "unit": "mM",
+      "compartment": "mitochondria",
+      "notes": "Cofactor for acyl group transfer"
+    },
+    "NAD": {
+      "kegg_id": "C00003",
+      "chebi_id": "CHEBI:15846",
+      "name": "NAD⁺",
+      "molecular_weight": 663.43,
+      "initial_concentration": 2.0,
+      "unit": "mM",
+      "compartment": "mitochondria",
+      "notes": "Oxidized nicotinamide cofactor, high matrix concentration"
+    },
+    "AcetylCoA": {
+      "kegg_id": "C00024",
+      "chebi_id": "CHEBI:15351",
+      "name": "Acetyl-CoA",
+      "molecular_weight": 809.57,
+      "initial_concentration": 0.05,
+      "unit": "mM",
+      "compartment": "mitochondria",
+      "notes": "Key metabolite entering TCA cycle"
+    },
+    "CO2": {
+      "kegg_id": "C00011",
+      "chebi_id": "CHEBI:16526",
+      "name": "Carbon dioxide",
+      "molecular_weight": 44.01,
+      "initial_concentration": 0.0,
+      "unit": "mM",
+      "compartment": "mitochondria",
+      "notes": "Released product, diffuses out"
+    },
+    "NADH": {
+      "kegg_id": "C00004",
+      "chebi_id": "CHEBI:16908",
+      "name": "NADH",
+      "molecular_weight": 665.44,
+      "initial_concentration": 0.1,
+      "unit": "mM",
+      "compartment": "mitochondria",
+      "notes": "Reduced cofactor, NAD⁺/NADH ratio ~20:1"
+    },
+    "Oxaloacetate": {
+      "kegg_id": "C00036",
+      "chebi_id": "CHEBI:16452",
+      "name": "Oxaloacetate",
+      "molecular_weight": 132.07,
+      "initial_concentration": 0.02,
+      "unit": "mM",
+      "compartment": "mitochondria",
+      "notes": "Rate-limiting TCA intermediate"
+    },
+    "Citrate": {
+      "kegg_id": "C00158",
+      "chebi_id": "CHEBI:30769",
+      "name": "Citrate",
+      "molecular_weight": 192.12,
+      "initial_concentration": 0.0,
+      "unit": "mM",
+      "compartment": "mitochondria",
+      "notes": "First TCA cycle intermediate"
+    }
+  },
+  "reactions": {
+    "T1_Pyruvate_Transport": {
+      "name": "Mitochondrial Pyruvate Carrier (MPC)",
+      "ec_number": null,
+      "type": "transport",
+      "reversible": false,
+      "stoichiometry": {
+        "substrates": {
+          "Pyruvate_cytosol": 1
+        },
+        "products": {
+          "Pyruvate_mito": 1
+        }
+      },
+      "kinetics": {
+        "type": "Michaelis-Menten",
+        "Vmax": {
+          "value": 2.0,
+          "unit": "mM/s",
+          "reference": "Bricker et al. 2012, PMID: 22628558"
+        },
+        "Km_Pyruvate": {
+          "value": 0.1,
+          "unit": "mM",
+          "reference": "Estimated from transport kinetics"
+        },
+        "rate_expression": "2.0 * (Pyruvate_cytosol / (0.1 + Pyruvate_cytosol))"
+      },
+      "notes": "Carrier-mediated facilitated diffusion"
+    },
+    "T2_PDH_Complex": {
+      "name": "Pyruvate Dehydrogenase Complex",
+      "ec_number": "1.2.4.1, 2.3.1.12, 1.8.1.4",
+      "kegg_reaction": "R00209",
+      "type": "oxidative_decarboxylation",
+      "reversible": false,
+      "stoichiometry": {
+        "substrates": {
+          "Pyruvate_mito": 1,
+          "CoA": 1,
+          "NAD": 1
+        },
+        "products": {
+          "AcetylCoA": 1,
+          "CO2": 1,
+          "NADH": 1
+        }
+      },
+      "thermodynamics": {
+        "delta_G_prime": {
+          "value": -33.4,
+          "unit": "kJ/mol",
+          "reference": "Berg, Biochemistry 7th ed."
+        },
+        "comment": "Highly exergonic, essentially irreversible"
+      },
+      "kinetics": {
+        "type": "Multi-substrate with product inhibition",
+        "Vmax": {
+          "value": 0.5,
+          "unit": "mM/s",
+          "reference": "Patel & Korotchkina 2006, PMID: 16545080"
+        },
+        "Km_Pyruvate": {
+          "value": 0.025,
+          "unit": "mM",
+          "reference": "Strumilo 2005, PMID: 15799709"
+        },
+        "Km_CoA": {
+          "value": 0.013,
+          "unit": "mM",
+          "reference": "Patel & Korotchkina 2006"
+        },
+        "Km_NAD": {
+          "value": 0.06,
+          "unit": "mM",
+          "reference": "Rutter & Denton 1988"
+        },
+        "Ki_NADH": {
+          "value": 0.05,
+          "unit": "mM",
+          "reference": "Competitive with NAD⁺, Reed 1974"
+        },
+        "Ki_AcetylCoA": {
+          "value": 0.02,
+          "unit": "mM",
+          "reference": "Competitive with CoA, Reed 1974"
+        },
+        "rate_expression": "0.5 * (Pyruvate_mito / (0.025 + Pyruvate_mito)) * (CoA / (0.013 + CoA)) * (NAD / (0.06 + NAD)) * (0.05 / (0.05 + NADH)) * (0.02 / (0.02 + AcetylCoA))"
+      },
+      "regulation": {
+        "inhibitors": [
+          {
+            "compound": "NADH",
+            "type": "product_inhibition",
+            "mechanism": "Competitive with NAD⁺",
+            "Ki": "0.05 mM"
+          },
+          {
+            "compound": "Acetyl-CoA",
+            "type": "product_inhibition",
+            "mechanism": "Competitive with CoA",
+            "Ki": "0.02 mM"
+          }
+        ],
+        "covalent_modification": {
+          "type": "Phosphorylation by PDH kinase",
+          "effect": "Inactivation",
+          "notes": "Not modeled in this example (future extension)"
+        }
+      },
+      "notes": "E1-E2-E3 multienzyme complex, 4-5 MDa molecular weight"
+    },
+    "T3_Citrate_Synthase": {
+      "name": "Citrate Synthase",
+      "ec_number": "2.3.3.1",
+      "kegg_reaction": "R00351",
+      "type": "condensation",
+      "reversible": false,
+      "stoichiometry": {
+        "substrates": {
+          "AcetylCoA": 1,
+          "Oxaloacetate": 1
+        },
+        "products": {
+          "Citrate": 1,
+          "CoA": 1
+        }
+      },
+      "thermodynamics": {
+        "delta_G_prime": {
+          "value": -31.4,
+          "unit": "kJ/mol",
+          "reference": "Highly favorable, pulls TCA cycle forward"
+        }
+      },
+      "kinetics": {
+        "type": "Sequential ordered bi-bi",
+        "Vmax": {
+          "value": 0.8,
+          "unit": "mM/s",
+          "reference": "Williamson & Cooper 1980"
+        },
+        "Km_AcetylCoA": {
+          "value": 0.005,
+          "unit": "mM",
+          "reference": "Very low Km, high affinity"
+        },
+        "Km_Oxaloacetate": {
+          "value": 0.002,
+          "unit": "mM",
+          "reference": "Extremely low, rate-limiting substrate"
+        },
+        "rate_expression": "0.8 * (AcetylCoA / (0.005 + AcetylCoA)) * (Oxaloacetate / (0.002 + Oxaloacetate))"
+      },
+      "notes": "First committed step of TCA cycle, highly regulated"
+    }
+  },
+  "cofactor_ratios": {
+    "NAD_NADH_ratio": {
+      "initial": 20.0,
+      "physiological_range": "10-50",
+      "significance": "Redox state indicator"
+    },
+    "CoA_AcetylCoA_ratio": {
+      "initial": 20.0,
+      "physiological_range": "10-100",
+      "significance": "Acyl group availability"
+    }
+  },
+  "expected_fluxes": {
+    "pyruvate_transport": {
+      "value": "0.3-0.5",
+      "unit": "mM/s",
+      "notes": "Determined by glycolytic flux"
+    },
+    "PDH_flux": {
+      "value": "0.2-0.4",
+      "unit": "mM/s",
+      "notes": "Lower than transport due to product inhibition"
+    },
+    "citrate_synthase_flux": {
+      "value": "0.2-0.3",
+      "unit": "mM/s",
+      "notes": "Limited by oxaloacetate availability"
+    }
+  },
+  "validation": {
+    "steady_state_concentrations": {
+      "AcetylCoA": {
+        "expected": "0.1-0.2 mM",
+        "reference": "Williamson et al. 1967"
+      },
+      "NADH": {
+        "expected": "0.3-0.5 mM",
+        "reference": "NAD⁺/NADH ratio 4-7:1 at steady state"
+      },
+      "Citrate": {
+        "expected": "0.3-0.5 mM",
+        "reference": "TCA cycle intermediate pool"
+      }
+    },
+    "regulatory_responses": {
+      "NADH_inhibition": {
+        "effect": "50-70% flux reduction",
+        "condition": "NADH increased 5-fold"
+      },
+      "AcetylCoA_inhibition": {
+        "effect": "40-60% flux reduction",
+        "condition": "Acetyl-CoA increased 4-fold"
+      }
+    }
+  },
+  "literature_references": [
+    {
+      "pmid": "16545080",
+      "citation": "Patel MS, Korotchkina LG (2006). Regulation of the pyruvate dehydrogenase complex. Biochem Soc Trans 34(2):217-22.",
+      "relevance": "PDH kinetics and regulation"
+    },
+    {
+      "pmid": "22628558",
+      "citation": "Bricker DK et al. (2012). A mitochondrial pyruvate carrier required for pyruvate uptake. Science 337(6090):96-100.",
+      "relevance": "Pyruvate transport mechanism"
+    },
+    {
+      "pmid": "15799709",
+      "citation": "Strumilo S (2005). Short-term regulation of the mammalian pyruvate dehydrogenase complex. Acta Biochim Pol 52(4):759-64.",
+      "relevance": "PDH regulatory mechanisms"
+    },
+    {
+      "reference": "Berg JM, Tymoczko JL, Stryer L (2012). Biochemistry, 7th edition",
+      "chapters": "16, 17",
+      "relevance": "General kinetics and thermodynamics"
+    }
+  ]
+}
