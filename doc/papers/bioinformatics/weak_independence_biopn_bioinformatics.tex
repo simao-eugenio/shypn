@@ -17,6 +17,18 @@
 \usepackage{pifont}  % For checkmarks
 \newcommand{\cmark}{\ding{51}}  % Checkmark
 
+% Compact spacing settings
+\setlength{\parskip}{0pt}
+\setlength{\itemsep}{0pt}
+\setlength{\parsep}{0pt}
+\setlength{\topsep}{0pt}
+\setlength{\partopsep}{0pt}
+\setlength{\textfloatsep}{8pt plus 2pt minus 2pt}
+\setlength{\floatsep}{8pt plus 2pt minus 2pt}
+\setlength{\intextsep}{8pt plus 2pt minus 2pt}
+\setlength{\abovecaptionskip}{4pt}
+\setlength{\belowcaptionskip}{2pt}
+
 % Custom commands
 \newcommand{\preset}[1]{\ensuremath{{}^{\bullet}#1}}
 \newcommand{\postset}[1]{\ensuremath{#1^{\bullet}}}
@@ -145,25 +157,24 @@ This definition guarantees \emph{true parallelism}: no coordination needed.
 
 \subsection{Tool Landscape and Gap Analysis}
 
-\begin{table}[t]
+\begin{table}[htbp]
 \small
 \centering
-\caption{Comparison of Bio-PN tools and frameworks}
+\caption{Tool comparison}
 \label{tab:tool_comparison}
+\vspace{-6pt}
 \begin{tabular}{@{}lcccc@{}}
 \toprule
-\textbf{Feature} & \textbf{Snoopy} & \textbf{Cell Ill.} & \textbf{COPASI} & \textbf{SHYpn} \\
+\textbf{Feature} & \textbf{Snoopy} & \textbf{Cell I.} & \textbf{COPASI} & \textbf{SHYpn} \\
 \midrule
-Continuous PNs & \cmark & \cmark & --- & \cmark \\
-Stochastic PNs & \cmark & \cmark & --- & \cmark \\
-Test/inhibitor arcs & \cmark & \cmark & --- & \cmark \\
-SBML import & Partial & Partial & \cmark & \cmark \\
-Weak independence & --- & --- & --- & \cmark \\
-Parallel simulation & --- & --- & --- & \cmark \\
-Mass balance check & --- & --- & --- & \cmark \\
-Formula tracking & --- & --- & --- & \cmark \\
+Hybrid PNs & \cmark & \cmark & --- & \cmark \\
+SBML import & Part. & Part. & \cmark & \cmark \\
+Weak indep. & --- & --- & --- & \cmark \\
+Parallel sim. & --- & --- & --- & \cmark \\
+Bio. topology & --- & --- & --- & \cmark \\
 \bottomrule
 \end{tabular}
+\vspace{-8pt}
 \end{table}
 
 \textbf{Gap}: Existing tools lack (1) formal treatment of non-conflicting place-sharing, (2) dependency classification beyond binary, and (3) biological validation (atom conservation). Our work addresses these through weak independence theory, 12-tuple formalism, and domain-specific analyzers.
@@ -399,58 +410,48 @@ Check equality for C, H, O, N, P, S.
 
 We validated the SHYpn SBML import infrastructure on 100 BioModels spanning simple to very complex biological systems. Table~\ref{tab:sbml-import-real} shows perfect conversion fidelity.
 
-\begin{table}[t]
+\begin{table}[htbp]
+\small
 \centering
-\caption{SBML to Petri Net conversion results (100 BioModels)}
+\caption{SBML conversion (100 BioModels): 100\% fidelity}
 \label{tab:sbml-import-real}
-\begin{tabular}{lrrr}
+\vspace{-6pt}
+\begin{tabular}{@{}lrr@{}}
 \toprule
-\textbf{Category} & \textbf{SBML} & \textbf{Petri Net} & \textbf{Accuracy} \\
+\textbf{Element} & \textbf{Count} & \textbf{Fidelity} \\
 \midrule
-Models Tested & 100 & --- & --- \\
-Success Rate & --- & 100 & 100\% \\
-\midrule
-Species & 2,495 & 2,495 places & 100\% \\
-Reactions & 2,952 & 2,952 transitions & 100\% \\
-\midrule
-\multicolumn{4}{l}{\textit{Arc Classification}} \\
-Normal arcs & --- & 7,376 & --- \\
-Test arcs (catalysts) & --- & 1,511 & 20.5\% of arcs \\
-Inhibitor arcs & --- & 0 & 0\% \\
-\midrule
-Kinetic Laws & 68 models & 1,765 continuous trans. & 68\% \\
-& & 1,187 stochastic trans. & 32\% \\
+Species $\to$ Places & 2,495 & 100\% \\
+Reactions $\to$ Transitions & 2,952 & 100\% \\
+Test arcs (catalysts) & 1,511 & 20.5\% \\
+Continuous transitions & 1,765 & 68\% \\
+Stochastic transitions & 1,187 & 32\% \\
 \bottomrule
 \end{tabular}
+\vspace{-8pt}
 \end{table}
-
-\textbf{Key Findings}:
-\begin{itemize}
-    \item \textbf{Perfect conversion fidelity}: 100\% species$\rightarrow$place and reaction$\rightarrow$transition mapping
-    \item \textbf{Catalyst detection}: 1,511 test arcs (20.5\% of total arcs) automatically identified from SBML modifiers
-    \item \textbf{Kinetic preservation}: 68\% of models contain kinetic laws successfully converted to transition rates
-    \item \textbf{Scale validation}: Models range from 2 species/0 reactions to 195 species/576 reactions
-\end{itemize}
 
 \subsection{Dependency Distribution}
 
-\begin{table}[t]
+\begin{table}[htbp]
+\small
 \centering
-\caption{Dependency classification on 100 BioModels (mean $\pm$ std)}
+\caption{Dependency classification (100 models)}
 \label{tab:dependency_dist}
-\begin{tabular}{lcc}
+\vspace{-6pt}
+\begin{tabular}{@{}lcc@{}}
 \toprule
-\textbf{Dependency Type} & \textbf{\% of Pairs} & \textbf{Parallel?} \\
+\textbf{Type} & \textbf{\%} & \textbf{Parallel} \\
 \midrule
-Strongly Independent & $15.3 \pm 8.2$ & Yes (full) \\
-Convergent Coupling & $52.7 \pm 12.1$ & Yes (coupled) \\
-Regulatory Coupling & $12.5 \pm 6.8$ & Yes (coupled) \\
-Competitive Conflict & $19.5 \pm 9.3$ & No \\
+Strong Independent & 15.3 & Yes \\
+Convergent & 52.7 & Yes \\
+Regulatory & 12.5 & Yes \\
+Competitive & 19.5 & No \\
+\midrule
+\textbf{Weakly Indep.} & \textbf{65.2} & --- \\
 \bottomrule
 \end{tabular}
+\vspace{-8pt}
 \end{table}
-
-\textbf{Key Finding}: $65.2\%$ (convergent + regulatory) of transition pairs are weakly independent. Classical analysis would flag these as conflicts.
 
 \subsection{Simulation Performance}
 
@@ -470,58 +471,36 @@ Competitive Conflict & $19.5 \pm 9.3$ & No \\
 
 \subsection{Validation Accuracy}
 
-\begin{table}[t]
+\begin{table}[htbp]
+\small
 \centering
-\caption{False positive rates in topology validation}
+\caption{Validation accuracy: classical vs biological}
 \label{tab:validation}
-\begin{tabular}{lcc}
+\vspace{-6pt}
+\begin{tabular}{@{}lcc@{}}
 \toprule
-\textbf{Validation Method} & \textbf{False Positives} & \textbf{False Negatives} \\
+\textbf{Method} & \textbf{False +} & \textbf{False -} \\
 \midrule
-Classical (P-invariants, boundedness, liveness) & 72.3\% & 8.1\% \\
-Biological (mass balance, flux feasibility) & 4.7\% & 6.3\% \\
+Classical & 72.3\% & 8.1\% \\
+Biological & 4.7\% & 6.3\% \\
 \bottomrule
 \end{tabular}
+\vspace{-8pt}
 \end{table}
-
-\textbf{Key Finding} (Table~\ref{tab:validation}): Classical checks flag 72\% of correct SBML models as erroneous (unbounded, non-live). Biological checks reduce false positives to 5\%.
 
 \section{Discussion}
 
 \subsection{Implementation: SHYpn Tool}
 
-SHYpn implements weak independence theory in Python (5000+ LOC):
-
-\textbf{Architecture}:
-\begin{itemize}
-    \item \texttt{locality\_detector.py}: Compute $\preset{t}$, $\postset{t}$, $\RegSet{t}$
-    \item \texttt{dependency\_classifier.py}: Algorithm~\ref{alg:classify}
-    \item \texttt{parallel\_scheduler.py}: Execute weakly independent transitions concurrently
-    \item \texttt{biological\_analyzers/}: Mass balance, flux feasibility, regulatory structure
-\end{itemize}
-
-\textbf{SBML Integration}: Direct import via \texttt{sbml\_parser.py}, preserving kinetic formulas in $\Phi(t)$.
-
-\textbf{Availability}: Open-source implementation available at \url{https://github.com/simao-eugenio/shypn} (MIT License).
+SHYpn implements weak independence in Python (5000+ LOC) with SBML import, dependency classification (Algorithm~\ref{alg:classify}), parallel scheduling, and biological topology analyzers. Open-source at \url{https://github.com/simao-eugenio/shypn} (MIT License).
 
 \subsection{Theoretical Significance}
 
-\textbf{Weak independence} extends classical Petri net theory to continuous/hybrid semantics. Prior work (Reisig~\cite{Reisig2013}, Murata~\cite{Murata1989}) defines independence as \emph{no shared places}. We refine this: place-sharing is acceptable if it represents \emph{coupling} (convergent/regulatory) rather than \emph{conflict} (competitive).
-
-\textbf{12-tuple extension} makes implicit biological concepts explicit:
-\begin{itemize}
-    \item $\Sigma$: Formalizes test arcs as computable function
-    \item $\Theta$: Distinguishes open vs.\ closed subsystems
-    \item $\Delta$: Provides taxonomy for dependency analysis
-\end{itemize}
+Weak independence extends classical PN theory~\cite{Reisig2013,Murata1989} to continuous/hybrid semantics, distinguishing biological coupling (convergent/regulatory) from conflict (competitive). The 12-tuple ($\Sigma$, $\Theta$, $\Delta$, $\tau$, $\rho$) formalizes test arcs, open systems, and dependency taxonomy.
 
 \subsection{Practical Impact}
 
-\textbf{Parallel simulation}: 65\% of transition pairs can execute concurrently, achieving $2{-}4\times$ speedup.
-
-\textbf{Correct validation}: Biological analyzers eliminate 67\% of false positives from classical checks.
-
-\textbf{SBML compliance}: First tool to validate Bio-PNs using biochemical semantics (atom conservation, flux feasibility).
+65\% transition pairs parallelizable ($2{-}4\times$ speedup); biological validation reduces false positives from 72\% to 5\%; first tool with biochemical semantics (atom conservation, flux feasibility).
 
 \subsection{Limitations and Future Work}
 
@@ -545,36 +524,29 @@ SHYpn implements weak independence theory in Python (5000+ LOC):
 
 \subsection{Related Work Comparison}
 
-\begin{table}[t]
+\begin{table}[htbp]
+\small
 \centering
-\caption{Comparison with existing Bio-PN tools}
+\caption{Comparison with existing tools}
 \label{tab:comparison}
-\begin{tabular}{lcccc}
+\vspace{-6pt}
+\begin{tabular}{@{}lcccc@{}}
 \toprule
-\textbf{Tool} & \textbf{Weak Indep.} & \textbf{Coupling Tax.} & \textbf{Bio. Topology} & \textbf{Parallel Sim.} \\
+\textbf{Tool} & \textbf{W.I.} & \textbf{Coupling} & \textbf{Bio.Top.} & \textbf{Par.} \\
 \midrule
-Snoopy~\cite{Heiner2015} & No & No & Partial & No \\
-Cell Illustrator~\cite{Nagasaki2011} & No & No & Partial & Limited \\
-Charlie~\cite{Heiner2009} & No & No & Classical & No \\
-COPASI~\cite{Hoops2006} & No & No & No & No \\
-\textbf{SHYpn (Ours)} & \textbf{Yes} & \textbf{Yes} & \textbf{Yes} & \textbf{Yes} \\
+Snoopy & --- & --- & Part. & --- \\
+Cell Ill. & --- & --- & Part. & --- \\
+Charlie & --- & --- & Class. & --- \\
+COPASI & --- & --- & --- & --- \\
+\textbf{SHYpn} & \textbf{\cmark} & \textbf{\cmark} & \textbf{\cmark} & \textbf{\cmark} \\
 \bottomrule
 \end{tabular}
+\vspace{-8pt}
 \end{table}
-
-\textbf{Snoopy}: Hybrid PN support, test arcs (graphical only), no weak independence. Supports structural analysis (P/T-invariants) but not biological validation.
-
-\textbf{Cell Illustrator}: Hybrid functional PNs, generic modeling, no dependency classification. Limited topology analysis.
-
-\textbf{Charlie}: Stochastic analysis via Markov chain generation, classical independence only. Focuses on reachability, not biological semantics.
-
-\textbf{COPASI}: ODE/stochastic simulation without Petri net representation. No topology analysis or independence classification.
 
 \section{Conclusion}
 
-We introduce \emph{weak independence}---a formalization of non-conflicting place-sharing in Biological Petri Nets. Our 12-tuple extension adds regulatory structure ($\Sigma$), environmental exchange ($\Theta$), dependency taxonomy ($\Delta$), heterogeneous transition types ($\tau$), and biochemical formula tracking ($\rho$) to Bio-PN theory. Classification of 100 BioModels shows 65\% of transition pairs are weakly independent, enabling coupled parallel simulation with $2{-}4\times$ speedup. Biological topology analyzers reduce false positives from 72\% (classical) to 5\%, correctly validating SBML models with biochemical semantics. Atomic mass balance validation via $\rho$ detects stoichiometric errors in 12\% of published models.
-
-This work bridges formal methods and systems biology, providing theoretical foundations and practical tools for scalable biochemical pathway analysis. Future directions include stochastic weak independence, thermodynamic validation, and automated parameter estimation leveraging parallel execution.
+We introduce weak independence---formalization of non-conflicting place-sharing in Bio-PNs. Our 12-tuple extension ($\Sigma$, $\Theta$, $\Delta$, $\tau$, $\rho$) enables coupled parallelism: 65\% of transition pairs (100 BioModels) are weakly independent, achieving $2{-}4\times$ speedup. Biological topology analyzers reduce validation false positives from 72\% to 5\%. Future work: stochastic weak independence, thermodynamic validation, parallel parameter estimation.
 
 \section*{Acknowledgments}
 [Funding sources, collaborators, etc.]
