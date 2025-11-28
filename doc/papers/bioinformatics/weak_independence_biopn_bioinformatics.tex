@@ -144,7 +144,8 @@ Places represent chemical species, transitions represent reactions, arc weights 
 \caption{Tool comparison}
 \label{tab:tool_comparison}
 \vspace{-6pt}
-\begin{tabular*}{\columnwidth}{@{\extracolsep{\fill}}lcccc@{}}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{@{}lcccc@{}}
 \toprule
 \textbf{Feature} & \textbf{Snoopy} & \textbf{Cell I.} & \textbf{COPASI} & \textbf{SHYpn} \\
 \midrule
@@ -152,9 +153,10 @@ Hybrid PNs & \cmark & \cmark & --- & \cmark \\
 SBML import & Part. & Part. & \cmark & \cmark \\
 Weak indep. & --- & --- & --- & \cmark \\
 Parallel sim. & --- & --- & --- & \cmark \\
-Bio. topology & --- & --- & --- & \cmark \\
+Bio. top. & --- & --- & --- & \cmark \\
 \bottomrule
-\end{tabular*}
+\end{tabular}%
+}
 \vspace{-8pt}
 \end{table}
 
@@ -172,7 +174,11 @@ An \emph{Extended Biological Petri Net} is a 12-tuple:
 \begin{equation}
 \text{BioPN} = (P, T, F, W, M_0, K, \Phi, \Sigma, \Theta, \Delta, \tau, \rho)
 \end{equation}
-where $P$ is the set of places (chemical species), $T$ is the set of transitions (biochemical reactions), $F \subseteq (P \times T) \cup (T \times P)$ is the flow relation (normal arcs), $W: F \to \mathbb{R}^+$ are arc weights (stoichiometric coefficients), $M_0: P \to \mathbb{N}_0 \cup \mathbb{R}_0^+$ is the initial marking (discrete or continuous), $K: P \to \mathbb{N} \cup \{\infty\}$ is the capacity function (optional bounds), $\Phi: T \to (\mathbb{R}^n \to \mathbb{R})$ are rate functions (kinetic laws), $\Sigma \subseteq (P \times T) \setminus F$ are regulatory arcs (test/inhibitor), $\Theta: T \to \{\text{INTERNAL}, \text{SOURCE}, \text{SINK}, \text{EXCHANGE}\}$ classifies environmental exchange, $\Delta: T \times T \to \{\text{INDEPENDENT}, \text{COMPETITIVE}, \text{CONVERGENT}, \text{REGULATORY}\}$ is the dependency type, $\tau: T \to \{\text{CONTINUOUS}, \text{STOCHASTIC}, \text{TIMED}, \text{IMMEDIATE}\}$ is the transition type, and $\rho: P \to \text{Formula}$ maps biochemical formulas (atomic composition).
+where: $P$ (places/chemical species); $T$ (transitions/reactions); $F \subseteq (P \times T) \cup (T \times P)$ (flow relation); $W: F \to \mathbb{R}^+$ (arc weights); $M_0: P \to \mathbb{N}_0 \cup \mathbb{R}_0^+$ (initial marking); $K: P \to \mathbb{N} \cup \{\infty\}$ (capacity); $\Phi: T \to (\mathbb{R}^n \to \mathbb{R})$ (rate functions); $\Sigma \subseteq (P \times T) \setminus F$ (regulatory arcs); \\
+$\Theta: T \to \{\text{INT}, \text{SRC}, \text{SNK}, \text{EXC}\}$ (environment); \\
+$\Delta: T \times T \to \{\text{IND}, \text{COMP}, \text{CONV}, \text{REG}\}$ (dependency); \\
+$\tau: T \to \{\text{CONT}, \text{STOCH}, \text{TIME}, \text{IMM}\}$ (transition type); \\
+$\rho: P \to \text{Formula}$ (biochemical formulas).
 }
 
 \subsubsection{Novel Components}
@@ -213,18 +219,18 @@ Transitions $t_1, t_2 \in T$ are \emph{weakly independent} iff:
 
 {\small
 \textbf{Theorem 1 (Weak Independence Correctness).}
-If $\DepType{t_1}{t_2} \in \{\text{convergent, regulatory}\}$, then parallel execution of $t_1$ and $t_2$ is semantically equivalent to any sequential interleaving.
+If $\DepType{t_1}{t_2} \in \{\text{convergent, regulatory}\}$, then parallel execution of $t_1$ and $t_2$ is equivalent to any sequential interleaving.
 }
 
 \textbf{Proof sketch.}
 \textbf{Case 1 (Convergent)}: Let $p \in \postset{t_1} \cap \postset{t_2}$. By ODE semantics:
-\begin{align}
-\frac{dM(p)}{dt} &= \sum_{t \in \preset{p}} W(t,p) \cdot \Phi(t, M) - \sum_{t \in \postset{p}} W(p,t) \cdot \Phi(t, M) \\
-&= \cdots + W(t_1,p) \cdot \Phi(t_1, M) + W(t_2,p) \cdot \Phi(t_2, M) + \cdots
-\end{align}
-Rate contributions \emph{add linearly} (superposition). Order of evaluation irrelevant. $\square$
+\begin{equation}
+\small
+\frac{dM(p)}{dt} = \sum_{t \in \preset{p}} W(t,p) \Phi(t, M) - \sum_{t \in \postset{p}} W(p,t) \Phi(t, M)
+\end{equation}
+Rate contributions \emph{add linearly} (superposition). $\square$
 
-\textbf{Case 2 (Regulatory)}: Let $e \in \RegSet{t_1} \cap \RegSet{t_2}$. Since $e \notin \preset{t_1} \cup \preset{t_2}$, firing $t_1$ or $t_2$ does \emph{not modify} $M(e)$. Both read $M(e)$ simultaneously without conflict. $\square$
+\textbf{Case 2 (Regulatory)}: Let $e \in \RegSet{t_1} \cap \RegSet{t_2}$. Since $e \notin \preset{t_1} \cup \preset{t_2}$, firing $t_1$ or $t_2$ does not modify $M(e)$. Both read $M(e)$ without conflict. $\square$
 
 \subsection{Dependency Classification Algorithm}
 
@@ -233,7 +239,7 @@ Rate contributions \emph{add linearly} (superposition). Order of evaluation irre
 \label{alg:classify}
 \begin{algorithmic}[1]
 \REQUIRE BioPN $(P, T, F, W, M_0, K, \Phi, \Sigma, \Theta, \Delta, \tau, \rho)$
-\ENSURE $\Delta(t_i, t_j)$ for all $t_i, t_j \in T$
+\ENSURE $\Delta(t_i, t_j)$ for all pairs $t_i, t_j \in T$
 \FOR{each pair $(t_i, t_j) \in T \times T$ where $i \neq j$}
     \STATE $\text{input}_i \gets \preset{t_i}$, $\text{output}_i \gets \postset{t_i}$, $\text{reg}_i \gets \RegSet{t_i}$
     \STATE $\text{input}_j \gets \preset{t_j}$, $\text{output}_j \gets \postset{t_j}$, $\text{reg}_j \gets \RegSet{t_j}$
