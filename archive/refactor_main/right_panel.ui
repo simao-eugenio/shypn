@@ -1,0 +1,415 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- GTK3 Dynamic Analyses panel - can be docked or float as separate window -->
+<interface>
+  <requires lib="gtk+" version="3.0"/>
+
+  <object class="GtkWindow" id="right_panel_window">
+    <property name="visible">False</property>
+    <property name="title">Analyses</property>
+    <property name="default-width">280</property>
+    <property name="default-height">400</property>
+    <property name="resizable">True</property>
+    
+    <child>
+      <object class="GtkBox" id="right_panel_content">
+        <property name="visible">True</property>
+        <property name="orientation">vertical</property>
+        <property name="spacing">0</property>
+        
+        <!-- Panel Header with Float Button and Title -->
+        <child>
+          <object class="GtkBox" id="panel_header">
+            <property name="visible">True</property>
+            <property name="orientation">horizontal</property>
+            <property name="spacing">6</property>
+            <property name="margin-start">6</property>
+            <property name="margin-end">6</property>
+            <property name="margin-top">6</property>
+            <property name="margin-bottom">6</property>
+            
+            <child>
+              <object class="GtkLabel" id="panel_title">
+                <property name="visible">True</property>
+                <property name="label">Analyses</property>
+                <property name="halign">start</property>
+                <property name="hexpand">True</property>
+                <style>
+                  <class name="heading"/>
+                </style>
+              </object>
+              <packing>
+                <property name="expand">True</property>
+                <property name="fill">True</property>
+              </packing>
+            </child>
+            
+            <child>
+              <object class="GtkToggleButton" id="float_button">
+                <property name="visible">True</property>
+                <property name="label">⇱</property>
+                <property name="tooltip-text">Float/Dock panel toggle</property>
+                <property name="halign">end</property>
+                <property name="active">False</property>
+                <style>
+                  <class name="flat"/>
+                </style>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">False</property>
+              </packing>
+            </child>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+          </packing>
+        </child>
+        
+        <child>
+          <object class="GtkSeparator">
+            <property name="visible">True</property>
+            <property name="orientation">horizontal</property>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+          </packing>
+        </child>
+        
+        <!-- Main Content Area -->
+        <child>
+          <object class="GtkBox" id="analyses_content">
+            <property name="visible">True</property>
+            <property name="orientation">vertical</property>
+            <property name="spacing">6</property>
+            <property name="margin-start">6</property>
+            <property name="margin-end">6</property>
+            <property name="margin-top">6</property>
+            <property name="margin-bottom">6</property>
+            <property name="vexpand">True</property>
+            <property name="hexpand">True</property>
+                
+                <!-- Topologic Analyses Section -->
+                <child>
+                  <object class="GtkExpander" id="topological_analyses_expander">
+                    <property name="visible">True</property>
+                    <property name="expanded">False</property>
+                    <child type="label">
+                      <object class="GtkLabel">
+                        <property name="visible">True</property>
+                        <property name="label">Topologic Analyses</property>
+                        <property name="xalign">0</property>
+                        <attributes>
+                          <attribute name="weight" value="bold"/>
+                        </attributes>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkBox" id="topological_content">
+                        <property name="visible">True</property>
+                        <property name="orientation">vertical</property>
+                        <property name="spacing">6</property>
+                        <property name="margin-start">12</property>
+                        <property name="margin-top">6</property>
+                        <property name="margin-bottom">6</property>
+                        <child>
+                          <object class="GtkLabel">
+                            <property name="visible">True</property>
+                            <property name="label">Topologic analysis tools will appear here</property>
+                            <property name="xalign">0</property>
+                            <style>
+                              <class name="dim-label"/>
+                            </style>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                  </object>
+                  <packing>
+                    <property name="expand">False</property>
+                    <property name="fill">True</property>
+                  </packing>
+                </child>
+                
+                <!-- Dynamic Analyses Section with Internal Notebook -->
+                <child>
+                  <object class="GtkExpander" id="dynamic_analyses_expander">
+                    <property name="visible">True</property>
+                    <property name="expanded">True</property>
+                    <child type="label">
+                      <object class="GtkLabel">
+                        <property name="visible">True</property>
+                        <property name="label">Dynamic Analyses</property>
+                        <property name="xalign">1</property>
+                        <attributes>
+                          <attribute name="weight" value="bold"/>
+                        </attributes>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkNotebook" id="internal_dynamic_analyses">
+                        <property name="visible">True</property>
+                        <property name="show-border">True</property>
+                        <property name="show-tabs">True</property>
+                        <property name="scrollable">False</property>
+                        <property name="vexpand">True</property>
+                        <property name="hexpand">True</property>
+                        
+                        <!-- Transitions Page -->
+                        <child>
+                          <object class="GtkBox" id="transitions_page">
+                            <property name="visible">True</property>
+                            <property name="orientation">vertical</property>
+                            <property name="spacing">6</property>
+                            <property name="margin-start">6</property>
+                            <property name="margin-end">6</property>
+                            <property name="margin-top">6</property>
+                            <property name="margin-bottom">6</property>
+                            
+                            <!-- Search Controls -->
+                            <child>
+                              <object class="GtkBox">
+                                <property name="visible">True</property>
+                                <property name="orientation">horizontal</property>
+                                <property name="spacing">6</property>
+                                <child>
+                                  <object class="GtkEntry" id="transitions_search_entry">
+                                    <property name="visible">True</property>
+                                    <property name="hexpand">True</property>
+                                    <property name="placeholder-text">Search transitions...</property>
+                                  </object>
+                                  <packing>
+                                    <property name="expand">True</property>
+                                    <property name="fill">True</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkButton" id="transitions_search_button">
+                                    <property name="visible">True</property>
+                                    <property name="label">Search</property>
+                                  </object>
+                                  <packing>
+                                    <property name="expand">False</property>
+                                    <property name="fill">False</property>
+                                  </packing>
+                                </child>
+                              </object>
+                            </child>
+                            
+                            <!-- Search Result Label -->
+                            <child>
+                              <object class="GtkLabel" id="transitions_result_label">
+                                <property name="visible">True</property>
+                                <property name="label"></property>
+                                <property name="xalign">0</property>
+                                <property name="selectable">True</property>
+                                <property name="ellipsize">end</property>
+                                <style>
+                                  <class name="dim-label"/>
+                                </style>
+                              </object>
+                            </child>
+                            
+                            <!-- Matplotlib Canvas Container -->
+                            <child>
+                              <object class="GtkBox" id="transitions_canvas_container">
+                                <property name="visible">True</property>
+                                <property name="orientation">vertical</property>
+                                <property name="vexpand">True</property>
+                                <property name="hexpand">True</property>
+                                <child>
+                                  <object class="GtkLabel">
+                                    <property name="visible">True</property>
+                                    <property name="label">Real-time transition data plot</property>
+                                    <property name="xalign">0.5</property>
+                                    <property name="yalign">0.5</property>
+                                    <property name="vexpand">True</property>
+                                    <style>
+                                      <class name="dim-label"/>
+                                    </style>
+                                  </object>
+                                </child>
+                              </object>
+                            </child>
+                            
+                          </object>
+                        </child>
+                        <child type="tab">
+                          <object class="GtkLabel">
+                            <property name="visible">True</property>
+                            <property name="label">Transitions</property>
+                          </object>
+                        </child>
+                        
+                        <!-- Places Page -->
+                        <child>
+                          <object class="GtkBox" id="places_page">
+                            <property name="visible">True</property>
+                            <property name="orientation">vertical</property>
+                            <property name="spacing">6</property>
+                            <property name="margin-start">6</property>
+                            <property name="margin-end">6</property>
+                            <property name="margin-top">6</property>
+                            <property name="margin-bottom">6</property>
+                            
+                            <!-- Search Controls -->
+                            <child>
+                              <object class="GtkBox">
+                                <property name="visible">True</property>
+                                <property name="orientation">horizontal</property>
+                                <property name="spacing">6</property>
+                                <child>
+                                  <object class="GtkEntry" id="places_search_entry">
+                                    <property name="visible">True</property>
+                                    <property name="hexpand">True</property>
+                                    <property name="placeholder-text">Search places...</property>
+                                  </object>
+                                  <packing>
+                                    <property name="expand">True</property>
+                                    <property name="fill">True</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkButton" id="places_search_button">
+                                    <property name="visible">True</property>
+                                    <property name="label">Search</property>
+                                  </object>
+                                  <packing>
+                                    <property name="expand">False</property>
+                                    <property name="fill">False</property>
+                                  </packing>
+                                </child>
+                              </object>
+                            </child>
+                            
+                            <!-- Search Result Label -->
+                            <child>
+                              <object class="GtkLabel" id="places_result_label">
+                                <property name="visible">True</property>
+                                <property name="label"></property>
+                                <property name="xalign">0</property>
+                                <property name="selectable">True</property>
+                                <property name="ellipsize">end</property>
+                                <style>
+                                  <class name="dim-label"/>
+                                </style>
+                              </object>
+                            </child>
+                            
+                            <!-- Matplotlib Canvas Container -->
+                            <child>
+                              <object class="GtkBox" id="places_canvas_container">
+                                <property name="visible">True</property>
+                                <property name="orientation">vertical</property>
+                                <property name="vexpand">True</property>
+                                <property name="hexpand">True</property>
+                                <child>
+                                  <object class="GtkLabel">
+                                    <property name="visible">True</property>
+                                    <property name="label">Real-time place data plot</property>
+                                    <property name="xalign">0.5</property>
+                                    <property name="yalign">0.5</property>
+                                    <property name="vexpand">True</property>
+                                    <style>
+                                      <class name="dim-label"/>
+                                    </style>
+                                  </object>
+                                </child>
+                              </object>
+                            </child>
+                            
+                          </object>
+                        </child>
+                        <child type="tab">
+                          <object class="GtkLabel">
+                            <property name="visible">True</property>
+                            <property name="label">Places</property>
+                          </object>
+                        </child>
+                        
+                        <!-- Diagnostics Page -->
+                        <child>
+                          <object class="GtkBox" id="diagnostics_page">
+                            <property name="visible">True</property>
+                            <property name="orientation">vertical</property>
+                            <property name="spacing">6</property>
+                            <property name="margin-start">6</property>
+                            <property name="margin-end">6</property>
+                            <property name="margin-top">6</property>
+                            <property name="margin-bottom">6</property>
+                            
+                            <!-- Selection Info -->
+                            <child>
+                              <object class="GtkLabel" id="diagnostics_selection_label">
+                                <property name="visible">True</property>
+                                <property name="label">Select a transition to view diagnostics</property>
+                                <property name="xalign">0</property>
+                                <property name="selectable">True</property>
+                                <property name="wrap">True</property>
+                                <style>
+                                  <class name="dim-label"/>
+                                </style>
+                              </object>
+                            </child>
+                            
+                            <!-- Diagnostics Content Container -->
+                            <child>
+                              <object class="GtkScrolledWindow" id="diagnostics_scrolled">
+                                <property name="visible">True</property>
+                                <property name="vexpand">True</property>
+                                <property name="hexpand">True</property>
+                                <property name="shadow-type">in</property>
+                                <property name="min-content-height">200</property>
+                                <child>
+                                  <object class="GtkBox" id="diagnostics_content_container">
+                                    <property name="visible">True</property>
+                                    <property name="orientation">vertical</property>
+                                    <property name="spacing">0</property>
+                                    <property name="margin">10</property>
+                                    <child>
+                                      <object class="GtkLabel" id="diagnostics_placeholder">
+                                        <property name="visible">True</property>
+                                        <property name="label">No transition selected</property>
+                                        <property name="xalign">0.5</property>
+                                        <property name="yalign">0.5</property>
+                                        <property name="vexpand">True</property>
+                                        <style>
+                                          <class name="dim-label"/>
+                                        </style>
+                                      </object>
+                                    </child>
+                                  </object>
+                                </child>
+                              </object>
+                            </child>
+                            
+                          </object>
+                        </child>
+                        <child type="tab">
+                          <object class="GtkLabel">
+                            <property name="visible">True</property>
+                            <property name="label">Diagnostics</property>
+                          </object>
+                        </child>
+                        
+                      </object>
+                    </child>
+                  </object>
+                  <packing>
+                    <property name="expand">True</property>
+                    <property name="fill">True</property>
+                  </packing>
+                </child>
+                
+              </object>
+          <packing>
+            <property name="expand">True</property>
+            <property name="fill">True</property>
+          </packing>
+        </child>
+        
+      </object>
+    </child>
+  </object>
+</interface>

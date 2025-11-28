@@ -1,0 +1,518 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- GTK3 File Explorer panel - can be docked or float as separate window -->
+<interface>
+  <requires lib="gtk+" version="3.0"/>
+
+  <object class="GtkWindow" id="left_panel_window">
+    <property name="visible">False</property>
+    <property name="title">File Explorer</property>
+    <property name="default-width">300</property>
+    <property name="default-height">500</property>
+    <property name="resizable">True</property>
+    
+    <child>
+      <object class="GtkBox" id="left_panel_content">
+        <property name="visible">True</property>
+        <property name="orientation">vertical</property>
+        <property name="spacing">0</property>
+        
+        <!-- Panel Header with Title and Float Button -->
+        <child>
+          <object class="GtkBox" id="panel_header">
+            <property name="visible">True</property>
+            <property name="orientation">horizontal</property>
+            <property name="spacing">6</property>
+            <property name="margin-start">6</property>
+            <property name="margin-end">6</property>
+            <property name="margin-top">6</property>
+            <property name="margin-bottom">6</property>
+            
+            <child>
+              <object class="GtkLabel" id="panel_title">
+                <property name="visible">True</property>
+                <property name="label">File Explorer</property>
+                <property name="halign">start</property>
+                <property name="hexpand">True</property>
+                <style>
+                  <class name="heading"/>
+                </style>
+              </object>
+              <packing>
+                <property name="expand">True</property>
+                <property name="fill">True</property>
+              </packing>
+            </child>
+            
+            <child>
+              <object class="GtkToggleButton" id="float_button">
+                <property name="visible">True</property>
+                <property name="label">⇱</property>
+                <property name="tooltip-text">Float/Dock panel toggle</property>
+                <property name="halign">end</property>
+                <property name="active">False</property>
+                <style>
+                  <class name="flat"/>
+                </style>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">False</property>
+              </packing>
+            </child>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+          </packing>
+        </child>
+        
+        <child>
+          <object class="GtkSeparator">
+            <property name="visible">True</property>
+            <property name="orientation">horizontal</property>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+          </packing>
+        </child>
+        
+        <!-- File Operations Toolbar -->
+        <child>
+          <object class="GtkBox" id="file_operations_toolbar">
+            <property name="visible">True</property>
+            <property name="orientation">horizontal</property>
+            <property name="spacing">3</property>
+            <property name="margin-start">6</property>
+            <property name="margin-end">6</property>
+            <property name="margin-top">3</property>
+            <property name="margin-bottom">3</property>
+            
+            <child>
+              <object class="GtkButton" id="file_new_button">
+                <property name="visible">True</property>
+                <property name="label">New</property>
+                <property name="tooltip-text">New File (Ctrl+N)</property>
+                <style>
+                  <class name="flat"/>
+                </style>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">False</property>
+              </packing>
+            </child>
+            
+            <child>
+              <object class="GtkButton" id="file_open_button">
+                <property name="visible">True</property>
+                <property name="label">Open</property>
+                <property name="tooltip-text">Open File (Ctrl+O)</property>
+                <style>
+                  <class name="flat"/>
+                </style>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">False</property>
+              </packing>
+            </child>
+            
+            <child>
+              <object class="GtkButton" id="file_save_button">
+                <property name="visible">True</property>
+                <property name="label">Save</property>
+                <property name="tooltip-text">Save File (Ctrl+S)</property>
+                <style>
+                  <class name="flat"/>
+                </style>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">False</property>
+              </packing>
+            </child>
+            
+            <child>
+              <object class="GtkButton" id="file_save_as_button">
+                <property name="visible">True</property>
+                <property name="label">Save As...</property>
+                <property name="tooltip-text">Save As... (Ctrl+Shift+S)</property>
+                <style>
+                  <class name="flat"/>
+                </style>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">False</property>
+              </packing>
+            </child>
+            
+            <child>
+              <object class="GtkSeparator">
+                <property name="visible">True</property>
+                <property name="orientation">vertical</property>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">False</property>
+              </packing>
+            </child>
+            
+            <child>
+              <object class="GtkButton" id="file_new_folder_button">
+                <property name="visible">True</property>
+                <property name="label">New Folder</property>
+                <property name="tooltip-text">Create New Folder</property>
+                <style>
+                  <class name="flat"/>
+                </style>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">False</property>
+              </packing>
+            </child>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+          </packing>
+        </child>
+        
+        <child>
+          <object class="GtkSeparator">
+            <property name="visible">True</property>
+            <property name="orientation">horizontal</property>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+          </packing>
+        </child>
+        
+        <!-- Navigation Toolbar -->
+        <child>
+          <object class="GtkBox" id="navigation_toolbar">
+            <property name="visible">True</property>
+            <property name="orientation">horizontal</property>
+            <property name="spacing">3</property>
+            <property name="margin-start">6</property>
+            <property name="margin-end">6</property>
+            <property name="margin-top">3</property>
+            <property name="margin-bottom">3</property>
+            
+            <!-- Home button at extreme left -->
+            <child>
+              <object class="GtkButton" id="nav_home_button">
+                <property name="visible">True</property>
+                <property name="label">Home</property>
+                <property name="tooltip-text">Go to Models Home</property>
+                <style>
+                  <class name="flat"/>
+                </style>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">False</property>
+              </packing>
+            </child>
+            
+            <child>
+              <object class="GtkSeparator">
+                <property name="visible">True</property>
+                <property name="orientation">vertical</property>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">False</property>
+              </packing>
+            </child>
+            
+            <child>
+              <object class="GtkButton" id="nav_back_button">
+                <property name="visible">True</property>
+                <property name="label">◀</property>
+                <property name="tooltip-text">Back</property>
+                <property name="sensitive">False</property>
+                <style>
+                  <class name="flat"/>
+                </style>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">False</property>
+              </packing>
+            </child>
+            
+            <!-- Current File Entry between Back and Forward -->
+            <child>
+              <object class="GtkEntry" id="current_file_entry">
+                <property name="visible">True</property>
+                <property name="editable">False</property>
+                <property name="text">workspace/examples/simple.shy</property>
+                <property name="has-frame">True</property>
+                <property name="width-chars">20</property>
+                <style>
+                  <class name="flat"/>
+                </style>
+              </object>
+              <packing>
+                <property name="expand">True</property>
+                <property name="fill">True</property>
+              </packing>
+            </child>
+            
+            <child>
+              <object class="GtkButton" id="nav_forward_button">
+                <property name="visible">True</property>
+                <property name="label">▶</property>
+                <property name="tooltip-text">Forward</property>
+                <property name="sensitive">False</property>
+                <style>
+                  <class name="flat"/>
+                </style>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">False</property>
+              </packing>
+            </child>
+            
+            <child>
+              <object class="GtkSeparator">
+                <property name="visible">True</property>
+                <property name="orientation">vertical</property>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">False</property>
+              </packing>
+            </child>
+            
+            <child>
+              <object class="GtkButton" id="nav_refresh_button">
+                <property name="visible">True</property>
+                <property name="label">Refresh</property>
+                <property name="tooltip-text">Refresh / Toggle Hierarchical View</property>
+                <style>
+                  <class name="flat"/>
+                </style>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">False</property>
+              </packing>
+            </child>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+          </packing>
+        </child>
+        
+        <child>
+          <object class="GtkSeparator">
+            <property name="visible">True</property>
+            <property name="orientation">horizontal</property>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+          </packing>
+        </child>
+        
+        <!-- File Browser TreeView -->
+        <child>
+          <object class="GtkScrolledWindow" id="file_browser_scroll">
+            <property name="visible">True</property>
+            <property name="hscrollbar-policy">automatic</property>
+            <property name="vscrollbar-policy">automatic</property>
+            <property name="shadow-type">in</property>
+            <property name="height-request">600</property>
+            
+            <child>
+              <object class="GtkTreeView" id="file_browser_tree">
+                <property name="visible">True</property>
+                <property name="headers-visible">True</property>
+                <property name="enable-tree-lines">True</property>
+                <property name="show-expanders">True</property>
+                <property name="enable-grid-lines">none</property>
+                <property name="activate-on-single-click">False</property>
+                <!-- Columns will be added programmatically -->
+              </object>
+            </child>
+          </object>
+          <packing>
+            <property name="expand">True</property>
+            <property name="fill">True</property>
+          </packing>
+        </child>
+        
+        <child>
+          <object class="GtkSeparator">
+            <property name="visible">True</property>
+            <property name="orientation">horizontal</property>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+          </packing>
+        </child>
+        
+        <!-- Project Actions Section -->
+        <child>
+          <object class="GtkFrame" id="project_actions_frame">
+            <property name="visible">True</property>
+            <property name="label-xalign">0</property>
+            <property name="shadow-type">none</property>
+            <property name="margin-start">6</property>
+            <property name="margin-end">6</property>
+            <property name="margin-top">6</property>
+            <property name="margin-bottom">3</property>
+            
+            <child type="label">
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="label">Project Actions</property>
+                <style>
+                  <class name="dim-label"/>
+                </style>
+              </object>
+            </child>
+            
+            <child>
+              <object class="GtkBox" id="project_actions_box">
+                <property name="visible">True</property>
+                <property name="orientation">vertical</property>
+                <property name="spacing">3</property>
+                <property name="margin-start">12</property>
+                <property name="margin-end">12</property>
+                <property name="margin-top">6</property>
+                <property name="margin-bottom">6</property>
+                
+                <child>
+                  <object class="GtkButton" id="new_project_button">
+                    <property name="visible">True</property>
+                    <property name="label">New Project</property>
+                    <property name="tooltip-text">Create a new shypn project</property>
+                    <property name="always-show-image">True</property>
+                  </object>
+                  <packing>
+                    <property name="expand">False</property>
+                    <property name="fill">True</property>
+                  </packing>
+                </child>
+                
+                <child>
+                  <object class="GtkButton" id="open_project_button">
+                    <property name="visible">True</property>
+                    <property name="label">Open Project</property>
+                    <property name="tooltip-text">Open an existing project or import archive</property>
+                    <property name="always-show-image">True</property>
+                  </object>
+                  <packing>
+                    <property name="expand">False</property>
+                    <property name="fill">True</property>
+                  </packing>
+                </child>
+                
+                <child>
+                  <object class="GtkButton" id="project_settings_button">
+                    <property name="visible">True</property>
+                    <property name="label">Project Settings</property>
+                    <property name="tooltip-text">View and edit project properties</property>
+                    <property name="sensitive">False</property>
+                    <property name="always-show-image">True</property>
+                  </object>
+                  <packing>
+                    <property name="expand">False</property>
+                    <property name="fill">True</property>
+                  </packing>
+                </child>
+                
+              </object>
+            </child>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+          </packing>
+        </child>
+        
+        <child>
+          <object class="GtkSeparator">
+            <property name="visible">True</property>
+            <property name="orientation">horizontal</property>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+          </packing>
+        </child>
+        
+        <!-- Quit Button -->
+        <child>
+          <object class="GtkButton" id="quit_button">
+            <property name="visible">True</property>
+            <property name="label">Quit Application</property>
+            <property name="tooltip-text">Exit shypn (prompts to save unsaved changes)</property>
+            <property name="margin-start">6</property>
+            <property name="margin-end">6</property>
+            <property name="margin-top">3</property>
+            <property name="margin-bottom">3</property>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+          </packing>
+        </child>
+        
+        <child>
+          <object class="GtkSeparator">
+            <property name="visible">True</property>
+            <property name="orientation">horizontal</property>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+          </packing>
+        </child>
+        
+        <!-- Status Bar -->
+        <child>
+          <object class="GtkBox" id="status_bar">
+            <property name="visible">True</property>
+            <property name="orientation">horizontal</property>
+            <property name="spacing">6</property>
+            <property name="margin-start">6</property>
+            <property name="margin-end">6</property>
+            <property name="margin-top">3</property>
+            <property name="margin-bottom">3</property>
+            
+            <child>
+              <object class="GtkLabel" id="file_browser_status">
+                <property name="visible">True</property>
+                <property name="label">Ready</property>
+                <property name="halign">start</property>
+                <property name="xalign">0</property>
+                <style>
+                  <class name="dim-label"/>
+                </style>
+              </object>
+              <packing>
+                <property name="expand">True</property>
+                <property name="fill">True</property>
+              </packing>
+            </child>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+          </packing>
+        </child>
+        
+      </object>
+    </child>
+  </object>
+</interface>

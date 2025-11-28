@@ -1,0 +1,329 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- GTK3 main window skeleton with dock/undock architecture -->
+<interface>
+  <requires lib="gtk+" version="3.0"/>
+
+  <object class="GtkApplicationWindow" id="main_window">
+    <property name="title">Shypn</property>
+    <property name="default-width">800</property>
+    <property name="default-height">600</property>
+    <property name="visible">True</property>
+
+    <!-- Header Bar with window controls and panel toggles -->
+    <child type="titlebar">
+      <object class="GtkHeaderBar" id="header_bar">
+        <property name="show-close-button">True</property>
+        <property name="visible">True</property>
+        <property name="title">Shypn</property>
+        
+        <!-- LEFT SIDE: Files Panel Toggle -->
+        <child>
+          <object class="GtkToggleButton" id="headerbar_files_toggle">
+            <property name="visible">True</property>
+            <property name="label">Files</property>
+            <property name="tooltip-text">Toggle Files panel</property>
+            <property name="active">False</property>
+          </object>
+          <packing>
+            <property name="pack-type">start</property>
+            <property name="position">0</property>
+          </packing>
+        </child>
+        
+        <!-- RIGHT SIDE: Panel Toggles (Topology | Pathways | Analyses) -->
+        
+        <!-- Topology Toggle (far right) -->
+        <!-- RIGHT SIDE: Topology Panel Toggle -->
+        <child>
+          <object class="GtkToggleButton" id="headerbar_topology_toggle">
+            <property name="label">Topology</property>
+            <property name="tooltip-text">Toggle Topology panel</property>
+            <property name="visible">True</property>
+            <property name="sensitive">False</property>
+          </object>
+          <packing>
+            <property name="pack-type">end</property>
+            <property name="position">4</property>
+          </packing>
+        </child>        <!-- Pathways Toggle (middle right) -->
+        <!-- RIGHT SIDE: Pathways Panel Toggle -->
+        <child>
+          <object class="GtkToggleButton" id="headerbar_pathways_toggle">
+            <property name="label">Pathways</property>
+            <property name="tooltip-text">Toggle Pathways panel</property>
+            <property name="visible">True</property>
+          </object>
+          <packing>
+            <property name="pack-type">end</property>
+            <property name="position">5</property>
+          </packing>
+        </child>        <!-- Analyses Toggle (leftmost of right side) -->
+        <child>
+          <object class="GtkToggleButton" id="headerbar_analyses_toggle">
+            <property name="visible">True</property>
+            <property name="label">Analyses</property>
+            <property name="tooltip-text">Toggle Analyses panel</property>
+            <property name="active">False</property>
+          </object>
+          <packing>
+            <property name="pack-type">end</property>
+            <property name="position">6</property>
+          </packing>
+        </child>
+        
+        <!-- Window Control Buttons -->
+        <child>
+          <object class="GtkButton" id="maximize_button">
+            <property name="visible">True</property>
+            <property name="can-focus">False</property>
+            <property name="tooltip-text">Maximize window</property>
+            <child>
+              <object class="GtkImage" id="maximize_image">
+                <property name="visible">True</property>
+                <property name="icon-name">window-maximize-symbolic</property>
+                <property name="icon-size">1</property>
+              </object>
+            </child>
+          </object>
+          <packing>
+            <property name="pack-type">end</property>
+            <property name="position">0</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkButton" id="minimize_button">
+            <property name="visible">True</property>
+            <property name="can-focus">False</property>
+            <property name="tooltip-text">Minimize window</property>
+            <child>
+              <object class="GtkImage">
+                <property name="visible">True</property>
+                <property name="icon-name">window-minimize-symbolic</property>
+                <property name="icon-size">1</property>
+              </object>
+            </child>
+          </object>
+          <packing>
+            <property name="pack-type">end</property>
+            <property name="position">1</property>
+          </packing>
+        </child>
+      </object>
+    </child>
+
+    <!-- Main content area: no master palette, direct content -->
+    <child>
+      <object class="GtkBox" id="root_container">
+        <property name="orientation">horizontal</property>
+        <property name="visible">True</property>
+        <property name="hexpand">True</property>
+        <property name="vexpand">True</property>
+        
+        <!-- Content area: vertical box with paned layout + status bar (no master palette) -->
+        <child>
+          <object class="GtkBox" id="content_with_statusbar">
+            <property name="orientation">vertical</property>
+            <property name="visible">True</property>
+            <property name="hexpand">True</property>
+            <property name="vexpand">True</property>
+            
+            <!-- Paned layout: left dock + main workspace (no right dock) -->
+            <child>
+              <object class="GtkPaned" id="left_paned">
+                <property name="orientation">horizontal</property>
+                <property name="position">0</property>
+                <property name="visible">True</property>
+                <property name="can-focus">True</property>
+                <property name="vexpand">True</property>
+                
+                <!-- Left dock area - GtkStack for panel switching (NO reparenting!) -->
+                <child>
+                  <object class="GtkStack" id="left_dock_stack">
+                    <property name="visible">False</property>
+                    <property name="vexpand">True</property>
+                    <property name="hexpand">False</property>
+                    <property name="transition-type">none</property>
+                    
+                    <!-- Files Panel Container -->
+                    <child>
+                      <object class="GtkBox" id="files_panel_container">
+                        <property name="orientation">vertical</property>
+                        <property name="visible">True</property>
+                        <property name="vexpand">True</property>
+                        <property name="hexpand">True</property>
+                        <!-- Content loaded from left_panel.ui at startup -->
+                      </object>
+                      <packing>
+                        <property name="name">files</property>
+                      </packing>
+                    </child>
+                    
+                    <!-- Analyses Panel Container -->
+                    <child>
+                      <object class="GtkBox" id="analyses_panel_container">
+                        <property name="orientation">vertical</property>
+                        <property name="visible">True</property>
+                        <property name="vexpand">True</property>
+                        <property name="hexpand">True</property>
+                        <!-- Content loaded from right_panel.ui at startup -->
+                      </object>
+                      <packing>
+                        <property name="name">analyses</property>
+                      </packing>
+                    </child>
+                    
+                    <!-- Pathways Panel Container -->
+                    <child>
+                      <object class="GtkBox" id="pathways_panel_container">
+                        <property name="orientation">vertical</property>
+                        <property name="visible">True</property>
+                        <property name="vexpand">True</property>
+                        <property name="hexpand">True</property>
+                        <!-- Content loaded from pathway_panel.ui at startup -->
+                      </object>
+                      <packing>
+                        <property name="name">pathways</property>
+                      </packing>
+                    </child>
+                    
+                    <!-- Topology Panel Container -->
+                    <child>
+                      <object class="GtkBox" id="topology_panel_container">
+                        <property name="orientation">vertical</property>
+                        <property name="visible">True</property>
+                        <property name="vexpand">True</property>
+                        <property name="hexpand">True</property>
+                        <!-- Content loaded from topology_panel.ui at startup -->
+                      </object>
+                      <packing>
+                        <property name="name">topology</property>
+                      </packing>
+                    </child>
+                    
+                  </object>
+                  <packing>
+                    <property name="resize">False</property>
+                    <property name="shrink">False</property>
+                  </packing>
+                </child>
+                
+                <!-- Right paned: main workspace + right dock -->
+                <child>
+                  <object class="GtkPaned" id="right_paned">
+                    <property name="orientation">horizontal</property>
+                    <property name="position">-1</property>
+                    <property name="position-set">False</property>
+                    <property name="visible">True</property>
+                    <property name="can-focus">True</property>
+                    <property name="vexpand">True</property>
+                    <property name="hexpand">True</property>
+                    
+                    <!-- Main workspace area (canvas) -->
+                    <child>
+                      <object class="GtkBox" id="main_workspace">
+                        <property name="orientation">vertical</property>
+                        <property name="hexpand">True</property>
+                        <property name="vexpand">True</property>
+                        <property name="visible">True</property>
+                        <!-- Canvas will be added programmatically -->
+                      </object>
+                      <packing>
+                        <property name="resize">True</property>
+                        <property name="shrink">False</property>
+                      </packing>
+                    </child>
+                    
+                    <!-- Right dock area - GtkStack for Analyses/Pathways/Topology panels -->
+                    <child>
+                      <object class="GtkStack" id="right_dock_stack">
+                        <property name="visible">False</property>
+                        <property name="vexpand">True</property>
+                        <property name="hexpand">False</property>
+                        <property name="transition-type">none</property>
+                        
+                        <!-- Analyses Panel Container (right side) -->
+                        <child>
+                          <object class="GtkBox" id="analyses_panel_container_right">
+                            <property name="orientation">vertical</property>
+                            <property name="visible">True</property>
+                            <property name="vexpand">True</property>
+                            <property name="hexpand">True</property>
+                            <!-- Content loaded from right_panel.ui at startup -->
+                          </object>
+                          <packing>
+                            <property name="name">analyses</property>
+                          </packing>
+                        </child>
+                        
+                        <!-- Pathways Panel Container (right side) -->
+                        <child>
+                          <object class="GtkBox" id="pathways_panel_container_right">
+                            <property name="orientation">vertical</property>
+                            <property name="visible">True</property>
+                            <property name="vexpand">True</property>
+                            <property name="hexpand">True</property>
+                            <!-- Content loaded from pathway_panel.ui at startup -->
+                          </object>
+                          <packing>
+                            <property name="name">pathways</property>
+                          </packing>
+                        </child>
+                        
+                        <!-- Topology Panel Container (right side) -->
+                        <child>
+                          <object class="GtkBox" id="topology_panel_container_right">
+                            <property name="orientation">vertical</property>
+                            <property name="visible">True</property>
+                            <property name="vexpand">True</property>
+                            <property name="hexpand">True</property>
+                            <!-- Content loaded from topology_panel.ui at startup -->
+                          </object>
+                          <packing>
+                            <property name="name">topology</property>
+                          </packing>
+                        </child>
+                        
+                      </object>
+                      <packing>
+                        <property name="resize">False</property>
+                        <property name="shrink">False</property>
+                      </packing>
+                    </child>
+                    
+                  </object>
+                  <packing>
+                    <property name="resize">True</property>
+                    <property name="shrink">False</property>
+                  </packing>
+                </child>
+                
+              </object>
+              <packing>
+                <property name="expand">True</property>
+                <property name="fill">True</property>
+              </packing>
+            </child>
+            
+            <!-- Status Bar (at bottom, always visible) -->
+            <child>
+              <object class="GtkStatusbar" id="status_bar">
+                <property name="visible">True</property>
+                <property name="vexpand">False</property>
+                <property name="hexpand">True</property>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">True</property>
+              </packing>
+            </child>
+            
+          </object>
+          <packing>
+            <property name="expand">True</property>
+            <property name="fill">True</property>
+          </packing>
+        </child>
+        
+      </object>
+    </child>  </object>
+</interface>

@@ -1,0 +1,841 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- GTK3 Pathway Operations panel - can be docked or float as separate window -->
+<interface>
+  <requires lib="gtk+" version="3.0"/>
+
+  <object class="GtkWindow" id="pathway_panel_window">
+    <property name="visible">False</property>
+    <property name="title">Pathway Operations</property>
+    <property name="default-width">320</property>
+    <property name="default-height">500</property>
+    <property name="resizable">True</property>
+    
+    <child>
+      <object class="GtkBox" id="pathway_panel_content">
+        <property name="visible">True</property>
+        <property name="orientation">vertical</property>
+        <property name="spacing">0</property>
+        
+        <!-- Panel Header with Float Button and Title -->
+        <child>
+          <object class="GtkBox" id="panel_header">
+            <property name="visible">True</property>
+            <property name="orientation">horizontal</property>
+            <property name="spacing">6</property>
+            <property name="margin-start">6</property>
+            <property name="margin-end">6</property>
+            <property name="margin-top">6</property>
+            <property name="margin-bottom">6</property>
+            
+            <child>
+              <object class="GtkLabel" id="panel_title">
+                <property name="visible">True</property>
+                <property name="label">Pathway Operations</property>
+                <property name="halign">start</property>
+                <property name="hexpand">True</property>
+                <style>
+                  <class name="heading"/>
+                </style>
+              </object>
+              <packing>
+                <property name="expand">True</property>
+                <property name="fill">True</property>
+              </packing>
+            </child>
+            
+            <child>
+              <object class="GtkToggleButton" id="float_button">
+                <property name="visible">True</property>
+                <property name="label">⇱</property>
+                <property name="tooltip-text">Float/Dock panel toggle</property>
+                <property name="halign">end</property>
+                <property name="active">False</property>
+                <style>
+                  <class name="flat"/>
+                </style>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">False</property>
+              </packing>
+            </child>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+          </packing>
+        </child>
+        
+        <child>
+          <object class="GtkSeparator">
+            <property name="visible">True</property>
+            <property name="orientation">horizontal</property>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+          </packing>
+        </child>
+        
+        <!-- Main Content: Notebook with Multiple Tabs -->
+        <child>
+          <object class="GtkNotebook" id="pathway_notebook">
+            <property name="visible">True</property>
+            <property name="vexpand">True</property>
+            <property name="hexpand">True</property>
+            <property name="margin-start">6</property>
+            <property name="margin-end">6</property>
+            <property name="margin-top">6</property>
+            <property name="margin-bottom">6</property>
+            
+            <!-- TAB 1: Import from KEGG -->
+            <child>
+              <object class="GtkBox" id="import_tab_content">
+                <property name="visible">True</property>
+                <property name="orientation">vertical</property>
+                <property name="spacing">12</property>
+                <property name="margin">12</property>
+                
+                <!-- Pathway ID Input -->
+                <child>
+                  <object class="GtkBox">
+                    <property name="visible">True</property>
+                    <property name="orientation">vertical</property>
+                    <property name="spacing">6</property>
+                    
+                    <child>
+                      <object class="GtkLabel">
+                        <property name="visible">True</property>
+                        <property name="label">Pathway ID</property>
+                        <property name="halign">start</property>
+                        <property name="xalign">0</property>
+                        <attributes>
+                          <attribute name="weight" value="bold"/>
+                        </attributes>
+                      </object>
+                    </child>
+                    
+                    <child>
+                      <object class="GtkEntry" id="pathway_id_entry">
+                        <property name="visible">True</property>
+                        <property name="placeholder-text">e.g., hsa00010, eco00020</property>
+                        <property name="tooltip-text">Enter KEGG pathway ID (organism code + pathway number)</property>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                
+                <!-- Organism Selector -->
+                <child>
+                  <object class="GtkBox">
+                    <property name="visible">True</property>
+                    <property name="orientation">vertical</property>
+                    <property name="spacing">6</property>
+                    
+                    <child>
+                      <object class="GtkLabel">
+                        <property name="visible">True</property>
+                        <property name="label">Organism</property>
+                        <property name="halign">start</property>
+                        <property name="xalign">0</property>
+                        <attributes>
+                          <attribute name="weight" value="bold"/>
+                        </attributes>
+                      </object>
+                    </child>
+                    
+                    <child>
+                      <object class="GtkComboBoxText" id="organism_combo">
+                        <property name="visible">True</property>
+                        <property name="active">0</property>
+                        <items>
+                          <item>hsa - Homo sapiens (human)</item>
+                          <item>mmu - Mus musculus (mouse)</item>
+                          <item>dme - Drosophila melanogaster</item>
+                          <item>sce - Saccharomyces cerevisiae</item>
+                          <item>eco - Escherichia coli</item>
+                        </items>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                
+                <!-- Options Section -->
+                <child>
+                  <object class="GtkExpander" id="options_expander">
+                    <property name="visible">True</property>
+                    <property name="expanded">False</property>
+                    
+                    <child type="label">
+                      <object class="GtkLabel">
+                        <property name="visible">True</property>
+                        <property name="label">Import Options</property>
+                        <attributes>
+                          <attribute name="weight" value="bold"/>
+                        </attributes>
+                      </object>
+                    </child>
+                    
+                    <child>
+                      <object class="GtkBox">
+                        <property name="visible">True</property>
+                        <property name="orientation">vertical</property>
+                        <property name="spacing">6</property>
+                        <property name="margin">6</property>
+                        
+                        <!-- Filter Cofactors Option -->
+                        <child>
+                          <object class="GtkCheckButton" id="filter_cofactors_check">
+                            <property name="visible">True</property>
+                            <property name="label">Filter common cofactors (ATP, NAD+, etc.)</property>
+                            <property name="active">True</property>
+                            <property name="tooltip-text">Exclude ubiquitous molecules to simplify the network</property>
+                          </object>
+                        </child>
+                        
+                        <!-- Coordinate Scaling -->
+                        <child>
+                          <object class="GtkBox">
+                            <property name="visible">True</property>
+                            <property name="orientation">horizontal</property>
+                            <property name="spacing">6</property>
+                            
+                            <child>
+                              <object class="GtkLabel">
+                                <property name="visible">True</property>
+                                <property name="label">Coordinate scale:</property>
+                              </object>
+                            </child>
+                            
+                            <child>
+                              <object class="GtkSpinButton" id="scale_spin">
+                                <property name="visible">True</property>
+                                <property name="adjustment">scale_adjustment</property>
+                                <property name="digits">1</property>
+                                <property name="value">2.5</property>
+                              </object>
+                            </child>
+                          </object>
+                        </child>
+                        
+                        <!-- Include Regulatory Relations -->
+                        <child>
+                          <object class="GtkCheckButton" id="include_relations_check">
+                            <property name="visible">True</property>
+                            <property name="label">Include regulatory relations (future)</property>
+                            <property name="active">False</property>
+                            <property name="sensitive">False</property>
+                            <property name="tooltip-text">Convert activation/inhibition to test arcs (not yet implemented)</property>
+                          </object>
+                        </child>
+                        
+                        <!-- Separator for Enhancement Options -->
+                        <child>
+                          <object class="GtkSeparator">
+                            <property name="visible">True</property>
+                            <property name="margin-top">6</property>
+                            <property name="margin-bottom">6</property>
+                          </object>
+                        </child>
+                        
+                        <!-- Enhancement Options Label -->
+                        <child>
+                          <object class="GtkLabel">
+                            <property name="visible">True</property>
+                            <property name="label" translatable="yes">&lt;b&gt;Post-Processing Enhancements:&lt;/b&gt;</property>
+                            <property name="use-markup">True</property>
+                            <property name="halign">start</property>
+                            <property name="margin-bottom">3</property>
+                          </object>
+                        </child>
+                        
+                        <!-- Layout Optimization -->
+                        <child>
+                          <object class="GtkCheckButton" id="enhancement_layout_check">
+                            <property name="visible">True</property>
+                            <property name="label">Layout Optimization - Resolve overlapping elements</property>
+                            <property name="active">True</property>
+                            <property name="tooltip-text">Apply force-directed layout to eliminate overlapping places and transitions</property>
+                          </object>
+                        </child>
+                        
+                        <!-- Arc Routing -->
+                        <child>
+                          <object class="GtkCheckButton" id="enhancement_arcs_check">
+                            <property name="visible">True</property>
+                            <property name="label">Arc Routing - Create curved arcs for parallel connections</property>
+                            <property name="active">True</property>
+                            <property name="tooltip-text">Generate Bézier curves for parallel arcs to improve visual clarity</property>
+                          </object>
+                        </child>
+                        
+                        <!-- Metadata Enhancement -->
+                        <child>
+                          <object class="GtkCheckButton" id="enhancement_metadata_check">
+                            <property name="visible">True</property>
+                            <property name="label">Metadata Enhancement - Add compound/reaction names from KEGG</property>
+                            <property name="active">True</property>
+                            <property name="tooltip-text">Extract and apply compound names, reaction info, and colors from KEGG data</property>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                
+                <!-- Preview Area -->
+                <child>
+                  <object class="GtkFrame">
+                    <property name="visible">True</property>
+                    <property name="label">Preview</property>
+                    <property name="vexpand">True</property>
+                    
+                    <child>
+                      <object class="GtkScrolledWindow">
+                        <property name="visible">True</property>
+                        <property name="min-content-height">100</property>
+                        
+                        <child>
+                          <object class="GtkTextView" id="preview_text">
+                            <property name="visible">True</property>
+                            <property name="editable">False</property>
+                            <property name="wrap-mode">word</property>
+                            <property name="margin">6</property>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                
+                <!-- Status Label -->
+                <child>
+                  <object class="GtkLabel" id="import_status_label">
+                    <property name="visible">True</property>
+                    <property name="label"></property>
+                    <property name="halign">start</property>
+                    <property name="xalign">0</property>
+                    <property name="wrap">True</property>
+                  </object>
+                </child>
+                
+                <!-- Action Buttons -->
+                <child>
+                  <object class="GtkBox">
+                    <property name="visible">True</property>
+                    <property name="orientation">horizontal</property>
+                    <property name="spacing">6</property>
+                    <property name="halign">end</property>
+                    
+                    <child>
+                      <object class="GtkButton" id="fetch_button">
+                        <property name="visible">True</property>
+                        <property name="label">Fetch Pathway</property>
+                        <property name="tooltip-text">Download pathway information from KEGG</property>
+                      </object>
+                    </child>
+                    
+                    <child>
+                      <object class="GtkButton" id="import_button">
+                        <property name="visible">True</property>
+                        <property name="label">Import</property>
+                        <property name="sensitive">False</property>
+                        <property name="tooltip-text">Convert pathway to Petri net and load into canvas</property>
+                        <style>
+                          <class name="suggested-action"/>
+                        </style>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                
+                <!-- Academic Use Notice -->
+                <child>
+                  <object class="GtkFrame">
+                    <property name="visible">True</property>
+                    
+                    <child>
+                      <object class="GtkLabel">
+                        <property name="visible">True</property>
+                        <property name="label">⚠ KEGG data is for academic use only. Commercial use requires a license from Kanehisa Laboratories.</property>
+                        <property name="wrap">True</property>
+                        <property name="margin">6</property>
+                        <property name="xalign">0</property>
+                        <style>
+                          <class name="dim-label"/>
+                        </style>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+              </object>
+              <packing>
+                <property name="tab_fill">False</property>
+              </packing>
+            </child>
+            
+            <child type="tab">
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="label">Import</property>
+              </object>
+            </child>
+            
+            <!-- TAB 2: Browse Pathways (Future) -->
+            <child>
+              <object class="GtkBox" id="browse_tab_content">
+                <property name="visible">True</property>
+                <property name="orientation">vertical</property>
+                <property name="spacing">12</property>
+                <property name="margin">12</property>
+                
+                <child>
+                  <object class="GtkLabel">
+                    <property name="visible">True</property>
+                    <property name="label">Browse KEGG Pathways</property>
+                    <property name="halign">center</property>
+                    <property name="valign">center</property>
+                    <property name="vexpand">True</property>
+                    <style>
+                      <class name="dim-label"/>
+                    </style>
+                  </object>
+                </child>
+                
+                <child>
+                  <object class="GtkLabel">
+                    <property name="visible">True</property>
+                    <property name="label">(Future: List of available pathways by category)</property>
+                    <property name="halign">center</property>
+                    <style>
+                      <class name="dim-label"/>
+                    </style>
+                  </object>
+                </child>
+              </object>
+            </child>
+            
+            <child type="tab">
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="label">Browse</property>
+              </object>
+            </child>
+            
+            <!-- TAB 3: SBML Import -->
+            <child>
+              <object class="GtkBox" id="sbml_tab_content">
+                <property name="visible">True</property>
+                <property name="orientation">vertical</property>
+                <property name="spacing">12</property>
+                <property name="margin">12</property>
+                
+                <!-- File Selector -->
+                <child>
+                  <object class="GtkBox">
+                    <property name="visible">True</property>
+                    <property name="orientation">vertical</property>
+                    <property name="spacing">6</property>
+                    
+                    <child>
+                      <object class="GtkLabel">
+                        <property name="visible">True</property>
+                        <property name="label">SBML Source</property>
+                        <property name="halign">start</property>
+                        <property name="xalign">0</property>
+                        <attributes>
+                          <attribute name="weight" value="bold"/>
+                        </attributes>
+                      </object>
+                    </child>
+                    
+                    <!-- Mode Selection -->
+                    <child>
+                      <object class="GtkBox">
+                        <property name="visible">True</property>
+                        <property name="orientation">horizontal</property>
+                        <property name="spacing">12</property>
+                        
+                        <child>
+                          <object class="GtkRadioButton" id="sbml_local_radio">
+                            <property name="visible">True</property>
+                            <property name="label">Local File</property>
+                            <property name="active">True</property>
+                            <property name="tooltip-text">Browse for local SBML file</property>
+                          </object>
+                        </child>
+                        
+                        <child>
+                          <object class="GtkRadioButton" id="sbml_biomodels_radio">
+                            <property name="visible">True</property>
+                            <property name="label">BioModels Database</property>
+                            <property name="group">sbml_local_radio</property>
+                            <property name="tooltip-text">Fetch model from BioModels repository</property>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                    
+                    <!-- Local File Entry -->
+                    <child>
+                      <object class="GtkBox" id="sbml_local_box">
+                        <property name="visible">True</property>
+                        <property name="orientation">horizontal</property>
+                        <property name="spacing">6</property>
+                        
+                        <child>
+                          <object class="GtkEntry" id="sbml_file_entry">
+                            <property name="visible">True</property>
+                            <property name="editable">True</property>
+                            <property name="placeholder-text">Select SBML file or type path...</property>
+                            <property name="hexpand">True</property>
+                          </object>
+                        </child>
+                        
+                        <child>
+                          <object class="GtkButton" id="sbml_browse_button">
+                            <property name="visible">True</property>
+                            <property name="label">Browse...</property>
+                            <property name="tooltip-text">Select SBML file to import</property>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                    
+                    <!-- BioModels Entry -->
+                    <child>
+                      <object class="GtkBox" id="sbml_biomodels_box">
+                        <property name="visible">False</property>
+                        <property name="orientation">horizontal</property>
+                        <property name="spacing">6</property>
+                        
+                        <child>
+                          <object class="GtkEntry" id="sbml_biomodels_entry">
+                            <property name="visible">True</property>
+                            <property name="editable">True</property>
+                            <property name="placeholder-text">Enter BioModels ID (e.g., BIOMD0000000001)...</property>
+                            <property name="hexpand">True</property>
+                          </object>
+                        </child>
+                        
+                        <child>
+                          <object class="GtkButton" id="sbml_fetch_button">
+                            <property name="visible">True</property>
+                            <property name="label">Fetch</property>
+                            <property name="tooltip-text">Download model from BioModels</property>
+                            <property name="sensitive">False</property>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                    
+                    <!-- Info Label -->
+                    <child>
+                      <object class="GtkLabel" id="sbml_source_info">
+                        <property name="visible">True</property>
+                        <property name="label">Browse for a local SBML file (.sbml or .xml)</property>
+                        <property name="halign">start</property>
+                        <property name="wrap">True</property>
+                        <style>
+                          <class name="dim-label"/>
+                        </style>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                
+                <!-- Import Options -->
+                <child>
+                  <object class="GtkExpander" id="sbml_options_expander">
+                    <property name="visible">True</property>
+                    <property name="expanded">True</property>
+                    
+                    <child type="label">
+                      <object class="GtkLabel">
+                        <property name="visible">True</property>
+                        <property name="label">Import Options</property>
+                        <attributes>
+                          <attribute name="weight" value="bold"/>
+                        </attributes>
+                      </object>
+                    </child>
+                    
+                    <child>
+                      <object class="GtkBox">
+                        <property name="visible">True</property>
+                        <property name="orientation">vertical</property>
+                        <property name="spacing">6</property>
+                        <property name="margin">6</property>
+                        
+                        <!-- Layout Options -->
+                        <child>
+                          <object class="GtkLabel">
+                            <property name="visible">True</property>
+                            <property name="label" translatable="yes">&lt;b&gt;Layout Strategy:&lt;/b&gt;</property>
+                            <property name="use-markup">True</property>
+                            <property name="halign">start</property>
+                            <property name="margin-bottom">3</property>
+                          </object>
+                        </child>
+                        
+                        <!-- Info about new workflow -->
+                        <child>
+                          <object class="GtkLabel">
+                            <property name="visible">True</property>
+                            <property name="label">Parsed pathways are loaded with arbitrary positions. Use Swiss Palette → Force-Directed Layout to organize nodes after import.</property>
+                            <property name="halign">start</property>
+                            <property name="wrap">True</property>
+                            <property name="margin-bottom">12</property>
+                            <style>
+                              <class name="dim-label"/>
+                            </style>
+                          </object>
+                        </child>
+                        
+                        <!-- Separator -->
+                        <child>
+                          <object class="GtkSeparator">
+                            <property name="visible">True</property>
+                            <property name="margin-top">6</property>
+                            <property name="margin-bottom">6</property>
+                          </object>
+                        </child>
+                        
+                        <!-- Token Scaling -->
+                        <child>
+                          <object class="GtkLabel">
+                            <property name="visible">True</property>
+                            <property name="label" translatable="yes">&lt;b&gt;Token Conversion:&lt;/b&gt;</property>
+                            <property name="use-markup">True</property>
+                            <property name="halign">start</property>
+                            <property name="margin-bottom">3</property>
+                          </object>
+                        </child>
+                        
+                        <!-- Scale Factor Control -->
+                        <child>
+                          <object class="GtkBox">
+                            <property name="visible">True</property>
+                            <property name="orientation">horizontal</property>
+                            <property name="spacing">6</property>
+                            
+                            <child>
+                              <object class="GtkLabel">
+                                <property name="visible">True</property>
+                                <property name="label">Scale factor:</property>
+                                <property name="tooltip-text">Multiplier for concentration → token conversion</property>
+                              </object>
+                            </child>
+                            
+                            <child>
+                              <object class="GtkSpinButton" id="sbml_scale_spin">
+                                <property name="visible">True</property>
+                                <property name="adjustment">sbml_scale_adjustment</property>
+                                <property name="digits">1</property>
+                                <property name="value">1.0</property>
+                                <property name="tooltip-text">Scale factor: 1 mM = X tokens (0.1-10.0)</property>
+                              </object>
+                            </child>
+                            
+                            <child>
+                              <object class="GtkLabel">
+                                <property name="visible">True</property>
+                                <property name="label">   (1 mM → X tokens)</property>
+                                <style>
+                                  <class name="dim-label"/>
+                                </style>
+                              </object>
+                            </child>
+                          </object>
+                        </child>
+                        
+                        <!-- Example Calculation -->
+                        <child>
+                          <object class="GtkLabel" id="sbml_scale_example">
+                            <property name="visible">True</property>
+                            <property name="label">Example: 5 mM glucose → 5 tokens</property>
+                            <property name="halign">start</property>
+                            <property name="margin-start">20</property>
+                            <style>
+                              <class name="dim-label"/>
+                            </style>
+                          </object>
+                        </child>
+                        
+                        <!-- Enrichment Option (CrossFetch PRE-processing) - DISABLED -->
+                        <child>
+                          <object class="GtkCheckButton" id="sbml_enrich_check">
+                            <property name="visible">True</property>
+                            <property name="can-focus">True</property>
+                            <property name="receives-default">False</property>
+                            <property name="label">Enrich with external data (Disabled)</property>
+                            <property name="tooltip-text">Feature disabled: Automatic pathway matching between heterogeneous databases (KEGG, BioModels, etc.) is computationally intractable. Different organisms, notations, and scopes make reliable pathway equivalence detection impossible.</property>
+                            <property name="active">False</property>
+                            <property name="sensitive">False</property>
+                            <property name="margin-top">12</property>
+                            <property name="margin-start">12</property>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                
+                <!-- Preview/Status Area -->
+                <child>
+                  <object class="GtkFrame">
+                    <property name="visible">True</property>
+                    <property name="label">Pathway Information</property>
+                    <property name="vexpand">True</property>
+                    
+                    <child>
+                      <object class="GtkScrolledWindow">
+                        <property name="visible">True</property>
+                        <property name="min-content-height">150</property>
+                        
+                        <child>
+                          <object class="GtkTextView" id="sbml_preview_text">
+                            <property name="visible">True</property>
+                            <property name="editable">False</property>
+                            <property name="wrap-mode">word</property>
+                            <property name="margin">6</property>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                
+                <!-- Status Label -->
+                <child>
+                  <object class="GtkLabel" id="sbml_status_label">
+                    <property name="visible">True</property>
+                    <property name="label"></property>
+                    <property name="halign">start</property>
+                    <property name="xalign">0</property>
+                    <property name="wrap">True</property>
+                  </object>
+                </child>
+                
+                <!-- Action Buttons -->
+                <child>
+                  <object class="GtkBox">
+                    <property name="visible">True</property>
+                    <property name="orientation">horizontal</property>
+                    <property name="spacing">6</property>
+                    <property name="halign">end</property>
+                    
+                    <child>
+                      <object class="GtkButton" id="sbml_parse_button">
+                        <property name="visible">True</property>
+                        <property name="label">Parse and Load</property>
+                        <property name="sensitive">False</property>
+                        <property name="tooltip-text">Parse SBML file and automatically load to canvas (use Swiss Palette to apply force-directed layout)</property>
+                        <style>
+                          <class name="suggested-action"/>
+                        </style>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                
+                <!-- Info Notice -->
+                <child>
+                  <object class="GtkFrame">
+                    <property name="visible">True</property>
+                    
+                    <child>
+                      <object class="GtkLabel">
+                        <property name="visible">True</property>
+                        <property name="label">ℹ Import biochemical pathways from SBML files. Species → places, reactions → transitions, stoichiometry → arc weights. After loading, use Swiss Palette → Force-Directed Layout to organize nodes.</property>
+                        <property name="wrap">True</property>
+                        <property name="margin">6</property>
+                        <property name="xalign">0</property>
+                        <style>
+                          <class name="dim-label"/>
+                        </style>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+              </object>
+              <packing>
+                <property name="tab_fill">False</property>
+              </packing>
+            </child>
+            
+            <child type="tab">
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="label">SBML</property>
+              </object>
+            </child>
+            
+            <!-- TAB 4: Import History (Future) -->
+            <child>
+              <object class="GtkBox" id="history_tab_content">
+                <property name="visible">True</property>
+                <property name="orientation">vertical</property>
+                <property name="spacing">12</property>
+                <property name="margin">12</property>
+                
+                <child>
+                  <object class="GtkLabel">
+                    <property name="visible">True</property>
+                    <property name="label">Import History</property>
+                    <property name="halign">center</property>
+                    <property name="valign">center</property>
+                    <property name="vexpand">True</property>
+                    <style>
+                      <class name="dim-label"/>
+                    </style>
+                  </object>
+                </child>
+                
+                <child>
+                  <object class="GtkLabel">
+                    <property name="visible">True</property>
+                    <property name="label">(Future: Recently imported pathways)</property>
+                    <property name="halign">center</property>
+                    <style>
+                      <class name="dim-label"/>
+                    </style>
+                  </object>
+                </child>
+              </object>
+            </child>
+            
+            <child type="tab">
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="label">History</property>
+              </object>
+            </child>
+          </object>
+          <packing>
+            <property name="expand">True</property>
+            <property name="fill">True</property>
+          </packing>
+        </child>
+      </object>
+    </child>
+  </object>
+  
+  <!-- Adjustment for scale spin button -->
+  <object class="GtkAdjustment" id="scale_adjustment">
+    <property name="lower">0.5</property>
+    <property name="upper">10.0</property>
+    <property name="step-increment">0.1</property>
+    <property name="page-increment">1.0</property>
+    <property name="value">2.5</property>
+  </object>
+  
+  <!-- Adjustments for SBML import -->
+  <object class="GtkAdjustment" id="sbml_scale_adjustment">
+    <property name="lower">0.1</property>
+    <property name="upper">10.0</property>
+    <property name="step-increment">0.1</property>
+    <property name="page-increment">1.0</property>
+    <property name="value">1.0</property>
+  </object>
+</interface>
