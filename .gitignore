@@ -83,3 +83,46 @@ workspace/cache/
 
 # Legacy backups (pre-UI work safety backups)
 legacy/
+
+# ===== GitHub Visibility Control =====
+# Hide development materials from public GitHub (keep locally)
+
+# Documentation (papers, thesis, internal docs)
+doc/
+
+# Python examples (keep Biochemical-Examples only)
+examples/
+
+# Test suite
+tests/
+
+# Utility scripts (development tools)
+scripts/
+
+# Development and archived code
+archive/
+dev/
+
+# User workspace (except Biochemical-Examples)
+workspace/projects/My_Project/
+workspace/projects/thesis/
+workspace/projects/*.json
+
+# LaTeX auxiliary files
+*.aux
+*.log
+*.bbl
+*.blg
+*.out
+*.bcf
+*.run.xml
+*.toc
+*.lof
+*.lot
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+
+# PDF outputs (except final paper if needed)
+doc/**/*.pdf
+*.pdf
