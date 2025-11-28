@@ -83,3 +83,20 @@ workspace/cache/
 
 # Legacy backups (pre-UI work safety backups)
 legacy/
+
+# === Public Release Exclusions (v1.0.0) ===
+# Development and debugging scripts
+archive/
+dev/
+scripts/
+
+# Thesis source (available post-defense)
+doc/thesis/
+
+# Development configuration
+.pre-commit-config.yaml
+
+# Build artifacts
+*.egg-info/
+dist/
+build/
