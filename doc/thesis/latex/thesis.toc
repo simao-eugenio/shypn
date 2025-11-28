@@ -1,0 +1,735 @@
+\babel@toc {american}{}\relax 
+\vspace {-\cftbeforepartskip }
+\babel@toc {american}{}\relax 
+\contentsline {part}{\numberline {i}{Introduction and Foundations}}{1}{part.1}%
+\contentsline {chapter}{\numberline {1}{Introduction}}{3}{chapter.1}%
+\contentsline {section}{\numberline {1.1}{The Integration Challenge}}{3}{section.1.1}%
+\contentsline {section}{\numberline {1.2}{Motivating Example: The Lac Operon System}}{4}{section.1.2}%
+\contentsline {subsection}{\numberline {1.2.1}{Biological Background}}{4}{subsection.1.2.1}%
+\contentsline {paragraph}{{Metabolic layer (biochemical reactions):}}{4}{paragraph*.1}%
+\contentsline {paragraph}{{Regulatory layer (transcription factors):}}{4}{paragraph*.2}%
+\contentsline {paragraph}{{Integration (metabolite-gene coupling):}}{4}{paragraph*.3}%
+\contentsline {subsection}{\numberline {1.2.2}{Why This Cannot Be Modeled with Existing Formalisms}}{4}{subsection.1.2.2}%
+\contentsline {paragraph}{{Classical Petri nets}}{4}{paragraph*.4}%
+\contentsline {paragraph}{{SBML}}{5}{paragraph*.5}%
+\contentsline {paragraph}{{Boolean gene regulatory networks}}{5}{paragraph*.6}%
+\contentsline {paragraph}{{ODE systems}}{5}{paragraph*.7}%
+\contentsline {subsection}{\numberline {1.2.3}{What Is Needed}}{6}{subsection.1.2.3}%
+\contentsline {section}{\numberline {1.3}{Research Questions}}{6}{section.1.3}%
+\contentsline {subsection}{\numberline {1.3.1}{RQ1: Cooperative Parallelism (Weak Independence)}}{6}{subsection.1.3.1}%
+\contentsline {subsection}{\numberline {1.3.2}{RQ2: Heterogeneous Transition Types}}{7}{subsection.1.3.2}%
+\contentsline {subsection}{\numberline {1.3.3}{RQ3: Arc-Level Regulation}}{7}{subsection.1.3.3}%
+\contentsline {subsection}{\numberline {1.3.4}{RQ4: Atomic Conservation}}{7}{subsection.1.3.4}%
+\contentsline {subsection}{\numberline {1.3.5}{RQ5: Biological Validity}}{8}{subsection.1.3.5}%
+\contentsline {subsection}{\numberline {1.3.6}{RQ6: Practical Applicability}}{8}{subsection.1.3.6}%
+\contentsline {section}{\numberline {1.4}{Thesis Contributions}}{9}{section.1.4}%
+\contentsline {subsection}{\numberline {1.4.1}{Theoretical Contributions (Part II: Core Theory)}}{9}{subsection.1.4.1}%
+\contentsline {paragraph}{{Chapter \ref {ch:extended-biopn}: Extended Biological Petri Net Formalism}}{9}{paragraph*.8}%
+\contentsline {paragraph}{{Chapter \ref {ch:weak-independence}: Weak Independence Theory}}{9}{paragraph*.9}%
+\contentsline {paragraph}{{Chapter \ref {ch:biochemical-formulas}: Biochemical Formula Tracking}}{10}{paragraph*.10}%
+\contentsline {subsection}{\numberline {1.4.2}{Validation Contributions (Part III: Empirical Validation)}}{10}{subsection.1.4.2}%
+\contentsline {paragraph}{{Chapter \ref {ch:validation}: Validation Through Examples}}{10}{paragraph*.11}%
+\contentsline {subsection}{\numberline {1.4.3}{Implementation Contributions (Part IV: Supporting Tools)}}{11}{subsection.1.4.3}%
+\contentsline {paragraph}{{Chapter \ref {ch:architecture}: SHYpn System Architecture}}{11}{paragraph*.12}%
+\contentsline {paragraph}{{Chapter \ref {ch:kegg}: KEGG Compound Integration}}{11}{paragraph*.13}%
+\contentsline {paragraph}{{Chapter \ref {ch:brenda}: Intelligent Parameter Inference from BRENDA}}{12}{paragraph*.14}%
+\contentsline {paragraph}{{Chapter \ref {ch:simulation}: Hybrid Simulation Engine}}{12}{paragraph*.15}%
+\contentsline {subsection}{\numberline {1.4.4}{Impact Summary}}{12}{subsection.1.4.4}%
+\contentsline {section}{\numberline {1.5}{Research Methodology}}{13}{section.1.5}%
+\contentsline {subsection}{\numberline {1.5.1}{Formalism Development}}{13}{subsection.1.5.1}%
+\contentsline {subsection}{\numberline {1.5.2}{Validation Strategy}}{14}{subsection.1.5.2}%
+\contentsline {subsection}{\numberline {1.5.3}{Implementation Validation}}{14}{subsection.1.5.3}%
+\contentsline {section}{\numberline {1.6}{Thesis Scope and Limitations}}{15}{section.1.6}%
+\contentsline {subsection}{\numberline {1.6.1}{In Scope}}{15}{subsection.1.6.1}%
+\contentsline {subsection}{\numberline {1.6.2}{Out of Scope}}{15}{subsection.1.6.2}%
+\contentsline {subsection}{\numberline {1.6.3}{Assumptions}}{16}{subsection.1.6.3}%
+\contentsline {section}{\numberline {1.7}{Thesis Organization}}{16}{section.1.7}%
+\contentsline {section}{\numberline {1.8}{Reading Guide}}{17}{section.1.8}%
+\contentsline {paragraph}{{Theoretical foundations:}}{17}{paragraph*.16}%
+\contentsline {paragraph}{{Practical modeling:}}{18}{paragraph*.17}%
+\contentsline {paragraph}{{Implementation and tools:}}{18}{paragraph*.18}%
+\contentsline {paragraph}{{Systems biology applications:}}{18}{paragraph*.19}%
+\contentsline {paragraph}{{Computer science formalism:}}{18}{paragraph*.20}%
+\contentsline {section}{\numberline {1.9}{Summary}}{18}{section.1.9}%
+\contentsline {chapter}{\numberline {2}{Background and Related Work}}{21}{chapter.2}%
+\contentsline {section}{\numberline {2.1}{Petri Net Fundamentals}}{21}{section.2.1}%
+\contentsline {subsection}{\numberline {2.1.1}{Classical Petri Nets}}{21}{subsection.2.1.1}%
+\contentsline {subsection}{\numberline {2.1.2}{Petri Net Semantics}}{22}{subsection.2.1.2}%
+\contentsline {subsection}{\numberline {2.1.3}{Petri Net Properties}}{22}{subsection.2.1.3}%
+\contentsline {subsection}{\numberline {2.1.4}{Limitations for Biological Modeling}}{23}{subsection.2.1.4}%
+\contentsline {section}{\numberline {2.2}{Petri Net Extensions}}{23}{section.2.2}%
+\contentsline {subsection}{\numberline {2.2.1}{Colored Petri Nets (CPN)}}{23}{subsection.2.2.1}%
+\contentsline {subsection}{\numberline {2.2.2}{Timed Petri Nets}}{24}{subsection.2.2.2}%
+\contentsline {subsection}{\numberline {2.2.3}{Stochastic Petri Nets (SPN)}}{24}{subsection.2.2.3}%
+\contentsline {subsection}{\numberline {2.2.4}{Hybrid Petri Nets}}{25}{subsection.2.2.4}%
+\contentsline {subsection}{\numberline {2.2.5}{Comparison Summary}}{26}{subsection.2.2.5}%
+\contentsline {section}{\numberline {2.3}{Biological Petri Nets (Bio-PN)}}{26}{section.2.3}%
+\contentsline {subsection}{\numberline {2.3.1}{Early Work (1990s)}}{26}{subsection.2.3.1}%
+\contentsline {subsection}{\numberline {2.3.2}{Qualitative Bio-PNs (2000s)}}{26}{subsection.2.3.2}%
+\contentsline {subsection}{\numberline {2.3.3}{Quantitative Bio-PNs}}{27}{subsection.2.3.3}%
+\contentsline {subsection}{\numberline {2.3.4}{Recent Developments (2010s-2020s)}}{27}{subsection.2.3.4}%
+\contentsline {subsection}{\numberline {2.3.5}{Gap Analysis}}{28}{subsection.2.3.5}%
+\contentsline {section}{\numberline {2.4}{Multi-Scale Biological Modeling}}{29}{section.2.4}%
+\contentsline {subsection}{\numberline {2.4.1}{Genome-Scale Metabolic Models (GSMM)}}{29}{subsection.2.4.1}%
+\contentsline {subsection}{\numberline {2.4.2}{Gene Regulatory Networks (GRN)}}{29}{subsection.2.4.2}%
+\contentsline {subsection}{\numberline {2.4.3}{Integrated Approaches}}{30}{subsection.2.4.3}%
+\contentsline {subsection}{\numberline {2.4.4}{Why Current Approaches Fall Short}}{31}{subsection.2.4.4}%
+\contentsline {section}{\numberline {2.5}{Systems Biology Standards and Databases}}{31}{section.2.5}%
+\contentsline {subsection}{\numberline {2.5.1}{SBML (Systems Biology Markup Language)}}{31}{subsection.2.5.1}%
+\contentsline {subsection}{\numberline {2.5.2}{KEGG (Kyoto Encyclopedia of Genes and Genomes)}}{32}{subsection.2.5.2}%
+\contentsline {subsection}{\numberline {2.5.3}{BRENDA (Enzyme Database)}}{32}{subsection.2.5.3}%
+\contentsline {subsection}{\numberline {2.5.4}{Other Databases}}{33}{subsection.2.5.4}%
+\contentsline {section}{\numberline {2.6}{Related Tools}}{33}{section.2.6}%
+\contentsline {subsection}{\numberline {2.6.1}{Snoopy (Brandenburg University of Technology)}}{33}{subsection.2.6.1}%
+\contentsline {subsection}{\numberline {2.6.2}{Cell Illustrator (University of Tokyo)}}{34}{subsection.2.6.2}%
+\contentsline {subsection}{\numberline {2.6.3}{COPASI (Complex Pathway Simulator)}}{34}{subsection.2.6.3}%
+\contentsline {subsection}{\numberline {2.6.4}{CellDesigner (Systems Biology Institute)}}{35}{subsection.2.6.4}%
+\contentsline {subsection}{\numberline {2.6.5}{Charlie (Model Checker)}}{35}{subsection.2.6.5}%
+\contentsline {subsection}{\numberline {2.6.6}{Comparison Summary}}{36}{subsection.2.6.6}%
+\contentsline {section}{\numberline {2.7}{Theoretical Foundations}}{36}{section.2.7}%
+\contentsline {subsection}{\numberline {2.7.1}{Concurrency Theory}}{36}{subsection.2.7.1}%
+\contentsline {subsection}{\numberline {2.7.2}{Process Calculi}}{37}{subsection.2.7.2}%
+\contentsline {subsection}{\numberline {2.7.3}{Chemical Reaction Network Theory}}{38}{subsection.2.7.3}%
+\contentsline {subsection}{\numberline {2.7.4}{Stochastic Simulation}}{38}{subsection.2.7.4}%
+\contentsline {section}{\numberline {2.8}{Gap Summary}}{39}{section.2.8}%
+\contentsline {section}{\numberline {2.9}{Summary}}{39}{section.2.9}%
+\contentsline {chapter}{\numberline {3}{The Integration Challenge}}{41}{chapter.3}%
+\contentsline {section}{\numberline {3.1}{Introduction}}{41}{section.3.1}%
+\contentsline {subsection}{\numberline {3.1.1}{The Multi-Scale Challenge}}{41}{subsection.3.1.1}%
+\contentsline {paragraph}{{Traditional approach:}}{41}{paragraph*.23}%
+\contentsline {paragraph}{{Problem:}}{41}{paragraph*.24}%
+\contentsline {subsection}{\numberline {3.1.2}{Chapter Overview}}{42}{subsection.3.1.2}%
+\contentsline {section}{\numberline {3.2}{Motivating Example: cAMP-CRP Regulation of Lac Operon}}{42}{section.3.2}%
+\contentsline {subsection}{\numberline {3.2.1}{Biological Background}}{42}{subsection.3.2.1}%
+\contentsline {paragraph}{{Components:}}{42}{paragraph*.25}%
+\contentsline {paragraph}{{Regulation (simplified):}}{42}{paragraph*.26}%
+\contentsline {paragraph}{{Biological interpretation:}}{43}{paragraph*.27}%
+\contentsline {subsection}{\numberline {3.2.2}{Detailed Mechanistic Model}}{43}{subsection.3.2.2}%
+\contentsline {paragraph}{{Species (11 places):}}{43}{paragraph*.28}%
+\contentsline {paragraph}{{Transitions (9 reactions):}}{43}{paragraph*.29}%
+\contentsline {subsubsection}{{T1: Glucose Consumption (Continuous, Michaelis-Menten)}}{43}{subsubsection*.30}%
+\contentsline {subsubsection}{{T2: cAMP Synthesis (Continuous, Inhibited by Glucose)}}{44}{subsubsection*.31}%
+\contentsline {subsubsection}{{T3: CRP-cAMP Complex Formation (Continuous, Mass Action)}}{44}{subsubsection*.32}%
+\contentsline {subsubsection}{{T4: Repressor-Lactose Binding (Continuous, Fast Equilibrium)}}{44}{subsubsection*.33}%
+\contentsline {subsubsection}{{T5: Lac Operon Transcription (Stochastic, Burst Mode)}}{44}{subsubsection*.34}%
+\contentsline {subsubsection}{{T6: mRNA Translation (Stochastic, Discrete)}}{45}{subsubsection*.35}%
+\contentsline {subsubsection}{{T7: mRNA Degradation (Stochastic, First-Order)}}{45}{subsubsection*.36}%
+\contentsline {subsubsection}{{T8: Lactose Import (Continuous, Enzyme-Catalyzed)}}{45}{subsubsection*.37}%
+\contentsline {subsubsection}{{T9: Lactose Cleavage (Continuous, Michaelis-Menten)}}{45}{subsubsection*.38}%
+\contentsline {subsection}{\numberline {3.2.3}{System Dynamics}}{47}{subsection.3.2.3}%
+\contentsline {subsection}{\numberline {3.2.4}{Four Capabilities Required}}{47}{subsection.3.2.4}%
+\contentsline {subsubsection}{{Capability 1: Weak Independence \& Cooperative Parallelism}}{47}{subsubsection*.40}%
+\contentsline {subsubsection}{{Capability 2: Heterogeneous Transition Types Coexistence}}{47}{subsubsection*.41}%
+\contentsline {paragraph}{{Challenge:}}{47}{paragraph*.43}%
+\contentsline {subsubsection}{{Capability 3: Arc-Level Regulation with Biochemical Semantics}}{47}{subsubsection*.44}%
+\contentsline {paragraph}{{Test arcs (non-consumptive catalysis):}}{48}{paragraph*.45}%
+\contentsline {paragraph}{{Inhibitor arcs (threshold-based blocking):}}{48}{paragraph*.46}%
+\contentsline {paragraph}{{Key insight:}}{48}{paragraph*.48}%
+\contentsline {subsubsection}{{Capability 4: Atomic Conservation \& Biochemical Formula Tracking}}{49}{subsubsection*.49}%
+\contentsline {paragraph}{{Elemental balance verification:}}{49}{paragraph*.50}%
+\contentsline {paragraph}{{Purpose:}}{50}{paragraph*.51}%
+\contentsline {section}{\numberline {3.3}{Eight Formal Requirements for Integrated Biological Modeling}}{50}{section.3.3}%
+\contentsline {subsection}{\numberline {3.3.1}{R1: Multi-Scale Temporal Dynamics (Milliseconds to Hours)}}{50}{subsection.3.3.1}%
+\contentsline {paragraph}{{Requirement:}}{50}{paragraph*.52}%
+\contentsline {paragraph}{{Justification:}}{50}{paragraph*.53}%
+\contentsline {paragraph}{{Example (lac operon):}}{50}{paragraph*.54}%
+\contentsline {paragraph}{{Implication:}}{50}{paragraph*.55}%
+\contentsline {paragraph}{{Solution:}}{50}{paragraph*.56}%
+\contentsline {subsection}{\numberline {3.3.2}{R2: Discrete and Continuous State Variables (Hybrid Semantics)}}{51}{subsection.3.3.2}%
+\contentsline {paragraph}{{Requirement:}}{51}{paragraph*.57}%
+\contentsline {paragraph}{{Justification:}}{51}{paragraph*.58}%
+\contentsline {paragraph}{{Example (lac operon):}}{51}{paragraph*.59}%
+\contentsline {paragraph}{{Implication:}}{51}{paragraph*.60}%
+\contentsline {paragraph}{{Solution:}}{51}{paragraph*.61}%
+\contentsline {subsection}{\numberline {3.3.3}{R3: Non-Consumptive Participation (Catalysis, Templating)}}{51}{subsection.3.3.3}%
+\contentsline {paragraph}{{Requirement:}}{51}{paragraph*.62}%
+\contentsline {paragraph}{{Justification:}}{51}{paragraph*.63}%
+\contentsline {paragraph}{{Example (lac operon):}}{52}{paragraph*.64}%
+\contentsline {paragraph}{{Implication:}}{52}{paragraph*.65}%
+\contentsline {paragraph}{{Solution:}}{52}{paragraph*.66}%
+\contentsline {subsection}{\numberline {3.3.4}{R4: Threshold-Based Regulation (Inhibition, Activation Thresholds)}}{52}{subsection.3.3.4}%
+\contentsline {paragraph}{{Requirement:}}{52}{paragraph*.67}%
+\contentsline {paragraph}{{Justification:}}{52}{paragraph*.68}%
+\contentsline {paragraph}{{Example (lac operon):}}{52}{paragraph*.69}%
+\contentsline {paragraph}{{Implication:}}{53}{paragraph*.70}%
+\contentsline {paragraph}{{Solution:}}{53}{paragraph*.71}%
+\contentsline {subsection}{\numberline {3.3.5}{R5: Cooperative and Convergent Processes (Shared Outputs, Superposition)}}{53}{subsection.3.3.5}%
+\contentsline {paragraph}{{Requirement:}}{53}{paragraph*.72}%
+\contentsline {paragraph}{{Justification:}}{53}{paragraph*.73}%
+\contentsline {paragraph}{{General example (pyruvate):}}{53}{paragraph*.74}%
+\contentsline {paragraph}{{Implication:}}{53}{paragraph*.75}%
+\contentsline {paragraph}{{Solution:}}{53}{paragraph*.76}%
+\contentsline {subsection}{\numberline {3.3.6}{R6: Multi-Type Kinetics}}{53}{subsection.3.3.6}%
+\contentsline {paragraph}{{Requirement:}}{53}{paragraph*.77}%
+\contentsline {paragraph}{{Justification:}}{53}{paragraph*.78}%
+\contentsline {paragraph}{{Example (lac operon):}}{54}{paragraph*.79}%
+\contentsline {paragraph}{{Implication:}}{54}{paragraph*.81}%
+\contentsline {paragraph}{{Solution:}}{54}{paragraph*.82}%
+\contentsline {subsection}{\numberline {3.3.7}{R7: Elemental Conservation (Mass Balance at Atomic Level)}}{54}{subsection.3.3.7}%
+\contentsline {paragraph}{{Requirement:}}{54}{paragraph*.83}%
+\contentsline {paragraph}{{Justification:}}{54}{paragraph*.84}%
+\contentsline {paragraph}{{Example (lac operon):}}{55}{paragraph*.85}%
+\contentsline {paragraph}{{Implication:}}{55}{paragraph*.86}%
+\contentsline {paragraph}{{Solution:}}{55}{paragraph*.87}%
+\contentsline {subsection}{\numberline {3.3.8}{R8: Parallelism for Computational Efficiency}}{55}{subsection.3.3.8}%
+\contentsline {paragraph}{{Requirement:}}{55}{paragraph*.88}%
+\contentsline {paragraph}{{Justification:}}{55}{paragraph*.89}%
+\contentsline {paragraph}{{Example (genome-scale):}}{55}{paragraph*.90}%
+\contentsline {paragraph}{{Implication:}}{55}{paragraph*.91}%
+\contentsline {paragraph}{{Solution:}}{55}{paragraph*.92}%
+\contentsline {section}{\numberline {3.4}{Why Existing Formalisms Fail}}{56}{section.3.4}%
+\contentsline {subsection}{\numberline {3.4.1}{Comparative Analysis}}{56}{subsection.3.4.1}%
+\contentsline {subsection}{\numberline {3.4.2}{Classical Petri Nets (Place-Transition Nets)}}{56}{subsection.3.4.2}%
+\contentsline {paragraph}{{Definition:}}{56}{paragraph*.94}%
+\contentsline {paragraph}{{Verdict:}}{56}{paragraph*.95}%
+\contentsline {subsection}{\numberline {3.4.3}{Continuous Petri Nets (CPNs)}}{56}{subsection.3.4.3}%
+\contentsline {paragraph}{{Definition:}}{56}{paragraph*.96}%
+\contentsline {paragraph}{{Verdict:}}{56}{paragraph*.97}%
+\contentsline {subsection}{\numberline {3.4.4}{Hybrid Petri Nets (HPNs)}}{57}{subsection.3.4.4}%
+\contentsline {paragraph}{{Definition:}}{57}{paragraph*.98}%
+\contentsline {paragraph}{{Verdict:}}{57}{paragraph*.99}%
+\contentsline {subsection}{\numberline {3.4.5}{ODE Systems (SBML Models)}}{57}{subsection.3.4.5}%
+\contentsline {paragraph}{{Definition:}}{57}{paragraph*.100}%
+\contentsline {paragraph}{{Verdict:}}{57}{paragraph*.101}%
+\contentsline {section}{\numberline {3.5}{The Integration Gap}}{57}{section.3.5}%
+\contentsline {subsection}{\numberline {3.5.1}{Current Practice: Separate Models}}{57}{subsection.3.5.1}%
+\contentsline {paragraph}{{Integration attempt:}}{57}{paragraph*.102}%
+\contentsline {paragraph}{{Problems:}}{58}{paragraph*.103}%
+\contentsline {subsection}{\numberline {3.5.2}{The Need for Unified Formalism}}{58}{subsection.3.5.2}%
+\contentsline {paragraph}{{Goal:}}{58}{paragraph*.104}%
+\contentsline {paragraph}{{Requirements for unified formalism:}}{58}{paragraph*.105}%
+\contentsline {paragraph}{{Extended Bio-PN achieves this}}{58}{paragraph*.106}%
+\contentsline {section}{\numberline {3.6}{Summary}}{58}{section.3.6}%
+\contentsline {paragraph}{{Key Contributions:}}{58}{paragraph*.107}%
+\contentsline {paragraph}{{The Solution:}}{59}{paragraph*.108}%
+\contentsline {paragraph}{{Next Chapters:}}{60}{paragraph*.109}%
+\contentsline {part}{\numberline {ii}{Core Theory}}{61}{part.2}%
+\contentsline {chapter}{\numberline {4}{Formal Definition of Extended Biological Petri Nets}}{63}{chapter.4}%
+\contentsline {section}{\numberline {4.1}{Classical Petri Net Review}}{63}{section.4.1}%
+\contentsline {subsection}{\numberline {4.1.1}{Basic Definitions}}{63}{subsection.4.1.1}%
+\contentsline {subsection}{\numberline {4.1.2}{Neighborhood Notation}}{63}{subsection.4.1.2}%
+\contentsline {subsection}{\numberline {4.1.3}{Enabling Rule}}{63}{subsection.4.1.3}%
+\contentsline {subsection}{\numberline {4.1.4}{Firing Rule}}{64}{subsection.4.1.4}%
+\contentsline {subsection}{\numberline {4.1.5}{Reachability}}{64}{subsection.4.1.5}%
+\contentsline {subsection}{\numberline {4.1.6}{Limitations for Biological Modeling}}{64}{subsection.4.1.6}%
+\contentsline {section}{\numberline {4.2}{Extended Bio-PN: The 12-Tuple Definition}}{65}{section.4.2}%
+\contentsline {subsection}{\numberline {4.2.1}{Core Components (From Classical PN)}}{65}{subsection.4.2.1}%
+\contentsline {paragraph}{{P: Places (Biochemical Species)}}{65}{paragraph*.110}%
+\contentsline {paragraph}{{T: Transitions (Biochemical Reactions)}}{66}{paragraph*.111}%
+\contentsline {paragraph}{{F $\subseteq $ (P $\times $ T) $\cup $ (T $\times $ P): Normal Arcs}}{66}{paragraph*.112}%
+\contentsline {paragraph}{{W: F $\to \PazoBB {N}^+$: Arc Weights (Stoichiometric Coefficients)}}{66}{paragraph*.113}%
+\contentsline {paragraph}{{$M_0$: P $\to \PazoBB {N}_0 \cup \PazoBB {R}_0^+$: Initial Marking}}{66}{paragraph*.114}%
+\contentsline {subsection}{\numberline {4.2.2}{Extended Components (Novel to Bio-PN)}}{67}{subsection.4.2.2}%
+\contentsline {paragraph}{{K: Capacity Function (Optional Bounds)}}{67}{paragraph*.115}%
+\contentsline {paragraph}{{$\Phi $: Rate Function (Kinetic Laws)}}{67}{paragraph*.116}%
+\contentsline {paragraph}{{$\Sigma $: Regulatory Structure (Test \& Inhibitor Arcs)}}{67}{paragraph*.117}%
+\contentsline {paragraph}{{$\Theta $: Environmental Exchange Classification}}{68}{paragraph*.118}%
+\contentsline {paragraph}{{$\Delta $: Dependency Taxonomy}}{68}{paragraph*.119}%
+\contentsline {paragraph}{{$\tau $: Transition Type}}{68}{paragraph*.120}%
+\contentsline {paragraph}{{$\rho $: Formula Mapping (Atom Tracking)}}{68}{paragraph*.121}%
+\contentsline {section}{\numberline {4.3}{Extended Enabling and Firing Rules}}{69}{section.4.3}%
+\contentsline {subsection}{\numberline {4.3.1}{Extended Enabling Rule}}{69}{subsection.4.3.1}%
+\contentsline {subsection}{\numberline {4.3.2}{Extended Firing Rule}}{69}{subsection.4.3.2}%
+\contentsline {subsection}{\numberline {4.3.3}{Example: Enzyme-Catalyzed Reaction}}{69}{subsection.4.3.3}%
+\contentsline {section}{\numberline {4.4}{Biochemical Formula Tracking}}{70}{section.4.4}%
+\contentsline {subsection}{\numberline {4.4.1}{Atomic Balance Validation}}{70}{subsection.4.4.1}%
+\contentsline {subsection}{\numberline {4.4.2}{Example: Glucose Phosphorylation Balance}}{70}{subsection.4.4.2}%
+\contentsline {section}{\numberline {4.5}{Comparison with Classical Petri Nets}}{72}{section.4.5}%
+\contentsline {section}{\numberline {4.6}{Summary}}{72}{section.4.6}%
+\contentsline {chapter}{\numberline {5}{Weak Independence Theory \& Cooperative Parallelism}}{73}{chapter.5}%
+\contentsline {section}{\numberline {5.1}{The Parallelism Challenge in Biological Networks}}{73}{section.5.1}%
+\contentsline {subsection}{\numberline {5.1.1}{Motivation: Why Parallelism Matters}}{73}{subsection.5.1.1}%
+\contentsline {paragraph}{{Simulation Challenge:}}{73}{paragraph*.125}%
+\contentsline {paragraph}{{Sequential Simulation}}{73}{paragraph*.126}%
+\contentsline {paragraph}{{Parallel Simulation}}{73}{paragraph*.127}%
+\contentsline {subsection}{\numberline {5.1.2}{Classical Strong Independence}}{74}{subsection.5.1.2}%
+\contentsline {subsection}{\numberline {5.1.3}{Problem: Biological Networks Violate Strong Independence}}{75}{subsection.5.1.3}%
+\contentsline {paragraph}{{Example 1: Convergent Synthesis}}{75}{paragraph*.129}%
+\contentsline {paragraph}{{Example 2: Shared Catalyst}}{75}{paragraph*.131}%
+\contentsline {paragraph}{{Example 3: Feedback Regulation}}{75}{paragraph*.133}%
+\contentsline {paragraph}{{Empirical Observation}}{75}{paragraph*.135}%
+\contentsline {paragraph}{{Impact}}{75}{paragraph*.137}%
+\contentsline {subsection}{\numberline {5.1.4}{Biological Superposition Principle}}{76}{subsection.5.1.4}%
+\contentsline {paragraph}{{Superposition for Shared Outputs:}}{76}{paragraph*.138}%
+\contentsline {paragraph}{{Superposition for Shared Catalysts:}}{76}{paragraph*.139}%
+\contentsline {paragraph}{{Superposition Does NOT Hold for Shared Inputs:}}{77}{paragraph*.140}%
+\contentsline {section}{\numberline {5.2}{Weak Independence: Formal Definition}}{77}{section.5.2}%
+\contentsline {subsection}{\numberline {5.2.1}{Definition}}{77}{subsection.5.2.1}%
+\contentsline {paragraph}{{Intuition:}}{77}{paragraph*.141}%
+\contentsline {subsection}{\numberline {5.2.2}{Notation}}{77}{subsection.5.2.2}%
+\contentsline {paragraph}{{COUPLING relationship:}}{77}{paragraph*.142}%
+\contentsline {paragraph}{{CONFLICT relationship:}}{77}{paragraph*.143}%
+\contentsline {paragraph}{{INDEPENDENT relationship:}}{77}{paragraph*.144}%
+\contentsline {paragraph}{{Hierarchy:}}{78}{paragraph*.145}%
+\contentsline {subsection}{\numberline {5.2.3}{Three Coupling Modes}}{78}{subsection.5.2.3}%
+\contentsline {subsubsection}{{Mode 1: CONFLICT (Shared Input Places)}}{78}{subsubsection*.146}%
+\contentsline {subsubsection}{{Mode 2: COUPLING -- Convergent (Shared Output Places)}}{78}{subsubsection*.148}%
+\contentsline {subsubsection}{{Mode 3: COUPLING -- Regulatory (Shared Catalyst Places)}}{79}{subsubsection*.150}%
+\contentsline {section}{\numberline {5.3}{Parallel Execution under Weak Independence}}{79}{section.5.3}%
+\contentsline {subsection}{\numberline {5.3.1}{Concurrent Firing Semantics}}{79}{subsection.5.3.1}%
+\contentsline {paragraph}{{Key Property:}}{80}{paragraph*.152}%
+\contentsline {subsection}{\numberline {5.3.2}{Dependency Classification Algorithm}}{80}{subsection.5.3.2}%
+\contentsline {subsection}{\numberline {5.3.3}{Partition Algorithm for Parallel Execution}}{81}{subsection.5.3.3}%
+\contentsline {section}{\numberline {5.4}{Correctness Proof}}{81}{section.5.4}%
+\contentsline {subsection}{\numberline {5.4.1}{Theorem: Commutativity of Weakly Independent Transitions}}{81}{subsection.5.4.1}%
+\contentsline {subsection}{\numberline {5.4.2}{Theorem: Reachability Preservation}}{82}{subsection.5.4.2}%
+\contentsline {section}{\numberline {5.5}{Case Study: Glycolysis Parallelization}}{82}{section.5.5}%
+\contentsline {subsection}{\numberline {5.5.1}{Model Description}}{82}{subsection.5.5.1}%
+\contentsline {subsection}{\numberline {5.5.2}{Dependency Graph}}{84}{subsection.5.5.2}%
+\contentsline {subsection}{\numberline {5.5.3}{Parallel Execution Results}}{84}{subsection.5.5.3}%
+\contentsline {section}{\numberline {5.6}{Summary}}{84}{section.5.6}%
+\contentsline {paragraph}{{Key Contributions:}}{84}{paragraph*.156}%
+\contentsline {paragraph}{{Impact:}}{84}{paragraph*.157}%
+\contentsline {paragraph}{{Next Chapter:}}{84}{paragraph*.158}%
+\contentsline {chapter}{\numberline {6}{Biochemical Formula Tracking \& Atomic Conservation}}{85}{chapter.6}%
+\contentsline {section}{\numberline {6.1}{Introduction}}{85}{section.6.1}%
+\contentsline {paragraph}{{This chapter presents}}{85}{paragraph*.159}%
+\contentsline {subsection}{\numberline {6.1.1}{Key Contributions}}{85}{subsection.6.1.1}%
+\contentsline {paragraph}{{Benefits:}}{86}{paragraph*.160}%
+\contentsline {section}{\numberline {6.2}{Biochemical Formula Representation}}{86}{section.6.2}%
+\contentsline {subsection}{\numberline {6.2.1}{Hill Notation}}{86}{subsection.6.2.1}%
+\contentsline {paragraph}{{Format:}}{86}{paragraph*.161}%
+\contentsline {paragraph}{{Examples:}}{86}{paragraph*.162}%
+\contentsline {subsection}{\numberline {6.2.2}{Protonation States}}{86}{subsection.6.2.2}%
+\contentsline {paragraph}{{Challenge:}}{86}{paragraph*.164}%
+\contentsline {paragraph}{{Example: Phosphate}}{87}{paragraph*.165}%
+\contentsline {paragraph}{{Convention:}}{87}{paragraph*.166}%
+\contentsline {paragraph}{{Approach in Extended Bio-PN:}}{87}{paragraph*.167}%
+\contentsline {subsection}{\numberline {6.2.3}{Elemental Decomposition}}{87}{subsection.6.2.3}%
+\contentsline {paragraph}{{Data structure:}}{87}{paragraph*.168}%
+\contentsline {paragraph}{{Examples:}}{87}{paragraph*.169}%
+\contentsline {subsection}{\numberline {6.2.4}{Formula Arithmetic}}{87}{subsection.6.2.4}%
+\contentsline {subsubsection}{{Addition (Combining Molecules)}}{87}{subsubsection*.170}%
+\contentsline {paragraph}{{Example:}}{88}{paragraph*.171}%
+\contentsline {subsubsection}{{Subtraction (Removing Molecules)}}{88}{subsubsection*.172}%
+\contentsline {subsubsection}{{Multiplication (Stoichiometric Scaling)}}{88}{subsubsection*.173}%
+\contentsline {paragraph}{{Example:}}{88}{paragraph*.174}%
+\contentsline {section}{\numberline {6.3}{Reaction Formula Specification}}{89}{section.6.3}%
+\contentsline {subsection}{\numberline {6.3.1}{Format}}{89}{subsection.6.3.1}%
+\contentsline {paragraph}{{Reaction formula:}}{89}{paragraph*.175}%
+\contentsline {paragraph}{{Reactants/Products:}}{89}{paragraph*.176}%
+\contentsline {subsection}{\numberline {6.3.2}{Examples}}{89}{subsection.6.3.2}%
+\contentsline {subsubsection}{{Hexokinase (Glucose Phosphorylation)}}{89}{subsubsection*.177}%
+\contentsline {subsubsection}{{Phosphoglucose Isomerase (G6P $\rightleftharpoons $ F6P)}}{89}{subsubsection*.178}%
+\contentsline {subsubsection}{{Phosphofructokinase (F6P Phosphorylation)}}{89}{subsubsection*.179}%
+\contentsline {subsubsection}{{Lactate Dehydrogenase (Pyruvate Reduction)}}{89}{subsubsection*.180}%
+\contentsline {subsection}{\numberline {6.3.3}{Extended Syntax with Cofactors}}{90}{subsection.6.3.3}%
+\contentsline {paragraph}{{Common pattern:}}{90}{paragraph*.181}%
+\contentsline {paragraph}{{Example: ATP Hydrolysis}}{90}{paragraph*.182}%
+\contentsline {paragraph}{{Water addition:}}{90}{paragraph*.183}%
+\contentsline {paragraph}{{Proton release:}}{90}{paragraph*.184}%
+\contentsline {paragraph}{{Extended Bio-PN approach:}}{90}{paragraph*.185}%
+\contentsline {section}{\numberline {6.4}{Elemental Balance Verification}}{90}{section.6.4}%
+\contentsline {subsection}{\numberline {6.4.1}{Balance Check Algorithm}}{90}{subsection.6.4.1}%
+\contentsline {subsection}{\numberline {6.4.2}{Example: Hexokinase Balance Check}}{90}{subsection.6.4.2}%
+\contentsline {paragraph}{{Reaction:}}{90}{paragraph*.186}%
+\contentsline {paragraph}{{Input atoms:}}{92}{paragraph*.187}%
+\contentsline {paragraph}{{Output atoms:}}{92}{paragraph*.188}%
+\contentsline {paragraph}{{Imbalance:}}{92}{paragraph*.189}%
+\contentsline {paragraph}{{Issue detected:}}{92}{paragraph*.190}%
+\contentsline {subsection}{\numberline {6.4.3}{Handling Protonation Consistently}}{92}{subsection.6.4.3}%
+\contentsline {subsubsection}{{Approach 1: Ionic Formulas (Charge-Accurate)}}{92}{subsubsection*.191}%
+\contentsline {paragraph}{{Example: Hexokinase with ionic formulas}}{92}{paragraph*.192}%
+\contentsline {paragraph}{{Balance check:}}{92}{paragraph*.193}%
+\contentsline {subsubsection}{{Approach 2: Charge-Neutral Formulas (Proton-Adjusted)}}{92}{subsubsection*.195}%
+\contentsline {subsubsection}{{Recommended Approach: Hybrid}}{93}{subsubsection*.196}%
+\contentsline {paragraph}{{Extended Bio-PN implementation:}}{93}{paragraph*.197}%
+\contentsline {section}{\numberline {6.5}{Elemental Balance Matrix}}{93}{section.6.5}%
+\contentsline {subsection}{\numberline {6.5.1}{Definition}}{93}{subsection.6.5.1}%
+\contentsline {paragraph}{{Stoichiometric matrix}}{93}{paragraph*.198}%
+\contentsline {paragraph}{{Elemental balance matrix}}{93}{paragraph*.199}%
+\contentsline {subsection}{\numberline {6.5.2}{Construction Algorithm}}{94}{subsection.6.5.2}%
+\contentsline {paragraph}{{Meaning:}}{94}{paragraph*.200}%
+\contentsline {subsection}{\numberline {6.5.3}{Steady-State Condition}}{94}{subsection.6.5.3}%
+\contentsline {paragraph}{{Interpretation:}}{94}{paragraph*.201}%
+\contentsline {subsection}{\numberline {6.5.4}{Example: Simplified Glycolysis}}{94}{subsection.6.5.4}%
+\contentsline {paragraph}{{Transitions:}}{94}{paragraph*.202}%
+\contentsline {paragraph}{{Elemental balance matrix}}{94}{paragraph*.203}%
+\contentsline {paragraph}{{Interpretation:}}{94}{paragraph*.205}%
+\contentsline {paragraph}{{Steady-state flux:}}{95}{paragraph*.206}%
+\contentsline {paragraph}{{Contradiction:}}{95}{paragraph*.207}%
+\contentsline {paragraph}{{Resolution:}}{95}{paragraph*.208}%
+\contentsline {paragraph}{{Conclusion:}}{95}{paragraph*.209}%
+\contentsline {subsection}{\numberline {6.5.5}{Null Space Analysis}}{95}{subsection.6.5.5}%
+\contentsline {paragraph}{{Mathematical insight:}}{95}{paragraph*.210}%
+\contentsline {paragraph}{{Biological interpretation:}}{96}{paragraph*.211}%
+\contentsline {paragraph}{{Example (complete glycolysis, 10 reactions):}}{96}{paragraph*.212}%
+\contentsline {paragraph}{{Applications:}}{96}{paragraph*.213}%
+\contentsline {section}{\numberline {6.6}{Integration with Databases}}{96}{section.6.6}%
+\contentsline {subsection}{\numberline {6.6.1}{KEGG Compound Formulas}}{96}{subsection.6.6.1}%
+\contentsline {paragraph}{{Example API query:}}{96}{paragraph*.214}%
+\contentsline {paragraph}{{Response (excerpt):}}{96}{paragraph*.215}%
+\contentsline {paragraph}{{Extended Bio-PN integration:}}{96}{paragraph*.216}%
+\contentsline {subsection}{\numberline {6.6.2}{ChEBI Formulas}}{97}{subsection.6.6.2}%
+\contentsline {paragraph}{{Example:}}{97}{paragraph*.217}%
+\contentsline {paragraph}{{Advantage over KEGG:}}{97}{paragraph*.218}%
+\contentsline {paragraph}{{Example: ATP}}{97}{paragraph*.219}%
+\contentsline {subsection}{\numberline {6.6.3}{PubChem Formulas}}{97}{subsection.6.6.3}%
+\contentsline {paragraph}{{Example:}}{97}{paragraph*.220}%
+\contentsline {paragraph}{{Recommendation:}}{97}{paragraph*.221}%
+\contentsline {section}{\numberline {6.7}{Automatic Cofactor Suggestion}}{97}{section.6.7}%
+\contentsline {subsection}{\numberline {6.7.1}{Detecting Imbalance}}{97}{subsection.6.7.1}%
+\contentsline {paragraph}{{Scenario:}}{97}{paragraph*.222}%
+\contentsline {paragraph}{{Example:}}{97}{paragraph*.223}%
+\contentsline {paragraph}{{Imbalance:}}{98}{paragraph*.224}%
+\contentsline {paragraph}{{Interpretation:}}{98}{paragraph*.225}%
+\contentsline {paragraph}{{Possible cofactors:}}{98}{paragraph*.226}%
+\contentsline {subsection}{\numberline {6.7.2}{Cofactor Matching Algorithm}}{98}{subsection.6.7.2}%
+\contentsline {subsection}{\numberline {6.7.3}{User Interface Workflow}}{98}{subsection.6.7.3}%
+\contentsline {paragraph}{{Benefit:}}{99}{paragraph*.227}%
+\contentsline {section}{\numberline {6.8}{Applications and Benefits}}{99}{section.6.8}%
+\contentsline {subsection}{\numberline {6.8.1}{Model Validation}}{99}{subsection.6.8.1}%
+\contentsline {paragraph}{{Use case:}}{99}{paragraph*.228}%
+\contentsline {paragraph}{{Validation steps:}}{99}{paragraph*.229}%
+\contentsline {paragraph}{{Result:}}{99}{paragraph*.230}%
+\contentsline {subsection}{\numberline {6.8.2}{Pathway Completion}}{99}{subsection.6.8.2}%
+\contentsline {paragraph}{{Use case:}}{99}{paragraph*.231}%
+\contentsline {paragraph}{{Algorithm:}}{99}{paragraph*.232}%
+\contentsline {paragraph}{{Example (glycolysis):}}{100}{paragraph*.233}%
+\contentsline {subsection}{\numberline {6.8.3}{Redox Balance}}{100}{subsection.6.8.3}%
+\contentsline {paragraph}{{Extended feature:}}{100}{paragraph*.234}%
+\contentsline {paragraph}{{Example:}}{100}{paragraph*.235}%
+\contentsline {paragraph}{{Elemental change:}}{100}{paragraph*.236}%
+\contentsline {paragraph}{{Redox balance matrix}}{100}{paragraph*.237}%
+\contentsline {paragraph}{{Applications:}}{100}{paragraph*.238}%
+\contentsline {section}{\numberline {6.9}{Implementation Details}}{100}{section.6.9}%
+\contentsline {subsection}{\numberline {6.9.1}{Data Structure}}{100}{subsection.6.9.1}%
+\contentsline {paragraph}{{Place attributes:}}{100}{paragraph*.239}%
+\contentsline {paragraph}{{Transition attributes:}}{101}{paragraph*.240}%
+\contentsline {subsection}{\numberline {6.9.2}{Automatic Balance Checking}}{101}{subsection.6.9.2}%
+\contentsline {paragraph}{{On model load/save:}}{101}{paragraph*.241}%
+\contentsline {section}{\numberline {6.10}{Limitations and Future Work}}{102}{section.6.10}%
+\contentsline {subsection}{\numberline {6.10.1}{Current Limitations}}{102}{subsection.6.10.1}%
+\contentsline {subsubsection}{{Structural Isomers Not Distinguished}}{102}{subsubsection*.242}%
+\contentsline {subsubsection}{{Stereochemistry Not Captured}}{102}{subsubsection*.243}%
+\contentsline {subsubsection}{{Protonation State Ambiguity}}{102}{subsubsection*.244}%
+\contentsline {subsection}{\numberline {6.10.2}{Future Extensions}}{102}{subsection.6.10.2}%
+\contentsline {subsubsection}{{SMILES/InChI Integration}}{102}{subsubsection*.245}%
+\contentsline {subsubsection}{{Thermodynamic Integration}}{102}{subsubsection*.246}%
+\contentsline {subsubsection}{{Isotope Tracking}}{103}{subsubsection*.247}%
+\contentsline {section}{\numberline {6.11}{Summary}}{103}{section.6.11}%
+\contentsline {paragraph}{{Key Contributions:}}{103}{paragraph*.248}%
+\contentsline {paragraph}{{Impact:}}{103}{paragraph*.249}%
+\contentsline {paragraph}{{Next Chapter:}}{103}{paragraph*.250}%
+\contentsline {part}{\numberline {iii}{Validation}}{105}{part.3}%
+\contentsline {chapter}{\numberline {7}{Validation Through Examples}}{107}{chapter.7}%
+\contentsline {section}{\numberline {7.1}{Introduction}}{107}{section.7.1}%
+\contentsline {subsection}{\numberline {7.1.1}{Validation Strategy}}{107}{subsection.7.1.1}%
+\contentsline {section}{\numberline {7.2}{Example 1: Hexokinase with Enzyme Catalysis}}{108}{section.7.2}%
+\contentsline {subsection}{\numberline {7.2.1}{Purpose and Biological Context}}{108}{subsection.7.2.1}%
+\contentsline {subsection}{\numberline {7.2.2}{Reaction and Model Structure}}{108}{subsection.7.2.2}%
+\contentsline {subsection}{\numberline {7.2.3}{Innovations Demonstrated}}{109}{subsection.7.2.3}%
+\contentsline {paragraph}{{Arc-Level Regulation (Test Arcs):}}{109}{paragraph*.251}%
+\contentsline {paragraph}{{Atomic Conservation:}}{110}{paragraph*.252}%
+\contentsline {subsection}{\numberline {7.2.4}{Expected Behavior and Validation}}{110}{subsection.7.2.4}%
+\contentsline {subsection}{\numberline {7.2.5}{Limitations}}{111}{subsection.7.2.5}%
+\contentsline {section}{\numberline {7.3}{Example 2: Allosteric Inhibition of PFK}}{111}{section.7.3}%
+\contentsline {subsection}{\numberline {7.3.1}{Purpose and Biological Context}}{111}{subsection.7.3.1}%
+\contentsline {subsection}{\numberline {7.3.2}{Reaction and Model Structure}}{111}{subsection.7.3.2}%
+\contentsline {subsection}{\numberline {7.3.3}{Inhibitor Arc Semantics}}{112}{subsection.7.3.3}%
+\contentsline {subsection}{\numberline {7.3.4}{Innovations Demonstrated}}{112}{subsection.7.3.4}%
+\contentsline {paragraph}{{Arc-Level Regulation (Inhibitor Arcs):}}{112}{paragraph*.254}%
+\contentsline {paragraph}{{Atomic Conservation:}}{112}{paragraph*.255}%
+\contentsline {subsection}{\numberline {7.3.5}{Expected Behavior and Validation}}{112}{subsection.7.3.5}%
+\contentsline {section}{\numberline {7.4}{Example 3: Competitive Inhibition of Succinate Dehydrogenase}}{113}{section.7.4}%
+\contentsline {subsection}{\numberline {7.4.1}{Purpose and Biological Context}}{113}{subsection.7.4.1}%
+\contentsline {subsection}{\numberline {7.4.2}{Reaction and Model Structure}}{113}{subsection.7.4.2}%
+\contentsline {subsection}{\numberline {7.4.3}{Innovations Demonstrated}}{114}{subsection.7.4.3}%
+\contentsline {paragraph}{{Weak Independence with Shared Catalysts:}}{114}{paragraph*.256}%
+\contentsline {paragraph}{{Test Arcs Make Enzyme Sharing Explicit:}}{114}{paragraph*.257}%
+\contentsline {subsection}{\numberline {7.4.4}{Expected Behavior and Validation}}{115}{subsection.7.4.4}%
+\contentsline {section}{\numberline {7.5}{Example 4: Upper Glycolysis Pathway}}{115}{section.7.5}%
+\contentsline {subsection}{\numberline {7.5.1}{Purpose and Biological Context}}{115}{subsection.7.5.1}%
+\contentsline {subsection}{\numberline {7.5.2}{Pathway and Model Structure}}{115}{subsection.7.5.2}%
+\contentsline {subsection}{\numberline {7.5.3}{Innovations Demonstrated}}{116}{subsection.7.5.3}%
+\contentsline {paragraph}{{Weak Independence -- Pathway Dependency Analysis:}}{116}{paragraph*.258}%
+\contentsline {paragraph}{{Arc-Level Regulation -- Multiple Checkpoints:}}{116}{paragraph*.259}%
+\contentsline {paragraph}{{Atomic Conservation -- Multi-Step Verification:}}{116}{paragraph*.260}%
+\contentsline {subsection}{\numberline {7.5.4}{Expected Behavior and Validation}}{117}{subsection.7.5.4}%
+\contentsline {section}{\numberline {7.6}{Example 5: Energy Sensing Motif -- Complete Integration}}{117}{section.7.6}%
+\contentsline {subsection}{\numberline {7.6.1}{Purpose and Biological Context}}{117}{subsection.7.6.1}%
+\contentsline {subsection}{\numberline {7.6.2}{Model Structure}}{118}{subsection.7.6.2}%
+\contentsline {subsection}{\numberline {7.6.3}{Innovation 1: Weak Independence \& Cooperative Parallelism}}{119}{subsection.7.6.3}%
+\contentsline {subsection}{\numberline {7.6.4}{Innovation 2: Heterogeneous Transition Types Coexistence}}{119}{subsection.7.6.4}%
+\contentsline {subsection}{\numberline {7.6.5}{Innovation 3: Arc-Level Regulation with Biochemical Semantics}}{120}{subsection.7.6.5}%
+\contentsline {subsection}{\numberline {7.6.6}{Innovation 4: Atomic Conservation \& Formula Tracking}}{121}{subsection.7.6.6}%
+\contentsline {subsection}{\numberline {7.6.7}{Expected Behavior and Validation}}{122}{subsection.7.6.7}%
+\contentsline {subsection}{\numberline {7.6.8}{Summary: Complete Integration Proof}}{123}{subsection.7.6.8}%
+\contentsline {section}{\numberline {7.7}{Comparative Analysis}}{123}{section.7.7}%
+\contentsline {subsection}{\numberline {7.7.1}{Innovation Coverage Matrix}}{123}{subsection.7.7.1}%
+\contentsline {subsection}{\numberline {7.7.2}{Comparison with Existing Formalisms}}{124}{subsection.7.7.2}%
+\contentsline {subsection}{\numberline {7.7.3}{Scalability Analysis}}{124}{subsection.7.7.3}%
+\contentsline {section}{\numberline {7.8}{Validation Against Requirements}}{125}{section.7.8}%
+\contentsline {subsection}{\numberline {7.8.1}{Eight Requirements from Chapter~\ref {ch:integration-challenge}}}{125}{subsection.7.8.1}%
+\contentsline {subsection}{\numberline {7.8.2}{Limitations Identified}}{125}{subsection.7.8.2}%
+\contentsline {section}{\numberline {7.9}{Summary and Conclusions}}{126}{section.7.9}%
+\contentsline {subsection}{\numberline {7.9.1}{Key Validation Outcomes}}{126}{subsection.7.9.1}%
+\contentsline {subsection}{\numberline {7.9.2}{Four Innovations Validated}}{126}{subsection.7.9.2}%
+\contentsline {subsection}{\numberline {7.9.3}{Example 5 as Definitive Proof}}{127}{subsection.7.9.3}%
+\contentsline {subsection}{\numberline {7.9.4}{Future Validation Directions}}{127}{subsection.7.9.4}%
+\contentsline {part}{\numberline {iv}{Implementation}}{129}{part.4}%
+\contentsline {chapter}{\numberline {8}{SHYpn System Architecture}}{131}{chapter.8}%
+\contentsline {section}{\numberline {8.1}{Introduction}}{131}{section.8.1}%
+\contentsline {subsection}{\numberline {8.1.1}{Design Goals}}{131}{subsection.8.1.1}%
+\contentsline {subsection}{\numberline {8.1.2}{Key Contributions}}{131}{subsection.8.1.2}%
+\contentsline {section}{\numberline {8.2}{System Overview}}{131}{section.8.2}%
+\contentsline {subsection}{\numberline {8.2.1}{Architectural Layers}}{131}{subsection.8.2.1}%
+\contentsline {subsection}{\numberline {8.2.2}{Technology Stack}}{132}{subsection.8.2.2}%
+\contentsline {subsection}{\numberline {8.2.3}{Project Structure}}{133}{subsection.8.2.3}%
+\contentsline {section}{\numberline {8.3}{Data Layer: Model Representation}}{134}{section.8.3}%
+\contentsline {subsection}{\numberline {8.3.1}{Core Classes}}{134}{subsection.8.3.1}%
+\contentsline {paragraph}{{BioPetriNet class (12-tuple representation):}}{134}{paragraph*.267}%
+\contentsline {paragraph}{{Place class:}}{134}{paragraph*.268}%
+\contentsline {paragraph}{{Transition class:}}{134}{paragraph*.269}%
+\contentsline {paragraph}{{Arc class:}}{135}{paragraph*.270}%
+\contentsline {paragraph}{{Enumerations:}}{135}{paragraph*.271}%
+\contentsline {subsection}{\numberline {8.3.2}{Rate Functions}}{135}{subsection.8.3.2}%
+\contentsline {subsection}{\numberline {8.3.3}{Biochemical Formulas}}{136}{subsection.8.3.3}%
+\contentsline {section}{\numberline {8.4}{Business Logic Layer}}{136}{section.8.4}%
+\contentsline {subsection}{\numberline {8.4.1}{Model Manager}}{136}{subsection.8.4.1}%
+\contentsline {subsection}{\numberline {8.4.2}{Simulation Controller}}{136}{subsection.8.4.2}%
+\contentsline {subsection}{\numberline {8.4.3}{Analysis Engine}}{137}{subsection.8.4.3}%
+\contentsline {section}{\numberline {8.5}{Presentation Layer}}{137}{section.8.5}%
+\contentsline {subsection}{\numberline {8.5.1}{Network Canvas}}{137}{subsection.8.5.1}%
+\contentsline {paragraph}{{Rendering algorithm:}}{137}{paragraph*.272}%
+\contentsline {paragraph}{{Interaction:}}{138}{paragraph*.273}%
+\contentsline {subsection}{\numberline {8.5.2}{Property Panel}}{138}{subsection.8.5.2}%
+\contentsline {paragraph}{{Place properties:}}{138}{paragraph*.274}%
+\contentsline {paragraph}{{Transition properties:}}{138}{paragraph*.275}%
+\contentsline {subsection}{\numberline {8.5.3}{Simulation Panel}}{139}{subsection.8.5.3}%
+\contentsline {section}{\numberline {8.6}{Persistence and Interoperability}}{139}{section.8.6}%
+\contentsline {subsection}{\numberline {8.6.1}{Native JSON Format}}{139}{subsection.8.6.1}%
+\contentsline {subsection}{\numberline {8.6.2}{SBML Import}}{140}{subsection.8.6.2}%
+\contentsline {subsection}{\numberline {8.6.3}{GraphML Export}}{141}{subsection.8.6.3}%
+\contentsline {section}{\numberline {8.7}{Performance Considerations}}{141}{section.8.7}%
+\contentsline {subsection}{\numberline {8.7.1}{Identified Bottlenecks}}{141}{subsection.8.7.1}%
+\contentsline {subsection}{\numberline {8.7.2}{Optimization Strategies}}{141}{subsection.8.7.2}%
+\contentsline {subsection}{\numberline {8.7.3}{Benchmark Results}}{142}{subsection.8.7.3}%
+\contentsline {section}{\numberline {8.8}{Summary}}{142}{section.8.8}%
+\contentsline {chapter}{\numberline {9}{KEGG Compound and Reaction Integration}}{145}{chapter.9}%
+\contentsline {section}{\numberline {9.1}{Introduction}}{145}{section.9.1}%
+\contentsline {subsection}{\numberline {9.1.1}{KEGG Database}}{145}{subsection.9.1.1}%
+\contentsline {subsection}{\numberline {9.1.2}{SHYpn Integration Features}}{145}{subsection.9.1.2}%
+\contentsline {section}{\numberline {9.2}{KEGG REST API}}{146}{section.9.2}%
+\contentsline {subsection}{\numberline {9.2.1}{Endpoints}}{146}{subsection.9.2.1}%
+\contentsline {subsection}{\numberline {9.2.2}{Example: Fetch Glucose}}{146}{subsection.9.2.2}%
+\contentsline {paragraph}{{Request:}}{146}{paragraph*.277}%
+\contentsline {paragraph}{{Response (excerpt):}}{146}{paragraph*.278}%
+\contentsline {subsection}{\numberline {9.2.3}{Example: Fetch Hexokinase Reaction}}{147}{subsection.9.2.3}%
+\contentsline {paragraph}{{Request:}}{147}{paragraph*.279}%
+\contentsline {paragraph}{{Response (excerpt):}}{147}{paragraph*.280}%
+\contentsline {section}{\numberline {9.3}{KEGGConnector Class}}{147}{section.9.3}%
+\contentsline {subsection}{\numberline {9.3.1}{Responsibilities}}{147}{subsection.9.3.1}%
+\contentsline {subsection}{\numberline {9.3.2}{Key Methods}}{147}{subsection.9.3.2}%
+\contentsline {subsection}{\numberline {9.3.3}{Usage Examples}}{148}{subsection.9.3.3}%
+\contentsline {paragraph}{{Example 1: Lookup compound by ID}}{148}{paragraph*.281}%
+\contentsline {paragraph}{{Example 2: Search compound by name}}{148}{paragraph*.282}%
+\contentsline {paragraph}{{Example 3: Fetch reaction}}{148}{paragraph*.283}%
+\contentsline {section}{\numberline {9.4}{Automatic Model Enrichment}}{149}{section.9.4}%
+\contentsline {subsection}{\numberline {9.4.1}{Place Formula Auto-Fill}}{149}{subsection.9.4.1}%
+\contentsline {subsection}{\numberline {9.4.2}{Reaction Import}}{149}{subsection.9.4.2}%
+\contentsline {paragraph}{{Example: Importing hexokinase (R00299)}}{149}{paragraph*.284}%
+\contentsline {subsection}{\numberline {9.4.3}{Pathway Import}}{150}{subsection.9.4.3}%
+\contentsline {paragraph}{{Example: Importing glycolysis (map00010)}}{150}{paragraph*.285}%
+\contentsline {section}{\numberline {9.5}{Cofactor Suggestion}}{150}{section.9.5}%
+\contentsline {subsection}{\numberline {9.5.1}{Problem: Missing Cofactors}}{150}{subsection.9.5.1}%
+\contentsline {subsection}{\numberline {9.5.2}{Cofactor Suggestion Algorithm}}{151}{subsection.9.5.2}%
+\contentsline {paragraph}{{Example:}}{151}{paragraph*.286}%
+\contentsline {subsection}{\numberline {9.5.3}{Example: Hexokinase Balance}}{151}{subsection.9.5.3}%
+\contentsline {section}{\numberline {9.6}{Integration with Model Validation}}{152}{section.9.6}%
+\contentsline {subsection}{\numberline {9.6.1}{Validation Workflow}}{152}{subsection.9.6.1}%
+\contentsline {section}{\numberline {9.7}{Performance and Caching}}{152}{section.9.7}%
+\contentsline {subsection}{\numberline {9.7.1}{API Call Minimization}}{152}{subsection.9.7.1}%
+\contentsline {subsection}{\numberline {9.7.2}{Offline Database}}{153}{subsection.9.7.2}%
+\contentsline {section}{\numberline {9.8}{Limitations and Future Work}}{154}{section.9.8}%
+\contentsline {subsection}{\numberline {9.8.1}{Current Limitations}}{154}{subsection.9.8.1}%
+\contentsline {subsection}{\numberline {9.8.2}{Future Enhancements}}{154}{subsection.9.8.2}%
+\contentsline {section}{\numberline {9.9}{Summary}}{154}{section.9.9}%
+\contentsline {chapter}{\numberline {10}{Intelligent Parameter Inference from BRENDA}}{157}{chapter.10}%
+\contentsline {section}{\numberline {10.1}{Introduction}}{157}{section.10.1}%
+\contentsline {subsection}{\numberline {10.1.1}{BRENDA Database}}{157}{subsection.10.1.1}%
+\contentsline {subsection}{\numberline {10.1.2}{SHYpn Parameter Inference}}{157}{subsection.10.1.2}%
+\contentsline {section}{\numberline {10.2}{BRENDA Data Structure}}{158}{section.10.2}%
+\contentsline {subsection}{\numberline {10.2.1}{Enzyme Commission (EC) Numbers}}{158}{subsection.10.2.1}%
+\contentsline {subsection}{\numberline {10.2.2}{Kinetic Parameters in BRENDA}}{158}{subsection.10.2.2}%
+\contentsline {section}{\numberline {10.3}{BRENDA SOAP API}}{159}{section.10.3}%
+\contentsline {subsection}{\numberline {10.3.1}{Authentication}}{159}{subsection.10.3.1}%
+\contentsline {subsection}{\numberline {10.3.2}{BRENDAConnector Class}}{159}{subsection.10.3.2}%
+\contentsline {subsection}{\numberline {10.3.3}{Example: Fetching Hexokinase $K_m$}}{159}{subsection.10.3.3}%
+\contentsline {section}{\numberline {10.4}{Statistical Aggregation}}{160}{section.10.4}%
+\contentsline {subsection}{\numberline {10.4.1}{Median as Robust Estimator}}{160}{subsection.10.4.1}%
+\contentsline {subsection}{\numberline {10.4.2}{Confidence Intervals}}{160}{subsection.10.4.2}%
+\contentsline {section}{\numberline {10.5}{Context-Aware Heuristics}}{161}{section.10.5}%
+\contentsline {subsection}{\numberline {10.5.1}{Organism Priority}}{161}{subsection.10.5.1}%
+\contentsline {subsection}{\numberline {10.5.2}{Quality Filtering}}{161}{subsection.10.5.2}%
+\contentsline {section}{\numberline {10.6}{Local Database Caching}}{162}{section.10.6}%
+\contentsline {subsection}{\numberline {10.6.1}{Motivation}}{162}{subsection.10.6.1}%
+\contentsline {subsection}{\numberline {10.6.2}{Database Schema}}{162}{subsection.10.6.2}%
+\contentsline {subsection}{\numberline {10.6.3}{Workflow with Caching}}{163}{subsection.10.6.3}%
+\contentsline {section}{\numberline {10.7}{UI Integration}}{163}{section.10.7}%
+\contentsline {subsection}{\numberline {10.7.1}{``Fetch from BRENDA'' Button}}{163}{subsection.10.7.1}%
+\contentsline {subsection}{\numberline {10.7.2}{Batch Parameter Inference}}{164}{subsection.10.7.2}%
+\contentsline {section}{\numberline {10.8}{Limitations and Future Work}}{164}{section.10.8}%
+\contentsline {subsection}{\numberline {10.8.1}{Current Limitations}}{164}{subsection.10.8.1}%
+\contentsline {subsection}{\numberline {10.8.2}{Future Enhancements}}{165}{subsection.10.8.2}%
+\contentsline {section}{\numberline {10.9}{Summary}}{165}{section.10.9}%
+\contentsline {chapter}{\numberline {11}{Hybrid Simulation Engine}}{167}{chapter.11}%
+\contentsline {section}{\numberline {11.1}{Introduction}}{167}{section.11.1}%
+\contentsline {subsection}{\numberline {11.1.1}{Key Contributions}}{167}{subsection.11.1.1}%
+\contentsline {section}{\numberline {11.2}{Architecture Overview}}{167}{section.11.2}%
+\contentsline {subsection}{\numberline {11.2.1}{Four-Engine Design}}{167}{subsection.11.2.1}%
+\contentsline {subsection}{\numberline {11.2.2}{Simulation Loop}}{168}{subsection.11.2.2}%
+\contentsline {section}{\numberline {11.3}{Continuous Engine (ODE Integration)}}{168}{section.11.3}%
+\contentsline {subsection}{\numberline {11.3.1}{Differential Equations}}{168}{subsection.11.3.1}%
+\contentsline {subsection}{\numberline {11.3.2}{ODE Solver Integration}}{169}{subsection.11.3.2}%
+\contentsline {subsection}{\numberline {11.3.3}{Adaptive Time-Stepping}}{169}{subsection.11.3.3}%
+\contentsline {section}{\numberline {11.4}{Stochastic Engine (Gillespie Algorithm)}}{169}{section.11.4}%
+\contentsline {subsection}{\numberline {11.4.1}{Stochastic Simulation Algorithm (SSA)}}{169}{subsection.11.4.1}%
+\contentsline {subsection}{\numberline {11.4.2}{Example: Gene Expression}}{170}{subsection.11.4.2}%
+\contentsline {section}{\numberline {11.5}{Timed Engine (Scheduled Events)}}{170}{section.11.5}%
+\contentsline {subsection}{\numberline {11.5.1}{Timed Transitions}}{170}{subsection.11.5.1}%
+\contentsline {subsection}{\numberline {11.5.2}{Implementation (Priority Queue)}}{170}{subsection.11.5.2}%
+\contentsline {section}{\numberline {11.6}{Burst Engine (Transcriptional Bursts)}}{171}{section.11.6}%
+\contentsline {subsection}{\numberline {11.6.1}{Burst Dynamics}}{171}{subsection.11.6.1}%
+\contentsline {subsection}{\numberline {11.6.2}{Example: Bursty Gene Expression}}{171}{subsection.11.6.2}%
+\contentsline {section}{\numberline {11.7}{Hybrid Synchronization}}{171}{section.11.7}%
+\contentsline {subsection}{\numberline {11.7.1}{Coordination Algorithm}}{171}{subsection.11.7.1}%
+\contentsline {subsection}{\numberline {11.7.2}{Synchronization Guarantees}}{172}{subsection.11.7.2}%
+\contentsline {section}{\numberline {11.8}{Parallel Execution (Weak Independence)}}{172}{section.11.8}%
+\contentsline {subsection}{\numberline {11.8.1}{Motivation}}{172}{subsection.11.8.1}%
+\contentsline {subsection}{\numberline {11.8.2}{Parallel Algorithm}}{172}{subsection.11.8.2}%
+\contentsline {subsection}{\numberline {11.8.3}{Benchmark Results}}{173}{subsection.11.8.3}%
+\contentsline {section}{\numberline {11.9}{Validation}}{173}{section.11.9}%
+\contentsline {subsection}{\numberline {11.9.1}{Correctness Tests}}{173}{subsection.11.9.1}%
+\contentsline {subsection}{\numberline {11.9.2}{Performance Benchmarks}}{174}{subsection.11.9.2}%
+\contentsline {section}{\numberline {11.10}{Summary}}{174}{section.11.10}%
+\contentsline {part}{\numberline {v}{Evaluation}}{175}{part.5}%
+\contentsline {chapter}{\numberline {12}{Case Studies and Applications}}{177}{chapter.12}%
+\contentsline {section}{\numberline {12.1}{Introduction}}{177}{section.12.1}%
+\contentsline {section}{\numberline {12.2}{Case Study 1: Complete Glycolysis Pathway}}{177}{section.12.2}%
+\contentsline {subsection}{\numberline {12.2.1}{Biological Context}}{177}{subsection.12.2.1}%
+\contentsline {subsection}{\numberline {12.2.2}{Model Structure}}{178}{subsection.12.2.2}%
+\contentsline {subsection}{\numberline {12.2.3}{Formal Analysis}}{178}{subsection.12.2.3}%
+\contentsline {paragraph}{{P-Invariants (Conservation Laws):}}{178}{paragraph*.291}%
+\contentsline {paragraph}{{Dependency Classification:}}{179}{paragraph*.292}%
+\contentsline {paragraph}{{Elemental Balance:}}{179}{paragraph*.293}%
+\contentsline {subsection}{\numberline {12.2.4}{Simulation Results}}{179}{subsection.12.2.4}%
+\contentsline {paragraph}{{Steady-State Behavior (t = 100 seconds):}}{179}{paragraph*.294}%
+\contentsline {paragraph}{{Perturbation: High ATP (Energy Sufficiency):}}{180}{paragraph*.296}%
+\contentsline {subsection}{\numberline {12.2.5}{Key Findings}}{180}{subsection.12.2.5}%
+\contentsline {section}{\numberline {12.3}{Case Study 2: Citric Acid Cycle}}{180}{section.12.3}%
+\contentsline {subsection}{\numberline {12.3.1}{Biological Context}}{180}{subsection.12.3.1}%
+\contentsline {subsection}{\numberline {12.3.2}{Model Structure}}{181}{subsection.12.3.2}%
+\contentsline {subsection}{\numberline {12.3.3}{Formal Analysis}}{181}{subsection.12.3.3}%
+\contentsline {paragraph}{{Cyclic Topology (T-invariant):}}{181}{paragraph*.297}%
+\contentsline {subsection}{\numberline {12.3.4}{Simulation Results}}{181}{subsection.12.3.4}%
+\contentsline {paragraph}{{Steady-State Behavior (t = 200 seconds):}}{181}{paragraph*.298}%
+\contentsline {paragraph}{{Perturbation: High NADH (Redox Pressure):}}{182}{paragraph*.300}%
+\contentsline {subsection}{\numberline {12.3.5}{Comparative Analysis}}{182}{subsection.12.3.5}%
+\contentsline {section}{\numberline {12.4}{Case Study 3: Integrated Cellular Respiration}}{182}{section.12.4}%
+\contentsline {subsection}{\numberline {12.4.1}{Model Structure}}{182}{subsection.12.4.1}%
+\contentsline {subsection}{\numberline {12.4.2}{System-Level Analysis}}{183}{subsection.12.4.2}%
+\contentsline {paragraph}{{Carbon Flow Tracking:}}{183}{paragraph*.302}%
+\contentsline {paragraph}{{Energy Accounting:}}{183}{paragraph*.303}%
+\contentsline {paragraph}{{Weak Independence (System-Wide):}}{183}{paragraph*.305}%
+\contentsline {subsection}{\numberline {12.4.3}{Performance Results}}{183}{subsection.12.4.3}%
+\contentsline {section}{\numberline {12.5}{Summary}}{184}{section.12.5}%
+\contentsline {chapter}{\numberline {13}{Performance Evaluation}}{185}{chapter.13}%
+\contentsline {section}{\numberline {13.1}{Introduction}}{185}{section.13.1}%
+\contentsline {section}{\numberline {13.2}{Simulation Runtime Analysis}}{185}{section.13.2}%
+\contentsline {subsection}{\numberline {13.2.1}{Runtime vs. Model Size}}{185}{subsection.13.2.1}%
+\contentsline {subsection}{\numberline {13.2.2}{Impact of Regulatory Arcs}}{186}{subsection.13.2.2}%
+\contentsline {section}{\numberline {13.3}{Parallel Execution Performance}}{186}{section.13.3}%
+\contentsline {subsection}{\numberline {13.3.1}{Speedup Results}}{186}{subsection.13.3.1}%
+\contentsline {subsection}{\numberline {13.3.2}{Scalability with Core Count}}{187}{subsection.13.3.2}%
+\contentsline {section}{\numberline {13.4}{Memory Consumption}}{187}{section.13.4}%
+\contentsline {subsection}{\numberline {13.4.1}{Memory Footprint vs. Model Size}}{187}{subsection.13.4.1}%
+\contentsline {subsection}{\numberline {13.4.2}{Memory Leak Testing}}{188}{subsection.13.4.2}%
+\contentsline {section}{\numberline {13.5}{Comparison with Other Tools}}{188}{section.13.5}%
+\contentsline {subsection}{\numberline {13.5.1}{Feature Comparison}}{188}{subsection.13.5.1}%
+\contentsline {subsection}{\numberline {13.5.2}{Performance Benchmark}}{189}{subsection.13.5.2}%
+\contentsline {subsection}{\numberline {13.5.3}{Accuracy Validation}}{189}{subsection.13.5.3}%
+\contentsline {section}{\numberline {13.6}{Scalability Limits}}{189}{section.13.6}%
+\contentsline {subsection}{\numberline {13.6.1}{Stress Testing}}{189}{subsection.13.6.1}%
+\contentsline {section}{\numberline {13.7}{Summary}}{190}{section.13.7}%
+\contentsline {part}{\numberline {vi}{Synthesis}}{191}{part.6}%
+\contentsline {chapter}{\numberline {14}{Discussion}}{193}{chapter.14}%
+\contentsline {section}{\numberline {14.1}{Introduction}}{193}{section.14.1}%
+\contentsline {section}{\numberline {14.2}{Research Questions Answered}}{193}{section.14.2}%
+\contentsline {subsection}{\numberline {14.2.1}{RQ1: Weak Independence in Biological Networks}}{193}{subsection.14.2.1}%
+\contentsline {subsection}{\numberline {14.2.2}{RQ2: Heterogeneous Transition Types}}{194}{subsection.14.2.2}%
+\contentsline {subsection}{\numberline {14.2.3}{RQ3: Arc-Level Regulation}}{194}{subsection.14.2.3}%
+\contentsline {subsection}{\numberline {14.2.4}{RQ4: Atomic Conservation}}{195}{subsection.14.2.4}%
+\contentsline {subsection}{\numberline {14.2.5}{RQ5: Realistic Parameterization}}{196}{subsection.14.2.5}%
+\contentsline {subsection}{\numberline {14.2.6}{RQ6: Scalable Simulation}}{196}{subsection.14.2.6}%
+\contentsline {section}{\numberline {14.3}{Biological Validity Assessment}}{197}{section.14.3}%
+\contentsline {subsection}{\numberline {14.3.1}{Stoichiometric Accuracy}}{197}{subsection.14.3.1}%
+\contentsline {subsection}{\numberline {14.3.2}{Kinetic Parameter Realism}}{197}{subsection.14.3.2}%
+\contentsline {subsection}{\numberline {14.3.3}{Regulatory Behavior}}{198}{subsection.14.3.3}%
+\contentsline {section}{\numberline {14.4}{Theoretical Contributions}}{198}{section.14.4}%
+\contentsline {subsection}{\numberline {14.4.1}{Weak Independence Theory}}{198}{subsection.14.4.1}%
+\contentsline {subsection}{\numberline {14.4.2}{Unified Hybrid Semantics}}{199}{subsection.14.4.2}%
+\contentsline {subsection}{\numberline {14.4.3}{Arc-Level Regulation}}{199}{subsection.14.4.3}%
+\contentsline {subsection}{\numberline {14.4.4}{Atomic Conservation Framework}}{199}{subsection.14.4.4}%
+\contentsline {section}{\numberline {14.5}{Practical Impact}}{200}{section.14.5}%
+\contentsline {subsection}{\numberline {14.5.1}{Reduced Modeling Time}}{200}{subsection.14.5.1}%
+\contentsline {subsection}{\numberline {14.5.2}{Improved Model Quality}}{200}{subsection.14.5.2}%
+\contentsline {subsection}{\numberline {14.5.3}{Educational Value}}{200}{subsection.14.5.3}%
+\contentsline {section}{\numberline {14.6}{Limitations and Assumptions}}{201}{section.14.6}%
+\contentsline {subsection}{\numberline {14.6.1}{Well-Mixed Assumption}}{201}{subsection.14.6.1}%
+\contentsline {subsection}{\numberline {14.6.2}{Scalability Limits}}{201}{subsection.14.6.2}%
+\contentsline {section}{\numberline {14.7}{Comparison with Related Work}}{201}{section.14.7}%
+\contentsline {subsection}{\numberline {14.7.1}{Comparison with COPASI}}{201}{subsection.14.7.1}%
+\contentsline {subsection}{\numberline {14.7.2}{Summary Table}}{201}{subsection.14.7.2}%
+\contentsline {section}{\numberline {14.8}{Broader Implications}}{201}{section.14.8}%
+\contentsline {subsection}{\numberline {14.8.1}{For Systems Biology}}{201}{subsection.14.8.1}%
+\contentsline {subsection}{\numberline {14.8.2}{For Petri Net Theory}}{202}{subsection.14.8.2}%
+\contentsline {subsection}{\numberline {14.8.3}{For Computational Biology Education}}{202}{subsection.14.8.3}%
+\contentsline {section}{\numberline {14.9}{Summary}}{203}{section.14.9}%
+\contentsline {chapter}{\numberline {15}{Conclusion and Future Work}}{205}{chapter.15}%
+\contentsline {section}{\numberline {15.1}{Summary of Contributions}}{205}{section.15.1}%
+\contentsline {subsection}{\numberline {15.1.1}{Weak Independence Theory}}{205}{subsection.15.1.1}%
+\contentsline {subsection}{\numberline {15.1.2}{Heterogeneous Transition Types}}{205}{subsection.15.1.2}%
+\contentsline {subsection}{\numberline {15.1.3}{Arc-Level Regulation}}{206}{subsection.15.1.3}%
+\contentsline {subsection}{\numberline {15.1.4}{Atomic Conservation}}{206}{subsection.15.1.4}%
+\contentsline {section}{\numberline {15.2}{Validation and Evaluation}}{207}{section.15.2}%
+\contentsline {subsection}{\numberline {15.2.1}{Theoretical Validation}}{207}{subsection.15.2.1}%
+\contentsline {subsection}{\numberline {15.2.2}{Biological Validation}}{207}{subsection.15.2.2}%
+\contentsline {subsection}{\numberline {15.2.3}{Computational Evaluation}}{208}{subsection.15.2.3}%
+\contentsline {section}{\numberline {15.3}{Research Impact}}{208}{section.15.3}%
+\contentsline {subsection}{\numberline {15.3.1}{Theoretical Impact}}{208}{subsection.15.3.1}%
+\contentsline {subsection}{\numberline {15.3.2}{Practical Impact}}{208}{subsection.15.3.2}%
+\contentsline {subsection}{\numberline {15.3.3}{Software Impact}}{209}{subsection.15.3.3}%
+\contentsline {section}{\numberline {15.4}{Limitations Revisited}}{209}{section.15.4}%
+\contentsline {subsection}{\numberline {15.4.1}{Spatial Dynamics}}{209}{subsection.15.4.1}%
+\contentsline {subsection}{\numberline {15.4.2}{Scalability}}{209}{subsection.15.4.2}%
+\contentsline {subsection}{\numberline {15.4.3}{Parameter Uncertainty}}{209}{subsection.15.4.3}%
+\contentsline {section}{\numberline {15.5}{Future Work}}{210}{section.15.5}%
+\contentsline {subsection}{\numberline {15.5.1}{Short-Term Extensions (1--2 Years)}}{210}{subsection.15.5.1}%
+\contentsline {subsubsection}{{Spatial Dynamics via Colored Petri Nets}}{210}{subsubsection*.323}%
+\contentsline {subsubsection}{{Uncertainty Quantification}}{210}{subsubsection*.324}%
+\contentsline {subsubsection}{{Tau-Leaping for Stochastic Transitions}}{210}{subsubsection*.325}%
+\contentsline {subsubsection}{{SABIO-RK Integration}}{211}{subsubsection*.326}%
+\contentsline {subsection}{\numberline {15.5.2}{Medium-Term Research (2--4 Years)}}{211}{subsection.15.5.2}%
+\contentsline {subsubsection}{{Hierarchical Modeling}}{211}{subsubsection*.327}%
+\contentsline {subsubsection}{{GPU Acceleration}}{211}{subsubsection*.328}%
+\contentsline {subsubsection}{{Model Reduction}}{212}{subsubsection*.329}%
+\contentsline {subsubsection}{{Symbolic Analysis Integration}}{212}{subsubsection*.330}%
+\contentsline {subsection}{\numberline {15.5.3}{Long-Term Vision (5+ Years)}}{212}{subsection.15.5.3}%
+\contentsline {subsubsection}{{Whole-Cell Modeling}}{212}{subsubsection*.331}%
+\contentsline {subsubsection}{{Automated Model Construction}}{213}{subsubsection*.332}%
+\contentsline {subsubsection}{{Multi-Organism Modeling}}{213}{subsubsection*.333}%
+\contentsline {subsubsection}{{Machine Learning Integration}}{213}{subsubsection*.334}%
+\contentsline {section}{\numberline {15.6}{Open Problems}}{214}{section.15.6}%
+\contentsline {subsection}{\numberline {15.6.1}{Theoretical}}{214}{subsection.15.6.1}%
+\contentsline {subsection}{\numberline {15.6.2}{Practical}}{214}{subsection.15.6.2}%
+\contentsline {section}{\numberline {15.7}{Concluding Remarks}}{214}{section.15.7}%
+\contentsline {subsection}{\numberline {15.7.1}{Achievement Summary}}{214}{subsection.15.7.1}%
+\contentsline {subsection}{\numberline {15.7.2}{Broader Significance}}{215}{subsection.15.7.2}%
+\contentsline {subsection}{\numberline {15.7.3}{Vision for the Future}}{215}{subsection.15.7.3}%
+\contentsline {subsection}{\numberline {15.7.4}{Final Thoughts}}{216}{subsection.15.7.4}%
+\contentsline {section}{\numberline {15.8}{Thesis Deliverables}}{217}{section.15.8}%
+\contentsline {section}{\numberline {15.9}{Chapter Summary}}{218}{section.15.9}%
+\contentsline {part}{\numberline {vii}{Appendix}}{219}{part.7}%
+\contentsline {chapter}{{Bibliography}}{221}{chapter*.335}%
+\providecommand \tocbasic@end@toc@file {}\tocbasic@end@toc@file 

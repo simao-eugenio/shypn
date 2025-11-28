@@ -1,0 +1,100 @@
+%*******************************************************
+% Extended Biological Petri Nets PhD Thesis
+% Based on ClassicThesis by André Miede
+%*******************************************************
+\documentclass[
+    twoside,openright,titlepage,numbers=noenddot,
+    headinclude,footinclude,cleardoublepage=empty,
+    paper=a4,fontsize=11pt
+]{scrreprt}
+
+%*******************************************************
+% Note: Make all your adjustments in here
+%*******************************************************
+\input{classicthesis-config}
+
+%*******************************************************
+% Bibliographies
+%*******************************************************
+\addbibresource{Bibliography.bib}
+
+%*******************************************************
+% Hyphenation
+%*******************************************************
+\hyphenation{systems biology Petri networks}
+
+%*******************************************************
+% GO! GO! GO!
+%*******************************************************
+\begin{document}
+\frenchspacing
+\raggedbottom
+\selectlanguage{american}
+\pagenumbering{roman}
+\pagestyle{plain}
+
+%*******************************************************
+% Frontmatter
+%*******************************************************
+\include{FrontBackmatter/Titlepage}
+\include{FrontBackmatter/Titleback}
+\cleardoublepage\include{FrontBackmatter/Abstract}
+\cleardoublepage\include{FrontBackmatter/Acknowledgments}
+\cleardoublepage\include{FrontBackmatter/Contents}
+
+%*******************************************************
+% Mainmatter
+%*******************************************************
+\cleardoublepage
+\pagestyle{scrheadings}
+\pagenumbering{arabic}
+
+% Part I: Introduction and Foundations
+\part{Introduction and Foundations}
+\include{Chapters/chapter_01_refactored}
+\include{Chapters/chapter_02_refactored}
+\include{Chapters/chapter_03_refactored}
+
+% Part II: Core Theory
+\part{Core Theory}
+\include{Chapters/chapter_04_refactored}
+\include{Chapters/chapter_05_refactored}
+\include{Chapters/chapter_06_refactored}
+
+% Part III: Validation
+\part{Validation}
+\include{Chapters/chapter_07_refactored}
+
+% Part IV: Implementation
+\part{Implementation}
+\include{Chapters/chapter_08_refactored}
+\include{Chapters/chapter_09_refactored}
+\include{Chapters/chapter_10_refactored}
+\include{Chapters/chapter_11_refactored}
+
+% Part V: Evaluation
+\part{Evaluation}
+\include{Chapters/chapter_12_refactored}
+\include{Chapters/chapter_13_refactored}
+
+% Part VI: Synthesis
+\part{Synthesis}
+\include{Chapters/chapter_14_refactored}
+\include{Chapters/chapter_15_refactored}
+
+%*******************************************************
+% Backmatter
+%*******************************************************
+\appendix
+\cleardoublepage
+\part{Appendix}
+% \include{Chapters/appendix_a}
+
+%*******************************************************
+% Other Stuff in the Back
+%*******************************************************
+\cleardoublepage\include{FrontBackmatter/Bibliography}
+% \cleardoublepage\include{FrontBackmatter/Declaration}
+% \cleardoublepage\include{FrontBackmatter/Colophon}
+
+\end{document}

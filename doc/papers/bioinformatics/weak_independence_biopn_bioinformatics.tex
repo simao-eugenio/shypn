@@ -268,6 +268,13 @@ We illustrate weak independence with the \emph{lac} operon (Jacob \& Monod, 1961
 
 The \emph{lac} operon encodes $\beta$-galactosidase (LacZ) which metabolizes lactose. Expression is repressed by glucose (catabolite repression) and LacI protein (allosteric inhibition). When lactose is present without glucose, LacZ is induced 1000-fold.
 
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.8\columnwidth]{figures/lac_operon.pdf}
+\caption{Lac operon Petri net model with 10 places and 9 transitions. Regulatory arcs (dashed) represent glucose and LacI inhibition, enzyme catalysis by LacZ, and shared RNA polymerase (RNAP) resource.}
+\label{fig:lac-operon}
+\end{figure}
+
 \subsubsection{Model Structure}
 
 \textbf{Places} (10): \texttt{lacDNA}, \texttt{lacZ\_mRNA}, \texttt{LacZ\_enzyme}, \texttt{Lactose}, \texttt{Glucose}, \texttt{Galactose}, \texttt{LacI\_protein}, \texttt{lacI\_DNA}, \texttt{lacI\_mRNA}, \texttt{RNAP}.

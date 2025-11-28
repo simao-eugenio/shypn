@@ -1,0 +1,72 @@
+\babel@toc {american}{}\relax 
+\deactivateaddvspace 
+\babel@toc {american}{}\relax 
+\ttl@tocsep 
+\ttl@tocsep 
+\ttl@tocsep 
+\ttl@tocsep 
+\ttl@tocsep 
+\ttl@tocsep 
+\ttl@tocsep 
+\contentsline {table}{\numberline {2.1}{\ignorespaces Comparison of Petri net extensions for biological modeling.}}{26}{table.caption.21}%
+\contentsline {table}{\numberline {2.2}{\ignorespaces Comparison of biological modeling tools.}}{36}{table.caption.22}%
+\ttl@tocsep 
+\contentsline {table}{\numberline {3.1}{\ignorespaces Lac operon system dynamics over time}}{46}{table.caption.39}%
+\contentsline {table}{\numberline {3.2}{\ignorespaces Heterogeneous transition types in lac operon}}{48}{table.caption.42}%
+\contentsline {table}{\numberline {3.3}{\ignorespaces Kinetic types in lac operon model}}{54}{table.caption.80}%
+\contentsline {table}{\numberline {3.4}{\ignorespaces Existing formalisms vs.\ eight requirements}}{56}{table.caption.93}%
+\ttl@tocsep 
+\contentsline {table}{\numberline {4.1}{\ignorespaces Atomic balance for hexokinase reaction}}{71}{table.caption.123}%
+\contentsline {table}{\numberline {4.2}{\ignorespaces Classical PN vs Extended Bio-PN comparison}}{71}{table.caption.124}%
+\ttl@tocsep 
+\contentsline {table}{\numberline {5.1}{\ignorespaces Dependency distribution in glycolysis}}{76}{table.caption.136}%
+\contentsline {table}{\numberline {5.2}{\ignorespaces Glycolysis transitions and their dependencies}}{83}{table.caption.153}%
+\contentsline {table}{\numberline {5.3}{\ignorespaces Parallel execution performance on glycolysis}}{83}{table.caption.155}%
+\ttl@tocsep 
+\contentsline {table}{\numberline {6.1}{\ignorespaces Common metabolite formulas in Hill notation}}{86}{table.caption.163}%
+\contentsline {table}{\numberline {6.2}{\ignorespaces Elemental balance with ionic formulas}}{93}{table.caption.194}%
+\contentsline {table}{\numberline {6.3}{\ignorespaces Elemental balance matrix for simplified glycolysis}}{95}{table.caption.204}%
+\ttl@tocsep 
+\contentsline {table}{\numberline {7.1}{\ignorespaces Elemental balance for hexokinase reaction.}}{110}{table.caption.253}%
+\contentsline {table}{\numberline {7.2}{\ignorespaces Elemental balance verification for T1 (PFK) and T2 (PK).}}{121}{table.caption.261}%
+\contentsline {table}{\numberline {7.3}{\ignorespaces Time-course dynamics for energy sensing motif.}}{122}{table.caption.262}%
+\contentsline {table}{\numberline {7.4}{\ignorespaces Innovation coverage across five key examples.}}{123}{table.caption.263}%
+\contentsline {table}{\numberline {7.5}{\ignorespaces Formalism comparison validated on Example 5.}}{124}{table.caption.264}%
+\contentsline {table}{\numberline {7.6}{\ignorespaces Parallel execution speedup on 8 cores.}}{124}{table.caption.265}%
+\contentsline {table}{\numberline {7.7}{\ignorespaces Validation of eight formal requirements.}}{125}{table.caption.266}%
+\ttl@tocsep 
+\ttl@tocsep 
+\contentsline {table}{\numberline {9.1}{\ignorespaces KEGG REST API endpoints used by SHYpn}}{146}{table.caption.276}%
+\contentsline {table}{\numberline {9.2}{\ignorespaces Performance comparison for importing glycolysis pathway (10 reactions, 13 compounds)}}{153}{table.caption.287}%
+\ttl@tocsep 
+\contentsline {table}{\numberline {10.1}{\ignorespaces Kinetic parameter types in BRENDA}}{158}{table.caption.288}%
+\ttl@tocsep 
+\contentsline {table}{\numberline {11.1}{\ignorespaces Parallel execution speedup for glycolysis pathway}}{173}{table.caption.289}%
+\contentsline {table}{\numberline {11.2}{\ignorespaces Performance benchmarks on validation examples}}{174}{table.caption.290}%
+\ttl@tocsep 
+\contentsline {table}{\numberline {12.1}{\ignorespaces Glycolysis steady-state metabolite concentrations}}{179}{table.caption.295}%
+\contentsline {table}{\numberline {12.2}{\ignorespaces TCA cycle steady-state metabolite concentrations}}{182}{table.caption.299}%
+\contentsline {table}{\numberline {12.3}{\ignorespaces Comparison of glycolysis and TCA cycle}}{182}{table.caption.301}%
+\contentsline {table}{\numberline {12.4}{\ignorespaces ATP production in cellular respiration}}{183}{table.caption.304}%
+\contentsline {table}{\numberline {12.5}{\ignorespaces Dependency classification for cellular respiration model}}{183}{table.caption.306}%
+\ttl@tocsep 
+\contentsline {table}{\numberline {13.1}{\ignorespaces Simulation runtime vs. model size (1000s simulation, 1 core)}}{185}{table.caption.307}%
+\contentsline {table}{\numberline {13.2}{\ignorespaces Parallel execution speedup (8 cores). WI\% = Weakly Independent percentage}}{186}{table.caption.308}%
+\contentsline {table}{\numberline {13.3}{\ignorespaces Scalability with core count (Example 13)}}{187}{table.caption.309}%
+\contentsline {table}{\numberline {13.4}{\ignorespaces Memory consumption vs. model size}}{188}{table.caption.310}%
+\contentsline {table}{\numberline {13.5}{\ignorespaces Memory leak testing (10,000 seconds simulation)}}{188}{table.caption.311}%
+\contentsline {table}{\numberline {13.6}{\ignorespaces Feature comparison with existing tools}}{188}{table.caption.312}%
+\contentsline {table}{\numberline {13.7}{\ignorespaces Performance benchmark comparison (Example 13)}}{189}{table.caption.313}%
+\contentsline {table}{\numberline {13.8}{\ignorespaces Accuracy validation against COPASI}}{189}{table.caption.314}%
+\contentsline {table}{\numberline {13.9}{\ignorespaces Scalability stress testing}}{190}{table.caption.315}%
+\ttl@tocsep 
+\contentsline {table}{\numberline {14.1}{\ignorespaces Stoichiometric validation}}{197}{table.caption.316}%
+\contentsline {table}{\numberline {14.2}{\ignorespaces Kinetic parameter validation}}{198}{table.caption.317}%
+\contentsline {table}{\numberline {14.3}{\ignorespaces Regulatory perturbation validation}}{198}{table.caption.318}%
+\contentsline {table}{\numberline {14.4}{\ignorespaces Independence concepts comparison}}{198}{table.caption.319}%
+\contentsline {table}{\numberline {14.5}{\ignorespaces Modeling time reduction}}{200}{table.caption.320}%
+\contentsline {table}{\numberline {14.6}{\ignorespaces Comparison with COPASI}}{202}{table.caption.321}%
+\contentsline {table}{\numberline {14.7}{\ignorespaces Tool comparison summary}}{202}{table.caption.322}%
+\ttl@tocsep 
+\ttl@tocsep 
+\providecommand \tocbasic@end@toc@file {}\tocbasic@end@toc@file 

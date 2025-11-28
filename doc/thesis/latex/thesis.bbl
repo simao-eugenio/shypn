@@ -1,0 +1,515 @@
+% $ biblatex auxiliary file $
+% $ biblatex bbl format version 3.2 $
+% Do not modify the above lines!
+%
+% This is an auxiliary file used by the 'biblatex' package.
+% This file may safely be deleted. It will be recreated by
+% biber as required.
+%
+\begingroup
+\makeatletter
+\@ifundefined{ver@biblatex.sty}
+  {\@latex@error
+     {Missing 'biblatex' package}
+     {The bibliography requires the 'biblatex' package.}
+      \aftergroup\endinput}
+  {}
+\endgroup
+
+
+\refsection{0}
+  \datalist[entry]{nyt/global//global/global}
+    \entry{Gilbert2006}{incollection}{}
+      \name{author}{2}{}{%
+        {{un=0,uniquepart=base,hash=d914915b9636943df69405ed649bc1ae}{%
+           family={Gilbert},
+           familyi={G\bibinitperiod},
+           given={David},
+           giveni={D\bibinitperiod},
+           givenun=0}}%
+        {{un=0,uniquepart=base,hash=3d332d7109e7036341b792e9accdcf35}{%
+           family={Heiner},
+           familyi={H\bibinitperiod},
+           given={Monika},
+           giveni={M\bibinitperiod},
+           givenun=0}}%
+      }
+      \list{location}{1}{%
+        {Berlin}%
+      }
+      \list{publisher}{1}{%
+        {Springer}%
+      }
+      \strng{namehash}{7ba3046de446d2826058e833ff5b7729}
+      \strng{fullhash}{7ba3046de446d2826058e833ff5b7729}
+      \strng{bibnamehash}{7ba3046de446d2826058e833ff5b7729}
+      \strng{authorbibnamehash}{7ba3046de446d2826058e833ff5b7729}
+      \strng{authornamehash}{7ba3046de446d2826058e833ff5b7729}
+      \strng{authorfullhash}{7ba3046de446d2826058e833ff5b7729}
+      \field{sortinit}{G}
+      \field{sortinithash}{32d67eca0634bf53703493fb1090a2e8}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{booktitle}{Petri Nets and Other Models of Concurrency}
+      \field{series}{LNCS}
+      \field{title}{From {Petri} nets to differential equations---an integrative approach for biochemical network analysis}
+      \field{volume}{4024}
+      \field{year}{2006}
+      \field{pages}{181\bibrangedash 200}
+      \range{pages}{20}
+    \endentry
+    \entry{Gillespie1977}{article}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=1bf42ebd509a3dc7c57325afbcd733fa}{%
+           family={Gillespie},
+           familyi={G\bibinitperiod},
+           given={Daniel\bibnamedelima T.},
+           giveni={D\bibinitperiod\bibinitdelim T\bibinitperiod},
+           givenun=0}}%
+      }
+      \strng{namehash}{1bf42ebd509a3dc7c57325afbcd733fa}
+      \strng{fullhash}{1bf42ebd509a3dc7c57325afbcd733fa}
+      \strng{bibnamehash}{1bf42ebd509a3dc7c57325afbcd733fa}
+      \strng{authorbibnamehash}{1bf42ebd509a3dc7c57325afbcd733fa}
+      \strng{authornamehash}{1bf42ebd509a3dc7c57325afbcd733fa}
+      \strng{authorfullhash}{1bf42ebd509a3dc7c57325afbcd733fa}
+      \field{extraname}{1}
+      \field{sortinit}{G}
+      \field{sortinithash}{32d67eca0634bf53703493fb1090a2e8}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{journaltitle}{The Journal of Physical Chemistry}
+      \field{number}{25}
+      \field{title}{Exact stochastic simulation of coupled chemical reactions}
+      \field{volume}{81}
+      \field{year}{1977}
+      \field{pages}{2340\bibrangedash 2361}
+      \range{pages}{22}
+      \verb{doi}
+      \verb 10.1021/j100540a008
+      \endverb
+    \endentry
+    \entry{Gillespie2001}{article}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=1bf42ebd509a3dc7c57325afbcd733fa}{%
+           family={Gillespie},
+           familyi={G\bibinitperiod},
+           given={Daniel\bibnamedelima T.},
+           giveni={D\bibinitperiod\bibinitdelim T\bibinitperiod},
+           givenun=0}}%
+      }
+      \strng{namehash}{1bf42ebd509a3dc7c57325afbcd733fa}
+      \strng{fullhash}{1bf42ebd509a3dc7c57325afbcd733fa}
+      \strng{bibnamehash}{1bf42ebd509a3dc7c57325afbcd733fa}
+      \strng{authorbibnamehash}{1bf42ebd509a3dc7c57325afbcd733fa}
+      \strng{authornamehash}{1bf42ebd509a3dc7c57325afbcd733fa}
+      \strng{authorfullhash}{1bf42ebd509a3dc7c57325afbcd733fa}
+      \field{extraname}{2}
+      \field{sortinit}{G}
+      \field{sortinithash}{32d67eca0634bf53703493fb1090a2e8}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{journaltitle}{The Journal of Chemical Physics}
+      \field{number}{4}
+      \field{title}{Approximate accelerated stochastic simulation of chemically reacting systems}
+      \field{volume}{115}
+      \field{year}{2001}
+      \field{pages}{1716\bibrangedash 1733}
+      \range{pages}{18}
+      \verb{doi}
+      \verb 10.1063/1.1378322
+      \endverb
+    \endentry
+    \entry{Heiner2008}{article}{}
+      \name{author}{3}{}{%
+        {{un=0,uniquepart=base,hash=3d332d7109e7036341b792e9accdcf35}{%
+           family={Heiner},
+           familyi={H\bibinitperiod},
+           given={Monika},
+           giveni={M\bibinitperiod},
+           givenun=0}}%
+        {{un=0,uniquepart=base,hash=d914915b9636943df69405ed649bc1ae}{%
+           family={Gilbert},
+           familyi={G\bibinitperiod},
+           given={David},
+           giveni={D\bibinitperiod},
+           givenun=0}}%
+        {{un=0,uniquepart=base,hash=05dcefb890a452105850a4e0863bc8bd}{%
+           family={Donaldson},
+           familyi={D\bibinitperiod},
+           given={Robin},
+           giveni={R\bibinitperiod},
+           givenun=0}}%
+      }
+      \list{publisher}{1}{%
+        {Springer}%
+      }
+      \strng{namehash}{27ecf030f5eaacbfc8f55b74930205c6}
+      \strng{fullhash}{27ecf030f5eaacbfc8f55b74930205c6}
+      \strng{bibnamehash}{27ecf030f5eaacbfc8f55b74930205c6}
+      \strng{authorbibnamehash}{27ecf030f5eaacbfc8f55b74930205c6}
+      \strng{authornamehash}{27ecf030f5eaacbfc8f55b74930205c6}
+      \strng{authorfullhash}{27ecf030f5eaacbfc8f55b74930205c6}
+      \field{sortinit}{H}
+      \field{sortinithash}{23a3aa7c24e56cfa16945d55545109b5}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{journaltitle}{Formal Methods for Computational Systems Biology}
+      \field{title}{Petri nets for systems and synthetic biology}
+      \field{year}{2008}
+      \field{pages}{215\bibrangedash 264}
+      \range{pages}{50}
+    \endentry
+    \entry{Hoops2006}{article}{}
+      \name{author}{10}{}{%
+        {{un=0,uniquepart=base,hash=7c17ff2ceda28a19163a289c20805ca2}{%
+           family={Hoops},
+           familyi={H\bibinitperiod},
+           given={Stefan},
+           giveni={S\bibinitperiod},
+           givenun=0}}%
+        {{un=0,uniquepart=base,hash=d677a6f06b3e04ba7b1954e84ee7b874}{%
+           family={Sahle},
+           familyi={S\bibinitperiod},
+           given={Sven},
+           giveni={S\bibinitperiod},
+           givenun=0}}%
+        {{un=0,uniquepart=base,hash=a8635e76665175be87da49d0b93a8489}{%
+           family={Gauges},
+           familyi={G\bibinitperiod},
+           given={Ralph},
+           giveni={R\bibinitperiod},
+           givenun=0}}%
+        {{un=0,uniquepart=base,hash=8a8d440af2bf1505aa5e096d34e7f4a0}{%
+           family={Lee},
+           familyi={L\bibinitperiod},
+           given={Christine},
+           giveni={C\bibinitperiod},
+           givenun=0}}%
+        {{un=0,uniquepart=base,hash=47e09a5928e83f8427f7ae9e608fa7c8}{%
+           family={Pahle},
+           familyi={P\bibinitperiod},
+           given={Jürgen},
+           giveni={J\bibinitperiod},
+           givenun=0}}%
+        {{un=0,uniquepart=base,hash=091e45763dc90dd978a291c3af7ae91e}{%
+           family={Simus},
+           familyi={S\bibinitperiod},
+           given={Natalia},
+           giveni={N\bibinitperiod},
+           givenun=0}}%
+        {{un=0,uniquepart=base,hash=79fc4ec0c2c35cfb3c280274657418c7}{%
+           family={Singhal},
+           familyi={S\bibinitperiod},
+           given={Mudita},
+           giveni={M\bibinitperiod},
+           givenun=0}}%
+        {{un=0,uniquepart=base,hash=d3945b8e6764532b23deebba43b764b5}{%
+           family={Xu},
+           familyi={X\bibinitperiod},
+           given={Liang},
+           giveni={L\bibinitperiod},
+           givenun=0}}%
+        {{un=0,uniquepart=base,hash=075686383394e8aa7ef64f9716c609c6}{%
+           family={Mendes},
+           familyi={M\bibinitperiod},
+           given={Pedro},
+           giveni={P\bibinitperiod},
+           givenun=0}}%
+        {{un=0,uniquepart=base,hash=0c20583cd23296c713186315536d63d5}{%
+           family={Kummer},
+           familyi={K\bibinitperiod},
+           given={Ursula},
+           giveni={U\bibinitperiod},
+           givenun=0}}%
+      }
+      \strng{namehash}{38f355d0c6b279db9d44a45179cbf3e1}
+      \strng{fullhash}{fe6995e7c4feb2ed5e447d585221f4ad}
+      \strng{bibnamehash}{fe6995e7c4feb2ed5e447d585221f4ad}
+      \strng{authorbibnamehash}{fe6995e7c4feb2ed5e447d585221f4ad}
+      \strng{authornamehash}{38f355d0c6b279db9d44a45179cbf3e1}
+      \strng{authorfullhash}{fe6995e7c4feb2ed5e447d585221f4ad}
+      \field{sortinit}{H}
+      \field{sortinithash}{23a3aa7c24e56cfa16945d55545109b5}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{journaltitle}{Bioinformatics}
+      \field{number}{24}
+      \field{title}{{COPASI}---a complex pathway simulator}
+      \field{volume}{22}
+      \field{year}{2006}
+      \field{pages}{3067\bibrangedash 3074}
+      \range{pages}{8}
+      \verb{doi}
+      \verb 10.1093/bioinformatics/btl485
+      \endverb
+    \endentry
+    \entry{Kanehisa2000}{article}{}
+      \name{author}{2}{}{%
+        {{un=0,uniquepart=base,hash=ec3c5c5b7d5449aed63041d60bdd719e}{%
+           family={Kanehisa},
+           familyi={K\bibinitperiod},
+           given={Minoru},
+           giveni={M\bibinitperiod},
+           givenun=0}}%
+        {{un=0,uniquepart=base,hash=48a0595aea8e691ed3e8261a79e07c62}{%
+           family={Goto},
+           familyi={G\bibinitperiod},
+           given={Susumu},
+           giveni={S\bibinitperiod},
+           givenun=0}}%
+      }
+      \strng{namehash}{f68b31ccae19db8b9e875ee051389aca}
+      \strng{fullhash}{f68b31ccae19db8b9e875ee051389aca}
+      \strng{bibnamehash}{f68b31ccae19db8b9e875ee051389aca}
+      \strng{authorbibnamehash}{f68b31ccae19db8b9e875ee051389aca}
+      \strng{authornamehash}{f68b31ccae19db8b9e875ee051389aca}
+      \strng{authorfullhash}{f68b31ccae19db8b9e875ee051389aca}
+      \field{sortinit}{K}
+      \field{sortinithash}{c02bf6bff1c488450c352b40f5d853ab}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{journaltitle}{Nucleic acids research}
+      \field{number}{1}
+      \field{title}{{KEGG}: kyoto encyclopedia of genes and genomes}
+      \field{volume}{28}
+      \field{year}{2000}
+      \field{pages}{27\bibrangedash 30}
+      \range{pages}{4}
+    \endentry
+    \entry{Matsuno2003}{article}{}
+      \name{author}{6}{}{%
+        {{un=0,uniquepart=base,hash=c9eaaa4a4c43abfc37aa6a4e89b8fffe}{%
+           family={Matsuno},
+           familyi={M\bibinitperiod},
+           given={Hiroshi},
+           giveni={H\bibinitperiod},
+           givenun=0}}%
+        {{un=0,uniquepart=base,hash=19d28be7527dae325e058cb73dd88eb7}{%
+           family={Tanaka},
+           familyi={T\bibinitperiod},
+           given={Yuki},
+           giveni={Y\bibinitperiod},
+           givenun=0}}%
+        {{un=0,uniquepart=base,hash=c7317a6568669fd838b82b9996bc5e85}{%
+           family={Aoshima},
+           familyi={A\bibinitperiod},
+           given={Hitoshi},
+           giveni={H\bibinitperiod},
+           givenun=0}}%
+        {{un=0,uniquepart=base,hash=8f03c0637589a31939379187bbdabdb0}{%
+           family={Doi},
+           familyi={D\bibinitperiod},
+           given={Atsushi},
+           giveni={A\bibinitperiod},
+           givenun=0}}%
+        {{un=0,uniquepart=base,hash=314a409de8ff3ad524218289e05b9a9e}{%
+           family={Matsui},
+           familyi={M\bibinitperiod},
+           given={Mika},
+           giveni={M\bibinitperiod},
+           givenun=0}}%
+        {{un=0,uniquepart=base,hash=7f5545b36bcb77438641e9755fde3662}{%
+           family={Miyano},
+           familyi={M\bibinitperiod},
+           given={Satoru},
+           giveni={S\bibinitperiod},
+           givenun=0}}%
+      }
+      \strng{namehash}{d86b06579ba102b05b648d19720bc7ad}
+      \strng{fullhash}{6fd93dc74078dbb87906cb442a3e1918}
+      \strng{bibnamehash}{6fd93dc74078dbb87906cb442a3e1918}
+      \strng{authorbibnamehash}{6fd93dc74078dbb87906cb442a3e1918}
+      \strng{authornamehash}{d86b06579ba102b05b648d19720bc7ad}
+      \strng{authorfullhash}{6fd93dc74078dbb87906cb442a3e1918}
+      \field{sortinit}{M}
+      \field{sortinithash}{4625c616857f13d17ce56f7d4f97d451}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{journaltitle}{In silico biology}
+      \field{number}{3}
+      \field{title}{Biopathways representation and simulation on hybrid functional Petri net}
+      \field{volume}{3}
+      \field{year}{2003}
+      \field{pages}{389\bibrangedash 404}
+      \range{pages}{16}
+    \endentry
+    \entry{Petri1962}{report}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=831c32c98d50eee6b6440612230884db}{%
+           family={Petri},
+           familyi={P\bibinitperiod},
+           given={Carl\bibnamedelima Adam},
+           giveni={C\bibinitperiod\bibinitdelim A\bibinitperiod},
+           givenun=0}}%
+      }
+      \list{institution}{1}{%
+        {Institut für Instrumentelle Mathematik, Bonn}%
+      }
+      \strng{namehash}{831c32c98d50eee6b6440612230884db}
+      \strng{fullhash}{831c32c98d50eee6b6440612230884db}
+      \strng{bibnamehash}{831c32c98d50eee6b6440612230884db}
+      \strng{authorbibnamehash}{831c32c98d50eee6b6440612230884db}
+      \strng{authornamehash}{831c32c98d50eee6b6440612230884db}
+      \strng{authorfullhash}{831c32c98d50eee6b6440612230884db}
+      \field{sortinit}{P}
+      \field{sortinithash}{ff3bcf24f47321b42cb156c2cc8a8422}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{note}{(in German)}
+      \field{number}{3}
+      \field{title}{Communication with automata}
+      \field{type}{Schriften des IIM}
+      \field{year}{1962}
+    \endentry
+    \entry{Reddy1993}{article}{}
+      \name{author}{3}{}{%
+        {{un=0,uniquepart=base,hash=3c4821ce3abe8044cde178b7fad301b3}{%
+           family={Reddy},
+           familyi={R\bibinitperiod},
+           given={V.\bibnamedelimi N.},
+           giveni={V\bibinitperiod\bibinitdelim N\bibinitperiod},
+           givenun=0}}%
+        {{un=0,uniquepart=base,hash=95e8dd6f9cfacfd3500cb97e267f8afd}{%
+           family={Mavrovouniotis},
+           familyi={M\bibinitperiod},
+           given={M.\bibnamedelimi L.},
+           giveni={M\bibinitperiod\bibinitdelim L\bibinitperiod},
+           givenun=0}}%
+        {{un=0,uniquepart=base,hash=341751771db704e745d2db1a7ee36a8f}{%
+           family={Liebman},
+           familyi={L\bibinitperiod},
+           given={M.\bibnamedelimi N.},
+           giveni={M\bibinitperiod\bibinitdelim N\bibinitperiod},
+           givenun=0}}%
+      }
+      \strng{namehash}{432b5a692ccce29731ce6728b8641dc5}
+      \strng{fullhash}{432b5a692ccce29731ce6728b8641dc5}
+      \strng{bibnamehash}{432b5a692ccce29731ce6728b8641dc5}
+      \strng{authorbibnamehash}{432b5a692ccce29731ce6728b8641dc5}
+      \strng{authornamehash}{432b5a692ccce29731ce6728b8641dc5}
+      \strng{authorfullhash}{432b5a692ccce29731ce6728b8641dc5}
+      \field{sortinit}{R}
+      \field{sortinithash}{5e1c39a9d46ffb6bebd8f801023a9486}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{journaltitle}{Proceedings of the 1st International Conference on Intelligent Systems for Molecular Biology}
+      \field{title}{Petri Net Representations in Metabolic Pathways}
+      \field{year}{1993}
+      \field{pages}{328\bibrangedash 336}
+      \range{pages}{9}
+    \endentry
+    \entry{Schomburg2004}{article}{}
+      \name{author}{7}{}{%
+        {{un=0,uniquepart=base,hash=bb821ca91742d406d259363c0d777ca2}{%
+           family={Schomburg},
+           familyi={S\bibinitperiod},
+           given={Ida},
+           giveni={I\bibinitperiod},
+           givenun=0}}%
+        {{un=0,uniquepart=base,hash=67bfe6096830a25c9971cbbe36339609}{%
+           family={Chang},
+           familyi={C\bibinitperiod},
+           given={Antje},
+           giveni={A\bibinitperiod},
+           givenun=0}}%
+        {{un=0,uniquepart=base,hash=1eea60eda368dc8bb7676071f772a16f}{%
+           family={Ebeling},
+           familyi={E\bibinitperiod},
+           given={Christian},
+           giveni={C\bibinitperiod},
+           givenun=0}}%
+        {{un=0,uniquepart=base,hash=79ea61158c5a9409bd6f817adf646d4e}{%
+           family={Gremse},
+           familyi={G\bibinitperiod},
+           given={Marion},
+           giveni={M\bibinitperiod},
+           givenun=0}}%
+        {{un=0,uniquepart=base,hash=ddd1443edc1bc5f5b07fd638285f0a99}{%
+           family={Heldt},
+           familyi={H\bibinitperiod},
+           given={Christian},
+           giveni={C\bibinitperiod},
+           givenun=0}}%
+        {{un=0,uniquepart=base,hash=063db49a01ba0daf300d538353e30421}{%
+           family={Huhn},
+           familyi={H\bibinitperiod},
+           given={Gregor},
+           giveni={G\bibinitperiod},
+           givenun=0}}%
+        {{un=0,uniquepart=base,hash=260de527d79b12657cc7f5f504979937}{%
+           family={Schomburg},
+           familyi={S\bibinitperiod},
+           given={Dietmar},
+           giveni={D\bibinitperiod},
+           givenun=0}}%
+      }
+      \strng{namehash}{5841acd0c0ae14fff1f2fcfd5061dbfd}
+      \strng{fullhash}{3b54992f03d81491ad40e148b46c1db5}
+      \strng{bibnamehash}{3b54992f03d81491ad40e148b46c1db5}
+      \strng{authorbibnamehash}{3b54992f03d81491ad40e148b46c1db5}
+      \strng{authornamehash}{5841acd0c0ae14fff1f2fcfd5061dbfd}
+      \strng{authorfullhash}{3b54992f03d81491ad40e148b46c1db5}
+      \field{sortinit}{S}
+      \field{sortinithash}{b164b07b29984b41daf1e85279fbc5ab}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{journaltitle}{Nucleic acids research}
+      \field{number}{suppl\_1}
+      \field{title}{{BRENDA}, the enzyme database: updates and major new developments}
+      \field{volume}{32}
+      \field{year}{2004}
+      \field{pages}{D431\bibrangedash D433}
+      \range{pages}{-1}
+    \endentry
+  \enddatalist
+  \missing{Ajmone1984}
+  \missing{Blaetke2015}
+  \missing{David1992}
+  \missing{Feinberg1987}
+  \missing{Funahashi2003}
+  \missing{Haseltine2002}
+  \missing{Heiner2012}
+  \missing{Heiner2015}
+  \missing{Hofestaedt1994}
+  \missing{Hucka2003}
+  \missing{Jensen1981}
+  \missing{Kauffman1969}
+  \missing{Kitano2002}
+  \missing{Koch2011}
+  \missing{Liu2013}
+  \missing{Marwan2011}
+  \missing{Mazurkiewicz1987}
+  \missing{Merlin1974}
+  \missing{Milner1980}
+  \missing{Milner1992}
+  \missing{Molloy1981}
+  \missing{Nagasaki2010}
+  \missing{Priami1995}
+  \missing{Ramchandani1974}
+  \missing{Schaff1997}
+  \missing{Tomita1999}
+  \missing{Varma1994}
+\endrefsection
+\endinput
+
