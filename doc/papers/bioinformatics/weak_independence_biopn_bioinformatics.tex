@@ -1,5 +1,5 @@
-% Bioinformatics journal template
-\documentclass{article}
+% Bioinformatics journal template - Two-column format
+\documentclass[twocolumn,11pt]{article}
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
 \usepackage{amsmath,amssymb,amsfonts}
@@ -12,7 +12,10 @@
 \usepackage{subcaption}
 \usepackage{tikz}
 \usetikzlibrary{petri,arrows,positioning}
-\usepackage[margin=2.5cm]{geometry}
+\usepackage[margin=2cm,columnsep=0.5cm]{geometry}
+\usepackage{balance}  % Balance last page columns
+\usepackage{pifont}  % For checkmarks
+\newcommand{\cmark}{\ding{51}}  % Checkmark
 
 % Custom commands
 \newcommand{\preset}[1]{\ensuremath{{}^{\bullet}#1}}
@@ -46,6 +49,8 @@ Eugênio Simão\textsuperscript{1,*}\\
 
 \section{Introduction}
 
+\textbf{Metabolic convergence is ubiquitous in biological systems}. Central metabolism exemplifies this: glycogenolysis, gluconeogenesis, and starch degradation all converge to produce glucose; glycolysis and pentose phosphate pathway both consume it. Multi-enzyme complexes catalyze dozens of reactions simultaneously through shared active sites. Gene regulatory networks exhibit feedback loops where transcription factors regulate multiple genes while being products of other genes. This concurrency is not accidental---it enables homeostasis, rapid response to environmental changes, and efficient resource utilization~\cite{Alberts2015,Nelson2017}.
+
 Petri nets have been successfully applied to modeling biochemical pathways since Reddy et al.'s pioneering work in 1993~\cite{Reddy1993}. However, Biological Petri Nets (Bio-PNs) differ fundamentally from classical Petri nets in their treatment of \emph{shared places}. In biological systems, multiple reactions routinely affect the same metabolite through:
 \begin{itemize}
     \item \textbf{Convergent production}: Glycogenolysis and gluconeogenesis both produce glucose
@@ -54,6 +59,8 @@ Petri nets have been successfully applied to modeling biochemical pathways since
 \end{itemize}
 
 Classical Petri net theory treats all place-sharing as potential \emph{conflict}~\cite{Reisig2013}. This conservative view prevents parallel execution and flags biologically correct models as structurally problematic. We observe that in continuous Bio-PNs with ODE semantics, transitions can fire \emph{simultaneously} as long as they don't compete for input tokens---their rate contributions simply \emph{superpose}.
+
+\textbf{The computational challenge is significant}. The BioModels database contains over 1,000 curated SBML models~\cite{Malik2020}, with typical models containing 50--200 species and 100--300 reactions. Genome-scale metabolic reconstructions exceed 2,000 reactions~\cite{Orth2011}. Sequential simulation of these systems is computationally expensive---a single parameter sweep can require hours. Yet classical Petri net theory forbids parallel execution of transitions sharing places, despite biological coupling often being non-conflicting. This creates an artificial bottleneck: the formalism contradicts the inherent parallelism of molecular interactions.
 
 \subsection{Motivating Example}
 
@@ -111,6 +118,8 @@ We make four key contributions:
 
 \section{Background and Related Work}
 
+\textbf{Historical Context}: Petri nets entered systems biology through Reddy's metabolic pathway modeling (1993)~\cite{Reddy1993}, followed by Hofestädt's binary PN models (1994) and Matsuno's hybrid approach (1998). The SBML standard (2003)~\cite{Hucka2003} enabled model exchange, spurring tool development (Snoopy, Cell Illustrator). However, no prior work addresses the fundamental mismatch between classical independence (Eq.~\ref{eq:classical_independence}) and biological coupling.
+
 \subsection{Classical Petri Nets}
 
 A \emph{classical Petri net} is a 5-tuple $(P, T, F, W, M_0)$ where $P$ is a set of places, $T$ a set of transitions, $F \subseteq (P \times T) \cup (T \times P)$ the flow relation, $W: F \to \mathbb{N}^+$ arc weights, and $M_0: P \to \mathbb{N}$ the initial marking~\cite{Murata1989}.
@@ -134,20 +143,30 @@ This definition guarantees \emph{true parallelism}: no coordination needed.
 
 \textbf{Test arcs}~\cite{Koch2011}: Graphical notation for catalysts/enzymes (read but not consumed). Prior work treats these informally; we formalize via $\Sigma$ function.
 
-\subsection{Hybrid Petri Nets}
+\subsection{Tool Landscape and Gap Analysis}
 
-\textbf{Snoopy}~\cite{Heiner2015}, \textbf{Cell Illustrator}~\cite{Nagasaki2011}, \textbf{Charlie}~\cite{Heiner2009}: Tools supporting continuous/stochastic Bio-PNs. None formalize weak independence or provide biological topology analyzers.
+\begin{table}[t]
+\small
+\centering
+\caption{Comparison of Bio-PN tools and frameworks}
+\label{tab:tool_comparison}
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+\textbf{Feature} & \textbf{Snoopy} & \textbf{Cell Ill.} & \textbf{COPASI} & \textbf{SHYpn} \\
+\midrule
+Continuous PNs & \cmark & \cmark & --- & \cmark \\
+Stochastic PNs & \cmark & \cmark & --- & \cmark \\
+Test/inhibitor arcs & \cmark & \cmark & --- & \cmark \\
+SBML import & Partial & Partial & \cmark & \cmark \\
+Weak independence & --- & --- & --- & \cmark \\
+Parallel simulation & --- & --- & --- & \cmark \\
+Mass balance check & --- & --- & --- & \cmark \\
+Formula tracking & --- & --- & --- & \cmark \\
+\bottomrule
+\end{tabular}
+\end{table}
 
-\subsection{Gap in Literature}
-
-Existing work lacks:
-\begin{enumerate}
-    \item Formal treatment of \emph{non-conflicting} place-sharing (convergent/regulatory)
-    \item Classification of dependency types beyond binary (conflict vs.\ independent)
-    \item Biological validation metrics (atom conservation, not token conservation)
-\end{enumerate}
-
-Our work fills these gaps with rigorous formalization and practical implementation.
+\textbf{Gap}: Existing tools lack (1) formal treatment of non-conflicting place-sharing, (2) dependency classification beyond binary, and (3) biological validation (atom conservation). Our work addresses these through weak independence theory, 12-tuple formalism, and domain-specific analyzers.
 
 \section{Methods}
 
