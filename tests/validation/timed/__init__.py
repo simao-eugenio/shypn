@@ -1,1 +1,0 @@
-"""Timed transition validation tests."""
