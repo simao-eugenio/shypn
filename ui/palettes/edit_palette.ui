@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Edit Palette - Floating [E] Button to Toggle Tools -->
+<interface>
+  <requires lib="gtk+" version="3.0"/>
+
+  <!-- Main container for edit palette -->
+  <object class="GtkBox" id="edit_palette_container">
+    <property name="visible">True</property>
+    <property name="orientation">vertical</property>
+    <property name="spacing">0</property>
+    <property name="halign">center</property>
+    <property name="valign">end</property>
+    <property name="margin_bottom">24</property>
+
+    <!-- Edit Button [E] - Toggles the tools palette -->
+    <child>
+      <object class="GtkToggleButton" id="edit_toggle_button">
+        <property name="visible">True</property>
+        <property name="label">E</property>
+        <property name="tooltip-text">Toggle Edit Tools (Place, Transition, Arc)</property>
+        <property name="width-request">36</property>
+        <property name="height-request">36</property>
+        <style>
+          <class name="edit-button"/>
+        </style>
+      </object>
+    </child>
+
+  </object>
+
+</interface>

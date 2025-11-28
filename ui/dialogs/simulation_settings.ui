@@ -1,0 +1,338 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Simulation Settings Dialog - Advanced Configuration -->
+<interface>
+  <requires lib="gtk+" version="3.0"/>
+
+  <object class="GtkDialog" id="simulation_settings_dialog">
+    <property name="title" translatable="yes">Simulation Settings</property>
+    <property name="modal">True</property>
+    <property name="window-position">center-on-parent</property>
+    <property name="default-width">450</property>
+    <property name="default-height">350</property>
+    <property name="type-hint">dialog</property>
+    <style>
+      <class name="simulation-settings-dialog"/>
+    </style>
+
+    <!-- Dialog Content Area -->
+    <child internal-child="vbox">
+      <object class="GtkBox" id="dialog_content">
+        <property name="visible">True</property>
+        <property name="orientation">vertical</property>
+        <property name="spacing">0</property>
+
+        <!-- Main Grid Container -->
+        <child>
+          <object class="GtkGrid" id="settings_grid">
+            <property name="visible">True</property>
+            <property name="row-spacing">16</property>
+            <property name="column-spacing">12</property>
+            <property name="margin">20</property>
+            <style>
+              <class name="settings-grid"/>
+            </style>
+
+            <!-- Time Step Section -->
+            <child>
+              <object class="GtkFrame" id="timestep_frame">
+                <property name="visible">True</property>
+                <property name="label-xalign">0</property>
+                <property name="shadow-type">none</property>
+                <style>
+                  <class name="settings-section"/>
+                </style>
+                
+                <child type="label">
+                  <object class="GtkLabel" id="timestep_section_label">
+                    <property name="visible">True</property>
+                    <property name="label" translatable="yes">Time Step Configuration</property>
+                    <style>
+                      <class name="settings-section-title"/>
+                    </style>
+                  </object>
+                </child>
+
+                <child>
+                  <object class="GtkGrid" id="timestep_grid">
+                    <property name="visible">True</property>
+                    <property name="row-spacing">8</property>
+                    <property name="column-spacing">8</property>
+                    <property name="margin-start">12</property>
+                    <property name="margin-top">8</property>
+                    <property name="margin-bottom">8</property>
+                    
+                    <!-- Automatic Radio -->
+                    <child>
+                      <object class="GtkRadioButton" id="dt_auto_radio">
+                        <property name="visible">True</property>
+                        <property name="label" translatable="yes">Automatic (Recommended)</property>
+                        <property name="active">True</property>
+                        <property name="tooltip-text">Time step automatically calculated as duration/1000</property>
+                        <style>
+                          <class name="settings-radio"/>
+                        </style>
+                      </object>
+                      <packing>
+                        <property name="left-attach">0</property>
+                        <property name="top-attach">0</property>
+                        <property name="width">2</property>
+                      </packing>
+                    </child>
+
+                    <!-- Manual Radio -->
+                    <child>
+                      <object class="GtkRadioButton" id="dt_manual_radio">
+                        <property name="visible">True</property>
+                        <property name="label" translatable="yes">Manual:</property>
+                        <property name="group">dt_auto_radio</property>
+                        <style>
+                          <class name="settings-radio"/>
+                        </style>
+                      </object>
+                      <packing>
+                        <property name="left-attach">0</property>
+                        <property name="top-attach">1</property>
+                      </packing>
+                    </child>
+
+                    <!-- Manual Entry -->
+                    <child>
+                      <object class="GtkEntry" id="dt_manual_entry">
+                        <property name="visible">True</property>
+                        <property name="text">0.1</property>
+                        <property name="width-chars">10</property>
+                        <property name="sensitive">False</property>
+                        <property name="tooltip-text">Time step in seconds</property>
+                        <style>
+                          <class name="settings-entry"/>
+                        </style>
+                      </object>
+                      <packing>
+                        <property name="left-attach">1</property>
+                        <property name="top-attach">1</property>
+                      </packing>
+                    </child>
+
+                  </object>
+                </child>
+              </object>
+              <packing>
+                <property name="left-attach">0</property>
+                <property name="top-attach">0</property>
+              </packing>
+            </child>
+
+            <!-- Time Scale Section -->
+            <child>
+              <object class="GtkFrame" id="timescale_frame">
+                <property name="visible">True</property>
+                <property name="label-xalign">0</property>
+                <property name="shadow-type">none</property>
+                <style>
+                  <class name="settings-section"/>
+                </style>
+
+                <child type="label">
+                  <object class="GtkLabel" id="timescale_section_label">
+                    <property name="visible">True</property>
+                    <property name="label" translatable="yes">Time Scale (Advanced)</property>
+                    <style>
+                      <class name="settings-section-title"/>
+                    </style>
+                  </object>
+                </child>
+
+                <child>
+                  <object class="GtkGrid" id="timescale_grid">
+                    <property name="visible">True</property>
+                    <property name="column-spacing">8</property>
+                    <property name="margin-start">12</property>
+                    <property name="margin-top">8</property>
+                    <property name="margin-bottom">8</property>
+
+                    <!-- Scale Label -->
+                    <child>
+                      <object class="GtkLabel" id="scale_label">
+                        <property name="visible">True</property>
+                        <property name="label" translatable="yes">Scale Factor:</property>
+                        <property name="xalign">0</property>
+                        <style>
+                          <class name="settings-label"/>
+                        </style>
+                      </object>
+                      <packing>
+                        <property name="left-attach">0</property>
+                        <property name="top-attach">0</property>
+                      </packing>
+                    </child>
+
+                    <!-- Scale Entry -->
+                    <child>
+                      <object class="GtkEntry" id="time_scale_entry">
+                        <property name="visible">True</property>
+                        <property name="text">1.0</property>
+                        <property name="width-chars">10</property>
+                        <property name="tooltip-text">1.0 = real-time, 1000 = compressed</property>
+                        <style>
+                          <class name="settings-entry"/>
+                        </style>
+                      </object>
+                      <packing>
+                        <property name="left-attach">1</property>
+                        <property name="top-attach">0</property>
+                      </packing>
+                    </child>
+
+                    <!-- Hint Label -->
+                    <child>
+                      <object class="GtkLabel" id="scale_hint_label">
+                        <property name="visible">True</property>
+                        <property name="label" translatable="yes">(1.0 = real-time)</property>
+                        <property name="xalign">0</property>
+                        <style>
+                          <class name="dim-label"/>
+                        </style>
+                      </object>
+                      <packing>
+                        <property name="left-attach">2</property>
+                        <property name="top-attach">0</property>
+                      </packing>
+                    </child>
+
+                  </object>
+                </child>
+              </object>
+              <packing>
+                <property name="left-attach">0</property>
+                <property name="top-attach">1</property>
+              </packing>
+            </child>
+
+            <!-- Conflict Resolution Section -->
+            <child>
+              <object class="GtkFrame" id="conflict_frame">
+                <property name="visible">True</property>
+                <property name="label-xalign">0</property>
+                <property name="shadow-type">none</property>
+                <style>
+                  <class name="settings-section"/>
+                </style>
+
+                <child type="label">
+                  <object class="GtkLabel" id="conflict_section_label">
+                    <property name="visible">True</property>
+                    <property name="label" translatable="yes">Conflict Resolution</property>
+                    <style>
+                      <class name="settings-section-title"/>
+                    </style>
+                  </object>
+                </child>
+
+                <child>
+                  <object class="GtkGrid" id="conflict_grid">
+                    <property name="visible">True</property>
+                    <property name="column-spacing">8</property>
+                    <property name="margin-start">12</property>
+                    <property name="margin-top">8</property>
+                    <property name="margin-bottom">8</property>
+
+                    <!-- Policy Label -->
+                    <child>
+                      <object class="GtkLabel" id="policy_label">
+                        <property name="visible">True</property>
+                        <property name="label" translatable="yes">Policy:</property>
+                        <property name="xalign">0</property>
+                        <style>
+                          <class name="settings-label"/>
+                        </style>
+                      </object>
+                      <packing>
+                        <property name="left-attach">0</property>
+                        <property name="top-attach">0</property>
+                      </packing>
+                    </child>
+
+                    <!-- Policy Combo -->
+                    <child>
+                      <object class="GtkComboBoxText" id="conflict_policy_combo">
+                        <property name="visible">True</property>
+                        <property name="active">0</property>
+                        <property name="tooltip-text">How to select when multiple transitions are enabled</property>
+                        <style>
+                          <class name="settings-combo"/>
+                        </style>
+                        <items>
+                          <item translatable="yes">Random</item>
+                          <item translatable="yes">Priority</item>
+                          <item translatable="yes">Round Robin</item>
+                        </items>
+                      </object>
+                      <packing>
+                        <property name="left-attach">1</property>
+                        <property name="top-attach">0</property>
+                      </packing>
+                    </child>
+
+                  </object>
+                </child>
+              </object>
+              <packing>
+                <property name="left-attach">0</property>
+                <property name="top-attach">2</property>
+              </packing>
+            </child>
+
+          </object>
+        </child>
+
+      </object>
+    </child>
+
+    <!-- Dialog Action Buttons -->
+    <child internal-child="action_area">
+      <object class="GtkButtonBox" id="dialog_action_area">
+        <property name="visible">True</property>
+        <property name="layout-style">end</property>
+        <property name="spacing">6</property>
+        <style>
+          <class name="dialog-action-area"/>
+        </style>
+
+        <!-- Cancel Button -->
+        <child>
+          <object class="GtkButton" id="cancel_button">
+            <property name="visible">True</property>
+            <property name="label" translatable="yes">Cancel</property>
+            <property name="use-underline">True</property>
+            <style>
+              <class name="dialog-button"/>
+            </style>
+          </object>
+        </child>
+
+        <!-- OK Button -->
+        <child>
+          <object class="GtkButton" id="ok_button">
+            <property name="visible">True</property>
+            <property name="label" translatable="yes">OK</property>
+            <property name="use-underline">True</property>
+            <property name="can-default">True</property>
+            <style>
+              <class name="dialog-button"/>
+              <class name="suggested-action"/>
+            </style>
+          </object>
+        </child>
+
+      </object>
+    </child>
+
+    <!-- Dialog Responses -->
+    <action-widgets>
+      <action-widget response="-6">cancel_button</action-widget>
+      <action-widget response="-5">ok_button</action-widget>
+    </action-widgets>
+
+  </object>
+
+</interface>
