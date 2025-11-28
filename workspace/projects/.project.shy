@@ -1,0 +1,27 @@
+{
+  "document_type": "project",
+  "version": "2.0",
+  "identity": {
+    "id": "c69c1a42-5dde-4df3-9832-fbea2cf65f6e",
+    "name": "projects",
+    "description": "",
+    "created_date": "2025-11-20T17:06:14.208391",
+    "modified_date": "2025-11-20T17:06:14.208391"
+  },
+  "location": {
+    "base_path": "/home/simao/projetos/shypn/workspace/projects"
+  },
+  "content": {
+    "models": [],
+    "pathways": {},
+    "simulations": []
+  },
+  "metadata": {
+    "tags": [],
+    "settings": {
+      "auto_backup": true,
+      "backup_frequency": "daily",
+      "keep_backups": 5
+    }
+  }
+}

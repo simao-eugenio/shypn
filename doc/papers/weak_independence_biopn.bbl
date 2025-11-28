@@ -12,6 +12,11 @@ Gilbert, D., Heiner, M.: From petri nets to differential equations---an
   integrative approach for biochemical network analysis. Petri Nets and Other
   Models of Concurrency  \textbf{4024},  181--200 (2006)
 
+\bibitem{Gillespie2001}
+Gillespie, D.T.: Approximate accelerated stochastic simulation of chemically
+  reacting systems. The Journal of Chemical Physics  \textbf{115}(4),
+  1716--1733 (2001)
+
 \bibitem{Heiner2008}
 Heiner, M., Gilbert, D., Donaldson, R.: Petri nets for systems and synthetic
   biology. Lecture Notes in Computer Science  \textbf{5016},  215--264 (2008)

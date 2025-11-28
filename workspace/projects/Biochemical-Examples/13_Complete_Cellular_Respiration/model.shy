@@ -1,0 +1,3654 @@
+{
+  "version": "2.0",
+  "metadata": {
+    "created": "2025-11-20T10:17:29.174359",
+    "object_counts": {
+      "places": 38,
+      "transitions": 19,
+      "arcs": 92
+    }
+  },
+  "view_state": {
+    "zoom": 0.4392300000000011,
+    "pan_x": 1095.4812605839888,
+    "pan_y": 584.5564276156115,
+    "transformations": {
+      "rotation": {
+        "type": "rotation",
+        "angle_degrees": 0.0,
+        "enabled": true
+      }
+    }
+  },
+  "places": [
+    {
+      "id": "P1",
+      "name": "Glucose",
+      "label": "Glucose\n5.0 mM",
+      "object_type": "place",
+      "x": 1900.0,
+      "y": 660.0,
+      "radius": 35.0,
+      "marking": 4949.0576456373,
+      "initial_marking": 5000,
+      "capacity": null,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false
+    },
+    {
+      "id": "P2",
+      "name": "G6P",
+      "label": "G6P\n0.1 mM",
+      "object_type": "place",
+      "x": 1220.0,
+      "y": 490.0,
+      "radius": 30.0,
+      "marking": 82.15080614227882,
+      "initial_marking": 100,
+      "capacity": null,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 2.5,
+      "is_catalyst": false
+    },
+    {
+      "id": "P3",
+      "name": "F6P",
+      "label": "F6P\n0.05 mM",
+      "object_type": "place",
+      "x": 1100.0,
+      "y": 700.0,
+      "radius": 28.0,
+      "marking": 118.79154822043336,
+      "initial_marking": 50,
+      "capacity": null,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 2.5,
+      "is_catalyst": false
+    },
+    {
+      "id": "P4",
+      "name": "FBP",
+      "label": "F1,6BP\n0.02 mM",
+      "object_type": "place",
+      "x": 1030.0,
+      "y": 850.0,
+      "radius": 28.0,
+      "marking": 8.131063860296475,
+      "initial_marking": 20,
+      "capacity": null,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 2.5,
+      "is_catalyst": false
+    },
+    {
+      "id": "P5",
+      "name": "G3P",
+      "label": "G3P\n0.02 mM",
+      "object_type": "place",
+      "x": 950.0,
+      "y": 610.0,
+      "radius": 28.0,
+      "marking": 21.768010532964144,
+      "initial_marking": 20,
+      "capacity": null,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 2.5,
+      "is_catalyst": false
+    },
+    {
+      "id": "P6",
+      "name": "BPG",
+      "label": "1,3-BPG\n0.005 mM",
+      "object_type": "place",
+      "x": 1040.0,
+      "y": 970.0,
+      "radius": 26.0,
+      "marking": 24.93789085309472,
+      "initial_marking": 5,
+      "capacity": null,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 2.5,
+      "is_catalyst": false
+    },
+    {
+      "id": "P7",
+      "name": "PEP",
+      "label": "PEP\n0.05 mM",
+      "object_type": "place",
+      "x": 1460.0,
+      "y": 940.0,
+      "radius": 28.0,
+      "marking": 16.426087716433496,
+      "initial_marking": 50,
+      "capacity": null,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 2.5,
+      "is_catalyst": false
+    },
+    {
+      "id": "P8",
+      "name": "Pyruvate_cyt",
+      "label": "Pyruvate\n(cytosol)\n0.1 mM",
+      "object_type": "place",
+      "x": 842.8132237125673,
+      "y": 1020.6404392816412,
+      "radius": 32.0,
+      "marking": 2.9803248419616764,
+      "initial_marking": 100,
+      "capacity": null,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false
+    },
+    {
+      "id": "P9",
+      "name": "Pyruvate_mito",
+      "label": "Pyruvate\n(mito)\n0.05 mM",
+      "object_type": "place",
+      "x": 120.0,
+      "y": 570.0,
+      "radius": 32.0,
+      "marking": 182.6255583349527,
+      "initial_marking": 50,
+      "capacity": null,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false
+    },
+    {
+      "id": "P10",
+      "name": "AcetylCoA",
+      "label": "Acetyl-CoA\n0.005 mM",
+      "object_type": "place",
+      "x": -332.95745683983444,
+      "y": 145.6868976316068,
+      "radius": 30.0,
+      "marking": 9.022606021627942e-08,
+      "initial_marking": 5,
+      "capacity": null,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false
+    },
+    {
+      "id": "P11",
+      "name": "Citrate",
+      "label": "Citrate\n0.3 mM",
+      "object_type": "place",
+      "x": -570.0,
+      "y": 150.0,
+      "radius": 28.0,
+      "marking": 157.46659383989268,
+      "initial_marking": 300,
+      "capacity": null,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 2.5,
+      "is_catalyst": false
+    },
+    {
+      "id": "P12",
+      "name": "Isocitrate",
+      "label": "Isocitrate\n0.02 mM",
+      "object_type": "place",
+      "x": -110.0,
+      "y": 570.0,
+      "radius": 26.0,
+      "marking": 158.20359730690026,
+      "initial_marking": 20,
+      "capacity": null,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 2.5,
+      "is_catalyst": false
+    },
+    {
+      "id": "P13",
+      "name": "AlphaKG",
+      "label": "\u03b1-KG\n0.1 mM",
+      "object_type": "place",
+      "x": -280.0,
+      "y": 100.0,
+      "radius": 28.0,
+      "marking": 86.07533402878703,
+      "initial_marking": 100,
+      "capacity": null,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 2.5,
+      "is_catalyst": false
+    },
+    {
+      "id": "P14",
+      "name": "SuccinylCoA",
+      "label": "Succ-CoA\n0.005 mM",
+      "object_type": "place",
+      "x": 390.0,
+      "y": -70.0,
+      "radius": 26.0,
+      "marking": 25.0153882473521,
+      "initial_marking": 5,
+      "capacity": null,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 2.5,
+      "is_catalyst": false
+    },
+    {
+      "id": "P15",
+      "name": "Succinate",
+      "label": "Succinate\n0.5 mM",
+      "object_type": "place",
+      "x": 280.0,
+      "y": -350.0,
+      "radius": 28.0,
+      "marking": 491.181101375312,
+      "initial_marking": 500,
+      "capacity": null,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 2.5,
+      "is_catalyst": false
+    },
+    {
+      "id": "P16",
+      "name": "Fumarate",
+      "label": "Fumarate\n0.05 mM",
+      "object_type": "place",
+      "x": -310.5969788980693,
+      "y": -395.9431417719638,
+      "radius": 26.0,
+      "marking": 62.05798511152322,
+      "initial_marking": 50,
+      "capacity": null,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 2.5,
+      "is_catalyst": false
+    },
+    {
+      "id": "P17",
+      "name": "Malate",
+      "label": "Malate\n0.2 mM",
+      "object_type": "place",
+      "x": -10.0,
+      "y": -460.0,
+      "radius": 28.0,
+      "marking": 200.0,
+      "initial_marking": 200,
+      "capacity": null,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 2.5,
+      "is_catalyst": false
+    },
+    {
+      "id": "P18",
+      "name": "Oxaloacetate",
+      "label": "OAA\n0.001 mM",
+      "object_type": "place",
+      "x": -340.0,
+      "y": -190.0,
+      "radius": 26.0,
+      "marking": 8.05798520174939,
+      "initial_marking": 1,
+      "capacity": null,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 2.5,
+      "is_catalyst": false
+    },
+    {
+      "id": "P19",
+      "name": "NADH_cyt",
+      "label": "NADH\n(cytosol)\n0.01 mM",
+      "object_type": "place",
+      "x": 540.0,
+      "y": 420.0,
+      "radius": 28.0,
+      "marking": 0,
+      "initial_marking": 10,
+      "capacity": null,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 2.5,
+      "is_catalyst": false
+    },
+    {
+      "id": "P20",
+      "name": "NAD_cyt",
+      "label": "NAD\u207a\n(cytosol)\n0.5 mM",
+      "object_type": "place",
+      "x": 770.0,
+      "y": 430.0,
+      "radius": 28.0,
+      "marking": 510.0000000000007,
+      "initial_marking": 500,
+      "capacity": null,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 2.5,
+      "is_catalyst": false
+    },
+    {
+      "id": "P21",
+      "name": "NADH_mito",
+      "label": "NADH\n(mito)\n0.1 mM",
+      "object_type": "place",
+      "x": 138.07777250139736,
+      "y": 100.071305569354,
+      "radius": 30.0,
+      "marking": 112.67240686225043,
+      "initial_marking": 100,
+      "capacity": null,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false
+    },
+    {
+      "id": "P22",
+      "name": "NAD_mito",
+      "label": "NAD\u207a\n(mito)\n2.0 mM",
+      "object_type": "place",
+      "x": 400.0,
+      "y": 70.0,
+      "radius": 30.0,
+      "marking": 1987.3275931377414,
+      "initial_marking": 2000,
+      "capacity": null,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false
+    },
+    {
+      "id": "P23",
+      "name": "CoQ",
+      "label": "CoQ\n1.0 mM",
+      "object_type": "place",
+      "x": 820.0,
+      "y": 150.0,
+      "radius": 30.0,
+      "marking": 981.2692247403986,
+      "initial_marking": 1000,
+      "capacity": null,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false
+    },
+    {
+      "id": "P24",
+      "name": "CoQH2",
+      "label": "CoQH\u2082\n0.1 mM",
+      "object_type": "place",
+      "x": 701.810918982718,
+      "y": 46.4513436643976,
+      "radius": 30.0,
+      "marking": 118.73077525960385,
+      "initial_marking": 100,
+      "capacity": null,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false
+    },
+    {
+      "id": "P25",
+      "name": "Cyt_c_ox",
+      "label": "Cyt c (ox)\n0.5 mM",
+      "object_type": "place",
+      "x": 1030.0,
+      "y": -40.0,
+      "radius": 30.0,
+      "marking": 549.9653588380673,
+      "initial_marking": 500,
+      "capacity": null,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false
+    },
+    {
+      "id": "P26",
+      "name": "Cyt_c_red",
+      "label": "Cyt c (red)\n0.05 mM",
+      "object_type": "place",
+      "x": 1020.0,
+      "y": -280.0,
+      "radius": 30.0,
+      "marking": 0.03464116193633653,
+      "initial_marking": 50,
+      "capacity": null,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false
+    },
+    {
+      "id": "P27",
+      "name": "O2",
+      "label": "O\u2082\n0.2 mM",
+      "object_type": "place",
+      "x": 1310.0,
+      "y": -240.0,
+      "radius": 28.0,
+      "marking": 180.8891170470648,
+      "initial_marking": 200,
+      "capacity": null,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false
+    },
+    {
+      "id": "P28",
+      "name": "H2O",
+      "label": "H\u2082O\n0.0 mM",
+      "object_type": "place",
+      "x": 1410.0,
+      "y": -50.0,
+      "radius": 25.0,
+      "marking": 38.221765905870924,
+      "initial_marking": 0,
+      "capacity": null,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 2.0,
+      "is_catalyst": false
+    },
+    {
+      "id": "P29",
+      "name": "CO2",
+      "label": "CO\u2082\n0.0 mM",
+      "object_type": "place",
+      "x": 300.0,
+      "y": 540.0,
+      "radius": 25.0,
+      "marking": 32.58428349716932,
+      "initial_marking": 0,
+      "capacity": null,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 2.0,
+      "is_catalyst": false
+    },
+    {
+      "id": "P30",
+      "name": "H_matrix",
+      "label": "H\u207a (matrix)\npH 7.8",
+      "object_type": "place",
+      "x": 1410.0,
+      "y": 270.0,
+      "radius": 32.0,
+      "marking": 158.7948965036957,
+      "initial_marking": 0.16,
+      "capacity": null,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false
+    },
+    {
+      "id": "P31",
+      "name": "H_IMS",
+      "label": "H\u207a (IMS)\npH 7.0",
+      "object_type": "place",
+      "x": 1100.0,
+      "y": 240.0,
+      "radius": 32.0,
+      "marking": 61.42266233530268,
+      "initial_marking": 1.0,
+      "capacity": null,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false
+    },
+    {
+      "id": "P32",
+      "name": "ATP",
+      "label": "ATP\n3.0 mM",
+      "object_type": "place",
+      "x": 1750.0,
+      "y": 450.0,
+      "radius": 35.0,
+      "marking": 3034.3336067657146,
+      "initial_marking": 3000,
+      "capacity": null,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false
+    },
+    {
+      "id": "P33",
+      "name": "ADP",
+      "label": "ADP\n1.0 mM",
+      "object_type": "place",
+      "x": 1300.0,
+      "y": 620.0,
+      "radius": 30.0,
+      "marking": 965.6663932342819,
+      "initial_marking": 1000,
+      "capacity": null,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false
+    },
+    {
+      "id": "P34",
+      "name": "Pi",
+      "label": "P\u1d62\n5.0 mM",
+      "object_type": "place",
+      "x": 930.0,
+      "y": 510.0,
+      "radius": 28.0,
+      "marking": 4930.39203119542,
+      "initial_marking": 5000,
+      "capacity": null,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false
+    },
+    {
+      "id": "P35",
+      "name": "CoA",
+      "label": "CoA\n0.02 mM",
+      "object_type": "place",
+      "x": -93.79899262228128,
+      "y": -41.01030570841681,
+      "radius": 26.0,
+      "marking": 4.984611662421812,
+      "initial_marking": 20,
+      "capacity": null,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 2.5,
+      "is_catalyst": false
+    },
+    {
+      "id": "P36",
+      "name": "FAD",
+      "label": "FAD\n0.01 mM",
+      "object_type": "place",
+      "x": 660.0,
+      "y": -70.0,
+      "radius": 26.0,
+      "marking": 20.00000000000005,
+      "initial_marking": 10,
+      "capacity": null,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 2.5,
+      "is_catalyst": false
+    },
+    {
+      "id": "P37",
+      "name": "FADH2",
+      "label": "FADH\u2082\n0.01 mM",
+      "object_type": "place",
+      "x": 790.0,
+      "y": -180.0,
+      "radius": 26.0,
+      "marking": 0,
+      "initial_marking": 10,
+      "capacity": null,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 2.5,
+      "is_catalyst": false
+    },
+    {
+      "id": "P38",
+      "name": "GTP",
+      "label": "GTP\n0.5 mM",
+      "object_type": "place",
+      "x": 520.0,
+      "y": -470.0,
+      "radius": 26.0,
+      "marking": 503.23908648683533,
+      "initial_marking": 500,
+      "capacity": null,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 2.5,
+      "is_catalyst": false
+    }
+  ],
+  "transitions": [
+    {
+      "id": "T1",
+      "name": "Hexokinase",
+      "label": "Hexokinase",
+      "object_type": "transition",
+      "x": 1420.0,
+      "y": 540.0,
+      "width": 45.0,
+      "height": 20.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "5.0 * (Glucose/1000.0 / (0.1 + Glucose/1000.0)) * (ATP/1000.0 / (0.5 + ATP/1000.0))"
+    },
+    {
+      "id": "T2",
+      "name": "PGI",
+      "label": "PGI",
+      "object_type": "transition",
+      "x": 1090.0,
+      "y": 580.0,
+      "width": 35.0,
+      "height": 18.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 2.5,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "20.0 * (G6P/1000.0 - F6P/1000.0 / 3.0)"
+    },
+    {
+      "id": "T3",
+      "name": "PFK",
+      "label": "PFK",
+      "object_type": "transition",
+      "x": 1300.0,
+      "y": 950.0,
+      "width": 35.0,
+      "height": 18.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "8.0 * (F6P/1000.0 / (0.1 + F6P/1000.0)) * (ATP/1000.0 / (0.5 + ATP/1000.0))"
+    },
+    {
+      "id": "T4",
+      "name": "Aldolase",
+      "label": "Aldolase",
+      "object_type": "transition",
+      "x": 1020.0,
+      "y": 730.0,
+      "width": 40.0,
+      "height": 18.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 2.5,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "15.0 * (FBP/1000.0)"
+    },
+    {
+      "id": "T5",
+      "name": "GAPDH",
+      "label": "GAPDH",
+      "object_type": "transition",
+      "x": 670.0,
+      "y": 610.0,
+      "width": 40.0,
+      "height": 18.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "12.0 * (G3P/1000.0 / (0.05 + G3P/1000.0)) * (NAD_cyt/1000.0 / (0.5 + NAD_cyt/1000.0))"
+    },
+    {
+      "id": "T6",
+      "name": "PGK",
+      "label": "PGK +\nPGM + ENO",
+      "object_type": "transition",
+      "x": 1410.0,
+      "y": 710.0,
+      "width": 40.0,
+      "height": 18.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 2.5,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "15.0 * (BPG/1000.0) * (ADP/1000.0 / (0.3 + ADP/1000.0))"
+    },
+    {
+      "id": "T7",
+      "name": "PK",
+      "label": "PK",
+      "object_type": "transition",
+      "x": 1440.0,
+      "y": 1190.0,
+      "width": 35.0,
+      "height": 18.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "10.0 * (PEP/1000.0 / (0.05 + PEP/1000.0)) * (ADP/1000.0 / (0.3 + ADP/1000.0))"
+    },
+    {
+      "id": "T8",
+      "name": "PyrTransport",
+      "label": "Pyr\nTransport",
+      "object_type": "transition",
+      "x": 473.11581423278153,
+      "y": 895.0315197020707,
+      "width": 40.0,
+      "height": 18.0,
+      "horizontal": false,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 2.5,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "8.0 * (Pyruvate_cyt/1000.0 / (0.05 + Pyruvate_cyt/1000.0))"
+    },
+    {
+      "id": "T9",
+      "name": "PDH",
+      "label": "PDH",
+      "object_type": "transition",
+      "x": -40.0,
+      "y": 320.0,
+      "width": 40.0,
+      "height": 18.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "4.0 * (Pyruvate_mito/1000.0 / (0.1 + Pyruvate_mito/1000.0)) * (CoA/1000.0 / (0.02 + CoA/1000.0)) * (NAD_mito/1000.0 / (0.5 + NAD_mito/1000.0))"
+    },
+    {
+      "id": "T10",
+      "name": "CS",
+      "label": "CS",
+      "object_type": "transition",
+      "x": -448.22607410725846,
+      "y": -44.34582401137118,
+      "width": 35.0,
+      "height": 18.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "6.0 * (AcetylCoA/1000.0 / (0.01 + AcetylCoA/1000.0)) * (Oxaloacetate/1000.0 / (0.001 + Oxaloacetate/1000.0))"
+    },
+    {
+      "id": "T11",
+      "name": "Aconitase",
+      "label": "ACO",
+      "object_type": "transition",
+      "x": -410.0,
+      "y": 320.0,
+      "width": 35.0,
+      "height": 18.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 2.5,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "15.0 * (Citrate/1000.0 - Isocitrate/1000.0 / 2.0)"
+    },
+    {
+      "id": "T12",
+      "name": "IDH",
+      "label": "IDH",
+      "object_type": "transition",
+      "x": 310.0,
+      "y": 360.0,
+      "width": 35.0,
+      "height": 18.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "8.0 * (Isocitrate/1000.0 / (0.05 + Isocitrate/1000.0)) * (NAD_mito/1000.0 / (0.5 + NAD_mito/1000.0))"
+    },
+    {
+      "id": "T13",
+      "name": "KGDH",
+      "label": "KGDH",
+      "object_type": "transition",
+      "x": -130.0,
+      "y": 80.0,
+      "width": 40.0,
+      "height": 18.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "6.0 * (AlphaKG/1000.0 / (0.1 + AlphaKG/1000.0)) * (NAD_mito/1000.0 / (0.5 + NAD_mito/1000.0)) * (CoA/1000.0 / (0.02 + CoA/1000.0))"
+    },
+    {
+      "id": "T14",
+      "name": "SCS_SDH",
+      "label": "SCS +\nSDH",
+      "object_type": "transition",
+      "x": 520.0,
+      "y": -240.0,
+      "width": 40.0,
+      "height": 18.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 2.5,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "5.0 * (SuccinylCoA/1000.0) * (FAD/1000.0 / (0.01 + FAD/1000.0))"
+    },
+    {
+      "id": "T15",
+      "name": "FH_MDH",
+      "label": "FH +\nMDH",
+      "object_type": "transition",
+      "x": -98.16413871253849,
+      "y": -190.86715523550248,
+      "width": 40.0,
+      "height": 18.0,
+      "horizontal": false,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 2.5,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "10.0 * (Fumarate/1000.0) * (NAD_mito/1000.0 / (0.5 + NAD_mito/1000.0))"
+    },
+    {
+      "id": "T16",
+      "name": "Complex_I",
+      "label": "Complex I",
+      "object_type": "transition",
+      "x": 637.5289507043595,
+      "y": 245.20433336922412,
+      "width": 45.0,
+      "height": 20.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "10.0 * (NADH_mito/1000.0 / (0.02 + NADH_mito/1000.0)) * (CoQ/1000.0 / (0.05 + CoQ/1000.0))"
+    },
+    {
+      "id": "T17",
+      "name": "Complex_III",
+      "label": "Complex III",
+      "object_type": "transition",
+      "x": 857.4237786818951,
+      "y": -19.055693860283384,
+      "width": 45.0,
+      "height": 20.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "8.0 * (CoQH2/1000.0 / (0.01 + CoQH2/1000.0)) * (Cyt_c_ox/1000.0 / (0.01 + Cyt_c_ox/1000.0))"
+    },
+    {
+      "id": "T18",
+      "name": "Complex_IV",
+      "label": "Complex IV",
+      "object_type": "transition",
+      "x": 1240.0,
+      "y": -50.0,
+      "width": 45.0,
+      "height": 20.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "6.0 * (Cyt_c_red/1000.0 / (0.005 + Cyt_c_red/1000.0)) * (O2/1000.0 / (0.001 + O2/1000.0))"
+    },
+    {
+      "id": "T19",
+      "name": "ATP_Synthase",
+      "label": "ATP\nSynthase",
+      "object_type": "transition",
+      "x": 1290.0,
+      "y": 360.0,
+      "width": 50.0,
+      "height": 22.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "5.0 * (ADP/1000.0 / (0.025 + ADP/1000.0)) * (Pi/1000.0 / (0.5 + Pi/1000.0)) * (H_IMS/1000.0 / (0.01 + H_IMS/1000.0))"
+    }
+  ],
+  "arcs": [
+    {
+      "id": "A1",
+      "name": "A1",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P1",
+      "source_type": "place",
+      "target_id": "T1",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": []
+    },
+    {
+      "id": "A2",
+      "name": "A2",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P32",
+      "source_type": "place",
+      "target_id": "T1",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": [
+        [
+          175.0,
+          50.0
+        ],
+        [
+          100.0,
+          50.0
+        ],
+        [
+          100.0,
+          700.0
+        ],
+        [
+          1050.0,
+          700.0
+        ]
+      ]
+    },
+    {
+      "id": "A3",
+      "name": "A3",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T1",
+      "source_type": "transition",
+      "target_id": "P2",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": []
+    },
+    {
+      "id": "A4",
+      "name": "A4",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T1",
+      "source_type": "transition",
+      "target_id": "P33",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": [
+        [
+          175.0,
+          150.0
+        ],
+        [
+          50.0,
+          150.0
+        ],
+        [
+          50.0,
+          550.0
+        ],
+        [
+          900.0,
+          550.0
+        ]
+      ]
+    },
+    {
+      "id": "A5",
+      "name": "A5",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P2",
+      "source_type": "place",
+      "target_id": "T2",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": []
+    },
+    {
+      "id": "A6",
+      "name": "A6",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T2",
+      "source_type": "transition",
+      "target_id": "P3",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": []
+    },
+    {
+      "id": "A7",
+      "name": "A7",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P3",
+      "source_type": "place",
+      "target_id": "T3",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": []
+    },
+    {
+      "id": "A8",
+      "name": "A8",
+      "label": "",
+      "object_type": "curved_arc",
+      "arc_type": "curved_arc",
+      "source_id": "P32",
+      "source_type": "place",
+      "target_id": "T3",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": [
+        [
+          475.0,
+          50.0
+        ],
+        [
+          400.0,
+          50.0
+        ],
+        [
+          400.0,
+          750.0
+        ],
+        [
+          1050.0,
+          750.0
+        ]
+      ]
+    },
+    {
+      "id": "A9",
+      "name": "A9",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T3",
+      "source_type": "transition",
+      "target_id": "P4",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": []
+    },
+    {
+      "id": "A10",
+      "name": "A10",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T3",
+      "source_type": "transition",
+      "target_id": "P33",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": [
+        [
+          475.0,
+          150.0
+        ],
+        [
+          450.0,
+          150.0
+        ],
+        [
+          450.0,
+          525.0
+        ],
+        [
+          900.0,
+          525.0
+        ]
+      ]
+    },
+    {
+      "id": "A11",
+      "name": "A11",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P4",
+      "source_type": "place",
+      "target_id": "T4",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": []
+    },
+    {
+      "id": "A12",
+      "name": "A12",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T4",
+      "source_type": "transition",
+      "target_id": "P5",
+      "target_type": "place",
+      "weight": 2.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": []
+    },
+    {
+      "id": "A13",
+      "name": "A13",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P5",
+      "source_type": "place",
+      "target_id": "T5",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": []
+    },
+    {
+      "id": "A14",
+      "name": "A14",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P20",
+      "source_type": "place",
+      "target_id": "T5",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": []
+    },
+    {
+      "id": "A15",
+      "name": "A15",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P34",
+      "source_type": "place",
+      "target_id": "T5",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": [
+        [
+          775.0,
+          150.0
+        ],
+        [
+          700.0,
+          150.0
+        ],
+        [
+          700.0,
+          575.0
+        ],
+        [
+          1000.0,
+          575.0
+        ]
+      ]
+    },
+    {
+      "id": "A16",
+      "name": "A16",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T5",
+      "source_type": "transition",
+      "target_id": "P6",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": []
+    },
+    {
+      "id": "A17",
+      "name": "A17",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T5",
+      "source_type": "transition",
+      "target_id": "P19",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": []
+    },
+    {
+      "id": "A18",
+      "name": "A18",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P6",
+      "source_type": "place",
+      "target_id": "T6",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": []
+    },
+    {
+      "id": "A19",
+      "name": "A19",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P33",
+      "source_type": "place",
+      "target_id": "T6",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": [
+        [
+          925.0,
+          150.0
+        ],
+        [
+          900.0,
+          150.0
+        ],
+        [
+          900.0,
+          500.0
+        ]
+      ]
+    },
+    {
+      "id": "A20",
+      "name": "A20",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T6",
+      "source_type": "transition",
+      "target_id": "P7",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": []
+    },
+    {
+      "id": "A21",
+      "name": "A21",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T6",
+      "source_type": "transition",
+      "target_id": "P32",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": [
+        [
+          925.0,
+          150.0
+        ],
+        [
+          950.0,
+          150.0
+        ],
+        [
+          950.0,
+          675.0
+        ],
+        [
+          1050.0,
+          675.0
+        ]
+      ]
+    },
+    {
+      "id": "A22",
+      "name": "A22",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P7",
+      "source_type": "place",
+      "target_id": "T7",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": []
+    },
+    {
+      "id": "A23",
+      "name": "A23",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P33",
+      "source_type": "place",
+      "target_id": "T7",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": [
+        [
+          1075.0,
+          150.0
+        ],
+        [
+          1050.0,
+          150.0
+        ],
+        [
+          1050.0,
+          525.0
+        ],
+        [
+          925.0,
+          525.0
+        ]
+      ]
+    },
+    {
+      "id": "A24",
+      "name": "A24",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T7",
+      "source_type": "transition",
+      "target_id": "P8",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": []
+    },
+    {
+      "id": "A25",
+      "name": "A25",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T7",
+      "source_type": "transition",
+      "target_id": "P32",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": [
+        [
+          1075.0,
+          150.0
+        ],
+        [
+          1100.0,
+          150.0
+        ],
+        [
+          1100.0,
+          675.0
+        ],
+        [
+          1075.0,
+          675.0
+        ]
+      ]
+    },
+    {
+      "id": "A26",
+      "name": "A26",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P8",
+      "source_type": "place",
+      "target_id": "T8",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": []
+    },
+    {
+      "id": "A27",
+      "name": "A27",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T8",
+      "source_type": "transition",
+      "target_id": "P9",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": []
+    },
+    {
+      "id": "A28",
+      "name": "A28",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P9",
+      "source_type": "place",
+      "target_id": "T9",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": []
+    },
+    {
+      "id": "A29",
+      "name": "A29",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P35",
+      "source_type": "place",
+      "target_id": "T9",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": []
+    },
+    {
+      "id": "A30",
+      "name": "A30",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P22",
+      "source_type": "place",
+      "target_id": "T9",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": []
+    },
+    {
+      "id": "A31",
+      "name": "A31",
+      "label": "",
+      "object_type": "curved_arc",
+      "arc_type": "curved_arc",
+      "source_id": "T9",
+      "source_type": "transition",
+      "target_id": "P10",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": []
+    },
+    {
+      "id": "A32",
+      "name": "A32",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T9",
+      "source_type": "transition",
+      "target_id": "P29",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": []
+    },
+    {
+      "id": "A33",
+      "name": "A33",
+      "label": "",
+      "object_type": "curved_arc",
+      "arc_type": "curved_arc",
+      "source_id": "T9",
+      "source_type": "transition",
+      "target_id": "P21",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": []
+    },
+    {
+      "id": "A34",
+      "name": "A34",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P10",
+      "source_type": "place",
+      "target_id": "T10",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": []
+    },
+    {
+      "id": "A35",
+      "name": "A35",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P18",
+      "source_type": "place",
+      "target_id": "T10",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": [
+        [
+          325.0,
+          425.0
+        ],
+        [
+          300.0,
+          425.0
+        ],
+        [
+          300.0,
+          450.0
+        ],
+        [
+          1000.0,
+          450.0
+        ]
+      ]
+    },
+    {
+      "id": "A36",
+      "name": "A36",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T10",
+      "source_type": "transition",
+      "target_id": "P11",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": []
+    },
+    {
+      "id": "A37",
+      "name": "A37",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T10",
+      "source_type": "transition",
+      "target_id": "P35",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": []
+    },
+    {
+      "id": "A38",
+      "name": "A38",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P11",
+      "source_type": "place",
+      "target_id": "T11",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": []
+    },
+    {
+      "id": "A39",
+      "name": "A39",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T11",
+      "source_type": "transition",
+      "target_id": "P12",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": []
+    },
+    {
+      "id": "A40",
+      "name": "A40",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P12",
+      "source_type": "place",
+      "target_id": "T12",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": []
+    },
+    {
+      "id": "A41",
+      "name": "A41",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P22",
+      "source_type": "place",
+      "target_id": "T12",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": [
+        [
+          625.0,
+          275.0
+        ],
+        [
+          575.0,
+          275.0
+        ],
+        [
+          575.0,
+          250.0
+        ],
+        [
+          100.0,
+          250.0
+        ]
+      ]
+    },
+    {
+      "id": "A42",
+      "name": "A42",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T12",
+      "source_type": "transition",
+      "target_id": "P13",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": []
+    },
+    {
+      "id": "A43",
+      "name": "A43",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T12",
+      "source_type": "transition",
+      "target_id": "P29",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": []
+    },
+    {
+      "id": "A44",
+      "name": "A44",
+      "label": "",
+      "object_type": "curved_arc",
+      "arc_type": "curved_arc",
+      "source_id": "T12",
+      "source_type": "transition",
+      "target_id": "P21",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": [
+        [
+          625.0,
+          425.0
+        ],
+        [
+          600.0,
+          425.0
+        ],
+        [
+          600.0,
+          575.0
+        ],
+        [
+          125.0,
+          575.0
+        ]
+      ]
+    },
+    {
+      "id": "A45",
+      "name": "A45",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P13",
+      "source_type": "place",
+      "target_id": "T13",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": []
+    },
+    {
+      "id": "A46",
+      "name": "A46",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P22",
+      "source_type": "place",
+      "target_id": "T13",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": [
+        [
+          775.0,
+          275.0
+        ],
+        [
+          725.0,
+          275.0
+        ],
+        [
+          725.0,
+          250.0
+        ],
+        [
+          100.0,
+          250.0
+        ]
+      ]
+    },
+    {
+      "id": "A47",
+      "name": "A47",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P35",
+      "source_type": "place",
+      "target_id": "T13",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": [
+        [
+          775.0,
+          275.0
+        ],
+        [
+          750.0,
+          275.0
+        ],
+        [
+          750.0,
+          250.0
+        ],
+        [
+          250.0,
+          250.0
+        ]
+      ]
+    },
+    {
+      "id": "A48",
+      "name": "A48",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T13",
+      "source_type": "transition",
+      "target_id": "P14",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": []
+    },
+    {
+      "id": "A49",
+      "name": "A49",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T13",
+      "source_type": "transition",
+      "target_id": "P29",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": [
+        [
+          775.0,
+          425.0
+        ],
+        [
+          700.0,
+          425.0
+        ],
+        [
+          700.0,
+          450.0
+        ],
+        [
+          550.0,
+          450.0
+        ]
+      ]
+    },
+    {
+      "id": "A50",
+      "name": "A50",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T13",
+      "source_type": "transition",
+      "target_id": "P21",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": [
+        [
+          775.0,
+          425.0
+        ],
+        [
+          750.0,
+          425.0
+        ],
+        [
+          750.0,
+          575.0
+        ],
+        [
+          125.0,
+          575.0
+        ]
+      ]
+    },
+    {
+      "id": "A51",
+      "name": "A51",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P14",
+      "source_type": "place",
+      "target_id": "T14",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": []
+    },
+    {
+      "id": "A52",
+      "name": "A52",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P36",
+      "source_type": "place",
+      "target_id": "T14",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": []
+    },
+    {
+      "id": "A53",
+      "name": "A53",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T14",
+      "source_type": "transition",
+      "target_id": "P15",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": []
+    },
+    {
+      "id": "A54",
+      "name": "A54",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T14",
+      "source_type": "transition",
+      "target_id": "P37",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": []
+    },
+    {
+      "id": "A55",
+      "name": "A55",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T14",
+      "source_type": "transition",
+      "target_id": "P38",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": []
+    },
+    {
+      "id": "A56",
+      "name": "A56",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T14",
+      "source_type": "transition",
+      "target_id": "P35",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": [
+        [
+          925.0,
+          275.0
+        ],
+        [
+          900.0,
+          275.0
+        ],
+        [
+          900.0,
+          250.0
+        ],
+        [
+          250.0,
+          250.0
+        ]
+      ]
+    },
+    {
+      "id": "A57",
+      "name": "A57",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P15",
+      "source_type": "place",
+      "target_id": "T15",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": [
+        [
+          1000.0,
+          375.0
+        ]
+      ]
+    },
+    {
+      "id": "A58",
+      "name": "A58",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P22",
+      "source_type": "place",
+      "target_id": "T15",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": [
+        [
+          1050.0,
+          400.0
+        ],
+        [
+          1025.0,
+          400.0
+        ],
+        [
+          1025.0,
+          225.0
+        ],
+        [
+          125.0,
+          225.0
+        ]
+      ]
+    },
+    {
+      "id": "A59",
+      "name": "A59",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T15",
+      "source_type": "transition",
+      "target_id": "P16",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": [
+        [
+          1100.0,
+          400.0
+        ],
+        [
+          1125.0,
+          375.0
+        ]
+      ]
+    },
+    {
+      "id": "A60",
+      "name": "A60",
+      "label": "",
+      "object_type": "curved_arc",
+      "arc_type": "curved_arc",
+      "source_id": "T15",
+      "source_type": "transition",
+      "target_id": "P17",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": [
+        [
+          1100.0,
+          425.0
+        ]
+      ]
+    },
+    {
+      "id": "A61",
+      "name": "A61",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T15",
+      "source_type": "transition",
+      "target_id": "P21",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": [
+        [
+          1050.0,
+          400.0
+        ],
+        [
+          1050.0,
+          575.0
+        ],
+        [
+          125.0,
+          575.0
+        ]
+      ]
+    },
+    {
+      "id": "A62",
+      "name": "A62",
+      "label": "",
+      "object_type": "curved_arc",
+      "arc_type": "curved_arc",
+      "source_id": "P17",
+      "source_type": "place",
+      "target_id": "T15",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": [
+        [
+          1100.0,
+          425.0
+        ]
+      ]
+    },
+    {
+      "id": "A63",
+      "name": "A63",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T15",
+      "source_type": "transition",
+      "target_id": "P18",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": [
+        [
+          1050.0,
+          425.0
+        ]
+      ]
+    },
+    {
+      "id": "A64",
+      "name": "A64",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P21",
+      "source_type": "place",
+      "target_id": "T16",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A65",
+      "name": "A65",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P23",
+      "source_type": "place",
+      "target_id": "T16",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A66",
+      "name": "A66",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T16",
+      "source_type": "transition",
+      "target_id": "P22",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": [
+        [
+          200.0,
+          600.0
+        ],
+        [
+          150.0,
+          600.0
+        ],
+        [
+          150.0,
+          250.0
+        ],
+        [
+          100.0,
+          250.0
+        ]
+      ]
+    },
+    {
+      "id": "A67",
+      "name": "A67",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T16",
+      "source_type": "transition",
+      "target_id": "P24",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A68",
+      "name": "A68",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T16",
+      "source_type": "transition",
+      "target_id": "P31",
+      "target_type": "place",
+      "weight": 4.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A69",
+      "name": "A69",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P24",
+      "source_type": "place",
+      "target_id": "T17",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A70",
+      "name": "A70",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P25",
+      "source_type": "place",
+      "target_id": "T17",
+      "target_type": "transition",
+      "weight": 2.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A71",
+      "name": "A71",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T17",
+      "source_type": "transition",
+      "target_id": "P23",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A72",
+      "name": "A72",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T17",
+      "source_type": "transition",
+      "target_id": "P26",
+      "target_type": "place",
+      "weight": 2.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A73",
+      "name": "A73",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T17",
+      "source_type": "transition",
+      "target_id": "P31",
+      "target_type": "place",
+      "weight": 4.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A74",
+      "name": "A74",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P26",
+      "source_type": "place",
+      "target_id": "T18",
+      "target_type": "transition",
+      "weight": 4.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A75",
+      "name": "A75",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P27",
+      "source_type": "place",
+      "target_id": "T18",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A76",
+      "name": "A76",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T18",
+      "source_type": "transition",
+      "target_id": "P25",
+      "target_type": "place",
+      "weight": 4.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A77",
+      "name": "A77",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T18",
+      "source_type": "transition",
+      "target_id": "P28",
+      "target_type": "place",
+      "weight": 2.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A78",
+      "name": "A78",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T18",
+      "source_type": "transition",
+      "target_id": "P31",
+      "target_type": "place",
+      "weight": 2.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A79",
+      "name": "A79",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P33",
+      "source_type": "place",
+      "target_id": "T19",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A80",
+      "name": "A80",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P34",
+      "source_type": "place",
+      "target_id": "T19",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A81",
+      "name": "A81",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P31",
+      "source_type": "place",
+      "target_id": "T19",
+      "target_type": "transition",
+      "weight": 3.33,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A82",
+      "name": "A82",
+      "label": "",
+      "object_type": "curved_arc",
+      "arc_type": "curved_arc",
+      "source_id": "T19",
+      "source_type": "transition",
+      "target_id": "P32",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A83",
+      "name": "A83",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T19",
+      "source_type": "transition",
+      "target_id": "P30",
+      "target_type": "place",
+      "weight": 3.33,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A84",
+      "name": "A84",
+      "label": "",
+      "object_type": "curved_inhibitor_arc",
+      "arc_type": "curved_inhibitor_arc",
+      "source_id": "P32",
+      "source_type": "place",
+      "target_id": "T19",
+      "target_type": "transition",
+      "weight": 5000.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A85",
+      "name": "A85",
+      "label": "",
+      "object_type": "curved_inhibitor_arc",
+      "arc_type": "curved_inhibitor_arc",
+      "source_id": "P21",
+      "source_type": "place",
+      "target_id": "T9",
+      "target_type": "transition",
+      "weight": 50.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": [
+        [
+          175.0,
+          425.0
+        ],
+        [
+          150.0,
+          425.0
+        ],
+        [
+          150.0,
+          575.0
+        ]
+      ]
+    },
+    {
+      "id": "A86",
+      "name": "A86",
+      "label": "",
+      "object_type": "curved_inhibitor_arc",
+      "arc_type": "curved_inhibitor_arc",
+      "source_id": "P10",
+      "source_type": "place",
+      "target_id": "T9",
+      "target_type": "transition",
+      "weight": 20.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": [
+        [
+          175.0,
+          425.0
+        ],
+        [
+          200.0,
+          425.0
+        ],
+        [
+          200.0,
+          350.0
+        ],
+        [
+          250.0,
+          350.0
+        ]
+      ]
+    },
+    {
+      "id": "A87",
+      "name": "A87",
+      "label": "",
+      "object_type": "curved_inhibitor_arc",
+      "arc_type": "curved_inhibitor_arc",
+      "source_id": "P21",
+      "source_type": "place",
+      "target_id": "T12",
+      "target_type": "transition",
+      "weight": 100.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": [
+        [
+          625.0,
+          425.0
+        ],
+        [
+          575.0,
+          425.0
+        ],
+        [
+          575.0,
+          575.0
+        ],
+        [
+          125.0,
+          575.0
+        ]
+      ]
+    },
+    {
+      "id": "A88",
+      "name": "A88",
+      "label": "",
+      "object_type": "curved_inhibitor_arc",
+      "arc_type": "curved_inhibitor_arc",
+      "source_id": "P32",
+      "source_type": "place",
+      "target_id": "T3",
+      "target_type": "transition",
+      "weight": 500.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": [
+        [
+          475.0,
+          50.0
+        ],
+        [
+          425.0,
+          50.0
+        ],
+        [
+          425.0,
+          725.0
+        ],
+        [
+          1075.0,
+          725.0
+        ]
+      ]
+    },
+    {
+      "id": "A89",
+      "name": "A89",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P37",
+      "source_type": "place",
+      "target_id": "T17",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": [
+        [
+          400.0,
+          575.0
+        ],
+        [
+          375.0,
+          575.0
+        ],
+        [
+          375.0,
+          250.0
+        ],
+        [
+          1150.0,
+          250.0
+        ]
+      ]
+    },
+    {
+      "id": "A90",
+      "name": "A90",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T17",
+      "source_type": "transition",
+      "target_id": "P36",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": [
+        [
+          400.0,
+          575.0
+        ],
+        [
+          350.0,
+          575.0
+        ],
+        [
+          350.0,
+          225.0
+        ],
+        [
+          1000.0,
+          225.0
+        ]
+      ]
+    },
+    {
+      "id": "A91",
+      "name": "A91",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P19",
+      "source_type": "place",
+      "target_id": "T16",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": [
+        [
+          200.0,
+          575.0
+        ],
+        [
+          175.0,
+          575.0
+        ],
+        [
+          175.0,
+          200.0
+        ],
+        [
+          850.0,
+          200.0
+        ]
+      ]
+    },
+    {
+      "id": "A92",
+      "name": "A92",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T16",
+      "source_type": "transition",
+      "target_id": "P20",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.5,
+      "control_points": [
+        [
+          200.0,
+          575.0
+        ],
+        [
+          150.0,
+          575.0
+        ],
+        [
+          150.0,
+          25.0
+        ],
+        [
+          850.0,
+          25.0
+        ]
+      ]
+    }
+  ]
+}

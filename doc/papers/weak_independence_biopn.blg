@@ -3,44 +3,44 @@ Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
 The top-level auxiliary file: weak_independence_biopn.aux
 The style file: splncs04.bst
 Database file #1: references.bib
-You've used 13 entries,
+You've used 14 entries,
             2850 wiz_defined-function locations,
-            697 strings with 7119 characters,
-and the built_in function-call counts, 8579 in all, are:
-= -- 711
-> -- 291
-< -- 19
-+ -- 119
-- -- 106
-* -- 561
-:= -- 1070
-add.period$ -- 17
-call.type$ -- 13
-change.case$ -- 93
+            706 strings with 7303 characters,
+and the built_in function-call counts, 9177 in all, are:
+= -- 766
+> -- 298
+< -- 21
++ -- 122
+- -- 108
+* -- 597
+:= -- 1138
+add.period$ -- 18
+call.type$ -- 14
+change.case$ -- 97
 chr.to.int$ -- 0
-cite$ -- 13
-duplicate$ -- 738
-empty$ -- 732
-format.name$ -- 116
-if$ -- 1874
+cite$ -- 14
+duplicate$ -- 793
+empty$ -- 789
+format.name$ -- 118
+if$ -- 2011
 int.to.chr$ -- 0
-int.to.str$ -- 13
-missing$ -- 154
-newline$ -- 45
-num.names$ -- 26
-pop$ -- 272
+int.to.str$ -- 14
+missing$ -- 163
+newline$ -- 48
+num.names$ -- 28
+pop$ -- 284
 preamble$ -- 1
-purify$ -- 78
+purify$ -- 81
 quote$ -- 0
-skip$ -- 247
+skip$ -- 271
 stack$ -- 0
-substring$ -- 524
-swap$ -- 457
-text.length$ -- 19
+substring$ -- 577
+swap$ -- 494
+text.length$ -- 21
 text.prefix$ -- 0
 top$ -- 0
-type$ -- 48
+type$ -- 52
 warning$ -- 0
-while$ -- 72
-width$ -- 15
-write$ -- 135
+while$ -- 78
+width$ -- 16
+write$ -- 145

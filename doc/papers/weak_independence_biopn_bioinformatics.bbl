@@ -1,0 +1,83 @@
+\begin{thebibliography}{10}
+
+\bibitem{Chaouiya2007}
+Claudine Chaouiya.
+\newblock Petri net modelling of biological networks.
+\newblock {\em Briefings in Bioinformatics}, 8(4):210--219, 2007.
+
+\bibitem{Gilbert2006}
+David Gilbert and Monika Heiner.
+\newblock From petri nets to differential equations---an integrative approach
+  for biochemical network analysis.
+\newblock {\em Petri Nets and Other Models of Concurrency}, 4024:181--200,
+  2006.
+
+\bibitem{Gillespie2001}
+Daniel~T. Gillespie.
+\newblock Approximate accelerated stochastic simulation of chemically reacting
+  systems.
+\newblock {\em The Journal of Chemical Physics}, 115(4):1716--1733, 2001.
+
+\bibitem{Heiner2008}
+Monika Heiner, David Gilbert, and Robin Donaldson.
+\newblock Petri nets for systems and synthetic biology.
+\newblock {\em Lecture Notes in Computer Science}, 5016:215--264, 2008.
+
+\bibitem{Heiner2015}
+Monika Heiner, Mostafa Herajy, Fei Liu, Christian Rohr, and Martin Schwarick.
+\newblock Snoopy--a unifying petri net tool.
+\newblock {\em Application and Theory of Petri Nets}, pages 398--407, 2012.
+
+\bibitem{Heiner2009}
+Monika Heiner, Christian Rohr, and Martin Schwarick.
+\newblock Marcie--model checking and reachability analysis done efficiently.
+\newblock In {\em International Conference on Application and Theory of Petri
+  Nets}, pages 389--399. Springer, 2013.
+
+\bibitem{Hoops2006}
+Stefan Hoops, Sven Sahle, Ralph Gauges, Christine Lee, J{\"u}rgen Pahle,
+  Natalia Simus, Mudita Singhal, Liang Xu, Pedro Mendes, and Ursula Kummer.
+\newblock Copasi--a complex pathway simulator.
+\newblock {\em Bioinformatics}, 22(24):3067--3074, 2006.
+
+\bibitem{Koch2011}
+Ina Koch, Wolfgang Reisig, and Falk Schreiber.
+\newblock {\em Modeling in Systems Biology: The Petri Net Approach}.
+\newblock Springer, London, 2011.
+
+\bibitem{Malik-Sheriff2020}
+Rahuman~S. Malik-Sheriff, Mihai Glont, Tung V.~N. Nguyen, Krishna Tiwari,
+  Matthew~G. Roberts, Ashley Xavier, Manh~T. Vu, Jinghao Men, Matthieu Maire,
+  Sarubini Kananathan, et~al.
+\newblock Biomodels---15 years of sharing computational models in life science.
+\newblock {\em Nucleic Acids Research}, 48(D1):D407--D415, 2020.
+
+\bibitem{Murata1989}
+Tadao Murata.
+\newblock Petri nets: Properties, analysis and applications.
+\newblock {\em Proceedings of the IEEE}, 77(4):541--580, 1989.
+
+\bibitem{Nagasaki2011}
+Masao Nagasaki, Ayumu Saito, Euna Jeong, Chen Li, Kaname Kojima, Emi Ikeda, and
+  Satoru Miyano.
+\newblock Cell illustrator 4.0: A computational platform for systems biology.
+\newblock {\em In Silico Biology}, 10(1-2):5--26, 2011.
+
+\bibitem{Orth2010}
+Jeffrey~D. Orth, Ines Thiele, and Bernhard~{\O}. Palsson.
+\newblock What is flux balance analysis?
+\newblock {\em Nature Biotechnology}, 28(3):245--248, 2010.
+
+\bibitem{Reddy1993}
+Venkatramana~N. Reddy, Michael~N. Liebman, and Michael~L. Mavrovouniotis.
+\newblock Petri net representations in metabolic pathways.
+\newblock In {\em Proceedings of the 1st International Conference on
+  Intelligent Systems for Molecular Biology}, pages 328--336. AAAI Press, 1993.
+
+\bibitem{Reisig2013}
+Wolfgang Reisig.
+\newblock {\em Understanding Petri Nets: Modeling Techniques, Analysis Methods,
+  Case Studies}.
+\newblock Springer, Berlin, Heidelberg, 2013.
+
+\end{thebibliography}

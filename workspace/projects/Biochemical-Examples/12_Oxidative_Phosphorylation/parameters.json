@@ -1,0 +1,234 @@
+{
+  "metadata": {
+    "example_number": 12,
+    "title": "Oxidative Phosphorylation",
+    "description": "Electron transport chain and ATP synthesis via chemiosmotic coupling",
+    "organism": "Homo sapiens",
+    "compartment": "mitochondria_inner_membrane",
+    "references": [
+      "PMID:15766527",
+      "PMID:11290750",
+      "PMID:12668659",
+      "PMID:9662403"
+    ]
+  },
+  
+  "metabolites": {
+    "NADH": {
+      "kegg_id": "C00004",
+      "chebi_id": "CHEBI:16908",
+      "name": "NADH",
+      "concentration_mM": 0.1,
+      "marking": 100,
+      "compartment": "mitochondrial_matrix"
+    },
+    "NAD": {
+      "kegg_id": "C00003",
+      "chebi_id": "CHEBI:15846",
+      "name": "NAD+",
+      "concentration_mM": 2.0,
+      "marking": 2000,
+      "compartment": "mitochondrial_matrix"
+    },
+    "CoQ": {
+      "kegg_id": "C00399",
+      "chebi_id": "CHEBI:16389",
+      "name": "Ubiquinone (oxidized)",
+      "concentration_mM": 1.0,
+      "marking": 1000,
+      "compartment": "inner_membrane"
+    },
+    "CoQH2": {
+      "kegg_id": "C00390",
+      "chebi_id": "CHEBI:17976",
+      "name": "Ubiquinol (reduced)",
+      "concentration_mM": 0.1,
+      "marking": 100,
+      "compartment": "inner_membrane"
+    },
+    "Cyt_c_ox": {
+      "kegg_id": "C00125",
+      "chebi_id": "CHEBI:18070",
+      "name": "Cytochrome c (oxidized)",
+      "concentration_mM": 0.5,
+      "marking": 500,
+      "compartment": "intermembrane_space"
+    },
+    "Cyt_c_red": {
+      "kegg_id": "C00126",
+      "chebi_id": "CHEBI:18069",
+      "name": "Cytochrome c (reduced)",
+      "concentration_mM": 0.05,
+      "marking": 50,
+      "compartment": "intermembrane_space"
+    },
+    "O2": {
+      "kegg_id": "C00007",
+      "chebi_id": "CHEBI:15379",
+      "name": "Oxygen",
+      "concentration_mM": 0.2,
+      "marking": 200,
+      "compartment": "mitochondrial_matrix"
+    },
+    "H2O": {
+      "kegg_id": "C00001",
+      "chebi_id": "CHEBI:15377",
+      "name": "Water",
+      "concentration_mM": 0.0,
+      "marking": 0,
+      "compartment": "mitochondrial_matrix"
+    },
+    "H_matrix": {
+      "name": "Protons (matrix)",
+      "concentration_mM": 0.00016,
+      "marking": 0.16,
+      "compartment": "mitochondrial_matrix",
+      "note": "pH 7.8 = 10^-7.8 M = 0.00016 mM"
+    },
+    "H_IMS": {
+      "name": "Protons (intermembrane space)",
+      "concentration_mM": 0.001,
+      "marking": 1.0,
+      "compartment": "intermembrane_space",
+      "note": "pH 7.0 = 10^-7 M = 0.001 mM"
+    },
+    "ADP": {
+      "kegg_id": "C00008",
+      "chebi_id": "CHEBI:16761",
+      "name": "ADP",
+      "concentration_mM": 1.0,
+      "marking": 1000,
+      "compartment": "mitochondrial_matrix"
+    },
+    "Pi": {
+      "kegg_id": "C00009",
+      "chebi_id": "CHEBI:18367",
+      "name": "Inorganic phosphate",
+      "concentration_mM": 5.0,
+      "marking": 5000,
+      "compartment": "mitochondrial_matrix"
+    },
+    "ATP": {
+      "kegg_id": "C00002",
+      "chebi_id": "CHEBI:15422",
+      "name": "ATP",
+      "concentration_mM": 3.0,
+      "marking": 3000,
+      "compartment": "mitochondrial_matrix"
+    }
+  },
+  
+  "reactions": {
+    "Complex_I": {
+      "ec_number": "1.6.5.3",
+      "name": "NADH-ubiquinone oxidoreductase",
+      "substrates": ["NADH", "CoQ"],
+      "products": ["NAD", "CoQH2", "H_IMS"],
+      "stoichiometry": {
+        "NADH": -1,
+        "CoQ": -1,
+        "NAD": 1,
+        "CoQH2": 1,
+        "H_IMS": 4
+      },
+      "kinetics": {
+        "type": "michaelis_menten_sequential",
+        "Vmax": 10.0,
+        "Km_NADH": 0.02,
+        "Km_CoQ": 0.05,
+        "reference": "PMID:15766527"
+      }
+    },
+    "Complex_III": {
+      "ec_number": "1.10.2.2",
+      "name": "Ubiquinol-cytochrome c reductase",
+      "substrates": ["CoQH2", "Cyt_c_ox"],
+      "products": ["CoQ", "Cyt_c_red", "H_IMS"],
+      "stoichiometry": {
+        "CoQH2": -1,
+        "Cyt_c_ox": -2,
+        "CoQ": 1,
+        "Cyt_c_red": 2,
+        "H_IMS": 4
+      },
+      "kinetics": {
+        "type": "michaelis_menten_sequential",
+        "Vmax": 8.0,
+        "Km_CoQH2": 0.01,
+        "Km_Cyt_c_ox": 0.01,
+        "reference": "PMID:11290750"
+      }
+    },
+    "Complex_IV": {
+      "ec_number": "1.9.3.1",
+      "name": "Cytochrome c oxidase",
+      "substrates": ["Cyt_c_red", "O2"],
+      "products": ["Cyt_c_ox", "H2O", "H_IMS"],
+      "stoichiometry": {
+        "Cyt_c_red": -4,
+        "O2": -1,
+        "Cyt_c_ox": 4,
+        "H2O": 2,
+        "H_IMS": 2
+      },
+      "kinetics": {
+        "type": "michaelis_menten_sequential",
+        "Vmax": 6.0,
+        "Km_Cyt_c_red": 0.005,
+        "Km_O2": 0.001,
+        "reference": "PMID:12668659"
+      }
+    },
+    "ATP_Synthase": {
+      "ec_number": "3.6.3.14",
+      "name": "ATP synthase",
+      "substrates": ["ADP", "Pi", "H_IMS"],
+      "products": ["ATP", "H_matrix"],
+      "stoichiometry": {
+        "ADP": -1,
+        "Pi": -1,
+        "H_IMS": -3.33,
+        "ATP": 1,
+        "H_matrix": 3.33
+      },
+      "kinetics": {
+        "type": "michaelis_menten_sequential_product_inhibition",
+        "Vmax": 5.0,
+        "Km_ADP": 0.025,
+        "Km_Pi": 0.5,
+        "Km_H_gradient": 0.01,
+        "Ki_ATP": 5.0,
+        "reference": "PMID:9662403"
+      }
+    }
+  },
+  
+  "validation": {
+    "expected_fluxes": {
+      "Complex_I": {
+        "range": [0.5, 2.0],
+        "units": "μM/s",
+        "state": "State 3 (active phosphorylation)"
+      },
+      "ATP_Synthase": {
+        "range": [1.0, 5.0],
+        "units": "μM/s",
+        "state": "State 3"
+      }
+    },
+    "P_O_ratio": {
+      "expected": 2.5,
+      "range": [2.0, 3.0],
+      "note": "ATP produced per NADH oxidized"
+    },
+    "respiratory_control_ratio": {
+      "expected": 5,
+      "range": [3, 10],
+      "definition": "State 3 rate / State 4 rate"
+    },
+    "steady_state_time": {
+      "expected": "30-60 seconds",
+      "observation": "Proton gradient and ATP production equilibrate"
+    }
+  }
+}
