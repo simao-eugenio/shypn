@@ -141,11 +141,10 @@ Places represent chemical species, transitions represent reactions, arc weights 
 
 \begin{table}[htbp]
 \small
-\centering
 \caption{Tool comparison}
 \label{tab:tool_comparison}
 \vspace{-6pt}
-\begin{tabular}{@{}lcccc@{}}
+\begin{tabular*}{\columnwidth}{@{\extracolsep{\fill}}lcccc@{}}
 \toprule
 \textbf{Feature} & \textbf{Snoopy} & \textbf{Cell I.} & \textbf{COPASI} & \textbf{SHYpn} \\
 \midrule
@@ -155,7 +154,7 @@ Weak indep. & --- & --- & --- & \cmark \\
 Parallel sim. & --- & --- & --- & \cmark \\
 Bio. topology & --- & --- & --- & \cmark \\
 \bottomrule
-\end{tabular}
+\end{tabular*}
 \vspace{-8pt}
 \end{table}
 
@@ -307,11 +306,10 @@ We validated the SHYpn SBML import infrastructure on 100 BioModels spanning simp
 
 \begin{table}[htbp]
 \small
-\centering
 \caption{SBML conversion (100 BioModels): 100\% fidelity}
 \label{tab:sbml-import-real}
 \vspace{-6pt}
-\begin{tabular}{@{}lrr@{}}
+\begin{tabular*}{\columnwidth}{@{\extracolsep{\fill}}lrr@{}}
 \toprule
 \textbf{Element} & \textbf{Count} & \textbf{Fidelity} \\
 \midrule
@@ -321,7 +319,7 @@ Test arcs (catalysts) & 1,511 & 20.5\% \\
 Continuous transitions & 1,765 & 68\% \\
 Stochastic transitions & 1,187 & 32\% \\
 \bottomrule
-\end{tabular}
+\end{tabular*}
 \vspace{-8pt}
 \end{table}
 
@@ -329,11 +327,10 @@ Stochastic transitions & 1,187 & 32\% \\
 
 \begin{table}[htbp]
 \small
-\centering
 \caption{Dependency classification (100 models)}
 \label{tab:dependency_dist}
 \vspace{-6pt}
-\begin{tabular}{@{}lcc@{}}
+\begin{tabular*}{\columnwidth}{@{\extracolsep{\fill}}lcc@{}}
 \toprule
 \textbf{Type} & \textbf{\%} & \textbf{Parallel} \\
 \midrule
@@ -344,7 +341,7 @@ Competitive & 19.5 & No \\
 \midrule
 \textbf{Weakly Indep.} & \textbf{65.2} & --- \\
 \bottomrule
-\end{tabular}
+\end{tabular*}
 \vspace{-8pt}
 \end{table}
 
@@ -363,18 +360,17 @@ Competitive & 19.5 & No \\
 
 \begin{table}[htbp]
 \small
-\centering
 \caption{Validation accuracy: classical vs biological}
 \label{tab:validation}
 \vspace{-6pt}
-\begin{tabular}{@{}lcc@{}}
+\begin{tabular*}{\columnwidth}{@{\extracolsep{\fill}}lcc@{}}
 \toprule
 \textbf{Method} & \textbf{False +} & \textbf{False -} \\
 \midrule
 Classical & 72.3\% & 8.1\% \\
 Biological & 4.7\% & 6.3\% \\
 \bottomrule
-\end{tabular}
+\end{tabular*}
 \vspace{-8pt}
 \end{table}
 
@@ -401,11 +397,10 @@ Weak independence extends classical PN theory~\cite{Reisig2013,Murata1989} to co
 
 \begin{table}[htbp]
 \small
-\centering
 \caption{Comparison with existing tools}
 \label{tab:comparison}
 \vspace{-6pt}
-\begin{tabular}{@{}lcccc@{}}
+\begin{tabular*}{\columnwidth}{@{\extracolsep{\fill}}lcccc@{}}
 \toprule
 \textbf{Tool} & \textbf{W.I.} & \textbf{Coupling} & \textbf{Bio.Top.} & \textbf{Par.} \\
 \midrule
@@ -415,7 +410,7 @@ Charlie & --- & --- & Class. & --- \\
 COPASI & --- & --- & --- & --- \\
 \textbf{SHYpn} & \textbf{\cmark} & \textbf{\cmark} & \textbf{\cmark} & \textbf{\cmark} \\
 \bottomrule
-\end{tabular}
+\end{tabular*}
 \vspace{-8pt}
 \end{table}
 
