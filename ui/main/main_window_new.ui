@@ -1,0 +1,235 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- GTK3 Main Window - Monolithic Architecture with Master Palette -->
+<!-- Phase 1: Main Window UI Rebuild -->
+<interface>
+  <requires lib="gtk+" version="3.0"/>
+
+  <object class="GtkApplicationWindow" id="main_window">
+    <property name="title">Shypn</property>
+    <property name="default-width">1200</property>
+    <property name="default-height">800</property>
+    <property name="visible">True</property>
+
+    <!-- Header Bar with ONLY window controls (NO panel toggles) -->
+    <child type="titlebar">
+      <object class="GtkHeaderBar" id="header_bar">
+        <property name="show-close-button">True</property>
+        <property name="visible">True</property>
+        <property name="title">Shypn</property>
+        
+        <!-- Window Control Buttons -->
+        <child>
+          <object class="GtkButton" id="minimize_button">
+            <property name="visible">True</property>
+            <property name="can-focus">False</property>
+            <property name="tooltip-text">Minimize window</property>
+            <child>
+              <object class="GtkImage">
+                <property name="visible">True</property>
+                <property name="icon-name">window-minimize-symbolic</property>
+                <property name="icon-size">1</property>
+              </object>
+            </child>
+          </object>
+          <packing>
+            <property name="pack-type">end</property>
+            <property name="position">1</property>
+          </packing>
+        </child>
+        
+        <child>
+          <object class="GtkButton" id="maximize_button">
+            <property name="visible">True</property>
+            <property name="can-focus">False</property>
+            <property name="tooltip-text">Maximize window</property>
+            <child>
+              <object class="GtkImage" id="maximize_image">
+                <property name="visible">True</property>
+                <property name="icon-name">window-maximize-symbolic</property>
+                <property name="icon-size">1</property>
+              </object>
+            </child>
+          </object>
+          <packing>
+            <property name="pack-type">end</property>
+            <property name="position">0</property>
+          </packing>
+        </child>
+      </object>
+    </child>
+
+    <!-- Main content: Master Palette + Content Area -->
+    <child>
+      <object class="GtkBox" id="root_container">
+        <property name="orientation">horizontal</property>
+        <property name="visible">True</property>
+        <property name="hexpand">True</property>
+        <property name="vexpand">True</property>
+        
+        <!-- Master Palette Slot (48px width) -->
+        <child>
+          <object class="GtkBox" id="master_palette_slot">
+            <property name="orientation">vertical</property>
+            <property name="visible">True</property>
+            <property name="width-request">48</property>
+            <property name="hexpand">False</property>
+            <property name="vexpand">True</property>
+            <!-- MasterPalette widget inserted programmatically here -->
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+          </packing>
+        </child>
+        
+        <!-- Content area: Paned layout + Status bar -->
+        <child>
+          <object class="GtkBox" id="content_with_statusbar">
+            <property name="orientation">vertical</property>
+            <property name="visible">True</property>
+            <property name="hexpand">True</property>
+            <property name="vexpand">True</property>
+            
+            <!-- Paned layout: Panels (left) + Workspace (right) -->
+            <child>
+              <object class="GtkPaned" id="left_paned">
+                <property name="orientation">horizontal</property>
+                <property name="position">0</property>
+                <property name="visible">True</property>
+                <property name="can-focus">True</property>
+                <property name="vexpand">True</property>
+                
+                <!-- Left: GtkRevealer with slide-right animation -->
+                <child>
+                  <object class="GtkRevealer" id="panels_revealer">
+                    <property name="visible">True</property>
+                    <property name="reveal-child">False</property>
+                    <property name="transition-type">slide-right</property>
+                    <property name="transition-duration">250</property>
+                    <property name="vexpand">True</property>
+                    <property name="hexpand">False</property>
+                    
+                    <child>
+                      <!-- GtkStack for instant panel switching (NO transition) -->
+                      <object class="GtkStack" id="panels_stack">
+                        <property name="visible">True</property>
+                        <property name="vexpand">True</property>
+                        <property name="hexpand">False</property>
+                        <property name="transition-type">none</property>
+                        
+                        <!-- Files Panel Container (300px) -->
+                        <child>
+                          <object class="GtkBox" id="files_panel_container">
+                            <property name="orientation">vertical</property>
+                            <property name="visible">True</property>
+                            <property name="vexpand">True</property>
+                            <property name="hexpand">False</property>
+                            <property name="width-request">300</property>
+                            <!-- Panel content from left_panel.ui goes here (Phase 2) -->
+                          </object>
+                          <packing>
+                            <property name="name">files</property>
+                          </packing>
+                        </child>
+                        
+                        <!-- Analyses Panel Container (350px) -->
+                        <child>
+                          <object class="GtkBox" id="analyses_panel_container">
+                            <property name="orientation">vertical</property>
+                            <property name="visible">True</property>
+                            <property name="vexpand">True</property>
+                            <property name="hexpand">False</property>
+                            <property name="width-request">350</property>
+                            <!-- Panel content from right_panel.ui goes here (Phase 2) -->
+                          </object>
+                          <packing>
+                            <property name="name">analyses</property>
+                          </packing>
+                        </child>
+                        
+                        <!-- Pathways Panel Container (320px) -->
+                        <child>
+                          <object class="GtkBox" id="pathways_panel_container">
+                            <property name="orientation">vertical</property>
+                            <property name="visible">True</property>
+                            <property name="vexpand">True</property>
+                            <property name="hexpand">False</property>
+                            <property name="width-request">320</property>
+                            <!-- Panel content from pathway_panel.ui goes here (Phase 2) -->
+                          </object>
+                          <packing>
+                            <property name="name">pathways</property>
+                          </packing>
+                        </child>
+                        
+                        <!-- Topology Panel Container (400px) -->
+                        <child>
+                          <object class="GtkBox" id="topology_panel_container">
+                            <property name="orientation">vertical</property>
+                            <property name="visible">True</property>
+                            <property name="vexpand">True</property>
+                            <property name="hexpand">False</property>
+                            <property name="width-request">400</property>
+                            <!-- Panel content from topology_panel.ui goes here (Phase 2) -->
+                          </object>
+                          <packing>
+                            <property name="name">topology</property>
+                          </packing>
+                        </child>
+                        
+                      </object>
+                    </child>
+                  </object>
+                  <packing>
+                    <property name="resize">False</property>
+                    <property name="shrink">False</property>
+                  </packing>
+                </child>
+                
+                <!-- Right: Main Workspace -->
+                <child>
+                  <object class="GtkBox" id="main_workspace">
+                    <property name="orientation">vertical</property>
+                    <property name="visible">True</property>
+                    <property name="vexpand">True</property>
+                    <property name="hexpand">True</property>
+                    <!-- Canvas notebook inserted programmatically here -->
+                  </object>
+                  <packing>
+                    <property name="resize">True</property>
+                    <property name="shrink">False</property>
+                  </packing>
+                </child>
+                
+              </object>
+              <packing>
+                <property name="expand">True</property>
+                <property name="fill">True</property>
+              </packing>
+            </child>
+            
+            <!-- Status Bar -->
+            <child>
+              <object class="GtkStatusbar" id="status_bar">
+                <property name="visible">True</property>
+                <property name="hexpand">True</property>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">True</property>
+              </packing>
+            </child>
+            
+          </object>
+          <packing>
+            <property name="expand">True</property>
+            <property name="fill">True</property>
+          </packing>
+        </child>
+        
+      </object>
+    </child>
+
+  </object>
+
+</interface>
