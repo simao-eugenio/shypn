@@ -2,71 +2,45 @@ This is BibTeX, Version 0.99d (TeX Live 2023/Debian)
 Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
 The top-level auxiliary file: weak_independence_biopn_bioinformatics.aux
 The style file: plain.bst
-I couldn't open database file references.bib
----line 85 of file weak_independence_biopn_bioinformatics.aux
- : \bibdata{references
- :                    }
-I'm skipping whatever remains of this command
-I found no database files---while reading file weak_independence_biopn_bioinformatics.aux
-Warning--I didn't find a database entry for "Alberts2015"
-Warning--I didn't find a database entry for "Nelson2017"
-Warning--I didn't find a database entry for "Reddy1993"
-Warning--I didn't find a database entry for "Reisig2013"
-Warning--I didn't find a database entry for "Malik2020"
-Warning--I didn't find a database entry for "Orth2011"
-Warning--I didn't find a database entry for "Hucka2003"
-Warning--I didn't find a database entry for "Murata1989"
-Warning--I didn't find a database entry for "Heiner2008"
-Warning--I didn't find a database entry for "Gilbert2006"
-Warning--I didn't find a database entry for "Koch2011"
-Warning--I didn't find a database entry for "Chaouiya2007"
-Warning--I didn't find a database entry for "Orth2010"
-Warning--I didn't find a database entry for "Malik-Sheriff2020"
-Warning--I didn't find a database entry for "Gillespie2001"
-Warning--I didn't find a database entry for "Flamholz2012"
-Warning--I didn't find a database entry for "Heiner2015"
-Warning--I didn't find a database entry for "Nagasaki2011"
-Warning--I didn't find a database entry for "Heiner2009"
-Warning--I didn't find a database entry for "Hoops2006"
-You've used 0 entries,
+Database file #1: ../references.bib
+You've used 16 entries,
             2118 wiz_defined-function locations,
-            537 strings with 4475 characters,
-and the built_in function-call counts, 18 in all, are:
-= -- 0
-> -- 0
-< -- 0
-+ -- 0
-- -- 0
-* -- 2
-:= -- 7
-add.period$ -- 0
-call.type$ -- 0
-change.case$ -- 0
+            619 strings with 7086 characters,
+and the built_in function-call counts, 6383 in all, are:
+= -- 607
+> -- 399
+< -- 1
++ -- 160
+- -- 142
+* -- 529
+:= -- 1099
+add.period$ -- 49
+call.type$ -- 16
+change.case$ -- 114
 chr.to.int$ -- 0
-cite$ -- 0
-duplicate$ -- 0
-empty$ -- 1
-format.name$ -- 0
-if$ -- 1
+cite$ -- 16
+duplicate$ -- 192
+empty$ -- 429
+format.name$ -- 142
+if$ -- 1271
 int.to.chr$ -- 0
-int.to.str$ -- 0
-missing$ -- 0
-newline$ -- 3
-num.names$ -- 0
-pop$ -- 0
+int.to.str$ -- 16
+missing$ -- 20
+newline$ -- 83
+num.names$ -- 32
+pop$ -- 106
 preamble$ -- 1
-purify$ -- 0
+purify$ -- 100
 quote$ -- 0
-skip$ -- 1
+skip$ -- 124
 stack$ -- 0
-substring$ -- 0
-swap$ -- 0
-text.length$ -- 0
+substring$ -- 397
+swap$ -- 26
+text.length$ -- 1
 text.prefix$ -- 0
 top$ -- 0
-type$ -- 0
+type$ -- 56
 warning$ -- 0
-while$ -- 0
-width$ -- 0
-write$ -- 2
-(There were 2 error messages)
+while$ -- 56
+width$ -- 18
+write$ -- 181
