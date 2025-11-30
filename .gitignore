@@ -103,6 +103,8 @@ scripts/
 archive/
 dev/
 
+# Note: ui/ directory is tracked (contains GTK XML definitions needed at runtime)
+
 # User workspace (except Biochemical-Examples)
 workspace/projects/My_Project/
 workspace/projects/thesis/

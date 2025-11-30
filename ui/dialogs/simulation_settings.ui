@@ -99,9 +99,10 @@
                     <child>
                       <object class="GtkEntry" id="dt_manual_entry">
                         <property name="visible">True</property>
+                        <property name="can-focus">True</property>
+                        <property name="editable">True</property>
                         <property name="text">0.1</property>
                         <property name="width-chars">10</property>
-                        <property name="sensitive">False</property>
                         <property name="tooltip-text">Time step in seconds</property>
                         <style>
                           <class name="settings-entry"/>
