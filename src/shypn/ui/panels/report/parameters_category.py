@@ -774,6 +774,10 @@ class DynamicAnalysesCategory(BaseReportCategory):
                 # print("[DEBUG_TABLES] Auto-expanding Dynamic Analyses category")
                 self.category_frame.set_expanded(True)
         
+        # Notify export toolbar that simulation data is available
+        if self.parent_panel and hasattr(self.parent_panel, 'export_toolbar'):
+            self.parent_panel.export_toolbar.update_simulation_data_availability(True)
+        
         # Ensure all widgets are visible and properly rendered
         self.summary_label.show()
         self.simulation_status_label.show()

@@ -82,6 +82,8 @@
                     <child>
                       <object class="GtkEntry" id="dt_manual_entry">
                         <property name="visible">True</property>
+                        <property name="can-focus">True</property>
+                        <property name="editable">True</property>
                         <property name="text">0.06</property>
                         <property name="width-chars">6</property>
                         <property name="max-width-chars">8</property>

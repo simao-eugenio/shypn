@@ -67,6 +67,12 @@ class SimulationSettingsDialog(Gtk.Dialog):
         
         # Load current settings
         self._load_from_settings()
+        
+        print("DEBUG: SimulationSettingsDialog __init__ called")
+        
+        # Manually trigger the initial state update for the entry field
+        # This ensures the sensitivity is correctly set on dialog open
+        self._update_dt_entry_sensitivity()
     
     def _load_ui(self):
         """Load UI definition from file."""
@@ -134,6 +140,15 @@ class SimulationSettingsDialog(Gtk.Dialog):
         for name, widget in self._widgets.items():
             if widget is None:
                 raise ValueError(f"Widget '{name}' not found in UI file")
+        
+        # Explicitly ensure the manual entry is editable and can receive focus
+        entry = self._widgets['dt_manual_entry']
+        entry.set_editable(True)
+        entry.set_can_focus(True)
+        entry.set_property('editable', True)
+        
+        # Show all widgets
+        self.show_all()
     
     def _connect_signals(self):
         """Connect widget signals.
@@ -147,9 +162,41 @@ class SimulationSettingsDialog(Gtk.Dialog):
             entry = DebouncedEntry(delay_ms=300)
             entry.set_debounced_callback(self._on_value_changed_debounced)
         """
-        # Manual dt radio toggle
+        # Auto dt radio toggle - disable manual entry when auto is selected
+        if self._widgets['dt_auto_radio']:
+            self._widgets['dt_auto_radio'].connect('toggled', self._on_auto_dt_toggled)
+        
+        # Manual dt radio toggle - enable manual entry when manual is selected
         if self._widgets['dt_manual_radio']:
             self._widgets['dt_manual_radio'].connect('toggled', self._on_manual_dt_toggled)
+    
+    def _update_dt_entry_sensitivity(self):
+        """Update the manual dt entry sensitivity based on current radio button state."""
+        is_manual_active = self._widgets['dt_manual_radio'].get_active()
+        entry = self._widgets['dt_manual_entry']
+        
+        # Debug output
+        print(f"DEBUG: Manual radio active: {is_manual_active}")
+        print(f"DEBUG: Entry sensitive before: {entry.get_sensitive()}")
+        print(f"DEBUG: Entry editable before: {entry.get_editable()}")
+        
+        entry.set_sensitive(is_manual_active)
+        entry.set_editable(True)
+        
+        print(f"DEBUG: Entry sensitive after: {entry.get_sensitive()}")
+        print(f"DEBUG: Entry editable after: {entry.get_editable()}")
+        print(f"DEBUG: Entry can-focus: {entry.get_can_focus()}")
+    
+    def _on_auto_dt_toggled(self, button):
+        """Handle auto dt radio toggle.
+        
+        Args:
+            button: GtkRadioButton that was toggled
+        """
+        print(f"DEBUG _on_auto_dt_toggled: button active = {button.get_active()}")
+        # Only act when button becomes active (not when it becomes inactive)
+        if button.get_active():
+            self._update_dt_entry_sensitivity()
     
     def _on_manual_dt_toggled(self, button):
         """Handle manual dt radio toggle.
@@ -157,19 +204,19 @@ class SimulationSettingsDialog(Gtk.Dialog):
         Args:
             button: GtkRadioButton that was toggled
         """
-        is_manual = button.get_active()
-        if self._widgets['dt_manual_entry']:
-            self._widgets['dt_manual_entry'].set_sensitive(is_manual)
+        print(f"DEBUG _on_manual_dt_toggled: button active = {button.get_active()}")
+        # Only act when button becomes active (not when it becomes inactive)
+        if button.get_active():
+            self._update_dt_entry_sensitivity()
     
     def _load_from_settings(self):
         """Load current values from settings object."""
-        # Time step mode
+        # Time step mode - setting the radio button will trigger the signal handler
+        # which will automatically set the entry sensitivity
         if self.settings.dt_auto:
             self._widgets['dt_auto_radio'].set_active(True)
-            self._widgets['dt_manual_entry'].set_sensitive(False)
         else:
             self._widgets['dt_manual_radio'].set_active(True)
-            self._widgets['dt_manual_entry'].set_sensitive(True)
         
         # Manual dt value
         self._widgets['dt_manual_entry'].set_text(str(self.settings.dt_manual))

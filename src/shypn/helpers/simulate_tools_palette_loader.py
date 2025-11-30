@@ -222,6 +222,12 @@ class SimulateToolsPaletteLoader(GObject.GObject):
             self.dt_auto_radio = settings_builder.get_object('dt_auto_radio')
             self.dt_manual_radio = settings_builder.get_object('dt_manual_radio')
             self.dt_manual_entry = settings_builder.get_object('dt_manual_entry')
+            
+            # Ensure manual entry is editable (critical fix)
+            if self.dt_manual_entry:
+                self.dt_manual_entry.set_editable(True)
+                self.dt_manual_entry.set_can_focus(True)
+            
             self.settings_apply_button = None  # Removed from parameters panel
             self.settings_reset_button = None  # Removed from parameters panel
             
@@ -305,6 +311,8 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         # Wire time step radio buttons (immediate atomic update)
         if self.dt_auto_radio:
             self.dt_auto_radio.connect('toggled', self._on_dt_mode_changed)
+        if self.dt_manual_radio:
+            self.dt_manual_radio.connect('toggled', self._on_dt_mode_changed)
         
         # Wire manual time step entry (debounced atomic update)
         if self.dt_manual_entry:
@@ -358,9 +366,10 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         
         # Commit atomically
         if self.buffered_settings.commit():
-            # Update entry sensitivity
+            # Update entry sensitivity and ensure it's editable
             if self.dt_manual_entry:
                 self.dt_manual_entry.set_sensitive(not is_auto)
+                self.dt_manual_entry.set_editable(True)
             
             self.emit('settings-changed')
         else:
@@ -465,6 +474,7 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         if self.dt_manual_entry:
             self.dt_manual_entry.set_text(str(settings.dt_manual))
             self.dt_manual_entry.set_sensitive(not settings.dt_auto)
+            self.dt_manual_entry.set_editable(True)
     
     def _hide_settings_panel(self):
         """Hide the settings panel with animation.
