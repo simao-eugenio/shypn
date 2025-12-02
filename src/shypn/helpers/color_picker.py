@@ -115,7 +115,10 @@ class ColorPickerRow(Gtk.ScrolledWindow):
         """
         # Use EventBox instead of Button for no spacing
         event_box = Gtk.EventBox()
+        # Request minimum size but allow expansion
         event_box.set_size_request(self.button_size, self.button_size)
+        event_box.set_hexpand(False)
+        event_box.set_vexpand(False)
         
         # Create drawing area for color display (full size, no padding)
         drawing_area = Gtk.DrawingArea()

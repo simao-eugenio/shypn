@@ -133,7 +133,12 @@ class SimulationSettingsDialog(Gtk.Dialog):
             'dt_manual_radio': builder.get_object('dt_manual_radio'),
             'dt_manual_entry': builder.get_object('dt_manual_entry'),
             'time_scale_entry': builder.get_object('time_scale_entry'),
-            'conflict_policy_combo': builder.get_object('conflict_policy_combo')
+            'conflict_policy_combo': builder.get_object('conflict_policy_combo'),
+            # τ-leaping settings
+            'tau_leaping_enabled_check': builder.get_object('tau_leaping_enabled_check'),
+            'tau_epsilon_entry': builder.get_object('tau_epsilon_entry'),
+            'critical_threshold_entry': builder.get_object('critical_threshold_entry'),
+            'parallel_stochastic_check': builder.get_object('parallel_stochastic_check')
         }
         
         # Validate all widgets found
@@ -235,6 +240,12 @@ class SimulationSettingsDialog(Gtk.Dialog):
         # For now, default to RANDOM (index 0)
         index = 0  # Default to Random
         self._widgets['conflict_policy_combo'].set_active(index)
+        
+        # τ-Leaping settings
+        self._widgets['tau_leaping_enabled_check'].set_active(self.settings.use_tau_leaping)
+        self._widgets['tau_epsilon_entry'].set_text(str(self.settings.tau_epsilon))
+        self._widgets['critical_threshold_entry'].set_text(str(self.settings.critical_threshold))
+        self._widgets['parallel_stochastic_check'].set_active(self.settings.use_parallel_stochastic)
     
     def apply_to_settings(self) -> bool:
         """Apply dialog values to settings object atomically.
@@ -273,6 +284,46 @@ class SimulationSettingsDialog(Gtk.Dialog):
                                f"Time scale must be a positive number. Got: {scale_text}")
                 self.buffered_settings.rollback()
                 return False
+            
+            # τ-Leaping settings
+            use_tau_leaping = self._widgets['tau_leaping_enabled_check'].get_active()
+            self.buffered_settings.buffer.use_tau_leaping = use_tau_leaping
+            
+            # Epsilon
+            epsilon_text = self._widgets['tau_epsilon_entry'].get_text().strip()
+            try:
+                epsilon_value = float(epsilon_text)
+                if epsilon_value <= 0 or epsilon_value > 1:
+                    self._show_error("Invalid epsilon",
+                                   f"Epsilon must be between 0 and 1. Got: {epsilon_value}")
+                    self.buffered_settings.rollback()
+                    return False
+                self.buffered_settings.buffer.tau_epsilon = epsilon_value
+            except ValueError:
+                self._show_error("Invalid epsilon",
+                               f"Epsilon must be a number. Got: {epsilon_text}")
+                self.buffered_settings.rollback()
+                return False
+            
+            # Critical threshold
+            threshold_text = self._widgets['critical_threshold_entry'].get_text().strip()
+            try:
+                threshold_value = float(threshold_text)
+                if threshold_value < 0:
+                    self._show_error("Invalid critical threshold",
+                                   f"Critical threshold must be non-negative. Got: {threshold_value}")
+                    self.buffered_settings.rollback()
+                    return False
+                self.buffered_settings.buffer.critical_threshold = threshold_value
+            except ValueError:
+                self._show_error("Invalid critical threshold",
+                               f"Critical threshold must be a number. Got: {threshold_text}")
+                self.buffered_settings.rollback()
+                return False
+            
+            # Parallel stochastic
+            use_parallel = self._widgets['parallel_stochastic_check'].get_active()
+            self.buffered_settings.buffer.use_parallel_stochastic = use_parallel
             
             # Mark as dirty (has uncommitted changes)
             self.buffered_settings.mark_dirty()

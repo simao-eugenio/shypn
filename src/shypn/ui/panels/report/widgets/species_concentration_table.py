@@ -13,14 +13,15 @@ class SpeciesConcentrationTable(Gtk.ScrolledWindow):
     """Table displaying species concentration metrics.
     
     Columns:
-    1. Species Name (with color indicator)
-    2. Initial Tokens
-    3. Final Tokens
-    4. Min
-    5. Max
-    6. Average
-    7. Δ (Total Change)
-    8. Rate (Δ/time)
+    1. ID (Place ID)
+    2. Species Name (with color indicator)
+    3. Initial Tokens
+    4. Final Tokens
+    5. Min
+    6. Max
+    7. Average
+    8. Δ (Total Change)
+    9. Rate (Δ/time)
     """
     
     def __init__(self):
@@ -31,20 +32,21 @@ class SpeciesConcentrationTable(Gtk.ScrolledWindow):
         
         # Create tree view with columns
         self.store = Gtk.ListStore(
-            str,   # 0: Place Name
-            str,   # 1: Color (hex)
-            float, # 2: Initial (changed to float for continuous)
-            float, # 3: Final (changed to float for continuous)
-            float, # 4: Min (changed to float for continuous)
-            float, # 5: Max (changed to float for continuous)
-            float, # 6: Average
-            float, # 7: Change (Δ) (changed to float for continuous)
-            float  # 8: Rate (Δ/time)
+            str,   # 0: Place ID
+            str,   # 1: Place Name
+            str,   # 2: Color (hex)
+            float, # 3: Initial (changed to float for continuous)
+            float, # 4: Final (changed to float for continuous)
+            float, # 5: Min (changed to float for continuous)
+            float, # 6: Max (changed to float for continuous)
+            float, # 7: Average
+            float, # 8: Change (Δ) (changed to float for continuous)
+            float  # 9: Rate (Δ/time)
         )
         
         self.tree_view = Gtk.TreeView(model=self.store)
         self.tree_view.set_enable_search(True)
-        self.tree_view.set_search_column(0)
+        self.tree_view.set_search_column(1)  # Search by species name
         self.tree_view.set_grid_lines(Gtk.TreeViewGridLines.HORIZONTAL)
         
         # Add columns
@@ -55,34 +57,42 @@ class SpeciesConcentrationTable(Gtk.ScrolledWindow):
     def _setup_columns(self):
         """Create table columns."""
         
-        # Column 0: Species Name with color indicator
+        # Column 0: ID
         renderer_text = Gtk.CellRendererText()
-        column = Gtk.TreeViewColumn("Species", renderer_text, text=0)
+        column = Gtk.TreeViewColumn("ID", renderer_text, text=0)
         column.set_resizable(True)
         column.set_sort_column_id(0)
+        column.set_min_width(60)
+        self.tree_view.append_column(column)
+        
+        # Column 1: Species Name with color indicator
+        renderer_text = Gtk.CellRendererText()
+        column = Gtk.TreeViewColumn("Species", renderer_text, text=1)
+        column.set_resizable(True)
+        column.set_sort_column_id(1)
         column.set_min_width(150)
         self.tree_view.append_column(column)
         
-        # Column 1: Initial Tokens
-        self._add_numeric_column("Initial", 2, float, format_str="{:.2f}")
+        # Column 2: Initial Tokens
+        self._add_numeric_column("Initial", 3, float, format_str="{:.2f}")
         
-        # Column 2: Final Tokens
-        self._add_numeric_column("Final", 3, float, format_str="{:.2f}")
+        # Column 3: Final Tokens
+        self._add_numeric_column("Final", 4, float, format_str="{:.2f}")
         
-        # Column 3: Minimum
-        self._add_numeric_column("Min", 4, float, format_str="{:.2f}")
+        # Column 4: Minimum
+        self._add_numeric_column("Min", 5, float, format_str="{:.2f}")
         
-        # Column 4: Maximum
-        self._add_numeric_column("Max", 5, float, format_str="{:.2f}")
+        # Column 5: Maximum
+        self._add_numeric_column("Max", 6, float, format_str="{:.2f}")
         
-        # Column 5: Average
-        self._add_numeric_column("Average", 6, float, format_str="{:.2f}")
+        # Column 6: Average
+        self._add_numeric_column("Average", 7, float, format_str="{:.2f}")
         
-        # Column 6: Total Change
-        self._add_numeric_column("Δ", 7, float, format_str="{:+.2f}")
+        # Column 7: Total Change
+        self._add_numeric_column("Δ", 8, float, format_str="{:+.2f}")
         
-        # Column 7: Change Rate
-        self._add_numeric_column("Rate (Δ/t)", 8, float, format_str="{:+.4f}")
+        # Column 8: Change Rate
+        self._add_numeric_column("Rate (Δ/t)", 9, float, format_str="{:+.4f}")
         
     def _add_numeric_column(self, title: str, column_id: int, 
                            value_type: type, format_str: str = None):
@@ -141,6 +151,7 @@ class SpeciesConcentrationTable(Gtk.ScrolledWindow):
         
         for metrics in species_metrics:
             self.store.append([
+                metrics.place_id,
                 metrics.place_name,
                 metrics.place_color,
                 metrics.initial_tokens,
@@ -168,14 +179,15 @@ class SpeciesConcentrationTable(Gtk.ScrolledWindow):
         lines = []
         
         # Header
-        lines.append("Species,Initial,Final,Min,Max,Average,Change,Rate")
+        lines.append("ID,Species,Initial,Final,Min,Max,Average,Change,Rate")
         
         # Data rows
         iter = self.store.get_iter_first()
         while iter:
             values = []
-            values.append(self.store.get_value(iter, 0))  # Species name
-            for i in range(2, 9):  # Skip color column (1)
+            values.append(self.store.get_value(iter, 0))  # ID
+            values.append(self.store.get_value(iter, 1))  # Species name
+            for i in range(3, 10):  # Skip color column (2)
                 values.append(str(self.store.get_value(iter, i)))
             lines.append(",".join(values))
             iter = self.store.iter_next(iter)

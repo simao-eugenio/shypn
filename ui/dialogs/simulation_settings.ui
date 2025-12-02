@@ -283,6 +283,199 @@
               </packing>
             </child>
 
+            <!-- τ-Leaping (Stochastic) Section -->
+            <child>
+              <object class="GtkFrame" id="tau_leaping_frame">
+                <property name="visible">True</property>
+                <property name="label-xalign">0</property>
+                <property name="shadow-type">none</property>
+                <style>
+                  <class name="settings-section"/>
+                </style>
+
+                <child type="label">
+                  <object class="GtkLabel" id="tau_leaping_section_label">
+                    <property name="visible">True</property>
+                    <property name="label" translatable="yes">Stochastic Acceleration (Enabled by Default)</property>
+                    <style>
+                      <class name="settings-section-title"/>
+                    </style>
+                  </object>
+                </child>
+
+                <child>
+                  <object class="GtkGrid" id="tau_leaping_grid">
+                    <property name="visible">True</property>
+                    <property name="row-spacing">8</property>
+                    <property name="column-spacing">8</property>
+                    <property name="margin-start">12</property>
+                    <property name="margin-top">8</property>
+                    <property name="margin-bottom">8</property>
+                    
+                    <!-- Info label -->
+                    <child>
+                      <object class="GtkLabel" id="tau_info_label">
+                        <property name="visible">True</property>
+                        <property name="label" translatable="yes">τ-Leaping with parallel execution is enabled by default for maximum performance (20-400× faster). Disable only for debugging.</property>
+                        <property name="xalign">0</property>
+                        <property name="wrap">True</property>
+                        <property name="max-width-chars">50</property>
+                        <style>
+                          <class name="dim-label"/>
+                        </style>
+                      </object>
+                      <packing>
+                        <property name="left-attach">0</property>
+                        <property name="top-attach">0</property>
+                        <property name="width">3</property>
+                      </packing>
+                    </child>
+
+                    <!-- Enable τ-Leaping Checkbox -->
+                    <child>
+                      <object class="GtkCheckButton" id="tau_leaping_enabled_check">
+                        <property name="visible">True</property>
+                        <property name="label" translatable="yes">Enable τ-Leaping</property>
+                        <property name="active">True</property>
+                        <property name="tooltip-text">Uncheck to use exact Gillespie SSA (slower, for verification only)</property>
+                        <style>
+                          <class name="settings-checkbox"/>
+                        </style>
+                      </object>
+                      <packing>
+                        <property name="left-attach">0</property>
+                        <property name="top-attach">1</property>
+                        <property name="width">3</property>
+                      </packing>
+                    </child>
+
+                    <!-- Epsilon Label -->
+                    <child>
+                      <object class="GtkLabel" id="tau_epsilon_label">
+                        <property name="visible">True</property>
+                        <property name="label" translatable="yes">Epsilon (ε):</property>
+                        <property name="xalign">0</property>
+                        <property name="tooltip-text">Leap condition tolerance (0.01-0.1)</property>
+                        <style>
+                          <class name="settings-label"/>
+                        </style>
+                      </object>
+                      <packing>
+                        <property name="left-attach">0</property>
+                        <property name="top-attach">2</property>
+                      </packing>
+                    </child>
+
+                    <!-- Epsilon Entry -->
+                    <child>
+                      <object class="GtkEntry" id="tau_epsilon_entry">
+                        <property name="visible">True</property>
+                        <property name="text">0.03</property>
+                        <property name="width-chars">8</property>
+                        <property name="tooltip-text">Controls accuracy (lower = more accurate but slower)</property>
+                        <style>
+                          <class name="settings-entry"/>
+                        </style>
+                      </object>
+                      <packing>
+                        <property name="left-attach">1</property>
+                        <property name="top-attach">2</property>
+                      </packing>
+                    </child>
+
+                    <!-- Epsilon Hint -->
+                    <child>
+                      <object class="GtkLabel" id="tau_epsilon_hint">
+                        <property name="visible">True</property>
+                        <property name="label" translatable="yes">(default: 0.03)</property>
+                        <property name="xalign">0</property>
+                        <style>
+                          <class name="dim-label"/>
+                        </style>
+                      </object>
+                      <packing>
+                        <property name="left-attach">2</property>
+                        <property name="top-attach">2</property>
+                      </packing>
+                    </child>
+
+                    <!-- Critical Threshold Label -->
+                    <child>
+                      <object class="GtkLabel" id="critical_threshold_label">
+                        <property name="visible">True</property>
+                        <property name="label" translatable="yes">Critical Threshold:</property>
+                        <property name="xalign">0</property>
+                        <property name="tooltip-text">Low propensity threshold for exact handling</property>
+                        <style>
+                          <class name="settings-label"/>
+                        </style>
+                      </object>
+                      <packing>
+                        <property name="left-attach">0</property>
+                        <property name="top-attach">3</property>
+                      </packing>
+                    </child>
+
+                    <!-- Critical Threshold Entry -->
+                    <child>
+                      <object class="GtkEntry" id="critical_threshold_entry">
+                        <property name="visible">True</property>
+                        <property name="text">10</property>
+                        <property name="width-chars">8</property>
+                        <property name="tooltip-text">Transitions with propensity below this use exact SSA</property>
+                        <style>
+                          <class name="settings-entry"/>
+                        </style>
+                      </object>
+                      <packing>
+                        <property name="left-attach">1</property>
+                        <property name="top-attach">3</property>
+                      </packing>
+                    </child>
+
+                    <!-- Critical Threshold Hint -->
+                    <child>
+                      <object class="GtkLabel" id="critical_threshold_hint">
+                        <property name="visible">True</property>
+                        <property name="label" translatable="yes">(default: 10)</property>
+                        <property name="xalign">0</property>
+                        <style>
+                          <class name="dim-label"/>
+                        </style>
+                      </object>
+                      <packing>
+                        <property name="left-attach">2</property>
+                        <property name="top-attach">3</property>
+                      </packing>
+                    </child>
+
+                    <!-- Enable Parallel Checkbox -->
+                    <child>
+                      <object class="GtkCheckButton" id="parallel_stochastic_check">
+                        <property name="visible">True</property>
+                        <property name="label" translatable="yes">Enable Parallel Execution</property>
+                        <property name="active">True</property>
+                        <property name="tooltip-text">Uses weak independence for parallel sampling (enabled by default, 2-4× additional speedup)</property>
+                        <style>
+                          <class name="settings-checkbox"/>
+                        </style>
+                      </object>
+                      <packing>
+                        <property name="left-attach">0</property>
+                        <property name="top-attach">4</property>
+                        <property name="width">3</property>
+                      </packing>
+                    </child>
+
+                  </object>
+                </child>
+              </object>
+              <packing>
+                <property name="left-attach">0</property>
+                <property name="top-attach">3</property>
+              </packing>
+            </child>
+
           </object>
         </child>
 
