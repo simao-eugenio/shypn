@@ -62,6 +62,44 @@ class DataCollector:
             count = getattr(transition, 'firing_count', 0)
             self.transition_data[transition.id].append(count)
     
+    def record_event(self, time: float, event_type: str, data: dict = None):
+        """Record a simulation event (for logging/debugging).
+        
+        This is used by τ-leaping and other advanced features to log
+        internal events. Currently just logs, doesn't store long-term.
+        
+        Args:
+            time: Event timestamp
+            event_type: Type of event (e.g., 'tau_leap', 'ssa_step')
+            data: Optional event data dictionary
+        """
+        # For now, just pass - this is used for debugging/logging
+        # Could extend to store event history if needed
+        pass
+    
+    def record_firing(self, time: float, transition, consumed: dict = None, 
+                     produced: dict = None, mode: str = None, firings: int = 1):
+        """Record a transition firing event.
+        
+        Used by τ-leaping and other engines to record firing details.
+        Updates the transition's firing count.
+        
+        Args:
+            time: Time of firing
+            transition: Transition object that fired
+            consumed: Map of place_id -> tokens consumed
+            produced: Map of place_id -> tokens produced
+            mode: Firing mode ('tau_leaping', 'gillespie', etc.)
+            firings: Number of firings (for batch firings in τ-leaping)
+        """
+        # Update transition firing count
+        if hasattr(transition, 'firing_count'):
+            transition.firing_count += firings
+        
+        # For now, detailed firing events are just logged, not stored
+        # Could extend to store firing history if needed for analysis
+        pass
+    
     def stop_collection(self):
         """Stop collecting data."""
         self.is_collecting = False

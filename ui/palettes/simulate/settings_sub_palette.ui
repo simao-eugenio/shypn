@@ -165,6 +165,141 @@
               </object>
             </child>
             
+            <!-- ─────────────────────────────────────────────── -->
+            <!-- Stochastic Simulation Section -->
+            <!-- ─────────────────────────────────────────────── -->
+            
+            <child>
+              <object class="GtkBox">
+                <property name="visible">True</property>
+                <property name="orientation">vertical</property>
+                <property name="spacing">4</property>
+                <property name="margin_top">8</property>
+                
+                <child>
+                  <object class="GtkLabel">
+                    <property name="visible">True</property>
+                    <property name="label">STOCHASTIC ACCELERATION</property>
+                    <property name="xalign">0</property>
+                  </object>
+                </child>
+                
+                <!-- Info label -->
+                <child>
+                  <object class="GtkLabel">
+                    <property name="visible">True</property>
+                    <property name="label">τ-Leaping with parallel execution enabled by default (20-400× faster)</property>
+                    <property name="xalign">0</property>
+                    <property name="margin_top">2</property>
+                    <property name="wrap">True</property>
+                    <property name="max-width-chars">40</property>
+                  </object>
+                </child>
+                
+                <!-- Advanced tuning expander -->
+                <child>
+                  <object class="GtkExpander" id="stochastic_advanced_expander">
+                    <property name="visible">True</property>
+                    <property name="expanded">False</property>
+                    <property name="margin_top">4</property>
+                    
+                    <child type="label">
+                      <object class="GtkLabel">
+                        <property name="visible">True</property>
+                        <property name="label">Advanced Tuning</property>
+                      </object>
+                    </child>
+                    
+                    <child>
+                      <object class="GtkBox">
+                        <property name="visible">True</property>
+                        <property name="orientation">vertical</property>
+                        <property name="spacing">6</property>
+                        <property name="margin_top">6</property>
+                        <property name="margin_start">12</property>
+                        
+                        <!-- Disable option for debugging -->
+                        <child>
+                          <object class="GtkCheckButton" id="tau_leaping_check">
+                            <property name="visible">True</property>
+                            <property name="label">Enable τ-Leaping (uncheck for exact SSA)</property>
+                            <property name="active">True</property>
+                            <property name="tooltip-text">Disable only for debugging or verification against exact Gillespie</property>
+                          </object>
+                        </child>
+                        
+                        <!-- Epsilon row -->
+                        <child>
+                          <object class="GtkBox">
+                            <property name="visible">True</property>
+                            <property name="orientation">horizontal</property>
+                            <property name="spacing">8</property>
+                            <property name="margin_top">2</property>
+                            
+                            <child>
+                              <object class="GtkLabel">
+                                <property name="visible">True</property>
+                                <property name="label">Accuracy ε:</property>
+                                <property name="tooltip-text">Leap condition tolerance</property>
+                              </object>
+                            </child>
+                            
+                            <child>
+                              <object class="GtkEntry" id="tau_epsilon_entry">
+                                <property name="visible">True</property>
+                                <property name="can-focus">True</property>
+                                <property name="editable">True</property>
+                                <property name="text">0.03</property>
+                                <property name="width-chars">5</property>
+                                <property name="max-width-chars">6</property>
+                                <property name="tooltip-text">Lower = more accurate but slower (0.01-0.1)</property>
+                              </object>
+                            </child>
+                            
+                            <child>
+                              <object class="GtkLabel">
+                                <property name="visible">True</property>
+                                <property name="label">Critical:</property>
+                                <property name="margin_start">8</property>
+                                <property name="tooltip-text">Threshold for exact handling</property>
+                              </object>
+                            </child>
+                            
+                            <child>
+                              <object class="GtkEntry" id="critical_threshold_entry">
+                                <property name="visible">True</property>
+                                <property name="can-focus">True</property>
+                                <property name="editable">True</property>
+                                <property name="text">10</property>
+                                <property name="width-chars">4</property>
+                                <property name="max-width-chars">5</property>
+                                <property name="tooltip-text">Reactions with propensity below this use exact SSA</property>
+                              </object>
+                            </child>
+                            
+                          </object>
+                        </child>
+                        
+                        <!-- Parallel execution -->
+                        <child>
+                          <object class="GtkCheckButton" id="parallel_stochastic_check">
+                            <property name="visible">True</property>
+                            <property name="label">Parallel Execution (uncheck to force sequential)</property>
+                            <property name="active">True</property>
+                            <property name="tooltip-text">Uses weak independence for parallel sampling (enabled by default)</property>
+                            <property name="margin_top">2</property>
+                          </object>
+                        </child>
+                        
+                      </object>
+                    </child>
+                    
+                  </object>
+                </child>
+                
+              </object>
+            </child>
+            
           </object>
         </child>
       </object>

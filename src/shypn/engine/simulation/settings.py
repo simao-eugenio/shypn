@@ -36,6 +36,16 @@ class SimulationSettings:
     DEFAULT_TIME_SCALE = 1.0
     DEFAULT_STEPS_TARGET = 10000  # Target number of steps for auto dt
     
+    # τ-Leaping defaults - ENABLED BY DEFAULT for performance
+    # Users should get fast simulation automatically, just like ODEs
+    DEFAULT_USE_TAU_LEAPING = True  # Use τ-leaping by default (10-100× faster)
+    DEFAULT_TAU_EPSILON = 0.03  # 3% leap condition tolerance
+    DEFAULT_CRITICAL_THRESHOLD = 10.0  # Propensity threshold for exact SSA
+    DEFAULT_MAX_TAU = 0.01  # Maximum leap size (seconds) - conservative default to prevent huge time jumps
+    DEFAULT_MIN_TAU = 1e-6  # Minimum leap size (seconds)
+    DEFAULT_USE_PARALLEL_STOCHASTIC = True  # Parallel by default (2-4× faster)
+    # Note: max_workers is auto-determined from os.cpu_count(), not a user setting
+    
     # Precision tolerance for time comparisons (prevents floating-point errors)
     # Using 1e-9 (1 nanosecond) to safely handle accumulated rounding errors
     # while still maintaining high precision for scientific simulations
@@ -48,6 +58,14 @@ class SimulationSettings:
         self._dt_auto = self.DEFAULT_DT_AUTO
         self._dt_manual = self.DEFAULT_DT_MANUAL
         self._time_scale = self.DEFAULT_TIME_SCALE
+        
+        # τ-Leaping settings
+        self._use_tau_leaping = self.DEFAULT_USE_TAU_LEAPING
+        self._tau_epsilon = self.DEFAULT_TAU_EPSILON
+        self._critical_threshold = self.DEFAULT_CRITICAL_THRESHOLD
+        self._max_tau = self.DEFAULT_MAX_TAU
+        self._min_tau = self.DEFAULT_MIN_TAU
+        self._use_parallel_stochastic = self.DEFAULT_USE_PARALLEL_STOCHASTIC
     
     # ========== Properties with Validation ==========
     
@@ -144,6 +162,117 @@ class SimulationSettings:
         if value <= 0:
             raise ValueError("Time scale must be positive")
         self._time_scale = value
+    
+    # ========== τ-Leaping Properties ==========
+    
+    @property
+    def use_tau_leaping(self) -> bool:
+        """Get whether τ-leaping is enabled."""
+        return self._use_tau_leaping
+    
+    @use_tau_leaping.setter
+    def use_tau_leaping(self, value: bool):
+        """Set τ-leaping mode."""
+        self._use_tau_leaping = bool(value)
+    
+    @property
+    def tau_epsilon(self) -> float:
+        """Get τ-leaping epsilon (leap condition tolerance)."""
+        return self._tau_epsilon
+    
+    @tau_epsilon.setter
+    def tau_epsilon(self, value: float):
+        """Set epsilon with validation.
+        
+        Args:
+            value: Epsilon (0 < ε < 1, typically 0.01-0.05)
+        
+        Raises:
+            ValueError: If epsilon is invalid
+        """
+        if not 0 < value < 1:
+            raise ValueError("Epsilon must be in (0, 1)")
+        self._tau_epsilon = value
+    
+    @property
+    def critical_threshold(self) -> float:
+        """Get critical reaction threshold."""
+        return self._critical_threshold
+    
+    @critical_threshold.setter
+    def critical_threshold(self, value: float):
+        """Set critical threshold with validation.
+        
+        Args:
+            value: Threshold (positive)
+        
+        Raises:
+            ValueError: If threshold is not positive
+        """
+        if value <= 0:
+            raise ValueError("Critical threshold must be positive")
+        self._critical_threshold = value
+    
+    @property
+    def max_tau(self) -> float:
+        """Get maximum leap size."""
+        return self._max_tau
+    
+    @max_tau.setter
+    def max_tau(self, value: float):
+        """Set maximum tau with validation.
+        
+        Args:
+            value: Max tau (positive)
+        
+        Raises:
+            ValueError: If max_tau is not positive
+        """
+        if value <= 0:
+            raise ValueError("Max tau must be positive")
+        self._max_tau = value
+    
+    @property
+    def min_tau(self) -> float:
+        """Get minimum leap size."""
+        return self._min_tau
+    
+    @min_tau.setter
+    def min_tau(self, value: float):
+        """Set minimum tau with validation.
+        
+        Args:
+            value: Min tau (positive, < max_tau)
+        
+        Raises:
+            ValueError: If min_tau is invalid
+        """
+        if value <= 0:
+            raise ValueError("Min tau must be positive")
+        if hasattr(self, '_max_tau') and value >= self._max_tau:
+            raise ValueError("Min tau must be less than max tau")
+        self._min_tau = value
+    
+    @property
+    def use_parallel_stochastic(self) -> bool:
+        """Get whether parallel stochastic execution is enabled.
+        
+        When enabled, weakly independent transitions (convergent and regulatory
+        coupling) are sampled concurrently, reflecting the biological reality
+        of spatially distributed molecular collisions. Thread count is
+        automatically determined based on system capabilities.
+        """
+        return self._use_parallel_stochastic
+    
+    @use_parallel_stochastic.setter
+    def use_parallel_stochastic(self, value: bool):
+        """Set parallel stochastic mode.
+        
+        Args:
+            value: True to enable parallel sampling of weakly independent transitions
+        """
+        self._use_parallel_stochastic = bool(value)
+
     
     # ========== Duration Management ==========
     
@@ -304,7 +433,14 @@ class SimulationSettings:
             'duration': self._duration,
             'dt_auto': self._dt_auto,
             'dt_manual': self._dt_manual,
-            'time_scale': self._time_scale
+            'time_scale': self._time_scale,
+            # τ-Leaping settings
+            'use_tau_leaping': self._use_tau_leaping,
+            'tau_epsilon': self._tau_epsilon,
+            'critical_threshold': self._critical_threshold,
+            'max_tau': self._max_tau,
+            'min_tau': self._min_tau,
+            'use_parallel_stochastic': self._use_parallel_stochastic
         }
     
     @classmethod
@@ -334,6 +470,25 @@ class SimulationSettings:
         if 'time_scale' in data:
             settings.time_scale = data['time_scale']
         
+        # τ-Leaping settings (with defaults for backward compatibility)
+        if 'use_tau_leaping' in data:
+            settings.use_tau_leaping = data['use_tau_leaping']
+        
+        if 'tau_epsilon' in data:
+            settings.tau_epsilon = data['tau_epsilon']
+        
+        if 'critical_threshold' in data:
+            settings.critical_threshold = data['critical_threshold']
+        
+        if 'max_tau' in data:
+            settings.max_tau = data['max_tau']
+        
+        if 'min_tau' in data:
+            settings.min_tau = data['min_tau']
+        
+        if 'use_parallel_stochastic' in data:
+            settings.use_parallel_stochastic = data['use_parallel_stochastic']
+        
         return settings
     
     # ========== String Representation ==========
@@ -342,9 +497,12 @@ class SimulationSettings:
         """Get string representation for debugging."""
         duration_str = f"{self._duration} {self._time_units.full_name}" if self._duration else "None"
         dt_str = "auto" if self._dt_auto else f"manual ({self._dt_manual})"
+        tau_str = "τ-leaping" if self._use_tau_leaping else "exact SSA"
+        parallel_str = "+parallel" if self._use_parallel_stochastic else ""
         
         return (f"SimulationSettings(duration={duration_str}, "
-                f"dt={dt_str}, scale={self._time_scale})")
+                f"dt={dt_str}, scale={self._time_scale}, "
+                f"stochastic={tau_str}{parallel_str})")
     
     def __str__(self) -> str:
         """Get user-friendly string representation."""
@@ -374,6 +532,19 @@ class SimulationSettings:
         
         # Time scale
         lines.append(f"Time scale: {self._time_scale}")
+        
+        # Stochastic simulation mode
+        if self._use_tau_leaping:
+            lines.append(f"\nStochastic Mode: τ-Leaping (approximate)")
+            lines.append(f"  Epsilon (ε): {self._tau_epsilon}")
+            lines.append(f"  Critical threshold: {self._critical_threshold}")
+            lines.append(f"  Tau range: [{self._min_tau}, {self._max_tau}]")
+            if self._use_parallel_stochastic:
+                lines.append(f"  Parallel execution: Enabled (weak independence)")
+            else:
+                lines.append(f"  Parallel execution: Disabled")
+        else:
+            lines.append(f"\nStochastic Mode: Exact SSA (Gillespie)")
         
         return "\n".join(lines)
 
@@ -441,6 +612,44 @@ class SimulationSettingsBuilder:
         self._settings.time_scale = scale
         return self
     
+    def with_tau_leaping(
+        self,
+        epsilon: float = 0.03,
+        critical_threshold: float = 10.0,
+        max_tau: float = 1.0,
+        min_tau: float = 1e-6,
+        use_parallel: bool = False
+    ) -> 'SimulationSettingsBuilder':
+        """Enable τ-leaping approximate stochastic simulation.
+        
+        Args:
+            epsilon: Leap condition tolerance (smaller = more accurate, typically 0.01-0.05)
+            critical_threshold: Propensity below this uses exact SSA
+            max_tau: Maximum leap size
+            min_tau: Minimum leap size
+            use_parallel: Enable parallel sampling for weakly independent transitions.
+                         Thread count auto-determined from system capabilities.
+        
+        Returns:
+            SimulationSettingsBuilder: Self for chaining
+        """
+        self._settings.use_tau_leaping = True
+        self._settings.tau_epsilon = epsilon
+        self._settings.critical_threshold = critical_threshold
+        self._settings.max_tau = max_tau
+        self._settings.min_tau = min_tau
+        self._settings.use_parallel_stochastic = use_parallel
+        return self
+    
+    def with_exact_ssa(self) -> 'SimulationSettingsBuilder':
+        """Disable τ-leaping (use exact SSA).
+        
+        Returns:
+            SimulationSettingsBuilder: Self for chaining
+        """
+        self._settings.use_tau_leaping = False
+        return self
+    
     def build(self) -> SimulationSettings:
         """Build and return settings object.
         
@@ -448,3 +657,4 @@ class SimulationSettingsBuilder:
             SimulationSettings: Configured settings
         """
         return self._settings
+

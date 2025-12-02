@@ -96,6 +96,9 @@ class SwissKnifePaletteUI:
         
         # Event box for CSS
         event_box = Gtk.EventBox()
+        event_box.set_can_focus(False)
+        event_box.set_hexpand(False)
+        event_box.set_vexpand(False)
         event_box.get_style_context().add_class('sub-palette')
         event_box.get_style_context().add_class(f'sub-palette-{cat_id}')
         

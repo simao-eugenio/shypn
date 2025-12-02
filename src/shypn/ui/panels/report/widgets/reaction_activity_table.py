@@ -13,13 +13,14 @@ class ReactionActivityTable(Gtk.ScrolledWindow):
     """Table displaying reaction activity metrics.
     
     Columns:
-    1. Reaction Name
-    2. Type (Stochastic/Continuous)
-    3. Firing Count
-    4. Average Rate
-    5. Total Flux
-    6. Contribution %
-    7. Status
+    1. ID (Transition ID)
+    2. Reaction Name
+    3. Type (Stochastic/Continuous)
+    4. Firing Count
+    5. Average Rate
+    6. Total Flux
+    7. Contribution %
+    8. Status
     """
     
     def __init__(self):
@@ -30,18 +31,19 @@ class ReactionActivityTable(Gtk.ScrolledWindow):
         
         # Create tree view with columns
         self.store = Gtk.ListStore(
-            str,   # 0: Transition Name
-            str,   # 1: Type (stochastic/continuous)
-            int,   # 2: Firing Count
-            float, # 3: Average Rate
-            int,   # 4: Total Flux
-            float, # 5: Contribution %
-            str    # 6: Status
+            str,   # 0: Transition ID
+            str,   # 1: Transition Name
+            str,   # 2: Type (stochastic/continuous)
+            int,   # 3: Firing Count
+            float, # 4: Average Rate
+            int,   # 5: Total Flux
+            float, # 6: Contribution %
+            str    # 7: Status
         )
         
         self.tree_view = Gtk.TreeView(model=self.store)
         self.tree_view.set_enable_search(True)
-        self.tree_view.set_search_column(0)
+        self.tree_view.set_search_column(1)  # Search by reaction name
         self.tree_view.set_grid_lines(Gtk.TreeViewGridLines.HORIZONTAL)
         
         # Add columns
@@ -52,40 +54,48 @@ class ReactionActivityTable(Gtk.ScrolledWindow):
     def _setup_columns(self):
         """Create table columns."""
         
-        # Column 0: Transition Name
+        # Column 0: ID
         renderer = Gtk.CellRendererText()
-        column = Gtk.TreeViewColumn("Reaction", renderer, text=0)
+        column = Gtk.TreeViewColumn("ID", renderer, text=0)
         column.set_resizable(True)
         column.set_sort_column_id(0)
+        column.set_min_width(60)
+        self.tree_view.append_column(column)
+        
+        # Column 1: Transition Name
+        renderer = Gtk.CellRendererText()
+        column = Gtk.TreeViewColumn("Reaction", renderer, text=1)
+        column.set_resizable(True)
+        column.set_sort_column_id(1)
         column.set_min_width(150)
         self.tree_view.append_column(column)
         
-        # Column 1: Type
+        # Column 2: Type
         renderer = Gtk.CellRendererText()
         renderer.set_property("xalign", 0.5)  # Center align
-        column = Gtk.TreeViewColumn("Type", renderer, text=1)
+        column = Gtk.TreeViewColumn("Type", renderer, text=2)
         column.set_resizable(True)
-        column.set_sort_column_id(1)
+        column.set_sort_column_id(2)
         self.tree_view.append_column(column)
         
-        # Column 2: Firing Count
-        self._add_numeric_column("Firings", 2, "{:,d}")
+        # Column 3: Firing Count
+        self._add_numeric_column("Firings", 3, "{:,d}")
         
-        # Column 3: Average Rate
-        self._add_numeric_column("Avg Rate", 3, "{:.4f}")
+        # Column 4: Average Rate
+        self._add_numeric_column("Avg Rate", 4, "{:.4f}")
         
-        # Column 4: Total Flux
-        self._add_numeric_column("Total Flux", 4, "{:,d}")
+        # Column 5: Total Flux
+        self._add_numeric_column("Total Flux", 5, "{:,d}")
         
-        # Column 5: Contribution %
-        self._add_numeric_column("Contribution %", 5, "{:.2f}")
+        # Column 6: Contribution %
+        self._add_numeric_column("Contribution %", 6, "{:.2f}")
         
-        # Column 6: Status
+        # Column 7: Status
         renderer = Gtk.CellRendererText()
         renderer.set_property("xalign", 0.5)  # Center align
-        column = Gtk.TreeViewColumn("Status", renderer, text=6)
+        column = Gtk.TreeViewColumn("Status", renderer, text=7)
         column.set_resizable(True)
-        column.set_sort_column_id(6)
+        column.set_sort_column_id(7)
         self.tree_view.append_column(column)
         
     def _add_numeric_column(self, title: str, column_id: int, format_str: str):
@@ -138,6 +148,7 @@ class ReactionActivityTable(Gtk.ScrolledWindow):
         
         for metrics in reaction_metrics:
             self.store.append([
+                metrics.transition_id,
                 metrics.transition_name,
                 metrics.transition_type,
                 metrics.firing_count,
@@ -163,13 +174,13 @@ class ReactionActivityTable(Gtk.ScrolledWindow):
         lines = []
         
         # Header
-        lines.append("Reaction,Type,Firings,Avg Rate,Total Flux,Contribution %,Status")
+        lines.append("ID,Reaction,Type,Firings,Avg Rate,Total Flux,Contribution %,Status")
         
         # Data rows
         iter = self.store.get_iter_first()
         while iter:
             values = []
-            for i in range(7):  # All columns
+            for i in range(8):  # All columns including ID
                 values.append(str(self.store.get_value(iter, i)))
             lines.append(",".join(values))
             iter = self.store.iter_next(iter)
