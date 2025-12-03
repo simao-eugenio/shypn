@@ -1,0 +1,62 @@
+\begin{thebibliography}{10}
+
+\bibitem{cao2006efficient}
+Yang Cao, Daniel~T Gillespie, and Linda~R Petzold.
+\newblock Efficient step size selection for the tau-leaping simulation method.
+\newblock {\em The Journal of Chemical Physics}, 124(4):044109, 2006.
+
+\bibitem{chaouiya2007petri}
+Claudine Chaouiya.
+\newblock Petri net modelling of biological networks.
+\newblock {\em Briefings in Bioinformatics}, 8(4):210--219, 2007.
+
+\bibitem{elowitz2002stochastic}
+Michael~B Elowitz, Arnold~J Levine, Eric~D Siggia, and Peter~S Swain.
+\newblock Stochastic gene expression in a single cell.
+\newblock {\em Science}, 297(5584):1183--1186, 2002.
+
+\bibitem{eugenio2024weak}
+Sim{\~a}o Eug{\'e}nio.
+\newblock Weak independence in biological petri nets: Formalizing
+  non-conflicting coupling for parallel continuous simulation.
+\newblock {\em [Submitted for publication]}, November 2025.
+\newblock Under review. Introduces weak independence theory from Petri Net
+  foundations, enables parallel continuous (ODE) transitions via
+  convergent/regulatory coupling modes.
+
+\bibitem{gibson2000efficient}
+Michael~A Gibson and Jehoshua Bruck.
+\newblock Efficient exact stochastic simulation of chemical systems with many
+  species and many channels.
+\newblock {\em The Journal of Physical Chemistry A}, 104(9):1876--1889, 2000.
+
+\bibitem{gillespie1977exact}
+Daniel~T Gillespie.
+\newblock Exact stochastic simulation of coupled chemical reactions.
+\newblock {\em The Journal of Physical Chemistry}, 81(25):2340--2361, 1977.
+
+\bibitem{gillespie2001approximate}
+Daniel~T Gillespie.
+\newblock Approximate accelerated stochastic simulation of chemically reacting
+  systems.
+\newblock {\em The Journal of Chemical Physics}, 115(4):1716--1733, 2001.
+
+\bibitem{haseltine2002approximate}
+Eric~L Haseltine and James~B Rawlings.
+\newblock Approximate simulation of coupled fast and slow reactions for
+  stochastic chemical kinetics.
+\newblock {\em The Journal of Chemical Physics}, 117(15):6959--6969, 2002.
+
+\bibitem{murata1989petri}
+Tadao Murata.
+\newblock Petri nets: Properties, analysis and applications.
+\newblock {\em Proceedings of the IEEE}, 77(4):541--580, 1989.
+
+\bibitem{petri1962communication}
+Carl~Adam Petri.
+\newblock {\em Kommunikation mit Automaten}.
+\newblock PhD thesis, Universit{\"a}t Bonn, 1962.
+\newblock English translation: Communication with Automata, Technical Report
+  RADC-TR-65-377, Griffiss Air Force Base, New York, 1966.
+
+\end{thebibliography}
