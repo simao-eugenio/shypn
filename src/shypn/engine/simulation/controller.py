@@ -480,14 +480,47 @@ class SimulationController:
             
             input_arcs = behavior.get_input_arcs()
             locally_enabled = True
+            
+            # Import arc types and threshold evaluator
+            from shypn.netobjs.inhibitor_arc import InhibitorArc
+            from shypn.netobjs.curved_inhibitor_arc import CurvedInhibitorArc
+            from shypn.utils.threshold_evaluator import ThresholdEvaluator
+            
+            # Create threshold evaluator for dynamic threshold support
+            evaluator = ThresholdEvaluator(behavior.model)
+            context = {'time': self.time}
+            
             for arc in input_arcs:
                 # Check ALL arc types for enablement (normal, test, inhibitor)
-                # Test arcs check presence but don't consume (catalysts)
-                # Inhibitor arcs check surplus and do consume (cooperation)
                 source_place = behavior._get_place(arc.source_id)
-                if source_place is None or source_place.tokens < arc.weight:
+                if source_place is None:
                     locally_enabled = False
                     break
+                
+                # Evaluate effective threshold (supersedes weight if threshold is set)
+                # This supports dynamic thresholds like "ATP * 0.5" (Example 16)
+                effective_threshold = evaluator.evaluate(arc, context)
+                
+                # Test arcs (catalysts) use lower threshold for fractional enablement
+                # Allows stochastic reactions to fire even with sub-unity concentrations
+                # This prevents "oscillation trap" where smooth production below 1.0
+                # prevents stochastic transitions from ever enabling
+                if hasattr(arc, 'arc_type') and arc.arc_type == 'test':
+                    # Test arcs: Catalyst presence (lower threshold for fractional concentrations)
+                    effective_threshold = min(effective_threshold, 0.1)  # At least 10% of threshold
+                
+                # Check based on arc type
+                if isinstance(arc, (InhibitorArc, CurvedInhibitorArc)):
+                    # Inhibitor arcs: INVERTED check (enabled when tokens < threshold)
+                    # Transition DISABLED when place has too many tokens (negative feedback)
+                    if source_place.tokens >= effective_threshold:
+                        locally_enabled = False
+                        break
+                else:
+                    # Normal/Test arcs: Standard check (enabled when tokens >= threshold)
+                    if source_place.tokens < effective_threshold:
+                        locally_enabled = False
+                        break
             state = self._get_or_create_state(transition)
             
             # Debug stochastic enablement (first time only)
@@ -1593,6 +1626,11 @@ class SimulationController:
             validate([T1, T2]) → False (P3 has 0 < 1 tokens)
             validate([T1]) → True (P1 has 2 >= 1 tokens)
         """
+        # Import arc types for proper handling
+        from shypn.netobjs.inhibitor_arc import InhibitorArc
+        from shypn.netobjs.curved_inhibitor_arc import CurvedInhibitorArc
+        from shypn.netobjs.test_arc import TestArc
+        
         for transition in transition_set:
             pass
             # Find input arcs for this transition
@@ -1602,14 +1640,25 @@ class SimulationController:
                     # This is an input arc (place → transition)
                     place = arc.source
                     
-                    # Get weight/threshold
+                    # Get effective threshold for enablement check
+                    # Use threshold if set, otherwise fallback to weight
                     tokens_needed = getattr(arc, 'weight', 1)
                     if hasattr(arc, 'threshold') and arc.threshold is not None:
                         tokens_needed = arc.threshold
                     
-                    # Check sufficient tokens
-                    if place.tokens < tokens_needed:
-                        return False  # Not enough tokens
+                    # Check based on arc type
+                    if isinstance(arc, (InhibitorArc, CurvedInhibitorArc)):
+                        # Inhibitor: INVERTED check (disabled when tokens >= threshold)
+                        if place.tokens >= tokens_needed:
+                            return False  # Inhibited by excess
+                    elif isinstance(arc, TestArc):
+                        # Test arc: Check threshold but won't consume
+                        if place.tokens < tokens_needed:
+                            return False  # Catalyst not present
+                    else:
+                        # Normal: Standard check (disabled when tokens < threshold)
+                        if place.tokens < tokens_needed:
+                            return False  # Not enough tokens
             
             # Check guard condition (if any)
             if hasattr(transition, 'guard') and transition.guard is not None:
@@ -1722,6 +1771,11 @@ class SimulationController:
                 reverse=True
             )
             
+            # Import arc types for proper handling
+            from shypn.netobjs.inhibitor_arc import InhibitorArc
+            from shypn.netobjs.curved_inhibitor_arc import CurvedInhibitorArc
+            from shypn.netobjs.test_arc import TestArc
+            
             for transition in sorted_transitions:
                 pass
                 # Remove input tokens
@@ -1731,19 +1785,22 @@ class SimulationController:
                         # Input arc (place → transition)
                         place = arc.source
                         
-                        # Get weight/threshold
-                        tokens_needed = getattr(arc, 'weight', 1)
-                        if hasattr(arc, 'threshold') and arc.threshold is not None:
-                            tokens_needed = arc.threshold
+                        # Skip arcs that don't consume tokens
+                        if isinstance(arc, (InhibitorArc, CurvedInhibitorArc, TestArc)):
+                            continue  # Inhibitor and test arcs NEVER consume tokens
+                        
+                        # CRITICAL: ALWAYS use weight for consumption (NOT threshold!)
+                        # Threshold is for enablement only, weight is for token transfer
+                        tokens_consumed = getattr(arc, 'weight', 1)
                         
                         # Safety check (should not fail after validation)
-                        if place.tokens < tokens_needed:
+                        if place.tokens < tokens_consumed:
                             raise RuntimeError(
                                 f"{transition.id} cannot fire: {place.id} has "
-                                f"{place.tokens} < {tokens_needed} tokens"
+                                f"{place.tokens} < {tokens_consumed} tokens"
                             )
                         
-                        place.tokens -= tokens_needed
+                        place.tokens -= tokens_consumed
                 
                 # Execute transition behavior (if any)
                 if hasattr(transition, 'behavior') and transition.behavior is not None:
