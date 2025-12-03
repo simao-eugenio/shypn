@@ -317,9 +317,23 @@ class TestArc(Arc):
         # Draw hollow diamond at target boundary
         self._render_arrow(cr, x2, y2, dx, dy, zoom)
         
-        # Render weight label if not 1 (use boundary points for positioning)
-        if self.weight != 1:
-            self._render_weight(cr, x1, y1, x2, y2, zoom)
+        # Render threshold/weight label if different from 1
+        # For test arcs, threshold is stored in 'threshold' attribute or 'weight' as fallback
+        # This shows catalyst requirement (e.g., 0.5 for low-affinity binding)
+        threshold_value = getattr(self, 'threshold', self.weight)
+        
+        # Handle dynamic threshold formulas (strings) vs numeric thresholds
+        if threshold_value:
+            if isinstance(threshold_value, str):
+                # Dynamic threshold formula - always display
+                self._render_weight(cr, x1, y1, x2, y2, zoom)
+            elif isinstance(threshold_value, (int, float)) and abs(threshold_value - 1.0) > 1e-6:
+                # Numeric threshold different from 1 - display it
+                # Temporarily set weight to threshold for rendering
+                original_weight = self.weight
+                self.weight = threshold_value
+                self._render_weight(cr, x1, y1, x2, y2, zoom)
+                self.weight = original_weight  # Restore original weight
     
     def __repr__(self):
         """String representation for debugging.
