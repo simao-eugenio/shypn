@@ -38,7 +38,8 @@
         0.0
       ],
       "border_width": 3.0,
-      "is_catalyst": false
+      "is_catalyst": false,
+      "initial_tokens": 5.0
     },
     {
       "id": "P2",
@@ -48,7 +49,7 @@
       "x": 250.0,
       "y": -120.0,
       "radius": 30.0,
-      "marking": 0,
+      "marking": 10.0,
       "initial_marking": 10.0,
       "capacity": "Infinity",
       "border_color": [
@@ -57,7 +58,8 @@
         0.0
       ],
       "border_width": 3.0,
-      "is_catalyst": false
+      "is_catalyst": false,
+      "initial_tokens": 10.0
     },
     {
       "id": "P3",
@@ -67,7 +69,7 @@
       "x": -90.0,
       "y": 370.0,
       "radius": 30.0,
-      "marking": 0,
+      "marking": 0.1,
       "initial_marking": 0.1,
       "capacity": "Infinity",
       "border_color": [
@@ -76,7 +78,8 @@
         0.0
       ],
       "border_width": 3.0,
-      "is_catalyst": false
+      "is_catalyst": false,
+      "initial_tokens": 0.1
     },
     {
       "id": "P4",
@@ -86,7 +89,7 @@
       "x": 200.0,
       "y": 500.0,
       "radius": 30.0,
-      "marking": 10.000000000000016,
+      "marking": 10.0,
       "initial_marking": 10.0,
       "capacity": "Infinity",
       "border_color": [
@@ -95,7 +98,8 @@
         0.0
       ],
       "border_width": 3.0,
-      "is_catalyst": false
+      "is_catalyst": false,
+      "initial_tokens": 10.0
     },
     {
       "id": "P5",
@@ -105,7 +109,7 @@
       "x": 380.0,
       "y": 370.0,
       "radius": 30.0,
-      "marking": 0,
+      "marking": 0.0,
       "initial_marking": 0.0,
       "capacity": "Infinity",
       "border_color": [
@@ -114,7 +118,8 @@
         0.0
       ],
       "border_width": 3.0,
-      "is_catalyst": false
+      "is_catalyst": false,
+      "initial_tokens": 0.0
     },
     {
       "id": "P6",
@@ -133,7 +138,8 @@
         0.0
       ],
       "border_width": 3.0,
-      "is_catalyst": true
+      "is_catalyst": true,
+      "initial_tokens": 1
     },
     {
       "id": "P7",
@@ -152,7 +158,8 @@
         0.0
       ],
       "border_width": 3.0,
-      "is_catalyst": true
+      "is_catalyst": true,
+      "initial_tokens": 0
     },
     {
       "id": "P8",
@@ -171,7 +178,8 @@
         0.0
       ],
       "border_width": 3.0,
-      "is_catalyst": true
+      "is_catalyst": true,
+      "initial_tokens": 10.0
     },
     {
       "id": "P9",
@@ -181,7 +189,7 @@
       "x": 60.0,
       "y": 140.0,
       "radius": 30.0,
-      "marking": 0,
+      "marking": 10.0,
       "initial_marking": 10.0,
       "capacity": "Infinity",
       "border_color": [
@@ -190,7 +198,8 @@
         0.0
       ],
       "border_width": 3.0,
-      "is_catalyst": false
+      "is_catalyst": false,
+      "initial_tokens": 10.0
     },
     {
       "id": "P10",
@@ -200,8 +209,8 @@
       "x": 310.0,
       "y": 280.0,
       "radius": 30.0,
-      "marking": 9.999999999999998,
-      "initial_marking": 0.0,
+      "marking": 0,
+      "initial_marking": 0,
       "capacity": "Infinity",
       "border_color": [
         0.0,
@@ -209,7 +218,8 @@
         0.0
       ],
       "border_width": 3.0,
-      "is_catalyst": false
+      "is_catalyst": false,
+      "initial_tokens": 0
     },
     {
       "id": "P11",
@@ -219,8 +229,8 @@
       "x": 70.0,
       "y": 280.0,
       "radius": 30.0,
-      "marking": 9.999999999999998,
-      "initial_marking": 0.0,
+      "marking": 0,
+      "initial_marking": 0,
       "capacity": "Infinity",
       "border_color": [
         0.0,
@@ -228,7 +238,8 @@
         0.0
       ],
       "border_width": 3.0,
-      "is_catalyst": false
+      "is_catalyst": false,
+      "initial_tokens": 0
     },
     {
       "id": "P12",
@@ -238,8 +249,8 @@
       "x": 610.0,
       "y": 0.0,
       "radius": 30.0,
-      "marking": 10.0,
-      "initial_marking": 0.0,
+      "marking": 0,
+      "initial_marking": 0,
       "capacity": "Infinity",
       "border_color": [
         0.0,
@@ -247,7 +258,8 @@
         0.0
       ],
       "border_width": 3.0,
-      "is_catalyst": false
+      "is_catalyst": false,
+      "initial_tokens": 0
     }
   ],
   "transitions": [
@@ -369,7 +381,9 @@
       "is_source": false,
       "is_sink": false,
       "guard": 1,
-      "rate": "0.01 + 0.5 * CRP_cAMP"
+      "properties": {
+        "rate_function": "0.01 + 0.5 * CRP_cAMP"
+      }
     },
     {
       "id": "T5",
@@ -399,7 +413,9 @@
       "is_source": false,
       "is_sink": false,
       "guard": 1,
-      "rate": "0.1 * mRNA_lac"
+      "properties": {
+        "rate_function": "0.1 * mRNA_lac"
+      }
     },
     {
       "id": "T6",
@@ -429,7 +445,9 @@
       "is_source": false,
       "is_sink": false,
       "guard": 1,
-      "rate": "0.23 * mRNA_lac"
+      "properties": {
+        "rate_function": "0.23 * mRNA_lac"
+      }
     },
     {
       "id": "T7",
@@ -453,7 +471,7 @@
         0.0
       ],
       "border_width": 2.0,
-      "transition_type": "immediate",
+      "transition_type": "continuous",
       "priority": 0,
       "firing_policy": "race",
       "is_source": false,

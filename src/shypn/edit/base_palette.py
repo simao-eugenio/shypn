@@ -95,6 +95,9 @@ class BasePalette(GObject.GObject, ABC, metaclass=GObjectABCMeta):
         self.event_box.get_style_context().add_class(f"palette-{self.palette_id}")
         self.event_box.get_style_context().add_class("floating-palette")
         self.event_box.set_visible(True)  # Event box must be visible
+        # Allow EventBox to be resized freely to avoid GTK warnings
+        self.event_box.set_can_focus(False)
+        self.event_box.set_above_child(False)
         
         # Create content box for widgets
         self.content_box = Gtk.Box(orientation=self._orientation, spacing=6)

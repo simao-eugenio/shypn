@@ -1,0 +1,73 @@
+Dear Editor,
+
+I am pleased to submit our manuscript entitled "Weak Independence and Coupled Parallelism in Biological Petri Nets" for consideration as an Original Paper in Bioinformatics.
+
+SIGNIFICANCE AND SCOPE
+
+This manuscript addresses a fundamental limitation in computational systems biology: the gap between classical Petri net theory and the biological reality of metabolic networks. Our work fits within the "Systems Biology" scope of Bioinformatics, specifically addressing pathway modeling, simulation, and analysis.
+
+The key contribution is the formalization of "weak independence"—a novel concept that distinguishes genuine resource conflicts from biological coupling in Petri nets. This enables parallel simulation of biochemical pathways that classical theory would forbid, achieving 2-4× speedup while maintaining biological correctness.
+
+NOVEL CONTRIBUTIONS
+
+1. **Theoretical Foundation**: We extend Bio-PNs from a 5-tuple to a 12-tuple formalism, adding regulatory structure (Σ), environmental exchange classification (Θ), dependency taxonomy (Δ), transition type heterogeneity (τ), and biochemical formula tracking (ρ).
+
+2. **Practical Validation**: Analysis of 100 curated BioModels demonstrates that 60-80% of apparent dependencies are actually weakly independent, enabling coupled parallelism.
+
+3. **Implementation**: Open-source tool (SHYpn) with biological topology analyzers that reduce false positives from 70% (classical analysis) to 5% (biological analysis).
+
+BIOLOGICAL RELEVANCE
+
+The work addresses real biological phenomena: convergent production (multiple pathways producing the same metabolite), regulatory coupling (enzyme-catalyzed reactions), and competitive consumption. These are ubiquitous in central metabolism, gene regulation, and signaling pathways.
+
+COMPUTATIONAL IMPACT
+
+Genome-scale metabolic reconstructions contain 2,000+ reactions, and sequential simulation is prohibitively expensive for parameter sweeps and sensitivity analyses. Our approach enables parallel execution while respecting biological constraints.
+
+ORIGINALITY AND COMPARISON
+
+This is original work not under consideration elsewhere. We compare extensively with state-of-the-art tools (Snoopy, Cell Illustrator, Charlie, COPASI) and demonstrate that SHYpn is the first to combine weak independence analysis, biological coupling classification, and parallel simulation capabilities.
+
+SOFTWARE AVAILABILITY
+
+The open-source implementation is available at https://github.com/simao-eugenio/shypn under MIT License. The software has been tested on multiple platforms (Linux, macOS, Windows/WSL), includes comprehensive documentation, and will be maintained for at least 3 years following publication.
+
+DATA AVAILABILITY
+
+All validation data comes from publicly available BioModels (https://www.ebi.ac.uk/biomodels/). Specific model identifiers are provided in the manuscript, and analysis scripts will be deposited in the GitHub repository upon acceptance.
+
+MANUSCRIPT SPECIFICATIONS
+
+- Type: Original Paper
+- Length: 7 pages (within journal limits)
+- Category: Systems Biology
+- Structured abstract: Motivation, Results, Availability and Implementation
+- Real biological data: 100 BioModels analyzed
+- Comparison with existing methods: Comprehensive table and discussion
+- Format: Two-column LaTeX following Bioinformatics template
+
+AUTHOR CONTRIBUTIONS
+
+As sole author, I am responsible for all aspects of this work: conceptualization, methodology development, software implementation, validation, and manuscript preparation.
+
+CONFLICTS OF INTEREST
+
+I declare no conflicts of interest.
+
+FUNDING
+
+This work was conducted as part of my research activities at Universidade Federal de Santa Catarina. No external funding was received for this specific work.
+
+I believe this manuscript makes a significant contribution to computational systems biology by bridging the gap between formal methods and biological reality. The weak independence framework enables more efficient simulation while improving the biological accuracy of pathway analysis.
+
+Thank you for considering our manuscript. I look forward to your response and am available to address any questions during the review process.
+
+Sincerely,
+
+Eugênio Simão, Ph.D.
+Universidade Federal de Santa Catarina
+UFSC - Araranguá - Brazil
+eugenio.simao@ufsc.br
+
+ORCID:https://orcid.org/0000-0001-9446-2596
+

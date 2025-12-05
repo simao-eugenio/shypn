@@ -1,0 +1,198 @@
+Koch, I., Heiner, M.: Petri nets. In: Junker, B.H., Schreiber, F. (eds.)
+Biological Network Analysis, Wiley Book Series on Bioinformatics, pp.
+139–180. Wiley, New York (2008). Chapter 7
+
+Koch, I., Junker, B.H., Heiner, M.: Application of Petri net theory for
+modelling and validation of the sucrose breakdown pathway in the potato
+tuber. Bioinformatics 21(7), 1219–1226 (2005)
+
+Matsuno, H., Fujita, S., Doi, A., Nagasaki, M., Miyano, S.: Towards
+biopathway modeling and simulation. In: Proc. ICATPN 2003. LNCS, vol.
+2679, pp. 3–22. Springer, Berlin (2003)
+
+Matsuno, H., Doi, A., Nagasaki, M., Miyano, S.: Hybrid Petri Net
+Representation of Gene Regulatory Network. In: Proceedings Pacific
+Symposium Biocomputing 2000, vol. 5, pp. 338–349 (2000)
+
+Matsuno, H., Tanaka, Y., Aoshima, H., Doi, A., Matsui, M., Miyano, S.:
+Biopathway representation and simulation on hybrid functional Petri net. In
+Silico Biology 3(3), 389–404 (2003)
+
+Matsuno, H., Inouye, S.-I.T., Okitsu, Y., Fujii, Y., Miyano, S.: A new
+regulatory interaction suggested by simulations for circadian genetic
+control mechanism in mammals. J. Bioinf. Comput. Biol. 4(1), 139–153
+(2006)
+
+Petri, C.A.: Communication with automata. Institut für Instrumentelle
+Mathematik, Bonn: Schriften des IIM 3 (1962) (in German)
+
+Popova-Zeugmann, L., Heiner, M., Koch, I.: Time Petri nets for modelling
+and analysis of biochemical networks. Fundam. Inform. 67, 149–162
+(2005)
+
+Reddy, V.N., Mavrovouniotis, M.L., Liebman, M.N.: Petri net
+representation in metabolic pathways. In: Proc. Int. Conf. Intell. Syst. Mol.
+57 Biol., vol. 1, pp. 328–336. MIT Press, Cambridge (1993)
+
+Sackmann, A., Heiner, M., Koch, I.: Application of Petri net based analysis
+techniques to signal transduction pathways. BMC Bioinform. 7(1), 482
+(2006)
+
+Windhager, L., Zimmer, R.: Intuitive modeling of dynamic systems with
+Petri nets and fuzzy logic. In: Proceedings German Conference on
+Bioinformatics. Lecture Notes in Informatics, pp. 106–115. Gesellschaft
+für Informatik, Bonn (2008)
+
+Chaouiya, C.: Petri net modelling of biological networks. Brief. Bioinform.
+8(4), 210–219 (2007)
+
+David, R., Alla, H.: Discrete, Continuous, and Hybrid Petri Nets. Springer,
+Berlin (2005)
+Gilbert, D., Heiner, M.: From Petri nets to differential equations—an
+integrative approach for biochemical network analysis. In: Petri Nets and
+Other Models of Concurrency. LNCS, vol. 4024, pp. 181–200. Springer,
+Berlin (2006)
+
+Heiner, M., Koch, I.: Petri net based model validation in systems biology.
+In: Applications and Theory of Petri Nets. LCNS, vol. 3099, pp. 216–237.
+Springer, Berlin (2004)
+
+Heiner, M., Koch, I., Will, J.: Model validation of biological pathways
+using Petri nets—demonstrated for apoptosis. Biosystems 75(1), 15–28
+(2004)
+
+Koch, I.: Petri nets and GRN Models. In: Das, S., Caragea, D., Hsu, W.H.,
+Welch, S.M. (eds.): Handbook of Research on Computational
+Methodologies in Gene Regulatory Networks, pp. 604–637. IGI Global,
+Hershey–New York (2010). Chapter 25
+
+Koch, I., Heiner, M.: Petri nets. In: Junker, B.H., Schreiber, F. (eds.)
+Biological Network Analysis, Wiley Book Series on Bioinformatics, pp.
+139–180. Wiley, New York (2008). Chapter 7
+
+Koch, I., Junker, B.H., Heiner, M.: Application of Petri net theory for
+modelling and validation of the sucrose breakdown pathway in the potato
+tuber. Bioinformatics 21(7), 1219–1226 (2005)
+
+Nagasaki, M., Doi, A., Matsuno, H., Miyano, S.: Petri net based description
+and modeling of biological pathways. In: Algebraic Biology 2005: Proc. of
+the 1st International Conference on Algebraic Biology—Computer Algebra
+in Biology, pp. 19–31. Universal Acad. Press, Tokyo (2005)
+
+Sackmann, A., Heiner, M., Koch, I.: Application of Petri net based analysis
+techniques to signal transduction pathways. BMC Bioinform. 7(1), 482
+(2006)
+
+Sackmann, A., Formanowicz, D., Formanowicz, P., Blazewicz, J.: New
+insights into the human body iron metabolism analyzed by a Petri net based
+approach. Biosystems 96(1), 104–113 (2009)
+
+Schilling, C.H., Letscher, D., Palsson, B.Ø.: Theory for the systemic
+definition of metabolic pathways and their use in interpreting metabolic
+function from a pathway-oriented perspective. J. Theor. Biol. 203(3), 229–
+248 (2000)
+
+Chaouiya, C., Remy, E., Ruet, P., Thieffry, D.: Qualitative modelling of
+genetic networks: from logical regulatory graphs to standard Petri nets. In:
+LNCS, vol. 3099, pp. 137–156. Springer, Berlin (2004)
+
+Chaouiya, C., Remy, E., Thieffry, D.: Qualitative Petri net modelling of
+genetic networks. In: Trans. Comp. Syst. Biol. VI. LNCS, vol. 4220, pp.
+95–112. Springer, Berlin (2006)
+
+Chaouiya, C., Remy, E., Thieffry, D.: Petri net modelling of biological
+regulatory networks. J. Discret. Algorithms 6(2), 165–177 (2008)
+
+Hardy, S., Robillard, P.N.: Modeling and simulation of molecular biology
+systems using Petri nets: modeling goals of various approaches. J.
+Bioinform. Comput. Biol. 2(4), 619–637 (2004)
+
+Matsuno, H., Tanaka, Y., Aoshima, H., Doi, A., Matsui, M., Miyano, S.:
+Biopathways representation and simulation on hybrid functional Petri net.
+In Silico Biol. 3(3), 389–404 (2003)
+
+Reisig, W.: Petri nets: an introduction. In: Brauer, W., et al. (eds.) EATCS
+Monographs on Theoretical Computer Science. Springer, Berlin (1985)
+
+Remy, E., Ruet, P., Mendoza, L., Thieffry, D., Chaouiya, C.: From logical
+regulatory graphs to standard Petri nets: dynamical roles of functionality of
+feedback circuits. Concurr. Models Molec. Biol. 4230, 52–72 (2004)
+
+Simão, E., Remy, E., Thieffry, D., Chaouiya, C.: Qualitative modelling of
+regulated metabolic pathways: application to the tryptophan biosynthesis in
+E. Coli. Bioinformatics 21(2), ii190–ii196 (2005)
+
+Steggles, L.J., Banks, R., Shaw, O., Wipat, A.: Qualitatively modelling and
+analysing genetic regulatory networks: a Petri net approach. Bioinformatics
+23(3), 336–343 (2007)
+
+Alla, H., David, R.: Continuous and hybrid Petri nets. JCSC 8, 159–188
+(1998)
+
+Doi, A., Nagasaki, M., Fujita, S., Matsuno, H., Miyano, S.: Abstract
+Genomic Object Net: II. Modelling biopathways by hybrid functional Petri
+net with extension. Appl. Bioinform. 2(3), 185–188 (2003)
+
+Goss, P.J.E., Peccoud, J.: Quantitative modeling of stochastic systems in
+molecular biology by using stochastic Petri nets. Proc. Natl. Acad. Sci.
+USA. 95(12), 6750–6755 (1998)
+
+Hofestädt, R., Thelen, S.: Quantitative modeling of biochemical networks.
+In Silico Biol. 1, 39–53 (1998)
+
+Nagasaki, M., Doi, A., Matsuno, H., Miyano, S.: Computational modeling
+of biological processes with Petri net based architecture. In: Chen, Y.P.
+(ed.) Bioinformatics Technologies, pp. 179–243. Springer, Berlin (2005)
+
+
+Voss, K., Heiner, M., Koch, I.: Steady state analysis of metabolic pathways
+using Petri nets. In Silico Biol. 3, 367–387 (2003)
+
+Chiola, G., Dutheillet, C., Franceschinis, G., Haddad, S.: Stochastic well-
+formed colored nets and symmetric modeling applications. IEEE Trans.
+Comput. 42(11), 1343–1360 (1993)
+
+Ciardo, G., Muppala, J.K., Trivedi, K.S.: Stochastic Petri net package. In:
+Intern. Workshop on Petri Nets and Performance Models (PNPM’89), pp. 142–
+151 (1989)
+
+
+Gillespie, D.T.: A general method for numerically simulating the stochastic
+time evolution of coupled chemical reactions. J. Comput. Phys. 22(4), 403–
+434 (1976)
+
+Gillespie, D.T.: Exact stochastic simulation of coupled chemical reactions. J.
+Phys. Chem. 81(25), 2340–2361 (1977)
+
+Goss, P.J.E., Peccoud, J.: Quantitative modeling of stochastic systems in
+molecular biology by using stochastic Petri nets. Proc. Natl. Acad. Sci. USA.
+95(12), 6750–6755 (1998)
+
+Hardy, S., Robillard, P.N.: Modeling and simulation of molecular biology
+systems using Petri nets: modeling goals of various approaches. J. Bioinform.
+Comput. Biol. 2(4), 619–637 (2004)
+
+McColluma, J.M., Peterson, G.D., Cox, C.D., Simpson, M.L., Samatova, N.F.:
+The sorting direct method for stochastic simulation of biochemical systems
+with varying reaction execution behavior. Comput. Biol. Chem. 30(1), 29–39
+(2006)
+
+Meyer, J.F., Movaghar, A., Sanders, W.H.: Stochastic Activity Networks:
+Structure, Behavior, and Application. In: International Workshop on Timed
+Petri Nets, pp. 106–115. IEEE Comput. Soc., Los Alamitos (1985)
+
+
+Alves, R., Antunes, F., Salvador, A.: Tools for kinetic modelling of
+biochemical networks. Nat. Biotechnol. 24, 667–672 (2006)
+
+Atkins, P.W., De Paula, J.: Physical Chemistry, 7th edn. John Wiley, New
+York (2002)
+
+Goodrich, J.A., Kugel, J.F.: Binding and Kinetics for Molecular Biologists.
+Cold Spring Harbor Laboratory Press, Cold Spring Harbor (2007)
+
+Gilbert, D., Heiner, M.: From Petri nets to differential equations—an
+integrative approach for biochemical network analysis. In: Petri Nets and
+Other Models of Concurrency. LNCS, vol. 4024, pp. 181–200. Springer,
+Berlin (2006)
+
