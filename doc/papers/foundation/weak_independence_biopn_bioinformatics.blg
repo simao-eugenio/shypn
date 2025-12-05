@@ -3,44 +3,44 @@ Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
 The top-level auxiliary file: weak_independence_biopn_bioinformatics.aux
 The style file: plain.bst
 Database file #1: ../references.bib
-You've used 18 entries,
+You've used 15 entries,
             2118 wiz_defined-function locations,
-            635 strings with 7520 characters,
-and the built_in function-call counts, 7304 in all, are:
-= -- 702
-> -- 440
+            618 strings with 7182 characters,
+and the built_in function-call counts, 5996 in all, are:
+= -- 587
+> -- 331
 < -- 3
-+ -- 176
-- -- 156
-* -- 605
-:= -- 1241
-add.period$ -- 56
-call.type$ -- 18
-change.case$ -- 127
++ -- 133
+- -- 116
+* -- 490
+:= -- 1008
+add.period$ -- 47
+call.type$ -- 15
+change.case$ -- 99
 chr.to.int$ -- 0
-cite$ -- 18
-duplicate$ -- 226
-empty$ -- 500
-format.name$ -- 156
-if$ -- 1469
+cite$ -- 15
+duplicate$ -- 191
+empty$ -- 427
+format.name$ -- 116
+if$ -- 1215
 int.to.chr$ -- 0
-int.to.str$ -- 18
-missing$ -- 22
-newline$ -- 93
-num.names$ -- 36
-pop$ -- 118
+int.to.str$ -- 15
+missing$ -- 17
+newline$ -- 78
+num.names$ -- 30
+pop$ -- 88
 preamble$ -- 1
-purify$ -- 111
+purify$ -- 86
 quote$ -- 0
-skip$ -- 146
+skip$ -- 125
 stack$ -- 0
-substring$ -- 471
-swap$ -- 37
+substring$ -- 425
+swap$ -- 34
 text.length$ -- 3
 text.prefix$ -- 0
 top$ -- 0
-type$ -- 64
+type$ -- 56
 warning$ -- 0
-while$ -- 65
-width$ -- 20
-write$ -- 206
+while$ -- 57
+width$ -- 17
+write$ -- 171
