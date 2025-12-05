@@ -222,6 +222,18 @@ class SimulateToolsPaletteLoader(GObject.GObject):
             self.dt_auto_radio = settings_builder.get_object('dt_auto_radio')
             self.dt_manual_radio = settings_builder.get_object('dt_manual_radio')
             self.dt_manual_entry = settings_builder.get_object('dt_manual_entry')
+            
+            # τ-Leaping controls
+            self.tau_leaping_check = settings_builder.get_object('tau_leaping_check')
+            self.tau_epsilon_entry = settings_builder.get_object('tau_epsilon_entry')
+            self.critical_threshold_entry = settings_builder.get_object('critical_threshold_entry')
+            self.parallel_stochastic_check = settings_builder.get_object('parallel_stochastic_check')
+            
+            # Ensure manual entry is editable (critical fix)
+            if self.dt_manual_entry:
+                self.dt_manual_entry.set_editable(True)
+                self.dt_manual_entry.set_can_focus(True)
+            
             self.settings_apply_button = None  # Removed from parameters panel
             self.settings_reset_button = None  # Removed from parameters panel
             
@@ -305,11 +317,25 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         # Wire time step radio buttons (immediate atomic update)
         if self.dt_auto_radio:
             self.dt_auto_radio.connect('toggled', self._on_dt_mode_changed)
+        if self.dt_manual_radio:
+            self.dt_manual_radio.connect('toggled', self._on_dt_mode_changed)
         
         # Wire manual time step entry (debounced atomic update)
         if self.dt_manual_entry:
             self.dt_manual_entry.connect('changed', self._on_dt_entry_changed)
             self.dt_manual_entry.connect('activate', self._on_dt_entry_activate)
+        
+        # Wire τ-leaping controls
+        if self.tau_leaping_check:
+            self.tau_leaping_check.connect('toggled', self._on_tau_leaping_toggled)
+        if self.tau_epsilon_entry:
+            self.tau_epsilon_entry.connect('changed', self._on_tau_epsilon_changed)
+            self.tau_epsilon_entry.connect('activate', self._on_tau_epsilon_activate)
+        if self.critical_threshold_entry:
+            self.critical_threshold_entry.connect('changed', self._on_critical_threshold_changed)
+            self.critical_threshold_entry.connect('activate', self._on_critical_threshold_activate)
+        if self.parallel_stochastic_check:
+            self.parallel_stochastic_check.connect('toggled', self._on_parallel_stochastic_toggled)
     
     def _on_speed_changed(self, spin):
         """Handle playback speed spinner change (atomic).
@@ -358,9 +384,10 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         
         # Commit atomically
         if self.buffered_settings.commit():
-            # Update entry sensitivity
+            # Update entry sensitivity and ensure it's editable
             if self.dt_manual_entry:
                 self.dt_manual_entry.set_sensitive(not is_auto)
+                self.dt_manual_entry.set_editable(True)
             
             self.emit('settings-changed')
         else:
@@ -440,6 +467,170 @@ class SimulateToolsPaletteLoader(GObject.GObject):
             entry.get_style_context().remove_class('error')
         return False  # One-shot timer
     
+    # ========== τ-Leaping Control Handlers ==========
+    
+    def _on_tau_leaping_toggled(self, check_button):
+        """Handle τ-leaping checkbox toggle (atomic)."""
+        if not self.simulation or not self.buffered_settings:
+            return
+        
+        enabled = check_button.get_active()
+        
+        # Write to buffer
+        self.buffered_settings.buffer.use_tau_leaping = enabled
+        self.buffered_settings.mark_dirty()
+        
+        # Commit atomically
+        if self.buffered_settings.commit():
+            # Update UI sensitivity
+            if self.tau_epsilon_entry:
+                self.tau_epsilon_entry.set_sensitive(enabled)
+            if self.critical_threshold_entry:
+                self.critical_threshold_entry.set_sensitive(enabled)
+            if self.parallel_stochastic_check:
+                self.parallel_stochastic_check.set_sensitive(enabled)
+            
+            self.emit('settings-changed')
+        else:
+            # Validation failed - restore previous state
+            check_button.set_active(self.simulation.settings.use_tau_leaping)
+    
+    def _on_tau_epsilon_changed(self, entry):
+        """Handle epsilon entry change (debounced)."""
+        # Cancel pending timer
+        if self._debounce_timer:
+            GLib.source_remove(self._debounce_timer)
+        
+        # Schedule update after 500ms of no typing
+        self._debounce_timer = GLib.timeout_add(500, self._apply_tau_epsilon_value, entry)
+    
+    def _on_tau_epsilon_activate(self, entry):
+        """Handle epsilon entry activation (Enter key) - immediate."""
+        if self._debounce_timer:
+            GLib.source_remove(self._debounce_timer)
+            self._debounce_timer = None
+        
+        self._apply_tau_epsilon_value(entry)
+    
+    def _apply_tau_epsilon_value(self, entry):
+        """Apply epsilon entry value atomically."""
+        self._debounce_timer = None
+        
+        if not self.simulation or not self.buffered_settings:
+            return False
+        
+        try:
+            text = entry.get_text().strip()
+            value = float(text)
+            
+            # Validate range
+            if not 0 < value <= 1:
+                entry.get_style_context().add_class('error')
+                GLib.timeout_add(2000, self._restore_tau_epsilon_value, entry)
+                return False
+            
+            # Write to buffer
+            self.buffered_settings.buffer.tau_epsilon = value
+            self.buffered_settings.mark_dirty()
+            
+            # Commit atomically
+            if self.buffered_settings.commit():
+                entry.get_style_context().remove_class('error')
+                self.emit('settings-changed')
+            else:
+                entry.get_style_context().add_class('error')
+                GLib.timeout_add(2000, self._restore_tau_epsilon_value, entry)
+        
+        except ValueError:
+            entry.get_style_context().add_class('error')
+            GLib.timeout_add(2000, self._restore_tau_epsilon_value, entry)
+        
+        return False
+    
+    def _restore_tau_epsilon_value(self, entry):
+        """Restore epsilon to valid value after error."""
+        if self.simulation:
+            entry.set_text(str(self.simulation.settings.tau_epsilon))
+            entry.get_style_context().remove_class('error')
+        return False
+    
+    def _on_critical_threshold_changed(self, entry):
+        """Handle critical threshold entry change (debounced)."""
+        if self._debounce_timer:
+            GLib.source_remove(self._debounce_timer)
+        
+        self._debounce_timer = GLib.timeout_add(500, self._apply_critical_threshold_value, entry)
+    
+    def _on_critical_threshold_activate(self, entry):
+        """Handle critical threshold entry activation (Enter key) - immediate."""
+        if self._debounce_timer:
+            GLib.source_remove(self._debounce_timer)
+            self._debounce_timer = None
+        
+        self._apply_critical_threshold_value(entry)
+    
+    def _apply_critical_threshold_value(self, entry):
+        """Apply critical threshold entry value atomically."""
+        self._debounce_timer = None
+        
+        if not self.simulation or not self.buffered_settings:
+            return False
+        
+        try:
+            text = entry.get_text().strip()
+            value = float(text)
+            
+            # Validate range
+            if value <= 0:
+                entry.get_style_context().add_class('error')
+                GLib.timeout_add(2000, self._restore_critical_threshold_value, entry)
+                return False
+            
+            # Write to buffer
+            self.buffered_settings.buffer.critical_threshold = value
+            self.buffered_settings.mark_dirty()
+            
+            # Commit atomically
+            if self.buffered_settings.commit():
+                entry.get_style_context().remove_class('error')
+                self.emit('settings-changed')
+            else:
+                entry.get_style_context().add_class('error')
+                GLib.timeout_add(2000, self._restore_critical_threshold_value, entry)
+        
+        except ValueError:
+            entry.get_style_context().add_class('error')
+            GLib.timeout_add(2000, self._restore_critical_threshold_value, entry)
+        
+        return False
+    
+    def _restore_critical_threshold_value(self, entry):
+        """Restore critical threshold to valid value after error."""
+        if self.simulation:
+            entry.set_text(str(self.simulation.settings.critical_threshold))
+            entry.get_style_context().remove_class('error')
+        return False
+    
+    def _on_parallel_stochastic_toggled(self, check_button):
+        """Handle parallel stochastic checkbox toggle (atomic)."""
+        if not self.simulation or not self.buffered_settings:
+            return
+        
+        enabled = check_button.get_active()
+        
+        # Write to buffer
+        self.buffered_settings.buffer.use_parallel_stochastic = enabled
+        self.buffered_settings.mark_dirty()
+        
+        # Commit atomically
+        if self.buffered_settings.commit():
+            self.emit('settings-changed')
+        else:
+            # Validation failed - restore previous state
+            check_button.set_active(self.simulation.settings.use_parallel_stochastic)
+    
+    # ========== UI Synchronization ==========
+    
     def _sync_settings_to_ui(self):
         """Synchronize current simulation settings to UI controls.
         
@@ -465,6 +656,23 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         if self.dt_manual_entry:
             self.dt_manual_entry.set_text(str(settings.dt_manual))
             self.dt_manual_entry.set_sensitive(not settings.dt_auto)
+            self.dt_manual_entry.set_editable(True)
+        
+        # Update τ-leaping controls
+        if self.tau_leaping_check:
+            self.tau_leaping_check.set_active(settings.use_tau_leaping)
+        
+        if self.tau_epsilon_entry:
+            self.tau_epsilon_entry.set_text(str(settings.tau_epsilon))
+            self.tau_epsilon_entry.set_sensitive(settings.use_tau_leaping)
+        
+        if self.critical_threshold_entry:
+            self.critical_threshold_entry.set_text(str(settings.critical_threshold))
+            self.critical_threshold_entry.set_sensitive(settings.use_tau_leaping)
+        
+        if self.parallel_stochastic_check:
+            self.parallel_stochastic_check.set_active(settings.use_parallel_stochastic)
+            self.parallel_stochastic_check.set_sensitive(settings.use_tau_leaping)
     
     def _hide_settings_panel(self):
         """Hide the settings panel with animation.

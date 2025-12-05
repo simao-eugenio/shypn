@@ -211,6 +211,10 @@ class SimulationController:
         self.transition_states.clear()
         self._round_robin_index = 0
         
+        # Reset τ-leaping engine (if it exists)
+        if hasattr(self, '_tau_leaping_engine'):
+            delattr(self, '_tau_leaping_engine')
+        
         # Reinitialize model adapter with current model
         from shypn.engine.simulation.model_adapter import ModelAdapter
         self.model_adapter = ModelAdapter(self.model, controller=self)
@@ -476,16 +480,60 @@ class SimulationController:
             
             input_arcs = behavior.get_input_arcs()
             locally_enabled = True
+            
+            # Import arc types and threshold evaluator
+            from shypn.netobjs.inhibitor_arc import InhibitorArc
+            from shypn.netobjs.curved_inhibitor_arc import CurvedInhibitorArc
+            from shypn.utils.threshold_evaluator import ThresholdEvaluator
+            
+            # Create threshold evaluator for dynamic threshold support
+            evaluator = ThresholdEvaluator(behavior.model)
+            context = {'time': self.time}
+            
             for arc in input_arcs:
-                pass
                 # Check ALL arc types for enablement (normal, test, inhibitor)
-                # Test arcs check presence but don't consume (catalysts)
-                # Inhibitor arcs check surplus and do consume (cooperation)
                 source_place = behavior._get_place(arc.source_id)
-                if source_place is None or source_place.tokens < arc.weight:
+                if source_place is None:
                     locally_enabled = False
                     break
+                
+                # Evaluate effective threshold (supersedes weight if threshold is set)
+                # This supports dynamic thresholds like "ATP * 0.5" (Example 16)
+                effective_threshold = evaluator.evaluate(arc, context)
+                
+                # Test arcs (catalysts) use lower threshold for fractional enablement
+                # Allows stochastic reactions to fire even with sub-unity concentrations
+                # This prevents "oscillation trap" where smooth production below 1.0
+                # prevents stochastic transitions from ever enabling
+                if hasattr(arc, 'arc_type') and arc.arc_type == 'test':
+                    # Test arcs: Catalyst presence (lower threshold for fractional concentrations)
+                    effective_threshold = min(effective_threshold, 0.1)  # At least 10% of threshold
+                
+                # Check based on arc type
+                if isinstance(arc, (InhibitorArc, CurvedInhibitorArc)):
+                    # Inhibitor arcs: INVERTED check (enabled when tokens < threshold)
+                    # Transition DISABLED when place has too many tokens (negative feedback)
+                    if source_place.tokens >= effective_threshold:
+                        locally_enabled = False
+                        break
+                else:
+                    # Normal/Test arcs: Standard check (enabled when tokens >= threshold)
+                    if source_place.tokens < effective_threshold:
+                        locally_enabled = False
+                        break
             state = self._get_or_create_state(transition)
+            
+            # Debug stochastic enablement (first time only)
+            if transition.transition_type == 'stochastic':
+                if locally_enabled and state.enablement_time is None:
+                    if not hasattr(self, f'_first_enable_{transition.id}'):
+                        print(f"✅ Enabling stochastic {transition.name} at t={self.time:.3f}")
+                        for arc in input_arcs:
+                            sp = behavior._get_place(arc.source_id)
+                            if sp:
+                                print(f"   {sp.name}: {sp.tokens:.1f} >= {arc.weight}")
+                        setattr(self, f'_first_enable_{transition.id}', True)
+            
             if locally_enabled:
                 if state.enablement_time is None:
                     state.enablement_time = self.time
@@ -864,16 +912,78 @@ class SimulationController:
             self._update_enablement_states()  # Update after firing
         
         # Phase 2b: Stochastic transitions (PROBABILISTIC - LOWER PRIORITY)
-        # Only execute if NO timed transitions fired (timed has priority)
-        elif not discrete_fired:  # Changed: only if no timed fired
+        # Execute if NO timed transitions fired (timed has priority)
+        # NOTE: Stochastic CAN fire alongside continuous (they operate on different time scales)
+        if not discrete_fired:  # Only if no timed fired
             stochastic_transitions = [t for t in self.model.transitions if t.transition_type == 'stochastic']
             enabled_stochastic = [t for t in stochastic_transitions if self._is_transition_enabled(t)]
+            
             if enabled_stochastic:
-                pass
-                # Select and fire one stochastic transition (may have conflicts among stochastic)
-                transition = self._select_transition(enabled_stochastic)
-                self._fire_transition(transition)
-                discrete_fired = True
+                # ALWAYS use τ-leaping for mixed models (continuous + stochastic)
+                # This ensures stochastic transitions fire within the fixed time step
+                # without breaking the continuous integration schedule
+                if self.settings.use_tau_leaping or continuous_active > 0:
+                    # Use τ-leaping approximate simulation
+                    from .tau_leaping import TauLeapingEngine
+                    
+                    if not hasattr(self, '_tau_leaping_engine'):
+                        self._tau_leaping_engine = TauLeapingEngine(
+                            epsilon=self.settings.tau_epsilon,
+                            critical_threshold=self.settings.critical_threshold,
+                            max_tau=self.settings.max_tau,
+                            seed=None,  # Use default random seed
+                            use_parallel=self.settings.use_parallel_stochastic
+                        )
+                        self._tau_leaping_engine.leap_selector.min_tau = self.settings.min_tau
+                        # Config printed once at initialization (commented out for cleaner output)
+                        # print(f"🔧 τ-leaping config: epsilon={self.settings.tau_epsilon}, max_tau={self.settings.max_tau}, min_tau={self.settings.min_tau}")
+                    
+                    # Debug: Print propensities before τ-leaping (commented out - working correctly)
+                    # if not hasattr(self, '_tau_debug_count'):
+                    #     self._tau_debug_count = 0
+                    # 
+                    # if self._tau_debug_count < 3:
+                    #     self._tau_debug_count += 1
+                    #     print(f"\n🔬 τ-leaping attempt {self._tau_debug_count} at t={self.time:.3f}:")
+                    #     for t in enabled_stochastic:
+                    #         behavior = self._get_behavior(t)
+                    #         try:
+                    #             prop = behavior._evaluate_rate_at_enablement(self.time)
+                    #             print(f"   {t.name}: propensity={prop:.6f}")
+                    #         except:
+                    #             print(f"   {t.name}: propensity=ERROR")
+                    #     print(f"   time_step={time_step}")
+                    
+                    # Execute τ-leaping step with current time_step as max tau
+                    # This ensures stochastic events happen within the current step
+                    original_max_tau = self._tau_leaping_engine.leap_selector.max_tau
+                    self._tau_leaping_engine.leap_selector.max_tau = min(time_step, original_max_tau)
+                    
+                    self._tau_leaping_engine.execute_step(self)
+                    discrete_fired = True
+                    
+                    # Restore original max_tau
+                    self._tau_leaping_engine.leap_selector.max_tau = original_max_tau
+                else:
+                    # Pure stochastic model: Use exact SSA (can advance time freely)
+                    # Find transition with earliest scheduled fire time
+                    next_transition = None
+                    next_fire_time = float('inf')
+                    
+                    for transition in enabled_stochastic:
+                        behavior = self._get_behavior(transition)
+                        fire_time = behavior.get_scheduled_fire_time()
+                        if fire_time is not None and fire_time < next_fire_time:
+                            next_fire_time = fire_time
+                            next_transition = transition
+                    
+                    if next_transition and next_fire_time < float('inf'):
+                        # Advance time to next firing (only safe in pure stochastic models)
+                        self.time = next_fire_time
+                        
+                        # Fire the transition
+                        self._fire_transition(next_transition)
+                        discrete_fired = True
         
         self._notify_step_listeners()
         
@@ -950,9 +1060,12 @@ class SimulationController:
         output_arcs = behavior.get_output_arcs()
         success, details = behavior.fire(input_arcs, output_arcs)
         if success:
-            pass
             # Increment firing count for statistics
             transition.firing_count += 1
+            
+            # Notify console when stochastic transitions fire (first 10 times)
+            if transition.transition_type == 'stochastic' and transition.firing_count <= 10:
+                print(f"🔥 Stochastic {transition.name} fired at t={self.time:.3f} (count={transition.firing_count})")
             
             state = self._get_or_create_state(transition)
             state.enablement_time = None
@@ -1513,6 +1626,11 @@ class SimulationController:
             validate([T1, T2]) → False (P3 has 0 < 1 tokens)
             validate([T1]) → True (P1 has 2 >= 1 tokens)
         """
+        # Import arc types for proper handling
+        from shypn.netobjs.inhibitor_arc import InhibitorArc
+        from shypn.netobjs.curved_inhibitor_arc import CurvedInhibitorArc
+        from shypn.netobjs.test_arc import TestArc
+        
         for transition in transition_set:
             pass
             # Find input arcs for this transition
@@ -1522,14 +1640,25 @@ class SimulationController:
                     # This is an input arc (place → transition)
                     place = arc.source
                     
-                    # Get weight/threshold
+                    # Get effective threshold for enablement check
+                    # Use threshold if set, otherwise fallback to weight
                     tokens_needed = getattr(arc, 'weight', 1)
                     if hasattr(arc, 'threshold') and arc.threshold is not None:
                         tokens_needed = arc.threshold
                     
-                    # Check sufficient tokens
-                    if place.tokens < tokens_needed:
-                        return False  # Not enough tokens
+                    # Check based on arc type
+                    if isinstance(arc, (InhibitorArc, CurvedInhibitorArc)):
+                        # Inhibitor: INVERTED check (disabled when tokens >= threshold)
+                        if place.tokens >= tokens_needed:
+                            return False  # Inhibited by excess
+                    elif isinstance(arc, TestArc):
+                        # Test arc: Check threshold but won't consume
+                        if place.tokens < tokens_needed:
+                            return False  # Catalyst not present
+                    else:
+                        # Normal: Standard check (disabled when tokens < threshold)
+                        if place.tokens < tokens_needed:
+                            return False  # Not enough tokens
             
             # Check guard condition (if any)
             if hasattr(transition, 'guard') and transition.guard is not None:
@@ -1642,6 +1771,11 @@ class SimulationController:
                 reverse=True
             )
             
+            # Import arc types for proper handling
+            from shypn.netobjs.inhibitor_arc import InhibitorArc
+            from shypn.netobjs.curved_inhibitor_arc import CurvedInhibitorArc
+            from shypn.netobjs.test_arc import TestArc
+            
             for transition in sorted_transitions:
                 pass
                 # Remove input tokens
@@ -1651,19 +1785,22 @@ class SimulationController:
                         # Input arc (place → transition)
                         place = arc.source
                         
-                        # Get weight/threshold
-                        tokens_needed = getattr(arc, 'weight', 1)
-                        if hasattr(arc, 'threshold') and arc.threshold is not None:
-                            tokens_needed = arc.threshold
+                        # Skip arcs that don't consume tokens
+                        if isinstance(arc, (InhibitorArc, CurvedInhibitorArc, TestArc)):
+                            continue  # Inhibitor and test arcs NEVER consume tokens
+                        
+                        # CRITICAL: ALWAYS use weight for consumption (NOT threshold!)
+                        # Threshold is for enablement only, weight is for token transfer
+                        tokens_consumed = getattr(arc, 'weight', 1)
                         
                         # Safety check (should not fail after validation)
-                        if place.tokens < tokens_needed:
+                        if place.tokens < tokens_consumed:
                             raise RuntimeError(
                                 f"{transition.id} cannot fire: {place.id} has "
-                                f"{place.tokens} < {tokens_needed} tokens"
+                                f"{place.tokens} < {tokens_consumed} tokens"
                             )
                         
-                        place.tokens -= tokens_needed
+                        place.tokens -= tokens_consumed
                 
                 # Execute transition behavior (if any)
                 if hasattr(transition, 'behavior') and transition.behavior is not None:
@@ -1954,7 +2091,40 @@ class SimulationController:
         else:
             self._steps_per_callback = min(self._steps_per_callback, 1000)
         
+        # CRITICAL: Initialize all stochastic transitions before simulation starts
+        # This ensures they have valid scheduled firing times
         self._update_enablement_states()
+        
+        # Verify stochastic transitions are properly scheduled
+        stochastic_transitions = [t for t in self.model.transitions if t.transition_type == 'stochastic']
+        if stochastic_transitions:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"Initializing {len(stochastic_transitions)} stochastic transition(s)")
+            
+            for transition in stochastic_transitions:
+                behavior = self._get_behavior(transition)
+                state = self.transition_states.get(transition.id)
+                
+                # Log initialization status
+                if state and state.enablement_time is not None:
+                    scheduled_time = behavior.get_scheduled_fire_time() if hasattr(behavior, 'get_scheduled_fire_time') else None
+                    if scheduled_time is not None:
+                        logger.info(
+                            f"  ✓ {transition.name} (ID={transition.id}): enabled, "
+                            f"scheduled to fire at t={scheduled_time:.3f}"
+                        )
+                    else:
+                        logger.warning(
+                            f"  ⚠ {transition.name} (ID={transition.id}): enabled but NOT scheduled "
+                            f"(rate may be 0 or evaluation failed)"
+                        )
+                else:
+                    logger.info(
+                        f"  ○ {transition.name} (ID={transition.id}): not enabled "
+                        f"(insufficient tokens)"
+                    )
+        
         for transition in self.model.transitions:
             state = self.transition_states.get(transition.id)
             behavior = self._get_behavior(transition)

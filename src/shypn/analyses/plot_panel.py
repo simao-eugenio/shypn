@@ -211,7 +211,7 @@ class AnalysisPlotPanel(Gtk.Box):
         self.canvas = FigureCanvas(self.figure)
         self.canvas.set_size_request(400, 200)
         from matplotlib.backends.backend_gtk3 import NavigationToolbar2GTK3
-        self.toolbar = NavigationToolbar2GTK3(self.canvas, None)
+        self.toolbar = NavigationToolbar2GTK3(self.canvas)
         canvas_box.pack_start(self.toolbar, False, False, 0)
         canvas_box.pack_start(self.canvas, True, True, 0)
         canvas_frame.add(canvas_box)

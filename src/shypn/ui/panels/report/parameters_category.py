@@ -774,6 +774,10 @@ class DynamicAnalysesCategory(BaseReportCategory):
                 # print("[DEBUG_TABLES] Auto-expanding Dynamic Analyses category")
                 self.category_frame.set_expanded(True)
         
+        # Notify export toolbar that simulation data is available
+        if self.parent_panel and hasattr(self.parent_panel, 'export_toolbar'):
+            self.parent_panel.export_toolbar.update_simulation_data_availability(True)
+        
         # Ensure all widgets are visible and properly rendered
         self.summary_label.show()
         self.simulation_status_label.show()
@@ -821,7 +825,7 @@ class DynamicAnalysesCategory(BaseReportCategory):
             
             # Get simulation settings from stored metadata
             metadata = sim_data['metadata']
-            time_step = metadata.get('time_step', 0.0)
+            time_step = metadata.get('time_step')
             target_duration = metadata.get('target_duration')
             time_scale = metadata.get('time_scale', 1.0)
             
@@ -843,7 +847,7 @@ class DynamicAnalysesCategory(BaseReportCategory):
                     total_firings += firing_series[-1]
             
             # Format time_step (handle None case)
-            if time_step is None:
+            if time_step is None or time_step == 0.0:
                 time_step_str = "Not set"
             else:
                 time_step_str = f"{time_step:.4f} s"

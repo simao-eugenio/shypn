@@ -199,6 +199,13 @@ class BufferedSimulationSettings:
         clone.dt_auto = settings.dt_auto
         clone.dt_manual = settings.dt_manual
         clone.time_scale = settings.time_scale
+        # τ-Leaping settings
+        clone.use_tau_leaping = settings.use_tau_leaping
+        clone.tau_epsilon = settings.tau_epsilon
+        clone.critical_threshold = settings.critical_threshold
+        clone.max_tau = settings.max_tau
+        clone.min_tau = settings.min_tau
+        clone.use_parallel_stochastic = settings.use_parallel_stochastic
         return clone
     
     def _validate_buffer(self):
@@ -219,6 +226,14 @@ class BufferedSimulationSettings:
         _ = self._buffer.dt_auto
         _ = self._buffer.dt_manual
         _ = self._buffer.time_scale
+        
+        # τ-Leaping property validation
+        _ = self._buffer.use_tau_leaping
+        _ = self._buffer.tau_epsilon
+        _ = self._buffer.critical_threshold
+        _ = self._buffer.max_tau
+        _ = self._buffer.min_tau
+        _ = self._buffer.use_parallel_stochastic
         
         # Cross-validation: Check step count
         if self._buffer.duration is not None:
@@ -291,6 +306,13 @@ class BufferedSimulationSettings:
         self._live.dt_auto = self._buffer.dt_auto
         self._live.dt_manual = self._buffer.dt_manual
         self._live.time_scale = self._buffer.time_scale
+        # τ-Leaping settings
+        self._live.use_tau_leaping = self._buffer.use_tau_leaping
+        self._live.tau_epsilon = self._buffer.tau_epsilon
+        self._live.critical_threshold = self._buffer.critical_threshold
+        self._live.max_tau = self._buffer.max_tau
+        self._live.min_tau = self._buffer.min_tau
+        self._live.use_parallel_stochastic = self._buffer.use_parallel_stochastic
     
     # ========== Observer Pattern ==========
     

@@ -67,6 +67,12 @@ class SimulationSettingsDialog(Gtk.Dialog):
         
         # Load current settings
         self._load_from_settings()
+        
+        print("DEBUG: SimulationSettingsDialog __init__ called")
+        
+        # Manually trigger the initial state update for the entry field
+        # This ensures the sensitivity is correctly set on dialog open
+        self._update_dt_entry_sensitivity()
     
     def _load_ui(self):
         """Load UI definition from file."""
@@ -127,13 +133,27 @@ class SimulationSettingsDialog(Gtk.Dialog):
             'dt_manual_radio': builder.get_object('dt_manual_radio'),
             'dt_manual_entry': builder.get_object('dt_manual_entry'),
             'time_scale_entry': builder.get_object('time_scale_entry'),
-            'conflict_policy_combo': builder.get_object('conflict_policy_combo')
+            'conflict_policy_combo': builder.get_object('conflict_policy_combo'),
+            # τ-leaping settings
+            'tau_leaping_enabled_check': builder.get_object('tau_leaping_enabled_check'),
+            'tau_epsilon_entry': builder.get_object('tau_epsilon_entry'),
+            'critical_threshold_entry': builder.get_object('critical_threshold_entry'),
+            'parallel_stochastic_check': builder.get_object('parallel_stochastic_check')
         }
         
         # Validate all widgets found
         for name, widget in self._widgets.items():
             if widget is None:
                 raise ValueError(f"Widget '{name}' not found in UI file")
+        
+        # Explicitly ensure the manual entry is editable and can receive focus
+        entry = self._widgets['dt_manual_entry']
+        entry.set_editable(True)
+        entry.set_can_focus(True)
+        entry.set_property('editable', True)
+        
+        # Show all widgets
+        self.show_all()
     
     def _connect_signals(self):
         """Connect widget signals.
@@ -147,9 +167,41 @@ class SimulationSettingsDialog(Gtk.Dialog):
             entry = DebouncedEntry(delay_ms=300)
             entry.set_debounced_callback(self._on_value_changed_debounced)
         """
-        # Manual dt radio toggle
+        # Auto dt radio toggle - disable manual entry when auto is selected
+        if self._widgets['dt_auto_radio']:
+            self._widgets['dt_auto_radio'].connect('toggled', self._on_auto_dt_toggled)
+        
+        # Manual dt radio toggle - enable manual entry when manual is selected
         if self._widgets['dt_manual_radio']:
             self._widgets['dt_manual_radio'].connect('toggled', self._on_manual_dt_toggled)
+    
+    def _update_dt_entry_sensitivity(self):
+        """Update the manual dt entry sensitivity based on current radio button state."""
+        is_manual_active = self._widgets['dt_manual_radio'].get_active()
+        entry = self._widgets['dt_manual_entry']
+        
+        # Debug output
+        print(f"DEBUG: Manual radio active: {is_manual_active}")
+        print(f"DEBUG: Entry sensitive before: {entry.get_sensitive()}")
+        print(f"DEBUG: Entry editable before: {entry.get_editable()}")
+        
+        entry.set_sensitive(is_manual_active)
+        entry.set_editable(True)
+        
+        print(f"DEBUG: Entry sensitive after: {entry.get_sensitive()}")
+        print(f"DEBUG: Entry editable after: {entry.get_editable()}")
+        print(f"DEBUG: Entry can-focus: {entry.get_can_focus()}")
+    
+    def _on_auto_dt_toggled(self, button):
+        """Handle auto dt radio toggle.
+        
+        Args:
+            button: GtkRadioButton that was toggled
+        """
+        print(f"DEBUG _on_auto_dt_toggled: button active = {button.get_active()}")
+        # Only act when button becomes active (not when it becomes inactive)
+        if button.get_active():
+            self._update_dt_entry_sensitivity()
     
     def _on_manual_dt_toggled(self, button):
         """Handle manual dt radio toggle.
@@ -157,19 +209,19 @@ class SimulationSettingsDialog(Gtk.Dialog):
         Args:
             button: GtkRadioButton that was toggled
         """
-        is_manual = button.get_active()
-        if self._widgets['dt_manual_entry']:
-            self._widgets['dt_manual_entry'].set_sensitive(is_manual)
+        print(f"DEBUG _on_manual_dt_toggled: button active = {button.get_active()}")
+        # Only act when button becomes active (not when it becomes inactive)
+        if button.get_active():
+            self._update_dt_entry_sensitivity()
     
     def _load_from_settings(self):
         """Load current values from settings object."""
-        # Time step mode
+        # Time step mode - setting the radio button will trigger the signal handler
+        # which will automatically set the entry sensitivity
         if self.settings.dt_auto:
             self._widgets['dt_auto_radio'].set_active(True)
-            self._widgets['dt_manual_entry'].set_sensitive(False)
         else:
             self._widgets['dt_manual_radio'].set_active(True)
-            self._widgets['dt_manual_entry'].set_sensitive(True)
         
         # Manual dt value
         self._widgets['dt_manual_entry'].set_text(str(self.settings.dt_manual))
@@ -188,6 +240,12 @@ class SimulationSettingsDialog(Gtk.Dialog):
         # For now, default to RANDOM (index 0)
         index = 0  # Default to Random
         self._widgets['conflict_policy_combo'].set_active(index)
+        
+        # τ-Leaping settings
+        self._widgets['tau_leaping_enabled_check'].set_active(self.settings.use_tau_leaping)
+        self._widgets['tau_epsilon_entry'].set_text(str(self.settings.tau_epsilon))
+        self._widgets['critical_threshold_entry'].set_text(str(self.settings.critical_threshold))
+        self._widgets['parallel_stochastic_check'].set_active(self.settings.use_parallel_stochastic)
     
     def apply_to_settings(self) -> bool:
         """Apply dialog values to settings object atomically.
@@ -226,6 +284,46 @@ class SimulationSettingsDialog(Gtk.Dialog):
                                f"Time scale must be a positive number. Got: {scale_text}")
                 self.buffered_settings.rollback()
                 return False
+            
+            # τ-Leaping settings
+            use_tau_leaping = self._widgets['tau_leaping_enabled_check'].get_active()
+            self.buffered_settings.buffer.use_tau_leaping = use_tau_leaping
+            
+            # Epsilon
+            epsilon_text = self._widgets['tau_epsilon_entry'].get_text().strip()
+            try:
+                epsilon_value = float(epsilon_text)
+                if epsilon_value <= 0 or epsilon_value > 1:
+                    self._show_error("Invalid epsilon",
+                                   f"Epsilon must be between 0 and 1. Got: {epsilon_value}")
+                    self.buffered_settings.rollback()
+                    return False
+                self.buffered_settings.buffer.tau_epsilon = epsilon_value
+            except ValueError:
+                self._show_error("Invalid epsilon",
+                               f"Epsilon must be a number. Got: {epsilon_text}")
+                self.buffered_settings.rollback()
+                return False
+            
+            # Critical threshold
+            threshold_text = self._widgets['critical_threshold_entry'].get_text().strip()
+            try:
+                threshold_value = float(threshold_text)
+                if threshold_value < 0:
+                    self._show_error("Invalid critical threshold",
+                                   f"Critical threshold must be non-negative. Got: {threshold_value}")
+                    self.buffered_settings.rollback()
+                    return False
+                self.buffered_settings.buffer.critical_threshold = threshold_value
+            except ValueError:
+                self._show_error("Invalid critical threshold",
+                               f"Critical threshold must be a number. Got: {threshold_text}")
+                self.buffered_settings.rollback()
+                return False
+            
+            # Parallel stochastic
+            use_parallel = self._widgets['parallel_stochastic_check'].get_active()
+            self.buffered_settings.buffer.use_parallel_stochastic = use_parallel
             
             # Mark as dirty (has uncommitted changes)
             self.buffered_settings.mark_dirty()

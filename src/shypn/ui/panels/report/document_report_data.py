@@ -77,7 +77,8 @@ class DocumentReportData:
         
         if hasattr(controller, 'settings') and controller.settings:
             settings = controller.settings
-            time_step = getattr(settings, 'time_step', None)
+            # Get the effective time step (handles both auto and manual modes)
+            time_step = controller.get_effective_dt() if hasattr(controller, 'get_effective_dt') else None
             target_duration = getattr(settings, 'duration', None)
             time_scale = getattr(settings, 'time_scale', None)
             self.last_time_step = time_step

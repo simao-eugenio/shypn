@@ -113,6 +113,19 @@ class ExportToolbar(Gtk.Box):
         export_box.pack_start(self.export_btn, False, False, 0)
         
         self.pack_end(export_box, False, False, 0)
+        
+        # Separator before simulation export
+        separator2 = Gtk.Separator(orientation=Gtk.Orientation.VERTICAL)
+        self.pack_end(separator2, False, False, 6)
+        
+        # Simulation data export button
+        sim_export_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        self.sim_export_btn = Gtk.Button(label="Export Simulation Data")
+        self.sim_export_btn.set_tooltip_text("Export time-series simulation data (CSV/JSON/Plots)")
+        self.sim_export_btn.connect('clicked', self._on_export_simulation_data)
+        self.sim_export_btn.set_sensitive(False)  # Initially disabled
+        sim_export_box.pack_start(self.sim_export_btn, False, False, 0)
+        self.pack_end(sim_export_box, False, False, 0)
     
     def set_parent_window(self, window: Gtk.Window):
         """Set parent window for dialogs.
@@ -794,3 +807,196 @@ class ExportToolbar(Gtk.Box):
             Current UserProfile instance
         """
         return self.profile
+
+    # =========================================================================
+    # SIMULATION DATA EXPORT
+    # =========================================================================
+    
+    def update_simulation_data_availability(self, has_data: bool):
+        """Enable/disable simulation export button based on data availability.
+        
+        Args:
+            has_data: True if simulation data is available
+        """
+        if hasattr(self, 'sim_export_btn'):
+            self.sim_export_btn.set_sensitive(has_data)
+    
+    def _on_export_simulation_data(self, button):
+        """Handle simulation data export button click."""
+        # Get simulation data from parent panel
+        if not self.parent_panel:
+            self._show_error("No Data", "No simulation data available.")
+            return
+        
+        sim_data = self._get_simulation_data()
+        if not sim_data:
+            self._show_error("No Data", 
+                           "No simulation data available. Run a simulation first.")
+            return
+        
+        # Get the actual top-level window
+        toplevel = self.get_toplevel()
+        if not isinstance(toplevel, Gtk.Window):
+            toplevel = None
+        
+        # Open export dialog
+        from .simulation_export_dialog import SimulationExportDialog
+        dialog = SimulationExportDialog(toplevel, sim_data, self.metadata or {})
+        response, export_config = dialog.run()
+        dialog.destroy()
+        
+        if response == Gtk.ResponseType.OK:
+            self._execute_simulation_export(export_config, sim_data)
+    
+    def _get_simulation_data(self) -> dict:
+        """Get simulation data from Dynamic Analyses category.
+        
+        Returns:
+            Dict with simulation data or None if not available
+        """
+        if not self.parent_panel or not hasattr(self.parent_panel, 'categories'):
+            return None
+        
+        for category in self.parent_panel.categories:
+            if hasattr(category, 'controller') and category.controller:
+                if hasattr(category.controller, 'data_collector'):
+                    dc = category.controller.data_collector
+                    if dc and dc.has_data():
+                        # Get stored simulation data from document report data
+                        stored_data = None
+                        if hasattr(category.controller, 'drawing_area'):
+                            da = category.controller.drawing_area
+                            if hasattr(da, 'report_data') and da.report_data:
+                                stored_data = da.report_data.last_simulation_data
+                        
+                        return {
+                            'time_points': stored_data['time_points'] if stored_data else dc.time_points,
+                            'place_data': stored_data['place_data'] if stored_data else dc.place_data,
+                            'transition_data': stored_data['transition_data'] if stored_data else dc.transition_data,
+                            'model': category.controller.model,
+                            'metadata': stored_data.get('metadata', {}) if stored_data else {}
+                        }
+        return None
+    
+    def _execute_simulation_export(self, config: dict, sim_data: dict):
+        """Execute the export based on user configuration.
+        
+        Args:
+            config: Export configuration dict
+            sim_data: Simulation data dict
+        """
+        format_type = config['format']
+        
+        # Get default filename
+        model_name = "simulation"
+        if sim_data.get('model'):
+            model_name = getattr(sim_data['model'], 'name', 
+                               getattr(sim_data['model'], 'id', 'simulation'))
+        elif self.metadata:
+            model_name = self.metadata.model_name or 'simulation'
+        
+        default_filename = f"{model_name}_data{config['extension']}"
+        
+        # File chooser dialog
+        toplevel = self.get_toplevel()
+        if not isinstance(toplevel, Gtk.Window):
+            toplevel = None
+        
+        dialog = Gtk.FileChooserDialog(
+            title="Export Simulation Data",
+            transient_for=toplevel,
+            action=Gtk.FileChooserAction.SAVE
+        )
+        dialog.add_buttons(
+            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+            Gtk.STOCK_SAVE, Gtk.ResponseType.OK
+        )
+        dialog.set_do_overwrite_confirmation(True)
+        dialog.set_current_name(default_filename)
+        
+        # Set default directory
+        export_dir = self._get_export_directory()
+        dialog.set_current_folder(export_dir)
+        
+        # Add file filter
+        file_filter = Gtk.FileFilter()
+        if format_type.startswith('csv'):
+            file_filter.set_name("CSV files")
+            file_filter.add_pattern("*.csv")
+        elif format_type == 'json':
+            file_filter.set_name("JSON files")
+            file_filter.add_pattern("*.json")
+        elif format_type == 'svg':
+            file_filter.set_name("SVG files")
+            file_filter.add_pattern("*.svg")
+        elif format_type == 'png':
+            file_filter.set_name("PNG files")
+            file_filter.add_pattern("*.png")
+        dialog.add_filter(file_filter)
+        
+        response = dialog.run()
+        filepath = dialog.get_filename()
+        dialog.destroy()
+        
+        if response != Gtk.ResponseType.OK or not filepath:
+            return
+        
+        # Execute export
+        try:
+            success = False
+            
+            if format_type == 'csv_timeseries_wide':
+                from shypn.reporting.exporters import CSVSimulationExporter
+                exporter = CSVSimulationExporter(sim_data, self.metadata)
+                success = exporter.export_timeseries_wide(filepath)
+            
+            elif format_type == 'csv_timeseries_long':
+                from shypn.reporting.exporters import CSVSimulationExporter
+                exporter = CSVSimulationExporter(sim_data, self.metadata)
+                success = exporter.export_timeseries_long(filepath)
+            
+            elif format_type == 'csv_summary':
+                from shypn.reporting.exporters import CSVSimulationExporter
+                exporter = CSVSimulationExporter(sim_data, self.metadata)
+                success = exporter.export_summary_statistics(filepath)
+            
+            elif format_type == 'json':
+                from shypn.reporting.exporters import JSONSimulationExporter
+                exporter = JSONSimulationExporter(sim_data, self.metadata, sim_data.get('model'))
+                success = exporter.export(
+                    filepath,
+                    include_metadata=config.get('include_metadata', True),
+                    include_timeseries=True,
+                    include_statistics=config.get('include_statistics', True)
+                )
+            
+            elif format_type in ['svg', 'png']:
+                from shypn.reporting.exporters import PlotExporter
+                exporter = PlotExporter(sim_data, self.metadata, sim_data.get('model'))
+                plot_opts = config.get('plot_options', {})
+                
+                if plot_opts.get('combined', False):
+                    success = exporter.export_combined_plot(
+                        filepath, format=format_type, dpi=plot_opts.get('dpi', 300)
+                    )
+                elif plot_opts.get('firing_rates', False):
+                    success = exporter.export_firing_rate_curves(
+                        filepath, format=format_type, dpi=plot_opts.get('dpi', 300)
+                    )
+                else:  # Default to concentrations
+                    success = exporter.export_concentration_curves(
+                        filepath, format=format_type, dpi=plot_opts.get('dpi', 300)
+                    )
+            
+            if success:
+                self._show_info("Export Successful", 
+                              f"Simulation data exported to:\n{filepath}")
+            else:
+                self._show_error("Export Failed", 
+                               "Failed to export simulation data.")
+        
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            self._show_error("Export Error", 
+                           f"An error occurred during export:\n{str(e)}")

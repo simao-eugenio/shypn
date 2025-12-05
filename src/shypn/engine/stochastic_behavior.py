@@ -63,6 +63,13 @@ class StochasticBehavior(TransitionBehavior):
         # Logger for warnings
         self.logger = logging.getLogger(self.__class__.__name__)
         
+        # Log creation with all details
+        self.logger.info(
+            f"Creating StochasticBehavior for transition '{transition.name}' (ID={transition.id}), "
+            f"transition.rate={getattr(transition, 'rate', 'NOT SET')}, "
+            f"transition.transition_type={getattr(transition, 'transition_type', 'NOT SET')}"
+        )
+        
         # Extract stochastic parameters
         props = getattr(transition, 'properties', {})
         
@@ -98,11 +105,16 @@ class StochasticBehavior(TransitionBehavior):
         
         self.max_burst = int(props.get('max_burst', 8))
         
-        # Validation
+        # Validation - use warnings instead of exceptions to avoid breaking initialization
         if self.rate <= 0:
-            raise ValueError(f"Rate must be positive: {self.rate}")
+            self.logger.warning(
+                f"Stochastic transition '{transition.name}' has non-positive rate ({self.rate}). "
+                f"Using default rate 1.0. Please set rate property in transition dialog."
+            )
+            self.rate = 1.0
         if self.max_burst < 1:
-            raise ValueError(f"Max burst must be >= 1: {self.max_burst}")
+            self.logger.warning(f"Max burst must be >= 1, got {self.max_burst}. Using default 8.")
+            self.max_burst = 8
         
         # Scheduling state
         self._enablement_time = None
@@ -123,6 +135,13 @@ class StochasticBehavior(TransitionBehavior):
         """
         if not self.has_rate_function:
             # No formula - use constant rate
+            # Ensure we have a valid positive rate (should be validated in __init__)
+            if not hasattr(self, 'rate') or self.rate <= 0:
+                self.logger.warning(
+                    f"Stochastic transition '{self.transition.name}' has invalid rate "
+                    f"({getattr(self, 'rate', 'None')}). Using default rate 1.0"
+                )
+                return 1.0
             return self.rate
         
         try:
@@ -152,23 +171,37 @@ class StochasticBehavior(TransitionBehavior):
             # Add place tokens using their names directly
             # Add small epsilon to prevent division by zero in rate formulas
             places_dict = self._get_places_dict()
-            for place_id, tokens in places_dict.items():
+            
+            # Debug: Log available places
+            if not places_dict:
+                self.logger.warning(
+                    f"No places found for rate formula evaluation in {self.transition.name}. "
+                    f"Formula: {self.rate_function_expr}"
+                )
+            
+            for place_name, tokens in places_dict.items():
                 # Add tiny epsilon (1e-10) to avoid division by zero
                 # This doesn't affect simulation dynamics but prevents math errors
-                context[place_id] = max(tokens, 1e-10)
+                context[place_name] = max(tokens, 1e-10)
             
             # Evaluate formula
             result = eval(self.rate_function_expr, {"__builtins__": {}}, context)
             rate = float(result)
             
-            # Ensure positive rate (required for exponential distribution)
+            # Handle zero/negative rates gracefully for τ-leaping
+            # When substrates are depleted, rate can legitimately become 0
+            # This doesn't indicate an error - the transition simply can't fire
+            # Return 0.0 propensity (will result in 0 firings in τ-leaping)
             if rate <= 0:
-                raise ValueError(
-                    f"Stochastic transition '{self.transition.name}' formula evaluated to "
-                    f"non-positive rate {rate:.3f}. This indicates a reversible reaction "
-                    f"that should be modeled as continuous (not stochastic), or the formula is incorrect. "
-                    f"Expression: {self.rate_function_expr}"
-                )
+                # Only log warning if rate is significantly negative (formula error)
+                if rate < -1e-6:
+                    self.logger.warning(
+                        f"Stochastic transition '{self.transition.name}' formula evaluated to "
+                        f"negative rate {rate:.6f}, which may indicate a reversible reaction "
+                        f"that should be modeled as continuous. Clamping to 0.0. "
+                        f"Expression: {self.rate_function_expr}"
+                    )
+                return 0.0  # Transition inactive, but not an error
             
             return rate
             
@@ -203,26 +236,31 @@ class StochasticBehavior(TransitionBehavior):
             raise RuntimeError(
                 f"Failed to evaluate rate_function for stochastic transition '{self.transition.name}': {e}\n"
                 f"Expression: {self.rate_function_expr}\n"
-                f"Context: {context}"
+                f"Available places: {list(places_dict.keys()) if 'places_dict' in locals() else 'N/A'}"
             ) from e
     
     def _get_places_dict(self) -> Dict:
         """Get current place tokens as dict for formula evaluation.
         
-        For SBML-imported models with rate formulas, we need access to ALL places
+        For stochastic transitions with rate formulas, we need access to ALL places
         because the formula can reference any species, not just those directly
         connected by arcs.
         """
         places_dict = {}
         
-        # For SBML models: Get ALL places from model (formulas can reference any species)
-        if hasattr(self.model, 'places') and hasattr(self.transition, 'kinetic_metadata'):
-            for place in self.model.places:
+        # If transition has rate_function, get ALL places (formula can reference any)
+        # This applies to both SBML-imported and manually created models
+        if self.has_rate_function and hasattr(self.model, 'places'):
+            # ModelAdapter returns places as a dict, so we need .values()
+            places_to_iterate = self.model.places.values() if isinstance(self.model.places, dict) else self.model.places
+            
+            for place in places_to_iterate:
                 if hasattr(place, 'tokens') and hasattr(place, 'name'):
                     places_dict[place.name] = place.tokens
+            
             return places_dict
         
-        # For regular Petri nets: Only get connected places
+        # For constant-rate stochastic transitions: Only get connected places
         # Get all input places
         for arc in self.get_input_arcs():
             if hasattr(arc, 'source'):
@@ -261,17 +299,45 @@ class StochasticBehavior(TransitionBehavior):
         except (RuntimeError, NameError, AttributeError, KeyError) as e:
             # During import, places may not be available yet for rate evaluation
             # This is normal - rate will be evaluated when simulation actually starts
+            self.logger.warning(
+                f"Could not evaluate rate at enablement for {self.transition.name}: {e}. "
+                f"Transition will not be scheduled."
+            )
+            return
+        
+        # If rate is zero or negative, don't schedule firing
+        # This happens when substrates are depleted and propensity = 0
+        if lambda_rate <= 0:
+            self.logger.warning(
+                f"Transition {self.transition.name} has zero/negative rate ({lambda_rate:.6f}). "
+                f"Check that: (1) transition.rate is set to positive value, "
+                f"(2) if using rate formula, it evaluates correctly. "
+                f"Self.rate={getattr(self, 'rate', 'NOT SET')}, "
+                f"has_rate_function={getattr(self, 'has_rate_function', False)}"
+            )
+            # Clear any previous scheduling
+            self._scheduled_fire_time = None
+            self._sampled_burst = None
             return
         
         # Sample firing delay from exponential distribution
         # T ~ Exp(λ) => T = -ln(U) / λ, where U ~ Uniform(0,1)
         u = random.random()
-        delay = -math.log(u) / lambda_rate if u > 0 and lambda_rate > 0 else 0.0
+        # Protect against u=0 which would cause log(0) = -inf
+        if u <= 1e-10:
+            u = 1e-10
+        delay = -math.log(u) / lambda_rate
         
         self._scheduled_fire_time = time + delay
         
         # Sample burst size (will be used at firing time)
         self._sampled_burst = random.randint(1, self.max_burst)
+        
+        self.logger.debug(
+            f"Stochastic {self.transition.name} enabled at t={time:.3f}, "
+            f"rate={lambda_rate:.3f}, delay={delay:.3f}, "
+            f"scheduled={self._scheduled_fire_time:.3f}, burst={self._sampled_burst}"
+        )
     
     def get_scheduled_fire_time(self) -> Optional[float]:
         """Get the scheduled firing time.
