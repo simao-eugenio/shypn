@@ -8,8 +8,8 @@ Building three facade classes that bridge CLI tools to core SHYpn platform:
 
 ## Timeline
 - **Day 1-2**: ReplicateRunner ✅ **COMPLETED**
-- **Day 3**: Export API ⏳ NEXT
-- **Day 4-5**: BatchProcessor ⏳ TODO
+- **Day 3**: Export API ✅ **COMPLETED**
+- **Day 4-5**: BatchProcessor ⏳ **IN PROGRESS**
 
 ---
 
@@ -286,7 +286,209 @@ runner = ReplicateRunner(MockModel())
 
 ---
 
-## Day 3: Export API ⏳ NEXT
+## Day 3: Export API ✅ COMPLETED
+
+### Implementation Summary
+Extended `src/shypn/engine/simulation/data_collector.py` (+73 lines)
+
+### New Methods
+
+#### 1. `get_data() -> Dict[str, Any]`
+**Purpose**: Return collected data in format expected by exporters
+
+**Returns**: Dictionary containing:
+```python
+{
+    'time_points': List[float],      # Simulation time points
+    'place_data': Dict[str, List],   # place_id -> token counts
+    'transition_data': Dict[str, List],  # transition_id -> firing counts
+    'model': DocumentModel           # Reference to model
+}
+```
+
+**Usage**:
+```python
+collector = DataCollector(model)
+# ... run simulation ...
+data = collector.get_data()
+```
+
+**Integration**: Simplifies data extraction in ReplicateRunner
+```python
+# Before:
+time_points = controller.data_collector.time_points
+place_data = {place.id: controller.data_collector.place_data[place.id] 
+              for place in model.places}
+
+# After:
+data = controller.data_collector.get_data()
+```
+
+#### 2. `export_csv(filepath, format='wide') -> bool`
+**Purpose**: Export time-series to CSV file
+
+**Parameters**:
+- `filepath`: Output CSV file path
+- `format`: 'wide' (matrix layout) or 'long' (tidy format)
+
+**Returns**: `True` if successful, `False` otherwise
+
+**Raises**: `ValueError` if format not 'wide' or 'long'
+
+**CSV Formats**:
+
+**Wide format** (matrix):
+```csv
+Time (s),S1 (mM),S2 (mM),S3 (mM),T1 (firings),T2 (firings)
+0.000000,100.000000,50.000000,25.000000,0,0
+0.500000,95.000000,53.000000,27.000000,2,1
+...
+```
+
+**Long format** (tidy):
+```csv
+Time,Entity,Type,Value,Unit
+0.000000,S1,Place,100.000000,mM
+0.500000,S1,Place,95.000000,mM
+0.000000,S2,Place,50.000000,mM
+...
+```
+
+**Usage**:
+```python
+# Wide format for Excel
+collector.export_csv('results.csv', format='wide')
+
+# Long format for R/ggplot2
+collector.export_csv('results_tidy.csv', format='long')
+```
+
+#### 3. `export_json(filepath, include_metadata=True, include_timeseries=True, include_statistics=True) -> bool`
+**Purpose**: Export complete simulation data to JSON
+
+**Parameters**:
+- `filepath`: Output JSON file path
+- `include_metadata`: Include metadata section (default: True)
+- `include_timeseries`: Include time-series data (default: True)
+- `include_statistics`: Include summary statistics (default: True)
+
+**Returns**: `True` if successful, `False` otherwise
+
+**JSON Structure**:
+```json
+{
+  "metadata": {
+    "model_name": "...",
+    "export_timestamp": "...",
+    ...
+  },
+  "time_points": [0.0, 0.5, 1.0, ...],
+  "places": {
+    "S1": {"values": [...], "unit": "mM", ...},
+    ...
+  },
+  "transitions": {
+    "T1": {"firings": [...], ...},
+    ...
+  },
+  "statistics": {
+    "S1": {"initial": 100, "final": 80, "mean": 90, ...},
+    ...
+  }
+}
+```
+
+**Usage**:
+```python
+# Full export
+collector.export_json('results.json')
+
+# Minimal export (no metadata/stats)
+collector.export_json(
+    'data_only.json',
+    include_metadata=False,
+    include_statistics=False
+)
+```
+
+### Implementation Details
+
+**Integration with Existing Exporters**:
+```python
+def export_csv(self, filepath: str, format: str = 'wide') -> bool:
+    from shypn.reporting.exporters.csv_simulation_exporter import CSVSimulationExporter
+    
+    if format not in ('wide', 'long'):
+        raise ValueError(f"Invalid format '{format}'. Must be 'wide' or 'long'")
+    
+    exporter = CSVSimulationExporter(self.get_data(), {})
+    
+    if format == 'wide':
+        return exporter.export_timeseries_wide(filepath)
+    else:
+        return exporter.export_timeseries_long(filepath)
+```
+
+**No Breaking Changes**:
+- All existing DataCollector methods unchanged
+- New methods are pure additions
+- Existing code continues to work
+
+### Testing
+
+**Test File**: `tests/engine/simulation/test_export_api.py` (gitignored)
+
+**Test Coverage**:
+- ✅ `get_data()` returns correct structure
+- ✅ `export_csv(format='wide')` creates valid matrix CSV
+- ✅ `export_csv(format='long')` creates valid tidy CSV
+- ✅ `export_json()` creates valid JSON with all sections
+- ✅ `export_json(**options)` respects custom options
+- ✅ Error handling: ValueError for invalid format
+
+**Test Results**:
+```
+✅ ALL EXPORT API TESTS PASSED!
+
+Test files created in: /tmp/shypn_export_test
+  - test_wide.csv (wide format, 5 rows)
+  - test_long.csv (long format, 25 rows)
+  - test_data.json (full data with metadata/stats)
+  - test_minimal.json (minimal, data only)
+```
+
+**Sample Output**:
+
+Wide CSV:
+```csv
+Time (s),S1 (mM),S2 (mM),S3 (mM),T1 (firings),T2 (firings)
+0.000000,100.000000,50.000000,25.000000,0,0
+0.500000,95.000000,53.000000,27.000000,2,1
+```
+
+Long CSV:
+```csv
+Time,Entity,Type,Value,Unit
+0.000000,S1,Place,100.000000,mM
+0.500000,S1,Place,95.000000,mM
+```
+
+### Benefits
+
+1. **Simplified CLI Tools**: One-line export instead of manual data extraction
+2. **Consistent Interface**: Same export format across all tools
+3. **Flexible Formats**: Wide for Excel, Long for R/Python analysis
+4. **Future-Proof**: Wraps existing exporters, easy to extend
+
+### Commit Details
+- **Commit**: 33f592a
+- **Message**: "feat: Add Export API to DataCollector"
+- **Files**: `src/shypn/engine/simulation/data_collector.py` (+73 lines)
+- **Timestamp**: 2024-01-XX (Day 3 of Week 1)
+
+---
+
+## Day 4-5: BatchProcessor ⏳ **IN PROGRESS**
 
 ### Objectives
 Extend `DataCollector` with programmatic export methods.
