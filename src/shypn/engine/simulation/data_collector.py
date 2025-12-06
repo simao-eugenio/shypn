@@ -152,3 +152,76 @@ class DataCollector:
             True if data is available, False otherwise
         """
         return len(self.time_points) > 0
+    
+    def get_data(self) -> Dict[str, any]:
+        """Get collected data in format expected by exporters.
+        
+        Returns dictionary with:
+        - time_points: List of time values
+        - place_data: Dict mapping place_id to token counts
+        - transition_data: Dict mapping transition_id to firing counts
+        - model: Reference to DocumentModel
+        
+        Returns:
+            Dict containing all collected trajectory data
+        """
+        return {
+            'time_points': self.time_points,
+            'place_data': self.place_data,
+            'transition_data': self.transition_data,
+            'model': self.model
+        }
+    
+    def export_csv(self, filepath: str, format: str = 'wide') -> bool:
+        """Export time-series data to CSV file.
+        
+        Wrapper around CSVSimulationExporter for programmatic export.
+        
+        Args:
+            filepath: Output file path
+            format: 'wide' (matrix layout) or 'long' (tidy format)
+            
+        Returns:
+            True if successful, False otherwise
+            
+        Raises:
+            ValueError: If format is not 'wide' or 'long'
+        """
+        from shypn.reporting.exporters.csv_simulation_exporter import CSVSimulationExporter
+        
+        if format not in ('wide', 'long'):
+            raise ValueError(f"Invalid format '{format}'. Must be 'wide' or 'long'")
+        
+        exporter = CSVSimulationExporter(self.get_data(), {})
+        
+        if format == 'wide':
+            return exporter.export_timeseries_wide(filepath)
+        else:  # format == 'long'
+            return exporter.export_timeseries_long(filepath)
+    
+    def export_json(self, filepath: str, 
+                   include_metadata: bool = True,
+                   include_timeseries: bool = True,
+                   include_statistics: bool = True) -> bool:
+        """Export complete simulation data to JSON file.
+        
+        Wrapper around JSONSimulationExporter for programmatic export.
+        
+        Args:
+            filepath: Output file path
+            include_metadata: Include metadata section (default: True)
+            include_timeseries: Include time-series data (default: True)
+            include_statistics: Include summary statistics (default: True)
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        from shypn.reporting.exporters.json_simulation_exporter import JSONSimulationExporter
+        
+        exporter = JSONSimulationExporter(self.get_data(), {}, self.model)
+        return exporter.export(
+            filepath,
+            include_metadata=include_metadata,
+            include_timeseries=include_timeseries,
+            include_statistics=include_statistics
+        )
