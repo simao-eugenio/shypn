@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Run Simulation Replicates - Implemented CLI Tool"""
+import _fix_imports  # Add src to path
 import argparse, sys
 from pathlib import Path
 from shypn.engine.simulation.replicate_runner import ReplicateRunner
-from shypn.data.pathway.sbml_parser import SBMLParser
-from shypn.data.pathway.pathway_converter import PathwayConverter
+from _sbml_loader import load_sbml_model
+
 
 def main():
     parser = argparse.ArgumentParser(description='Run replicates with ReplicateRunner')
@@ -24,10 +25,7 @@ def main():
         output_dir.mkdir(parents=True, exist_ok=True)
         
         print(f"Loading {model_path.name}...")
-        parser_obj = SBMLParser()
-        pathway = parser_obj.parse_file(model_path)
-        converter = PathwayConverter()
-        model = converter.convert(pathway)
+        model = load_sbml_model(model_path)
         
         print(f"Running {args.replicates} replicates...")
         runner = ReplicateRunner(model)
