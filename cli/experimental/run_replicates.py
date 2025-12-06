@@ -1,47 +1,45 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Tool: To be implemented
-
-Usage:
-    python -m shypn.cli.experimental.TOOL_NAME [options]
-
-Author: SHYpn Development Team
-License: MIT
-Version: 1.0.0
-"""
-
-import argparse
-import sys
-
-
-def parse_arguments():
-    """Parse command-line arguments."""
-    parser = argparse.ArgumentParser(
-        description='Tool description here',
-        formatter_class=argparse.RawDescriptionHelpFormatter
-    )
-    
-    parser.add_argument('--version', action='version', version='%(prog)s 1.0.0')
-    
-    return parser.parse_args()
-
+"""Run Simulation Replicates - Implemented CLI Tool"""
+import argparse, sys
+from pathlib import Path
+from shypn.engine.simulation.replicate_runner import ReplicateRunner
+from shypn.data.pathway.sbml_parser import SBMLParser
+from shypn.data.pathway.pathway_converter import PathwayConverter
 
 def main():
-    """Main entry point."""
-    args = parse_arguments()
+    parser = argparse.ArgumentParser(description='Run replicates with ReplicateRunner')
+    parser.add_argument('model', help='SBML model file')
+    parser.add_argument('-n', '--replicates', type=int, default=100)
+    parser.add_argument('-d', '--duration', type=float, default=100.0)
+    parser.add_argument('-o', '--output', default='.')
+    parser.add_argument('-v', '--verbose', action='store_true')
+    args = parser.parse_args()
     
     try:
-        print("🔜 This tool is not yet implemented.")
-        print("See cli/experimental/README.md for implementation roadmap.")
-        sys.exit(1)
+        model_path = Path(args.model)
+        if not model_path.exists():
+            sys.exit(f"ERROR: Model not found: {model_path}")
         
+        output_dir = Path(args.output)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        
+        print(f"Loading {model_path.name}...")
+        parser_obj = SBMLParser()
+        pathway = parser_obj.parse_file(model_path)
+        converter = PathwayConverter()
+        model = converter.convert(pathway)
+        
+        print(f"Running {args.replicates} replicates...")
+        runner = ReplicateRunner(model)
+        results = runner.run_replicates(n=args.replicates, duration=args.duration, verbose=args.verbose)
+        stats = runner.compute_statistics(results)
+        
+        runner.export_trajectories_csv(results, output_dir / 'trajectories.csv')
+        runner.export_statistics_json(stats, output_dir / 'statistics.json')
+        
+        print(f"✅ Complete! Saved to: {output_dir.absolute()}")
     except Exception as e:
-        print(f"ERROR: {e}", file=sys.stderr)
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)
-
+        sys.exit(f"ERROR: {e}")
 
 if __name__ == '__main__':
     main()
