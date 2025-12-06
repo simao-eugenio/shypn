@@ -1,366 +1,373 @@
-# Experimental Validation Toolkit
+# Experimental CLI Tools for τ-Leaping Validation
 
-Complete toolkit for validating stochastic simulation algorithms at scale.
+This directory contains command-line tools for validating the τ-leaping algorithm implementation (Paper 2).
 
 ## Overview
 
-This toolkit enables large-scale validation experiments for stochastic simulation methods. It provides tools to:
+These tools provide a complete experimental workflow for comparing τ-leaping with Gillespie SSA:
+- **Validation**: Compare algorithm equivalence
+- **Benchmarking**: Measure performance and speedup
+- **Analysis**: Examine model structure and dependencies
+- **Visualization**: Generate publication-quality plots
+- **Reporting**: Compile comprehensive experiment reports
 
-1. Run thousands of simulation replicates
-2. Compare different simulation algorithms (e.g., parallel vs sequential τ-leaping)
-3. Perform statistical validation (MAE, CV, Kolmogorov-Smirnov tests)
-4. Analyze dependency impact on performance
-5. Generate publication-quality reports and figures
+## Installation
 
-## Workflow
+Tools require ShyPN with the experimental validation infrastructure:
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│ 1. setup_experiment.py                                      │
-│    Initialize experiment directory structure                │
-└─────────────────────────────────────────────────────────────┘
-                          ↓
-┌─────────────────────────────────────────────────────────────┐
-│ 2. run_batch_replicates.py                                  │
-│    Run n replicates for all models (parallel + sequential)  │
-│    • Checkpointing for resume capability                    │
-│    • Progress tracking                                       │
-│    • Error isolation per model                              │
-└─────────────────────────────────────────────────────────────┘
-                          ↓
-┌─────────────────────────────────────────────────────────────┐
-│ 3. benchmark_timing.py                                      │
-│    Measure execution time and compute speedup               │
-└─────────────────────────────────────────────────────────────┘
-                          ↓
-┌─────────────────────────────────────────────────────────────┐
-│ 4. validate_equivalence.py                                  │
-│    Statistical validation for each model                    │
-│    • Mean Absolute Error (MAE)                              │
-│    • Coefficient of Variation error (CV)                    │
-│    • Kolmogorov-Smirnov test                                │
-└─────────────────────────────────────────────────────────────┘
-                          ↓
-┌─────────────────────────────────────────────────────────────┐
-│ 5. analyze_dependency_impact.py                             │
-│    Correlate speedup with dependency structure              │
-│    • Regression analysis                                    │
-│    • Correlation tests                                      │
-└─────────────────────────────────────────────────────────────┘
-                          ↓
-┌─────────────────────────────────────────────────────────────┐
-│ 6. Visualization                                            │
-│    • plot_validation_results.py                             │
-│    • plot_speedup_analysis.py                               │
-└─────────────────────────────────────────────────────────────┘
-                          ↓
-┌─────────────────────────────────────────────────────────────┐
-│ 7. generate_experiment_report.py                            │
-│    Aggregate all results into comprehensive report          │
-│    • Markdown report                                        │
-│    • LaTeX tables                                           │
-└─────────────────────────────────────────────────────────────┘
+```bash
+# Ensure you're in the cli/experimental directory
+cd cli/experimental
+
+# All tools use relative imports - run from this directory
 ```
 
-## Tools
+## Quick Start
+
+### Single Model Validation
+
+```bash
+# Validate τ-leaping vs Gillespie (10 replicates)
+./validate_equivalence.py model.xml -n 10 -d 100.0 -o results/
+
+# Benchmark performance
+./benchmark_timing.py model.xml -n 100 --compare -o results/
+
+# Analyze dependencies
+./analyze_dependency_impact.py model.xml -n 50 -o results/
+
+# Generate report
+./generate_experiment_report.py \
+  --validation results/validation_results.json \
+  --benchmark results/benchmark_results.json \
+  --dependency results/dependency_analysis.json \
+  -o results/report.md
+```
+
+### Batch Processing
+
+```bash
+# Create batch CSV
+cat > batch.csv << EOF
+model_id,model_path
+BIOMD0000000001,path/to/BIOMD0000000001.xml
+BIOMD0000000004,path/to/BIOMD0000000004.xml
+EOF
+
+# Run batch experiment
+./run_batch_replicates.py batch.csv -n 100 -d 100.0 -o batch_results/
+
+# Analyze results
+./analyze_batch_results.py batch_results/batch_summary.json
+```
+
+### Complete Workflow
+
+```bash
+# Run the full pipeline
+./test_workflow.sh
+```
+
+## Tool Reference
 
 ### 1. setup_experiment.py
+**Purpose**: Interactive experiment setup and configuration
 
-Initialize experiment directory with proper structure.
-
-**Usage**:
 ```bash
-python -m shypn.cli.experimental.setup_experiment \
-    --name "tau_leaping_validation_93_models" \
-    --models ../../doc/papers/foundation/experimental_data/model_list.csv \
-    --output experiments/tau_leaping_validation/
+./setup_experiment.py
 ```
 
-**Creates**:
-```
-experiments/tau_leaping_validation/
-├── config.json
-├── models/
-├── data/
-│   ├── replicates/
-│   ├── statistics/
-│   └── timing/
-├── validation/
-├── figures/
-├── reports/
-└── checkpoints/
-```
-
----
+Creates experiment directory structure and batch CSV files.
 
 ### 2. run_replicates.py
+**Purpose**: Run replicate simulations on a single model
 
-Run n stochastic replicates for a SINGLE model.
-
-**Usage**:
 ```bash
-python -m shypn.cli.experimental.run_replicates \
-    --model data/models/BIOMD0000000064.xml \
-    --replicates 1000 \
-    --duration 100.0 \
-    --output results/BIOMD0000000064/ \
-    --mode both  # or 'parallel', 'sequential'
+./run_replicates.py model.xml -n 100 -d 100.0 -o output/
 ```
+
+**Options**:
+- `-n, --replicates`: Number of replicates (default: 100)
+- `-d, --duration`: Simulation duration (default: 100.0)
+- `-o, --output`: Output directory (default: replicate_results)
+- `--no-tau-leaping`: Use Gillespie SSA instead
 
 **Output**:
-- `parallel_trajectories.csv` - Parallel mode trajectories
-- `sequential_trajectories.csv` - Sequential mode trajectories
-- `parallel_statistics.json` - Mean, std, CV per species
-- `sequential_statistics.json` - Same structure
-- `metadata.json` - Model info and run parameters
-
----
+- `trajectories.csv`: Time series data (wide or long format)
+- `statistics.json`: Mean, std, CV, percentiles
 
 ### 3. run_batch_replicates.py
+**Purpose**: Process multiple models with replicate simulations
 
-Run replicates for ALL models with checkpointing.
-
-**Usage**:
 ```bash
-python -m shypn.cli.experimental.run_batch_replicates \
-    --models experiments/tau_leaping/models/model_list.csv \
-    --sbml-dir ../../doc/papers/foundation/experimental_data/biomodels_dataset/sbml_files/ \
-    --replicates 1000 \
-    --duration 100.0 \
-    --output experiments/tau_leaping/data/replicates/ \
-    --checkpoint experiments/tau_leaping/checkpoints/progress.json \
-    --parallel-workers 4
+./run_batch_replicates.py batch.csv -n 100 --parallel -o batch_results/
 ```
 
-**Features**:
-- ✅ Checkpoint every model (resume failed runs)
-- ✅ Progress bar (tqdm)
-- ✅ Error isolation (one failure doesn't kill batch)
-- ✅ Parallel processing (process N models at once)
-
----
-
-### 4. benchmark_timing.py
-
-Measure execution time and compute speedup.
-
-**Usage**:
-```bash
-python -m shypn.cli.experimental.benchmark_timing \
-    --model data/models/BIOMD0000000064.xml \
-    --repetitions 10 \
-    --duration 100.0 \
-    --output experiments/tau_leaping/data/timing/BIOMD0000000064_timing.json
+**CSV Format**:
+```csv
+model_id,model_path
+MODEL1,path/to/model1.xml
+MODEL2,path/to/model2.xml
 ```
 
-**Output**: JSON with timing statistics and speedup
+**Options**:
+- `-n, --replicates`: Replicates per model (default: 100)
+- `-d, --duration`: Simulation duration (default: 100.0)
+- `--parallel`: Use parallel processing
+- `-o, --output`: Output directory
 
----
+**Output**:
+- `batch_summary.json`: Complete results for all models
+- `successful_models.csv`: List of successful models
+- `failed_models.csv`: List of failed models with errors
 
-### 5. validate_equivalence.py
+### 4. validate_equivalence.py
+**Purpose**: Compare τ-leaping vs Gillespie SSA for equivalence
 
-Statistical validation of parallel vs sequential equivalence.
-
-**Usage**:
 ```bash
-python -m shypn.cli.experimental.validate_equivalence \
-    --parallel experiments/tau_leaping/data/replicates/BIOMD0000000064/parallel_trajectories.csv \
-    --sequential experiments/tau_leaping/data/replicates/BIOMD0000000064/sequential_trajectories.csv \
-    --output experiments/tau_leaping/validation/BIOMD0000000064_validation.json \
-    --alpha 0.05
+./validate_equivalence.py model.xml -n 100 -d 100.0 -o validation/
 ```
 
-**Tests**:
-- **MAE** (Mean Absolute Error): `|mean_par - mean_seq|` < 1% threshold
-- **CV Error**: `|CV_par - CV_seq| / CV_seq` < 5% threshold
-- **KS Test**: Kolmogorov-Smirnov p-value > 0.05 (not significantly different)
+**Algorithm**:
+1. Run n replicates with τ-leaping
+2. Run n replicates with Gillespie SSA
+3. Compare final means per species
+4. Calculate relative difference: |τ - SSA| / |SSA|
+5. Determine equivalence (5% tolerance)
 
----
+**Verdict**:
+- ✅ **PASSED**: ≥95% equivalent species
+- ⚠️ **WARNING**: ≥90% equivalent species
+- ❌ **FAILED**: <90% equivalent species
+
+**Output**: `validation_results.json`
+
+### 5. benchmark_timing.py
+**Purpose**: Measure and compare execution times
+
+```bash
+./benchmark_timing.py model.xml -n 100 --compare -o benchmark/
+```
+
+**Options**:
+- `--compare`: Compare τ-leaping with Gillespie SSA
+
+**Output**:
+- `benchmark_results.json`: Timing data and speedup factor
 
 ### 6. analyze_dependency_impact.py
+**Purpose**: Analyze model dependency structure and parallelization potential
 
-Correlate speedup with dependency structure.
-
-**Usage**:
 ```bash
-python -m shypn.cli.experimental.analyze_dependency_impact \
-    --timing-dir experiments/tau_leaping/data/timing/ \
-    --models experiments/tau_leaping/models/model_list.csv \
-    --sbml-dir ../../doc/papers/foundation/experimental_data/biomodels_dataset/sbml_files/ \
-    --output experiments/tau_leaping/reports/dependency_analysis.json
+./analyze_dependency_impact.py model.xml -n 50 -o dependency/
 ```
 
-**Output**: Regression analysis, correlation coefficients
+**Analysis**:
+- Counts independent vs dependent transitions
+- Calculates independence ratio
+- Recommends parallelization potential (HIGH/MODERATE/LOW)
 
----
+**Output**: `dependency_analysis.json`
 
-### 7. plot_validation_results.py
+### 7. plot_speedup_analysis.py
+**Purpose**: Visualize performance benchmark results
 
-Generate validation visualizations.
-
-**Usage**:
 ```bash
-python -m shypn.cli.experimental.plot_validation_results \
-    --validation-dir experiments/tau_leaping/validation/ \
-    --replicates-dir experiments/tau_leaping/data/replicates/ \
-    --output experiments/tau_leaping/figures/ \
-    --format pdf
+./plot_speedup_analysis.py benchmark_results.json -o speedup.png
 ```
 
-**Generates**:
-- Violin plots (distribution comparison)
-- Heatmaps (MAE across models × species)
-- Trajectory overlays (sample time-series)
-- KS test p-value distribution
+**Requires**: matplotlib
 
----
+**Output**: Two-panel figure with execution time comparison and speedup factor
 
-### 8. plot_speedup_analysis.py
+### 8. plot_validation_results.py
+**Purpose**: Visualize algorithm equivalence results
 
-Generate speedup visualizations.
-
-**Usage**:
 ```bash
-python -m shypn.cli.experimental.plot_speedup_analysis \
-    --timing-dir experiments/tau_leaping/data/timing/ \
-    --dependency-analysis experiments/tau_leaping/reports/dependency_analysis.json \
-    --output experiments/tau_leaping/figures/ \
-    --format pdf
+./plot_validation_results.py validation_results.json -o validation.png
 ```
 
-**Generates**:
-- Box plot (speedup distribution)
-- Scatter plot (speedup vs weak independence ratio)
-- Histogram (speedup frequency)
-- Bar chart (top 10 models by speedup)
+**Requires**: matplotlib
 
----
+**Output**: Two-panel figure with mean comparison and relative differences
 
 ### 9. generate_experiment_report.py
-
-Aggregate all results into comprehensive report.
-
-**Usage**:
-```bash
-python -m shypn.cli.experimental.generate_experiment_report \
-    --experiment-dir experiments/tau_leaping/ \
-    --output experiments/tau_leaping/reports/FINAL_REPORT.md \
-    --latex experiments/tau_leaping/reports/tables.tex
-```
-
-**Generates**:
-- Markdown report (human-readable summary)
-- LaTeX tables (camera-ready for paper)
-- Summary statistics (overall validation rates)
-
----
-
-### 10. run_full_experiment.sh
-
-Master orchestration script that runs entire pipeline.
-
-**Usage**:
-```bash
-bash run_full_experiment.sh experiments/tau_leaping_validation/
-```
-
-## Example: Complete Validation Workflow
+**Purpose**: Generate comprehensive markdown report
 
 ```bash
-# Step 1: Setup
-shypn-setup-experiment \
-    --name "tau_leaping_validation_93_models" \
-    --models model_list.csv \
-    --output exp/
-
-# Step 2: Run batch replicates (this takes ~24-48 hours)
-shypn-batch-replicates \
-    --models exp/models/model_list.csv \
-    --sbml-dir biomodels_sbml/ \
-    --replicates 1000 \
-    --output exp/data/replicates/ \
-    --checkpoint exp/checkpoints/progress.json
-
-# Step 3: Benchmark timing
-for model_id in $(cat exp/models/model_list.csv | tail -n +2 | cut -d',' -f1); do
-    shypn-benchmark-timing \
-        --model biomodels_sbml/${model_id}.xml \
-        --repetitions 10 \
-        --output exp/data/timing/${model_id}_timing.json
-done
-
-# Step 4: Validate equivalence
-for model_id in $(cat exp/models/model_list.csv | tail -n +2 | cut -d',' -f1); do
-    shypn-validate-equivalence \
-        --parallel exp/data/replicates/${model_id}/parallel_trajectories.csv \
-        --sequential exp/data/replicates/${model_id}/sequential_trajectories.csv \
-        --output exp/validation/${model_id}_validation.json
-done
-
-# Step 5: Dependency analysis
-shypn-analyze-dependency-impact \
-    --timing-dir exp/data/timing/ \
-    --models exp/models/model_list.csv \
-    --output exp/reports/dependency_analysis.json
-
-# Step 6: Generate plots
-shypn-plot-validation --validation-dir exp/validation/ --output exp/figures/
-shypn-plot-speedup --timing-dir exp/data/timing/ --output exp/figures/
-
-# Step 7: Generate final report
-shypn-generate-report \
-    --experiment-dir exp/ \
-    --output exp/reports/FINAL_REPORT.md \
-    --latex exp/reports/tables.tex
+./generate_experiment_report.py \
+  --validation validation_results.json \
+  --benchmark benchmark_results.json \
+  --dependency dependency_analysis.json \
+  -o report.md
 ```
 
-## Success Criteria
+**Output**: Markdown report with tables, conclusions, and recommendations
 
-### Statistical Validation
-- ✅ MAE < 1% of sequential mean
-- ✅ CV error < 5%
-- ✅ KS test p-value > 0.05
-- ✅ >95% of models pass validation
+### 10. analyze_batch_results.py
+**Purpose**: Analyze and summarize batch experiment results
 
-### Performance
-- ✅ Speedup > 1.5× for models with >70% weak independence
-- ✅ No degradation for competitive-heavy models
+```bash
+./analyze_batch_results.py batch_summary.json -o analysis.json
+```
 
-### Reproducibility
-- ✅ Fixed random seeds produce identical results
-- ✅ Complete provenance tracking
+**Output**: Summary statistics and model distribution analysis
 
-## Implementation Status
+## Example Workflow
 
-| Tool | Status | Priority |
-|------|--------|----------|
-| setup_experiment.py | 🔜 To implement | Week 2 |
-| run_replicates.py | 🔜 To implement | Week 2 |
-| run_batch_replicates.py | 🔜 To implement | Week 2 |
-| benchmark_timing.py | 🔜 To implement | Week 2 |
-| validate_equivalence.py | 🔜 To implement | Week 2 |
-| analyze_dependency_impact.py | 🔜 To implement | Week 3 |
-| plot_validation_results.py | 🔜 To implement | Week 3 |
-| plot_speedup_analysis.py | 🔜 To implement | Week 3 |
-| generate_experiment_report.py | 🔜 To implement | Week 3 |
-| run_full_experiment.sh | 🔜 To implement | Week 3 |
+```bash
+# 1. Setup experiment
+./setup_experiment.py
 
-## Dependencies
+# 2. Validate equivalence
+./validate_equivalence.py model.xml -n 100 -o results/
 
-Platform requirements (Week 1):
-- `ReplicateRunner` class (run n simulations)
-- `BatchProcessor` class (process multiple models)
-- Export API (programmatic data export)
+# 3. Benchmark performance  
+./benchmark_timing.py model.xml -n 100 --compare -o results/
 
-Python packages:
-- `scipy` (statistical tests)
-- `pandas` (data handling)
-- `numpy` (numerical computations)
-- `matplotlib` (plotting)
-- `tqdm` (progress bars)
+# 4. Analyze dependencies
+./analyze_dependency_impact.py model.xml -n 50 -o results/
 
-## Support
+# 5. Generate visualizations
+./plot_validation_results.py results/validation_results.json -o results/validation.png
+./plot_speedup_analysis.py results/benchmark_results.json -o results/speedup.png
 
-For issues or questions about the experimental toolkit:
-- See main [CLI README](../README.md)
-- Check [EXPERIMENTAL_TOOLKIT_DESIGN.md](../../doc/papers/tau-leaping/EXPERIMENTAL_TOOLKIT_DESIGN.md)
+# 6. Compile report
+./generate_experiment_report.py \
+  --validation results/validation_results.json \
+  --benchmark results/benchmark_results.json \
+  --dependency results/dependency_analysis.json \
+  -o results/report.md
+```
+
+## Batch Experiment Example
+
+```bash
+# Create batch CSV with 100 BioModels
+cat > biomodels_batch.csv << EOF
+model_id,model_path
+$(for i in $(seq -f "%04g" 1 100); do 
+    echo "BIOMD00000000${i#0},../../doc/papers/foundation/experimental_data/biomodels_dataset/sbml_files/BIOMD00000000${i#0}.xml"
+done)
+EOF
+
+# Run batch (this may take hours)
+./run_batch_replicates.py biomodels_batch.csv -n 100 -d 100.0 --parallel -o biomodels_results/
+
+# Analyze results
+./analyze_batch_results.py biomodels_results/batch_summary.json
+```
+
+## Validation Criteria
+
+### Equivalence Test
+- **Tolerance**: 5% relative difference
+- **Success**: ≥95% of species equivalent
+- **Warning**: 90-95% of species equivalent
+- **Failure**: <90% of species equivalent
+
+### Performance Benchmark
+- **Speedup**: Total time ratio (Gillespie / τ-leaping)
+- **Expected**: 1.5-3x for medium models (10-50 species)
+- **Best case**: >5x for large models (>100 species)
+
+## Troubleshooting
+
+### Import Errors
+All tools use `_fix_imports.py` to add `src/` to Python path. Ensure you run from `cli/experimental/` directory.
+
+### SBML Loading Errors
+Tools use `_sbml_loader.py` which handles the full pipeline:
+- SBMLParser → PathwayPostProcessor → PathwayConverter → DocumentModel
+
+### Simulation Failures
+Check model structure:
+- Verify all species have initial values
+- Check for numerical issues (very large/small values)
+- Examine kinetic rate expressions
+
+## Implementation Details
+
+### Architecture
+```
+CLI Tools (this directory)
+├── User Interface Layer
+├── Facade Layer (Week 1)
+│   ├── ReplicateRunner
+│   ├── BatchProcessor
+│   └── Export API
+└── Core Platform
+    ├── SimulationController
+    ├── TauLeapingEngine
+    └── GillespieSSA
+```
+
+### Data Formats
+
+**CSV (Batch Input)**:
+```csv
+model_id,model_path
+BIOMD0000000001,path/to/model.xml
+```
+
+**JSON (Results)**:
+```json
+{
+  "model_name": "BIOMD0000000001",
+  "n_replicates": 100,
+  "species_statistics": {
+    "Species1": {
+      "mean": [0.0, 1.2, ...],
+      "std": [0.0, 0.3, ...],
+      "cv": [0.0, 0.25, ...]
+    }
+  }
+}
+```
+
+## Testing
+
+### Unit Test
+```bash
+# Test single model
+./validate_equivalence.py \
+  ../../doc/papers/foundation/experimental_data/biomodels_dataset/sbml_files/BIOMD0000000001.xml \
+  -n 10 -d 50.0 -o test_output/
+```
+
+### Integration Test
+```bash
+# Run complete workflow
+./test_workflow.sh
+```
+
+### Batch Test
+```bash
+# Test with 10 models
+./run_batch_replicates.py batch_experiment.csv -n 5 -d 50.0 -o test_batch/
+./analyze_batch_results.py test_batch/batch_summary.json
+```
+
+## Performance Notes
+
+- **Single model**: ~1-10 seconds (100 replicates, 100 time units)
+- **Batch (10 models)**: ~1-5 minutes (5 replicates, 50 time units)
+- **Large batch (100 models)**: ~30-120 minutes (100 replicates, 100 time units)
+
+## Paper 2 Usage
+
+These tools are designed for the experimental validation section of Paper 2:
+
+1. **Equivalence Validation**: Demonstrate τ-leaping produces equivalent results
+2. **Performance Analysis**: Show computational speedup benefits
+3. **Scalability Study**: Test across diverse model sizes
+4. **Dependency Impact**: Analyze parallelization potential
+
+## Author
+
+Eugênio Simão  
+December 2025
+
+## License
+
+Part of the ShyPN project.
