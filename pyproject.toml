@@ -30,3 +30,26 @@ classifiers = [
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["shypn*", "shypn.api*"]
+
+[project.scripts]
+# Experimental validation tools
+shypn-setup-experiment = "cli.experimental.setup_experiment:main"
+shypn-run-replicates = "cli.experimental.run_replicates:main"
+shypn-batch-replicates = "cli.experimental.run_batch_replicates:main"
+shypn-benchmark-timing = "cli.experimental.benchmark_timing:main"
+shypn-validate-equivalence = "cli.experimental.validate_equivalence:main"
+shypn-analyze-dependency-impact = "cli.experimental.analyze_dependency_impact:main"
+shypn-plot-validation = "cli.experimental.plot_validation_results:main"
+shypn-plot-speedup-analysis = "cli.experimental.plot_speedup_analysis:main"
+shypn-generate-report = "cli.experimental.generate_experiment_report:main"
+
+# Data acquisition tools
+shypn-fetch-biomodels = "cli.data.fetch_biomodels:main"
+
+# Model analysis tools
+shypn-classify-dependencies = "cli.analysis.classify_dependencies:main"
+shypn-validate-topology = "cli.analysis.validate_topology:main"
+shypn-validate-sbml = "cli.analysis.validate_sbml_conversion:main"
+
+# Visualization tools
+shypn-plot-speedup = "cli.visualization.plot_speedup:main"
