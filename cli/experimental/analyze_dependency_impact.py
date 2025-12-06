@@ -14,15 +14,26 @@ def analyze_dependencies(model):
     independent_count = 0
     dependent_count = 0
     
+    # Build dict of transition -> connected places
+    transition_places = {}
     for t in model.transitions:
-        # A transition is independent if it doesn't share places with others
+        connected_places = set()
+        # Get all arcs connected to this transition
+        for arc in model.arcs:
+            if arc.source == t:
+                connected_places.add(arc.target)
+            elif arc.target == t:
+                connected_places.add(arc.source)
+        transition_places[t] = connected_places
+    
+    # Check for dependencies (shared places)
+    for t in model.transitions:
+        t_places = transition_places[t]
         shared = False
         for other in model.transitions:
             if t == other:
                 continue
-            # Check for shared places in pre/post conditions
-            t_places = set(t.pre_conditions.keys()) | set(t.post_conditions.keys())
-            other_places = set(other.pre_conditions.keys()) | set(other.post_conditions.keys())
+            other_places = transition_places[other]
             if t_places & other_places:
                 shared = True
                 break
