@@ -1,0 +1,22 @@
+{
+  "model_info": {
+    "name": "BIOMD0000000001.xml",
+    "places": 12,
+    "transitions": 17
+  },
+  "dependency_structure": {
+    "total_transitions": 17,
+    "independent": 0,
+    "dependent": 17,
+    "independence_ratio": 0.0
+  },
+  "simulation_results": {
+    "n_replicates": 5,
+    "successful": 5,
+    "success_rate": 1.0
+  },
+  "performance_insight": {
+    "parallelization_potential": 0.0,
+    "recommendation": "LOW"
+  }
+}
