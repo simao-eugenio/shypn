@@ -1,47 +1,91 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Tool: To be implemented
+"""Benchmark Timing - Measure and compare execution times"""
+import argparse, sys, json, time
+from pathlib import Path
+from shypn.engine.simulation.replicate_runner import ReplicateRunner
+from shypn.data.pathway.sbml_parser import SBMLParser
+from shypn.data.pathway.pathway_converter import PathwayConverter
 
-Usage:
-    python -m shypn.cli.experimental.TOOL_NAME [options]
-
-Author: SHYpn Development Team
-License: MIT
-Version: 1.0.0
-"""
-
-import argparse
-import sys
-
-
-def parse_arguments():
-    """Parse command-line arguments."""
-    parser = argparse.ArgumentParser(
-        description='Tool description here',
-        formatter_class=argparse.RawDescriptionHelpFormatter
+def benchmark_algorithm(model, algorithm_name, use_tau_leaping, n_replicates, duration):
+    """Benchmark a single algorithm."""
+    runner = ReplicateRunner(model)
+    
+    start_time = time.time()
+    results = runner.run_replicates(
+        n=n_replicates,
+        use_tau_leaping=use_tau_leaping,
+        duration=duration,
+        verbose=False
     )
+    end_time = time.time()
     
-    parser.add_argument('--version', action='version', version='%(prog)s 1.0.0')
+    elapsed = end_time - start_time
+    per_replicate = elapsed / n_replicates
     
-    return parser.parse_args()
-
+    return {
+        'algorithm': algorithm_name,
+        'n_replicates': n_replicates,
+        'total_time': float(elapsed),
+        'time_per_replicate': float(per_replicate),
+        'successful': sum(1 for r in results if 'error' not in r)
+    }
 
 def main():
-    """Main entry point."""
-    args = parse_arguments()
+    parser = argparse.ArgumentParser(description='Benchmark simulation timing')
+    parser.add_argument('model', help='SBML model file')
+    parser.add_argument('-n', '--replicates', type=int, default=100)
+    parser.add_argument('-d', '--duration', type=float, default=100.0)
+    parser.add_argument('--compare', action='store_true', help='Compare both algorithms')
+    parser.add_argument('-o', '--output', default='benchmark_results')
+    args = parser.parse_args()
     
     try:
-        print("🔜 This tool is not yet implemented.")
-        print("See cli/experimental/README.md for implementation roadmap.")
-        sys.exit(1)
+        model_path = Path(args.model)
+        if not model_path.exists():
+            sys.exit(f"ERROR: Model not found: {model_path}")
+        
+        output_dir = Path(args.output)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        
+        print(f"Loading {model_path.name}...")
+        parser_obj = SBMLParser()
+        pathway = parser_obj.parse_file(model_path)
+        converter = PathwayConverter()
+        model = converter.convert(pathway)
+        print(f"  Model: {len(model.places)} places, {len(model.transitions)} transitions")
+        
+        results = {}
+        
+        # Benchmark τ-leaping
+        print(f"\nBenchmarking τ-leaping ({args.replicates} replicates)...")
+        results['tau_leaping'] = benchmark_algorithm(model, 'τ-leaping', True, args.replicates, args.duration)
+        print(f"  Time: {results['tau_leaping']['total_time']:.2f}s "
+              f"({results['tau_leaping']['time_per_replicate']*1000:.1f}ms per replicate)")
+        
+        if args.compare:
+            # Benchmark Gillespie
+            print(f"\nBenchmarking Gillespie SSA ({args.replicates} replicates)...")
+            results['gillespie'] = benchmark_algorithm(model, 'Gillespie', False, args.replicates, args.duration)
+            print(f"  Time: {results['gillespie']['total_time']:.2f}s "
+                  f"({results['gillespie']['time_per_replicate']*1000:.1f}ms per replicate)")
+            
+            # Compute speedup
+            speedup = results['gillespie']['total_time'] / results['tau_leaping']['total_time']
+            results['speedup'] = float(speedup)
+            
+            print(f"\n{'='*60}")
+            print(f"Speedup: {speedup:.2f}x (τ-leaping is {speedup:.2f}x faster)")
+            print(f"{'='*60}")
+        
+        # Export results
+        results_file = output_dir / 'benchmark_results.json'
+        with open(results_file, 'w') as f:
+            json.dump(results, f, indent=2)
+        
+        print(f"\n✓ Results saved to: {results_file}")
         
     except Exception as e:
-        print(f"ERROR: {e}", file=sys.stderr)
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)
-
+        sys.exit(f"ERROR: {e}")
 
 if __name__ == '__main__':
     main()
