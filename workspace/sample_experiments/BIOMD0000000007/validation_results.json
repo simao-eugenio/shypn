@@ -1,0 +1,139 @@
+{
+  "comparison": {
+    "P1": {
+      "tau_mean": 1.0,
+      "ssa_mean": 1.0,
+      "rel_diff": 0.0,
+      "equivalent": true
+    },
+    "P2": {
+      "tau_mean": 0.0,
+      "ssa_mean": 0.0,
+      "rel_diff": 0.0,
+      "equivalent": true
+    },
+    "P3": {
+      "tau_mean": 0.0,
+      "ssa_mean": 0.0,
+      "rel_diff": 0.0,
+      "equivalent": true
+    },
+    "P4": {
+      "tau_mean": 0.0,
+      "ssa_mean": 0.0,
+      "rel_diff": 0.0,
+      "equivalent": true
+    },
+    "P5": {
+      "tau_mean": 0.0,
+      "ssa_mean": 0.0,
+      "rel_diff": 0.0,
+      "equivalent": true
+    },
+    "P6": {
+      "tau_mean": 1.0,
+      "ssa_mean": 1.0,
+      "rel_diff": 0.0,
+      "equivalent": true
+    },
+    "P7": {
+      "tau_mean": 0.0,
+      "ssa_mean": 0.0,
+      "rel_diff": 0.0,
+      "equivalent": true
+    },
+    "P8": {
+      "tau_mean": 0.0,
+      "ssa_mean": 0.0,
+      "rel_diff": 0.0,
+      "equivalent": true
+    },
+    "P9": {
+      "tau_mean": 0.0,
+      "ssa_mean": 0.0,
+      "rel_diff": 0.0,
+      "equivalent": true
+    },
+    "P10": {
+      "tau_mean": 0.0,
+      "ssa_mean": 0.0,
+      "rel_diff": 0.0,
+      "equivalent": true
+    },
+    "P11": {
+      "tau_mean": 0.0,
+      "ssa_mean": 0.0,
+      "rel_diff": 0.0,
+      "equivalent": true
+    },
+    "P12": {
+      "tau_mean": 0.0,
+      "ssa_mean": 0.0,
+      "rel_diff": 0.0,
+      "equivalent": true
+    },
+    "P13": {
+      "tau_mean": 0.0,
+      "ssa_mean": 0.0,
+      "rel_diff": 0.0,
+      "equivalent": true
+    },
+    "P14": {
+      "tau_mean": 0.0,
+      "ssa_mean": 0.0,
+      "rel_diff": 0.0,
+      "equivalent": true
+    },
+    "P15": {
+      "tau_mean": 0.0,
+      "ssa_mean": 0.0,
+      "rel_diff": 0.0,
+      "equivalent": true
+    },
+    "P16": {
+      "tau_mean": 0.0,
+      "ssa_mean": 0.0,
+      "rel_diff": 0.0,
+      "equivalent": true
+    },
+    "P17": {
+      "tau_mean": 0.0,
+      "ssa_mean": 0.0,
+      "rel_diff": 0.0,
+      "equivalent": true
+    },
+    "P18": {
+      "tau_mean": 0.0,
+      "ssa_mean": 0.0,
+      "rel_diff": 0.0,
+      "equivalent": true
+    },
+    "P19": {
+      "tau_mean": 0.0,
+      "ssa_mean": 0.0,
+      "rel_diff": 0.0,
+      "equivalent": true
+    },
+    "P20": {
+      "tau_mean": 1.0,
+      "ssa_mean": 1.0,
+      "rel_diff": 0.0,
+      "equivalent": true
+    },
+    "P21": {
+      "tau_mean": 1.0,
+      "ssa_mean": 1.0,
+      "rel_diff": 0.0,
+      "equivalent": true
+    },
+    "P22": {
+      "tau_mean": 1.0,
+      "ssa_mean": 1.0,
+      "rel_diff": 0.0,
+      "equivalent": true
+    }
+  },
+  "n_species": 22,
+  "n_equivalent": 22,
+  "equivalence_rate": 1.0
+}
