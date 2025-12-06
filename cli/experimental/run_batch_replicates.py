@@ -10,10 +10,7 @@ from _sbml_loader import load_sbml_model
 
 def process_model(model_id, model_path, config):
     """Process single model with replicates."""
-    parser = SBMLParser()
-    pathway = parser.parse_file(model_path)
-    converter = PathwayConverter()
-    model = converter.convert(pathway)
+    model = load_sbml_model(Path(model_path))
     
     runner = ReplicateRunner(model)
     results = runner.run_replicates(

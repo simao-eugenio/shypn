@@ -1,0 +1,11 @@
+model_id,error
+BIOMD0000000001,NameError: name 'SBMLParser' is not defined
+BIOMD0000000004,NameError: name 'SBMLParser' is not defined
+BIOMD0000000005,NameError: name 'SBMLParser' is not defined
+BIOMD0000000006,NameError: name 'SBMLParser' is not defined
+BIOMD0000000007,NameError: name 'SBMLParser' is not defined
+BIOMD0000000008,NameError: name 'SBMLParser' is not defined
+BIOMD0000000009,NameError: name 'SBMLParser' is not defined
+BIOMD0000000010,NameError: name 'SBMLParser' is not defined
+BIOMD0000000011,NameError: name 'SBMLParser' is not defined
+BIOMD0000000012,NameError: name 'SBMLParser' is not defined
