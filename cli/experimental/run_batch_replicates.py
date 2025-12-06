@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Run Batch Replicates - Process multiple models with replicates"""
+import _fix_imports  # Add src to path
 import argparse, sys
 from pathlib import Path
 from shypn.data.batch import BatchProcessor
 from shypn.engine.simulation.replicate_runner import ReplicateRunner
-from shypn.data.pathway.sbml_parser import SBMLParser
-from shypn.data.pathway.pathway_converter import PathwayConverter
+from _sbml_loader import load_sbml_model
+
 
 def process_model(model_id, model_path, config):
     """Process single model with replicates."""

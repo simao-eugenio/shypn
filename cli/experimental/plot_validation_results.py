@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Plot Validation Results - Visualize algorithm equivalence results"""
+import _fix_imports  # Add src to path
 import argparse, sys, json
 from pathlib import Path
 

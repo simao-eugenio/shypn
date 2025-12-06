@@ -129,11 +129,15 @@ class ReplicateRunner:
             # Start data collection
             controller.data_collector.start_collection()
             
+            # Calculate max_steps from duration
+            dt = time_step if time_step else controller.settings.get_effective_dt()
+            max_steps = int(duration / dt)
+            
             # Run simulation
             try:
                 controller.run(
-                    duration=duration,
-                    time_step=time_step if time_step else controller.settings.get_effective_dt()
+                    time_step=dt,
+                    max_steps=max_steps
                 )
             except Exception as e:
                 if verbose:

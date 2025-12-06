@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Benchmark Timing - Measure and compare execution times"""
+import _fix_imports  # Add src to path
 import argparse, sys, json, time
 from pathlib import Path
 from shypn.engine.simulation.replicate_runner import ReplicateRunner
-from shypn.data.pathway.sbml_parser import SBMLParser
-from shypn.data.pathway.pathway_converter import PathwayConverter
+from _sbml_loader import load_sbml_model
+
 
 def benchmark_algorithm(model, algorithm_name, use_tau_leaping, n_replicates, duration):
     """Benchmark a single algorithm."""
@@ -48,10 +49,7 @@ def main():
         output_dir.mkdir(parents=True, exist_ok=True)
         
         print(f"Loading {model_path.name}...")
-        parser_obj = SBMLParser()
-        pathway = parser_obj.parse_file(model_path)
-        converter = PathwayConverter()
-        model = converter.convert(pathway)
+        model = load_sbml_model(model_path)
         print(f"  Model: {len(model.places)} places, {len(model.transitions)} transitions")
         
         results = {}
