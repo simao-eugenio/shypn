@@ -1,0 +1,378 @@
+#!/usr/bin/env python3
+"""Experiment Queue View - Display and manage queued experiments.
+
+Shows a list of experiments to be executed with their status, progress,
+and control actions. Integrates with BatchExecutor for execution.
+
+Author: Simão Eugénio
+Date: December 7, 2025
+"""
+
+import gi
+gi.require_version('Gtk', '3.0')
+from gi.repository import Gtk, GLib
+
+
+class ExperimentQueueView(Gtk.Box):
+    """Widget displaying experiment queue with status and controls.
+    
+    Features:
+    - TreeView showing queued experiments
+    - Status indicators (pending/running/completed/failed)
+    - Progress tracking per experiment
+    - Control buttons (run/pause/clear)
+    """
+    
+    # Status constants
+    STATUS_PENDING = "pending"
+    STATUS_RUNNING = "running"
+    STATUS_COMPLETED = "completed"
+    STATUS_FAILED = "failed"
+    STATUS_CANCELLED = "cancelled"
+    
+    def __init__(self):
+        """Initialize experiment queue view."""
+        super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        
+        # Queue data: list of dicts with experiment info
+        self.queue = []
+        
+        # Callbacks
+        self.on_run_callback = None
+        self.on_cancel_callback = None
+        self.on_clear_callback = None
+        
+        # Build UI
+        self._build_ui()
+    
+    def _build_ui(self):
+        """Build queue view UI."""
+        # Title
+        title_label = Gtk.Label()
+        title_label.set_markup("<b>Experiment Queue</b>")
+        title_label.set_xalign(0)
+        self.pack_start(title_label, False, False, 0)
+        
+        # Queue TreeView in ScrolledWindow
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        scrolled.set_size_request(-1, 200)
+        
+        # Create ListStore: name, status, progress, snapshot_index
+        # Columns: 0=name (str), 1=status (str), 2=progress (str), 3=snapshot_index (int)
+        self.queue_store = Gtk.ListStore(str, str, str, int)
+        
+        # Create TreeView
+        self.queue_tree = Gtk.TreeView(model=self.queue_store)
+        self.queue_tree.set_headers_visible(True)
+        
+        # Column 1: Experiment Name
+        renderer_name = Gtk.CellRendererText()
+        column_name = Gtk.TreeViewColumn("Experiment", renderer_name, text=0)
+        column_name.set_expand(True)
+        self.queue_tree.append_column(column_name)
+        
+        # Column 2: Status
+        renderer_status = Gtk.CellRendererText()
+        column_status = Gtk.TreeViewColumn("Status", renderer_status, text=1)
+        column_status.set_min_width(100)
+        self.queue_tree.append_column(column_status)
+        
+        # Column 3: Progress
+        renderer_progress = Gtk.CellRendererText()
+        column_progress = Gtk.TreeViewColumn("Progress", renderer_progress, text=2)
+        column_progress.set_min_width(80)
+        self.queue_tree.append_column(column_progress)
+        
+        scrolled.add(self.queue_tree)
+        self.pack_start(scrolled, True, True, 0)
+        
+        # Control buttons
+        button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        
+        # Run All button
+        self.run_button = Gtk.Button(label="▶ Run All")
+        self.run_button.set_tooltip_text("Execute all pending experiments")
+        self.run_button.connect("clicked", self._on_run_clicked)
+        button_box.pack_start(self.run_button, False, False, 0)
+        
+        # Cancel button
+        self.cancel_button = Gtk.Button(label="⏸ Cancel")
+        self.cancel_button.set_tooltip_text("Cancel running execution")
+        self.cancel_button.set_sensitive(False)
+        self.cancel_button.connect("clicked", self._on_cancel_clicked)
+        button_box.pack_start(self.cancel_button, False, False, 0)
+        
+        # Clear Completed button
+        clear_button = Gtk.Button(label="Clear Completed")
+        clear_button.set_tooltip_text("Remove completed experiments from queue")
+        clear_button.connect("clicked", self._on_clear_clicked)
+        button_box.pack_start(clear_button, False, False, 0)
+        
+        # Reset All button
+        reset_button = Gtk.Button(label="⟲ Reset All")
+        reset_button.set_tooltip_text("Reset all completed/failed experiments back to pending")
+        reset_button.connect("clicked", self._on_reset_clicked)
+        button_box.pack_start(reset_button, False, False, 0)
+        
+        # Status label
+        self.status_label = Gtk.Label()
+        self.status_label.set_markup("<i>Queue empty</i>")
+        self.status_label.set_xalign(0)
+        self.status_label.set_hexpand(True)
+        button_box.pack_start(self.status_label, True, True, 0)
+        
+        self.pack_start(button_box, False, False, 0)
+    
+    def add_experiment(self, name, snapshot_index):
+        """Add experiment to queue.
+        
+        Args:
+            name: Experiment name (from snapshot)
+            snapshot_index: Index of snapshot in ExperimentManager
+        """
+        self.queue_store.append([name, self.STATUS_PENDING, "0%", snapshot_index])
+        self._update_status_label()
+    
+    def add_experiments(self, experiments):
+        """Add multiple experiments to queue.
+        
+        Args:
+            experiments: List of (name, snapshot_index) tuples
+        """
+        for name, snapshot_index in experiments:
+            self.add_experiment(name, snapshot_index)
+    
+    def clear_queue(self):
+        """Clear all experiments from queue."""
+        self.queue_store.clear()
+        self._update_status_label()
+    
+    def clear_completed(self):
+        """Remove completed experiments from queue."""
+        iter = self.queue_store.get_iter_first()
+        while iter:
+            status = self.queue_store.get_value(iter, 1)
+            if status == self.STATUS_COMPLETED:
+                # Store next iter before removing current
+                next_iter = self.queue_store.iter_next(iter)
+                self.queue_store.remove(iter)
+                iter = next_iter
+            else:
+                iter = self.queue_store.iter_next(iter)
+        self._update_status_label()
+    
+    def update_experiment_status(self, index, status, progress=None):
+        """Update experiment status and progress.
+        
+        Args:
+            index: Row index in queue (TreeView row number)
+            status: New status (pending/running/completed/failed/cancelled)
+            progress: Optional progress string (e.g., "50%", "100%", error message)
+        """
+        try:
+            # Get iterator for the row
+            iter = self.queue_store.get_iter(index)
+            if not iter:
+                print(f"[QUEUE_VIEW] ERROR: Could not get iter for index {index}")
+                return
+            
+            # Get experiment name for logging
+            name = self.queue_store.get_value(iter, 0)
+            print(f"[QUEUE_VIEW] Updating '{name}' (row {index}): status={status}, progress={progress}")
+            
+            # Update status (column 1)
+            self.queue_store.set_value(iter, 1, status)
+            
+            # Update progress (column 2) if provided
+            if progress is not None:
+                self.queue_store.set_value(iter, 2, str(progress))
+            
+            # Update global status label
+            self._update_status_label()
+            
+            print(f"[QUEUE_VIEW] Successfully updated '{name}' to {status}")
+            
+        except Exception as e:
+            print(f"[QUEUE_VIEW] ERROR: update_experiment_status failed for index {index}: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def get_pending_experiments(self):
+        """Get list of pending experiments.
+        
+        Returns:
+            list: List of (index, name, snapshot_index) tuples for pending experiments
+        """
+        pending = []
+        iter = self.queue_store.get_iter_first()
+        index = 0
+        while iter:
+            status = self.queue_store.get_value(iter, 1)
+            if status == self.STATUS_PENDING:
+                name = self.queue_store.get_value(iter, 0)
+                snapshot_index = self.queue_store.get_value(iter, 3)
+                pending.append((index, name, snapshot_index))
+            iter = self.queue_store.iter_next(iter)
+            index += 1
+        return pending
+    
+    def set_running(self, is_running):
+        """Update UI for running/stopped state.
+        
+        Args:
+            is_running: True if execution is running
+        """
+        self.run_button.set_sensitive(not is_running)
+        self.cancel_button.set_sensitive(is_running)
+        
+        # Update status label to reflect running state
+        if is_running:
+            # Count running/pending experiments
+            running = 0
+            pending = 0
+            iter = self.queue_store.get_iter_first()
+            while iter:
+                status = self.queue_store.get_value(iter, 1)
+                if status == self.STATUS_RUNNING:
+                    running += 1
+                elif status == self.STATUS_PENDING:
+                    pending += 1
+                iter = self.queue_store.iter_next(iter)
+            
+            if running > 0 or pending > 0:
+                self.status_label.set_markup(f"<b>Running... ({running} active, {pending} pending)</b>")
+        else:
+            # Not running - refresh normal status
+            self._update_status_label()
+    
+    def _update_status_label(self):
+        """Update status label with queue statistics."""
+        total = len(self.queue_store)
+        if total == 0:
+            self.status_label.set_markup("<i>Queue empty</i>")
+            return False  # For GLib.timeout_add
+        
+        # Count by status
+        pending = 0
+        running = 0
+        completed = 0
+        failed = 0
+        cancelled = 0
+        
+        iter = self.queue_store.get_iter_first()
+        while iter:
+            status = self.queue_store.get_value(iter, 1)
+            if status == self.STATUS_PENDING:
+                pending += 1
+            elif status == self.STATUS_RUNNING:
+                running += 1
+            elif status == self.STATUS_COMPLETED:
+                completed += 1
+            elif status == self.STATUS_FAILED:
+                failed += 1
+            elif status == self.STATUS_CANCELLED:
+                cancelled += 1
+            iter = self.queue_store.iter_next(iter)
+        
+        # Build status text
+        parts = []
+        if pending > 0:
+            parts.append(f"{pending} pending")
+        if running > 0:
+            parts.append(f"<b>{running} running</b>")
+        if completed > 0:
+            parts.append(f"{completed} completed")
+        if cancelled > 0:
+            parts.append(f"<span foreground='orange'>{cancelled} cancelled</span>")
+        if failed > 0:
+            parts.append(f"<span foreground='red'>{failed} failed</span>")
+        
+        status_text = f"{total} total: {', '.join(parts)}"
+        self.status_label.set_markup(status_text)
+        return False  # For GLib.timeout_add
+    
+    def _on_run_clicked(self, button):
+        """Handle Run All button click."""
+        if self.on_run_callback:
+            pending = self.get_pending_experiments()
+            if pending:
+                self.on_run_callback(pending)
+            else:
+                # No pending experiments - show helpful message
+                total = len(self.queue_store)
+                if total == 0:
+                    self.status_label.set_markup("<i>Queue empty - generate experiments first</i>")
+                else:
+                    self.status_label.set_markup("<i>No pending experiments - use 'Reset All' to re-run</i>")
+    
+    def _on_cancel_clicked(self, button):
+        """Handle Cancel button click."""
+        if self.on_cancel_callback:
+            self.on_cancel_callback()
+    
+    def _on_clear_clicked(self, button):
+        """Handle Clear Completed button click."""
+        count_before = len(self.queue_store)
+        self.clear_completed()
+        count_after = len(self.queue_store)
+        removed = count_before - count_after
+        
+        if removed > 0:
+            self.status_label.set_markup(f"<i>Removed {removed} completed experiments</i>")
+            # Give brief feedback then restore normal status
+            GLib.timeout_add(2000, self._update_status_label)
+        
+        if self.on_clear_callback:
+            self.on_clear_callback()
+    
+    def _on_reset_clicked(self, button):
+        """Handle Reset All button click."""
+        count = self.reset_all_to_pending()
+        if count > 0:
+            self.status_label.set_markup(f"<i>Reset {count} experiments to pending</i>")
+            # Give brief feedback then restore normal status
+            GLib.timeout_add(2000, self._update_status_label)
+    
+    def reset_all_to_pending(self):
+        """Reset all completed/failed experiments back to pending status.
+        
+        Returns:
+            int: Number of experiments reset
+        """
+        count = 0
+        iter = self.queue_store.get_iter_first()
+        while iter:
+            status = self.queue_store.get_value(iter, 1)
+            # Reset any non-pending status back to pending
+            if status != self.STATUS_PENDING:
+                self.queue_store.set_value(iter, 1, self.STATUS_PENDING)
+                self.queue_store.set_value(iter, 2, "0%")
+                count += 1
+            iter = self.queue_store.iter_next(iter)
+        self._update_status_label()
+        return count
+    
+    def set_run_callback(self, callback):
+        """Set callback for Run All button.
+        
+        Args:
+            callback: Function to call with list of pending experiments
+        """
+        self.on_run_callback = callback
+    
+    def set_cancel_callback(self, callback):
+        """Set callback for Cancel button.
+        
+        Args:
+            callback: Function to call when canceling
+        """
+        self.on_cancel_callback = callback
+    
+    def set_clear_callback(self, callback):
+        """Set callback for Clear button.
+        
+        Args:
+            callback: Function to call after clearing
+        """
+        self.on_clear_callback = callback

@@ -79,16 +79,17 @@ class DocumentModel:
         return transition
     
     def create_arc(self, source: PetriNetObject, target: PetriNetObject, 
-                   weight: int = 1) -> Optional[Arc]:
+                   weight: int = 1, arc_type: str = 'normal') -> Optional[Arc]:
         """Create a new arc connecting source to target.
         
         Args:
             source: Source object (Place or Transition)
             target: Target object (must be different type from source)
             weight: Arc weight (default 1)
+            arc_type: Type of arc ('normal', 'test', 'inhibitor', 'curved', 'curved_inhibitor_arc')
             
         Returns:
-            The created Arc object, or None if connection is invalid
+            The created Arc object (proper subclass), or None if connection is invalid
         """
         # Validate connection (Place→Transition or Transition→Place)
         source_is_place = isinstance(source, Place)
@@ -102,7 +103,22 @@ class DocumentModel:
         arc_name = arc_id  # Name matches ID
         
         try:
-            arc = Arc(source=source, target=target, id=arc_id, name=arc_name, weight=weight)
+            # Instantiate the appropriate arc subclass based on arc_type
+            if arc_type == 'test':
+                from shypn.netobjs.test_arc import TestArc
+                arc = TestArc(source=source, target=target, id=arc_id, name=arc_name, weight=weight)
+            elif arc_type == 'inhibitor':
+                from shypn.netobjs.inhibitor_arc import InhibitorArc
+                arc = InhibitorArc(source=source, target=target, id=arc_id, name=arc_name, weight=weight)
+            elif arc_type == 'curved':
+                from shypn.netobjs.curved_arc import CurvedArc
+                arc = CurvedArc(source=source, target=target, id=arc_id, name=arc_name, weight=weight)
+            elif arc_type == 'curved_inhibitor_arc':
+                from shypn.netobjs.curved_inhibitor_arc import CurvedInhibitorArc
+                arc = CurvedInhibitorArc(source=source, target=target, id=arc_id, name=arc_name, weight=weight)
+            else:  # 'normal' or default
+                arc = Arc(source=source, target=target, id=arc_id, name=arc_name, weight=weight)
+            
             self.arcs.append(arc)
             return arc
         except ValueError:

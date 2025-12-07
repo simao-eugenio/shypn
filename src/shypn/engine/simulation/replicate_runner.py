@@ -24,6 +24,7 @@ Example:
     runner.export_trajectories_csv(results, "trajectories.csv")
 """
 import json
+import time
 import numpy as np
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Union
@@ -68,7 +69,8 @@ class ReplicateRunner:
         epsilon: float = 0.03,
         seed_base: int = 42,
         time_units: TimeUnits = TimeUnits.SECONDS,
-        verbose: bool = False
+        verbose: bool = False,
+        progress_callback: Optional[callable] = None
     ) -> List[Dict[str, Any]]:
         """Run n independent stochastic simulation replicates.
         
@@ -85,6 +87,7 @@ class ReplicateRunner:
             seed_base: Base random seed (replicate i uses seed_base + i)
             time_units: Time units for duration
             verbose: Print progress messages
+            progress_callback: Optional callback called with progress (0.0-1.0) after each replicate
             
         Returns:
             List of dictionaries, one per replicate, each containing:
@@ -103,13 +106,44 @@ class ReplicateRunner:
             print(f"  Duration: {duration} {time_units.value}")
         
         results = []
+        last_callback_time = time.time()  # Initialize with current time
+        
+        # Report initial 0% progress
+        if progress_callback:
+            progress_callback(0.0)
         
         for i in range(n):
             if verbose and (i + 1) % 100 == 0:
                 print(f"  Progress: {i + 1}/{n} replicates")
             
+            if i == 0:
+                print(f"[REPLICATE] Starting replicate 0/{n}...")
+            
+            # Time-throttled progress reporting: only call callback if 50ms has passed
+            # This prevents overwhelming the GTK event loop while still showing smooth progress
+            if progress_callback and i > 0:
+                current_time = time.time()
+                time_since_last = current_time - last_callback_time
+                
+                # Call callback if either:
+                # 1. At least 50ms (0.05s) has passed since last callback, OR
+                # 2. We're at a 10% boundary, OR
+                # 3. This is the last replicate (100%)
+                current_pct = int((i / n) * 100)
+                prev_pct = int(((i - 1) / n) * 100)
+                at_boundary = current_pct > prev_pct and current_pct % 10 == 0
+                is_last = (i == n - 1)
+                
+                if time_since_last >= 0.05 or at_boundary or is_last:
+                    progress_callback(i / n)
+                    last_callback_time = current_time
+            
             # Create fresh controller for this replicate
+            if i == 0:
+                print(f"[REPLICATE] Creating SimulationController...")
             controller = SimulationController(self.model)
+            if i == 0:
+                print(f"[REPLICATE] SimulationController created, configuring settings...")
             
             # Configure settings
             controller.settings.use_parallel_stochastic = use_parallel
@@ -124,9 +158,13 @@ class ReplicateRunner:
                 controller.settings.dt_manual = time_step
             
             # Reset model to initial marking
+            if i == 0:
+                print(f"[REPLICATE] Resetting model to initial marking...")
             self._reset_model(self.model)
             
             # Start data collection
+            if i == 0:
+                print(f"[REPLICATE] Starting data collection...")
             controller.data_collector.start_collection()
             
             # Calculate max_steps from duration
@@ -134,11 +172,15 @@ class ReplicateRunner:
             max_steps = int(duration / dt)
             
             # Run simulation
+            if i == 0:
+                print(f"[REPLICATE] Starting simulation: dt={dt}, max_steps={max_steps}")
             try:
                 controller.run(
                     time_step=dt,
                     max_steps=max_steps
                 )
+                if i == 0:
+                    print(f"[REPLICATE] Simulation completed successfully")
             except Exception as e:
                 if verbose:
                     print(f"  ERROR in replicate {i}: {e}")
@@ -173,6 +215,10 @@ class ReplicateRunner:
             }
             
             results.append(result)
+        
+        # Report final 100% progress
+        if progress_callback:
+            progress_callback(1.0)
         
         if verbose:
             successful = sum(1 for r in results if 'error' not in r)

@@ -157,6 +157,10 @@ class CategoryFrame(Gtk.Frame):
         # CRITICAL: Prevent show_all() from overriding collapsed state
         # When collapsed, mark content box to be skipped by show_all()
         self._content_box.set_no_show_all(not self.expanded)
+        
+        # When expanding, ensure all content widgets are shown
+        if self.expanded and self._content_widget:
+            self._content_widget.show_all()
     
     def _on_title_clicked(self, widget, event):
         """Handle title bar click to toggle expand/collapse."""

@@ -714,6 +714,10 @@ class Arc(PetriNetObject):
         # Check arc type to determine which class to instantiate
         arc_type = data.get('arc_type', 'normal')
         
+        # Warn if arc_type is missing (old file format)
+        if 'arc_type' not in data:
+            print(f"[WARNING] Arc {data.get('id', '?')} loaded without arc_type field - defaulting to 'normal'. File may be from old version - save to update.")
+        
         # Import subclasses if needed
         if arc_type == 'test':
             from shypn.netobjs.test_arc import TestArc
