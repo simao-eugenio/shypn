@@ -252,6 +252,64 @@ class ExperimentManager:
         """
         return [s.name for s in self.snapshots]
     
+    def generate_sweep_snapshots(self, parameter_type, parameter_name, values, base_snapshot=None):
+        """Generate multiple snapshots from parameter sweep.
+        
+        Args:
+            parameter_type: Type of parameter ('places', 'transitions', 'arcs')
+            parameter_name: Name of parameter to vary
+            values: List of values to test
+            base_snapshot: Base snapshot to vary (uses active if None)
+        
+        Returns:
+            int: Number of snapshots created
+        """
+        if base_snapshot is None:
+            base_snapshot = self.get_active_snapshot()
+            if base_snapshot is None:
+                # Create default snapshot if none exists
+                base_snapshot = self.add_snapshot("Baseline")
+        
+        # Validate parameter exists in base snapshot
+        if parameter_type == 'places':
+            param_dict = base_snapshot.place_markings
+        elif parameter_type == 'transitions':
+            param_dict = base_snapshot.transition_rates
+        elif parameter_type == 'arcs':
+            param_dict = base_snapshot.arc_weights
+        else:
+            raise ValueError(f"Invalid parameter_type: {parameter_type}")
+        
+        if parameter_name not in param_dict:
+            raise ValueError(f"Parameter '{parameter_name}' not found in {parameter_type}")
+        
+        # Generate snapshots for each value
+        created_count = 0
+        for value in values:
+            # Create snapshot name
+            name = f"{parameter_name}={value:.4g}"
+            
+            # Create new snapshot
+            snapshot = ExperimentSnapshot(name)
+            snapshot.place_markings = base_snapshot.place_markings.copy()
+            snapshot.arc_weights = base_snapshot.arc_weights.copy()
+            snapshot.transition_rates = base_snapshot.transition_rates.copy()
+            snapshot.notes = f"Sweep: {parameter_name} = {value}"
+            
+            # Modify the swept parameter
+            if parameter_type == 'places':
+                snapshot.place_markings[parameter_name] = value
+            elif parameter_type == 'transitions':
+                snapshot.transition_rates[parameter_name] = value
+            elif parameter_type == 'arcs':
+                snapshot.arc_weights[parameter_name] = value
+            
+            # Add to snapshots
+            self.snapshots.append(snapshot)
+            created_count += 1
+        
+        return created_count
+    
     def export_to_json(self, filepath):
         """Save all snapshots to JSON file.
         

@@ -317,18 +317,19 @@ class DocumentCanvas:
         return transition
     
     def add_arc(self, source: PetriNetObject, target: PetriNetObject,
-                weight: int = 1) -> Optional[Arc]:
+                weight: int = 1, arc_type: str = 'normal') -> Optional[Arc]:
         """Add an arc connecting source to target.
         
         Args:
             source: Source object (Place or Transition)
             target: Target object (must be different type)
             weight: Arc weight
+            arc_type: Type of arc ('normal', 'test', 'inhibitor', 'curved', 'curved_inhibitor_arc')
             
         Returns:
-            The created Arc, or None if connection is invalid
+            The created Arc (proper subclass), or None if connection is invalid
         """
-        arc = self.document.create_arc(source, target, weight)
+        arc = self.document.create_arc(source, target, weight, arc_type)
         if arc:
             self._notify_change()
         return arc

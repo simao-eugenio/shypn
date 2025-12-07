@@ -117,15 +117,33 @@ class DocumentController:
         Args:
             source: Source object instance (Place or Transition).
             target: Target object instance (Place or Transition).
-            **kwargs: Additional Arc parameters (weight, etc.).
+            **kwargs: Additional Arc parameters (weight, arc_type, etc.).
             
         Returns:
-            Arc: The newly created arc instance.
+            Arc: The newly created arc instance (proper subclass based on arc_type).
         """
         arc_id = self.id_manager.generate_arc_id()
         arc_name = arc_id  # Name matches ID
         
-        arc = Arc(source, target, arc_id, arc_name, **kwargs)
+        # Extract arc_type to determine which class to instantiate
+        arc_type = kwargs.pop('arc_type', 'normal')
+        
+        # Instantiate the appropriate arc subclass
+        if arc_type == 'test':
+            from shypn.netobjs.test_arc import TestArc
+            arc = TestArc(source, target, arc_id, arc_name, **kwargs)
+        elif arc_type == 'inhibitor':
+            from shypn.netobjs.inhibitor_arc import InhibitorArc
+            arc = InhibitorArc(source, target, arc_id, arc_name, **kwargs)
+        elif arc_type == 'curved':
+            from shypn.netobjs.curved_arc import CurvedArc
+            arc = CurvedArc(source, target, arc_id, arc_name, **kwargs)
+        elif arc_type == 'curved_inhibitor_arc':
+            from shypn.netobjs.curved_inhibitor_arc import CurvedInhibitorArc
+            arc = CurvedInhibitorArc(source, target, arc_id, arc_name, **kwargs)
+        else:  # 'normal' or default
+            arc = Arc(source, target, arc_id, arc_name, **kwargs)
+        
         if self._on_change_callback:
             arc.on_changed = self._on_change_callback
         self.arcs.append(arc)

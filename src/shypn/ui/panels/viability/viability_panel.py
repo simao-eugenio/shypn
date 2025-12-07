@@ -337,6 +337,24 @@ class ViabilityPanel(Gtk.Box):
         # Add results container to main layout
         main_box.pack_start(self.content_box, False, False, 0)
         
+        # Separator before experiment automation
+        sep4 = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
+        sep4.set_margin_top(10)
+        main_box.pack_start(sep4, False, False, 0)
+        
+        # === SECTION 8: EXPERIMENT AUTOMATION CATEGORY (NEW) ===
+        from .automation import ExperimentAutomationCategory
+        
+        self.automation_category = ExperimentAutomationCategory(
+            model_canvas=self.model_canvas,
+            experiment_manager=self.experiment_manager,
+            expanded=False  # Collapsed by default
+        )
+        self.automation_category.set_parent_panel(self)
+        
+        # Add to main layout
+        main_box.pack_start(self.automation_category.get_widget(), False, False, 0)
+        
         # Add main box to scrolled window
         self.scrolled_window = Gtk.ScrolledWindow()
         self.scrolled_window.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
@@ -832,12 +850,20 @@ class ViabilityPanel(Gtk.Box):
         for place_obj in locality.output_places:
             self._color_locality_place(place_obj)
         
+        # Color catalyst places (from test arcs - enzymes/cofactors)
+        for place_obj in locality.catalyst_places:
+            self._color_locality_place(place_obj)
+        
         # Color input arcs
         for arc_obj in locality.input_arcs:
             self._color_arc(arc_obj)
         
         # Color output arcs
         for arc_obj in locality.output_arcs:
+            self._color_arc(arc_obj)
+        
+        # Color catalyst arcs (test arcs - non-consuming)
+        for arc_obj in locality.catalyst_arcs:
             self._color_arc(arc_obj)
         
         # Trigger single canvas redraw after coloring all locality objects
@@ -885,6 +911,10 @@ class ViabilityPanel(Gtk.Box):
         # === OUTPUT PLACES (INDENTED ROWS) ===
         for place_obj in locality.output_places:
             self._add_locality_place_row_to_list(place_obj, "Output:")
+        
+        # === CATALYST PLACES (INDENTED ROWS) ===
+        for place_obj in locality.catalyst_places:
+            self._add_locality_place_row_to_list(place_obj, "Catalyst:")
         
         # Show all new widgets (only if panel is packed)
         if self.get_parent() is not None:
@@ -1032,10 +1062,12 @@ class ViabilityPanel(Gtk.Box):
             # Add place IDs
             all_place_ids.update(locality.input_places)
             all_place_ids.update(locality.output_places)
+            all_place_ids.update(locality.catalyst_places)  # Include catalyst/enzyme places
             
             # Add arc IDs
             all_arc_ids.update(locality.input_arcs)
             all_arc_ids.update(locality.output_arcs)
+            all_arc_ids.update(locality.catalyst_arcs)  # Include test arcs (non-consuming)
         
         # Populate Places table
         for place in model.places:
@@ -1085,6 +1117,10 @@ class ViabilityPanel(Gtk.Box):
                 weight,
                 arc_type
             ])
+        
+        # Notify automation category that subnet parameters are updated
+        if hasattr(self, 'automation_category') and self.automation_category:
+            GLib.idle_add(self.automation_category.refresh_parameters)
     
     # === EDITING CALLBACKS ===
     
@@ -2252,6 +2288,10 @@ class ViabilityPanel(Gtk.Box):
                         arc_type
                     ])
                     break
+        
+        # Notify automation category that subnet parameters are updated
+        if hasattr(self, 'automation_category') and self.automation_category:
+            GLib.idle_add(self.automation_category.refresh_parameters)
     
     def _update_ui_state(self):
         """Update UI state based on current selections."""

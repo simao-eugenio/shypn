@@ -1,0 +1,17 @@
+{
+  "tau_leaping": {
+    "algorithm": "\u03c4-leaping",
+    "n_replicates": 20,
+    "total_time": 0.0511019229888916,
+    "time_per_replicate": 0.00255509614944458,
+    "successful": 20
+  },
+  "gillespie": {
+    "algorithm": "Gillespie",
+    "n_replicates": 20,
+    "total_time": 0.027402400970458984,
+    "time_per_replicate": 0.0013701200485229492,
+    "successful": 20
+  },
+  "speedup": 0.5362303288746226
+}

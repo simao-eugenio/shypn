@@ -1190,5 +1190,47 @@ class DynamicAnalysesCategory(BaseReportCategory):
         
         self.reaction_selected_status.set_markup(status_text)
         self.reaction_selected_status.show()
+    
+    def add_experiment_result(self, name, result):
+        """Add an experiment result to the report.
+        
+        Args:
+            name: Experiment name
+            result: Result dictionary with trajectories and statistics
+        """
+        # Update summary to include experiment info
+        current_summary = self.summary_label.get_label()
+        
+        # Extract statistics
+        stats = result.get('statistics', {})
+        n_reps = stats.get('n_replicates', 0)
+        duration = stats.get('duration', 0.0)
+        elapsed = stats.get('elapsed_time', 0.0)
+        
+        # Build experiment summary text
+        exp_text = (
+            f"\n\n<b>Experiment Added:</b> {name}\n"
+            f"  • Replicates: {n_reps}\n"
+            f"  • Duration: {duration:.2f}s\n"
+            f"  • Execution time: {elapsed:.2f}s\n"
+            f"  • Trajectories: {len(result.get('trajectories', []))}"
+        )
+        
+        # Append to existing summary
+        if "No simulation or experimental data available" in current_summary:
+            # Replace placeholder with experiment data
+            self.summary_label.set_markup(
+                f"<b>Experiment Results</b>\n{exp_text.strip()}"
+            )
+        else:
+            # Append to existing data
+            self.summary_label.set_markup(current_summary + exp_text)
+        
+        # Update simulation status to show experiment was added
+        if hasattr(self, 'simulation_status_label'):
+            self.simulation_status_label.set_markup(
+                f"<span foreground='green'>✓ Experiment '{name}' added to report</span>\n"
+                f"<i>Showing {n_reps} replicates with {duration:.2f}s duration</i>"
+            )
 
         
