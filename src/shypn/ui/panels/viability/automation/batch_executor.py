@@ -712,8 +712,14 @@ class BatchExecutor:
         for place_id, marking in snapshot.place_markings.items():
             place = next((p for p in places if p.id == place_id), None)
             if place:
-                place.tokens = int(marking)
-                place.marking = int(marking)
+                original_value = marking
+                int_value = int(marking)
+                place.tokens = int_value
+                place.marking = int_value
+                
+                # Warn if rounding significantly changed the value
+                if abs(original_value - int_value) > 0.1:
+                    print(f"[WARNING] Place '{place_id}' marking {original_value} rounded to {int_value} (places hold integer tokens only)")
         
         # Apply transition rates (only to subnet transitions)
         # Handle both numeric rates and kinetic formulas
