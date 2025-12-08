@@ -171,7 +171,8 @@ class ReplicateRunner:
             dt = time_step if time_step else controller.settings.get_effective_dt()
             max_steps = int(duration / dt)
             
-            # Run simulation
+            # Run simulation synchronously (step-by-step) for background execution
+            # controller.run() uses GLib callbacks which don't work in threads
             if i == 0:
                 print(f"[REPLICATE] Starting simulation:")
                 print(f"[REPLICATE]   duration = {duration}")
@@ -179,10 +180,14 @@ class ReplicateRunner:
                 print(f"[REPLICATE]   max_steps = {max_steps}")
                 print(f"[REPLICATE]   Expected time points: ~{max_steps}")
             try:
-                controller.run(
-                    time_step=dt,
-                    max_steps=max_steps
-                )
+                # Initialize enablement states before simulation
+                controller._update_enablement_states()
+                
+                # Execute simulation steps synchronously
+                for step_num in range(max_steps):
+                    success = controller.step(time_step=dt)
+                    if not success:
+                        break  # Simulation stopped (e.g., deadlock)
                 if i == 0:
                     print(f"[REPLICATE] Simulation completed successfully")
             except Exception as e:
