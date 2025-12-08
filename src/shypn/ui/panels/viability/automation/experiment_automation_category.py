@@ -156,7 +156,10 @@ class ExperimentAutomationCategory:
         self.content_box.pack_start(sep2, False, False, 0)
         
         # Create results browser
-        self.results_browser = ResultsBrowserView()
+        model = None
+        if self.parent_panel:
+            model = self.parent_panel._get_current_model()
+        self.results_browser = ResultsBrowserView(model=model)
         self.results_browser.set_export_callback(self._on_export_results)
         self.results_browser.set_report_callback(self._on_add_to_report)
         self.content_box.pack_start(self.results_browser, True, True, 0)
