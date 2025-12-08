@@ -420,9 +420,10 @@ class BatchExecutor:
                     for species_id in list(statistics['species_statistics'].keys())[:2]:
                         species_data = statistics['species_statistics'][species_id]
                         mean_len = len(species_data.get('mean', []))
-                        print(f"[EXPERIMENT]   Species '{species_id}': mean length = {mean_len}")
+                        mean_first = species_data.get('mean', [])[:3] if len(species_data.get('mean', [])) > 0 else []
+                        print(f"[EXPERIMENT]   Species '{species_id}': mean length = {mean_len}, first values = {mean_first}")
                 if 'time_points' in statistics:
-                    print(f"[EXPERIMENT] Time points length: {len(statistics['time_points'])}")
+                    print(f"[EXPERIMENT] Time points length: {len(statistics['time_points'])}, first = {statistics['time_points'][:3] if len(statistics['time_points']) > 0 else []}")
             else:
                 print(f"[EXPERIMENT] WARNING: No successful replicates")
                 statistics = {
