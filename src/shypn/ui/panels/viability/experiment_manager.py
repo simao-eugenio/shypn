@@ -53,14 +53,21 @@ class ExperimentSnapshot:
             marking = row[2]
             self.place_markings[place_id] = marking
             
-        # Capture transition rates (column 2 = rate)
+        # Capture transition rates (column 2 = rate, column 3 = formula)
+        # For kinetic formulas, use the formula string; otherwise use numeric rate
         for row in transitions_store:
             trans_id = row[0]
             rate = row[2]
-            self.transition_rates[trans_id] = rate
-            # Warn if rate is zero (will prevent firing)
-            if rate == 0 or rate == 0.0 or rate == "0" or rate == "0.0":
-                print(f"[BASELINE WARNING] Transition {trans_id} has ZERO rate - it will never fire!")
+            formula = row[3] if len(row) > 3 else ""
+            
+            # Prefer formula over rate if formula exists
+            if formula and formula.strip():
+                self.transition_rates[trans_id] = formula
+            else:
+                self.transition_rates[trans_id] = rate
+                # Warn if rate is zero (will prevent firing)
+                if rate == 0 or rate == 0.0 or rate == "0" or rate == "0.0":
+                    print(f"[BASELINE WARNING] Transition {trans_id} has ZERO rate and no formula - it will never fire!")
             
         # Capture arc weights (column 3 = weight)
         for row in arcs_store:
