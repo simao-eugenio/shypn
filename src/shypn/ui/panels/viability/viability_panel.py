@@ -180,10 +180,11 @@ class ViabilityPanel(Gtk.Box):
         buttons_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
         buttons_box.set_margin_top(5)
         
-        self.diagnose_button = Gtk.Button(label="Diagnose Selected")
-        self.diagnose_button.connect("clicked", self._on_diagnose_clicked)
-        self.diagnose_button.set_sensitive(False)
-        buttons_box.pack_start(self.diagnose_button, True, True, 0)
+        # FUTURE ENHANCEMENT: Automatic diagnostics (currently disabled - user detects failures manually)
+        # self.diagnose_button = Gtk.Button(label="Diagnose Selected")
+        # self.diagnose_button.connect("clicked", self._on_diagnose_clicked)
+        # self.diagnose_button.set_sensitive(False)
+        # buttons_box.pack_start(self.diagnose_button, True, True, 0)
         
         clear_button = Gtk.Button(label="Clear All")
         clear_button.connect("clicked", self._on_clear_all_clicked)
@@ -1914,8 +1915,9 @@ class ViabilityPanel(Gtk.Box):
         self.simulation_toolbar.set_status("Ready", "ready")
         self.simulation_toolbar.set_running_state(False)
         
-        # Disable diagnose button
-        self.diagnose_button.set_sensitive(False)
+        # Disable diagnose button (if enabled in future)
+        # if hasattr(self, 'diagnose_button'):
+        #     self.diagnose_button.set_sensitive(False)
         
         # Clear results
         self._clear_results()
