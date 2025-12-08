@@ -176,21 +176,18 @@ class BatchExecutor:
                         progress_callback(queue_index, "cancelled", "Cancelled")
                     continue  # Skip to next experiment
                 
-                print(f"[BATCH] Experiment {i+1}/{total}: '{name}' (queue_index={queue_index})")
+                # print(f"[BATCH] Experiment {i+1}/{total}: '{name}' (queue_index={queue_index})")
                 
                 # Reset model to baseline before each experiment to avoid state corruption
-                print(f"[BATCH] Resetting model to baseline...")
+                # print(f"[BATCH] Resetting model to baseline...")
                 self._restore_parameters(base_model, subnet_data, baseline_params)
-                print(f"[BATCH] Model reset complete")
+                # print(f"[BATCH] Model reset complete")
                 
                 # CRITICAL: Set status to running BEFORE execution
                 self.current_experiment = name
                 if progress_callback:
                     progress_callback(queue_index, "running", "0%")
-                    print(f"[BATCH] Status set to RUNNING for experiment {queue_index}")
-                    
-                    # Brief pause to let UI update process
-                    time.sleep(0.05)  # Minimal delay for rate limiting
+                    # print(f"[BATCH] Status set to RUNNING for experiment {queue_index}")
                 
                 # Execute single experiment with error handling
                 try:
@@ -203,14 +200,14 @@ class BatchExecutor:
                         """Progress callback: p is 0.0 to 1.0 float."""
                         if progress_callback and 0.0 <= p <= 1.0:
                             current_time = time.time()
-                            # Only update if 0.2 seconds passed or it's 100%
-                            if (current_time - last_progress_time[0]) >= 0.2 or p >= 1.0:
+                            # Only update if 0.1 seconds passed or it's 100%
+                            if (current_time - last_progress_time[0]) >= 0.1 or p >= 1.0:
                                 last_progress_time[0] = current_time
                                 percentage_str = f"{int(p*100)}%"
                                 progress_callback(idx, "running", percentage_str)
                     
                     # Run experiment with pre-extracted model and subnet
-                    print(f"[BATCH] Running simulation for '{name}'...")
+                    # print(f"[BATCH] Running simulation for '{name}'...")
                     result = self._run_single_experiment(
                         name,
                         snapshot_index,
@@ -242,11 +239,7 @@ class BatchExecutor:
                     # CRITICAL: Mark as completed ONLY after result is stored
                     if progress_callback:
                         progress_callback(queue_index, "completed", "100%")
-                        print(f"[BATCH] Status set to COMPLETED for experiment {queue_index}")
-                        
-                        # Brief pause to let UI update process
-                        # (UI updates are async via GLib.idle_add, this just prevents hammering)
-                        time.sleep(0.05)  # Minimal delay for rate limiting
+                        # print(f"[BATCH] Status set to COMPLETED for experiment {queue_index}")
                     
                 except Exception as e:
                     print(f"[BATCH] ERROR in experiment '{name}': {e}")
@@ -335,28 +328,40 @@ class BatchExecutor:
             # to the simulator, causing it to run on wrong model structure (11 places vs 5)
             from shypn.data.canvas.document_model import DocumentModel
             
-            # Create new model with only subnet elements
+            # Create new model with INDEPENDENT COPIES of subnet elements
+            # CRITICAL: Must copy to prevent modifying canvas objects during simulation
+            # Use serialization/deserialization for clean copies (avoids GObject issues)
             model = DocumentModel()
-            model.places = list(subnet_data['places'])
-            model.transitions = list(subnet_data['transitions'])
-            model.arcs = list(subnet_data['arcs'])
             
-            print(f"[EXPERIMENT] Using subnet model: {len(model.places)} places, {len(model.transitions)} transitions, {len(model.arcs)} arcs")
+            # Step 1: Copy places and transitions (they don't have dependencies)
+            model.places = [type(p).from_dict(p.to_dict()) for p in subnet_data['places']]
+            model.transitions = [type(t).from_dict(t.to_dict()) for t in subnet_data['transitions']]
+            
+            # Step 2: Build ID lookup dictionaries for arc deserialization
+            places_dict = {p.id: p for p in model.places}
+            transitions_dict = {t.id: t for t in model.transitions}
+            
+            # Step 3: Copy arcs (they need references to the copied places and transitions)
+            model.arcs = [type(a).from_dict(a.to_dict(), places_dict, transitions_dict) 
+                          for a in subnet_data['arcs']]
+            
+            # print(f"[EXPERIMENT] Using subnet model: {len(model.places)} places, {len(model.transitions)} transitions, {len(model.arcs)} arcs")
             
             # Apply snapshot parameters to subnet model (pass None since model IS the subnet)
-            print(f"[EXPERIMENT] Applying snapshot parameters...")
+            # print(f"[EXPERIMENT] Applying snapshot parameters...")
             self._apply_snapshot_to_model(snapshot, model, None)
-            print(f"[EXPERIMENT] Snapshot parameters applied: {len(snapshot.place_markings)} places, {len(snapshot.transition_rates)} transitions, {len(snapshot.arc_weights)} arcs")
+            # print(f"[EXPERIMENT] Snapshot parameters applied: {len(snapshot.place_markings)} places, {len(snapshot.transition_rates)} transitions, {len(snapshot.arc_weights)} arcs")
             
             # CRITICAL: Verify arc types are preserved (test arcs should stay test arcs)
-            print(f"[EXPERIMENT] Verifying arc types after snapshot application...")
-            for arc in model.arcs:
-                arc_type = arc.arc_type if hasattr(arc, 'arc_type') else 'unknown'
-                arc_class = arc.__class__.__name__
-                print(f"[EXPERIMENT] Arc {arc.id}: type={arc_type}, class={arc_class}, weight={arc.weight}")
-                # Verify test arcs haven't been corrupted
-                if arc_type == 'test' and arc_class != 'TestArc':
-                    print(f"[ERROR] Test arc {arc.id} has wrong class: {arc_class}!")
+            # Disabled for performance - this per-arc loop is VERY slow
+            # print(f"[EXPERIMENT] Verifying arc types after snapshot application...")
+            # for arc in model.arcs:
+            #     arc_type = arc.arc_type if hasattr(arc, 'arc_type') else 'unknown'
+            #     arc_class = arc.__class__.__name__
+            #     print(f"[EXPERIMENT] Arc {arc.id}: type={arc_type}, class={arc_class}, weight={arc.weight}")
+            #     # Verify test arcs haven't been corrupted
+            #     if arc_type == 'test' and arc_class != 'TestArc':
+            #         print(f"[ERROR] Test arc {arc.id} has wrong class: {arc_class}!")
             
             # Report initial progress
             if progress_callback:
@@ -365,24 +370,24 @@ class BatchExecutor:
             # Run replicates using ReplicateRunner
             from shypn.engine.simulation.replicate_runner import ReplicateRunner
             
-            print(f"[EXPERIMENT] Creating ReplicateRunner...")
-            sim_start = time.time()
+            # print(f"[EXPERIMENT] Creating ReplicateRunner...")
+            # sim_start = time.time()
             runner = ReplicateRunner(model)
-            print(f"[EXPERIMENT] ReplicateRunner created in {time.time()-sim_start:.3f}s")
+            # print(f"[EXPERIMENT] ReplicateRunner created in {time.time()-sim_start:.3f}s")
             
-            print(f"[EXPERIMENT] Starting simulation: {replicates} replicates x {duration}s duration")
-            print(f"[EXPERIMENT] Model size: {len(model.places)} places, {len(model.transitions)} transitions")
+            # print(f"[EXPERIMENT] Starting simulation: {replicates} replicates x {duration}s duration")
+            # print(f"[EXPERIMENT] Model size: {len(model.places)} places, {len(model.transitions)} transitions")
             
-            # Count arc types for debugging
-            arc_types = {}
-            for arc in model.arcs:
-                atype = arc.arc_type if hasattr(arc, 'arc_type') else 'normal'
-                arc_types[atype] = arc_types.get(atype, 0) + 1
-            print(f"[EXPERIMENT] Arc types: {arc_types}")
+            # Count arc types for debugging (disabled for performance)
+            # arc_types = {}
+            # for arc in model.arcs:
+            #     arc_type = getattr(arc, 'arc_type', 'normal')
+            #     arc_types[arc_type] = arc_types.get(arc_type, 0) + 1
+            # print(f"[EXPERIMENT] Arc types: {arc_types}")
             
             # Run all replicates (use_parallel=False for SEQUENTIAL execution)
             sim_exec_start = time.time()
-            print(f"[EXPERIMENT] About to call runner.run_replicates()...")
+            # print(f"[EXPERIMENT] About to call runner.run_replicates()...")
             results = runner.run_replicates(
                 n=replicates,
                 use_parallel=False,  # SEQUENTIAL execution of replicates
@@ -392,11 +397,9 @@ class BatchExecutor:
                 verbose=False,
                 progress_callback=progress_callback
             )
-            print(f"[EXPERIMENT] runner.run_replicates() completed in {time.time()-sim_exec_start:.3f}s")
-            
-            print(f"[EXPERIMENT] Simulation execution took {time.time()-sim_exec_start:.3f}s")
-            
-            print(f"[EXPERIMENT] Simulation complete: {len(results) if results else 0} successful replicates")
+            # print(f"[EXPERIMENT] runner.run_replicates() completed in {time.time()-sim_exec_start:.3f}s")
+            # print(f"[EXPERIMENT] Simulation execution took {time.time()-sim_exec_start:.3f}s")
+            # print(f"[EXPERIMENT] Simulation complete: {len(results) if results else 0} successful replicates")
             
             # Report 100% progress
             if progress_callback:
@@ -406,12 +409,12 @@ class BatchExecutor:
             
             # CRITICAL: Compute statistics
             if results and len(results) > 0:
-                print(f"[EXPERIMENT] Computing statistics for {len(results)} replicates...")
+                # print(f"[EXPERIMENT] Computing statistics for {len(results)} replicates...")
                 statistics = runner.compute_statistics(results)
                 statistics['elapsed_time'] = elapsed_time
                 statistics['n_replicates'] = len(results)
-                print(f"[EXPERIMENT] Statistics computed successfully")
-                print(f"[EXPERIMENT] Statistics keys: {statistics.keys()}")
+                # print(f"[EXPERIMENT] Statistics computed successfully")
+                # print(f"[EXPERIMENT] Statistics keys: {statistics.keys()}")
                 if 'species_statistics' in statistics:
                     print(f"[EXPERIMENT] Species count: {len(statistics['species_statistics'])}")
                     for species_id in list(statistics['species_statistics'].keys())[:2]:

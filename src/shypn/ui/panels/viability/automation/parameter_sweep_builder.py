@@ -37,6 +37,7 @@ class ParameterSweepBuilder(Gtk.Box):
         
         # Callbacks
         self.on_generate_callback = None
+        self.on_clear_callback = None
         
         # Build UI
         self._build_ui()
@@ -293,7 +294,7 @@ class ParameterSweepBuilder(Gtk.Box):
                 )
     
     def _on_clear_clicked(self, button):
-        """Clear all inputs."""
+        """Clear all inputs and notify parent to clear queue."""
         self.start_entry.set_text("0.1")
         self.stop_entry.set_text("1.0")
         self.step_entry.set_text("0.1")
@@ -304,6 +305,10 @@ class ParameterSweepBuilder(Gtk.Box):
         self.duration_entry.set_text("100.0")
         self.preview_label.set_markup("<i>Configure parameters and click Preview</i>")
         self.generate_button.set_sensitive(False)
+        
+        # Notify parent to clear the experiment queue
+        if self.on_clear_callback:
+            self.on_clear_callback()
     
     def _compute_parameter_values(self):
         """Compute parameter values based on selected mode.
@@ -390,3 +395,11 @@ class ParameterSweepBuilder(Gtk.Box):
             callback: Function to call when generate is clicked
         """
         self.on_generate_callback = callback
+    
+    def set_clear_callback(self, callback):
+        """Set callback for clear button.
+        
+        Args:
+            callback: Function to call when clear is clicked
+        """
+        self.on_clear_callback = callback

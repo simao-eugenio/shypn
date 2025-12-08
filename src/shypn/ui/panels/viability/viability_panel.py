@@ -1076,7 +1076,7 @@ class ViabilityPanel(Gtk.Box):
             place_obj = place
             place_type = "Source" if hasattr(place_obj, 'is_source') and place_obj.is_source else "Normal"
             label = place_obj.label if hasattr(place_obj, 'label') else ""
-            marking = place_obj.marking if hasattr(place_obj, 'marking') else 0
+            marking = place_obj.tokens if hasattr(place_obj, 'tokens') else 0
             self.places_store.append([
                 place_obj.id,
                 place_obj.name if hasattr(place_obj, 'name') else place_obj.id,

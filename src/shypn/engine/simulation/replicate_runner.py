@@ -116,15 +116,14 @@ class ReplicateRunner:
             if verbose and (i + 1) % 100 == 0:
                 print(f"  Progress: {i + 1}/{n} replicates")
             
-            # Time-throttled progress reporting: only call callback if 200ms has passed
-            # CRITICAL: Minimize progress updates to prevent GTK crash
-            # Only update at 10% boundaries and completion to avoid flooding event loop
+            # Progress reporting: update at 1% boundaries to show smooth progress
+            # With batched UI updates, this is now safe and won't flood GTK
             if progress_callback and i > 0:
                 current_pct = int((i / n) * 100)
                 prev_pct = int(((i - 1) / n) * 100)
                 
-                # Only call callback at 10% boundaries or completion
-                at_boundary = current_pct > prev_pct and current_pct % 10 == 0
+                # Only call callback when percentage changes (every 1%)
+                at_boundary = current_pct > prev_pct
                 is_last = (i == n - 1)
                 
                 if at_boundary or is_last:
