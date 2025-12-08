@@ -341,7 +341,8 @@ class BatchExecutor:
             print(f"[MODEL] Copied {len(model.places)} places with initial markings:")
             for p in model.places[:4]:  # Show first 4
                 marking = getattr(p, 'tokens', getattr(p, 'marking', 0))
-                print(f"[MODEL]   {p.id}: tokens={marking}")
+                name = getattr(p, 'name', '<NO NAME>')
+                print(f"[MODEL]   {p.id} (name='{name}'): tokens={marking}")
             
             # Step 2: Build ID lookup dictionaries for arc deserialization
             places_dict = {p.id: p for p in model.places}
