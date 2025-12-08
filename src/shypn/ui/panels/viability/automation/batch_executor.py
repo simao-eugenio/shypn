@@ -401,13 +401,26 @@ class BatchExecutor:
                     'error': 'No successful replicates'
                 }
             
-            # CRITICAL: Return complete result dict (DON'T store trajectories - memory issue)
+            # Store lightweight trajectory summary (first, last, and metadata only)
+            # Full trajectories can be large - store only what's needed for visualization
+            trajectory_summary = []
+            if results:
+                for i, traj in enumerate(results[:100]):  # Limit to 100 for memory
+                    if 'error' not in traj:
+                        trajectory_summary.append({
+                            'replicate_id': i,
+                            'seed': traj.get('seed'),
+                            'n_timepoints': len(traj.get('time_points', [])),
+                            'final_time': traj.get('time_points', [0])[-1] if traj.get('time_points') else 0
+                        })
+            
+            # Return complete result dict with statistics (plottable from statistics)
             result = {
                 'name': name,
                 'snapshot_index': snapshot_index,
-                'trajectories': [],  # Don't store - causes memory/UI hang
+                'trajectory_summary': trajectory_summary,  # Lightweight summary
                 'n_replicates': len(results) if results else 0,
-                'statistics': statistics,
+                'statistics': statistics,  # Contains mean/std/percentiles for plotting
                 'duration': elapsed_time
             }
             
@@ -425,7 +438,7 @@ class BatchExecutor:
             return {
                 'name': name,
                 'snapshot_index': snapshot_index,
-                'trajectories': [],
+                'trajectory_summary': [],
                 'n_replicates': 0,
                 'statistics': {
                     'n_replicates': 0,

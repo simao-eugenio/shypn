@@ -122,6 +122,13 @@ class ResultsBrowserView(Gtk.Box):
         self.export_json_button.connect("clicked", self._on_export_json_clicked)
         button_box.pack_start(self.export_json_button, False, False, 0)
         
+        # Plot button
+        self.plot_button = Gtk.Button(label="📊 Plot")
+        self.plot_button.set_tooltip_text("Plot mean trajectories with confidence intervals")
+        self.plot_button.set_sensitive(False)
+        self.plot_button.connect("clicked", self._on_plot_clicked)
+        button_box.pack_start(self.plot_button, False, False, 0)
+        
         # Add to Report button
         self.report_button = Gtk.Button(label="Add to Report")
         self.report_button.set_tooltip_text("Add selected results to Report panel")
@@ -217,6 +224,7 @@ class ResultsBrowserView(Gtk.Box):
             # Enable action buttons
             self.export_csv_button.set_sensitive(True)
             self.export_json_button.set_sensitive(True)
+            self.plot_button.set_sensitive(True)
             self.report_button.set_sensitive(True)
             
             # Display statistics
@@ -225,6 +233,7 @@ class ResultsBrowserView(Gtk.Box):
             # Disable action buttons
             self.export_csv_button.set_sensitive(False)
             self.export_json_button.set_sensitive(False)
+            self.plot_button.set_sensitive(False)
             self.report_button.set_sensitive(False)
             
             self.stats_label.set_markup("<i>Select an experiment to view statistics</i>")
@@ -311,6 +320,129 @@ class ResultsBrowserView(Gtk.Box):
         
         if response == Gtk.ResponseType.YES:
             self.clear_results()
+    
+    def _on_plot_clicked(self, button):
+        """Handle Plot button click - show trajectory plot."""
+        name, result = self.get_selected_result()
+        if name and result:
+            self._plot_trajectories(name, result)
+    
+    def _plot_trajectories(self, name, result):
+        """Plot mean trajectories with confidence intervals.
+        
+        Args:
+            name: Experiment name
+            result: Result dictionary with statistics
+        """
+        try:
+            import matplotlib
+            matplotlib.use('TkAgg')  # Use TkAgg backend for popup windows
+            import matplotlib.pyplot as plt
+            import numpy as np
+        except ImportError:
+            dialog = Gtk.MessageDialog(
+                transient_for=self.get_toplevel(),
+                flags=0,
+                message_type=Gtk.MessageType.ERROR,
+                buttons=Gtk.ButtonsType.OK,
+                text="Matplotlib not available"
+            )
+            dialog.format_secondary_text(
+                "Install matplotlib to use plotting: pip install matplotlib"
+            )
+            dialog.run()
+            dialog.destroy()
+            return
+        
+        # Check for error
+        if "error" in result:
+            dialog = Gtk.MessageDialog(
+                transient_for=self.get_toplevel(),
+                flags=0,
+                message_type=Gtk.MessageType.WARNING,
+                buttons=Gtk.ButtonsType.OK,
+                text="Cannot plot failed experiment"
+            )
+            dialog.format_secondary_text(f"Error: {result['error']}")
+            dialog.run()
+            dialog.destroy()
+            return
+        
+        stats = result.get('statistics', {})
+        species_stats = stats.get('species_statistics', {})
+        time_points = stats.get('time_points', [])
+        
+        if not species_stats or not time_points:
+            dialog = Gtk.MessageDialog(
+                transient_for=self.get_toplevel(),
+                flags=0,
+                message_type=Gtk.MessageType.WARNING,
+                buttons=Gtk.ButtonsType.OK,
+                text="No trajectory data available"
+            )
+            dialog.format_secondary_text("Statistics do not contain plottable data.")
+            dialog.run()
+            dialog.destroy()
+            return
+        
+        # Create figure with subplots for each species
+        n_species = len(species_stats)
+        n_cols = min(3, n_species)  # Max 3 columns
+        n_rows = (n_species + n_cols - 1) // n_cols
+        
+        fig, axes = plt.subplots(n_rows, n_cols, figsize=(6*n_cols, 4*n_rows))
+        fig.suptitle(f"Experiment: {name}\\n{stats.get('n_replicates', 0)} replicates", 
+                     fontsize=14, fontweight='bold')
+        
+        # Flatten axes for easy iteration
+        if n_species == 1:
+            axes = [axes]
+        elif n_rows == 1:
+            axes = axes.tolist()
+        else:
+            axes = axes.flatten()
+        
+        # Plot each species
+        for idx, (species_id, species_data) in enumerate(species_stats.items()):
+            ax = axes[idx]
+            
+            mean = np.array(species_data.get('mean', []))
+            std = np.array(species_data.get('std', []))
+            
+            if len(mean) == 0 or len(time_points) == 0:
+                ax.text(0.5, 0.5, 'No data', ha='center', va='center')
+                ax.set_title(species_id)
+                continue
+            
+            # Plot mean trajectory
+            ax.plot(time_points, mean, 'b-', linewidth=2, label='Mean')
+            
+            # Plot confidence interval (mean ± 2*std ≈ 95% CI)
+            ax.fill_between(time_points, 
+                           mean - 2*std, 
+                           mean + 2*std, 
+                           alpha=0.3, 
+                           color='blue',
+                           label='95% CI')
+            
+            # Plot percentiles if available
+            percentiles = species_data.get('percentiles', {})
+            if '50' in percentiles:
+                median = np.array(percentiles['50'])
+                ax.plot(time_points, median, 'r--', linewidth=1, alpha=0.7, label='Median')
+            
+            ax.set_xlabel('Time')
+            ax.set_ylabel('Tokens')
+            ax.set_title(species_id)
+            ax.legend(loc='best', fontsize=8)
+            ax.grid(True, alpha=0.3)
+        
+        # Hide unused subplots
+        for idx in range(n_species, len(axes)):
+            axes[idx].set_visible(False)
+        
+        plt.tight_layout()
+        plt.show()
     
     def set_export_callback(self, callback):
         """Set callback for export actions.

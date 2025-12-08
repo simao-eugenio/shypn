@@ -563,7 +563,7 @@ class ExperimentAutomationCategory:
         Args:
             filepath: Output file path
             name: Experiment name
-            result: Result dictionary with trajectories and statistics
+            result: Result dictionary with statistics and trajectory summary
         """
         import csv
         
@@ -574,30 +574,58 @@ class ExperimentAutomationCategory:
             writer.writerow(['Experiment', name])
             stats = result.get('statistics', {})
             writer.writerow(['N_Replicates', stats.get('n_replicates', 0)])
-            writer.writerow(['Duration', stats.get('duration', 0.0)])
             writer.writerow(['Elapsed_Time', stats.get('elapsed_time', 0.0)])
             writer.writerow(['Snapshot_Index', result.get('snapshot_index', '')])
             writer.writerow([])
             
-            # Write trajectory data header
-            writer.writerow(['Replicate_ID', 'Seed', 'Time_Points', 'Status'])
+            # Write species statistics (mean trajectories)
+            writer.writerow(['Species Statistics - Mean Trajectories'])
+            time_points = stats.get('time_points', [])
+            species_stats = stats.get('species_statistics', {})
             
-            # Write trajectory data
-            trajectories = result.get('trajectories', [])
-            for traj in trajectories:
-                time_points = traj.get('time_points', [])
-                time_str = ';'.join(str(t) for t in time_points)
+            if time_points and species_stats:
+                # Header row: Time, Species1, Species2, ...
+                header = ['Time'] + list(species_stats.keys())
+                writer.writerow(header)
+                
+                # Data rows: time_point, mean_species1, mean_species2, ...
+                for i, t in enumerate(time_points):
+                    row = [t]
+                    for species_id, species_data in species_stats.items():
+                        mean = species_data.get('mean', [])
+                        row.append(mean[i] if i < len(mean) else '')
+                    writer.writerow(row)
+                
+                writer.writerow([])
+                
+                # Write standard deviations
+                writer.writerow(['Species Statistics - Standard Deviations'])
+                writer.writerow(header)
+                for i, t in enumerate(time_points):
+                    row = [t]
+                    for species_id, species_data in species_stats.items():
+                        std = species_data.get('std', [])
+                        row.append(std[i] if i < len(std) else '')
+                    writer.writerow(row)
+            
+            # Write trajectory summary
+            writer.writerow([])
+            writer.writerow(['Trajectory Summary'])
+            writer.writerow(['Replicate_ID', 'Seed', 'N_TimePoints', 'Final_Time'])
+            
+            trajectory_summary = result.get('trajectory_summary', [])
+            for traj in trajectory_summary:
                 writer.writerow([
                     traj.get('replicate_id', ''),
                     traj.get('seed', ''),
-                    time_str,
-                    'completed'
+                    traj.get('n_timepoints', ''),
+                    traj.get('final_time', '')
                 ])
             
             # Add summary statistics at the end
             writer.writerow([])
-            writer.writerow(['Summary Statistics'])
-            writer.writerow(['Total Replicates', len(trajectories)])
+            writer.writerow(['Summary'])
+            writer.writerow(['Total Replicates', stats.get('n_replicates', 0)])
             writer.writerow(['Execution Time (s)', result.get('duration', 0.0)])
     
     def _export_json(self, filepath, name, result):
@@ -618,8 +646,8 @@ class ExperimentAutomationCategory:
             'snapshot_index': result.get('snapshot_index'),
             'statistics': result.get('statistics', {}),
             'execution_time_seconds': result.get('duration', 0.0),
-            'n_trajectories': len(result.get('trajectories', [])),
-            'trajectories': result.get('trajectories', [])
+            'n_replicates': result.get('n_replicates', 0),
+            'trajectory_summary': result.get('trajectory_summary', [])
         }
         
         with open(filepath, 'w') as f:
