@@ -359,6 +359,11 @@ class ExperimentAutomationCategory:
         # Clear pending updates tracking
         self._pending_updates.clear()
         
+        # Clear old results from previous batch runs
+        if self.results_browser:
+            print("[DEBUG] Clearing old results from browser")
+            self.results_browser.clear_results()
+        
         # Update UI for running state
         self.queue_view.set_running(True)
         
