@@ -176,6 +176,7 @@ class ReplicateRunner:
             # Run simulation synchronously (step-by-step) for background execution
             # controller.run() uses GLib callbacks which don't work in threads
             if i == 0:
+                print(f"[REPLICATE] ===== DEBUG VERSION 2.0 =====")
                 print(f"[REPLICATE] Starting simulation:")
                 print(f"[REPLICATE]   duration = {duration}")
                 print(f"[REPLICATE]   dt = {dt}")
@@ -187,17 +188,27 @@ class ReplicateRunner:
                 
                 # Execute simulation steps synchronously
                 steps_completed = 0
+                if i == 0:
+                    print(f"[REPLICATE] ENTERING STEP LOOP with max_steps={max_steps}")
                 for step_num in range(max_steps):
                     success = controller.step(time_step=dt)
                     if not success:
                         if i == 0:
-                            print(f"[REPLICATE] Step failed at step {step_num}")
+                            print(f"[REPLICATE] Step returned False at step {step_num}")
+                            print(f"[REPLICATE]   Current time: {controller.time}")
+                            print(f"[REPLICATE]   Duration: {duration}")
+                            print(f"[REPLICATE]   is_simulation_complete(): {controller.is_simulation_complete()}")
                         break  # Simulation stopped (e.g., deadlock)
                     steps_completed += 1
+                    
+                    # Debug: Print every 1000 steps
+                    if i == 0 and step_num > 0 and step_num % 1000 == 0:
+                        print(f"[REPLICATE] Progress: step {step_num}, time={controller.time:.2f}s")
                 
                 if i == 0:
-                    print(f"[REPLICATE] Simulation completed successfully")
+                    print(f"[REPLICATE] Simulation loop exited")
                     print(f"[REPLICATE]   Steps completed: {steps_completed}/{max_steps}")
+                    print(f"[REPLICATE]   Final time: {controller.time}")
             except Exception as e:
                 if verbose:
                     print(f"  ERROR in replicate {i}: {e}")
