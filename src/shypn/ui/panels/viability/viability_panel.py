@@ -770,7 +770,7 @@ class ViabilityPanel(Gtk.Box):
         self._add_transition_to_list(transition_obj)
         
         # Enable diagnose button
-        self.diagnose_button.set_sensitive(True)
+        # self.diagnose_button.set_sensitive(True)  # Disabled - button removed
         
         self._show_feedback(f"Added {transition_id} to analysis list", "info")
     
@@ -2298,7 +2298,7 @@ class ViabilityPanel(Gtk.Box):
     def _update_ui_state(self):
         """Update UI state based on current selections."""
         has_localities = len(self.selected_localities) > 0
-        self.diagnose_button.set_sensitive(has_localities)
+        # self.diagnose_button.set_sensitive(has_localities)  # Disabled - button removed
     
     def get_knowledge_base(self):
         """Get knowledge base (compatibility).

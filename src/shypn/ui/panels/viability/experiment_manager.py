@@ -58,6 +58,9 @@ class ExperimentSnapshot:
             trans_id = row[0]
             rate = row[2]
             self.transition_rates[trans_id] = rate
+            # Warn if rate is zero (will prevent firing)
+            if rate == 0 or rate == 0.0 or rate == "0" or rate == "0.0":
+                print(f"[BASELINE WARNING] Transition {trans_id} has ZERO rate - it will never fire!")
             
         # Capture arc weights (column 3 = weight)
         for row in arcs_store:
