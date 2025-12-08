@@ -337,6 +337,12 @@ class BatchExecutor:
             model.places = [type(p).from_dict(p.to_dict()) for p in subnet_data['places']]
             model.transitions = [type(t).from_dict(t.to_dict()) for t in subnet_data['transitions']]
             
+            # Debug: Check initial markings
+            print(f"[MODEL] Copied {len(model.places)} places with initial markings:")
+            for p in model.places[:4]:  # Show first 4
+                marking = getattr(p, 'tokens', getattr(p, 'marking', 0))
+                print(f"[MODEL]   {p.id}: tokens={marking}")
+            
             # Step 2: Build ID lookup dictionaries for arc deserialization
             places_dict = {p.id: p for p in model.places}
             transitions_dict = {t.id: t for t in model.transitions}
@@ -584,6 +590,10 @@ class BatchExecutor:
         
         print(f"[SUBNET] Extracted {len(subnet_places_set)} places, {len(subnet_transitions_set)} transitions, {len(subnet_arcs_set)} arcs")
         
+        # Debug: Show first few elements
+        print(f"[SUBNET] First 3 places: {[p.id for p in list(subnet_places_set)[:3]]}")
+        print(f"[SUBNET] First 3 transitions: {[t.id for t in list(subnet_transitions_set)[:3]]}")
+        
         return {
             'places': list(subnet_places_set),
             'transitions': list(subnet_transitions_set),
@@ -714,14 +724,22 @@ class BatchExecutor:
         
         # Apply place markings (only to subnet places)
         # Note: Concentrations are in mM and can be fractional
+        print(f"[SNAPSHOT] Applying {len(snapshot.place_markings)} place markings to {len(places)} subnet places")
+        applied_markings = 0
         for place_id, marking in snapshot.place_markings.items():
             place = next((p for p in places if p.id == place_id), None)
             if place:
                 place.tokens = float(marking)
                 place.marking = float(marking)
+                applied_markings += 1
+                if applied_markings <= 3:  # Show first 3
+                    print(f"[SNAPSHOT]   {place_id}: {marking}")
+        print(f"[SNAPSHOT] Applied {applied_markings}/{len(snapshot.place_markings)} place markings")
         
         # Apply transition rates (only to subnet transitions)
         # Handle both numeric rates and kinetic formulas
+        print(f"[SNAPSHOT] Applying {len(snapshot.transition_rates)} transition rates to {len(transitions)} subnet transitions")
+        applied_rates = 0
         for trans_id, rate in snapshot.transition_rates.items():
             trans = next((t for t in transitions if t.id == trans_id), None)
             if trans:
@@ -737,6 +755,10 @@ class BatchExecutor:
                         print(f"[WARNING] Could not convert rate for {trans_id}: {rate} - {e}")
                         # Keep the value as-is if conversion fails
                         trans.rate = rate
+                applied_rates += 1
+                if applied_rates <= 3:  # Show first 3
+                    print(f"[SNAPSHOT]   {trans_id}: {rate}")
+        print(f"[SNAPSHOT] Applied {applied_rates}/{len(snapshot.transition_rates)} transition rates")
         
         # Apply arc weights (handle all arc types: normal, curved, inhibitor, test, curved_inhibitor)
         for arc_id, weight in snapshot.arc_weights.items():
