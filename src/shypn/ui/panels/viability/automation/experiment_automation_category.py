@@ -364,6 +364,11 @@ class ExperimentAutomationCategory:
             print("[DEBUG] Clearing old results from browser")
             self.results_browser.clear_results()
         
+        # Clear batch executor results to ensure clean state
+        if self.batch_executor:
+            print("[DEBUG] Clearing old results from batch executor")
+            self.batch_executor.clear_results()
+        
         # Update UI for running state
         self.queue_view.set_running(True)
         
@@ -482,6 +487,18 @@ class ExperimentAutomationCategory:
             result: Result dictionary with statistics
         """
         print(f"[RESULT] Adding result for '{name}' incrementally")
+        print(f"[RESULT]   Result has statistics: {'statistics' in result}")
+        if 'statistics' in result:
+            stats = result['statistics']
+            print(f"[RESULT]   N replicates in stats: {stats.get('n_replicates', 'MISSING')}")
+            print(f"[RESULT]   Time points length: {len(stats.get('time_points', []))}")
+            if 'species_statistics' in stats:
+                species_count = len(stats['species_statistics'])
+                print(f"[RESULT]   Species count: {species_count}")
+                if species_count > 0:
+                    first_species = list(stats['species_statistics'].keys())[0]
+                    first_mean = stats['species_statistics'][first_species].get('mean', [])
+                    print(f"[RESULT]   First species '{first_species}' mean length: {len(first_mean)}")
         
         if self.results_browser:
             try:
