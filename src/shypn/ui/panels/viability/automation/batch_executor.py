@@ -51,7 +51,8 @@ class BatchExecutor:
         replicates: int = 500,
         duration: float = 100.0,
         progress_callback: Optional[Callable] = None,
-        complete_callback: Optional[Callable] = None
+        complete_callback: Optional[Callable] = None,
+        experiment_result_callback: Optional[Callable] = None
     ):
         """Run batch of experiments asynchronously.
         
@@ -61,6 +62,7 @@ class BatchExecutor:
             duration: Simulation duration
             progress_callback: Called with (exp_index, status, progress)
             complete_callback: Called when batch completes
+            experiment_result_callback: Called with (name, result) when each experiment completes
         """
         if self.is_running:
             raise RuntimeError("Batch execution already in progress")
@@ -116,7 +118,7 @@ class BatchExecutor:
         # Start execution thread with pre-extracted data
         self.executor_thread = threading.Thread(
             target=self._execute_batch,
-            args=(experiments, replicates, duration, progress_callback, complete_callback, base_model, subnet_data, baseline_params),
+            args=(experiments, replicates, duration, progress_callback, complete_callback, experiment_result_callback, base_model, subnet_data, baseline_params),
             daemon=True
         )
         self.executor_thread.start()
@@ -142,6 +144,7 @@ class BatchExecutor:
         duration: float,
         progress_callback: Optional[Callable],
         complete_callback: Optional[Callable],
+        experiment_result_callback: Optional[Callable],
         base_model,  # Pre-extracted DocumentModel
         subnet_data: dict,  # Pre-extracted subnet data
         baseline_params: dict  # Baseline parameters to reset between experiments
@@ -154,6 +157,7 @@ class BatchExecutor:
             duration: Simulation duration
             progress_callback: Callback for progress updates (queue_index, status, progress_str)
             complete_callback: Callback when complete
+            experiment_result_callback: Callback for each experiment result (name, result)
             base_model: Pre-extracted DocumentModel (from main thread)
             subnet_data: Pre-extracted subnet dict (from main thread)
             baseline_params: Baseline parameter values to reset model between experiments
@@ -220,6 +224,13 @@ class BatchExecutor:
                     # Store result BEFORE marking as completed
                     self.results[name] = result
                     print(f"[BATCH] Result stored for '{name}': {result.get('n_replicates', 0)} replicates")
+                    
+                    # Call result callback immediately for incremental display
+                    if experiment_result_callback:
+                        from gi.repository import GLib
+                        # Schedule in main thread to update UI
+                        GLib.idle_add(lambda n=name, r=result: experiment_result_callback(n, r) or False)
+                        print(f"[BATCH] Result callback scheduled for '{name}'")
                     
                     # CRITICAL: Mark as completed ONLY after result is stored
                     if progress_callback:

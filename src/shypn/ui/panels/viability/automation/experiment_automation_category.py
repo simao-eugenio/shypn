@@ -376,7 +376,8 @@ class ExperimentAutomationCategory:
                 replicates=replicates,
                 duration=duration,
                 progress_callback=self._on_experiment_progress,
-                complete_callback=self._on_batch_complete
+                complete_callback=self._on_batch_complete,
+                experiment_result_callback=self._on_experiment_result
             )
         except Exception as e:
             print(f"[ERROR] Failed to start batch: {e}")
@@ -470,6 +471,27 @@ class ExperimentAutomationCategory:
         else:
             GLib.idle_add(update_ui, priority=GLib.PRIORITY_HIGH_IDLE)
     
+    def _on_experiment_result(self, name: str, result: dict):
+        """Handle individual experiment result (called as each experiment completes).
+        
+        This allows incremental display of results without waiting for entire batch.
+        Called from main thread via GLib.idle_add.
+        
+        Args:
+            name: Experiment name
+            result: Result dictionary with statistics
+        """
+        print(f"[RESULT] Adding result for '{name}' incrementally")
+        
+        if self.results_browser:
+            try:
+                self.results_browser.add_result(name, result)
+                print(f"[RESULT] Successfully added '{name}' to results browser")
+            except Exception as e:
+                print(f"[RESULT] ERROR adding result for '{name}': {e}")
+                import traceback
+                traceback.print_exc()
+    
     def _on_batch_complete(self, cancelled=False):
         """Handle batch execution completion.
         
@@ -497,17 +519,11 @@ class ExperimentAutomationCategory:
                     self.queue_view._update_status_label()
                     print("[DEBUG] Status label updated")
                 
-                # Only add results if not cancelled
-                if not cancelled:
-                    # Add all results to results browser
-                    if self.batch_executor and self.results_browser:
-                        all_results = self.batch_executor.get_all_results()
-                        print(f"[DEBUG] Adding {len(all_results)} results to browser")
-                        
-                        for name, result in all_results.items():
-                            self.results_browser.add_result(name, result)
-                        
-                        print("[DEBUG] All results added")
+                # NOTE: Results are now added incrementally via _on_experiment_result
+                # No need to add them again here - just handle cancellation cleanup
+                if cancelled:
+                    # On cancellation, results may be incomplete - already handled incrementally
+                    print("[DEBUG] Batch cancelled - incremental results already displayed")
                 
                 # Clear pending updates
                 self._pending_updates.clear()
