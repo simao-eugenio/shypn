@@ -116,17 +116,14 @@ class ReplicateRunner:
             if verbose and (i + 1) % 100 == 0:
                 print(f"  Progress: {i + 1}/{n} replicates")
             
-            if i == 0:
-                print(f"[REPLICATE] Starting replicate 0/{n}...")
-            
-            # Time-throttled progress reporting: only call callback if 50ms has passed
+            # Time-throttled progress reporting: only call callback if 200ms has passed
             # This prevents overwhelming the GTK event loop while still showing smooth progress
             if progress_callback and i > 0:
                 current_time = time.time()
                 time_since_last = current_time - last_callback_time
                 
                 # Call callback if either:
-                # 1. At least 50ms (0.05s) has passed since last callback, OR
+                # 1. At least 200ms (0.2s) has passed since last callback, OR
                 # 2. We're at a 10% boundary, OR
                 # 3. This is the last replicate (100%)
                 current_pct = int((i / n) * 100)
@@ -134,16 +131,12 @@ class ReplicateRunner:
                 at_boundary = current_pct > prev_pct and current_pct % 10 == 0
                 is_last = (i == n - 1)
                 
-                if time_since_last >= 0.05 or at_boundary or is_last:
+                if time_since_last >= 0.2 or at_boundary or is_last:
                     progress_callback(i / n)
                     last_callback_time = current_time
             
             # Create fresh controller for this replicate
-            if i == 0:
-                print(f"[REPLICATE] Creating SimulationController...")
             controller = SimulationController(self.model)
-            if i == 0:
-                print(f"[REPLICATE] SimulationController created, configuring settings...")
             
             # Configure settings
             controller.settings.use_parallel_stochastic = use_parallel
@@ -158,13 +151,9 @@ class ReplicateRunner:
                 controller.settings.dt_manual = time_step
             
             # Reset model to initial marking
-            if i == 0:
-                print(f"[REPLICATE] Resetting model to initial marking...")
             self._reset_model(self.model)
             
             # Start data collection
-            if i == 0:
-                print(f"[REPLICATE] Starting data collection...")
             controller.data_collector.start_collection()
             # Record initial state at t=0
             controller.data_collector.record_state(controller.time)
@@ -175,40 +164,15 @@ class ReplicateRunner:
             
             # Run simulation synchronously (step-by-step) for background execution
             # controller.run() uses GLib callbacks which don't work in threads
-            if i == 0:
-                print(f"[REPLICATE] ===== DEBUG VERSION 2.0 =====")
-                print(f"[REPLICATE] Starting simulation:")
-                print(f"[REPLICATE]   duration = {duration}")
-                print(f"[REPLICATE]   dt = {dt}")
-                print(f"[REPLICATE]   max_steps = {max_steps}")
-                print(f"[REPLICATE]   Expected time points: ~{max_steps}")
             try:
                 # Initialize enablement states before simulation
                 controller._update_enablement_states()
                 
                 # Execute simulation steps synchronously
-                steps_completed = 0
-                if i == 0:
-                    print(f"[REPLICATE] ENTERING STEP LOOP with max_steps={max_steps}")
                 for step_num in range(max_steps):
                     success = controller.step(time_step=dt)
                     if not success:
-                        if i == 0:
-                            print(f"[REPLICATE] Step returned False at step {step_num}")
-                            print(f"[REPLICATE]   Current time: {controller.time}")
-                            print(f"[REPLICATE]   Duration: {duration}")
-                            print(f"[REPLICATE]   is_simulation_complete(): {controller.is_simulation_complete()}")
-                        break  # Simulation stopped (e.g., deadlock)
-                    steps_completed += 1
-                    
-                    # Debug: Print every 1000 steps
-                    if i == 0 and step_num > 0 and step_num % 1000 == 0:
-                        print(f"[REPLICATE] Progress: step {step_num}, time={controller.time:.2f}s")
-                
-                if i == 0:
-                    print(f"[REPLICATE] Simulation loop exited")
-                    print(f"[REPLICATE]   Steps completed: {steps_completed}/{max_steps}")
-                    print(f"[REPLICATE]   Final time: {controller.time}")
+                        break  # Simulation stopped (e.g., deadlock or duration reached)
             except Exception as e:
                 if verbose:
                     print(f"  ERROR in replicate {i}: {e}")
@@ -221,14 +185,6 @@ class ReplicateRunner:
                 continue
             
             # Collect results
-            if i == 0:
-                print(f"[REPLICATE] Collecting data from controller...")
-                print(f"[REPLICATE]   time_points: {len(controller.data_collector.time_points)} points")
-                print(f"[REPLICATE]   place_data: {len(controller.data_collector.place_data)} places")
-                if controller.data_collector.place_data:
-                    first_place = list(controller.data_collector.place_data.keys())[0]
-                    print(f"[REPLICATE]   first place '{first_place}': {len(controller.data_collector.place_data[first_place])} time points")
-            
             result = {
                 'replicate_id': i,
                 'seed': seed_base + i,

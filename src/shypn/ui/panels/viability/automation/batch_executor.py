@@ -194,13 +194,20 @@ class BatchExecutor:
                 
                 # Execute single experiment with error handling
                 try:
+                    # Time throttling for progress updates
+                    last_progress_time = [0.0]  # Use list for mutable closure
+                    
                     # Create progress callback with proper closure
                     # Capture queue_index by value to avoid closure bug
                     def exp_progress_callback(p, idx=queue_index):
                         """Progress callback: p is 0.0 to 1.0 float."""
                         if progress_callback and 0.0 <= p <= 1.0:
-                            percentage_str = f"{int(p*100)}%"
-                            progress_callback(idx, "running", percentage_str)
+                            current_time = time.time()
+                            # Only update if 0.2 seconds passed or it's 100%
+                            if (current_time - last_progress_time[0]) >= 0.2 or p >= 1.0:
+                                last_progress_time[0] = current_time
+                                percentage_str = f"{int(p*100)}%"
+                                progress_callback(idx, "running", percentage_str)
                     
                     # Run experiment with pre-extracted model and subnet
                     print(f"[BATCH] Running simulation for '{name}'...")
