@@ -658,9 +658,9 @@ class BatchExecutor:
         for place_id, marking in saved_values['place_markings'].items():
             place = next((p for p in places if p.id == place_id), None)
             if place:
-                place.tokens = int(marking)
+                place.tokens = float(marking)
                 if hasattr(place, 'marking'):
-                    place.marking = int(marking)
+                    place.marking = float(marking)
         
         # Restore transition rates (handle both numeric and formula types)
         for trans_id, rate in saved_values['transition_rates'].items():
@@ -709,17 +709,12 @@ class BatchExecutor:
             arcs = model.arcs if hasattr(model, 'arcs') else []
         
         # Apply place markings (only to subnet places)
+        # Note: Concentrations are in mM and can be fractional
         for place_id, marking in snapshot.place_markings.items():
             place = next((p for p in places if p.id == place_id), None)
             if place:
-                original_value = marking
-                int_value = int(marking)
-                place.tokens = int_value
-                place.marking = int_value
-                
-                # Warn if rounding significantly changed the value
-                if abs(original_value - int_value) > 0.1:
-                    print(f"[WARNING] Place '{place_id}' marking {original_value} rounded to {int_value} (places hold integer tokens only)")
+                place.tokens = float(marking)
+                place.marking = float(marking)
         
         # Apply transition rates (only to subnet transitions)
         # Handle both numeric rates and kinetic formulas
