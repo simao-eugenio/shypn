@@ -393,6 +393,15 @@ class BatchExecutor:
                 statistics['elapsed_time'] = elapsed_time
                 statistics['n_replicates'] = len(results)
                 print(f"[EXPERIMENT] Statistics computed successfully")
+                print(f"[EXPERIMENT] Statistics keys: {statistics.keys()}")
+                if 'species_statistics' in statistics:
+                    print(f"[EXPERIMENT] Species count: {len(statistics['species_statistics'])}")
+                    for species_id in list(statistics['species_statistics'].keys())[:2]:
+                        species_data = statistics['species_statistics'][species_id]
+                        mean_len = len(species_data.get('mean', []))
+                        print(f"[EXPERIMENT]   Species '{species_id}': mean length = {mean_len}")
+                if 'time_points' in statistics:
+                    print(f"[EXPERIMENT] Time points length: {len(statistics['time_points'])}")
             else:
                 print(f"[EXPERIMENT] WARNING: No successful replicates")
                 statistics = {
