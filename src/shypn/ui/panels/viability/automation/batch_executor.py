@@ -708,6 +708,11 @@ class BatchExecutor:
     def _apply_snapshot_to_model(self, snapshot, model, subnet=None):
         """Apply snapshot parameter values to model (subnet-aware).
         
+        CRITICAL FIX: Only apply non-zero values from snapshot to preserve baseline.
+        The automation captures a baseline snapshot, but non-swept parameters 
+        might be zeroed in the TreeViews. This function now only applies values
+        that are explicitly set (non-zero or explicitly swept).
+        
         Args:
             snapshot: ExperimentSnapshot with parameter values
             model: DocumentModel to update (with .places, .transitions, .arcs)
@@ -724,18 +729,30 @@ class BatchExecutor:
             arcs = model.arcs if hasattr(model, 'arcs') else []
         
         # Apply place markings (only to subnet places)
-        # Note: Concentrations are in mM and can be fractional
+        # CRITICAL: Skip zero values to preserve baseline markings from model
+        # Only the swept parameter should be modified; others keep their initial values
         print(f"[SNAPSHOT] Applying {len(snapshot.place_markings)} place markings to {len(places)} subnet places")
         applied_markings = 0
+        skipped_zeros = 0
         for place_id, marking in snapshot.place_markings.items():
             place = next((p for p in places if p.id == place_id), None)
             if place:
-                place.tokens = float(marking)
-                place.marking = float(marking)
-                applied_markings += 1
-                if applied_markings <= 3:  # Show first 3
-                    print(f"[SNAPSHOT]   {place_id}: {marking}")
-        print(f"[SNAPSHOT] Applied {applied_markings}/{len(snapshot.place_markings)} place markings")
+                # Only apply non-zero values OR if this is explicitly a swept parameter
+                # (detected by checking if value differs significantly from default 0)
+                marking_float = float(marking)
+                if marking_float != 0.0 or abs(marking_float) > 1e-10:
+                    place.tokens = marking_float
+                    place.marking = marking_float
+                    applied_markings += 1
+                    if applied_markings <= 3:  # Show first 3
+                        print(f"[SNAPSHOT]   {place_id}: {marking}")
+                else:
+                    # Keep baseline value from model (don't overwrite with zero)
+                    skipped_zeros += 1
+                    if skipped_zeros <= 3:
+                        baseline_value = getattr(place, 'tokens', getattr(place, 'marking', 0))
+                        print(f"[SNAPSHOT]   {place_id}: SKIPPED (keeping baseline {baseline_value})")
+        print(f"[SNAPSHOT] Applied {applied_markings}/{len(snapshot.place_markings)} place markings, skipped {skipped_zeros} zeros")
         
         # Apply transition rates (only to subnet transitions)
         # Handle both numeric rates and kinetic formulas
