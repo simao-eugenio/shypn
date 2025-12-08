@@ -252,12 +252,13 @@ class ExperimentManager:
         """
         return [s.name for s in self.snapshots]
     
-    def generate_sweep_snapshots(self, parameter_type, parameter_name, values, base_snapshot=None):
+    def generate_sweep_snapshots(self, parameter_type, parameter_id, parameter_name, values, base_snapshot=None):
         """Generate multiple snapshots from parameter sweep.
         
         Args:
             parameter_type: Type of parameter ('places', 'transitions', 'arcs')
-            parameter_name: Name of parameter to vary
+            parameter_id: ID of parameter to vary (internal key for matching)
+            parameter_name: Name of parameter (for display in labels)
             values: List of values to test
             base_snapshot: Base snapshot to vary (uses active if None)
         
@@ -270,7 +271,7 @@ class ExperimentManager:
                 # Create default snapshot if none exists
                 base_snapshot = self.add_snapshot("Baseline")
         
-        # Validate parameter exists in base snapshot
+        # Validate parameter exists in base snapshot (use ID for lookup)
         if parameter_type == 'places':
             param_dict = base_snapshot.place_markings
         elif parameter_type == 'transitions':
@@ -280,13 +281,14 @@ class ExperimentManager:
         else:
             raise ValueError(f"Invalid parameter_type: {parameter_type}")
         
-        if parameter_name not in param_dict:
-            raise ValueError(f"Parameter '{parameter_name}' not found in {parameter_type}")
+        # Check if parameter ID exists in baseline snapshot
+        if parameter_id not in param_dict:
+            raise ValueError(f"Parameter ID '{parameter_id}' (name: '{parameter_name}') not found in {parameter_type}")
         
         # Generate snapshots for each value
         created_count = 0
         for value in values:
-            # Create snapshot name
+            # Create snapshot name using display name (user-friendly)
             name = f"{parameter_name}={value:.4g}"
             
             # Create new snapshot
@@ -294,15 +296,15 @@ class ExperimentManager:
             snapshot.place_markings = base_snapshot.place_markings.copy()
             snapshot.arc_weights = base_snapshot.arc_weights.copy()
             snapshot.transition_rates = base_snapshot.transition_rates.copy()
-            snapshot.notes = f"Sweep: {parameter_name} = {value}"
+            snapshot.notes = f"Sweep: {parameter_name} (ID: {parameter_id}) = {value}"
             
-            # Modify the swept parameter
+            # Modify the swept parameter using ID (internal key)
             if parameter_type == 'places':
-                snapshot.place_markings[parameter_name] = value
+                snapshot.place_markings[parameter_id] = value
             elif parameter_type == 'transitions':
-                snapshot.transition_rates[parameter_name] = value
+                snapshot.transition_rates[parameter_id] = value
             elif parameter_type == 'arcs':
-                snapshot.arc_weights[parameter_name] = value
+                snapshot.arc_weights[parameter_id] = value
             
             # Add to snapshots
             self.snapshots.append(snapshot)

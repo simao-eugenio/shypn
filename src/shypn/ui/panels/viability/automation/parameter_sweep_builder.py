@@ -34,6 +34,7 @@ class ParameterSweepBuilder(Gtk.Box):
         self.parameter_type = 'places'  # Default: 'places', 'transitions', 'arcs'
         self.parameter_name = None
         self.parameter_values = []
+        self._param_name_to_id = {}  # Mapping for name to ID resolution
         
         # Callbacks
         self.on_generate_callback = None
@@ -271,9 +272,11 @@ class ParameterSweepBuilder(Gtk.Box):
                     if self.parameter_type is None:
                         raise ValueError("Please select a parameter type")
                 
-                # Get parameter name
-                param_name = self.name_combo.get_active_text()
-                if not param_name or param_name.startswith("("):
+                # Get parameter ID (internal key) from combo
+                param_id = self.name_combo.get_active_id()
+                param_name = self.name_combo.get_active_text()  # Display name for labels
+                
+                if not param_id or param_id == "none" or not param_name or param_name.startswith("("):
                     raise ValueError("Please select a parameter from the dropdown")
                 
                 values = self._compute_parameter_values()
@@ -282,7 +285,8 @@ class ParameterSweepBuilder(Gtk.Box):
                 
                 config = {
                     'parameter_type': self.parameter_type,
-                    'parameter_name': param_name,
+                    'parameter_id': param_id,  # Internal ID for matching
+                    'parameter_name': param_name,  # Display name for labels
                     'values': values,
                     'replicates': int(self.replicates_entry.get_text()),
                     'duration': float(self.duration_entry.get_text())
@@ -371,14 +375,25 @@ class ParameterSweepBuilder(Gtk.Box):
         
         Args:
             parameter_type: Type of parameters ('places', 'transitions', 'arcs')
-            parameters: List of parameter names
+            parameters: List of (name, id) tuples or parameter names (for backward compatibility)
         """
         # Clear existing
         self.name_combo.remove_all()
         
+        # Store ID mapping for later retrieval
+        self._param_name_to_id = {}
+        
         # Add new parameters
         for param in parameters:
-            self.name_combo.append(param, param)
+            if isinstance(param, tuple) and len(param) == 2:
+                # New format: (name, id) tuple
+                name, param_id = param
+                self.name_combo.append(param_id, name)  # Store ID as key, display name
+                self._param_name_to_id[name] = param_id
+            else:
+                # Old format: just name/ID (backward compatibility)
+                self.name_combo.append(param, param)
+                self._param_name_to_id[param] = param
         
         # Select first if available
         if parameters:

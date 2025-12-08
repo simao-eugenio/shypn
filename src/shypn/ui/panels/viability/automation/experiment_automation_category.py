@@ -191,6 +191,7 @@ class ExperimentAutomationCategory:
         param_type = self.sweep_builder.type_combo.get_active_id()
         
         # Pull parameters from parent panel's TreeViews
+        # Store as list of (name, id) tuples for ID/name separation
         params = []
         
         if param_type == 'transitions':
@@ -199,10 +200,11 @@ class ExperimentAutomationCategory:
                 store = self.parent_panel.transitions_store
                 iter = store.get_iter_first()
                 while iter:
-                    # Column 0 is transition ID
+                    # Column 0 = ID (internal), Column 1 = Name (display)
                     transition_id = store.get_value(iter, 0)
-                    if transition_id:
-                        params.append(transition_id)
+                    transition_name = store.get_value(iter, 1)
+                    if transition_id and transition_name:
+                        params.append((transition_name, transition_id))
                     iter = store.iter_next(iter)
         
         elif param_type == 'places':
@@ -211,10 +213,11 @@ class ExperimentAutomationCategory:
                 store = self.parent_panel.places_store
                 iter = store.get_iter_first()
                 while iter:
-                    # Column 0 is place ID
+                    # Column 0 = ID (internal), Column 1 = Name (display)
                     place_id = store.get_value(iter, 0)
-                    if place_id:
-                        params.append(place_id)
+                    place_name = store.get_value(iter, 1)
+                    if place_id and place_name:
+                        params.append((place_name, place_id))
                     iter = store.iter_next(iter)
         
         elif param_type == 'arcs':
@@ -223,19 +226,19 @@ class ExperimentAutomationCategory:
                 store = self.parent_panel.arcs_store
                 iter = store.get_iter_first()
                 while iter:
-                    # Column 0 is arc ID (or construct from source/target)
+                    # Column 0 = arc ID, Columns 1,2 = source/target IDs
                     arc_id = store.get_value(iter, 0)
-                    if not arc_id:
-                        # Construct from source → target
-                        source = store.get_value(iter, 1)  # Column 1 might be source
-                        target = store.get_value(iter, 2)  # Column 2 might be target
-                        if source and target:
-                            arc_id = f"{source}→{target}"
+                    source_id = store.get_value(iter, 1)
+                    target_id = store.get_value(iter, 2)
+                    
+                    # Construct display name from source/target names (lookup if needed)
+                    # For now, use IDs for arcs since they don't have independent names
                     if arc_id:
-                        params.append(arc_id)
+                        arc_name = f"{source_id}→{target_id}"
+                        params.append((arc_name, arc_id))
                     iter = store.iter_next(iter)
         
-        # Update sweep builder with actual parameters
+        # Update sweep builder with actual parameters (name/ID pairs)
         if params:
             self.sweep_builder.set_available_parameters(param_type, params)
         else:
@@ -303,7 +306,8 @@ class ExperimentAutomationCategory:
             # Generate sweep snapshots
             count = self.experiment_manager.generate_sweep_snapshots(
                 parameter_type=config['parameter_type'],
-                parameter_name=config['parameter_name'],
+                parameter_id=config.get('parameter_id', config['parameter_name']),  # Use ID if available
+                parameter_name=config['parameter_name'],  # Display name
                 values=config['values'],
                 base_snapshot=base_snapshot
             )
