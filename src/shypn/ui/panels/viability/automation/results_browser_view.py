@@ -23,12 +23,19 @@ class ResultsBrowserView(Gtk.Box):
     - Integration with Report panel
     """
     
-    def __init__(self):
-        """Initialize results browser view."""
+    def __init__(self, model=None):
+        """Initialize results browser view.
+        
+        Args:
+            model: Optional model reference for resolving IDs to names
+        """
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         
         # Results data: experiment_name -> results_dict
         self.results = {}
+        
+        # Model reference for ID->name resolution
+        self.model = model
         
         # Callbacks
         self.on_export_callback = None
@@ -460,7 +467,9 @@ class ResultsBrowserView(Gtk.Box):
             
             ax.set_xlabel('Time')
             ax.set_ylabel('Tokens')
-            ax.set_title(species_id)
+            # Use name if available, otherwise ID
+            species_display = self._resolve_species_name(species_id)
+            ax.set_title(species_display)
             ax.legend(loc='best', fontsize=8)
             ax.grid(True, alpha=0.3)
         
@@ -486,3 +495,43 @@ class ResultsBrowserView(Gtk.Box):
             callback: Function(name, result) to call for report
         """
         self.on_report_callback = callback
+    
+    def set_model(self, model):
+        """Set model reference for ID->name resolution.
+        
+        Args:
+            model: Model with places/transitions for name lookup
+        """
+        self.model = model
+    
+    def _resolve_species_name(self, species_id):
+        """Resolve species ID to human-readable name.
+        
+        Args:
+            species_id: Place or transition ID
+            
+        Returns:
+            str: Name if found, otherwise ID
+        """
+        if not self.model:
+            return species_id
+        
+        # Try places first (most common for species)
+        if hasattr(self.model, 'places'):
+            for place in self.model.places:
+                if place.id == species_id:
+                    name = getattr(place, 'name', None)
+                    if name and name != species_id:
+                        return f"{name} ({species_id})"
+                    return species_id
+        
+        # Try transitions
+        if hasattr(self.model, 'transitions'):
+            for trans in self.model.transitions:
+                if trans.id == species_id:
+                    name = getattr(trans, 'name', None)
+                    if name and name != species_id:
+                        return f"{name} ({species_id})"
+                    return species_id
+        
+        return species_id
