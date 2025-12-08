@@ -67,6 +67,7 @@ class ExperimentAutomationCategory:
         # Track pending UI updates to prevent queue overflow
         self._pending_updates = {}  # Dict: queue_index -> latest (status, progress) to process
         self._processing_updates = set()  # Set of queue_index currently being processed
+        self._idle_handler_active = False  # Flag to ensure only one idle handler runs at a time
         
         # Build UI
         self._build_frame(expanded)
@@ -110,6 +111,7 @@ class ExperimentAutomationCategory:
         # Create sweep builder
         self.sweep_builder = ParameterSweepBuilder()
         self.sweep_builder.set_generate_callback(self._on_sweep_generate)
+        self.sweep_builder.set_clear_callback(lambda: self.queue_view.clear_queue())
         
         # Connect type change to parameter refresh AND clear queue
         self.sweep_builder.type_combo.connect("changed", self._on_object_type_changed)
@@ -421,6 +423,8 @@ class ExperimentAutomationCategory:
     def _on_experiment_progress(self, queue_index, status, progress):
         """Handle experiment progress update from background thread.
         
+        Uses a single idle handler to batch all UI updates safely.
+        
         Args:
             queue_index: Index in queue (row number)
             status: New status (running/completed/failed/cancelled)
@@ -430,51 +434,38 @@ class ExperimentAutomationCategory:
             print(f"[PROGRESS] Warning: No queue_view available for index {queue_index}")
             return
         
-        # Determine criticality: completed/failed/cancelled are critical, running only at 0%
-        is_terminal_status = status in ["completed", "failed", "cancelled"]
-        is_running_start = status == "running" and progress == "0%"
-        is_critical = is_terminal_status or is_running_start
-        
-        # Check if we already have an update pending/processing for this experiment
-        already_scheduled = queue_index in self._pending_updates or queue_index in self._processing_updates
-        
-        # Store this update as pending (replaces any previous pending update)
+        # Store this update as pending (replaces any previous pending update for same experiment)
         self._pending_updates[queue_index] = (status, progress)
         
-        # If already scheduled, just update the value and return (coalescing)
-        # Exception: critical updates always schedule immediately to ensure they're visible
-        if already_scheduled and not is_critical:
-            # The already-scheduled update will pick up this new value
-            print(f"[PROGRESS] Coalescing update for experiment {queue_index}: {status} - {progress}")
+        # If idle handler already running, it will pick up this update
+        if self._idle_handler_active:
             return
         
-        print(f"[PROGRESS] Scheduling update for experiment {queue_index}: {status} - {progress} (critical={is_critical})")
+        # Schedule a single idle handler to process ALL pending updates
+        self._idle_handler_active = True
         
-        # Schedule UI update
-        def update_ui():
+        def process_all_updates():
+            """Process all pending updates in a single GTK main loop iteration."""
             try:
-                # Get the latest update for this experiment (may have changed since scheduling)
-                if queue_index not in self._pending_updates:
-                    return False  # Update was cancelled/processed
+                # Process all pending updates (snapshot and clear)
+                updates_to_process = list(self._pending_updates.items())
+                self._pending_updates.clear()
                 
-                s, p = self._pending_updates.pop(queue_index)
-                self._processing_updates.add(queue_index)
-                
-                self.queue_view.update_experiment_status(queue_index, s, p)
-            except Exception as e:
-                print(f"[PROGRESS] ERROR: Failed to update experiment {queue_index} status: {e}")
-                import traceback
-                traceback.print_exc()
+                for idx, (s, p) in updates_to_process:
+                    try:
+                        self.queue_view.update_experiment_status(idx, s, p)
+                    except Exception as e:
+                        print(f"[PROGRESS] ERROR: Failed to update experiment {idx}: {e}")
+                        import traceback
+                        traceback.print_exc()
             finally:
-                # Remove from processing
-                self._processing_updates.discard(queue_index)
+                # Reset flag to allow next batch
+                self._idle_handler_active = False
+            
             return False  # Don't repeat
         
-        # Use DEFAULT priority for critical updates, HIGH_IDLE for progress
-        if is_critical:
-            GLib.idle_add(update_ui, priority=GLib.PRIORITY_DEFAULT)
-        else:
-            GLib.idle_add(update_ui, priority=GLib.PRIORITY_HIGH_IDLE)
+        # Schedule with HIGH_IDLE priority to not block user interactions
+        GLib.idle_add(process_all_updates, priority=GLib.PRIORITY_HIGH_IDLE)
     
     def _on_experiment_result(self, name: str, result: dict):
         """Handle individual experiment result (called as each experiment completes).

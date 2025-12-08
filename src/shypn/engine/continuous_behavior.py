@@ -183,12 +183,23 @@ class ContinuousBehavior(TransitionBehavior):
                         # This is a compartment parameter (comp1, comp2, etc.)
                         params[key] = 1.0  # Normalize for token-based simulation
                 
-                context.update(params)                # Add place tokens as P1, P2, ... (or P88, P105 if ID already has P)
+                context.update(params)
+                
+                # Add place tokens as P1, P2, ... (or P88, P105 if ID already has P)
                 # IMPORTANT: Also add by place.name for SBML formulas that use names
                 # Add small epsilon to prevent division by zero in rate formulas
                 for place_id, place in places.items():
+                    # Get tokens safely - handle both direct attribute and method
+                    if hasattr(place, 'tokens'):
+                        tokens = place.tokens
+                    elif hasattr(place, 'marking'):
+                        tokens = place.marking
+                    else:
+                        # Fallback - assume 0 tokens if attribute missing
+                        tokens = 0
+                    
                     # Use max() to ensure at least epsilon value to prevent division by zero
-                    tokens_safe = max(place.tokens, 1e-10)
+                    tokens_safe = max(float(tokens), 1e-10)
                     
                     # Add by ID (for numeric IDs like 1, 2, 3)
                     if isinstance(place_id, str) and place_id.startswith('P'):

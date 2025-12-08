@@ -171,15 +171,20 @@ class ExperimentQueueView(Gtk.Box):
             progress: Optional progress string (e.g., "50%", "100%", error message)
         """
         try:
+            # Validate index is within bounds
+            if index < 0 or index >= len(self.queue_store):
+                # Row no longer exists (queue was cleared/modified)
+                return
+            
             # Get iterator for the row
             iter = self.queue_store.get_iter(index)
             if not iter:
-                print(f"[QUEUE_VIEW] ERROR: Could not get iter for index {index}")
+                # print(f"[QUEUE_VIEW] ERROR: Could not get iter for index {index}")
                 return
             
-            # Get experiment name for logging
-            name = self.queue_store.get_value(iter, 0)
-            print(f"[QUEUE_VIEW] Updating '{name}' (row {index}): status={status}, progress={progress}")
+            # Get experiment name for logging (disabled for performance)
+            # name = self.queue_store.get_value(iter, 0)
+            # print(f"[QUEUE_VIEW] Updating '{name}' (row {index}): status={status}, progress={progress}")
             
             # Update status (column 1)
             self.queue_store.set_value(iter, 1, status)
@@ -191,10 +196,10 @@ class ExperimentQueueView(Gtk.Box):
             # Update global status label
             self._update_status_label()
             
-            print(f"[QUEUE_VIEW] Successfully updated '{name}' to {status}")
+            # print(f"[QUEUE_VIEW] Successfully updated '{name}' to {status}")
             
         except Exception as e:
-            print(f"[QUEUE_VIEW] ERROR: update_experiment_status failed for index {index}: {e}")
+            # print(f"[QUEUE_VIEW] ERROR: update_experiment_status failed for index {index}: {e}")
             import traceback
             traceback.print_exc()
     

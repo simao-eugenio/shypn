@@ -355,13 +355,10 @@ class ModelCanvasLoader:
         Args:
             page: Notebook page widget (Gtk.Overlay or Gtk.ScrolledWindow)
         """
-        # print(f"\n[WIRE] _wire_data_collector_for_page() called")
         # Always resolve the actual GtkDrawingArea via helper to avoid viewport mixups
         drawing_area = self._get_drawing_area_from_page(page)
         
-        
         if self.right_panel_loader and drawing_area:
-            pass
             # Get simulate_tools_palette from SwissKnife registry
             if drawing_area in self.overlay_managers:
                 overlay_manager = self.overlay_managers[drawing_area]
@@ -375,26 +372,14 @@ class ModelCanvasLoader:
                     simulate_tools_palette = None
                     
                     if hasattr(swissknife, 'registry') and hasattr(swissknife.registry, 'widget_palette_instances'):
-                        pass
                         simulate_tools_palette = swissknife.registry.widget_palette_instances.get('simulate')
                     elif hasattr(swissknife, 'widget_palette_instances'):
-                        pass
                         simulate_tools_palette = swissknife.widget_palette_instances.get('simulate')
-                    else:
-                        pass
                     
                     if simulate_tools_palette and hasattr(simulate_tools_palette, 'data_collector'):
                         data_collector = simulate_tools_palette.data_collector
                         self.right_panel_loader.set_data_collector(data_collector)
                         return True
-                    else:
-                        pass
-                else:
-                    pass
-            else:
-                pass
-        else:
-            pass
         return False
 
     def _on_notebook_page_changed(self, notebook, page, page_num):
@@ -1324,6 +1309,10 @@ class ModelCanvasLoader:
                 # Set context menu handler on model_canvas_loader
                 if self.right_panel_loader.context_menu_handler:
                     self.set_context_menu_handler(self.right_panel_loader.context_menu_handler)
+                
+                # CRITICAL FIX: Wire data_collector for the first page (default canvas)
+                # This ensures plotting works on the default canvas without requiring a tab switch
+                self._wire_data_collector_for_page(overlay)
             
             # Mark that we've initialized the first page
             self._first_page_initialized = True
@@ -4118,6 +4107,11 @@ class ModelCanvasLoader:
         
         # Wire locality sync callback for all existing Report panels
         self._wire_locality_sync_for_existing_panels()
+        
+        # CRITICAL FIX: Wire data collector for all existing pages
+        # This ensures the default canvas (page 0) gets its data collector wired
+        # even if it was created before right_panel_loader was set
+        self._wire_data_collectors_for_all_pages()
     
     def _wire_locality_sync_for_existing_panels(self):
         """Wire transition→report locality sync callbacks for all existing panels.
@@ -4200,6 +4194,27 @@ class ModelCanvasLoader:
         
         # Set the single dynamic callback (no loop needed, single global transition panel)
         transition_panel.on_selection_changed_callback = on_transition_selected
+    
+    def _wire_data_collectors_for_all_pages(self):
+        """Wire data collectors for all existing pages.
+        
+        This is called when right_panel_loader is first set, to ensure all
+        existing canvases (especially the default canvas on page 0) have their
+        data collectors properly wired to the plot panels.
+        """
+        if not self.right_panel_loader:
+            return
+        
+        if not self.notebook:
+            return
+        
+        # Wire data collector for each existing page
+        n_pages = self.notebook.get_n_pages()
+        
+        for page_num in range(n_pages):
+            page = self.notebook.get_nth_page(page_num)
+            if page:
+                self._wire_data_collector_for_page(page)
     
     def wire_existing_canvases_to_right_panel(self):
         """Wire data_collector to right_panel for all existing canvases.
