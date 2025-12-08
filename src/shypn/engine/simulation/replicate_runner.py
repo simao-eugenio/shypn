@@ -117,23 +117,19 @@ class ReplicateRunner:
                 print(f"  Progress: {i + 1}/{n} replicates")
             
             # Time-throttled progress reporting: only call callback if 200ms has passed
-            # This prevents overwhelming the GTK event loop while still showing smooth progress
+            # CRITICAL: Minimize progress updates to prevent GTK crash
+            # Only update at 10% boundaries and completion to avoid flooding event loop
             if progress_callback and i > 0:
-                current_time = time.time()
-                time_since_last = current_time - last_callback_time
-                
-                # Call callback if either:
-                # 1. At least 200ms (0.2s) has passed since last callback, OR
-                # 2. We're at a 10% boundary, OR
-                # 3. This is the last replicate (100%)
                 current_pct = int((i / n) * 100)
                 prev_pct = int(((i - 1) / n) * 100)
+                
+                # Only call callback at 10% boundaries or completion
                 at_boundary = current_pct > prev_pct and current_pct % 10 == 0
                 is_last = (i == n - 1)
                 
-                if time_since_last >= 0.2 or at_boundary or is_last:
+                if at_boundary or is_last:
                     progress_callback(i / n)
-                    last_callback_time = current_time
+                    last_callback_time = time.time()
             
             # Create fresh controller for this replicate
             controller = SimulationController(self.model)
