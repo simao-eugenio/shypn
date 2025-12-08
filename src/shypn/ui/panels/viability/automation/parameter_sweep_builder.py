@@ -321,21 +321,32 @@ class ParameterSweepBuilder(Gtk.Box):
             list: List of parameter values to test
         """
         if self.linear_radio.get_active():
-            # Linear range
+            # Linear range (supports both increasing and decreasing)
             start = float(self.start_entry.get_text())
             stop = float(self.stop_entry.get_text())
             step = float(self.step_entry.get_text())
             
             if step <= 0:
                 raise ValueError("Step must be positive")
-            if start >= stop:
-                raise ValueError("Start must be less than stop")
+            if start == stop:
+                raise ValueError("Start and stop must be different")
             
             values = []
-            current = start
-            while current <= stop:
-                values.append(current)
-                current += step
+            
+            # Determine direction
+            if start < stop:
+                # Increasing range
+                current = start
+                while current <= stop:
+                    values.append(current)
+                    current += step
+            else:
+                # Decreasing range (e.g., NAD 2mM → 0mM)
+                current = start
+                while current >= stop:
+                    values.append(current)
+                    current -= step
+            
             return values
             
         elif self.list_radio.get_active():
