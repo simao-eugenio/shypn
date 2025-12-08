@@ -111,8 +111,8 @@ class ExperimentAutomationCategory:
         self.sweep_builder = ParameterSweepBuilder()
         self.sweep_builder.set_generate_callback(self._on_sweep_generate)
         
-        # Connect type change to parameter refresh
-        self.sweep_builder.type_combo.connect("changed", lambda _: self.refresh_parameters())
+        # Connect type change to parameter refresh AND clear queue
+        self.sweep_builder.type_combo.connect("changed", self._on_object_type_changed)
         
         # Add to content box
         self.content_box.pack_start(self.sweep_builder, False, False, 0)
@@ -158,6 +158,23 @@ class ExperimentAutomationCategory:
         self.results_browser.set_export_callback(self._on_export_results)
         self.results_browser.set_report_callback(self._on_add_to_report)
         self.content_box.pack_start(self.results_browser, True, True, 0)
+    
+    def _on_object_type_changed(self, combo):
+        """Handle object type change - clear queue and refresh parameters.
+        
+        When switching between places, transitions, arcs, the old experiments
+        are no longer valid, so clear the queue.
+        """
+        # Clear experiment queue
+        if hasattr(self, 'queue_view'):
+            self.queue_view.clear_queue()
+        
+        # Clear results browser
+        if hasattr(self, 'results_browser'):
+            self.results_browser.clear_results()
+        
+        # Refresh parameters for new object type
+        self.refresh_parameters()
     
     def refresh_parameters(self):
         """Refresh available parameters from parent panel state.

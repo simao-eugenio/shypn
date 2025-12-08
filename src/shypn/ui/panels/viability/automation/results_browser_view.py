@@ -372,6 +372,15 @@ class ResultsBrowserView(Gtk.Box):
         species_stats = stats.get('species_statistics', {})
         time_points = stats.get('time_points', [])
         
+        # DEBUG: Print what we received
+        print(f"[PLOT_DEBUG] stats keys: {stats.keys()}")
+        print(f"[PLOT_DEBUG] species_stats keys: {list(species_stats.keys())}")
+        print(f"[PLOT_DEBUG] time_points length: {len(time_points)}")
+        if species_stats:
+            first_species = list(species_stats.keys())[0]
+            print(f"[PLOT_DEBUG] first species '{first_species}' keys: {species_stats[first_species].keys()}")
+            print(f"[PLOT_DEBUG] first species mean length: {len(species_stats[first_species].get('mean', []))}")
+        
         if not species_stats or not time_points:
             dialog = Gtk.MessageDialog(
                 transient_for=self.get_toplevel(),
@@ -406,19 +415,30 @@ class ResultsBrowserView(Gtk.Box):
         for idx, (species_id, species_data) in enumerate(species_stats.items()):
             ax = axes[idx]
             
+            # DEBUG: Check data structure
+            print(f"[PLOT_DEBUG] Species {species_id}: keys = {species_data.keys()}")
+            
             mean = np.array(species_data.get('mean', []))
             std = np.array(species_data.get('std', []))
+            
+            print(f"[PLOT_DEBUG] Species {species_id}: mean type = {type(species_data.get('mean'))}, len = {len(species_data.get('mean', []))}")
+            print(f"[PLOT_DEBUG] Species {species_id}: np.array(mean) shape = {mean.shape}, dtype = {mean.dtype}")
+            print(f"[PLOT_DEBUG] Species {species_id}: first few mean values = {mean[:5] if len(mean) > 0 else 'empty'}")
+            print(f"[PLOT_DEBUG] time_points type = {type(time_points)}, len = {len(time_points)}")
             
             if len(mean) == 0 or len(time_points) == 0:
                 ax.text(0.5, 0.5, 'No data', ha='center', va='center')
                 ax.set_title(species_id)
                 continue
             
+            # Convert to numpy arrays if needed
+            time_points_arr = np.array(time_points)
+            
             # Plot mean trajectory
-            ax.plot(time_points, mean, 'b-', linewidth=2, label='Mean')
+            ax.plot(time_points_arr, mean, 'b-', linewidth=2, label='Mean')
             
             # Plot confidence interval (mean ± 2*std ≈ 95% CI)
-            ax.fill_between(time_points, 
+            ax.fill_between(time_points_arr, 
                            mean - 2*std, 
                            mean + 2*std, 
                            alpha=0.3, 
@@ -429,7 +449,7 @@ class ResultsBrowserView(Gtk.Box):
             percentiles = species_data.get('percentiles', {})
             if '50' in percentiles:
                 median = np.array(percentiles['50'])
-                ax.plot(time_points, median, 'r--', linewidth=1, alpha=0.7, label='Median')
+                ax.plot(time_points_arr, median, 'r--', linewidth=1, alpha=0.7, label='Median')
             
             ax.set_xlabel('Time')
             ax.set_ylabel('Tokens')

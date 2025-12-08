@@ -173,7 +173,11 @@ class ReplicateRunner:
             
             # Run simulation
             if i == 0:
-                print(f"[REPLICATE] Starting simulation: dt={dt}, max_steps={max_steps}")
+                print(f"[REPLICATE] Starting simulation:")
+                print(f"[REPLICATE]   duration = {duration}")
+                print(f"[REPLICATE]   dt = {dt}")
+                print(f"[REPLICATE]   max_steps = {max_steps}")
+                print(f"[REPLICATE]   Expected time points: ~{max_steps}")
             try:
                 controller.run(
                     time_step=dt,
@@ -193,6 +197,14 @@ class ReplicateRunner:
                 continue
             
             # Collect results
+            if i == 0:
+                print(f"[REPLICATE] Collecting data from controller...")
+                print(f"[REPLICATE]   time_points: {len(controller.data_collector.time_points)} points")
+                print(f"[REPLICATE]   place_data: {len(controller.data_collector.place_data)} places")
+                if controller.data_collector.place_data:
+                    first_place = list(controller.data_collector.place_data.keys())[0]
+                    print(f"[REPLICATE]   first place '{first_place}': {len(controller.data_collector.place_data[first_place])} time points")
+            
             result = {
                 'replicate_id': i,
                 'seed': seed_base + i,
@@ -213,6 +225,9 @@ class ReplicateRunner:
                     for t in self.model.transitions
                 }
             }
+            
+            if i == 0:
+                print(f"[REPLICATE] Result created with {len(result['time_points'])} time points")
             
             results.append(result)
         
@@ -265,6 +280,8 @@ class ReplicateRunner:
         
         # Get common time points (assume all replicates have same times)
         time_points = successful[0]['time_points']
+        if isinstance(time_points, np.ndarray):
+            time_points = time_points.tolist()
         
         # Get all place IDs
         place_ids = list(successful[0]['place_data'].keys())
