@@ -993,26 +993,13 @@ class SimulationController:
             logging.getLogger(__name__).info(f"[SIMULATION] Duration reached: time={self.time}, duration={self.settings.duration}")
             return False  # Simulation complete
         
-        if immediate_fired_total > 0 or window_crossing_fired > 0 or discrete_fired or continuous_active > 0:
-            return True
-        
-        # Check for waiting discrete transitions
-        stochastic_transitions = [t for t in self.model.transitions if t.transition_type == 'stochastic']
-        all_discrete = timed_transitions + stochastic_transitions
-        waiting_count = 0
-        ready_count = 0
-        for transition in all_discrete:
-            behavior = self._get_behavior(transition)
-            can_fire, reason = behavior.can_fire()
-            if can_fire:
-                ready_count += 1
-            elif reason and 'too-early' in str(reason):
-                waiting_count += 1
-        
-        if waiting_count > 0 or ready_count > 0:
-            return True
-        
-        return False
+        # CRITICAL FIX: Always return True if simulation NOT complete
+        # Even if no transitions fired this step, we need to continue
+        # stepping until duration is reached to collect full trajectory data
+        # 
+        # Previous logic would return False when no transitions could fire,
+        # causing premature simulation termination with only 1-2 data points
+        return True
 
     def _find_enabled_transitions(self) -> List:
         """Find all transitions that are enabled (can fire).

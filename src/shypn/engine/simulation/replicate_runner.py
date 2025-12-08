@@ -166,6 +166,8 @@ class ReplicateRunner:
             if i == 0:
                 print(f"[REPLICATE] Starting data collection...")
             controller.data_collector.start_collection()
+            # Record initial state at t=0
+            controller.data_collector.record_state(controller.time)
             
             # Calculate max_steps from duration
             dt = time_step if time_step else controller.settings.get_effective_dt()
@@ -184,12 +186,18 @@ class ReplicateRunner:
                 controller._update_enablement_states()
                 
                 # Execute simulation steps synchronously
+                steps_completed = 0
                 for step_num in range(max_steps):
                     success = controller.step(time_step=dt)
                     if not success:
+                        if i == 0:
+                            print(f"[REPLICATE] Step failed at step {step_num}")
                         break  # Simulation stopped (e.g., deadlock)
+                    steps_completed += 1
+                
                 if i == 0:
                     print(f"[REPLICATE] Simulation completed successfully")
+                    print(f"[REPLICATE]   Steps completed: {steps_completed}/{max_steps}")
             except Exception as e:
                 if verbose:
                     print(f"  ERROR in replicate {i}: {e}")
