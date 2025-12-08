@@ -58,11 +58,15 @@ class ExperimentSnapshot:
         for row in transitions_store:
             trans_id = row[0]
             rate = row[2]
-            formula = row[3] if len(row) > 3 else ""
+            # TreeModelRow doesn't support len(), but we can safely access column 3
+            try:
+                formula = row[3]
+            except (IndexError, KeyError):
+                formula = ""
             
             # Prefer formula over rate if formula exists
-            if formula and formula.strip():
-                self.transition_rates[trans_id] = formula
+            if formula and str(formula).strip():
+                self.transition_rates[trans_id] = str(formula)
             else:
                 self.transition_rates[trans_id] = rate
                 # Warn if rate is zero (will prevent firing)
