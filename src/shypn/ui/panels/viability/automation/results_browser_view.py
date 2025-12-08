@@ -158,6 +158,11 @@ class ResultsBrowserView(Gtk.Box):
             name: Experiment name
             result: Results dictionary from BatchExecutor
         """
+        print(f"[BROWSER] add_result called for '{name}'")
+        print(f"[BROWSER]   Result keys: {result.keys()}")
+        print(f"[BROWSER]   Statistics keys: {result.get('statistics', {}).keys()}")
+        print(f"[BROWSER]   N replicates: {result.get('statistics', {}).get('n_replicates', 0)}")
+        
         self.results[name] = result
         
         # Extract info
@@ -170,6 +175,8 @@ class ResultsBrowserView(Gtk.Box):
         
         # Add to store
         self.results_store.append([name, n_replicates, duration_str, status])
+        
+        print(f"[BROWSER] Result '{name}' added to store: {n_replicates} replicates, {duration_str}, {status}")
         
         self._update_status_label()
     
