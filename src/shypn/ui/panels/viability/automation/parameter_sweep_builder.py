@@ -287,6 +287,11 @@ class ParameterSweepBuilder(Gtk.Box):
                 param_id = self.name_combo.get_active_id()
                 param_name = self.name_combo.get_active_text()  # Display name for labels
                 
+                print(f"[SWEEP_BUILDER] Generating sweep:")
+                print(f"[SWEEP_BUILDER]   parameter_type: {self.parameter_type}")
+                print(f"[SWEEP_BUILDER]   parameter_id: {param_id}")
+                print(f"[SWEEP_BUILDER]   parameter_name: {param_name}")
+                
                 if not param_id or param_id == "none" or not param_name or param_name.startswith("("):
                     raise ValueError("Please select a parameter from the dropdown")
                 
@@ -303,6 +308,10 @@ class ParameterSweepBuilder(Gtk.Box):
                     'duration': float(self.duration_entry.get_text()),
                     'termination_condition': self.termination_combo.get_active_id()
                 }
+                
+                print(f"[SWEEP_BUILDER]   values count: {len(values)}")
+                print(f"[SWEEP_BUILDER]   first 3 values: {values[:3]}")
+                
                 self.on_generate_callback(config)
             except Exception as e:
                 self.preview_label.set_markup(
