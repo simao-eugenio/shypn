@@ -351,6 +351,12 @@ class BatchExecutor:
                 name = getattr(p, 'name', '<NO NAME>')
                 print(f"[MODEL]   {p.id} (name='{name}'): tokens={marking}")
             
+            # Debug: Check transition types
+            print(f"[MODEL] Copied {len(model.transitions)} transitions:")
+            for t in model.transitions:
+                trans_type = getattr(t, 'transition_type', 'MISSING')
+                print(f"[MODEL]   {t.id}: transition_type='{trans_type}'")
+            
             # Step 2: Build ID lookup dictionaries for arc deserialization
             places_dict = {p.id: p for p in model.places}
             transitions_dict = {t.id: t for t in model.transitions}
