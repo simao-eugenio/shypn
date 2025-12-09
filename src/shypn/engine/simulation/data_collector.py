@@ -85,10 +85,10 @@ class DataCollector:
                         rate = float(transition.rate) if transition.rate else 0.0
                     
                     # Debug: Log first few rate evaluations to verify they're working
-                    if current_time < 0.02 and rate > 0:  # First couple time steps
+                    if current_time <= 0.02:  # First couple time steps - log even if rate is 0
                         trans_name = getattr(transition, 'name', transition.id)
                         rate_func = getattr(transition.behavior, 'rate_function_expr', 'N/A')
-                        print(f"[RATE] t={current_time:.4f}, {trans_name}: rate={rate:.4f}, formula={rate_func}")
+                        print(f"[RATE] t={current_time:.4f}, {trans_name}: rate={rate:.6f}, formula={rate_func}")
                 except Exception as e:
                     # If rate evaluation fails, use 0.0 and log
                     if current_time < 0.1:  # Only log errors early in simulation
