@@ -541,32 +541,34 @@ class ResultsBrowserView(Gtk.Box):
             # Smooth the curves for better visualization
             from scipy.interpolate import make_interp_spline
             
-            # Use fewer points for smoothing to avoid over-smoothing
-            if len(time_points_arr) > 100:
+            # Use more aggressive smoothing for cleaner curves
+            if len(time_points_arr) > 50:  # Lower threshold
                 # Create smooth curve using spline interpolation
                 try:
-                    # Reduce to reasonable number of points for spline
-                    indices = np.linspace(0, len(time_points_arr)-1, min(300, len(time_points_arr)), dtype=int)
+                    # Use more points for very smooth curves
+                    indices = np.linspace(0, len(time_points_arr)-1, min(500, len(time_points_arr)), dtype=int)
                     time_smooth = time_points_arr[indices]
                     mean_smooth = mean[indices]
                     
                     # Create spline with k=3 (cubic)
                     spl = make_interp_spline(time_smooth, mean_smooth, k=min(3, len(time_smooth)-1))
                     
-                    # Generate smooth points
-                    time_fine = np.linspace(time_points_arr[0], time_points_arr[-1], 500)
+                    # Generate extra smooth points
+                    time_fine = np.linspace(time_points_arr[0], time_points_arr[-1], 1000)
                     mean_fine = spl(time_fine)
                     
                     # Plot smooth mean line
                     line = ax1.plot(time_fine, mean_fine, color=color, 
                                   linewidth=2, label=place_name, alpha=0.8)
+                    print(f"[PLOT] Smoothed {place_id}: {len(time_points_arr)} → {len(time_fine)} points")
                 except Exception as e:
                     # Fallback to straight lines if smoothing fails
-                    print(f"[PLOT] Smoothing failed for {place_id}, using raw data: {e}")
+                    print(f"[PLOT] Smoothing failed for {place_id}: {e}")
                     line = ax1.plot(time_points_arr, mean, color=color, 
                                   linewidth=2, label=place_name, alpha=0.8)
             else:
                 # Too few points, use raw data
+                print(f"[PLOT] Too few points for {place_id} ({len(time_points_arr)}), using raw data")
                 line = ax1.plot(time_points_arr, mean, color=color, 
                               linewidth=2, label=place_name, alpha=0.8)
             
@@ -593,29 +595,31 @@ class ResultsBrowserView(Gtk.Box):
                 # Smooth the transition curve
                 from scipy.interpolate import make_interp_spline
                 
-                if len(time_points_arr) > 100:
+                if len(time_points_arr) > 50:  # Lower threshold
                     try:
-                        # Reduce to reasonable number of points for spline
-                        indices = np.linspace(0, len(time_points_arr)-1, min(300, len(time_points_arr)), dtype=int)
+                        # Use more points for very smooth curves
+                        indices = np.linspace(0, len(time_points_arr)-1, min(500, len(time_points_arr)), dtype=int)
                         time_smooth = time_points_arr[indices]
                         mean_smooth = mean[indices]
                         
                         # Create spline
                         spl = make_interp_spline(time_smooth, mean_smooth, k=min(3, len(time_smooth)-1))
                         
-                        # Generate smooth points
-                        time_fine = np.linspace(time_points_arr[0], time_points_arr[-1], 500)
+                        # Generate extra smooth points
+                        time_fine = np.linspace(time_points_arr[0], time_points_arr[-1], 1000)
                         mean_fine = spl(time_fine)
                         
                         # Plot smooth transition with thick red line
                         ax2.plot(time_fine, mean_fine, color='red', 
                                 linewidth=3, label=f'⚡ {trans_name}', alpha=0.9)
+                        print(f"[PLOT] Smoothed transition {transition_id}: {len(time_points_arr)} → {len(time_fine)} points")
                     except Exception as e:
-                        print(f"[PLOT] Smoothing failed for transition, using raw data: {e}")
+                        print(f"[PLOT] Smoothing failed for transition: {e}")
                         ax2.plot(time_points_arr, mean, color='red', 
                                 linewidth=3, label=f'⚡ {trans_name}', alpha=0.9)
                 else:
                     # Too few points, use raw data
+                    print(f"[PLOT] Too few points for transition ({len(time_points_arr)}), using raw data")
                     ax2.plot(time_points_arr, mean, color='red', 
                             linewidth=3, label=f'⚡ {trans_name}', alpha=0.9)
                 
