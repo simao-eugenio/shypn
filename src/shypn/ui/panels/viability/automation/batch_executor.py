@@ -344,6 +344,20 @@ class BatchExecutor:
             model.places = [type(p).from_dict(p.to_dict()) for p in subnet_data['places']]
             model.transitions = [type(t).from_dict(t.to_dict()) for t in subnet_data['transitions']]
             
+            # CRITICAL FIX: Normalize transition types for simulation controller
+            # UI stores as "Continuous (SHPN)", but controller expects "continuous"
+            type_name_map = {
+                'Immediate': 'immediate', 
+                'Timed (TPN)': 'timed', 
+                'Stochastic (FSPN)': 'stochastic', 
+                'Continuous (SHPN)': 'continuous'
+            }
+            for t in model.transitions:
+                if hasattr(t, 'transition_type'):
+                    # Normalize type name for controller
+                    if t.transition_type in type_name_map:
+                        t.transition_type = type_name_map[t.transition_type]
+            
             # Debug: Check initial markings
             print(f"[MODEL] Copied {len(model.places)} places with initial markings:")
             for p in model.places[:4]:  # Show first 4
