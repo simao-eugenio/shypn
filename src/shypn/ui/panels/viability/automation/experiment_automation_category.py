@@ -315,6 +315,13 @@ class ExperimentAutomationCategory:
                 base_snapshot=base_snapshot
             )
             
+            # Update visual indicators in parameter tables
+            if self.parent_panel and hasattr(self.parent_panel, 'update_sweep_indicators') and count > 0:
+                self.parent_panel.update_sweep_indicators(
+                    config['parameter_type'],
+                    config.get('parameter_id', config['parameter_name'])
+                )
+            
             # Update preview
             if hasattr(self.sweep_builder, 'preview_label'):
                 self.sweep_builder.preview_label.set_markup(
