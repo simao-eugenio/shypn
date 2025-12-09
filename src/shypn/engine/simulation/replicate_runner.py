@@ -224,7 +224,7 @@ class ReplicateRunner:
         """Compute statistics across replicates.
         
         Computes mean, std, min, max, CV (coefficient of variation),
-        and optionally percentiles for each species at each time point.
+        and optionally percentiles for each species (places and transitions) at each time point.
         
         Args:
             results: List of replicate results from run_replicates()
@@ -234,9 +234,9 @@ class ReplicateRunner:
             Dictionary containing:
                 - 'n_replicates': Number of successful replicates
                 - 'time_points': Common time points
-                - 'species_statistics': Dict mapping place_id to statistics dict
+                - 'species_statistics': Dict mapping place_id OR transition_id to statistics dict
                     Each statistics dict contains:
-                    - 'mean': Mean trajectory
+                    - 'mean': Mean trajectory (tokens for places, firing counts for transitions)
                     - 'std': Standard deviation
                     - 'min': Minimum trajectory
                     - 'max': Maximum trajectory
@@ -260,6 +260,11 @@ class ReplicateRunner:
         
         # Get all place IDs
         place_ids = list(successful[0]['place_data'].keys())
+        
+        # Get all transition IDs (if available)
+        transition_ids = []
+        if 'transition_data' in successful[0]:
+            transition_ids = list(successful[0]['transition_data'].keys())
         
         statistics = {
             'n_replicates': n_replicates,
@@ -293,6 +298,43 @@ class ReplicateRunner:
             }
             
             statistics['species_statistics'][place_id] = {
+                'mean': mean.tolist(),
+                'std': std.tolist(),
+                'min': min_traj.tolist(),
+                'max': max_traj.tolist(),
+                'cv': cv.tolist(),
+                'percentiles': {
+                    p: data.tolist()
+                    for p, data in percentile_data.items()
+                }
+            }
+        
+        # Compute statistics for each transition (firing counts)
+        for transition_id in transition_ids:
+            # Stack trajectories into matrix (replicates × time_points)
+            trajectories = np.array([
+                r['transition_data'][transition_id]
+                for r in successful
+            ])
+            
+            # Compute statistics
+            mean = np.mean(trajectories, axis=0)
+            std = np.std(trajectories, axis=0)
+            min_traj = np.min(trajectories, axis=0)
+            max_traj = np.max(trajectories, axis=0)
+            
+            # Coefficient of variation (handle divide by zero)
+            cv = np.zeros_like(mean)
+            nonzero_mask = mean > 0
+            cv[nonzero_mask] = std[nonzero_mask] / mean[nonzero_mask]
+            
+            # Percentiles
+            percentile_data = {
+                p: np.percentile(trajectories, p, axis=0)
+                for p in percentiles
+            }
+            
+            statistics['species_statistics'][transition_id] = {
                 'mean': mean.tolist(),
                 'std': std.tolist(),
                 'min': min_traj.tolist(),
