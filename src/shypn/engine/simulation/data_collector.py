@@ -67,22 +67,26 @@ class DataCollector:
             count = getattr(transition, 'firing_count', 0)
             self.transition_data[transition.id].append(count)
             
-            # Instantaneous rate/propensity
+            # Instantaneous rate/propensity - evaluate with CURRENT token state
             rate = 0.0
             if hasattr(transition, 'behavior') and transition.behavior:
                 try:
-                    # Try to evaluate the rate at current time
+                    # Force re-evaluation with current tokens by calling the method
+                    # This ensures we get the rate based on current marking, not cached value
                     if hasattr(transition.behavior, '_evaluate_rate_at_enablement'):
+                        # This method evaluates the rate formula with current place tokens
                         rate = transition.behavior._evaluate_rate_at_enablement(current_time)
                     elif hasattr(transition.behavior, 'evaluate_rate'):
-                        # For continuous transitions
+                        # For continuous transitions - needs places dict
                         places_dict = {p.id: p for p in self.model.places}
                         rate = transition.behavior.evaluate_rate(places_dict, current_time)
                     elif hasattr(transition, 'rate'):
-                        # Fallback: use static rate attribute
+                        # Fallback: use static rate attribute (won't reflect token changes)
                         rate = float(transition.rate) if transition.rate else 0.0
-                except Exception:
-                    # If rate evaluation fails, use 0.0
+                except Exception as e:
+                    # If rate evaluation fails, use 0.0 and log
+                    if current_time < 0.1:  # Only log errors early in simulation
+                        print(f"[DATA_COLLECTOR] Failed to evaluate rate for {transition.id}: {e}")
                     rate = 0.0
             
             self.transition_rates[transition.id].append(rate)
