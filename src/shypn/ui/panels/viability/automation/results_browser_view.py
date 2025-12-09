@@ -653,30 +653,39 @@ class ResultsBrowserView(Gtk.Box):
             label = f'⚡ {trans_name}' if is_swept else trans_name
             
             # Convert cumulative firing count to instantaneous firing rate
-            # This shows how rate functions (k * substrate) are being respected
+            # Use rolling window for stable rate estimation
             firing_rate = np.zeros_like(mean)
             firing_rate_std = np.zeros_like(std)
+            
             if len(time_points_arr) > 1:
-                # Compute derivative: dN/dt (firings per unit time)
-                dt = np.diff(time_points_arr)
-                d_mean = np.diff(mean)
-                firing_rate[1:] = d_mean / dt
-                firing_rate[0] = firing_rate[1] if len(firing_rate) > 1 else 0
+                # Use rolling window to compute average firing rates
+                # This is much more stable than point-wise derivatives
+                window_size = max(5, len(time_points_arr) // 20)  # 5% of data or min 5 points
                 
-                # For uncertainty: std of firing rate = sqrt((std[i]^2 + std[i+1]^2)) / dt
-                # This is proper error propagation for finite differences
-                std_sq_sum = std[:-1]**2 + std[1:]**2
-                firing_rate_std[1:] = np.sqrt(std_sq_sum) / dt
-                firing_rate_std[0] = firing_rate_std[1] if len(firing_rate_std) > 1 else 0
-                
-                # Apply Savitzky-Golay filter to smooth noisy derivatives
-                from scipy.signal import savgol_filter
-                if len(firing_rate) > 11:  # Need at least window_length points
-                    window = min(11, len(firing_rate) if len(firing_rate) % 2 == 1 else len(firing_rate) - 1)
-                    if window >= 5:  # Minimum reasonable window
-                        firing_rate = savgol_filter(firing_rate, window_length=window, polyorder=3)
-                        firing_rate_std = savgol_filter(firing_rate_std, window_length=window, polyorder=3)
-                        firing_rate_std = np.abs(firing_rate_std)  # Ensure positive
+                for i in range(len(mean)):
+                    # Define window bounds
+                    start_idx = max(0, i - window_size // 2)
+                    end_idx = min(len(mean), i + window_size // 2 + 1)
+                    
+                    # Ensure at least 2 points in window
+                    if end_idx - start_idx < 2:
+                        if i < len(mean) - 1:
+                            start_idx, end_idx = i, i + 2
+                        else:
+                            start_idx, end_idx = i - 1, i + 1
+                    
+                    # Compute rate as slope over window
+                    window_time = time_points_arr[start_idx:end_idx]
+                    window_count = mean[start_idx:end_idx]
+                    
+                    if len(window_time) > 1:
+                        delta_time = window_time[-1] - window_time[0]
+                        delta_count = window_count[-1] - window_count[0]
+                        firing_rate[i] = delta_count / delta_time if delta_time > 0 else 0
+                        
+                        # Estimate uncertainty as average std in window
+                        window_std = std[start_idx:end_idx]
+                        firing_rate_std[i] = np.mean(window_std) / delta_time if delta_time > 0 else 0
             
             # Use firing rate instead of cumulative count
             mean = firing_rate
