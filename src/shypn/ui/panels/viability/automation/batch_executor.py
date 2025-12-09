@@ -784,10 +784,25 @@ class BatchExecutor:
         for trans_id, rate in snapshot.transition_rates.items():
             trans = next((t for t in transitions if t.id == trans_id), None)
             if trans:
+                # Ensure properties dict exists
+                if not hasattr(trans, 'properties') or trans.properties is None:
+                    trans.properties = {}
+                
                 # Check if rate is numeric or a formula string
                 if isinstance(rate, str):
-                    # It's a kinetic formula - keep as string
-                    trans.rate = rate
+                    # Try to parse as number first
+                    try:
+                        numeric_rate = float(rate)
+                        # It's a numeric string - store as number
+                        trans.rate = numeric_rate
+                    except ValueError:
+                        # It's a formula string - store in properties for behavior factory
+                        trans.properties['rate_function'] = rate
+                        # Also set trans.rate to a reasonable default for fallback
+                        # Extract leading coefficient if present, otherwise use 1.0
+                        import re
+                        coef_match = re.match(r'^([\d.]+)', rate)
+                        trans.rate = float(coef_match.group(1)) if coef_match else 1.0
                 else:
                     # It's numeric - convert to float
                     try:
@@ -798,7 +813,8 @@ class BatchExecutor:
                         trans.rate = rate
                 applied_rates += 1
                 if applied_rates <= 3:  # Show first 3
-                    print(f"[SNAPSHOT]   {trans_id}: {rate}")
+                    rate_display = trans.properties.get('rate_function', rate) if isinstance(rate, str) and not rate.replace('.', '').isdigit() else rate
+                    print(f"[SNAPSHOT]   {trans_id}: {rate_display}")
         print(f"[SNAPSHOT] Applied {applied_rates}/{len(snapshot.transition_rates)} transition rates")
         
         # Apply arc weights (handle all arc types: normal, curved, inhibitor, test, curved_inhibitor)
