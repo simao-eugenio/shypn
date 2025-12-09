@@ -145,7 +145,7 @@ class SimulationController:
         
         # Data collection for simulation results
         from shypn.engine.simulation.data_collector import DataCollector
-        self.data_collector = DataCollector(model)
+        self.data_collector = DataCollector(model, controller=self)
         
         # Callback for simulation complete event
         # Use private attribute with property to trace all assignments
@@ -221,7 +221,7 @@ class SimulationController:
         
         # Reinitialize data collector with current model
         from shypn.engine.simulation.data_collector import DataCollector
-        self.data_collector = DataCollector(self.model)
+        self.data_collector = DataCollector(self.model, controller=self)
         
         # Reset buffered settings (discard any uncommitted changes from previous model)
         if hasattr(self, 'buffered_settings'):
@@ -2317,7 +2317,7 @@ class SimulationController:
         
         # Recreate data collector with new model
         from shypn.engine.simulation.data_collector import DataCollector
-        self.data_collector = DataCollector(new_model)
+        self.data_collector = DataCollector(new_model, controller=self)
         
         # PHASE 1-2 FIX: Restore callback after recreating data collector
         self.on_simulation_complete = saved_callback
