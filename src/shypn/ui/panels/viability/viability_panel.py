@@ -426,10 +426,10 @@ class ViabilityPanel(Gtk.Box):
     def _create_places_treeview(self):
         """Create TreeView for editing place parameters.
         
-        Columns: ID, Name, Marking (editable), Type, Label
+        Columns: ID, Name, Marking (editable), Type, Label, Background
         """
-        # Create ListStore: id, name, marking (int, editable), type, label
-        store = Gtk.ListStore(str, str, int, str, str)
+        # Create ListStore: id, name, marking (int, editable), type, label, background
+        store = Gtk.ListStore(str, str, int, str, str, str)
         
         # Create TreeView
         treeview = Gtk.TreeView(model=store)
@@ -438,14 +438,14 @@ class ViabilityPanel(Gtk.Box):
         
         # Column 0: ID
         renderer_id = Gtk.CellRendererText()
-        column_id = Gtk.TreeViewColumn("ID", renderer_id, text=0)
+        column_id = Gtk.TreeViewColumn("ID", renderer_id, text=0, background=5)
         column_id.set_resizable(True)
         column_id.set_min_width(60)
         treeview.append_column(column_id)
         
         # Column 1: Name
         renderer_name = Gtk.CellRendererText()
-        column_name = Gtk.TreeViewColumn("Name", renderer_name, text=1)
+        column_name = Gtk.TreeViewColumn("Name", renderer_name, text=1, background=5)
         column_name.set_resizable(True)
         column_name.set_min_width(100)
         treeview.append_column(column_name)
@@ -454,21 +454,21 @@ class ViabilityPanel(Gtk.Box):
         renderer_marking = Gtk.CellRendererText()
         renderer_marking.set_property("editable", True)
         renderer_marking.connect("edited", self._on_place_marking_edited, store)
-        column_marking = Gtk.TreeViewColumn("Marking", renderer_marking, text=2)
+        column_marking = Gtk.TreeViewColumn("Marking", renderer_marking, text=2, background=5)
         column_marking.set_resizable(True)
         column_marking.set_min_width(80)
         treeview.append_column(column_marking)
         
         # Column 3: Type
         renderer_type = Gtk.CellRendererText()
-        column_type = Gtk.TreeViewColumn("Type", renderer_type, text=3)
+        column_type = Gtk.TreeViewColumn("Type", renderer_type, text=3, background=5)
         column_type.set_resizable(True)
         column_type.set_min_width(100)
         treeview.append_column(column_type)
         
         # Column 4: Label
         renderer_label = Gtk.CellRendererText()
-        column_label = Gtk.TreeViewColumn("Label", renderer_label, text=4)
+        column_label = Gtk.TreeViewColumn("Label", renderer_label, text=4, background=5)
         column_label.set_resizable(True)
         column_label.set_expand(True)
         column_label.set_min_width(150)
@@ -479,10 +479,10 @@ class ViabilityPanel(Gtk.Box):
     def _create_transitions_treeview(self):
         """Create TreeView for editing transition parameters.
         
-        Columns: ID, Name, Rate (editable), Formula (editable), Type, Label
+        Columns: ID, Name, Rate (editable), Formula (editable), Type, Label, Background
         """
-        # Create ListStore: id, name, rate (float, editable), formula (str, editable), type, label
-        store = Gtk.ListStore(str, str, float, str, str, str)
+        # Create ListStore: id, name, rate (float, editable), formula (str, editable), type, label, background
+        store = Gtk.ListStore(str, str, float, str, str, str, str)
         
         # Create TreeView
         treeview = Gtk.TreeView(model=store)
@@ -491,14 +491,14 @@ class ViabilityPanel(Gtk.Box):
         
         # Column 0: ID
         renderer_id = Gtk.CellRendererText()
-        column_id = Gtk.TreeViewColumn("ID", renderer_id, text=0)
+        column_id = Gtk.TreeViewColumn("ID", renderer_id, text=0, background=6)
         column_id.set_resizable(True)
         column_id.set_min_width(60)
         treeview.append_column(column_id)
         
         # Column 1: Name
         renderer_name = Gtk.CellRendererText()
-        column_name = Gtk.TreeViewColumn("Name", renderer_name, text=1)
+        column_name = Gtk.TreeViewColumn("Name", renderer_name, text=1, background=6)
         column_name.set_resizable(True)
         column_name.set_min_width(100)
         treeview.append_column(column_name)
@@ -507,7 +507,7 @@ class ViabilityPanel(Gtk.Box):
         renderer_rate = Gtk.CellRendererText()
         renderer_rate.set_property("editable", True)
         renderer_rate.connect("edited", self._on_transition_rate_edited, store)
-        column_rate = Gtk.TreeViewColumn("Rate", renderer_rate, text=2)
+        column_rate = Gtk.TreeViewColumn("Rate", renderer_rate, text=2, background=6)
         column_rate.set_resizable(True)
         column_rate.set_min_width(80)
         treeview.append_column(column_rate)
@@ -516,7 +516,7 @@ class ViabilityPanel(Gtk.Box):
         renderer_formula = Gtk.CellRendererText()
         renderer_formula.set_property("editable", True)
         renderer_formula.connect("edited", self._on_transition_formula_edited, store)
-        column_formula = Gtk.TreeViewColumn("Formula", renderer_formula, text=3)
+        column_formula = Gtk.TreeViewColumn("Formula", renderer_formula, text=3, background=6)
         column_formula.set_resizable(True)
         column_formula.set_expand(True)
         column_formula.set_min_width(200)
@@ -524,14 +524,14 @@ class ViabilityPanel(Gtk.Box):
         
         # Column 4: Type
         renderer_type = Gtk.CellRendererText()
-        column_type = Gtk.TreeViewColumn("Type", renderer_type, text=4)
+        column_type = Gtk.TreeViewColumn("Type", renderer_type, text=4, background=6)
         column_type.set_resizable(True)
         column_type.set_min_width(100)
         treeview.append_column(column_type)
         
         # Column 5: Label
         renderer_label = Gtk.CellRendererText()
-        column_label = Gtk.TreeViewColumn("Label", renderer_label, text=5)
+        column_label = Gtk.TreeViewColumn("Label", renderer_label, text=5, background=6)
         column_label.set_resizable(True)
         column_label.set_min_width(150)
         treeview.append_column(column_label)
@@ -541,10 +541,10 @@ class ViabilityPanel(Gtk.Box):
     def _create_arcs_treeview(self):
         """Create TreeView for editing arc parameters.
         
-        Columns: ID, From, To, Weight (editable), Type
+        Columns: ID, From, To, Weight (editable), Type, Background
         """
-        # Create ListStore: id, from_id, to_id, weight (int, editable), arc_type
-        store = Gtk.ListStore(str, str, str, int, str)
+        # Create ListStore: id, from_id, to_id, weight (int, editable), arc_type, background
+        store = Gtk.ListStore(str, str, str, int, str, str)
         
         # Create TreeView
         treeview = Gtk.TreeView(model=store)
@@ -552,21 +552,21 @@ class ViabilityPanel(Gtk.Box):
         
         # Column 0: ID
         renderer_id = Gtk.CellRendererText()
-        column_id = Gtk.TreeViewColumn("ID", renderer_id, text=0)
+        column_id = Gtk.TreeViewColumn("ID", renderer_id, text=0, background=5)
         column_id.set_resizable(True)
         column_id.set_min_width(80)
         treeview.append_column(column_id)
         
         # Column 1: From
         renderer_from = Gtk.CellRendererText()
-        column_from = Gtk.TreeViewColumn("From", renderer_from, text=1)
+        column_from = Gtk.TreeViewColumn("From", renderer_from, text=1, background=5)
         column_from.set_resizable(True)
         column_from.set_min_width(100)
         treeview.append_column(column_from)
         
         # Column 2: To
         renderer_to = Gtk.CellRendererText()
-        column_to = Gtk.TreeViewColumn("To", renderer_to, text=2)
+        column_to = Gtk.TreeViewColumn("To", renderer_to, text=2, background=5)
         column_to.set_resizable(True)
         column_to.set_min_width(100)
         treeview.append_column(column_to)
@@ -575,14 +575,14 @@ class ViabilityPanel(Gtk.Box):
         renderer_weight = Gtk.CellRendererText()
         renderer_weight.set_property("editable", True)
         renderer_weight.connect("edited", self._on_arc_weight_edited, store)
-        column_weight = Gtk.TreeViewColumn("Weight", renderer_weight, text=3)
+        column_weight = Gtk.TreeViewColumn("Weight", renderer_weight, text=3, background=5)
         column_weight.set_resizable(True)
         column_weight.set_min_width(80)
         treeview.append_column(column_weight)
         
         # Column 4: Type
         renderer_type = Gtk.CellRendererText()
-        column_type = Gtk.TreeViewColumn("Type", renderer_type, text=4)
+        column_type = Gtk.TreeViewColumn("Type", renderer_type, text=4, background=5)
         column_type.set_resizable(True)
         column_type.set_expand(True)
         column_type.set_min_width(150)
@@ -1084,7 +1084,8 @@ class ViabilityPanel(Gtk.Box):
                 place_obj.name if hasattr(place_obj, 'name') else place_obj.id,
                 marking,
                 place_type,
-                label
+                label,
+                "#FFFFFF"  # Background color
             ])
         
         # Populate Transitions table
@@ -1100,7 +1101,8 @@ class ViabilityPanel(Gtk.Box):
                     rate,
                     formula,
                     trans_type,
-                    label
+                    label,
+                    "#FFFFFF"  # Background color
                 ])
         
         # Populate Arcs table
@@ -1117,7 +1119,8 @@ class ViabilityPanel(Gtk.Box):
                 source_id,
                 target_id,
                 weight,
-                arc_type
+                arc_type,
+                "#FFFFFF"  # Background color
             ])
         
         # Notify automation category that subnet parameters are updated
@@ -2264,7 +2267,8 @@ class ViabilityPanel(Gtk.Box):
                         place.name or place.id,
                         marking,
                         place_type,
-                        label
+                        label,
+                        "#FFFFFF"  # Background color
                     ])
                     break
         
@@ -2295,7 +2299,8 @@ class ViabilityPanel(Gtk.Box):
                         rate,
                         formula,
                         trans_type,
-                        label
+                        label,
+                        "#FFFFFF"  # Background color
                     ])
                     break
         
@@ -2313,7 +2318,8 @@ class ViabilityPanel(Gtk.Box):
                         source_id,
                         target_id,
                         weight,
-                        arc_type
+                        arc_type,
+                        "#FFFFFF"  # Background color
                     ])
                     break
         
@@ -2662,5 +2668,45 @@ class ViabilityPanel(Gtk.Box):
             # Hide warning
             self.simulation_toolbar.show_stale_baseline_warning(False)
             
+            # Clear sweep indicators
+            self._clear_sweep_indicators()
+            
             self._append_diagnostics_log("✓ Baseline synced to automation")
+    
+    def update_sweep_indicators(self, swept_param_type, swept_param_id):
+        """Highlight the swept parameter row in the appropriate table.
+        
+        Args:
+            swept_param_type: 'place', 'transition', or 'arc'
+            swept_param_id: ID of the swept parameter
+        """
+        # Clear all indicators first
+        self._clear_sweep_indicators()
+        
+        # Highlight the swept parameter
+        if swept_param_type == 'place':
+            for row in self.places_store:
+                if row[0] == swept_param_id:
+                    row[5] = "#E3F2FD"  # Light blue
+                    break
+        elif swept_param_type == 'transition':
+            for row in self.transitions_store:
+                if row[0] == swept_param_id:
+                    row[6] = "#E3F2FD"  # Light blue
+                    break
+        elif swept_param_type == 'arc':
+            for row in self.arcs_store:
+                if row[0] == swept_param_id:
+                    row[5] = "#E3F2FD"  # Light blue
+                    break
+    
+    def _clear_sweep_indicators(self):
+        """Reset all row backgrounds to white."""
+        for row in self.places_store:
+            row[5] = "#FFFFFF"
+        for row in self.transitions_store:
+            row[6] = "#FFFFFF"
+        for row in self.arcs_store:
+            row[5] = "#FFFFFF"
+
 
