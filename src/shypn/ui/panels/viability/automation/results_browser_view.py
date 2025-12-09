@@ -657,6 +657,10 @@ class ResultsBrowserView(Gtk.Box):
             
             if len(time_points_arr) > 50:
                 try:
+                    # Check for monotonicity issues
+                    if not np.all(np.diff(mean) >= 0):
+                        print(f"[PLOT] Warning: Non-monotonic cumulative count for {transition_id}, smoothing may fail")
+                    
                     # Subsample for cleaner spline
                     indices = np.linspace(0, len(time_points_arr)-1, min(500, len(time_points_arr)), dtype=int)
                     time_smooth = time_points_arr[indices]
@@ -671,17 +675,17 @@ class ResultsBrowserView(Gtk.Box):
                     
                     # Plot smooth transition
                     ax2.plot(time_fine, mean_fine, color=color, 
-                            linewidth=linewidth, label=label, alpha=0.9)
+                            linewidth=linewidth, label=label, alpha=0.8)
                     print(f"[PLOT] Smoothed transition {transition_id}: {len(time_points_arr)} → {len(time_fine)} points")
                 except Exception as e:
-                    print(f"[PLOT] Smoothing failed for transition {transition_id}: {e}")
+                    print(f"[PLOT] Smoothing failed for transition {transition_id}: {e}, using raw data")
                     ax2.plot(time_points_arr, mean, color=color, 
-                            linewidth=linewidth, label=label, alpha=0.9)
+                            linewidth=linewidth, label=label, alpha=0.8, linestyle='-', marker='')
             else:
                 # Too few points, use raw data
                 print(f"[PLOT] Too few points for transition {transition_id} ({len(time_points_arr)}), using raw data")
                 ax2.plot(time_points_arr, mean, color=color, 
-                        linewidth=linewidth, label=label, alpha=0.9)
+                        linewidth=linewidth, label=label, alpha=0.8, linestyle='-', marker='')
             
             # Plot confidence interval
             ax2.fill_between(time_points_arr, 
