@@ -92,6 +92,14 @@ class DataCollector:
                     # Behavior not in cache - try to create it
                     from shypn.engine import behavior_factory
                     try:
+                        # Debug: Check transition properties before creating behavior
+                        if current_time <= 0.0:
+                            trans_name = getattr(transition, 'name', transition.id)
+                            has_props = hasattr(transition, 'properties')
+                            props_value = getattr(transition, 'properties', None) if has_props else None
+                            rate_func = props_value.get('rate_function') if (props_value and isinstance(props_value, dict)) else 'N/A'
+                            print(f"[BEHAVIOR_CREATE] {trans_name}: has_properties={has_props}, properties={props_value}, rate_function={rate_func}")
+                        
                         behavior = behavior_factory.create_behavior(transition, self.model)
                         self.controller.behavior_cache[transition.id] = behavior
                     except Exception as e:
