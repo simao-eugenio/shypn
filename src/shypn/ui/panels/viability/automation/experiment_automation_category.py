@@ -361,6 +361,7 @@ class ExperimentAutomationCategory:
         # Get replicates and duration from sweep builder
         replicates = 500
         duration = 100.0
+        termination_condition = "deadlock"  # Default
         if hasattr(self.sweep_builder, 'replicates_entry'):
             try:
                 replicates = int(self.sweep_builder.replicates_entry.get_text())
@@ -369,6 +370,11 @@ class ExperimentAutomationCategory:
         if hasattr(self.sweep_builder, 'duration_entry'):
             try:
                 duration = float(self.sweep_builder.duration_entry.get_text())
+            except:
+                pass
+        if hasattr(self.sweep_builder, 'termination_combo'):
+            try:
+                termination_condition = self.sweep_builder.termination_combo.get_active_id() or "deadlock"
             except:
                 pass
         
@@ -396,6 +402,7 @@ class ExperimentAutomationCategory:
                 experiments=pending_experiments,
                 replicates=replicates,
                 duration=duration,
+                termination_condition=termination_condition,
                 progress_callback=self._on_experiment_progress,
                 complete_callback=self._on_batch_complete,
                 experiment_result_callback=self._on_experiment_result

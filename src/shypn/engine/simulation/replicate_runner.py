@@ -65,6 +65,7 @@ class ReplicateRunner:
         use_parallel: bool = True,
         use_tau_leaping: bool = True,
         duration: float = 100.0,
+        termination_condition: str = "deadlock",
         time_step: Optional[float] = None,
         epsilon: float = 0.03,
         seed_base: int = 42,
@@ -81,7 +82,11 @@ class ReplicateRunner:
             n: Number of replicates to run
             use_parallel: Use parallel stochastic execution
             use_tau_leaping: Use tau-leaping algorithm
-            duration: Simulation duration in time_units
+            duration: Simulation duration in time_units (maximum time limit)
+            termination_condition: When to stop ("time_only", "deadlock", "steady_state")
+                - "time_only": Run until duration is reached
+                - "deadlock": Stop when deadlock occurs OR duration is reached
+                - "steady_state": Stop when steady state detected OR duration is reached
             time_step: Time step for recording (None = auto)
             epsilon: Tau-leaping epsilon parameter
             seed_base: Base random seed (replicate i uses seed_base + i)
@@ -98,6 +103,7 @@ class ReplicateRunner:
                 - 'transition_data': Dict mapping transition_id to firing counts
                 - 'final_marking': Dict of place_id -> final token count
                 - 'total_firings': Dict of transition_id -> total firings
+                - 'stopped_reason': Why simulation stopped ("duration", "deadlock", "steady_state")
         """
         if verbose:
             print(f"Running {n} replicates...")
@@ -159,6 +165,7 @@ class ReplicateRunner:
             
             # Run simulation synchronously (step-by-step) for background execution
             # controller.run() uses GLib callbacks which don't work in threads
+            stopped_reason = "duration"  # Default: ran to completion
             try:
                 # Initialize enablement states before simulation
                 controller._update_enablement_states()
@@ -167,7 +174,32 @@ class ReplicateRunner:
                 for step_num in range(max_steps):
                     success = controller.step(time_step=dt)
                     if not success:
-                        break  # Simulation stopped (e.g., deadlock or duration reached)
+                        # Simulation stopped (deadlock)
+                        if termination_condition in ["deadlock", "steady_state"]:
+                            stopped_reason = "deadlock"
+                            break  # Early termination allowed
+                        elif termination_condition == "time_only":
+                            # Time-only mode: ignore deadlock, continue (this shouldn't happen but handle it)
+                            pass
+                    
+                    # Check for steady state (simple heuristic: no token changes for N steps)
+                    if termination_condition == "steady_state" and step_num > 100:
+                        # Check if marking hasn't changed in last 50 steps
+                        # This is a simple heuristic - could be improved
+                        recent_data = controller.data_collector.place_data
+                        if recent_data and len(list(recent_data.values())[0]) >= 50:
+                            # Check last 50 time points for all places
+                            all_stable = True
+                            for place_id, data in recent_data.items():
+                                if len(data) >= 50:
+                                    last_50 = data[-50:]
+                                    if not all(v == last_50[0] for v in last_50):
+                                        all_stable = False
+                                        break
+                            
+                            if all_stable:
+                                stopped_reason = "steady_state"
+                                break
             except Exception as e:
                 if verbose:
                     print(f"  ERROR in replicate {i}: {e}")
@@ -198,7 +230,8 @@ class ReplicateRunner:
                 'total_firings': {
                     t.id: getattr(t, 'firing_count', 0)
                     for t in self.model.transitions
-                }
+                },
+                'stopped_reason': stopped_reason
             }
             
             if i == 0:
