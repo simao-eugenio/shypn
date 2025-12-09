@@ -559,5 +559,17 @@ class ParameterSweepBuilder(Gtk.Box):
         self.replicates_entry.set_text(str(int(replicates)))
         self.duration_entry.set_text(f"{duration:.1f}")
         
-        # Update preview
-        self._update_preview()
+        # Update preview to show expected experiment count
+        try:
+            count = self._calculate_experiment_count()
+            if count > 0:
+                self.preview_label.set_markup(
+                    f"<span foreground='blue'>Ready: {count} experiments will be generated</span>"
+                )
+            else:
+                self.preview_label.set_markup(
+                    "<i>Configure parameters and click Preview</i>"
+                )
+        except Exception as e:
+            # Silently ignore preview calculation errors
+            print(f"[PREFILL] Preview calculation failed: {e}")
