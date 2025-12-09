@@ -691,21 +691,19 @@ class ResultsBrowserView(Gtk.Box):
             mean = firing_rate
             std = firing_rate_std
             
-            # Smooth the transition curve
+            # Smooth the transition curve with spline interpolation
             from scipy.interpolate import make_interp_spline
             
-            if len(time_points_arr) > 50:  # Lower threshold
+            if len(time_points_arr) >= 4:  # Need at least 4 points for cubic spline
                 try:
-                    # Use more points for very smooth curves
-                    indices = np.linspace(0, len(time_points_arr)-1, min(500, len(time_points_arr)), dtype=int)
-                    time_smooth = time_points_arr[indices]
-                    mean_smooth = mean[indices]
+                    # Use ALL data points for spline (rolling window already smoothed)
+                    # Create cubic spline with all available data
+                    k_order = min(3, len(time_points_arr) - 1)  # Cubic if possible
+                    spl = make_interp_spline(time_points_arr, mean, k=k_order)
                     
-                    # Create spline
-                    spl = make_interp_spline(time_smooth, mean_smooth, k=min(3, len(time_smooth)-1))
-                    
-                    # Generate extra smooth points
-                    time_fine = np.linspace(time_points_arr[0], time_points_arr[-1], 1000)
+                    # Generate smooth interpolated curve
+                    n_points = max(500, len(time_points_arr) * 5)  # Dense interpolation
+                    time_fine = np.linspace(time_points_arr[0], time_points_arr[-1], n_points)
                     mean_fine = spl(time_fine)
                     
                     # Plot smooth transition
