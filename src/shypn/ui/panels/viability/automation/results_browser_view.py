@@ -436,14 +436,17 @@ class ResultsBrowserView(Gtk.Box):
             dialog.destroy()
             return
         
-        # Determine if this is a transition sweep (for superposed plotting)
+        # Determine if this is a sweep that should be superposed
         swept_transition_id = None
+        swept_place_id = None
         related_place_ids = []
+        related_transition_ids = []
+        
         if swept_param and swept_param['type'] == 'transitions':
+            # TRANSITION SWEEP: Show transition + all places
             swept_transition_id = swept_param['id']
             
             # Get place IDs from subnet structure (the actual subnet composition)
-            # This ensures we're working with the complete subnet, not just what's in statistics
             subnet_structure = result.get('subnet_structure')
             if subnet_structure and 'place_ids' in subnet_structure:
                 # Use the actual subnet places
@@ -460,19 +463,48 @@ class ResultsBrowserView(Gtk.Box):
             print(f"[PLOT] Transition sweep detected: {swept_transition_id}")
             print(f"[PLOT] Subnet places: {related_place_ids}")
             print(f"[PLOT] Transition in stats: {swept_transition_id in species_stats}")
-            print(f"[PLOT] Available species in stats: {list(species_stats.keys())}")
+            
+        elif swept_param and swept_param['type'] == 'places':
+            # PLACE SWEEP: Show all places + transition
+            swept_place_id = swept_param['id']
+            
+            # Get all places and transitions from subnet structure
+            subnet_structure = result.get('subnet_structure')
+            if subnet_structure:
+                if 'place_ids' in subnet_structure:
+                    related_place_ids = subnet_structure['place_ids']
+                if 'transition_ids' in subnet_structure:
+                    related_transition_ids = subnet_structure['transition_ids']
+                print(f"[PLOT] Using subnet structure: {len(related_place_ids)} places, {len(related_transition_ids)} transitions")
+            else:
+                # Fallback: Get from statistics
+                related_place_ids = [sid for sid in species_stats.keys() if sid.startswith('P')]
+                related_transition_ids = [sid for sid in species_stats.keys() if sid.startswith('T')]
+                print(f"[PLOT] Warning: No subnet structure, using statistics")
+            
+            print(f"[PLOT] Place sweep detected: {swept_place_id}")
+            print(f"[PLOT] Subnet places: {related_place_ids}")
+            print(f"[PLOT] Subnet transitions: {related_transition_ids}")
         
-        # Check if we should create superposed plot (transition sweep with related places)
-        # Always create superposed for transition sweeps (even if no related places found)
-        create_superposed = (swept_transition_id and swept_transition_id in species_stats)
+        print(f"[PLOT] Available species in stats: {list(species_stats.keys())}")
+        
+        # Check if we should create superposed plot
+        create_superposed = False
+        if swept_transition_id and swept_transition_id in species_stats:
+            # Transition sweep with valid data
+            create_superposed = True
+        elif swept_place_id and (related_transition_ids or related_place_ids):
+            # Place sweep with places/transitions to show
+            create_superposed = True
         
         print(f"[PLOT] Create superposed: {create_superposed}")
         
         if create_superposed:
             # Create single plot with all variables superposed
             print(f"[PLOT] Creating superposed plot...")
-            self._plot_superposed_transition_sweep(
-                name, result, swept_transition_id, related_place_ids, 
+            self._plot_superposed_sweep(
+                name, result, swept_transition_id, swept_place_id,
+                related_place_ids, related_transition_ids,
                 species_stats, time_points, stats
             )
         else:
@@ -482,15 +514,19 @@ class ResultsBrowserView(Gtk.Box):
                 name, result, swept_param, species_stats, time_points, stats
             )
     
-    def _plot_superposed_transition_sweep(self, name, result, transition_id, 
-                                          place_ids, species_stats, time_points, stats):
-        """Plot transition and related places superposed on same axes.
+    def _plot_superposed_sweep(self, name, result, swept_transition_id, swept_place_id,
+                               place_ids, transition_ids, species_stats, time_points, stats):
+        """Plot places and transitions superposed on same axes with dual y-axes.
+        
+        Handles both transition sweeps (transition + places) and place sweeps (places + transition).
         
         Args:
             name: Experiment name
             result: Result dictionary
-            transition_id: ID of swept transition
-            place_ids: List of related place IDs
+            swept_transition_id: ID of swept transition (or None)
+            swept_place_id: ID of swept place (or None)
+            place_ids: List of place IDs to plot
+            transition_ids: List of transition IDs to plot
             species_stats: Species statistics dict
             time_points: Time points array
             stats: Full statistics dict
@@ -507,7 +543,10 @@ class ResultsBrowserView(Gtk.Box):
         title_text = f"Experiment: {name}\n{stats.get('n_replicates', 0)} replicates"
         swept_param = result.get('swept_parameter')
         if swept_param:
-            title_text += f"\nSwept Transition: {swept_param['name']} = {swept_param['value']:.4g}"
+            if swept_param['type'] == 'transitions':
+                title_text += f"\nSwept Transition: {swept_param['name']} = {swept_param['value']:.4g}"
+            elif swept_param['type'] == 'places':
+                title_text += f"\nSwept Place: {swept_param['name']} = {swept_param['value']:.4g}"
         fig.suptitle(title_text, fontsize=14, fontweight='bold')
         
         # Left y-axis: Plot places (tokens)
@@ -579,56 +618,74 @@ class ResultsBrowserView(Gtk.Box):
                            alpha=0.2, 
                            color=color)
         
-        # Right y-axis: Plot transition (firing rate)
+        # Right y-axis: Plot transitions (firing counts)
         ax2 = ax1.twinx()
-        ax2.set_ylabel('Firing Count (Transition)', fontsize=12, color='red')
+        ax2.set_ylabel('Firing Count (Transitions)', fontsize=12, color='red')
         ax2.tick_params(axis='y', labelcolor='red')
         
-        if transition_id in species_stats:
+        # Plot each transition (if any)
+        plotted_transitions = []
+        colors_transitions = ['red', 'darkred', 'crimson', 'firebrick']
+        
+        for idx, transition_id in enumerate(transition_ids):
+            if transition_id not in species_stats:
+                print(f"[PLOT] Warning: Transition {transition_id} in subnet but not in statistics")
+                continue
+                
             trans_data = species_stats[transition_id]
             mean = np.array(trans_data.get('mean', []))
             std = np.array(trans_data.get('std', []))
             
-            if len(mean) > 0:
-                trans_name = self._resolve_species_name(transition_id)
-                
-                # Smooth the transition curve
-                from scipy.interpolate import make_interp_spline
-                
-                if len(time_points_arr) > 50:  # Lower threshold
-                    try:
-                        # Use more points for very smooth curves
-                        indices = np.linspace(0, len(time_points_arr)-1, min(500, len(time_points_arr)), dtype=int)
-                        time_smooth = time_points_arr[indices]
-                        mean_smooth = mean[indices]
-                        
-                        # Create spline
-                        spl = make_interp_spline(time_smooth, mean_smooth, k=min(3, len(time_smooth)-1))
-                        
-                        # Generate extra smooth points
-                        time_fine = np.linspace(time_points_arr[0], time_points_arr[-1], 1000)
-                        mean_fine = spl(time_fine)
-                        
-                        # Plot smooth transition with thick red line
-                        ax2.plot(time_fine, mean_fine, color='red', 
-                                linewidth=3, label=f'⚡ {trans_name}', alpha=0.9)
-                        print(f"[PLOT] Smoothed transition {transition_id}: {len(time_points_arr)} → {len(time_fine)} points")
-                    except Exception as e:
-                        print(f"[PLOT] Smoothing failed for transition: {e}")
-                        ax2.plot(time_points_arr, mean, color='red', 
-                                linewidth=3, label=f'⚡ {trans_name}', alpha=0.9)
-                else:
-                    # Too few points, use raw data
-                    print(f"[PLOT] Too few points for transition ({len(time_points_arr)}), using raw data")
-                    ax2.plot(time_points_arr, mean, color='red', 
-                            linewidth=3, label=f'⚡ {trans_name}', alpha=0.9)
-                
-                # Plot confidence interval (use original data)
-                ax2.fill_between(time_points_arr, 
-                               mean - 2*std, 
-                               mean + 2*std, 
-                               alpha=0.3, 
-                               color='red')
+            if len(mean) == 0:
+                print(f"[PLOT] Warning: Transition {transition_id} has empty data")
+                continue
+            
+            plotted_transitions.append(transition_id)
+            color = colors_transitions[idx % len(colors_transitions)]
+            trans_name = self._resolve_species_name(transition_id)
+            
+            # Emphasize if this is the swept transition
+            is_swept = (transition_id == swept_transition_id)
+            linewidth = 3 if is_swept else 2
+            label = f'⚡ {trans_name}' if is_swept else trans_name
+            
+            # Smooth the transition curve
+            from scipy.interpolate import make_interp_spline
+            
+            if len(time_points_arr) > 50:  # Lower threshold
+                try:
+                    # Use more points for very smooth curves
+                    indices = np.linspace(0, len(time_points_arr)-1, min(500, len(time_points_arr)), dtype=int)
+                    time_smooth = time_points_arr[indices]
+                    mean_smooth = mean[indices]
+                    
+                    # Create spline
+                    spl = make_interp_spline(time_smooth, mean_smooth, k=min(3, len(time_smooth)-1))
+                    
+                    # Generate extra smooth points
+                    time_fine = np.linspace(time_points_arr[0], time_points_arr[-1], 1000)
+                    mean_fine = spl(time_fine)
+                    
+                    # Plot smooth transition
+                    ax2.plot(time_fine, mean_fine, color=color, 
+                            linewidth=linewidth, label=label, alpha=0.9)
+                    print(f"[PLOT] Smoothed transition {transition_id}: {len(time_points_arr)} → {len(time_fine)} points")
+                except Exception as e:
+                    print(f"[PLOT] Smoothing failed for transition {transition_id}: {e}")
+                    ax2.plot(time_points_arr, mean, color=color, 
+                            linewidth=linewidth, label=label, alpha=0.9)
+            else:
+                # Too few points, use raw data
+                print(f"[PLOT] Too few points for transition {transition_id} ({len(time_points_arr)}), using raw data")
+                ax2.plot(time_points_arr, mean, color=color, 
+                        linewidth=linewidth, label=label, alpha=0.9)
+            
+            # Plot confidence interval (use original data)
+            ax2.fill_between(time_points_arr, 
+                           mean - 2*std, 
+                           mean + 2*std, 
+                           alpha=0.3, 
+                           color=color)
         
         # Add legends
         lines1, labels1 = ax1.get_legend_handles_labels()
