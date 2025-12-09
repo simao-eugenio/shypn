@@ -84,11 +84,13 @@ class DataCollector:
                         # Fallback: use static rate attribute (won't reflect token changes)
                         rate = float(transition.rate) if transition.rate else 0.0
                     
-                    # Debug: Log first few rate evaluations to verify they're working
-                    if current_time <= 0.02:  # First couple time steps - log even if rate is 0
+                    # Debug: Log first several rate evaluations to verify dynamics
+                    if current_time <= 0.1:  # First 20 time steps (at dt=0.005)
                         trans_name = getattr(transition, 'name', transition.id)
                         rate_func = getattr(transition.behavior, 'rate_function_expr', 'N/A')
-                        print(f"[RATE] t={current_time:.4f}, {trans_name}: rate={rate:.6f}, formula={rate_func}")
+                        # Also log place tokens to see what's driving the rate
+                        place_tokens = {p.id: p.tokens for p in self.model.places}
+                        print(f"[RATE] t={current_time:.4f}, {trans_name}: rate={rate:.6f}, formula={rate_func}, tokens={place_tokens}")
                 except Exception as e:
                     # If rate evaluation fails, use 0.0 and log
                     if current_time < 0.1:  # Only log errors early in simulation
