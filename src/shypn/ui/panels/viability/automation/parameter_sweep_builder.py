@@ -200,7 +200,18 @@ class ParameterSweepBuilder(Gtk.Box):
         self.duration_entry = Gtk.Entry()
         self.duration_entry.set_text("100.0")
         self.duration_entry.set_width_chars(8)
+        self.duration_entry.set_tooltip_text("Maximum simulation time (can stop earlier if condition met)")
         sim_box.attach(self.duration_entry, 3, 0, 1, 1)
+        
+        # Termination condition
+        sim_box.attach(Gtk.Label(label="Stop condition:", xalign=0), 0, 1, 1, 1)
+        self.termination_combo = Gtk.ComboBoxText()
+        self.termination_combo.append("time_only", "Time limit only")
+        self.termination_combo.append("deadlock", "Deadlock or time limit")
+        self.termination_combo.append("steady_state", "Steady state or time limit")
+        self.termination_combo.set_active_id("deadlock")
+        self.termination_combo.set_tooltip_text("When to stop the simulation")
+        sim_box.attach(self.termination_combo, 1, 1, 3, 1)
         
         sim_frame.add(sim_box)
         self.pack_start(sim_frame, False, False, 0)
@@ -289,7 +300,8 @@ class ParameterSweepBuilder(Gtk.Box):
                     'parameter_name': param_name,  # Display name for labels
                     'values': values,
                     'replicates': int(self.replicates_entry.get_text()),
-                    'duration': float(self.duration_entry.get_text())
+                    'duration': float(self.duration_entry.get_text()),
+                    'termination_condition': self.termination_combo.get_active_id()
                 }
                 self.on_generate_callback(config)
             except Exception as e:
@@ -307,6 +319,7 @@ class ParameterSweepBuilder(Gtk.Box):
         self.percent_steps_entry.set_text("5")
         self.replicates_entry.set_text("500")
         self.duration_entry.set_text("100.0")
+        self.termination_combo.set_active_id("deadlock")
         self.preview_label.set_markup("<i>Configure parameters and click Preview</i>")
         self.generate_button.set_sensitive(False)
         

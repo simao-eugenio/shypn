@@ -50,6 +50,7 @@ class BatchExecutor:
         experiments: List[tuple],
         replicates: int = 500,
         duration: float = 100.0,
+        termination_condition: str = "deadlock",
         progress_callback: Optional[Callable] = None,
         complete_callback: Optional[Callable] = None,
         experiment_result_callback: Optional[Callable] = None
@@ -60,6 +61,7 @@ class BatchExecutor:
             experiments: List of (index, name, snapshot_index) tuples
             replicates: Number of replicates per experiment
             duration: Simulation duration
+            termination_condition: When to stop ("time_only", "deadlock", "steady_state")
             progress_callback: Called with (exp_index, status, progress)
             complete_callback: Called when batch completes
             experiment_result_callback: Called with (name, result) when each experiment completes
@@ -118,7 +120,7 @@ class BatchExecutor:
         # Start execution thread with pre-extracted data
         self.executor_thread = threading.Thread(
             target=self._execute_batch,
-            args=(experiments, replicates, duration, progress_callback, complete_callback, experiment_result_callback, base_model, subnet_data, baseline_params),
+            args=(experiments, replicates, duration, termination_condition, progress_callback, complete_callback, experiment_result_callback, base_model, subnet_data, baseline_params),
             daemon=True
         )
         self.executor_thread.start()
@@ -142,6 +144,7 @@ class BatchExecutor:
         experiments: List[tuple],
         replicates: int,
         duration: float,
+        termination_condition: str,
         progress_callback: Optional[Callable],
         complete_callback: Optional[Callable],
         experiment_result_callback: Optional[Callable],
@@ -155,6 +158,7 @@ class BatchExecutor:
             experiments: List of (index, name, snapshot_index) tuples
             replicates: Number of replicates per experiment
             duration: Simulation duration
+            termination_condition: When to stop ("time_only", "deadlock", "steady_state")
             progress_callback: Callback for progress updates (queue_index, status, progress_str)
             complete_callback: Callback when complete
             experiment_result_callback: Callback for each experiment result (name, result)
@@ -213,6 +217,7 @@ class BatchExecutor:
                         snapshot_index,
                         replicates,
                         duration,
+                        termination_condition,
                         exp_progress_callback,
                         base_model,
                         subnet_data
@@ -288,6 +293,7 @@ class BatchExecutor:
         snapshot_index: int,
         replicates: int,
         duration: float,
+        termination_condition: str,
         progress_callback: Optional[Callable] = None,
         base_model = None,  # Pre-extracted DocumentModel
         subnet_data: dict = None  # Pre-extracted subnet data
@@ -299,6 +305,7 @@ class BatchExecutor:
             snapshot_index: Snapshot index in ExperimentManager
             replicates: Number of replicates to run
             duration: Simulation duration
+            termination_condition: When to stop ("time_only", "deadlock", "steady_state")
             progress_callback: Called with progress (0.0 to 1.0 float)
             base_model: Pre-extracted DocumentModel (from main thread)
             subnet_data: Pre-extracted subnet dict (from main thread)
@@ -400,6 +407,7 @@ class BatchExecutor:
                 use_parallel=False,  # SEQUENTIAL execution of replicates
                 use_tau_leaping=True,
                 duration=duration,
+                termination_condition=termination_condition,
                 seed_base=42,
                 verbose=False,
                 progress_callback=progress_callback
