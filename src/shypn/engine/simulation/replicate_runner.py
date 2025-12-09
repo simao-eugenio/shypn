@@ -354,12 +354,26 @@ class ReplicateRunner:
             time_array = np.array(time_points)
             firing_rate_trajectories = np.zeros_like(cumulative_trajectories)
             
+            # Smooth cumulative counts before derivative to reduce noise
+            from scipy.signal import savgol_filter
+            
             for rep_idx in range(len(cumulative_trajectories)):
                 cumulative = cumulative_trajectories[rep_idx]
-                # Compute firing rate as dN/dt
+                
+                # Smooth cumulative count first
+                if len(cumulative) >= 11:
+                    window = min(51, len(cumulative) if len(cumulative) % 2 == 1 else len(cumulative) - 1)
+                    if window >= 5:
+                        cumulative_smooth = savgol_filter(cumulative, window_length=window, polyorder=3)
+                    else:
+                        cumulative_smooth = cumulative
+                else:
+                    cumulative_smooth = cumulative
+                
+                # Compute firing rate as dN/dt from smoothed cumulative
                 if len(time_array) > 1:
                     dt = np.diff(time_array)
-                    d_count = np.diff(cumulative)
+                    d_count = np.diff(cumulative_smooth)
                     firing_rate_trajectories[rep_idx, 1:] = d_count / dt
                     firing_rate_trajectories[rep_idx, 0] = firing_rate_trajectories[rep_idx, 1]
             
