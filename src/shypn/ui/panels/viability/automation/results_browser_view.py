@@ -618,9 +618,9 @@ class ResultsBrowserView(Gtk.Box):
                            alpha=0.2, 
                            color=color)
         
-        # Right y-axis: Plot transitions (firing counts)
+        # Right y-axis: Plot transitions (firing rates)
         ax2 = ax1.twinx()
-        ax2.set_ylabel('Firing Count (Transitions)', fontsize=12, color='red')
+        ax2.set_ylabel('Firing Rate (firings/time)', fontsize=12, color='red')
         ax2.tick_params(axis='y', labelcolor='red')
         
         # Plot each transition (if any)
@@ -648,6 +648,26 @@ class ResultsBrowserView(Gtk.Box):
             is_swept = (transition_id == swept_transition_id)
             linewidth = 3 if is_swept else 2
             label = f'⚡ {trans_name}' if is_swept else trans_name
+            
+            # Convert cumulative firing count to instantaneous firing rate
+            # This shows how rate functions (k * substrate) are being respected
+            firing_rate = np.zeros_like(mean)
+            firing_rate_std = np.zeros_like(std)
+            if len(time_points_arr) > 1:
+                # Compute derivative: dN/dt (firings per unit time)
+                dt = np.diff(time_points_arr)
+                firing_rate[1:] = np.diff(mean) / dt
+                firing_rate[0] = firing_rate[1] if len(firing_rate) > 1 else 0
+                
+                # Propagate uncertainty for derivative
+                firing_rate_std[1:] = np.diff(std) / dt
+                firing_rate_std[0] = firing_rate_std[1] if len(firing_rate_std) > 1 else 0
+                # Take absolute value (std is always positive)
+                firing_rate_std = np.abs(firing_rate_std)
+            
+            # Use firing rate instead of cumulative count
+            mean = firing_rate
+            std = firing_rate_std
             
             # Smooth the transition curve
             from scipy.interpolate import make_interp_spline
