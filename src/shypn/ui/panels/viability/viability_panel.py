@@ -280,7 +280,7 @@ class ViabilityPanel(Gtk.Box):
         
         # === DIAGNOSTICS LOG (NEW) ===
         self.diagnostics_expander = Gtk.Expander()
-        self.diagnostics_expander.set_expanded(True)
+        self.diagnostics_expander.set_expanded(False)  # Start collapsed
         self.diagnostics_expander.set_margin_start(10)
         self.diagnostics_expander.set_margin_end(10)
         self.diagnostics_expander.set_margin_top(10)
