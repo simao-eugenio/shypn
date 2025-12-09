@@ -442,16 +442,25 @@ class ResultsBrowserView(Gtk.Box):
         if swept_param and swept_param['type'] == 'transitions':
             swept_transition_id = swept_param['id']
             
-            # Get all place IDs from statistics (exclude the transition itself)
-            related_place_ids = [
-                species_id for species_id in species_stats.keys()
-                if species_id != swept_transition_id
-            ]
+            # Get place IDs from subnet structure (the actual subnet composition)
+            # This ensures we're working with the complete subnet, not just what's in statistics
+            subnet_structure = result.get('subnet_structure')
+            if subnet_structure and 'place_ids' in subnet_structure:
+                # Use the actual subnet places
+                related_place_ids = subnet_structure['place_ids']
+                print(f"[PLOT] Using subnet structure: {len(related_place_ids)} places from subnet")
+            else:
+                # Fallback: Get all place IDs from statistics (exclude the transition itself)
+                related_place_ids = [
+                    species_id for species_id in species_stats.keys()
+                    if species_id != swept_transition_id
+                ]
+                print(f"[PLOT] Warning: No subnet structure, using statistics ({len(related_place_ids)} species)")
             
             print(f"[PLOT] Transition sweep detected: {swept_transition_id}")
-            print(f"[PLOT] Related species found: {related_place_ids}")
+            print(f"[PLOT] Subnet places: {related_place_ids}")
             print(f"[PLOT] Transition in stats: {swept_transition_id in species_stats}")
-            print(f"[PLOT] Available species: {list(species_stats.keys())}")
+            print(f"[PLOT] Available species in stats: {list(species_stats.keys())}")
         
         # Check if we should create superposed plot (transition sweep with related places)
         # Always create superposed for transition sweeps (even if no related places found)
@@ -506,10 +515,15 @@ class ResultsBrowserView(Gtk.Box):
         ax1.set_ylabel('Tokens (Places)', fontsize=12, color='blue')
         ax1.tick_params(axis='y', labelcolor='blue')
         
-        # Plot each place
+        # Plot each place (only those with statistics)
         colors_places = ['#1f77b4', '#2ca02c', '#ff7f0e', '#9467bd', '#8c564b']
+        plotted_places = []
+        missing_places = []
+        
         for idx, place_id in enumerate(place_ids):
             if place_id not in species_stats:
+                missing_places.append(place_id)
+                print(f"[PLOT] Warning: Place {place_id} in subnet but not in statistics")
                 continue
             
             place_data = species_stats[place_id]
@@ -517,8 +531,10 @@ class ResultsBrowserView(Gtk.Box):
             std = np.array(place_data.get('std', []))
             
             if len(mean) == 0:
+                print(f"[PLOT] Warning: Place {place_id} has empty data")
                 continue
             
+            plotted_places.append(place_id)
             color = colors_places[idx % len(colors_places)]
             place_name = self._resolve_species_name(place_id)
             
@@ -565,6 +581,13 @@ class ResultsBrowserView(Gtk.Box):
         
         # Grid
         ax1.grid(True, alpha=0.3)
+        
+        # Summary of what was plotted
+        print(f"[PLOT] Superposed plot complete:")
+        print(f"[PLOT]   Transition: {transition_id} ({'found' if transition_id in species_stats else 'MISSING'})")
+        print(f"[PLOT]   Places plotted: {len(plotted_places)}/{len(place_ids)}")
+        if missing_places:
+            print(f"[PLOT]   WARNING: {len(missing_places)} places from subnet missing in statistics: {missing_places}")
         
         plt.tight_layout()
         plt.show()

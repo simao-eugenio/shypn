@@ -455,6 +455,13 @@ class BatchExecutor:
             # Include swept parameter metadata from snapshot
             swept_param = getattr(snapshot, 'swept_parameter', None)
             
+            # Include subnet structure for accurate plotting
+            subnet_structure = {
+                'place_ids': [p.id for p in subnet_data['places']],
+                'transition_ids': [t.id for t in subnet_data['transitions']],
+                'arc_ids': [a.id for a in subnet_data['arcs']]
+            }
+            
             # Return complete result dict with statistics (plottable from statistics)
             result = {
                 'name': name,
@@ -463,12 +470,14 @@ class BatchExecutor:
                 'n_replicates': len(results) if results else 0,
                 'statistics': statistics,  # Contains mean/std/percentiles for plotting
                 'duration': elapsed_time,
-                'swept_parameter': swept_param  # Include swept parameter info for smart plotting
+                'swept_parameter': swept_param,  # Include swept parameter info for smart plotting
+                'subnet_structure': subnet_structure  # Include actual subnet composition
             }
             
             print(f"[EXPERIMENT] Result dict created: {result['n_replicates']} replicates, {elapsed_time:.2f}s")
             if swept_param:
                 print(f"[EXPERIMENT] Swept parameter: {swept_param['type']} {swept_param['name']} = {swept_param['value']}")
+            print(f"[EXPERIMENT] Subnet: {len(subnet_structure['place_ids'])} places, {len(subnet_structure['transition_ids'])} transitions")
             return result
             
         except Exception as e:
