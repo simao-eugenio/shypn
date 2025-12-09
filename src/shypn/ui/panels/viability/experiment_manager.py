@@ -34,6 +34,8 @@ class ExperimentSnapshot:
         self.results = None           # SimulationResults after run
         self.timestamp = datetime.now().isoformat()
         self.notes = ""               # Optional user notes
+        self.is_stale = False         # True if tables modified after capture
+        self.swept_parameter = None   # {type: 'places'|'transitions'|'arcs', id: str, name: str} or None
         
     def capture_from_treeviews(self, places_store, transitions_store, arcs_store):
         """Read current parameter values from existing TreeViews.
@@ -156,6 +158,50 @@ class ExperimentManager:
         """Initialize experiment manager."""
         self.snapshots = []           # List of ExperimentSnapshot
         self.active_index = 0         # Currently selected snapshot
+        self.swept_parameters = {}    # {snapshot_index: {type, id, name, range}}
+        
+    def mark_baseline_stale(self):
+        """Mark baseline snapshot as stale (needs resync from tables)."""
+        if self.snapshots:
+            # Mark all snapshots as stale since they depend on baseline
+            for snapshot in self.snapshots:
+                snapshot.is_stale = True
+    
+    def sync_baseline_from_tables(self, places_store, transitions_store, arcs_store):
+        """Re-capture baseline snapshot from current table values.
+        
+        Args:
+            places_store: Gtk.ListStore from Places tab
+            transitions_store: Gtk.ListStore from Transitions tab
+            arcs_store: Gtk.ListStore from Arcs tab
+            
+        Returns:
+            bool: True if baseline was updated
+        """
+        if not self.snapshots:
+            return False
+        
+        # Update baseline (first snapshot)
+        baseline = self.snapshots[0]
+        baseline.capture_from_treeviews(places_store, transitions_store, arcs_store)
+        baseline.is_stale = False
+        
+        # Mark sweep snapshots as needing regeneration
+        for i, snapshot in enumerate(self.snapshots[1:], start=1):
+            snapshot.is_stale = True
+        
+        return True
+    
+    def get_swept_parameter_info(self, snapshot_index):
+        """Get information about which parameter is being swept for a snapshot.
+        
+        Args:
+            snapshot_index: Index of snapshot
+            
+        Returns:
+            dict or None: {type, id, name, range} or None if not a sweep snapshot
+        """
+        return self.swept_parameters.get(snapshot_index)
         
     def add_snapshot(self, name=None):
         """Create new experiment snapshot.
@@ -301,6 +347,8 @@ class ExperimentManager:
         
         # Generate snapshots for each value
         created_count = 0
+        start_index = len(self.snapshots)  # Track where sweep starts
+        
         for value in values:
             # Create snapshot name using display name (user-friendly)
             name = f"{parameter_name}={value:.4g}"
@@ -312,6 +360,14 @@ class ExperimentManager:
             snapshot.transition_rates = base_snapshot.transition_rates.copy()
             snapshot.notes = f"Sweep: {parameter_name} (ID: {parameter_id}) = {value}"
             
+            # Store swept parameter info
+            snapshot.swept_parameter = {
+                'type': parameter_type,
+                'id': parameter_id,
+                'name': parameter_name,
+                'value': value
+            }
+            
             # Modify the swept parameter using ID (internal key)
             if parameter_type == 'places':
                 snapshot.place_markings[parameter_id] = value
@@ -322,6 +378,17 @@ class ExperimentManager:
             
             # Add to snapshots
             self.snapshots.append(snapshot)
+            
+            # Store sweep info for quick lookup
+            snapshot_index = len(self.snapshots) - 1
+            self.swept_parameters[snapshot_index] = {
+                'type': parameter_type,
+                'id': parameter_id,
+                'name': parameter_name,
+                'range': values,
+                'current_value': value
+            }
+            
             created_count += 1
         
         return created_count

@@ -214,6 +214,7 @@ class ViabilityPanel(Gtk.Box):
         self.simulation_toolbar.add_exp_button.connect("clicked", self._on_add_experiment)
         self.simulation_toolbar.copy_exp_button.connect("clicked", self._on_copy_experiment)
         self.simulation_toolbar.experiment_combo.connect("changed", self._on_experiment_changed)
+        self.simulation_toolbar.sync_baseline_button.connect("clicked", self._on_sync_baseline)
         
         # === SECTION 2: SUBNET PARAMETERS EXPANDER ===
         self.subnet_expander = Gtk.Expander()
@@ -1141,6 +1142,11 @@ class ViabilityPanel(Gtk.Box):
                     if place.id == place_id:
                         place.marking = new_marking
                         break
+            
+            # Mark baseline as stale (needs resync for automation)
+            if hasattr(self, 'experiment_manager'):
+                self.experiment_manager.mark_baseline_stale()
+                self._show_stale_baseline_warning()
         except ValueError:
             pass
     
@@ -1160,6 +1166,11 @@ class ViabilityPanel(Gtk.Box):
                     if transition.id == transition_id:
                         transition.rate = new_rate
                         break
+            
+            # Mark baseline as stale (needs resync for automation)
+            if hasattr(self, 'experiment_manager'):
+                self.experiment_manager.mark_baseline_stale()
+                self._show_stale_baseline_warning()
         except ValueError:
             pass
     
@@ -1177,6 +1188,11 @@ class ViabilityPanel(Gtk.Box):
                 if transition.id == transition_id:
                     transition.formula = new_text
                     break
+        
+        # Mark baseline as stale (needs resync for automation)
+        if hasattr(self, 'experiment_manager'):
+            self.experiment_manager.mark_baseline_stale()
+            self._show_stale_baseline_warning()
     
     def _on_arc_weight_edited(self, widget, path, new_text, store):
         """Handle arc weight edit."""
@@ -1194,6 +1210,11 @@ class ViabilityPanel(Gtk.Box):
                     if arc.id == arc_id:
                         arc.weight = new_weight
                         break
+            
+            # Mark baseline as stale (needs resync for automation)
+            if hasattr(self, 'experiment_manager'):
+                self.experiment_manager.mark_baseline_stale()
+                self._show_stale_baseline_warning()
         except ValueError:
             pass
     
@@ -2602,3 +2623,44 @@ class ViabilityPanel(Gtk.Box):
             )
             
             self._append_diagnostics_log(f"Switched to: {snapshot.name}")
+    
+    def _show_stale_baseline_warning(self):
+        """Show visual warning that baseline is stale."""
+        if hasattr(self, 'simulation_toolbar'):
+            self.simulation_toolbar.show_stale_baseline_warning(True)
+    
+    def _on_sync_baseline(self, button):
+        """Sync automation baseline from current table values."""
+        if not hasattr(self, 'experiment_manager'):
+            return
+        
+        # Show confirmation dialog
+        dialog = Gtk.MessageDialog(
+            transient_for=self.get_toplevel(),
+            flags=0,
+            message_type=Gtk.MessageType.QUESTION,
+            buttons=Gtk.ButtonsType.YES_NO,
+            text="Sync Baseline to Automation?"
+        )
+        dialog.format_secondary_text(
+            "This will update the automation baseline with current table values.\n"
+            "Any existing experiment sweeps will use these new baseline values.\n\n"
+            "Continue?"
+        )
+        
+        response = dialog.run()
+        dialog.destroy()
+        
+        if response == Gtk.ResponseType.YES:
+            # Sync baseline from current tables
+            self.experiment_manager.sync_baseline_from_tables(
+                self.places_store,
+                self.transitions_store,
+                self.arcs_store
+            )
+            
+            # Hide warning
+            self.simulation_toolbar.show_stale_baseline_warning(False)
+            
+            self._append_diagnostics_log("✓ Baseline synced to automation")
+
