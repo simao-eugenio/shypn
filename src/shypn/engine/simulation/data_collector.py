@@ -17,13 +17,15 @@ class DataCollector:
     Thread-safe for single-threaded GTK event loop.
     """
     
-    def __init__(self, model):
+    def __init__(self, model, controller=None):
         """Initialize data collector.
         
         Args:
             model: DocumentModel instance with places and transitions
+            controller: Optional SimulationController for accessing behavior cache
         """
         self.model = model
+        self.controller = controller  # For accessing behavior cache
         self.time_points: List[float] = []
         self.place_data: Dict[str, List[int]] = {}
         self.transition_data: Dict[str, List[int]] = {}  # Cumulative counts
@@ -74,23 +76,39 @@ class DataCollector:
             # Debug: Check if transition has behavior
             if current_time <= 0.0:
                 trans_name = getattr(transition, 'name', transition.id)
-                has_behavior = hasattr(transition, 'behavior')
-                behavior_obj = getattr(transition, 'behavior', None) if has_behavior else None
-                print(f"[BEHAVIOR_CHECK] t={current_time:.4f}, {trans_name}: has_behavior={has_behavior}, behavior={behavior_obj}")
+                has_behavior_attr = hasattr(transition, 'behavior')
+                behavior_obj = getattr(transition, 'behavior', None) if has_behavior_attr else None
+                has_controller = self.controller is not None
+                print(f"[BEHAVIOR_CHECK] t={current_time:.4f}, {trans_name}: has_behavior={has_behavior_attr}, behavior={behavior_obj}, has_controller={has_controller}")
             
             # Instantaneous rate/propensity - evaluate with CURRENT token state
             rate = 0.0
-            if hasattr(transition, 'behavior') and transition.behavior:
+            
+            # Get behavior from controller's cache (behaviors are created on-demand by controller)
+            behavior = None
+            if self.controller and hasattr(self.controller, 'behavior_cache'):
+                behavior = self.controller.behavior_cache.get(transition.id)
+                if not behavior:
+                    # Behavior not in cache - try to create it
+                    from shypn.engine import behavior_factory
+                    try:
+                        behavior = behavior_factory.create_behavior(transition, self.model)
+                        self.controller.behavior_cache[transition.id] = behavior
+                    except Exception as e:
+                        if current_time < 0.1:
+                            print(f"[DATA_COLLECTOR] Failed to create behavior for {transition.id}: {e}")
+            
+            if behavior:
                 try:
                     # Force re-evaluation with current tokens by calling the method
                     # This ensures we get the rate based on current marking, not cached value
-                    if hasattr(transition.behavior, '_evaluate_rate_at_enablement'):
+                    if hasattr(behavior, '_evaluate_rate_at_enablement'):
                         # This method evaluates the rate formula with current place tokens
-                        rate = transition.behavior._evaluate_rate_at_enablement(current_time)
-                    elif hasattr(transition.behavior, 'evaluate_rate'):
+                        rate = behavior._evaluate_rate_at_enablement(current_time)
+                    elif hasattr(behavior, 'evaluate_rate'):
                         # For continuous transitions - needs places dict
                         places_dict = {p.id: p for p in self.model.places}
-                        rate = transition.behavior.evaluate_rate(places_dict, current_time)
+                        rate = behavior.evaluate_rate(places_dict, current_time)
                     elif hasattr(transition, 'rate'):
                         # Fallback: use static rate attribute (won't reflect token changes)
                         rate = float(transition.rate) if transition.rate else 0.0
@@ -98,7 +116,7 @@ class DataCollector:
                     # Debug: Log first several rate evaluations to verify dynamics
                     if current_time <= 0.1:  # First 20 time steps (at dt=0.005)
                         trans_name = getattr(transition, 'name', transition.id)
-                        rate_func = getattr(transition.behavior, 'rate_function_expr', 'N/A')
+                        rate_func = getattr(behavior, 'rate_function_expr', 'N/A')
                         # Also log place tokens to see what's driving the rate
                         place_tokens = {p.id: p.tokens for p in self.model.places}
                         print(f"[RATE] t={current_time:.4f}, {trans_name}: rate={rate:.6f}, formula={rate_func}, tokens={place_tokens}")
