@@ -452,6 +452,9 @@ class BatchExecutor:
                             'final_time': traj.get('time_points', [0])[-1] if traj.get('time_points') else 0
                         })
             
+            # Include swept parameter metadata from snapshot
+            swept_param = getattr(snapshot, 'swept_parameter', None)
+            
             # Return complete result dict with statistics (plottable from statistics)
             result = {
                 'name': name,
@@ -459,10 +462,13 @@ class BatchExecutor:
                 'trajectory_summary': trajectory_summary,  # Lightweight summary
                 'n_replicates': len(results) if results else 0,
                 'statistics': statistics,  # Contains mean/std/percentiles for plotting
-                'duration': elapsed_time
+                'duration': elapsed_time,
+                'swept_parameter': swept_param  # Include swept parameter info for smart plotting
             }
             
             print(f"[EXPERIMENT] Result dict created: {result['n_replicates']} replicates, {elapsed_time:.2f}s")
+            if swept_param:
+                print(f"[EXPERIMENT] Swept parameter: {swept_param['type']} {swept_param['name']} = {swept_param['value']}")
             return result
             
         except Exception as e:
