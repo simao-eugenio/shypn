@@ -541,11 +541,19 @@ class ParameterSweepBuilder(Gtk.Box):
         
         # === APPLY PREDICTIONS TO UI ===
         
-        # Set to linear mode and fill range values
-        self.mode_combo.set_active(0)  # Linear mode
-        self.min_spinbutton.set_value(float(min_val))
-        self.max_spinbutton.set_value(float(max_val))
-        self.steps_spinbutton.set_value(int(steps))
+        # Set to linear mode
+        self.linear_radio.set_active(True)
+        
+        # Fill range values in linear mode entries
+        self.start_entry.set_text(f"{min_val:.2f}" if isinstance(min_val, float) else str(int(min_val)))
+        self.stop_entry.set_text(f"{max_val:.2f}" if isinstance(max_val, float) else str(int(max_val)))
+        
+        # Calculate step size from min, max, and steps
+        if steps > 1:
+            step_size = (max_val - min_val) / (steps - 1)
+            self.step_entry.set_text(f"{step_size:.3f}" if isinstance(step_size, float) else str(int(step_size)))
+        else:
+            self.step_entry.set_text("1")
         
         # Set simulation settings
         self.replicates_entry.set_text(str(int(replicates)))
