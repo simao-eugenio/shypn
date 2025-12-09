@@ -436,6 +436,141 @@ class ResultsBrowserView(Gtk.Box):
             dialog.destroy()
             return
         
+        # Determine if this is a transition sweep (for superposed plotting)
+        swept_transition_id = None
+        related_place_ids = []
+        if swept_param and swept_param['type'] == 'transitions':
+            swept_transition_id = swept_param['id']
+            related_place_ids = self._get_related_places_for_transition(swept_transition_id)
+        
+        # Check if we should create superposed plot (transition sweep with related places)
+        create_superposed = (swept_transition_id and 
+                            swept_transition_id in species_stats and 
+                            len(related_place_ids) > 0)
+        
+        if create_superposed:
+            # Create single plot with all variables superposed
+            self._plot_superposed_transition_sweep(
+                name, result, swept_transition_id, related_place_ids, 
+                species_stats, time_points, stats
+            )
+        else:
+            # Create separate subplots for each species (original behavior)
+            self._plot_separate_subplots(
+                name, result, swept_param, species_stats, time_points, stats
+            )
+    
+    def _plot_superposed_transition_sweep(self, name, result, transition_id, 
+                                          place_ids, species_stats, time_points, stats):
+        """Plot transition and related places superposed on same axes.
+        
+        Args:
+            name: Experiment name
+            result: Result dictionary
+            transition_id: ID of swept transition
+            place_ids: List of related place IDs
+            species_stats: Species statistics dict
+            time_points: Time points array
+            stats: Full statistics dict
+        """
+        import matplotlib.pyplot as plt
+        import numpy as np
+        
+        time_points_arr = np.array(time_points)
+        
+        # Create figure with two y-axes (left: tokens, right: firing rate)
+        fig, ax1 = plt.subplots(figsize=(12, 7))
+        
+        # Title with sweep info
+        title_text = f"Experiment: {name}\n{stats.get('n_replicates', 0)} replicates"
+        swept_param = result.get('swept_parameter')
+        if swept_param:
+            title_text += f"\nSwept Transition: {swept_param['name']} = {swept_param['value']:.4g}"
+        fig.suptitle(title_text, fontsize=14, fontweight='bold')
+        
+        # Left y-axis: Plot places (tokens)
+        ax1.set_xlabel('Time', fontsize=12)
+        ax1.set_ylabel('Tokens (Places)', fontsize=12, color='blue')
+        ax1.tick_params(axis='y', labelcolor='blue')
+        
+        # Plot each place
+        colors_places = ['#1f77b4', '#2ca02c', '#ff7f0e', '#9467bd', '#8c564b']
+        for idx, place_id in enumerate(place_ids):
+            if place_id not in species_stats:
+                continue
+            
+            place_data = species_stats[place_id]
+            mean = np.array(place_data.get('mean', []))
+            std = np.array(place_data.get('std', []))
+            
+            if len(mean) == 0:
+                continue
+            
+            color = colors_places[idx % len(colors_places)]
+            place_name = self._resolve_species_name(place_id)
+            
+            # Plot mean line
+            line = ax1.plot(time_points_arr, mean, color=color, 
+                          linewidth=2, label=place_name, alpha=0.8)
+            
+            # Plot confidence interval
+            ax1.fill_between(time_points_arr, 
+                           mean - 2*std, 
+                           mean + 2*std, 
+                           alpha=0.2, 
+                           color=color)
+        
+        # Right y-axis: Plot transition (firing rate)
+        ax2 = ax1.twinx()
+        ax2.set_ylabel('Firing Count (Transition)', fontsize=12, color='red')
+        ax2.tick_params(axis='y', labelcolor='red')
+        
+        if transition_id in species_stats:
+            trans_data = species_stats[transition_id]
+            mean = np.array(trans_data.get('mean', []))
+            std = np.array(trans_data.get('std', []))
+            
+            if len(mean) > 0:
+                trans_name = self._resolve_species_name(transition_id)
+                
+                # Plot transition with thick red line
+                ax2.plot(time_points_arr, mean, color='red', 
+                        linewidth=3, label=f'⚡ {trans_name}', alpha=0.9)
+                
+                # Plot confidence interval
+                ax2.fill_between(time_points_arr, 
+                               mean - 2*std, 
+                               mean + 2*std, 
+                               alpha=0.3, 
+                               color='red')
+        
+        # Add legends
+        lines1, labels1 = ax1.get_legend_handles_labels()
+        lines2, labels2 = ax2.get_legend_handles_labels()
+        ax1.legend(lines1 + lines2, labels1 + labels2, 
+                  loc='best', fontsize=10, framealpha=0.9)
+        
+        # Grid
+        ax1.grid(True, alpha=0.3)
+        
+        plt.tight_layout()
+        plt.show()
+    
+    def _plot_separate_subplots(self, name, result, swept_param, 
+                                species_stats, time_points, stats):
+        """Plot each species in separate subplots (original behavior).
+        
+        Args:
+            name: Experiment name
+            result: Result dictionary
+            swept_param: Swept parameter info (or None)
+            species_stats: Species statistics dict
+            time_points: Time points array
+            stats: Full statistics dict
+        """
+        import matplotlib.pyplot as plt
+        import numpy as np
+        
         # Create figure with subplots for each species
         n_species = len(species_stats)
         n_cols = min(3, n_species)  # Max 3 columns
