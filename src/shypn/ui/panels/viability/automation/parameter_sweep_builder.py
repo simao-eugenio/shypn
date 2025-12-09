@@ -443,6 +443,18 @@ class ParameterSweepBuilder(Gtk.Box):
         """
         self.on_clear_callback = callback
     
+    def _calculate_experiment_count(self):
+        """Calculate number of experiments based on current configuration.
+        
+        Returns:
+            int: Number of experiments that will be generated
+        """
+        try:
+            values = self._compute_parameter_values()
+            return len(values)
+        except:
+            return 0
+    
     def prefill_parameter(self, param_type, param_id, param_name, current_value):
         """Pre-fill sweep builder with parameter from right-click context menu.
         
