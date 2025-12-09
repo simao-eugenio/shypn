@@ -2697,17 +2697,17 @@ class ViabilityPanel(Gtk.Box):
         if swept_param_type == 'place':
             for row in self.places_store:
                 if row[0] == swept_param_id:
-                    row[5] = "#E3F2FD"  # Light blue
+                    row[5] = "#B3D9FF"  # Medium blue - more visible
                     break
         elif swept_param_type == 'transition':
             for row in self.transitions_store:
                 if row[0] == swept_param_id:
-                    row[6] = "#E3F2FD"  # Light blue
+                    row[6] = "#B3D9FF"  # Medium blue - more visible
                     break
         elif swept_param_type == 'arc':
             for row in self.arcs_store:
                 if row[0] == swept_param_id:
-                    row[5] = "#E3F2FD"  # Light blue
+                    row[5] = "#B3D9FF"  # Medium blue - more visible
                     break
     
     def _clear_sweep_indicators(self):

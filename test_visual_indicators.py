@@ -47,6 +47,14 @@ def test_store_structure():
     for row in panel.places_store:
         print(f"  {row[0]}: background={row[5]}")
     
+    # Verify color
+    expected_color = "#B3D9FF"
+    actual_color = panel.places_store[1][5]
+    if actual_color == expected_color:
+        print(f"\n✓ Color correct: {expected_color}")
+    else:
+        print(f"\n✗ Color mismatch: expected {expected_color}, got {actual_color}")
+    
     print("\n✓ All tests passed!")
 
 if __name__ == '__main__':
