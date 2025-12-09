@@ -433,6 +433,9 @@ class ParameterSweepBuilder(Gtk.Box):
     def prefill_parameter(self, param_type, param_id, param_name, current_value):
         """Pre-fill sweep builder with parameter from right-click context menu.
         
+        Intelligently predicts range, replicates, and duration based on parameter type
+        and current value.
+        
         Args:
             param_type: 'place', 'transition', or 'arc'
             param_id: Parameter ID
@@ -454,23 +457,99 @@ class ParameterSweepBuilder(Gtk.Box):
         # The name_combo uses param_id as key
         self.name_combo.set_active_id(param_id)
         
-        # Pre-fill range based on current value
-        if current_value > 0:
-            # Suggest range: 50% to 150% of current value
-            min_val = current_value * 0.5
-            max_val = current_value * 1.5
-            steps = 10
-        else:
-            # For zero values, suggest 0 to 100
-            min_val = 0
-            max_val = 100
-            steps = 10
+        # === INTELLIGENT PREDICTION LOGIC ===
         
-        # Set to linear mode and fill values
+        # Predict range based on parameter type and value
+        if param_type == 'place':
+            # Place markings: typically integers, often represent molecule counts
+            if current_value == 0:
+                min_val, max_val, steps = 0, 100, 11
+            elif current_value <= 10:
+                min_val, max_val, steps = 0, current_value * 2, 11
+            elif current_value <= 100:
+                min_val, max_val, steps = current_value * 0.5, current_value * 1.5, 11
+            else:
+                min_val, max_val, steps = current_value * 0.7, current_value * 1.3, 11
+                
+        elif param_type == 'transition':
+            # Transition rates: typically small floats (0.1-10 range)
+            if current_value == 0:
+                min_val, max_val, steps = 0, 5.0, 11
+            elif current_value < 1.0:
+                min_val, max_val, steps = current_value * 0.1, current_value * 10, 11
+            else:
+                min_val, max_val, steps = current_value * 0.2, current_value * 5, 11
+                
+        elif param_type == 'arc':
+            # Arc weights: typically small integers (1-5 range)
+            if current_value <= 1:
+                min_val, max_val, steps = 1, 5, 5
+            else:
+                min_val, max_val, steps = 1, current_value * 2, min(current_value * 2, 10)
+        else:
+            # Fallback
+            min_val, max_val, steps = 0, 100, 11
+        
+        # Predict replicates based on sweep size and parameter type
+        # More replicates for stochastic systems, fewer for deterministic explorations
+        total_experiments = steps
+        if total_experiments <= 5:
+            replicates = 100  # Few experiments → more replicates each
+        elif total_experiments <= 10:
+            replicates = 50   # Standard sweep → moderate replicates
+        else:
+            replicates = 30   # Large sweep → fewer replicates to save time
+        
+        # Further adjust by parameter type
+        if param_type == 'place' and current_value < 20:
+            # Low molecule counts → more stochasticity → more replicates
+            replicates = min(replicates * 2, 200)
+        elif param_type == 'transition' and current_value < 0.5:
+            # Slow reactions → longer to equilibrate → more replicates
+            replicates = min(replicates * 1.5, 150)
+        
+        # Predict duration based on parameter values and type
+        if param_type == 'place':
+            # Duration scales with initial marking (more molecules → longer to equilibrate)
+            if current_value == 0:
+                duration = 50.0
+            elif current_value < 10:
+                duration = 30.0
+            elif current_value < 100:
+                duration = 50.0
+            else:
+                duration = 100.0
+                
+        elif param_type == 'transition':
+            # Duration inversely scales with rate (slower reactions → longer simulation)
+            if current_value == 0:
+                duration = 100.0
+            elif current_value < 0.1:
+                duration = 500.0  # Very slow reaction
+            elif current_value < 1.0:
+                duration = 200.0  # Slow reaction
+            elif current_value < 10:
+                duration = 50.0   # Fast reaction
+            else:
+                duration = 20.0   # Very fast reaction
+                
+        elif param_type == 'arc':
+            # Arc weights affect stoichiometry → moderate duration
+            duration = 50.0
+        else:
+            duration = 100.0
+        
+        # === APPLY PREDICTIONS TO UI ===
+        
+        # Set to linear mode and fill range values
         self.mode_combo.set_active(0)  # Linear mode
-        self.min_spinbutton.set_value(min_val)
-        self.max_spinbutton.set_value(max_val)
-        self.steps_spinbutton.set_value(steps)
+        self.min_spinbutton.set_value(float(min_val))
+        self.max_spinbutton.set_value(float(max_val))
+        self.steps_spinbutton.set_value(int(steps))
+        
+        # Set simulation settings
+        self.replicates_entry.set_text(str(int(replicates)))
+        self.duration_entry.set_text(f"{duration:.1f}")
         
         # Update preview
         self._update_preview()
