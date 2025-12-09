@@ -653,38 +653,37 @@ class ResultsBrowserView(Gtk.Box):
             label = f'⚡ {trans_name}' if is_swept else trans_name
             
             # Convert cumulative firing count to instantaneous firing rate
-            # Use rolling window for stable rate estimation
+            # Strategy: Smooth cumulative count first, then compute derivative from smooth curve
+            from scipy.signal import savgol_filter
+            
             firing_rate = np.zeros_like(mean)
             firing_rate_std = np.zeros_like(std)
             
             if len(time_points_arr) > 1:
-                # Use larger rolling window for smoother rate estimation
-                window_size = max(10, len(time_points_arr) // 10)  # 10% of data or min 10 points
+                # First, smooth the cumulative count with Savitzky-Golay filter
+                if len(mean) >= 11:
+                    window = min(51, len(mean) if len(mean) % 2 == 1 else len(mean) - 1)
+                    if window >= 5:
+                        mean_smooth = savgol_filter(mean, window_length=window, polyorder=3)
+                    else:
+                        mean_smooth = mean
+                else:
+                    mean_smooth = mean
                 
-                for i in range(len(mean)):
-                    # Define window bounds
-                    start_idx = max(0, i - window_size // 2)
-                    end_idx = min(len(mean), i + window_size // 2 + 1)
-                    
-                    # Ensure at least 2 points in window
-                    if end_idx - start_idx < 2:
-                        if i < len(mean) - 1:
-                            start_idx, end_idx = i, i + 2
-                        else:
-                            start_idx, end_idx = i - 1, i + 1
-                    
-                    # Compute rate as slope over window
-                    window_time = time_points_arr[start_idx:end_idx]
-                    window_count = mean[start_idx:end_idx]
-                    
-                    if len(window_time) > 1:
-                        delta_time = window_time[-1] - window_time[0]
-                        delta_count = window_count[-1] - window_count[0]
-                        firing_rate[i] = delta_count / delta_time if delta_time > 0 else 0
-                        
-                        # Estimate uncertainty as average std in window
-                        window_std = std[start_idx:end_idx]
-                        firing_rate_std[i] = np.mean(window_std) / delta_time if delta_time > 0 else 0
+                # Now compute derivative from the smoothed cumulative curve
+                dt = np.diff(time_points_arr)
+                d_mean = np.diff(mean_smooth)
+                firing_rate[1:] = d_mean / dt
+                firing_rate[0] = firing_rate[1] if len(firing_rate) > 1 else 0
+                
+                # For uncertainty: use average std over small windows
+                for i in range(len(std)):
+                    window_start = max(0, i - 2)
+                    window_end = min(len(std), i + 3)
+                    if window_end > window_start:
+                        window_dt = time_points_arr[window_end-1] - time_points_arr[window_start]
+                        if window_dt > 0:
+                            firing_rate_std[i] = np.mean(std[window_start:window_end]) / window_dt
             
             # Use firing rate instead of cumulative count
             mean = firing_rate
