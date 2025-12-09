@@ -658,9 +658,8 @@ class ResultsBrowserView(Gtk.Box):
             firing_rate_std = np.zeros_like(std)
             
             if len(time_points_arr) > 1:
-                # Use rolling window to compute average firing rates
-                # This is much more stable than point-wise derivatives
-                window_size = max(5, len(time_points_arr) // 20)  # 5% of data or min 5 points
+                # Use larger rolling window for smoother rate estimation
+                window_size = max(10, len(time_points_arr) // 10)  # 10% of data or min 10 points
                 
                 for i in range(len(mean)):
                     # Define window bounds
@@ -691,19 +690,21 @@ class ResultsBrowserView(Gtk.Box):
             mean = firing_rate
             std = firing_rate_std
             
-            # Smooth the transition curve with spline interpolation
+            # Smooth the transition curve with spline interpolation (same as places)
             from scipy.interpolate import make_interp_spline
             
-            if len(time_points_arr) >= 4:  # Need at least 4 points for cubic spline
+            if len(time_points_arr) > 50:  # Match places threshold
                 try:
-                    # Use ALL data points for spline (rolling window already smoothed)
-                    # Create cubic spline with all available data
-                    k_order = min(3, len(time_points_arr) - 1)  # Cubic if possible
-                    spl = make_interp_spline(time_points_arr, mean, k=k_order)
+                    # Subsample for cleaner spline (match places approach)
+                    indices = np.linspace(0, len(time_points_arr)-1, min(500, len(time_points_arr)), dtype=int)
+                    time_smooth = time_points_arr[indices]
+                    mean_smooth = mean[indices]
                     
-                    # Generate smooth interpolated curve
-                    n_points = max(500, len(time_points_arr) * 5)  # Dense interpolation
-                    time_fine = np.linspace(time_points_arr[0], time_points_arr[-1], n_points)
+                    # Create spline
+                    spl = make_interp_spline(time_smooth, mean_smooth, k=min(3, len(time_smooth)-1))
+                    
+                    # Generate extra smooth points
+                    time_fine = np.linspace(time_points_arr[0], time_points_arr[-1], 1000)
                     mean_fine = spl(time_fine)
                     
                     # Plot smooth transition
