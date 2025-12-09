@@ -718,8 +718,12 @@ class ResultsBrowserView(Gtk.Box):
         
         # Summary of what was plotted
         print(f"[PLOT] Superposed plot complete:")
-        print(f"[PLOT]   Transition: {transition_id} ({'found' if transition_id in species_stats else 'MISSING'})")
+        if swept_transition_id:
+            print(f"[PLOT]   Swept transition: {swept_transition_id} ({'found' if swept_transition_id in species_stats else 'MISSING'})")
+        if swept_place_id:
+            print(f"[PLOT]   Swept place: {swept_place_id} ({'found' if swept_place_id in species_stats else 'MISSING'})")
         print(f"[PLOT]   Places plotted: {len(plotted_places)}/{len(place_ids)}")
+        print(f"[PLOT]   Transitions plotted: {len(plotted_transitions)}/{len(transition_ids)}")
         if missing_places:
             print(f"[PLOT]   WARNING: {len(missing_places)} places from subnet missing in statistics: {missing_places}")
         
