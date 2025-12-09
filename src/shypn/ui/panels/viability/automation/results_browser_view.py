@@ -344,6 +344,8 @@ class ResultsBrowserView(Gtk.Box):
     def _plot_trajectories(self, name, result):
         """Plot mean trajectories with confidence intervals.
         
+        For transition sweeps, automatically includes connected places.
+        
         Args:
             name: Experiment name
             result: Result dictionary with statistics
@@ -386,6 +388,32 @@ class ResultsBrowserView(Gtk.Box):
         species_stats = stats.get('species_statistics', {})
         time_points = stats.get('time_points', [])
         
+        # Check if this is a transition sweep - if so, add related places
+        swept_param = result.get('swept_parameter')
+        if swept_param and swept_param['type'] == 'transitions' and self.model:
+            # Find the transition and its connected places
+            transition_id = swept_param['id']
+            related_place_ids = self._get_related_places_for_transition(transition_id)
+            
+            # Add transition firing rate to plot if not already present
+            if transition_id not in species_stats:
+                print(f"[PLOT] Warning: Transition {transition_id} not found in statistics")
+            
+            # Ensure related places are in the plot
+            for place_id in related_place_ids:
+                if place_id not in species_stats:
+                    print(f"[PLOT] Warning: Related place {place_id} not found in statistics")
+            
+            # Reorder species: transition first, then related places, then others
+            species_order = []
+            if transition_id in species_stats:
+                species_order.append(transition_id)
+            species_order.extend([p for p in related_place_ids if p in species_stats])
+            species_order.extend([s for s in species_stats.keys() if s not in species_order])
+            
+            # Rebuild species_stats in the new order (for display priority)
+            species_stats = {sid: species_stats[sid] for sid in species_order}
+        
         # DEBUG: Print what we received
         print(f"[PLOT_DEBUG] stats keys: {stats.keys()}")
         print(f"[PLOT_DEBUG] species_stats keys: {list(species_stats.keys())}")
@@ -413,9 +441,13 @@ class ResultsBrowserView(Gtk.Box):
         n_cols = min(3, n_species)  # Max 3 columns
         n_rows = (n_species + n_cols - 1) // n_cols
         
+        # Add subtitle for transition sweeps
+        title_text = f"Experiment: {name}\n{stats.get('n_replicates', 0)} replicates"
+        if swept_param and swept_param['type'] == 'transitions':
+            title_text += f"\nSwept Transition: {swept_param['name']} = {swept_param['value']:.4g}"
+        
         fig, axes = plt.subplots(n_rows, n_cols, figsize=(6*n_cols, 4*n_rows))
-        fig.suptitle(f"Experiment: {name}\\n{stats.get('n_replicates', 0)} replicates", 
-                     fontsize=14, fontweight='bold')
+        fig.suptitle(title_text, fontsize=14, fontweight='bold')
         
         # Flatten axes for easy iteration
         if n_species == 1:
@@ -425,9 +457,17 @@ class ResultsBrowserView(Gtk.Box):
         else:
             axes = axes.flatten()
         
+        # Determine which species is the swept transition (for visual distinction)
+        swept_transition_id = None
+        if swept_param and swept_param['type'] == 'transitions':
+            swept_transition_id = swept_param['id']
+        
         # Plot each species
         for idx, (species_id, species_data) in enumerate(species_stats.items()):
             ax = axes[idx]
+            
+            # Check if this is the swept transition
+            is_swept_transition = (species_id == swept_transition_id)
             
             # DEBUG: Check data structure
             print(f"[PLOT_DEBUG] Species {species_id}: keys = {species_data.keys()}")
@@ -448,28 +488,47 @@ class ResultsBrowserView(Gtk.Box):
             # Convert to numpy arrays if needed
             time_points_arr = np.array(time_points)
             
+            # Use different colors for transition vs places
+            if is_swept_transition:
+                color = 'red'  # Swept transition in red
+                linewidth = 2.5
+            else:
+                color = 'blue'  # Places in blue
+                linewidth = 2
+            
             # Plot mean trajectory
-            ax.plot(time_points_arr, mean, 'b-', linewidth=2, label='Mean')
+            ax.plot(time_points_arr, mean, color=color, linestyle='-', 
+                   linewidth=linewidth, label='Mean')
             
             # Plot confidence interval (mean ± 2*std ≈ 95% CI)
             ax.fill_between(time_points_arr, 
                            mean - 2*std, 
                            mean + 2*std, 
                            alpha=0.3, 
-                           color='blue',
+                           color=color,
                            label='95% CI')
             
             # Plot percentiles if available
             percentiles = species_data.get('percentiles', {})
             if '50' in percentiles:
                 median = np.array(percentiles['50'])
-                ax.plot(time_points_arr, median, 'r--', linewidth=1, alpha=0.7, label='Median')
+                ax.plot(time_points_arr, median, color=color, linestyle='--', 
+                       linewidth=1, alpha=0.7, label='Median')
             
             ax.set_xlabel('Time')
-            ax.set_ylabel('Tokens')
-            # Use name if available, otherwise ID
+            
+            # Set ylabel based on species type
+            if is_swept_transition:
+                ax.set_ylabel('Firing Rate')
+            else:
+                ax.set_ylabel('Tokens')
+            
+            # Use name if available, otherwise ID - add type indicator
             species_display = self._resolve_species_name(species_id)
-            ax.set_title(species_display)
+            if is_swept_transition:
+                species_display = f"⚡ {species_display} (TRANSITION)"
+            
+            ax.set_title(species_display, fontweight='bold' if is_swept_transition else 'normal')
             ax.legend(loc='best', fontsize=8)
             ax.grid(True, alpha=0.3)
         
@@ -535,3 +594,34 @@ class ResultsBrowserView(Gtk.Box):
                     return species_id
         
         return species_id
+    
+    def _get_related_places_for_transition(self, transition_id):
+        """Get all places connected to a transition via arcs.
+        
+        Args:
+            transition_id: Transition ID
+            
+        Returns:
+            list: List of place IDs (inputs, outputs, catalysts)
+        """
+        if not self.model or not hasattr(self.model, 'arcs'):
+            return []
+        
+        related_places = set()
+        
+        for arc in self.model.arcs:
+            # Check if arc involves this transition
+            source_id = getattr(arc.source, 'id', None)
+            target_id = getattr(arc.target, 'id', None)
+            
+            # Place → Transition (input place)
+            if target_id == transition_id:
+                if source_id:
+                    related_places.add(source_id)
+            
+            # Transition → Place (output place)
+            elif source_id == transition_id:
+                if target_id:
+                    related_places.add(target_id)
+        
+        return sorted(list(related_places))  # Sort for consistent ordering
