@@ -621,9 +621,9 @@ class ResultsBrowserView(Gtk.Box):
                            alpha=0.2, 
                            color=color)
         
-        # Right y-axis: Plot transitions (firing rates)
+        # Right y-axis: Plot transitions (cumulative firing counts)
         ax2 = ax1.twinx()
-        ax2.set_ylabel('Firing Rate (firings/time)', fontsize=12, color='red')
+        ax2.set_ylabel('Cumulative Firings (Transitions)', fontsize=12, color='red')
         ax2.tick_params(axis='y', labelcolor='red')
         
         # Plot each transition (if any)
@@ -652,49 +652,12 @@ class ResultsBrowserView(Gtk.Box):
             linewidth = 3 if is_swept else 2
             label = f'⚡ {trans_name}' if is_swept else trans_name
             
-            # Convert cumulative firing count to instantaneous firing rate
-            # Strategy: Smooth cumulative count first, then compute derivative from smooth curve
-            from scipy.signal import savgol_filter
-            
-            firing_rate = np.zeros_like(mean)
-            firing_rate_std = np.zeros_like(std)
-            
-            if len(time_points_arr) > 1:
-                # First, smooth the cumulative count with Savitzky-Golay filter
-                if len(mean) >= 11:
-                    window = min(51, len(mean) if len(mean) % 2 == 1 else len(mean) - 1)
-                    if window >= 5:
-                        mean_smooth = savgol_filter(mean, window_length=window, polyorder=3)
-                    else:
-                        mean_smooth = mean
-                else:
-                    mean_smooth = mean
-                
-                # Now compute derivative from the smoothed cumulative curve
-                dt = np.diff(time_points_arr)
-                d_mean = np.diff(mean_smooth)
-                firing_rate[1:] = d_mean / dt
-                firing_rate[0] = firing_rate[1] if len(firing_rate) > 1 else 0
-                
-                # For uncertainty: use average std over small windows
-                for i in range(len(std)):
-                    window_start = max(0, i - 2)
-                    window_end = min(len(std), i + 3)
-                    if window_end > window_start:
-                        window_dt = time_points_arr[window_end-1] - time_points_arr[window_start]
-                        if window_dt > 0:
-                            firing_rate_std[i] = np.mean(std[window_start:window_end]) / window_dt
-            
-            # Use firing rate instead of cumulative count
-            mean = firing_rate
-            std = firing_rate_std
-            
-            # Smooth the transition curve with spline interpolation (same as places)
+            # Plot cumulative firing counts directly from statistics (same as places)
             from scipy.interpolate import make_interp_spline
             
-            if len(time_points_arr) > 50:  # Match places threshold
+            if len(time_points_arr) > 50:
                 try:
-                    # Subsample for cleaner spline (match places approach)
+                    # Subsample for cleaner spline
                     indices = np.linspace(0, len(time_points_arr)-1, min(500, len(time_points_arr)), dtype=int)
                     time_smooth = time_points_arr[indices]
                     mean_smooth = mean[indices]
@@ -720,7 +683,7 @@ class ResultsBrowserView(Gtk.Box):
                 ax2.plot(time_points_arr, mean, color=color, 
                         linewidth=linewidth, label=label, alpha=0.9)
             
-            # Plot confidence interval (use original data)
+            # Plot confidence interval
             ax2.fill_between(time_points_arr, 
                            mean - 2*std, 
                            mean + 2*std, 
