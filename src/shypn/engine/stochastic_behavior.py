@@ -73,9 +73,15 @@ class StochasticBehavior(TransitionBehavior):
         # Extract stochastic parameters
         props = getattr(transition, 'properties', {})
         
+        # Debug: Log properties dict
+        print(f"[STOCHASTIC_INIT] Transition {transition.id}: props type={type(props)}, props={props}")
+        
         # Check if has rate_function (SBML formulas)
         self.has_rate_function = 'rate_function' in props
         self.rate_function_expr = props.get('rate_function') if self.has_rate_function else None
+        
+        # Debug: Log formula extraction
+        print(f"[STOCHASTIC_INIT] Transition {transition.id}: has_rate_function={self.has_rate_function}, rate_function_expr={self.rate_function_expr}")
         
         # Warn if stochastic transition has complex formula (likely should be continuous)
         if self.has_rate_function and self.rate_function_expr:
