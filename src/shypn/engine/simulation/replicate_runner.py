@@ -224,6 +224,10 @@ class ReplicateRunner:
                     tid: data.copy()
                     for tid, data in controller.data_collector.transition_data.items()
                 },
+                'transition_rates': {
+                    tid: data.copy()
+                    for tid, data in controller.data_collector.transition_rates.items()
+                },
                 'final_marking': {
                     p.id: p.tokens for p in self.model.places
                 },
@@ -342,46 +346,19 @@ class ReplicateRunner:
                 }
             }
         
-        # Compute statistics for each transition (firing rates, not cumulative counts)
+        # Compute statistics for each transition (use instantaneous rates from simulation)
         for transition_id in transition_ids:
-            # Stack cumulative trajectories into matrix (replicates × time_points)
-            cumulative_trajectories = np.array([
-                r['transition_data'][transition_id]
+            # Stack rate trajectories into matrix (replicates × time_points)
+            rate_trajectories = np.array([
+                r['transition_rates'][transition_id]
                 for r in successful
             ])
             
-            # Convert each replicate's cumulative count to firing rate (derivative)
-            time_array = np.array(time_points)
-            firing_rate_trajectories = np.zeros_like(cumulative_trajectories)
-            
-            # Smooth cumulative counts before derivative to reduce noise
-            from scipy.signal import savgol_filter
-            
-            for rep_idx in range(len(cumulative_trajectories)):
-                cumulative = cumulative_trajectories[rep_idx]
-                
-                # Smooth cumulative count first
-                if len(cumulative) >= 11:
-                    window = min(51, len(cumulative) if len(cumulative) % 2 == 1 else len(cumulative) - 1)
-                    if window >= 5:
-                        cumulative_smooth = savgol_filter(cumulative, window_length=window, polyorder=3)
-                    else:
-                        cumulative_smooth = cumulative
-                else:
-                    cumulative_smooth = cumulative
-                
-                # Compute firing rate as dN/dt from smoothed cumulative
-                if len(time_array) > 1:
-                    dt = np.diff(time_array)
-                    d_count = np.diff(cumulative_smooth)
-                    firing_rate_trajectories[rep_idx, 1:] = d_count / dt
-                    firing_rate_trajectories[rep_idx, 0] = firing_rate_trajectories[rep_idx, 1]
-            
-            # Now compute statistics on firing rates (not cumulative counts)
-            mean = np.mean(firing_rate_trajectories, axis=0)
-            std = np.std(firing_rate_trajectories, axis=0)
-            min_traj = np.min(firing_rate_trajectories, axis=0)
-            max_traj = np.max(firing_rate_trajectories, axis=0)
+            # Compute statistics on instantaneous rates (no derivatives needed!)
+            mean = np.mean(rate_trajectories, axis=0)
+            std = np.std(rate_trajectories, axis=0)
+            min_traj = np.min(rate_trajectories, axis=0)
+            max_traj = np.max(rate_trajectories, axis=0)
             
             # Coefficient of variation (handle divide by zero)
             cv = np.zeros_like(mean)
@@ -390,7 +367,7 @@ class ReplicateRunner:
             
             # Percentiles
             percentile_data = {
-                p: np.percentile(firing_rate_trajectories, p, axis=0)
+                p: np.percentile(rate_trajectories, p, axis=0)
                 for p in percentiles
             }
             
