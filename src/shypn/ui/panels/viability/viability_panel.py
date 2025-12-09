@@ -474,6 +474,9 @@ class ViabilityPanel(Gtk.Box):
         column_label.set_min_width(150)
         treeview.append_column(column_label)
         
+        # Add right-click context menu
+        treeview.connect("button-press-event", self._on_places_table_button_press)
+        
         return treeview, store
     
     def _create_transitions_treeview(self):
@@ -536,6 +539,9 @@ class ViabilityPanel(Gtk.Box):
         column_label.set_min_width(150)
         treeview.append_column(column_label)
         
+        # Add right-click context menu
+        treeview.connect("button-press-event", self._on_transitions_table_button_press)
+        
         return treeview, store
     
     def _create_arcs_treeview(self):
@@ -587,6 +593,9 @@ class ViabilityPanel(Gtk.Box):
         column_type.set_expand(True)
         column_type.set_min_width(150)
         treeview.append_column(column_type)
+        
+        # Add right-click context menu
+        treeview.connect("button-press-event", self._on_arcs_table_button_press)
         
         return treeview, store
     
@@ -2718,5 +2727,151 @@ class ViabilityPanel(Gtk.Box):
             row[6] = "#FFFFFF"
         for row in self.arcs_store:
             row[5] = "#FFFFFF"
+    
+    def _on_places_table_button_press(self, treeview, event):
+        """Handle right-click on places table to show context menu."""
+        if event.button == 3:  # Right-click
+            # Get clicked row
+            path_info = treeview.get_path_at_pos(int(event.x), int(event.y))
+            if path_info is None:
+                return False
+            
+            path, column, cell_x, cell_y = path_info
+            treeview.get_selection().select_path(path)
+            
+            # Get place data from row
+            tree_iter = self.places_store.get_iter(path)
+            place_id = self.places_store.get_value(tree_iter, 0)
+            place_name = self.places_store.get_value(tree_iter, 1)
+            current_marking = self.places_store.get_value(tree_iter, 2)
+            
+            # Create context menu
+            menu = Gtk.Menu()
+            
+            sweep_item = Gtk.MenuItem(label=f"⇄ Create Sweep for '{place_name}'")
+            sweep_item.connect("activate", self._on_create_sweep_from_place, 
+                             place_id, place_name, current_marking)
+            menu.append(sweep_item)
+            
+            menu.show_all()
+            menu.popup(None, None, None, None, event.button, event.time)
+            return True
+        
+        return False
+    
+    def _on_transitions_table_button_press(self, treeview, event):
+        """Handle right-click on transitions table to show context menu."""
+        if event.button == 3:  # Right-click
+            # Get clicked row
+            path_info = treeview.get_path_at_pos(int(event.x), int(event.y))
+            if path_info is None:
+                return False
+            
+            path, column, cell_x, cell_y = path_info
+            treeview.get_selection().select_path(path)
+            
+            # Get transition data from row
+            tree_iter = self.transitions_store.get_iter(path)
+            trans_id = self.transitions_store.get_value(tree_iter, 0)
+            trans_name = self.transitions_store.get_value(tree_iter, 1)
+            current_rate = self.transitions_store.get_value(tree_iter, 2)
+            
+            # Create context menu
+            menu = Gtk.Menu()
+            
+            sweep_item = Gtk.MenuItem(label=f"⇄ Create Sweep for '{trans_name}'")
+            sweep_item.connect("activate", self._on_create_sweep_from_transition,
+                             trans_id, trans_name, current_rate)
+            menu.append(sweep_item)
+            
+            menu.show_all()
+            menu.popup(None, None, None, None, event.button, event.time)
+            return True
+        
+        return False
+    
+    def _on_arcs_table_button_press(self, treeview, event):
+        """Handle right-click on arcs table to show context menu."""
+        if event.button == 3:  # Right-click
+            # Get clicked row
+            path_info = treeview.get_path_at_pos(int(event.x), int(event.y))
+            if path_info is None:
+                return False
+            
+            path, column, cell_x, cell_y = path_info
+            treeview.get_selection().select_path(path)
+            
+            # Get arc data from row
+            tree_iter = self.arcs_store.get_iter(path)
+            arc_id = self.arcs_store.get_value(tree_iter, 0)
+            from_id = self.arcs_store.get_value(tree_iter, 1)
+            to_id = self.arcs_store.get_value(tree_iter, 2)
+            current_weight = self.arcs_store.get_value(tree_iter, 3)
+            
+            # Create context menu
+            menu = Gtk.Menu()
+            
+            arc_label = f"{from_id} → {to_id}"
+            sweep_item = Gtk.MenuItem(label=f"⇄ Create Sweep for '{arc_label}'")
+            sweep_item.connect("activate", self._on_create_sweep_from_arc,
+                             arc_id, arc_label, current_weight)
+            menu.append(sweep_item)
+            
+            menu.show_all()
+            menu.popup(None, None, None, None, event.button, event.time)
+            return True
+        
+        return False
+    
+    def _on_create_sweep_from_place(self, menu_item, place_id, place_name, current_value):
+        """Create sweep from right-clicked place parameter."""
+        if not hasattr(self, 'automation_category') or not self.automation_category:
+            return
+        
+        # Expand automation section
+        self.automation_category.category_frame.set_expanded(True)
+        
+        # Pre-fill sweep builder with place info
+        if hasattr(self.automation_category, 'sweep_builder'):
+            self.automation_category.sweep_builder.prefill_parameter(
+                param_type='place',
+                param_id=place_id,
+                param_name=place_name,
+                current_value=current_value
+            )
+    
+    def _on_create_sweep_from_transition(self, menu_item, trans_id, trans_name, current_value):
+        """Create sweep from right-clicked transition parameter."""
+        if not hasattr(self, 'automation_category') or not self.automation_category:
+            return
+        
+        # Expand automation section
+        self.automation_category.category_frame.set_expanded(True)
+        
+        # Pre-fill sweep builder with transition info
+        if hasattr(self.automation_category, 'sweep_builder'):
+            self.automation_category.sweep_builder.prefill_parameter(
+                param_type='transition',
+                param_id=trans_id,
+                param_name=trans_name,
+                current_value=current_value
+            )
+    
+    def _on_create_sweep_from_arc(self, menu_item, arc_id, arc_label, current_value):
+        """Create sweep from right-clicked arc parameter."""
+        if not hasattr(self, 'automation_category') or not self.automation_category:
+            return
+        
+        # Expand automation section
+        self.automation_category.category_frame.set_expanded(True)
+        
+        # Pre-fill sweep builder with arc info
+        if hasattr(self.automation_category, 'sweep_builder'):
+            self.automation_category.sweep_builder.prefill_parameter(
+                param_type='arc',
+                param_id=arc_id,
+                param_name=arc_label,
+                current_value=current_value
+            )
 
 
