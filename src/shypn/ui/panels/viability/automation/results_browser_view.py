@@ -460,6 +460,9 @@ class ResultsBrowserView(Gtk.Box):
                 ]
                 print(f"[PLOT] Warning: No subnet structure, using statistics ({len(related_place_ids)} species)")
             
+            # Get transition to plot (the swept one)
+            related_transition_ids = [swept_transition_id] if swept_transition_id in species_stats else []
+            
             print(f"[PLOT] Transition sweep detected: {swept_transition_id}")
             print(f"[PLOT] Subnet places: {related_place_ids}")
             print(f"[PLOT] Transition in stats: {swept_transition_id in species_stats}")
