@@ -71,6 +71,13 @@ class DataCollector:
             count = getattr(transition, 'firing_count', 0)
             self.transition_data[transition.id].append(count)
             
+            # Debug: Check if transition has behavior
+            if current_time <= 0.0:
+                trans_name = getattr(transition, 'name', transition.id)
+                has_behavior = hasattr(transition, 'behavior')
+                behavior_obj = getattr(transition, 'behavior', None) if has_behavior else None
+                print(f"[BEHAVIOR_CHECK] t={current_time:.4f}, {trans_name}: has_behavior={has_behavior}, behavior={behavior_obj}")
+            
             # Instantaneous rate/propensity - evaluate with CURRENT token state
             rate = 0.0
             if hasattr(transition, 'behavior') and transition.behavior:
