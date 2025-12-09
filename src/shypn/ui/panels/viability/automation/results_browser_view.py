@@ -653,7 +653,7 @@ class ResultsBrowserView(Gtk.Box):
             label = f'⚡ {trans_name}' if is_swept else trans_name
             
             # Plot cumulative firing counts directly from statistics (same as places)
-            from scipy.interpolate import make_interp_spline
+            from scipy.interpolate import make_interp_spline, UnivariateSpline
             
             if len(time_points_arr) > 50:
                 try:
@@ -661,13 +661,9 @@ class ResultsBrowserView(Gtk.Box):
                     if not np.all(np.diff(mean) >= 0):
                         print(f"[PLOT] Warning: Non-monotonic cumulative count for {transition_id}, smoothing may fail")
                     
-                    # Subsample for cleaner spline
-                    indices = np.linspace(0, len(time_points_arr)-1, min(500, len(time_points_arr)), dtype=int)
-                    time_smooth = time_points_arr[indices]
-                    mean_smooth = mean[indices]
-                    
-                    # Create spline
-                    spl = make_interp_spline(time_smooth, mean_smooth, k=min(3, len(time_smooth)-1))
+                    # Use UnivariateSpline with smoothing parameter for extra smooth transitions
+                    # This is more aggressive than make_interp_spline
+                    spl = UnivariateSpline(time_points_arr, mean, k=3, s=len(time_points_arr)*0.1)
                     
                     # Generate extra smooth points
                     time_fine = np.linspace(time_points_arr[0], time_points_arr[-1], 1000)
@@ -676,7 +672,7 @@ class ResultsBrowserView(Gtk.Box):
                     # Plot smooth transition
                     ax2.plot(time_fine, mean_fine, color=color, 
                             linewidth=linewidth, label=label, alpha=0.8)
-                    print(f"[PLOT] Smoothed transition {transition_id}: {len(time_points_arr)} → {len(time_fine)} points")
+                    print(f"[PLOT] Smoothed transition {transition_id} with UnivariateSpline: {len(time_points_arr)} → {len(time_fine)} points")
                 except Exception as e:
                     print(f"[PLOT] Smoothing failed for transition {transition_id}: {e}, using raw data")
                     ax2.plot(time_points_arr, mean, color=color, 
