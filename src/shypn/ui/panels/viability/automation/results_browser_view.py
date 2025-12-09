@@ -441,21 +441,34 @@ class ResultsBrowserView(Gtk.Box):
         related_place_ids = []
         if swept_param and swept_param['type'] == 'transitions':
             swept_transition_id = swept_param['id']
-            related_place_ids = self._get_related_places_for_transition(swept_transition_id)
+            
+            # Get all place IDs from statistics (exclude the transition itself)
+            related_place_ids = [
+                species_id for species_id in species_stats.keys()
+                if species_id != swept_transition_id
+            ]
+            
+            print(f"[PLOT] Transition sweep detected: {swept_transition_id}")
+            print(f"[PLOT] Related species found: {related_place_ids}")
+            print(f"[PLOT] Transition in stats: {swept_transition_id in species_stats}")
+            print(f"[PLOT] Available species: {list(species_stats.keys())}")
         
         # Check if we should create superposed plot (transition sweep with related places)
-        create_superposed = (swept_transition_id and 
-                            swept_transition_id in species_stats and 
-                            len(related_place_ids) > 0)
+        # Always create superposed for transition sweeps (even if no related places found)
+        create_superposed = (swept_transition_id and swept_transition_id in species_stats)
+        
+        print(f"[PLOT] Create superposed: {create_superposed}")
         
         if create_superposed:
             # Create single plot with all variables superposed
+            print(f"[PLOT] Creating superposed plot...")
             self._plot_superposed_transition_sweep(
                 name, result, swept_transition_id, related_place_ids, 
                 species_stats, time_points, stats
             )
         else:
             # Create separate subplots for each species (original behavior)
+            print(f"[PLOT] Creating separate subplots...")
             self._plot_separate_subplots(
                 name, result, swept_param, species_stats, time_points, stats
             )
