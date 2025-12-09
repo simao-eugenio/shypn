@@ -659,14 +659,24 @@ class ResultsBrowserView(Gtk.Box):
             if len(time_points_arr) > 1:
                 # Compute derivative: dN/dt (firings per unit time)
                 dt = np.diff(time_points_arr)
-                firing_rate[1:] = np.diff(mean) / dt
+                d_mean = np.diff(mean)
+                firing_rate[1:] = d_mean / dt
                 firing_rate[0] = firing_rate[1] if len(firing_rate) > 1 else 0
                 
-                # Propagate uncertainty for derivative
-                firing_rate_std[1:] = np.diff(std) / dt
+                # For uncertainty: std of firing rate = sqrt((std[i]^2 + std[i+1]^2)) / dt
+                # This is proper error propagation for finite differences
+                std_sq_sum = std[:-1]**2 + std[1:]**2
+                firing_rate_std[1:] = np.sqrt(std_sq_sum) / dt
                 firing_rate_std[0] = firing_rate_std[1] if len(firing_rate_std) > 1 else 0
-                # Take absolute value (std is always positive)
-                firing_rate_std = np.abs(firing_rate_std)
+                
+                # Apply Savitzky-Golay filter to smooth noisy derivatives
+                from scipy.signal import savgol_filter
+                if len(firing_rate) > 11:  # Need at least window_length points
+                    window = min(11, len(firing_rate) if len(firing_rate) % 2 == 1 else len(firing_rate) - 1)
+                    if window >= 5:  # Minimum reasonable window
+                        firing_rate = savgol_filter(firing_rate, window_length=window, polyorder=3)
+                        firing_rate_std = savgol_filter(firing_rate_std, window_length=window, polyorder=3)
+                        firing_rate_std = np.abs(firing_rate_std)  # Ensure positive
             
             # Use firing rate instead of cumulative count
             mean = firing_rate
