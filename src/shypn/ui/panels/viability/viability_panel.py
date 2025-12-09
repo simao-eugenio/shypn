@@ -2628,6 +2628,16 @@ class ViabilityPanel(Gtk.Box):
                 self.arcs_store
             )
             
+            # Update visual indicators if this is a sweep snapshot
+            if snapshot.swept_parameter:
+                self.update_sweep_indicators(
+                    snapshot.swept_parameter['type'],
+                    snapshot.swept_parameter['id']
+                )
+            else:
+                # Clear indicators if this is baseline
+                self._clear_sweep_indicators()
+            
             self._append_diagnostics_log(f"Switched to: {snapshot.name}")
     
     def _show_stale_baseline_warning(self):
