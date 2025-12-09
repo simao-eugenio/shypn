@@ -429,3 +429,48 @@ class ParameterSweepBuilder(Gtk.Box):
             callback: Function to call when clear is clicked
         """
         self.on_clear_callback = callback
+    
+    def prefill_parameter(self, param_type, param_id, param_name, current_value):
+        """Pre-fill sweep builder with parameter from right-click context menu.
+        
+        Args:
+            param_type: 'place', 'transition', or 'arc'
+            param_id: Parameter ID
+            param_name: Parameter display name
+            current_value: Current parameter value
+        """
+        # Map param_type to combo box format
+        type_map = {
+            'place': 'places',
+            'transition': 'transitions',
+            'arc': 'arcs'
+        }
+        
+        # Set parameter type
+        combo_type = type_map.get(param_type, 'places')
+        self.type_combo.set_active_id(combo_type)
+        
+        # Try to select the parameter in name combo
+        # The name_combo uses param_id as key
+        self.name_combo.set_active_id(param_id)
+        
+        # Pre-fill range based on current value
+        if current_value > 0:
+            # Suggest range: 50% to 150% of current value
+            min_val = current_value * 0.5
+            max_val = current_value * 1.5
+            steps = 10
+        else:
+            # For zero values, suggest 0 to 100
+            min_val = 0
+            max_val = 100
+            steps = 10
+        
+        # Set to linear mode and fill values
+        self.mode_combo.set_active(0)  # Linear mode
+        self.min_spinbutton.set_value(min_val)
+        self.max_spinbutton.set_value(max_val)
+        self.steps_spinbutton.set_value(steps)
+        
+        # Update preview
+        self._update_preview()
