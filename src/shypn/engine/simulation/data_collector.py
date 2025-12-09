@@ -53,6 +53,10 @@ class DataCollector:
         """
         if not self.is_collecting:
             return
+        
+        # Debug: Verify this method is being called
+        if current_time <= 0.02:
+            print(f"[DATA_COLLECTOR] record_state called at t={current_time:.4f}")
             
         self.time_points.append(current_time)
         
