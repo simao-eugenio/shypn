@@ -506,6 +506,7 @@ class ContinuousBehavior(TransitionBehavior):
         try:
             # Check enablement
             can_fire, reason = self.can_fire()
+            print(f"[INTEGRATE] Transition {self.transition.id}: can_fire={can_fire}, reason={reason}")
             if not can_fire:
                 return False, {
                     'reason': f'not-enabled: {reason}',
@@ -513,6 +514,7 @@ class ContinuousBehavior(TransitionBehavior):
                 }
             
             current_time = self._get_current_time()
+            print(f"[INTEGRATE] Current time: {current_time:.4f}, dt={dt}")
             
             # Gather ALL place objects for rate evaluation
             # CRITICAL: Rate formulas may reference places not in this transition's arcs
@@ -547,6 +549,8 @@ class ContinuousBehavior(TransitionBehavior):
                 )
             
             # Evaluate rate function(s)
+            print(f"[INTEGRATE] Evaluating rate with {len(places_dict)} places")
+            print(f"[INTEGRATE] Places: {[(p.id, p.tokens) for p in list(places_dict.values())[:5]]}")
             if self.use_directional_rates:
                 # Directional rates: evaluate both directions
                 rate_forward = self.rate_forward_function(places_dict, current_time)
@@ -555,9 +559,11 @@ class ContinuousBehavior(TransitionBehavior):
                 # Store for debugging/visualization
                 self._last_rate_forward = rate_forward
                 self._last_rate_reverse = rate_reverse
+                print(f"[INTEGRATE] Directional rates: forward={rate_forward}, reverse={rate_reverse}, net={rate}")
             else:
                 # Single combined rate function
                 rate = self.rate_function(places_dict, current_time)
+                print(f"[INTEGRATE] Single rate function result: {rate}")
                 self._last_rate_forward = max(0, rate)
                 self._last_rate_reverse = max(0, -rate)
             
@@ -668,10 +674,13 @@ class ContinuousBehavior(TransitionBehavior):
             
             # Phase 1: Clamp flow to available tokens
             actual_flow = flow_magnitude
+            print(f"[INTEGRATE] Initial flow_magnitude: {flow_magnitude}, reverse={reverse_direction}")
+            print(f"[INTEGRATE] Consume from {len(consume_arcs)} arcs, produce to {len(produce_arcs)} arcs")
             if not is_source:
                 for arc in consume_arcs:
                     # Skip test arcs - they check enablement but don't consume tokens
                     if hasattr(arc, 'consumes_tokens') and not arc.consumes_tokens():
+                        print(f"[INTEGRATE] Skipping test arc {arc.id}")
                         continue
                     
                     # For reversed flow, get source from arc.target_id (normally output)
@@ -682,7 +691,10 @@ class ContinuousBehavior(TransitionBehavior):
                     
                     # Calculate max flow possible from this arc
                     max_flow_from_arc = source_place.tokens / arc.weight if arc.weight > 0 else float('inf')
+                    print(f"[INTEGRATE] Arc {arc.id}: place {place_id} has {source_place.tokens} tokens, weight={arc.weight}, max_flow={max_flow_from_arc}")
                     actual_flow = min(actual_flow, max_flow_from_arc)
+            
+            print(f"[INTEGRATE] Actual flow after clamping: {actual_flow}")
             
             # Phase 2: Consume tokens continuously
             if not is_source and actual_flow > 0:
@@ -700,8 +712,10 @@ class ContinuousBehavior(TransitionBehavior):
                     consumption = arc.weight * actual_flow
                     
                     if consumption > 0:
+                        old_tokens = source_place.tokens
                         source_place.set_tokens(source_place.tokens - consumption)
                         consumed_map[place_id] = consumption
+                        print(f"[INTEGRATE] CONSUMED from {place_id}: {old_tokens} -> {source_place.tokens} (amount={consumption})")
             
             # Phase 3: Produce tokens continuously
             if not is_sink and actual_flow > 0:
@@ -715,8 +729,10 @@ class ContinuousBehavior(TransitionBehavior):
                     production = arc.weight * actual_flow
                     
                     if production > 0:
+                        old_tokens = target_place.tokens
                         target_place.set_tokens(target_place.tokens + production)
                         produced_map[place_id] = production
+                        print(f"[INTEGRATE] PRODUCED to {place_id}: {old_tokens} -> {target_place.tokens} (amount={production})")
             
             # Phase 4: Record continuous flow event
             self._record_event(
