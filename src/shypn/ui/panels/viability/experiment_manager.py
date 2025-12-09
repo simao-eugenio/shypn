@@ -312,6 +312,60 @@ class ExperimentManager:
         """
         return [s.name for s in self.snapshots]
     
+    def _modify_rate_formula(self, original_rate, new_value):
+        """Modify rate formula by replacing numeric coefficient with new value.
+        
+        Args:
+            original_rate: Original rate (can be numeric or formula string)
+            new_value: New coefficient value to use
+            
+        Returns:
+            Modified rate (numeric if original was numeric, formula string if original was formula)
+        """
+        import re
+        
+        # If original is numeric (not a formula), just return the new value
+        if not isinstance(original_rate, str) or not original_rate.strip():
+            return new_value
+        
+        original_str = str(original_rate).strip()
+        
+        # Try to parse as simple number
+        try:
+            float(original_str)
+            # It's just a number, replace with new value
+            return new_value
+        except ValueError:
+            pass
+        
+        # It's a formula string - try to replace leading coefficient
+        # Patterns to match:
+        # "0.5*NAD" -> "4.5*NAD"
+        # "0.5 * NAD" -> "4.5 * NAD"
+        # "NAD*0.5" -> "NAD*4.5"
+        # "(0.5)*NAD" -> "(4.5)*NAD"
+        
+        # Try to find coefficient at start: "0.5*..."
+        match = re.match(r'^([\d.]+)\s*\*', original_str)
+        if match:
+            old_coefficient = match.group(1)
+            modified = original_str.replace(f'{old_coefficient}*', f'{new_value}*', 1)
+            print(f"[FORMULA_SWEEP] Modified formula: '{original_str}' -> '{modified}'")
+            return modified
+        
+        # Try to find coefficient after multiplication: "...*0.5"
+        match = re.search(r'\*\s*([\d.]+)$', original_str)
+        if match:
+            old_coefficient = match.group(1)
+            modified = re.sub(r'\*\s*[\d.]+$', f'*{new_value}', original_str)
+            print(f"[FORMULA_SWEEP] Modified formula: '{original_str}' -> '{modified}'")
+            return modified
+        
+        # If no coefficient found, prepend new coefficient: "NAD" -> "4.5*NAD"
+        modified = f'{new_value}*({original_str})'
+        print(f"[FORMULA_SWEEP] Added coefficient to formula: '{original_str}' -> '{modified}'")
+        return modified
+    
     def generate_sweep_snapshots(self, parameter_type, parameter_id, parameter_name, values, base_snapshot=None):
         """Generate multiple snapshots from parameter sweep.
         
@@ -345,6 +399,9 @@ class ExperimentManager:
         if parameter_id not in param_dict:
             raise ValueError(f"Parameter ID '{parameter_id}' (name: '{parameter_name}') not found in {parameter_type}")
         
+        # Get baseline value to check if it's a formula
+        baseline_value = param_dict[parameter_id]
+        
         # Generate snapshots for each value
         created_count = 0
         start_index = len(self.snapshots)  # Track where sweep starts
@@ -369,10 +426,12 @@ class ExperimentManager:
             }
             
             # Modify the swept parameter using ID (internal key)
+            # For transitions with formulas, preserve the formula structure
             if parameter_type == 'places':
                 snapshot.place_markings[parameter_id] = value
             elif parameter_type == 'transitions':
-                snapshot.transition_rates[parameter_id] = value
+                # Use formula modification helper for transitions
+                snapshot.transition_rates[parameter_id] = self._modify_rate_formula(baseline_value, value)
             elif parameter_type == 'arcs':
                 snapshot.arc_weights[parameter_id] = value
             
