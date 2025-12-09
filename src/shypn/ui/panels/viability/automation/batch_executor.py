@@ -798,11 +798,30 @@ class BatchExecutor:
                     except ValueError:
                         # It's a formula string - store in properties for behavior factory
                         trans.properties['rate_function'] = rate
-                        # Also set trans.rate to a reasonable default for fallback
-                        # Extract leading coefficient if present, otherwise use 1.0
+                        
+                        # Evaluate formula with initial place markings to get numeric fallback rate
+                        # Build evaluation context with place tokens
                         import re
-                        coef_match = re.match(r'^([\d.]+)', rate)
-                        trans.rate = float(coef_match.group(1)) if coef_match else 1.0
+                        context = {}
+                        for place in places:
+                            # Add by ID (P1, P2, etc.)
+                            context[place.id] = place.tokens
+                            # Also add by name if it exists
+                            if hasattr(place, 'name') and place.name:
+                                context[place.name] = place.tokens
+                        
+                        try:
+                            # Safely evaluate the formula
+                            evaluated_rate = eval(rate, {"__builtins__": {}}, context)
+                            trans.rate = float(evaluated_rate)
+                            if applied_rates <= 3:
+                                print(f"[SNAPSHOT]   {trans_id}: formula='{rate}' evaluated to {trans.rate:.6f}")
+                        except Exception as e:
+                            # If evaluation fails, extract leading coefficient as fallback
+                            coef_match = re.match(r'^([\d.]+)', rate)
+                            trans.rate = float(coef_match.group(1)) if coef_match else 1.0
+                            if applied_rates <= 3:
+                                print(f"[SNAPSHOT]   {trans_id}: formula='{rate}' (eval failed: {e}, using coef={trans.rate})")
                 else:
                     # It's numeric - convert to float
                     try:
@@ -811,10 +830,9 @@ class BatchExecutor:
                         print(f"[WARNING] Could not convert rate for {trans_id}: {rate} - {e}")
                         # Keep the value as-is if conversion fails
                         trans.rate = rate
+                    if applied_rates <= 3:
+                        print(f"[SNAPSHOT]   {trans_id}: {rate}")
                 applied_rates += 1
-                if applied_rates <= 3:  # Show first 3
-                    rate_display = trans.properties.get('rate_function', rate) if isinstance(rate, str) and not rate.replace('.', '').isdigit() else rate
-                    print(f"[SNAPSHOT]   {trans_id}: {rate_display}")
         print(f"[SNAPSHOT] Applied {applied_rates}/{len(snapshot.transition_rates)} transition rates")
         
         # Apply arc weights (handle all arc types: normal, curved, inhibitor, test, curved_inhibitor)
