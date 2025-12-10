@@ -379,6 +379,11 @@ class StandardConversionStrategy(ConversionStrategy):
         # VALIDATION: Ensure bipartite property
         self._validate_bipartite_property(document, pathway)
         
+        # Phase 4: Filter disconnected components if requested
+        # This removes isolated micro-networks that disrupt layout
+        if options.filter_isolated_compounds:  # Reuse flag for now
+            self._filter_disconnected_components(document)
+        
         # LOGGING: Log conversion statistics
         self._log_conversion_statistics(document, pathway)
         
@@ -566,6 +571,151 @@ class StandardConversionStrategy(ConversionStrategy):
             f"{enhancement_stats['skipped']} skipped, "
             f"{enhancement_stats['failed']} failed"
         )
+    
+    def _filter_disconnected_components(self, document: DocumentModel):
+        """Filter out small disconnected components (isolated micro-networks).
+        
+        KEGG pathways often contain auxiliary information as small disconnected
+        sub-networks that disrupt layout. This method identifies connected components
+        and removes small isolated ones, keeping only the largest component as the
+        main pathway network.
+        
+        Strategy:
+        1. Build graph of all places and transitions
+        2. Find connected components using BFS/DFS
+        3. Keep only the largest component
+        4. Store filtered elements as metadata (not deleted, just excluded from model)
+        
+        Args:
+            document: DocumentModel to filter (modified in place)
+        """
+        from collections import deque
+        
+        # Build adjacency list for the Petri net graph
+        graph = {}  # node_id -> set of connected node_ids
+        all_nodes = {}  # node_id -> actual object
+        
+        # Add all places and transitions to graph
+        for place in document.places:
+            graph[place.id] = set()
+            all_nodes[place.id] = place
+        
+        for transition in document.transitions:
+            graph[transition.id] = set()
+            all_nodes[transition.id] = transition
+        
+        # Build edges from arcs (undirected graph for connectivity)
+        for arc in document.arcs:
+            source_id = arc.source.id
+            target_id = arc.target.id
+            graph[source_id].add(target_id)
+            graph[target_id].add(source_id)
+        
+        # Find connected components using BFS
+        visited = set()
+        components = []
+        
+        for node_id in graph:
+            if node_id in visited:
+                continue
+            
+            # BFS to find component
+            component = set()
+            queue = deque([node_id])
+            
+            while queue:
+                current = queue.popleft()
+                if current in visited:
+                    continue
+                
+                visited.add(current)
+                component.add(current)
+                
+                # Add neighbors
+                for neighbor in graph[current]:
+                    if neighbor not in visited:
+                        queue.append(neighbor)
+            
+            components.append(component)
+        
+        # Find largest component (main network)
+        if not components:
+            logger.warning("No connected components found in network")
+            return
+        
+        largest_component = max(components, key=len)
+        num_components = len(components)
+        
+        logger.info(
+            f"Found {num_components} connected component(s): "
+            f"largest has {len(largest_component)} nodes"
+        )
+        
+        # If only one component, nothing to filter
+        if num_components == 1:
+            logger.info("Single connected component - no filtering needed")
+            return
+        
+        # Filter: keep only nodes in largest component
+        main_component_node_ids = largest_component
+        
+        # Separate places into kept and filtered
+        kept_places = []
+        filtered_places = []
+        for place in document.places:
+            if place.id in main_component_node_ids:
+                kept_places.append(place)
+            else:
+                filtered_places.append(place)
+        
+        # Separate transitions into kept and filtered
+        kept_transitions = []
+        filtered_transitions = []
+        for transition in document.transitions:
+            if transition.id in main_component_node_ids:
+                kept_transitions.append(transition)
+            else:
+                filtered_transitions.append(transition)
+        
+        # Filter arcs: keep only those connecting nodes in main component
+        kept_arcs = []
+        filtered_arcs = []
+        for arc in document.arcs:
+            if arc.source.id in main_component_node_ids and arc.target.id in main_component_node_ids:
+                kept_arcs.append(arc)
+            else:
+                filtered_arcs.append(arc)
+        
+        # Update document with filtered elements
+        document.places = kept_places
+        document.transitions = kept_transitions
+        document.arcs = kept_arcs
+        
+        # Store filtered elements in metadata for reference
+        if not hasattr(document, 'metadata') or document.metadata is None:
+            document.metadata = {}
+        
+        document.metadata['filtered_disconnected_components'] = {
+            'num_components_total': num_components,
+            'num_places_filtered': len(filtered_places),
+            'num_transitions_filtered': len(filtered_transitions),
+            'num_arcs_filtered': len(filtered_arcs),
+            'filtered_place_labels': [p.label for p in filtered_places],
+            'filtered_transition_labels': [t.label for t in filtered_transitions]
+        }
+        
+        logger.info(
+            f"Filtered {num_components - 1} disconnected component(s): "
+            f"removed {len(filtered_places)} places, "
+            f"{len(filtered_transitions)} transitions, "
+            f"{len(filtered_arcs)} arcs"
+        )
+        
+        if filtered_places:
+            logger.debug(
+                f"Filtered places: {', '.join([p.label for p in filtered_places[:5]])}"
+                f"{' ...' if len(filtered_places) > 5 else ''}"
+            )
     
     def _log_conversion_statistics(self, document: DocumentModel, pathway: KEGGPathway):
         """Log conversion statistics for debugging and monitoring.
