@@ -630,7 +630,7 @@ class BiochemicalLayoutProcessor:
         return False
     
     def _fallback_layout(self, processed_data: ProcessedPathwayData) -> None:
-        """Use force-directed layout as fallback.
+        """Use force-directed layout as fallback with bipartite vertical separation.
         
         Args:
             processed_data: Processed pathway data (will be modified)
@@ -640,33 +640,88 @@ class BiochemicalLayoutProcessor:
             
             # Build bipartite graph
             graph = nx.Graph()
-            for species in self.pathway.species:
-                graph.add_node(species.id, bipartite=0)
             
+            # Add species (places) to layer 0
+            species_nodes = []
+            for species in self.pathway.species:
+                graph.add_node(species.id, bipartite=0, node_type='species')
+                species_nodes.append(species.id)
+            
+            # Add reactions (transitions) to layer 1
+            reaction_nodes = []
             for reaction in self.pathway.reactions:
-                graph.add_node(reaction.id, bipartite=1)
+                graph.add_node(reaction.id, bipartite=1, node_type='reaction')
+                reaction_nodes.append(reaction.id)
+                
+                # Connect reactants
                 for species_id, _ in reaction.reactants:
                     graph.add_edge(species_id, reaction.id)
+                
+                # Connect products
                 for species_id, _ in reaction.products:
                     graph.add_edge(reaction.id, species_id)
-                # CRITICAL: Add modifiers/catalysts to graph for proper distribution
-                # This ensures catalyst places are positioned in the force-directed layout
+                
+                # Connect modifiers/catalysts
                 if hasattr(reaction, 'modifiers') and reaction.modifiers:
                     for modifier_id in reaction.modifiers:
                         graph.add_edge(modifier_id, reaction.id)
             
-            # Calculate layout
-            pos = nx.spring_layout(
+            # Calculate bipartite layout to maintain vertical separation
+            # This ensures places stay at one level and transitions at another
+            self.logger.info(f"Calculating bipartite layout: {len(species_nodes)} species, {len(reaction_nodes)} reactions")
+            
+            # Use bipartite layout as base, then apply spring forces horizontally only
+            pos = nx.bipartite_layout(
                 graph,
-                k=self.spacing / 50,
-                iterations=50,
-                scale=self.spacing * 2,
-                seed=42
+                species_nodes,
+                align='horizontal',  # Align horizontally (species at top, reactions at bottom)
+                scale=self.spacing * 3,
+                aspect_ratio=2.0  # Make it wider than tall
             )
             
-            # Convert to positions dict
+            # Apply additional spring layout but constrain to horizontal movement only
+            # This improves clustering while maintaining vertical separation
+            pos = nx.spring_layout(
+                graph,
+                pos=pos,  # Start from bipartite positions
+                fixed=None,  # Allow movement
+                k=self.spacing / 30,
+                iterations=30,
+                scale=self.spacing * 3,
+                seed=42,
+                dim=2
+            )
+            
+            # Ensure vertical separation: species at top, reactions at bottom
+            # Find min/max Y coordinates
+            species_ys = [pos[sid][1] for sid in species_nodes if sid in pos]
+            reaction_ys = [pos[rid][1] for rid in reaction_nodes if rid in pos]
+            
+            if species_ys and reaction_ys:
+                species_center_y = sum(species_ys) / len(species_ys)
+                reaction_center_y = sum(reaction_ys) / len(reaction_ys)
+                
+                # Force separation: species above, reactions below
+                separation = self.spacing * 1.5
+                
+                # Adjust Y coordinates to ensure separation
+                for sid in species_nodes:
+                    if sid in pos:
+                        x, y = pos[sid]
+                        # Shift species upward
+                        pos[sid] = (x, y - separation / 2)
+                
+                for rid in reaction_nodes:
+                    if rid in pos:
+                        x, y = pos[rid]
+                        # Shift reactions downward
+                        pos[rid] = (x, y + separation / 2)
+            
+            # Convert to positions dict with proper offset
             for node_id, (x, y) in pos.items():
-                processed_data.positions[node_id] = (x + 400, y + 300)
+                processed_data.positions[node_id] = (x + 400, y + 400)
+            
+            self.logger.info(f"Force-directed bipartite layout complete: {len(processed_data.positions)} positions")
         
         except Exception as e:
             self.logger.error(f"Force-directed layout failed: {e}")
