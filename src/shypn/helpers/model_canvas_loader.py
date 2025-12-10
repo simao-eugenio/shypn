@@ -4424,9 +4424,29 @@ class ModelCanvasLoader:
                 center_x = manager.canvas_width / 2
                 center_y = manager.canvas_height / 2
             
-            # Create engine and apply layout
+            # Get layout parameters from Layout Settings (palette parameter panel)
+            layout_params = {}
+            try:
+                if drawing_area in self.overlay_managers:
+                    swissknife = self.overlay_managers[drawing_area].swissknife_palette
+                    if swissknife and hasattr(swissknife, 'layout_settings_loader'):
+                        settings_loader = swissknife.layout_settings_loader
+                        if settings_loader:
+                            all_settings = settings_loader.get_settings()
+                            # Provide all settings - auto will select best algorithm and use appropriate params
+                            layout_params = {
+                                'layer_spacing': all_settings.get('layer_spacing', 150),
+                                'node_spacing': all_settings.get('node_spacing', 100),
+                                'iterations': all_settings.get('iterations', 500),
+                                'k_multiplier': all_settings.get('k_multiplier', 1.5),
+                                'scale': all_settings.get('scale', 2000.0)
+                            }
+            except Exception:
+                pass  # Use defaults if we can't get settings
+            
+            # Create engine and apply layout with parameters
             engine = LayoutEngine(manager)
-            result = engine.apply_layout('auto')
+            result = engine.apply_layout('auto', **layout_params)
             
             # The layout algorithms center at (0, 0), so we need to offset
             # back to the original center or canvas center
@@ -4450,6 +4470,9 @@ class ModelCanvasLoader:
             message = (f"Applied {result['algorithm']} layout\n"
                       f"Moved {result['nodes_moved']} objects\n"
                       f"Reason: {result['reason']}")
+            if layout_params and result.get('parameters'):
+                # Show what parameters were actually used
+                message += f"\nParameters: {result['parameters']}"
             self._show_layout_message(message, drawing_area)
             
             # Redraw
@@ -4566,17 +4589,36 @@ class ModelCanvasLoader:
                 center_x = manager.canvas_width / 2
                 center_y = manager.canvas_height / 2
             
-            # Try to get layout parameters from SBML Import panel (if available)
+            # Try to get layout parameters from Layout Settings (palette parameter panel)
             layout_params = {}
             try:
-                pass
-                # Check if sbml_panel is available (set during initialization)
-                if hasattr(self, 'sbml_panel') and self.sbml_panel:
+                # First priority: Layout palette parameter panel (layout_settings_loader)
+                if drawing_area in self.overlay_managers:
+                    swissknife = self.overlay_managers[drawing_area].swissknife_palette
+                    if swissknife and hasattr(swissknife, 'layout_settings_loader'):
+                        settings_loader = swissknife.layout_settings_loader
+                        if settings_loader:
+                            all_settings = settings_loader.get_settings()
+                            # Extract parameters relevant to this algorithm
+                            if algorithm == 'hierarchical':
+                                layout_params = {
+                                    'layer_spacing': all_settings.get('layer_spacing', 150),
+                                    'node_spacing': all_settings.get('node_spacing', 100)
+                                }
+                            elif algorithm == 'force_directed':
+                                layout_params = {
+                                    'iterations': all_settings.get('iterations', 500),
+                                    'k_multiplier': all_settings.get('k_multiplier', 1.5),
+                                    'scale': all_settings.get('scale', 2000.0)
+                                }
+                
+                # Fallback: SBML Import panel (for SBML import workflows)
+                if not layout_params and hasattr(self, 'sbml_panel') and self.sbml_panel:
                     layout_params = self.sbml_panel.get_layout_parameters_for_algorithm(algorithm)
-                    if layout_params:
-                        pass  # Use these params
+                    if not layout_params:
+                        layout_params = {}
             except Exception as e:
-                pass  # If we can't get params from SBML panel, just use defaults
+                pass  # If we can't get params, just use defaults
             
             # Create engine and apply layout with parameters
             engine = LayoutEngine(manager)
