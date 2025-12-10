@@ -226,8 +226,8 @@ class ViewportController:
         Grid always fills viewport regardless of pan/zoom by clamping
         the pan values to ensure the canvas extent covers the screen.
         
-        At very low zoom levels (<0.1), disable clamping to allow free panning
-        for viewing large models.
+        At very low zoom levels (<0.2), disable clamping to allow free panning
+        for viewing large models without instability.
         
         Canvas extent: ±CANVAS_EXTENT in world space
         Viewport: viewport_width × viewport_height in screen space
@@ -237,8 +237,8 @@ class ViewportController:
         - Right edge: (extent + pan) * zoom >= width  →  pan >= width/zoom - extent
         """
         # At very low zoom levels, allow free panning (don't clamp)
-        # This is necessary for viewing very large models
-        if self.zoom < 0.1:
+        # This prevents instability when viewing very large models
+        if self.zoom < 0.2:
             return
         
         extent_x = self.CANVAS_EXTENT
