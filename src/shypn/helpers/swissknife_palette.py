@@ -228,6 +228,9 @@ class SwissKnifePalette(GObject.GObject):
             event_box.set_can_focus(False)
             event_box.set_hexpand(False)
             event_box.set_vexpand(False)
+            # Prevent size allocation warnings
+            event_box.set_halign(Gtk.Align.START)
+            event_box.set_valign(Gtk.Align.START)
             event_box.get_style_context().add_class('sub-palette')
             event_box.get_style_context().add_class(f'sub-palette-{cat_id}')
             

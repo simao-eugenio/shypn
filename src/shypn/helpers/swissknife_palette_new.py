@@ -157,10 +157,13 @@ class SwissKnifePalette(GObject.GObject):
         self.drag_event_box.add(self.ui.main_container)
         self.drag_event_box.set_above_child(False)
         
-        # Prevent GTK warnings during drag/animation by allowing flexible sizing
+        # Prevent GTK warnings during drag/animation by constraining size behavior
         self.drag_event_box.set_can_focus(False)
         self.drag_event_box.set_hexpand(False)
         self.drag_event_box.set_vexpand(False)
+        # CRITICAL: Set alignment to prevent allocation adjustments
+        self.drag_event_box.set_halign(Gtk.Align.START)
+        self.drag_event_box.set_valign(Gtk.Align.START)
         
         # Enable events for drag and double-click
         self.drag_event_box.add_events(
