@@ -303,8 +303,10 @@ class DiagnosticsPanel:
             return '\n'.join(lines)
         
         try:
+            # Pass the full transition object, not just the ID
             diag = self.runtime_analyzer.get_transition_diagnostics(
-                self.current_transition.id
+                self.current_transition,
+                window=10
             )
             
             # Event statistics
@@ -476,7 +478,8 @@ class DiagnosticsPanel:
         
         try:
             diag = self.runtime_analyzer.get_transition_diagnostics(
-                self.current_transition.id
+                self.current_transition,
+                window=10
             )
             
             # Hash relevant runtime fields
