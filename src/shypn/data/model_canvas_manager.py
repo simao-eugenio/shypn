@@ -601,9 +601,10 @@ class ModelCanvasManager:
             arc._manager = self  # Set manager reference for parallel detection
             self._notify_observers('created', arc)
         
-        # SAFETY: Validate and remove corrupted arcs after loading
-        # Corrupted arcs can have invalid source/target references (e.g., pointing to other arcs)
-        # This prevents crashes in rendering and hit-testing
+        # SAFETY: Validate and remove corrupted arcs BEFORE auto-conversion
+        # Corrupted arcs can have invalid source/target references (e.g., None or pointing to other arcs)
+        # We must remove these BEFORE calling _auto_convert_parallel_arcs_to_curved
+        # which assumes valid source/target references
         validation = self.validate_arcs()
         if not validation['valid']:
             logger.warning(f"[ARC_VALIDATION] ⚠️ Detected {len(validation['corrupted_arcs'])} corrupted arc(s) after load")
@@ -611,9 +612,12 @@ class ModelCanvasManager:
                 logger.warning(f"[ARC_VALIDATION]   - {error}")
             removed = self.remove_corrupted_arcs()
             logger.info(f"[ARC_VALIDATION] ✅ Cleaned up {removed} corrupted arc(s)")
+            # Filter out removed arcs from the arcs list we'll process below
+            arcs = [arc for arc in arcs if arc in self.arcs]
         
         # Auto-convert loop arcs and parallel arcs to curved
         # This ensures loaded models have proper curved rendering for loops and parallels
+        # Only process arcs that passed validation
         for arc in arcs:
             self._auto_convert_parallel_arcs_to_curved(arc)
         
@@ -991,6 +995,16 @@ class ModelCanvasManager:
         from shypn.netobjs import CurvedArc, CurvedInhibitorArc, InhibitorArc
         from shypn.utils.arc_transform import make_curved
         import math
+        
+        # SAFETY: Skip arcs with invalid source/target references
+        if not hasattr(new_arc, 'source') or new_arc.source is None:
+            return
+        if not hasattr(new_arc, 'target') or new_arc.target is None:
+            return
+        if not hasattr(new_arc.source, 'x') or not hasattr(new_arc.source, 'y'):
+            return
+        if not hasattr(new_arc.target, 'x') or not hasattr(new_arc.target, 'y'):
+            return
         
         # Check if this is a loop arc (source == target)
         is_loop = (new_arc.source == new_arc.target)
