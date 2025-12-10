@@ -490,12 +490,12 @@ class BiochemicalLayoutProcessor:
     - Force-directed: For complex networks
     """
     
-    def __init__(self, pathway: PathwayData, spacing: float = 150.0, use_tree_layout: bool = False):
+    def __init__(self, pathway: PathwayData, spacing: float = 100.0, use_tree_layout: bool = False):
         """Initialize biochemical layout processor.
         
         Args:
             pathway: Pathway data
-            spacing: Base spacing between elements
+            spacing: Base spacing between elements (default 100px for compact layouts)
             use_tree_layout: If True, use tree-based aperture angle spacing
         """
         self.pathway = pathway
