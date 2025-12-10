@@ -4349,13 +4349,9 @@ class ModelCanvasLoader:
         drawing_area.queue_draw()
 
     def _on_fit_to_window_clicked(self, menu, drawing_area, manager):
-        """Fit canvas to window."""
-        zoom_x = manager.viewport_width / manager.canvas_width
-        zoom_y = manager.viewport_height / manager.canvas_height
-        fit_zoom = min(zoom_x, zoom_y) * 0.95
-        manager.set_zoom(fit_zoom, manager.viewport_width / 2, manager.viewport_height / 2)
-        manager.pan_x = 0
-        manager.pan_y = 0
+        """Fit entire model to window with padding."""
+        # Use fit_to_page to properly fit all content with 10% padding
+        manager.fit_to_page(padding_percent=10)
         drawing_area.queue_draw()
     
     def _on_rotate_90_cw_clicked(self, menu, drawing_area, manager):
