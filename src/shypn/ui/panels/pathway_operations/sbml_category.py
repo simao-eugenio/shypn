@@ -195,10 +195,22 @@ class SBMLCategory(BasePathwayCategory):
         label.set_xalign(0)
         box.pack_start(label, False, False, 0)
         
+        # Entry with browse button for local mode
+        entry_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        
         self.file_entry = Gtk.Entry()
         self.file_entry.set_placeholder_text("Path to SBML file or BioModels ID")
         self.file_entry.connect('changed', self._on_file_entry_changed)
-        box.pack_start(self.file_entry, False, False, 0)
+        entry_box.pack_start(self.file_entry, True, True, 0)
+        
+        # Browse button (only visible in local mode)
+        self.browse_button = Gtk.Button(label="Browse...")
+        self.browse_button.set_no_show_all(True)  # Hidden by default
+        self.browse_button.set_visible(True)  # Start visible since Local is default
+        self.browse_button.connect('clicked', self._on_browse_clicked)
+        entry_box.pack_start(self.browse_button, False, False, 0)
+        
+        box.pack_start(entry_box, False, False, 0)
         
         # Help text that changes based on mode
         self.source_info = Gtk.Label()
@@ -280,12 +292,14 @@ class SBMLCategory(BasePathwayCategory):
         if self.local_radio.get_active():
             # Local mode
             self.file_entry.set_placeholder_text("Path to SBML file")
+            self.browse_button.set_visible(True)
             self.source_info.set_markup(
                 '<span size="small">Enter full path to local SBML file (.sbml or .xml)</span>'
             )
         else:
             # BioModels mode
             self.file_entry.set_placeholder_text("BioModels ID (e.g., BIOMD0000000001)")
+            self.browse_button.set_visible(False)
             self.source_info.set_markup(
                 '<span size="small">Enter a <a href="https://www.ebi.ac.uk/biomodels/">BioModels</a> ID</span>'
             )
@@ -304,6 +318,47 @@ class SBMLCategory(BasePathwayCategory):
         # Also check project state
         if not self.project:
             self.import_button.set_sensitive(False)
+    
+    def _on_browse_clicked(self, button):
+        """Handle browse button click - open file chooser for SBML files."""
+        dialog = Gtk.FileChooserDialog(
+            title="Select SBML File",
+            transient_for=self.parent_window,
+            action=Gtk.FileChooserAction.OPEN,
+            buttons=(
+                Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+                Gtk.STOCK_OPEN, Gtk.ResponseType.OK
+            )
+        )
+        
+        # Add file filters
+        filter_sbml = Gtk.FileFilter()
+        filter_sbml.set_name("SBML Files")
+        filter_sbml.add_pattern("*.sbml")
+        filter_sbml.add_pattern("*.xml")
+        dialog.add_filter(filter_sbml)
+        
+        filter_all = Gtk.FileFilter()
+        filter_all.set_name("All Files")
+        filter_all.add_pattern("*")
+        dialog.add_filter(filter_all)
+        
+        # Wayland-safe async approach
+        result_container = [None]
+        
+        def on_response(dlg, response_id):
+            if response_id == Gtk.ResponseType.OK:
+                result_container[0] = dlg.get_filename()
+            dlg.destroy()
+            Gtk.main_quit()
+        
+        dialog.connect('response', on_response)
+        dialog.show()
+        Gtk.main()
+        
+        filepath = result_container[0]
+        if filepath:
+            self.file_entry.set_text(filepath)
     
     def _update_ui_for_project_state(self):
         """Update UI based on project availability.
