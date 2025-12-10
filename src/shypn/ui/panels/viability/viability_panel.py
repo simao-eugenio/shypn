@@ -1989,7 +1989,6 @@ class ViabilityPanel(Gtk.Box):
         # Reset colors - fetch objects from CURRENT model
         from shypn.netobjs import Place, Transition, Arc
         
-        
         # Get current model to fetch fresh object references
         model = self._get_current_model()
         if not model:
@@ -2012,13 +2011,24 @@ class ViabilityPanel(Gtk.Box):
                 for p_obj in locality_ids.output_places:
                     p_obj.border_color = Place.DEFAULT_BORDER_COLOR
                 
+                # Reset catalyst place colors
+                for p_obj in locality_ids.catalyst_places:
+                    p_obj.border_color = Place.DEFAULT_BORDER_COLOR
+                
                 # Reset input arc colors
                 for arc_obj in locality_ids.input_arcs:
-                    pass
+                    arc_obj.color = Arc.DEFAULT_COLOR
                 
                 # Reset output arc colors
                 for arc_obj in locality_ids.output_arcs:
-                    pass
+                    arc_obj.color = Arc.DEFAULT_COLOR
+                
+                # Reset catalyst arc colors
+                for arc_obj in locality_ids.catalyst_arcs:
+                    arc_obj.color = Arc.DEFAULT_COLOR
+            
+            # Trigger canvas redraw to show color changes
+            self._trigger_canvas_redraw()
         
         
         # Clear localities list
@@ -2176,6 +2186,35 @@ class ViabilityPanel(Gtk.Box):
         """
         import logging
         logging.getLogger(__name__).debug("[VIABILITY_CLEAR] Clearing panel data for new document")
+        
+        # Reset colors before clearing (in case previous document had colored objects)
+        from shypn.netobjs import Place, Transition, Arc
+        model = self._get_current_model()
+        if model:
+            for transition_id in self.selected_localities.keys():
+                locality_ids = self._locality_objects.get(transition_id)
+                if not locality_ids:
+                    continue
+                
+                # Reset all locality colors
+                locality_ids.transition.border_color = Transition.DEFAULT_BORDER_COLOR
+                locality_ids.transition.fill_color = Transition.DEFAULT_COLOR
+                
+                for p_obj in locality_ids.input_places:
+                    p_obj.border_color = Place.DEFAULT_BORDER_COLOR
+                for p_obj in locality_ids.output_places:
+                    p_obj.border_color = Place.DEFAULT_BORDER_COLOR
+                for p_obj in locality_ids.catalyst_places:
+                    p_obj.border_color = Place.DEFAULT_BORDER_COLOR
+                
+                for arc_obj in locality_ids.input_arcs:
+                    arc_obj.color = Arc.DEFAULT_COLOR
+                for arc_obj in locality_ids.output_arcs:
+                    arc_obj.color = Arc.DEFAULT_COLOR
+                for arc_obj in locality_ids.catalyst_arcs:
+                    arc_obj.color = Arc.DEFAULT_COLOR
+            
+            self._trigger_canvas_redraw()
         
         # Clear selected localities
         self.selected_localities.clear()
