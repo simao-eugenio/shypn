@@ -320,6 +320,11 @@ class StandardConversionStrategy(ConversionStrategy):
                 logger.warning(f"Failed to pre-fetch EC numbers: {e}")
                 logger.info("Will fall back to fetching EC numbers individually")
         
+        # Phase 1.7: Detect and document duplicate reactions (alternative enzymes/isoforms)
+        # In KEGG, multiple reactions can have same substrates/products but different enzymes
+        # These represent alternative pathways (isoenzymes) for the same transformation
+        self._detect_duplicate_reactions(pathway)
+        
         # Phase 2: Create transitions and arcs from reactions
         reaction_transition_map = {}  # Track reactions for kinetics enhancement
         reaction_name_to_transition = {}  # Map reaction names to transitions for enzyme conversion
@@ -713,9 +718,97 @@ class StandardConversionStrategy(ConversionStrategy):
         
         if filtered_places:
             logger.debug(
-                f"Filtered places: {', '.join([p.label for p in filtered_places[:5]])}"
+                f"{', '.join([p.label for p in filtered_places[:5]])}"
                 f"{' ...' if len(filtered_places) > 5 else ''}"
             )
+    
+    def _detect_duplicate_reactions(self, pathway: KEGGPathway):
+        """Detect and document reactions with identical substrates/products.
+        
+        In KEGG pathways (especially reference pathways like rn00071), multiple
+        reactions can have the same substrates and products but different reaction IDs.
+        
+        This represents:
+        - Alternative enzymes (isoenzymes) catalyzing the same transformation
+        - Different organisms having different enzymes for same pathway step
+        - Alternative mechanisms for the same biochemical transformation
+        
+        Example from rn00071 (fatty acid degradation):
+        - R00631: acyl-CoA + FAD → 2,3-dehydroacyl-CoA + FADH2  (enzyme: ACAD9)
+        - R03990: acyl-CoA + FAD → 2,3-dehydroacyl-CoA + FADH2  (enzyme: ACADL)
+        - R03857: acyl-CoA + FAD → 2,3-dehydroacyl-CoA + FADH2  (enzyme: ACADM)
+        
+        All three reactions perform the same transformation but with different
+        acyl-CoA dehydrogenase isoforms.
+        
+        In the Petri net, this creates multiple parallel transitions between the
+        same places, which is correct biologically (alternative pathways) but may
+        appear visually redundant.
+        
+        Args:
+            pathway: KEGG pathway to analyze
+        """
+        from collections import defaultdict
+        
+        # Group reactions by their substrate/product signature
+        reaction_signatures = defaultdict(list)
+        
+        for reaction in pathway.reactions:
+            # Create signature: sorted tuple of (substrate_ids, product_ids)
+            substrate_ids = tuple(sorted([s.id for s in reaction.substrates]))
+            product_ids = tuple(sorted([p.id for p in reaction.products]))
+            signature = (substrate_ids, product_ids)
+            
+            reaction_signatures[signature].append(reaction)
+        
+        # Find duplicates
+        duplicates_found = 0
+        total_duplicate_reactions = 0
+        
+        for signature, reactions in reaction_signatures.items():
+            if len(reactions) > 1:
+                duplicates_found += 1
+                total_duplicate_reactions += len(reactions)
+                
+                # Get compound names for readability
+                substrate_ids, product_ids = signature
+                
+                # Log the duplicate group
+                logger.info(
+                    f"Alternative enzymes detected: {len(reactions)} reactions "
+                    f"with same substrates/products"
+                )
+                logger.debug(
+                    f"  Substrates: {list(substrate_ids)}"
+                )
+                logger.debug(
+                    f"  Products: {list(product_ids)}"
+                )
+                
+                # Log individual reactions in the group
+                for rxn in reactions:
+                    enzyme_info = []
+                    
+                    # Try to find associated enzyme entries
+                    for entry_id, entry in pathway.entries.items():
+                        if entry.is_gene() and entry.reaction == rxn.name:
+                            enzyme_info.append(f"{entry.name}({entry.type})")
+                    
+                    enzyme_str = ", ".join(enzyme_info) if enzyme_info else "unknown enzyme"
+                    
+                    logger.debug(
+                        f"    - Reaction {rxn.name} (ID:{rxn.id}): {enzyme_str}"
+                    )
+        
+        if duplicates_found > 0:
+            logger.info(
+                f"Found {duplicates_found} groups of alternative enzymes "
+                f"(total {total_duplicate_reactions} reactions with duplicates). "
+                f"These create parallel transitions in the Petri net, representing "
+                f"biologically valid alternative pathways (isoenzymes)."
+            )
+        else:
+            logger.debug("No duplicate reactions found (no alternative enzymes detected)")
     
     def _log_conversion_statistics(self, document: DocumentModel, pathway: KEGGPathway):
         """Log conversion statistics for debugging and monitoring.
