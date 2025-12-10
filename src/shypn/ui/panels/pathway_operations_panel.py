@@ -76,11 +76,12 @@ class PathwayOperationsPanel(Gtk.Box):
         # Callback for notifying Report panel when pathways are imported
         self.report_refresh_callback = None
         
-        # Create categories (note: KEGG doesn't use workspace_settings/parent_window)
+        # Create categories
         self.kegg_category = KEGGCategory(
             expanded=False,
             model_canvas=model_canvas,
-            project=project
+            project=project,
+            parent_window=parent_window
         )
         
         self.sbml_category = SBMLCategory(
