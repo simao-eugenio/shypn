@@ -324,11 +324,11 @@ class SBMLCategory(BasePathwayCategory):
         dialog = Gtk.FileChooserDialog(
             title="Select SBML File",
             transient_for=self.parent_window,
-            action=Gtk.FileChooserAction.OPEN,
-            buttons=(
-                Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
-                Gtk.STOCK_OPEN, Gtk.ResponseType.OK
-            )
+            action=Gtk.FileChooserAction.OPEN
+        )
+        dialog.add_buttons(
+            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+            Gtk.STOCK_OPEN, Gtk.ResponseType.OK
         )
         
         # Add file filters

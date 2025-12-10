@@ -306,9 +306,6 @@ class KEGGCategory(BasePathwayCategory):
         label.set_markup("<b>Preview:</b>")
         label.set_xalign(0)
         box.pack_start(label, False, False, 0)
-        label.set_xalign(0)
-        label.set_markup("<b>Preview:</b>")
-        box.pack_start(label, False, False, 0)
         
         # Scrolled window for preview text
         scrolled = Gtk.ScrolledWindow()
@@ -419,11 +416,11 @@ class KEGGCategory(BasePathwayCategory):
         dialog = Gtk.FileChooserDialog(
             title="Select KEGG File",
             transient_for=self.parent_window,
-            action=Gtk.FileChooserAction.OPEN,
-            buttons=(
-                Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
-                Gtk.STOCK_OPEN, Gtk.ResponseType.OK
-            )
+            action=Gtk.FileChooserAction.OPEN
+        )
+        dialog.add_buttons(
+            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+            Gtk.STOCK_OPEN, Gtk.ResponseType.OK
         )
         
         # Add file filters
