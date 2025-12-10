@@ -43,6 +43,13 @@ class ModelsCategory(BaseReportCategory):
         # Refresh throttling to prevent redundant updates during file loading
         self._refresh_scheduled = False
         self._refresh_pending = False
+        self._refresh_timeout_id = None
+        self._last_interaction_time = 0  # Track user activity
+        
+        # Lazy table population flags (only populate when user opens expander)
+        self._species_table_needs_refresh = False
+        self._reactions_table_needs_refresh = False
+        self._kb_needs_update = False
         
         # Selected locality tracking
         self.selected_transition = None
@@ -138,6 +145,7 @@ class ModelsCategory(BaseReportCategory):
         # Species/Places Table with controls
         self.species_expander = Gtk.Expander(label="Show Species/Places Table (sortable)")
         self.species_expander.set_expanded(False)
+        self.species_expander.connect('activate', self._on_species_expander_activate)
         
         # Container for table and controls
         species_container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
@@ -160,6 +168,7 @@ class ModelsCategory(BaseReportCategory):
         # Reactions/Transitions Table
         self.reactions_expander = Gtk.Expander(label="Show Reactions/Transitions Table (sortable)")
         self.reactions_expander.set_expanded(False)
+        self.reactions_expander.connect('activate', self._on_reactions_expander_activate)
         scrolled_reactions, self.reactions_treeview, self.reactions_store = self._create_reactions_table()
         self.reactions_expander.add(scrolled_reactions)
         box.pack_start(self.reactions_expander, False, False, 0)
@@ -176,6 +185,57 @@ class ModelsCategory(BaseReportCategory):
         self.refresh()
         
         return box
+    
+    def mark_user_interaction(self):
+        """Mark that user is actively interacting with the canvas.
+        
+        Called by canvas during pan/zoom/drag operations to defer
+        expensive refresh operations until user is idle.
+        """
+        import time
+        self._last_interaction_time = time.time()
+    
+    def _on_species_expander_activate(self, expander):
+        """Populate species table when expander is opened."""
+        # Schedule population for next idle (after expander animation)
+        GLib.idle_add(self._populate_species_if_needed)
+    
+    def _on_reactions_expander_activate(self, expander):
+        """Populate reactions table when expander is opened."""
+        # Schedule population for next idle (after expander animation)
+        GLib.idle_add(self._populate_reactions_if_needed)
+    
+    def _populate_species_if_needed(self):
+        """Populate species table if it needs refresh and expander is open."""
+        if self.species_expander.get_expanded():
+            if self.model_canvas:
+                # Do KB update first if needed
+                if self._kb_needs_update:
+                    self._update_knowledge_base_structural(self.model_canvas)
+                    self._update_knowledge_base_pathway(self.model_canvas)
+                    self._update_knowledge_base_kinetics(self.model_canvas)
+                    self._kb_needs_update = False
+                
+                if self._species_table_needs_refresh:
+                    self._populate_species_table(self.model_canvas)
+                    self._species_table_needs_refresh = False
+        return False  # Don't repeat
+    
+    def _populate_reactions_if_needed(self):
+        """Populate reactions table if it needs refresh and expander is open."""
+        if self.reactions_expander.get_expanded():
+            if self.model_canvas:
+                # Do KB update first if needed
+                if self._kb_needs_update:
+                    self._update_knowledge_base_structural(self.model_canvas)
+                    self._update_knowledge_base_pathway(self.model_canvas)
+                    self._update_knowledge_base_kinetics(self.model_canvas)
+                    self._kb_needs_update = False
+                
+                if self._reactions_table_needs_refresh:
+                    self._populate_reactions_table(self.model_canvas)
+                    self._reactions_table_needs_refresh = False
+        return False  # Don't repeat
     
     def _create_summary_grid(self):
         """No longer needed - summary is in frame."""
@@ -804,20 +864,31 @@ class ModelsCategory(BaseReportCategory):
         OPTIMIZATION: Throttles redundant refreshes during file loading.
         During a file open, refresh() can be called 8+ times from various events
         (tab creation, tab switch, object notifications, explicit calls).
-        We defer all refreshes and execute only one at idle time.
+        We defer all refreshes and execute only one after a short delay.
         """
+        # Cancel any pending timeout to prevent stale refreshes
+        if self._refresh_timeout_id is not None:
+            GLib.source_remove(self._refresh_timeout_id)
+            self._refresh_timeout_id = None
+        
         # If refresh already scheduled, mark as pending and skip
         if self._refresh_scheduled:
             self._refresh_pending = True
             return
         
-        # Schedule deferred refresh at idle time
+        # Schedule deferred refresh with minimal delay (just enough to coalesce multiple calls)
+        # Expensive work (KB updates, table population) is deferred until user opens tables
         self._refresh_scheduled = True
-        GLib.idle_add(self._do_refresh)
+        self._refresh_timeout_id = GLib.timeout_add(100, self._do_refresh)
     
     def _do_refresh(self):
-        """Actual refresh implementation, called at idle time."""
+        """Actual refresh implementation - only updates lightweight UI elements.
+        
+        Expensive operations (KB updates, table population) are deferred until
+        user actually opens the corresponding expanders.
+        """
         self._refresh_scheduled = False
+        self._refresh_timeout_id = None
         
         # If no model, show empty state
         if not self.model_canvas:
@@ -826,21 +897,17 @@ class ModelsCategory(BaseReportCategory):
             self.provenance_label.set_text("No import data")
             # Hide provenance frame when no data
             self.provenance_frame.hide()
-            return False  # Don't repeat this idle callback
+            return False  # Don't repeat this timeout callback
         
         # The model_canvas IS the model (ModelCanvasManager with places/transitions/arcs)
         model = self.model_canvas
         
-        # UPDATE KNOWLEDGE BASE with structural data
-        self._update_knowledge_base_structural(model)
+        # DEFER EXPENSIVE KB UPDATES - only do them when tables are actually opened
+        # These iterate through all objects (268 for rn00071) and are very slow
+        # Mark for lazy execution instead of blocking here
+        self._kb_needs_update = True
         
-        # UPDATE KNOWLEDGE BASE with pathway metadata
-        self._update_knowledge_base_pathway(model)
-        
-        # UPDATE KNOWLEDGE BASE with kinetic parameters (BRENDA)
-        self._update_knowledge_base_kinetics(model)
-        
-        # === BUILD MODEL OVERVIEW ===
+        # === BUILD MODEL OVERVIEW (quick - just metadata) ===
         overview_lines = []
         
         # Model name
@@ -980,20 +1047,25 @@ class ModelsCategory(BaseReportCategory):
             self.provenance_label.set_text("No import data available (manually created model)")
             self.provenance_frame.set_visible(False)
         
-        # === BUILD DETAILED TABLES ===
-        self._populate_species_table(model)
-        self._populate_reactions_table(model)
+        # === DEFER DETAILED TABLES POPULATION ===
+        # Instead of populating tables immediately (expensive for large models),
+        # mark them as needing refresh and populate lazily when user expands them
+        # This makes refresh instant for large models (rn00071 with 268 objects)
+        self._species_table_needs_refresh = True
+        self._reactions_table_needs_refresh = True
+        
+        # Clear tables immediately to show they're ready for data
+        self.species_store.clear()
+        self.reactions_store.clear()
         
         # === REFRESH LOCALITY TABLE IF SELECTION EXISTS ===
         if self.selected_transition and self.selected_locality:
             self._populate_locality_table()
         
-        # If another refresh was requested while we were running, schedule it
-        if self._refresh_pending:
-            self._refresh_pending = False
-            GLib.idle_add(self._do_refresh)
+        # Clear pending flag - no need to reschedule since expensive work is deferred
+        self._refresh_pending = False
         
-        return False  # Don't repeat this idle callback
+        return False  # Don't repeat this timeout callback
     
     def _find_linked_pathway_document(self, model):
         """Find the PathwayDocument linked to this model.
