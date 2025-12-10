@@ -307,10 +307,14 @@ class HierarchicalLayoutProcessor:
                 ideal_width = (num_species - 1) * self.horizontal_spacing
                 
                 if ideal_width > max_canvas_width:
-                    # Too wide - use max width with tighter spacing
+                    # Too wide - use max width with calculated spacing
                     actual_width = max_canvas_width
-                    actual_spacing = max(min_spacing, max_canvas_width / (num_species - 1))
-                    self.logger.debug(f"      Layer too wide, reducing spacing to {actual_spacing:.1f}px")
+                    actual_spacing = max_canvas_width / (num_species - 1)
+                    # Enforce minimum only if it doesn't exceed max width
+                    if actual_spacing < min_spacing:
+                        actual_spacing = min_spacing
+                        actual_width = min(actual_spacing * (num_species - 1), max_canvas_width)
+                    self.logger.debug(f"      Layer too wide ({num_species} nodes), using {actual_spacing:.1f}px spacing, width {actual_width:.1f}px")
                 else:
                     actual_width = ideal_width
                     actual_spacing = self.horizontal_spacing
