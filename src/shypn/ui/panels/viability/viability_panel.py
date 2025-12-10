@@ -95,6 +95,9 @@ class ViabilityPanel(Gtk.Box):
         # Locality tracking for coloring
         self._locality_objects = {}
         
+        # Subnet model (complete DocumentModel created from localities)
+        self.subnet_model = None
+        
         # Track current drawing area to detect document switches
         self._current_drawing_area_id = None
         
@@ -280,7 +283,7 @@ class ViabilityPanel(Gtk.Box):
         
         # === DIAGNOSTICS LOG (NEW) ===
         self.diagnostics_expander = Gtk.Expander()
-        self.diagnostics_expander.set_expanded(True)
+        self.diagnostics_expander.set_expanded(False)  # Start collapsed
         self.diagnostics_expander.set_margin_start(10)
         self.diagnostics_expander.set_margin_end(10)
         self.diagnostics_expander.set_margin_top(10)
@@ -426,10 +429,10 @@ class ViabilityPanel(Gtk.Box):
     def _create_places_treeview(self):
         """Create TreeView for editing place parameters.
         
-        Columns: ID, Name, Marking (editable), Type, Label
+        Columns: ID, Name, Marking (editable), Type, Label, Background
         """
-        # Create ListStore: id, name, marking (int, editable), type, label
-        store = Gtk.ListStore(str, str, int, str, str)
+        # Create ListStore: id, name, marking (int, editable), type, label, background
+        store = Gtk.ListStore(str, str, int, str, str, str)
         
         # Create TreeView
         treeview = Gtk.TreeView(model=store)
@@ -438,14 +441,14 @@ class ViabilityPanel(Gtk.Box):
         
         # Column 0: ID
         renderer_id = Gtk.CellRendererText()
-        column_id = Gtk.TreeViewColumn("ID", renderer_id, text=0)
+        column_id = Gtk.TreeViewColumn("ID", renderer_id, text=0, background=5)
         column_id.set_resizable(True)
         column_id.set_min_width(60)
         treeview.append_column(column_id)
         
         # Column 1: Name
         renderer_name = Gtk.CellRendererText()
-        column_name = Gtk.TreeViewColumn("Name", renderer_name, text=1)
+        column_name = Gtk.TreeViewColumn("Name", renderer_name, text=1, background=5)
         column_name.set_resizable(True)
         column_name.set_min_width(100)
         treeview.append_column(column_name)
@@ -454,35 +457,38 @@ class ViabilityPanel(Gtk.Box):
         renderer_marking = Gtk.CellRendererText()
         renderer_marking.set_property("editable", True)
         renderer_marking.connect("edited", self._on_place_marking_edited, store)
-        column_marking = Gtk.TreeViewColumn("Marking", renderer_marking, text=2)
+        column_marking = Gtk.TreeViewColumn("Marking", renderer_marking, text=2, background=5)
         column_marking.set_resizable(True)
         column_marking.set_min_width(80)
         treeview.append_column(column_marking)
         
         # Column 3: Type
         renderer_type = Gtk.CellRendererText()
-        column_type = Gtk.TreeViewColumn("Type", renderer_type, text=3)
+        column_type = Gtk.TreeViewColumn("Type", renderer_type, text=3, background=5)
         column_type.set_resizable(True)
         column_type.set_min_width(100)
         treeview.append_column(column_type)
         
         # Column 4: Label
         renderer_label = Gtk.CellRendererText()
-        column_label = Gtk.TreeViewColumn("Label", renderer_label, text=4)
+        column_label = Gtk.TreeViewColumn("Label", renderer_label, text=4, background=5)
         column_label.set_resizable(True)
         column_label.set_expand(True)
         column_label.set_min_width(150)
         treeview.append_column(column_label)
+        
+        # Add right-click context menu
+        treeview.connect("button-press-event", self._on_places_table_button_press)
         
         return treeview, store
     
     def _create_transitions_treeview(self):
         """Create TreeView for editing transition parameters.
         
-        Columns: ID, Name, Rate (editable), Formula (editable), Type, Label
+        Columns: ID, Name, Rate (editable), Formula (editable), Type, Label, Background
         """
-        # Create ListStore: id, name, rate (float, editable), formula (str, editable), type, label
-        store = Gtk.ListStore(str, str, float, str, str, str)
+        # Create ListStore: id, name, rate (float, editable), formula (str, editable), type, label, background
+        store = Gtk.ListStore(str, str, float, str, str, str, str)
         
         # Create TreeView
         treeview = Gtk.TreeView(model=store)
@@ -491,14 +497,14 @@ class ViabilityPanel(Gtk.Box):
         
         # Column 0: ID
         renderer_id = Gtk.CellRendererText()
-        column_id = Gtk.TreeViewColumn("ID", renderer_id, text=0)
+        column_id = Gtk.TreeViewColumn("ID", renderer_id, text=0, background=6)
         column_id.set_resizable(True)
         column_id.set_min_width(60)
         treeview.append_column(column_id)
         
         # Column 1: Name
         renderer_name = Gtk.CellRendererText()
-        column_name = Gtk.TreeViewColumn("Name", renderer_name, text=1)
+        column_name = Gtk.TreeViewColumn("Name", renderer_name, text=1, background=6)
         column_name.set_resizable(True)
         column_name.set_min_width(100)
         treeview.append_column(column_name)
@@ -507,7 +513,7 @@ class ViabilityPanel(Gtk.Box):
         renderer_rate = Gtk.CellRendererText()
         renderer_rate.set_property("editable", True)
         renderer_rate.connect("edited", self._on_transition_rate_edited, store)
-        column_rate = Gtk.TreeViewColumn("Rate", renderer_rate, text=2)
+        column_rate = Gtk.TreeViewColumn("Rate", renderer_rate, text=2, background=6)
         column_rate.set_resizable(True)
         column_rate.set_min_width(80)
         treeview.append_column(column_rate)
@@ -516,7 +522,7 @@ class ViabilityPanel(Gtk.Box):
         renderer_formula = Gtk.CellRendererText()
         renderer_formula.set_property("editable", True)
         renderer_formula.connect("edited", self._on_transition_formula_edited, store)
-        column_formula = Gtk.TreeViewColumn("Formula", renderer_formula, text=3)
+        column_formula = Gtk.TreeViewColumn("Formula", renderer_formula, text=3, background=6)
         column_formula.set_resizable(True)
         column_formula.set_expand(True)
         column_formula.set_min_width(200)
@@ -524,27 +530,30 @@ class ViabilityPanel(Gtk.Box):
         
         # Column 4: Type
         renderer_type = Gtk.CellRendererText()
-        column_type = Gtk.TreeViewColumn("Type", renderer_type, text=4)
+        column_type = Gtk.TreeViewColumn("Type", renderer_type, text=4, background=6)
         column_type.set_resizable(True)
         column_type.set_min_width(100)
         treeview.append_column(column_type)
         
         # Column 5: Label
         renderer_label = Gtk.CellRendererText()
-        column_label = Gtk.TreeViewColumn("Label", renderer_label, text=5)
+        column_label = Gtk.TreeViewColumn("Label", renderer_label, text=5, background=6)
         column_label.set_resizable(True)
         column_label.set_min_width(150)
         treeview.append_column(column_label)
+        
+        # Add right-click context menu
+        treeview.connect("button-press-event", self._on_transitions_table_button_press)
         
         return treeview, store
     
     def _create_arcs_treeview(self):
         """Create TreeView for editing arc parameters.
         
-        Columns: ID, From, To, Weight (editable), Type
+        Columns: ID, From, To, Weight (editable), Type, Background
         """
-        # Create ListStore: id, from_id, to_id, weight (int, editable), arc_type
-        store = Gtk.ListStore(str, str, str, int, str)
+        # Create ListStore: id, from_id, to_id, weight (int, editable), arc_type, background
+        store = Gtk.ListStore(str, str, str, int, str, str)
         
         # Create TreeView
         treeview = Gtk.TreeView(model=store)
@@ -552,21 +561,21 @@ class ViabilityPanel(Gtk.Box):
         
         # Column 0: ID
         renderer_id = Gtk.CellRendererText()
-        column_id = Gtk.TreeViewColumn("ID", renderer_id, text=0)
+        column_id = Gtk.TreeViewColumn("ID", renderer_id, text=0, background=5)
         column_id.set_resizable(True)
         column_id.set_min_width(80)
         treeview.append_column(column_id)
         
         # Column 1: From
         renderer_from = Gtk.CellRendererText()
-        column_from = Gtk.TreeViewColumn("From", renderer_from, text=1)
+        column_from = Gtk.TreeViewColumn("From", renderer_from, text=1, background=5)
         column_from.set_resizable(True)
         column_from.set_min_width(100)
         treeview.append_column(column_from)
         
         # Column 2: To
         renderer_to = Gtk.CellRendererText()
-        column_to = Gtk.TreeViewColumn("To", renderer_to, text=2)
+        column_to = Gtk.TreeViewColumn("To", renderer_to, text=2, background=5)
         column_to.set_resizable(True)
         column_to.set_min_width(100)
         treeview.append_column(column_to)
@@ -575,18 +584,21 @@ class ViabilityPanel(Gtk.Box):
         renderer_weight = Gtk.CellRendererText()
         renderer_weight.set_property("editable", True)
         renderer_weight.connect("edited", self._on_arc_weight_edited, store)
-        column_weight = Gtk.TreeViewColumn("Weight", renderer_weight, text=3)
+        column_weight = Gtk.TreeViewColumn("Weight", renderer_weight, text=3, background=5)
         column_weight.set_resizable(True)
         column_weight.set_min_width(80)
         treeview.append_column(column_weight)
         
         # Column 4: Type
         renderer_type = Gtk.CellRendererText()
-        column_type = Gtk.TreeViewColumn("Type", renderer_type, text=4)
+        column_type = Gtk.TreeViewColumn("Type", renderer_type, text=4, background=5)
         column_type.set_resizable(True)
         column_type.set_expand(True)
         column_type.set_min_width(150)
         treeview.append_column(column_type)
+        
+        # Add right-click context menu
+        treeview.connect("button-press-event", self._on_arcs_table_button_press)
         
         return treeview, store
     
@@ -936,6 +948,27 @@ class ViabilityPanel(Gtk.Box):
         # Refresh subnet parameters display
         self._refresh_subnet_parameters()
         
+        # Create/update subnet model immediately
+        self._create_subnet_model()
+        
+        # Auto-sync baseline snapshot when localities change
+        if hasattr(self, 'experiment_manager'):
+            em = self.experiment_manager
+            
+            # Ensure baseline snapshot exists
+            if not em.snapshots:
+                from shypn.ui.panels.viability.experiment_manager import ExperimentSnapshot
+                baseline = ExperimentSnapshot("Baseline")
+                em.snapshots.append(baseline)
+                em.active_index = 0
+            
+            # Sync baseline from current stores
+            em.sync_baseline_from_tables(
+                self.places_store,
+                self.transitions_store,
+                self.arcs_store
+            )
+        
         # Show (only if panel is packed)
         if self.get_parent() is not None:
             self.localities_listbox.show_all()
@@ -1032,6 +1065,13 @@ class ViabilityPanel(Gtk.Box):
         # Refresh subnet parameters display
         self._refresh_subnet_parameters()
         
+        # Recreate subnet model
+        if self.selected_localities:
+            self._create_subnet_model()
+        else:
+            # Clear subnet model if no localities
+            self.subnet_model = None
+        
         # Disable diagnose button if list is empty
         if not self.selected_localities:
             self.diagnose_button.set_sensitive(False)
@@ -1059,17 +1099,17 @@ class ViabilityPanel(Gtk.Box):
                 continue
             
             # Add transition ID
-            all_transition_ids.add(locality.transition_id)
+            all_transition_ids.add(locality.transition.id)
             
-            # Add place IDs
-            all_place_ids.update(locality.input_places)
-            all_place_ids.update(locality.output_places)
-            all_place_ids.update(locality.catalyst_places)  # Include catalyst/enzyme places
+            # Add place IDs (extract IDs from place objects)
+            all_place_ids.update(p.id for p in locality.input_places)
+            all_place_ids.update(p.id for p in locality.output_places)
+            all_place_ids.update(p.id for p in locality.catalyst_places)  # Include catalyst/enzyme places
             
-            # Add arc IDs
-            all_arc_ids.update(locality.input_arcs)
-            all_arc_ids.update(locality.output_arcs)
-            all_arc_ids.update(locality.catalyst_arcs)  # Include test arcs (non-consuming)
+            # Add arc IDs (extract IDs from arc objects)
+            all_arc_ids.update(a.id for a in locality.input_arcs)
+            all_arc_ids.update(a.id for a in locality.output_arcs)
+            all_arc_ids.update(a.id for a in locality.catalyst_arcs)  # Include test arcs (non-consuming)
         
         # Populate Places table
         for place in model.places:
@@ -1084,7 +1124,8 @@ class ViabilityPanel(Gtk.Box):
                 place_obj.name if hasattr(place_obj, 'name') else place_obj.id,
                 marking,
                 place_type,
-                label
+                label,
+                "#FFFFFF"  # Background color
             ])
         
         # Populate Transitions table
@@ -1092,6 +1133,19 @@ class ViabilityPanel(Gtk.Box):
             if transition.id in all_transition_ids:
                 rate = transition.rate if hasattr(transition, 'rate') else 1.0
                 formula = transition.formula if hasattr(transition, 'formula') else ""
+                
+                # Handle case where rate might be a string formula
+                if isinstance(rate, str):
+                    # If rate is a string formula, move it to formula column and set numeric rate to 0
+                    if not formula:  # Only if formula column is empty
+                        formula = rate
+                    rate = 0.0
+                else:
+                    try:
+                        rate = float(rate)
+                    except (ValueError, TypeError):
+                        rate = 1.0
+                
                 trans_type = transition.transition_type if hasattr(transition, 'transition_type') else "continuous"
                 label = transition.label if hasattr(transition, 'label') else ""
                 self.transitions_store.append([
@@ -1100,7 +1154,8 @@ class ViabilityPanel(Gtk.Box):
                     rate,
                     formula,
                     trans_type,
-                    label
+                    label,
+                    "#FFFFFF"  # Background color
                 ])
         
         # Populate Arcs table
@@ -1117,12 +1172,68 @@ class ViabilityPanel(Gtk.Box):
                 source_id,
                 target_id,
                 weight,
-                arc_type
+                arc_type,
+                "#FFFFFF"  # Background color
             ])
         
         # Notify automation category that subnet parameters are updated
+        # Call synchronously (not idle_add) to ensure parameters refreshed before auto-sync
         if hasattr(self, 'automation_category') and self.automation_category:
-            GLib.idle_add(self.automation_category.refresh_parameters)
+            self.automation_category.refresh_parameters()
+    
+    def _create_subnet_model(self):
+        """Create a complete DocumentModel from selected localities.
+        
+        This creates the subnet model immediately when localities are added,
+        ensuring all elements (places, transitions, arcs) are captured correctly.
+        The model is stored and reused by batch execution.
+        """
+        from shypn.data.canvas.document_model import DocumentModel
+        
+        # Collect all elements from selected localities
+        subnet_places_set = set()
+        subnet_transitions_set = set()
+        subnet_arcs_set = set()
+        
+        for transition_id, data in self.selected_localities.items():
+            locality = data.get('locality')
+            if not locality:
+                continue
+            
+            # Add transition
+            subnet_transitions_set.add(locality.transition)
+            
+            # Add places
+            subnet_places_set.update(locality.input_places)
+            subnet_places_set.update(locality.output_places)
+            subnet_places_set.update(locality.catalyst_places)
+            
+            # Add arcs
+            subnet_arcs_set.update(locality.input_arcs)
+            subnet_arcs_set.update(locality.output_arcs)
+            subnet_arcs_set.update(locality.catalyst_arcs)
+        
+        # Create DocumentModel
+        model = DocumentModel()
+        
+        # Copy places via serialization (preserves all properties)
+        model.places = [type(p).from_dict(p.to_dict()) for p in subnet_places_set]
+        
+        # Copy transitions via serialization
+        model.transitions = [type(t).from_dict(t.to_dict()) for t in subnet_transitions_set]
+        
+        # Build ID lookup dictionaries for arc deserialization
+        places_dict = {p.id: p for p in model.places}
+        transitions_dict = {t.id: t for t in model.transitions}
+        
+        # Copy arcs (need references to copied places/transitions)
+        model.arcs = [type(a).from_dict(a.to_dict(), places_dict, transitions_dict) 
+                      for a in subnet_arcs_set]
+        
+        # Store the subnet model
+        self.subnet_model = model
+        
+        return model
     
     # === EDITING CALLBACKS ===
     
@@ -1878,7 +1989,6 @@ class ViabilityPanel(Gtk.Box):
         # Reset colors - fetch objects from CURRENT model
         from shypn.netobjs import Place, Transition, Arc
         
-        
         # Get current model to fetch fresh object references
         model = self._get_current_model()
         if not model:
@@ -1901,13 +2011,24 @@ class ViabilityPanel(Gtk.Box):
                 for p_obj in locality_ids.output_places:
                     p_obj.border_color = Place.DEFAULT_BORDER_COLOR
                 
+                # Reset catalyst place colors
+                for p_obj in locality_ids.catalyst_places:
+                    p_obj.border_color = Place.DEFAULT_BORDER_COLOR
+                
                 # Reset input arc colors
                 for arc_obj in locality_ids.input_arcs:
-                    pass
+                    arc_obj.color = Arc.DEFAULT_COLOR
                 
                 # Reset output arc colors
                 for arc_obj in locality_ids.output_arcs:
-                    pass
+                    arc_obj.color = Arc.DEFAULT_COLOR
+                
+                # Reset catalyst arc colors
+                for arc_obj in locality_ids.catalyst_arcs:
+                    arc_obj.color = Arc.DEFAULT_COLOR
+            
+            # Trigger canvas redraw to show color changes
+            self._trigger_canvas_redraw()
         
         
         # Clear localities list
@@ -2066,6 +2187,35 @@ class ViabilityPanel(Gtk.Box):
         import logging
         logging.getLogger(__name__).debug("[VIABILITY_CLEAR] Clearing panel data for new document")
         
+        # Reset colors before clearing (in case previous document had colored objects)
+        from shypn.netobjs import Place, Transition, Arc
+        model = self._get_current_model()
+        if model:
+            for transition_id in self.selected_localities.keys():
+                locality_ids = self._locality_objects.get(transition_id)
+                if not locality_ids:
+                    continue
+                
+                # Reset all locality colors
+                locality_ids.transition.border_color = Transition.DEFAULT_BORDER_COLOR
+                locality_ids.transition.fill_color = Transition.DEFAULT_COLOR
+                
+                for p_obj in locality_ids.input_places:
+                    p_obj.border_color = Place.DEFAULT_BORDER_COLOR
+                for p_obj in locality_ids.output_places:
+                    p_obj.border_color = Place.DEFAULT_BORDER_COLOR
+                for p_obj in locality_ids.catalyst_places:
+                    p_obj.border_color = Place.DEFAULT_BORDER_COLOR
+                
+                for arc_obj in locality_ids.input_arcs:
+                    arc_obj.color = Arc.DEFAULT_COLOR
+                for arc_obj in locality_ids.output_arcs:
+                    arc_obj.color = Arc.DEFAULT_COLOR
+                for arc_obj in locality_ids.catalyst_arcs:
+                    arc_obj.color = Arc.DEFAULT_COLOR
+            
+            self._trigger_canvas_redraw()
+        
         # Clear selected localities
         self.selected_localities.clear()
         self._locality_objects.clear()
@@ -2213,113 +2363,12 @@ class ViabilityPanel(Gtk.Box):
         # and calling show_all() will cause GTK realize errors
         if self.get_parent() is not None:
             self.localities_listbox.show_all()
-    
-    def _refresh_subnet_parameters(self):
-        """Refresh subnet parameters tables from current selected localities."""
-        try:
-            # Clear existing data
-            self.places_store.clear()
-            self.transitions_store.clear()
-            self.arcs_store.clear()
-        except Exception as e:
-            import logging
-            logging.getLogger(__name__).warning(f"[VIABILITY_REFRESH] Error clearing stores: {e}")
-            return
         
-        # Rebuild from current localities
-        canvas_manager = self._get_canvas_manager()
-        if not canvas_manager:
-            return
-        
-        # Collect all places, transitions, and arcs from selected localities
-        all_place_ids = set()
-        all_transition_ids = set()
-        all_arc_ids = set()
-        
-        for transition_id, locality_obj in self._locality_objects.items():
-            # Places
-            for place_obj in locality_obj.input_places:
-                all_place_ids.add(place_obj.id)
-            for place_obj in locality_obj.output_places:
-                all_place_ids.add(place_obj.id)
-            
-            # Transitions
-            all_transition_ids.add(locality_obj.transition.id)
-            
-            # Arcs
-            for arc_obj in locality_obj.input_arcs:
-                all_arc_ids.add(arc_obj.id)
-            for arc_obj in locality_obj.output_arcs:
-                all_arc_ids.add(arc_obj.id)
-        
-        # Populate places table
-        for place_id in sorted(all_place_ids):
-            for place in canvas_manager.places:
-                if place.id == place_id:
-                    place_type = "Source" if (hasattr(place, 'is_source') and place.is_source) else "Normal"
-                    label = place.label if hasattr(place, 'label') else ""
-                    marking = place.marking if hasattr(place, 'marking') else (place.initial_marking if hasattr(place, 'initial_marking') else 0)
-                    self.places_store.append([
-                        place.id,
-                        place.name or place.id,
-                        marking,
-                        place_type,
-                        label
-                    ])
-                    break
-        
-        # Populate transitions table
-        for transition_id in sorted(all_transition_ids):
-            for transition in canvas_manager.transitions:
-                if transition.id == transition_id:
-                    rate = getattr(transition, 'rate', 1.0)
-                    formula = getattr(transition, 'formula', getattr(transition, 'rate_formula', ''))
-                    
-                    # Handle case where rate might be a string expression (kinetic formula)
-                    if isinstance(rate, str):
-                        # If rate is a string formula, use it as the formula and set numeric rate to 0
-                        if not formula:  # Only if formula column is empty
-                            formula = rate
-                        rate = 0.0
-                    else:
-                        try:
-                            rate = float(rate)
-                        except (ValueError, TypeError):
-                            rate = 1.0
-                    
-                    trans_type = getattr(transition, 'transition_type', 'continuous')
-                    label = getattr(transition, 'label', '')
-                    self.transitions_store.append([
-                        transition.id,
-                        transition.name or transition.id,
-                        rate,
-                        formula,
-                        trans_type,
-                        label
-                    ])
-                    break
-        
-        # Populate arcs table
-        for arc_id in sorted(all_arc_ids):
-            for arc in canvas_manager.arcs:
-                if arc.id == arc_id:
-                    from shypn.netobjs import Place
-                    source_id = arc.source.id if hasattr(arc.source, 'id') else str(arc.source)
-                    target_id = arc.target.id if hasattr(arc.target, 'id') else str(arc.target)
-                    arc_type = "Place→Transition" if isinstance(arc.source, Place) else "Transition→Place"
-                    weight = arc.weight if hasattr(arc, 'weight') else 1
-                    self.arcs_store.append([
-                        arc.id,
-                        source_id,
-                        target_id,
-                        weight,
-                        arc_type
-                    ])
-                    break
-        
-        # Notify automation category that subnet parameters are updated
-        if hasattr(self, 'automation_category') and self.automation_category:
-            GLib.idle_add(self.automation_category.refresh_parameters)
+        # Recreate subnet model after rebuilding localities list
+        if self.selected_localities:
+            self._create_subnet_model()
+        else:
+            self.subnet_model = None
     
     def _update_ui_state(self):
         """Update UI state based on current selections."""
@@ -2622,6 +2671,16 @@ class ViabilityPanel(Gtk.Box):
                 self.arcs_store
             )
             
+            # Update visual indicators if this is a sweep snapshot
+            if snapshot.swept_parameter:
+                self.update_sweep_indicators(
+                    snapshot.swept_parameter['type'],
+                    snapshot.swept_parameter['id']
+                )
+            else:
+                # Clear indicators if this is baseline
+                self._clear_sweep_indicators()
+            
             self._append_diagnostics_log(f"Switched to: {snapshot.name}")
     
     def _show_stale_baseline_warning(self):
@@ -2662,5 +2721,213 @@ class ViabilityPanel(Gtk.Box):
             # Hide warning
             self.simulation_toolbar.show_stale_baseline_warning(False)
             
+            # Clear sweep indicators
+            self._clear_sweep_indicators()
+            
             self._append_diagnostics_log("✓ Baseline synced to automation")
+    
+    def update_sweep_indicators(self, swept_param_type, swept_param_id):
+        """Highlight the swept parameter row in the appropriate table.
+        
+        Args:
+            swept_param_type: 'place', 'transition', or 'arc'
+            swept_param_id: ID of the swept parameter
+        """
+        # Clear all indicators first
+        self._clear_sweep_indicators()
+        
+        # Highlight the swept parameter
+        if swept_param_type == 'place':
+            for row in self.places_store:
+                if row[0] == swept_param_id:
+                    row[5] = "#B3D9FF"  # Medium blue - more visible
+                    break
+        elif swept_param_type == 'transition':
+            for row in self.transitions_store:
+                if row[0] == swept_param_id:
+                    row[6] = "#B3D9FF"  # Medium blue - more visible
+                    break
+        elif swept_param_type == 'arc':
+            for row in self.arcs_store:
+                if row[0] == swept_param_id:
+                    row[5] = "#B3D9FF"  # Medium blue - more visible
+                    break
+    
+    def _clear_sweep_indicators(self):
+        """Reset all row backgrounds to white."""
+        for row in self.places_store:
+            row[5] = "#FFFFFF"
+        for row in self.transitions_store:
+            row[6] = "#FFFFFF"
+        for row in self.arcs_store:
+            row[5] = "#FFFFFF"
+    
+    def _on_places_table_button_press(self, treeview, event):
+        """Handle right-click on places table to show context menu."""
+        if event.button == 3:  # Right-click
+            # Get clicked row
+            path_info = treeview.get_path_at_pos(int(event.x), int(event.y))
+            if path_info is None:
+                return False
+            
+            path, column, cell_x, cell_y = path_info
+            treeview.get_selection().select_path(path)
+            
+            # Get place data from row
+            tree_iter = self.places_store.get_iter(path)
+            place_id = self.places_store.get_value(tree_iter, 0)
+            place_name = self.places_store.get_value(tree_iter, 1)
+            current_marking = self.places_store.get_value(tree_iter, 2)
+            
+            # Create context menu
+            menu = Gtk.Menu()
+            
+            sweep_item = Gtk.MenuItem(label=f"⇄ Create Sweep for '{place_name}'")
+            sweep_item.connect("activate", self._on_create_sweep_from_place, 
+                             place_id, place_name, current_marking)
+            menu.append(sweep_item)
+            
+            menu.show_all()
+            menu.popup(None, None, None, None, event.button, event.time)
+            return True
+        
+        return False
+    
+    def _on_transitions_table_button_press(self, treeview, event):
+        """Handle right-click on transitions table to show context menu."""
+        if event.button == 3:  # Right-click
+            # Get clicked row
+            path_info = treeview.get_path_at_pos(int(event.x), int(event.y))
+            if path_info is None:
+                return False
+            
+            path, column, cell_x, cell_y = path_info
+            treeview.get_selection().select_path(path)
+            
+            # Get transition data from row
+            tree_iter = self.transitions_store.get_iter(path)
+            trans_id = self.transitions_store.get_value(tree_iter, 0)
+            trans_name = self.transitions_store.get_value(tree_iter, 1)
+            current_rate = self.transitions_store.get_value(tree_iter, 2)
+            
+            # Create context menu
+            menu = Gtk.Menu()
+            
+            sweep_item = Gtk.MenuItem(label=f"⇄ Create Sweep for '{trans_name}'")
+            sweep_item.connect("activate", self._on_create_sweep_from_transition,
+                             trans_id, trans_name, current_rate)
+            menu.append(sweep_item)
+            
+            menu.show_all()
+            menu.popup(None, None, None, None, event.button, event.time)
+            return True
+        
+        return False
+    
+    def _on_arcs_table_button_press(self, treeview, event):
+        """Handle right-click on arcs table to show context menu."""
+        if event.button == 3:  # Right-click
+            # Get clicked row
+            path_info = treeview.get_path_at_pos(int(event.x), int(event.y))
+            if path_info is None:
+                return False
+            
+            path, column, cell_x, cell_y = path_info
+            treeview.get_selection().select_path(path)
+            
+            # Get arc data from row
+            tree_iter = self.arcs_store.get_iter(path)
+            arc_id = self.arcs_store.get_value(tree_iter, 0)
+            from_id = self.arcs_store.get_value(tree_iter, 1)
+            to_id = self.arcs_store.get_value(tree_iter, 2)
+            current_weight = self.arcs_store.get_value(tree_iter, 3)
+            
+            # Create context menu
+            menu = Gtk.Menu()
+            
+            arc_label = f"{from_id} → {to_id}"
+            sweep_item = Gtk.MenuItem(label=f"⇄ Create Sweep for '{arc_label}'")
+            sweep_item.connect("activate", self._on_create_sweep_from_arc,
+                             arc_id, arc_label, current_weight)
+            menu.append(sweep_item)
+            
+            menu.show_all()
+            menu.popup(None, None, None, None, event.button, event.time)
+            return True
+        
+        return False
+    
+    def _on_create_sweep_from_place(self, menu_item, place_id, place_name, current_value):
+        """Create sweep from right-clicked place parameter."""
+        if not hasattr(self, 'automation_category') or not self.automation_category:
+            return
+        
+        # Expand automation section
+        self.automation_category.category_frame.set_expanded(True)
+        
+        # Pre-fill sweep builder with place info
+        if hasattr(self.automation_category, 'sweep_builder'):
+            self.automation_category.sweep_builder.prefill_parameter(
+                param_type='place',
+                param_id=place_id,
+                param_name=place_name,
+                current_value=current_value
+            )
+    
+    def _on_create_sweep_from_transition(self, menu_item, trans_id, trans_name, current_value):
+        """Create sweep from right-clicked transition parameter."""
+        if not hasattr(self, 'automation_category') or not self.automation_category:
+            return
+        
+        # Expand automation section
+        self.automation_category.category_frame.set_expanded(True)
+        
+        # Evaluate formula to get numeric value for prediction
+        evaluated_value = current_value
+        if isinstance(current_value, str):
+            try:
+                # Build context with current place markings
+                context = {}
+                for place in self.canvas.model.places:
+                    context[place.id] = place.tokens
+                    if hasattr(place, 'name') and place.name:
+                        context[place.name] = place.tokens
+                
+                # Safely evaluate the formula
+                evaluated_value = eval(current_value, {"__builtins__": {}}, context)
+            except:
+                # If evaluation fails, try to extract numeric coefficient
+                import re
+                match = re.match(r'^([\d.]+)', current_value.strip())
+                if match:
+                    evaluated_value = float(match.group(1))
+                else:
+                    evaluated_value = 1.0  # Fallback
+        
+        # Pre-fill sweep builder with transition info
+        if hasattr(self.automation_category, 'sweep_builder'):
+            self.automation_category.sweep_builder.prefill_parameter(
+                param_type='transition',
+                param_id=trans_id,
+                param_name=trans_name,
+                current_value=evaluated_value
+            )
+    
+    def _on_create_sweep_from_arc(self, menu_item, arc_id, arc_label, current_value):
+        """Create sweep from right-clicked arc parameter."""
+        if not hasattr(self, 'automation_category') or not self.automation_category:
+            return
+        
+        # Expand automation section
+        self.automation_category.category_frame.set_expanded(True)
+        
+        # Pre-fill sweep builder with arc info
+        if hasattr(self.automation_category, 'sweep_builder'):
+            self.automation_category.sweep_builder.prefill_parameter(
+                param_type='arc',
+                param_id=arc_id,
+                param_name=arc_label,
+                current_value=current_value
+            )
+
 

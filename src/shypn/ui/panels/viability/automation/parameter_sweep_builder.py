@@ -36,6 +36,12 @@ class ParameterSweepBuilder(Gtk.Box):
         self.parameter_values = []
         self._param_name_to_id = {}  # Mapping for name to ID resolution
         
+        # Reference to viability panel for accessing model state
+        self.viability_panel = None
+        
+        # Flag to prevent recursive prefill
+        self._in_prefill = False
+        
         # Callbacks
         self.on_generate_callback = None
         self.on_clear_callback = None
@@ -88,6 +94,7 @@ class ParameterSweepBuilder(Gtk.Box):
         
         self.name_combo = Gtk.ComboBoxText()
         self.name_combo.set_tooltip_text("Load a model with subnet parameters to see available parameters")
+        self.name_combo.connect("changed", self._on_name_changed)
         name_box.pack_start(self.name_combo, True, True, 0)
         
         selection_box.pack_start(name_box, False, False, 0)
@@ -200,7 +207,18 @@ class ParameterSweepBuilder(Gtk.Box):
         self.duration_entry = Gtk.Entry()
         self.duration_entry.set_text("100.0")
         self.duration_entry.set_width_chars(8)
+        self.duration_entry.set_tooltip_text("Maximum simulation time (can stop earlier if condition met)")
         sim_box.attach(self.duration_entry, 3, 0, 1, 1)
+        
+        # Termination condition
+        sim_box.attach(Gtk.Label(label="Stop condition:", xalign=0), 0, 1, 1, 1)
+        self.termination_combo = Gtk.ComboBoxText()
+        self.termination_combo.append("time_only", "Time limit only")
+        self.termination_combo.append("deadlock", "Deadlock or time limit")
+        self.termination_combo.append("steady_state", "Steady state or time limit")
+        self.termination_combo.set_active_id("deadlock")
+        self.termination_combo.set_tooltip_text("When to stop the simulation")
+        sim_box.attach(self.termination_combo, 1, 1, 3, 1)
         
         sim_frame.add(sim_box)
         self.pack_start(sim_frame, False, False, 0)
@@ -238,6 +256,81 @@ class ParameterSweepBuilder(Gtk.Box):
         self.parameter_type = combo.get_active_id()
         # Note: Parameter list will be populated by category's refresh_parameters()
         # when it detects the type change
+    
+    def _on_name_changed(self, combo):
+        """Handle parameter name selection - auto-predict range and settings."""
+        # Prevent recursion when prefill_parameter changes the combo
+        if self._in_prefill:
+            return
+            
+        param_id = combo.get_active_id()
+        param_name = combo.get_active_text()
+        
+        if not param_id or not param_name or param_id == "none":
+            return
+        
+        # Get current value from the viability panel's tables
+        if not hasattr(self, 'viability_panel') or self.viability_panel is None:
+            return
+        
+        try:
+            current_value = None
+            param_type = self.parameter_type  # 'places', 'transitions', or 'arcs'
+            
+            # Get current value from appropriate table
+            if param_type == 'places':
+                # Search places table
+                for row in self.viability_panel.places_store:
+                    if row[0] == param_id:  # Column 0 is ID
+                        current_value = row[2]  # Column 2 is marking
+                        break
+                        
+            elif param_type == 'transitions':
+                # Search transitions table
+                for row in self.viability_panel.transitions_store:
+                    if row[0] == param_id:  # Column 0 is ID
+                        current_value = row[2]  # Column 2 is rate
+                        break
+                        
+            elif param_type == 'arcs':
+                # Search arcs table
+                for row in self.viability_panel.arcs_store:
+                    if row[0] == param_id:  # Column 0 is ID
+                        current_value = row[3]  # Column 3 is weight
+                        break
+            
+            if current_value is not None:
+                # Evaluate if it's a formula
+                evaluated_value = current_value
+                if isinstance(current_value, str):
+                    try:
+                        # Build context with current place markings
+                        context = {}
+                        for place in self.viability_panel.canvas.model.places:
+                            context[place.id] = place.tokens
+                            if hasattr(place, 'name') and place.name:
+                                context[place.name] = place.tokens
+                        
+                        # Safely evaluate the formula
+                        evaluated_value = eval(current_value, {"__builtins__": {}}, context)
+                    except:
+                        # If evaluation fails, try to parse as float
+                        try:
+                            evaluated_value = float(current_value)
+                        except:
+                            evaluated_value = 1.0
+                
+                # Trigger prefill with evaluated value (but skip the combo updates)
+                # Map param_type to singular form for prefill_parameter
+                type_map = {'places': 'place', 'transitions': 'transition', 'arcs': 'arc'}
+                singular_type = type_map.get(param_type, 'place')
+                
+                self._apply_prediction(singular_type, evaluated_value)
+                
+        except Exception as e:
+            pass  # Silent fail - user can manually adjust values
+            import traceback
+            traceback.print_exc()
     
     def _on_preview_clicked(self, button):
         """Preview experiment count based on current configuration."""
@@ -289,8 +382,10 @@ class ParameterSweepBuilder(Gtk.Box):
                     'parameter_name': param_name,  # Display name for labels
                     'values': values,
                     'replicates': int(self.replicates_entry.get_text()),
-                    'duration': float(self.duration_entry.get_text())
+                    'duration': float(self.duration_entry.get_text()),
+                    'termination_condition': self.termination_combo.get_active_id()
                 }
+                
                 self.on_generate_callback(config)
             except Exception as e:
                 self.preview_label.set_markup(
@@ -307,6 +402,7 @@ class ParameterSweepBuilder(Gtk.Box):
         self.percent_steps_entry.set_text("5")
         self.replicates_entry.set_text("500")
         self.duration_entry.set_text("100.0")
+        self.termination_combo.set_active_id("deadlock")
         self.preview_label.set_markup("<i>Configure parameters and click Preview</i>")
         self.generate_button.set_sensitive(False)
         
@@ -429,3 +525,175 @@ class ParameterSweepBuilder(Gtk.Box):
             callback: Function to call when clear is clicked
         """
         self.on_clear_callback = callback
+    
+    def _calculate_experiment_count(self):
+        """Calculate number of experiments based on current configuration.
+        
+        Returns:
+            int: Number of experiments that will be generated
+        """
+        try:
+            values = self._compute_parameter_values()
+            return len(values)
+        except:
+            return 0
+    
+    def _apply_prediction(self, param_type, numeric_value):
+        """Apply intelligent prediction to Range and Simulation fields without changing combos.
+        
+        Args:
+            param_type: 'place', 'transition', or 'arc'
+            numeric_value: Evaluated numeric value for prediction
+        """
+        try:
+            # Predict range based on parameter type and value
+            if param_type == 'place':
+                # Place markings: typically integers, often represent molecule counts
+                if numeric_value == 0:
+                    min_val, max_val, steps = 0, 100, 11
+                elif numeric_value <= 10:
+                    min_val, max_val, steps = 0, numeric_value * 2, 11
+                elif numeric_value <= 100:
+                    min_val, max_val, steps = numeric_value * 0.5, numeric_value * 1.5, 11
+                else:
+                    min_val, max_val, steps = numeric_value * 0.7, numeric_value * 1.3, 11
+                    
+            elif param_type == 'transition':
+                # Transition rates: typically small floats (0.1-10 range)
+                if numeric_value == 0:
+                    min_val, max_val, steps = 0, 5.0, 11
+                elif numeric_value < 1.0:
+                    min_val, max_val, steps = numeric_value * 0.1, numeric_value * 10, 11
+                else:
+                    min_val, max_val, steps = numeric_value * 0.2, numeric_value * 5, 11
+                    
+            elif param_type == 'arc':
+                # Arc weights: typically small integers (1-5 range)
+                if numeric_value <= 1:
+                    min_val, max_val, steps = 1, 5, 5
+                else:
+                    min_val, max_val, steps = 1, numeric_value * 2, min(int(numeric_value * 2), 10)
+            else:
+                # Fallback
+                min_val, max_val, steps = 0, 100, 11
+            
+            # Predict replicates
+            total_experiments = steps
+            if total_experiments <= 5:
+                replicates = 100
+            elif total_experiments <= 10:
+                replicates = 50
+            else:
+                replicates = 30
+            
+            # Adjust by parameter type
+            if param_type == 'place' and numeric_value < 20:
+                replicates = min(replicates * 2, 200)
+            elif param_type == 'transition' and numeric_value < 0.5:
+                replicates = min(replicates * 1.5, 150)
+            
+            # Predict duration (proportional to consumption time)
+            if param_type == 'place':
+                # Duration ~= tokens to consume (assuming rate ~1.0)
+                # Add margin for observation
+                if numeric_value == 0:
+                    duration = 20.0
+                else:
+                    duration = max(20.0, numeric_value * 1.2)
+                    
+            elif param_type == 'transition':
+                # Duration inversely proportional to rate
+                # Slower rates need more time to show effect
+                if numeric_value == 0:
+                    duration = 100.0
+                elif numeric_value < 0.1:
+                    duration = 500.0
+                elif numeric_value < 1.0:
+                    duration = 200.0
+                elif numeric_value < 10:
+                    duration = 50.0
+                else:
+                    duration = 20.0
+                    
+            elif param_type == 'arc':
+                # Arc weights affect rate, use moderate duration
+                duration = 50.0
+            else:
+                duration = 100.0
+            
+            # === APPLY TO UI ===
+            
+            print(f"[PREDICTION] Computed values: min={min_val}, max={max_val}, steps={steps}, replicates={replicates}, duration={duration}")
+            
+            # Set to linear mode
+            self.linear_radio.set_active(True)
+            
+            # Fill range values
+            self.start_entry.set_text(f"{min_val:.2f}" if isinstance(min_val, float) else str(int(min_val)))
+            self.stop_entry.set_text(f"{max_val:.2f}" if isinstance(max_val, float) else str(int(max_val)))
+            
+            # Calculate step size
+            if steps > 1:
+                step_size = (max_val - min_val) / (steps - 1)
+                self.step_entry.set_text(f"{step_size:.3f}" if isinstance(step_size, float) else str(int(step_size)))
+            else:
+                self.step_entry.set_text("1")
+            
+            # Set simulation settings
+            self.replicates_entry.set_text(str(int(replicates)))
+            self.duration_entry.set_text(f"{duration:.1f}")
+            
+            # Update preview
+            try:
+                count = self._calculate_experiment_count()
+                if count > 0:
+                    self.preview_label.set_markup(
+                        f"<span foreground='blue'>Ready: {count} experiments will be generated</span>"
+                    )
+            except:
+                pass
+                
+        except Exception as e:
+            pass  # Silent fail - user can manually adjust values
+    
+    def prefill_parameter(self, param_type, param_id, param_name, current_value):
+        """Pre-fill sweep builder with parameter from right-click context menu.
+        
+        Intelligently predicts range, replicates, and duration based on parameter type
+        and current value.
+        
+        Args:
+            param_type: 'place', 'transition', or 'arc'
+            param_id: Parameter ID
+            param_name: Parameter display name
+            current_value: Current parameter value (should be numeric)
+        """
+        self._in_prefill = True
+        try:
+            # Map param_type to combo box format
+            type_map = {
+                'place': 'places',
+                'transition': 'transitions',
+                'arc': 'arcs'
+            }
+            
+            # Set parameter type
+            combo_type = type_map.get(param_type, 'places')
+            self.type_combo.set_active_id(combo_type)
+            
+            # Try to select the parameter in name combo
+            # The name_combo uses param_id as key
+            self.name_combo.set_active_id(param_id)
+            
+            # Convert to numeric
+            try:
+                numeric_value = float(current_value)
+            except (ValueError, TypeError):
+                numeric_value = 1.0 if param_type == 'transition' else 10.0
+            
+            # Apply the prediction
+            self._apply_prediction(param_type, numeric_value)
+                
+        finally:
+            self._in_prefill = False
+
