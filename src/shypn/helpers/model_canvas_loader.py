@@ -2707,6 +2707,16 @@ class ModelCanvasLoader:
         except Exception:
             pass
 
+    def _mark_interaction(self, widget):
+        """Mark user interaction timestamp (lightweight tracking).
+        
+        Just stores a timestamp - no widget tree traversal or expensive operations.
+        """
+        import time
+        if not hasattr(self, '_last_interaction_time'):
+            self._last_interaction_time = 0
+        self._last_interaction_time = time.time()
+
     def _on_button_press(self, widget, event, manager):
         """Handle button press events (GTK3)."""
         # Grab focus so keyboard shortcuts work
@@ -3010,24 +3020,26 @@ class ModelCanvasLoader:
         self._last_pointer_world_x = world_x
         self._last_pointer_world_y = world_y
         
-        # Update hover tooltip for objects under cursor
-        hovered_obj = manager.find_object_at_position(world_x, world_y)
-        if hovered_obj:
-            from shypn.netobjs import Place, Transition, Arc
-            if isinstance(hovered_obj, (Place, Transition, Arc)):
-                # Show ID-Name tooltip with green background and black text (styled via CSS)
-                # ONLY show tooltips for network objects (places, transitions, arcs)
-                obj_id = hovered_obj.id if hasattr(hovered_obj, 'id') else "?"
-                obj_name = hovered_obj.name if hasattr(hovered_obj, 'name') else ""
-                if obj_name and obj_name != obj_id:
-                    tooltip = f"{obj_id} - {obj_name}"
-                else:
-                    tooltip = obj_id
-                # Use set_tooltip_text - CSS will apply green background and black text
-                widget.set_tooltip_text(tooltip)
-        else:
-            # Clear tooltip when not hovering over any object
-            widget.set_tooltip_text(None)
+        # Update hover tooltip - but only if not actively dragging/panning
+        # Tooltip lookup can be expensive for large models (268 objects in rn00071)
+        if not state['active']:
+            hovered_obj = manager.find_object_at_position(world_x, world_y)
+            if hovered_obj:
+                from shypn.netobjs import Place, Transition, Arc
+                if isinstance(hovered_obj, (Place, Transition, Arc)):
+                    # Show ID-Name tooltip with green background and black text (styled via CSS)
+                    # ONLY show tooltips for network objects (places, transitions, arcs)
+                    obj_id = hovered_obj.id if hasattr(hovered_obj, 'id') else "?"
+                    obj_name = hovered_obj.name if hasattr(hovered_obj, 'name') else ""
+                    if obj_name and obj_name != obj_id:
+                        tooltip = f"{obj_id} - {obj_name}"
+                    else:
+                        tooltip = obj_id
+                    # Use set_tooltip_text - CSS will apply green background and black text
+                    widget.set_tooltip_text(tooltip)
+            else:
+                # Clear tooltip when not hovering over any object
+                widget.set_tooltip_text(None)
         
         # Update lasso path if active
         if lasso_state.get('active', False) and lasso_state.get('selector'):
@@ -3072,6 +3084,9 @@ class ModelCanvasLoader:
                 widget.queue_draw()
                 return True
             if manager.selection_manager.update_drag(event.x, event.y, manager):
+                # Notify report panel of user interaction
+                self._mark_interaction(widget)
+                
                 click_state = self._click_state.get(widget)
                 if click_state and click_state.get('pending_timeout'):
                     from gi.repository import GLib
@@ -3083,21 +3098,19 @@ class ModelCanvasLoader:
             is_shift_pressed = event.state & Gdk.ModifierType.SHIFT_MASK
             should_pan = state['button'] in [2, 3] or (state['button'] == 1 and is_shift_pressed)
             if should_pan and state['is_panning']:
-                print(f"[PAN_DEBUG] Starting pan operation", flush=True)
+                # Notify report panel of user interaction to defer expensive refreshes
+                self._mark_interaction(widget)
+                
                 dx = event.x - state['start_x']
                 dy = event.y - state['start_y']
                 
-                print(f"[PAN_DEBUG] Delta: dx={dx}, dy={dy}", flush=True)
                 # Use pan() method which handles rotation correctly
                 # Reset pan to start position first, then apply delta
                 manager.pan_x = state['start_pan_x']
                 manager.pan_y = state['start_pan_y']
-                print(f"[PAN_DEBUG] Calling manager.pan()", flush=True)
                 manager.pan(dx, dy)
-                print(f"[PAN_DEBUG] Pan complete, queueing draw", flush=True)
                 
                 widget.queue_draw()
-                print(f"[PAN_DEBUG] Pan operation finished", flush=True)
         return True
 
     def _on_scroll_event(self, widget, event, manager):
@@ -3119,6 +3132,10 @@ class ModelCanvasLoader:
             factor = 1 / 1.1
         if factor is None:
             return False
+        
+        # Notify report panel of user interaction
+        self._mark_interaction(widget)
+        
         manager.zoom_at_point(factor, event.x, event.y)
         manager.save_view_state_to_file()
         widget.queue_draw()
@@ -3302,7 +3319,6 @@ class ModelCanvasLoader:
             height: Viewport height in pixels.
             manager: ModelCanvasManager instance.
         """
-        print(f"[DRAW_DEBUG] Draw started", flush=True)
         if manager.viewport_width != width or manager.viewport_height != height:
             manager.set_viewport_size(width, height)
         
@@ -3538,7 +3554,6 @@ class ModelCanvasLoader:
         cr.line_to(right_x, right_y)
         cr.close_path()
         cr.fill()
-        print(f"[DRAW_DEBUG] Draw complete", flush=True)
 
     def _show_canvas_context_menu(self, x, y, drawing_area):
         """Show the canvas context menu at the given position.

@@ -170,8 +170,8 @@ class ViewportController:
         world_dx = dx / self.zoom
         world_dy = dy / self.zoom
         
-        # Apply inverse rotation if canvas is rotated
-        if rotation and rotation.angle_degrees != 0:
+        # Apply inverse rotation if canvas is rotated (with tolerance for floating point errors)
+        if rotation and abs(rotation.angle_degrees) > 0.001:
             import math
             cos_a = math.cos(-rotation.angle_radians)  # Inverse rotation
             sin_a = math.sin(-rotation.angle_radians)
