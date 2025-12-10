@@ -1945,6 +1945,7 @@ class FileExplorerPanel:
             print(f"[FILE_LOAD] Callbacks set")
             
             # Restore view state (zoom, pan, and rotation) if available
+            print(f"[FILE_LOAD] Restoring view state")
             has_view_state = False
             if hasattr(document, 'view_state') and document.view_state:
                 # Always restore view state, even if it's default (0, 0, 1.0)
@@ -1973,19 +1974,25 @@ class FileExplorerPanel:
             
             # Only fit to page if no saved view state exists
             # This preserves user's saved view position and zoom level
+            print(f"[FILE_LOAD] View state restored, has_view_state={has_view_state}")
             if not has_view_state:
+                print(f"[FILE_LOAD] Calling fit_to_page")
                 # Use deferred=True to wait for viewport dimensions on first draw
                 # Use 30% horizontal offset to shift content RIGHT for left panels
                 # Use -10% vertical offset to shift content UP for bottom panels
                 manager.fit_to_page(padding_percent=15, deferred=True, horizontal_offset_percent=30, vertical_offset_percent=-10)
+                print(f"[FILE_LOAD] fit_to_page returned")
             
             # PHASE 1: Set per-document file state
             # Initialize manager's filepath and mark as clean (just loaded)
+            print(f"[FILE_LOAD] Setting file state")
             manager.set_filepath(filepath)
             manager.mark_clean()  # Just loaded, no unsaved changes
+            print(f"[FILE_LOAD] File state set")
             
             # Notify report panel that file was opened (for metadata loading)
             # Determine metadata path based on project structure
+            print(f"[FILE_LOAD] Notifying report panel")
             if self.project and hasattr(self.project, 'get_metadata_dir'):
                 metadata_dir = self.project.get_metadata_dir()
                 if metadata_dir:
@@ -2007,6 +2014,7 @@ class FileExplorerPanel:
                         report_panel = report_panel_loader.panel
                         if hasattr(report_panel, 'on_file_opened'):
                             report_panel.on_file_opened(shypn_path)
+            print(f"[FILE_LOAD] Report panel notified")
             
             # Update manager's filename to match the loaded file
             manager.filename = base_name
@@ -2021,16 +2029,20 @@ class FileExplorerPanel:
             
             # CRITICAL: Ensure simulation is reset after loading file
             # This guarantees clean initial state for the loaded model
+            print(f"[FILE_LOAD] Ensuring simulation reset")
             if hasattr(self.canvas_loader, '_ensure_simulation_reset'):
                 # Use the drawing_area we already have (from new tab creation)
                 self.canvas_loader._ensure_simulation_reset(drawing_area)
+            print(f"[FILE_LOAD] Simulation reset done")
             
             # Force redraw to display loaded objects
             manager.mark_needs_redraw()
+            print(f"[FILE_LOAD] Mark needs redraw done")
             
             # REPORT PANEL: Trigger refresh after file load (deferred)
             # Use GLib.idle_add to ensure this happens AFTER tab switch completes
             # This prevents race condition with tab switch handler also calling set_controller
+            print(f"[FILE_LOAD] Setting up deferred report panel refresh")
             if drawing_area in self.canvas_loader.overlay_managers:
                 from gi.repository import GLib
                 
