@@ -45,14 +45,14 @@ class HierarchicalLayoutProcessor:
     creating a clear flow from substrates to products.
     """
     
-    def __init__(self, pathway: PathwayData, vertical_spacing: float = 150.0, 
-                 horizontal_spacing: float = 100.0):
+    def __init__(self, pathway: PathwayData, vertical_spacing: float = 120.0, 
+                 horizontal_spacing: float = 80.0):
         """Initialize hierarchical layout processor.
         
         Args:
             pathway: Pathway data with species and reactions
-            vertical_spacing: Distance between layers (vertical)
-            horizontal_spacing: Distance between species in same layer
+            vertical_spacing: Distance between layers (vertical) - reduced for compactness
+            horizontal_spacing: Distance between species in same layer - reduced for compactness
         """
         self.pathway = pathway
         self.vertical_spacing = vertical_spacing
@@ -278,10 +278,16 @@ class HierarchicalLayoutProcessor:
         # Layout parameters
         start_y = 100.0  # Top margin
         canvas_center_x = 600.0  # Canvas center
-        max_canvas_width = 1200.0  # Maximum width
-        min_spacing = 80.0  # Minimum spacing between nodes
+        max_canvas_width = 800.0  # Maximum width (reduced for better viewing)
+        min_spacing = 60.0  # Minimum spacing between nodes (more compact)
         
-        self.logger.warning(f"🔍 POSITIONING {len(layers)} LAYERS:")
+        # Adaptive max width based on total nodes (tighter for large models)
+        total_nodes = sum(len(layer) for layer in layers)
+        if total_nodes > 100:
+            max_canvas_width = 600.0  # Even tighter for very large models
+            min_spacing = 50.0
+        
+        self.logger.warning(f"🔍 POSITIONING {len(layers)} LAYERS (total nodes: {total_nodes}):")
         
         for layer_index, layer_species in enumerate(layers):
             # Y position for this layer
@@ -303,7 +309,7 @@ class HierarchicalLayoutProcessor:
                 if ideal_width > max_canvas_width:
                     # Too wide - use max width with tighter spacing
                     actual_width = max_canvas_width
-                    actual_spacing = max_canvas_width / (num_species - 1)
+                    actual_spacing = max(min_spacing, max_canvas_width / (num_species - 1))
                     self.logger.debug(f"      Layer too wide, reducing spacing to {actual_spacing:.1f}px")
                 else:
                     actual_width = ideal_width
