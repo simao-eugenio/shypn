@@ -50,6 +50,7 @@ class BatchExecutor:
         experiments: List[tuple],
         replicates: int = 500,
         duration: float = 100.0,
+        termination_condition: str = "deadlock",
         progress_callback: Optional[Callable] = None,
         complete_callback: Optional[Callable] = None,
         experiment_result_callback: Optional[Callable] = None
@@ -60,6 +61,7 @@ class BatchExecutor:
             experiments: List of (index, name, snapshot_index) tuples
             replicates: Number of replicates per experiment
             duration: Simulation duration
+            termination_condition: When to stop ("time_only", "deadlock", "steady_state")
             progress_callback: Called with (exp_index, status, progress)
             complete_callback: Called when batch completes
             experiment_result_callback: Called with (name, result) when each experiment completes
@@ -72,45 +74,30 @@ class BatchExecutor:
         
         # CRITICAL: Extract model and subnet data in main thread BEFORE starting background thread
         # Accessing GTK widgets from background thread causes deadlock
-        print("[EXTRACT] Starting model extraction...")
         import time as time_module
         extraction_start = time_module.time()
         
         try:
-            # Step 1: Get canvas manager
-            print("[EXTRACT] Getting canvas manager...")
-            t1 = time_module.time()
-            canvas_manager = self._get_model()
-            if not canvas_manager:
-                raise RuntimeError("No model available for simulation")
-            print(f"[EXTRACT] Canvas manager obtained in {time_module.time()-t1:.3f}s")
+            # Use pre-built subnet model from viability panel (created when user adds localities)
+            if not hasattr(self.parent_panel, 'subnet_model') or self.parent_panel.subnet_model is None:
+                raise RuntimeError("No subnet model available. Please add transitions to viability analysis first.")
             
-            # Step 2: Convert to DocumentModel
-            print("[EXTRACT] Converting to DocumentModel...")
-            t2 = time_module.time()
-            base_model = canvas_manager.to_document_model()
-            print(f"[EXTRACT] DocumentModel created in {time_module.time()-t2:.3f}s")
-            print(f"[EXTRACT] Model has {len(base_model.places)} places, {len(base_model.transitions)} transitions, {len(base_model.arcs)} arcs")
+            subnet_model = self.parent_panel.subnet_model
             
-            # Step 3: Extract subnet
-            print("[EXTRACT] Extracting subnet...")
-            t3 = time_module.time()
-            subnet_data = self._extract_subnet(canvas_manager)
-            print(f"[EXTRACT] Subnet extracted in {time_module.time()-t3:.3f}s")
+            # Convert subnet elements to dict format for compatibility with existing code
+            subnet_data = {
+                'places': subnet_model.places,
+                'transitions': subnet_model.transitions,
+                'arcs': subnet_model.arcs
+            }
             
-            if not subnet_data or not subnet_data['transitions']:
-                raise RuntimeError("No transitions available for simulation")
-            
-            print(f"[EXTRACT] Total extraction time: {time_module.time()-extraction_start:.3f}s")
-            print(f"[EXTRACT] Subnet: {len(subnet_data['places'])} places, {len(subnet_data['transitions'])} transitions, {len(subnet_data['arcs'])} arcs")
+            if not subnet_data['transitions']:
+                raise RuntimeError("No transitions in subnet model")
             
             # Save baseline parameters to reset between experiments
-            print("[EXTRACT] Saving baseline parameters...")
-            baseline_params = self._save_current_parameters(base_model, subnet_data)
-            print(f"[EXTRACT] Baseline saved: {len(baseline_params['place_markings'])} places, {len(baseline_params['transition_rates'])} transitions")
+            baseline_params = self._save_current_parameters(subnet_model, subnet_data)
         except Exception as e:
             self.is_running = False
-            print(f"[ERROR] Failed to extract model: {e}")
             if complete_callback:
                 complete_callback()
             raise
@@ -118,7 +105,7 @@ class BatchExecutor:
         # Start execution thread with pre-extracted data
         self.executor_thread = threading.Thread(
             target=self._execute_batch,
-            args=(experiments, replicates, duration, progress_callback, complete_callback, experiment_result_callback, base_model, subnet_data, baseline_params),
+            args=(experiments, replicates, duration, termination_condition, progress_callback, complete_callback, experiment_result_callback, subnet_model, subnet_data, baseline_params),
             daemon=True
         )
         self.executor_thread.start()
@@ -128,20 +115,18 @@ class BatchExecutor:
         if not self.is_running:
             return
         
-        print("[DEBUG] Cancelling batch execution...")
         self.is_cancelled = True
         
         # Wait for thread to finish with timeout
         if self.executor_thread and self.executor_thread.is_alive():
             self.executor_thread.join(timeout=2.0)
-            if self.executor_thread.is_alive():
-                print("[WARNING] Executor thread did not terminate within timeout")
     
     def _execute_batch(
         self,
         experiments: List[tuple],
         replicates: int,
         duration: float,
+        termination_condition: str,
         progress_callback: Optional[Callable],
         complete_callback: Optional[Callable],
         experiment_result_callback: Optional[Callable],
@@ -155,6 +140,7 @@ class BatchExecutor:
             experiments: List of (index, name, snapshot_index) tuples
             replicates: Number of replicates per experiment
             duration: Simulation duration
+            termination_condition: When to stop ("time_only", "deadlock", "steady_state")
             progress_callback: Callback for progress updates (queue_index, status, progress_str)
             complete_callback: Callback when complete
             experiment_result_callback: Callback for each experiment result (name, result)
@@ -162,15 +148,12 @@ class BatchExecutor:
             subnet_data: Pre-extracted subnet dict (from main thread)
             baseline_params: Baseline parameter values to reset model between experiments
         """
-        print(f"[BATCH] Starting batch execution: {len(experiments)} experiments, {replicates} replicates each")
-        
         try:
             total = len(experiments)
             
             for i, (queue_index, name, snapshot_index) in enumerate(experiments):
                 # Check cancellation BEFORE starting each experiment
                 if self.is_cancelled:
-                    print(f"[BATCH] Cancelled - marking remaining {total - i} experiments as cancelled")
                     # Mark remaining experiments as cancelled
                     if progress_callback:
                         progress_callback(queue_index, "cancelled", "Cancelled")
@@ -213,6 +196,7 @@ class BatchExecutor:
                         snapshot_index,
                         replicates,
                         duration,
+                        termination_condition,
                         exp_progress_callback,
                         base_model,
                         subnet_data
@@ -227,14 +211,12 @@ class BatchExecutor:
                     
                     # Store result BEFORE marking as completed
                     self.results[name] = result
-                    print(f"[BATCH] Result stored for '{name}': {result.get('n_replicates', 0)} replicates")
                     
                     # Call result callback immediately for incremental display
                     if experiment_result_callback:
                         from gi.repository import GLib
                         # Schedule in main thread to update UI
                         GLib.idle_add(lambda n=name, r=result: experiment_result_callback(n, r) or False)
-                        print(f"[BATCH] Result callback scheduled for '{name}'")
                     
                     # CRITICAL: Mark as completed ONLY after result is stored
                     if progress_callback:
@@ -242,7 +224,6 @@ class BatchExecutor:
                         # print(f"[BATCH] Status set to COMPLETED for experiment {queue_index}")
                     
                 except Exception as e:
-                    print(f"[BATCH] ERROR in experiment '{name}': {e}")
                     import traceback
                     traceback.print_exc()
                     
@@ -250,7 +231,6 @@ class BatchExecutor:
                     error_msg = str(e)[:100]  # Truncate long errors
                     if progress_callback:
                         progress_callback(queue_index, "failed", error_msg)
-                        print(f"[BATCH] Status set to FAILED for experiment {queue_index}: {error_msg}")
                     
                     # Store error result
                     self.results[name] = {
@@ -259,10 +239,7 @@ class BatchExecutor:
                         "snapshot_index": snapshot_index
                     }
             
-            print(f"[BATCH] Batch execution finished - {'CANCELLED' if self.is_cancelled else 'COMPLETED'}")
-            
         except Exception as e:
-            print(f"[BATCH] CRITICAL ERROR in batch execution: {e}")
             import traceback
             traceback.print_exc()
             
@@ -271,16 +248,11 @@ class BatchExecutor:
             self.is_running = False
             self.current_experiment = None
             
-            print(f"[BATCH] Calling completion callback (cancelled={self.is_cancelled})")
-            
             if complete_callback:
                 # CRITICAL: Schedule callback in main thread - don't block background thread
                 from gi.repository import GLib
                 cancelled = self.is_cancelled
                 GLib.idle_add(lambda: complete_callback(cancelled=cancelled), priority=GLib.PRIORITY_HIGH_IDLE)
-                print("[BATCH] Completion callback scheduled in main thread")
-            else:
-                print("[BATCH] No completion callback provided")
     
     def _run_single_experiment(
         self,
@@ -288,6 +260,7 @@ class BatchExecutor:
         snapshot_index: int,
         replicates: int,
         duration: float,
+        termination_condition: str,
         progress_callback: Optional[Callable] = None,
         base_model = None,  # Pre-extracted DocumentModel
         subnet_data: dict = None  # Pre-extracted subnet data
@@ -299,6 +272,7 @@ class BatchExecutor:
             snapshot_index: Snapshot index in ExperimentManager
             replicates: Number of replicates to run
             duration: Simulation duration
+            termination_condition: When to stop ("time_only", "deadlock", "steady_state")
             progress_callback: Called with progress (0.0 to 1.0 float)
             base_model: Pre-extracted DocumentModel (from main thread)
             subnet_data: Pre-extracted subnet dict (from main thread)
@@ -312,7 +286,6 @@ class BatchExecutor:
                 - duration: Actual execution time
                 - error: Error message (if failed)
         """
-        print(f"[EXPERIMENT] Running '{name}' (snapshot {snapshot_index}): {replicates} replicates, {duration}s duration")
         start_time = time.time()
         
         try:
@@ -321,7 +294,6 @@ class BatchExecutor:
                 raise ValueError(f"Invalid snapshot index: {snapshot_index}")
             
             snapshot = self.experiment_manager.snapshots[snapshot_index]
-            print(f"[EXPERIMENT] Snapshot loaded: {snapshot.name}")
             
             # CRITICAL FIX: Create a fresh DocumentModel from the subnet data
             # The subnet is extracted correctly, but we were passing the full base_model
@@ -337,12 +309,19 @@ class BatchExecutor:
             model.places = [type(p).from_dict(p.to_dict()) for p in subnet_data['places']]
             model.transitions = [type(t).from_dict(t.to_dict()) for t in subnet_data['transitions']]
             
-            # Debug: Check initial markings
-            print(f"[MODEL] Copied {len(model.places)} places with initial markings:")
-            for p in model.places[:4]:  # Show first 4
-                marking = getattr(p, 'tokens', getattr(p, 'marking', 0))
-                name = getattr(p, 'name', '<NO NAME>')
-                print(f"[MODEL]   {p.id} (name='{name}'): tokens={marking}")
+            # CRITICAL FIX: Normalize transition types for simulation controller
+            # UI stores as "Continuous (SHPN)", but controller expects "continuous"
+            type_name_map = {
+                'Immediate': 'immediate', 
+                'Timed (TPN)': 'timed', 
+                'Stochastic (FSPN)': 'stochastic', 
+                'Continuous (SHPN)': 'continuous'
+            }
+            for t in model.transitions:
+                if hasattr(t, 'transition_type'):
+                    # Normalize type name for controller
+                    if t.transition_type in type_name_map:
+                        t.transition_type = type_name_map[t.transition_type]
             
             # Step 2: Build ID lookup dictionaries for arc deserialization
             places_dict = {p.id: p for p in model.places}
@@ -352,12 +331,8 @@ class BatchExecutor:
             model.arcs = [type(a).from_dict(a.to_dict(), places_dict, transitions_dict) 
                           for a in subnet_data['arcs']]
             
-            # print(f"[EXPERIMENT] Using subnet model: {len(model.places)} places, {len(model.transitions)} transitions, {len(model.arcs)} arcs")
-            
             # Apply snapshot parameters to subnet model (pass None since model IS the subnet)
-            # print(f"[EXPERIMENT] Applying snapshot parameters...")
             self._apply_snapshot_to_model(snapshot, model, None)
-            # print(f"[EXPERIMENT] Snapshot parameters applied: {len(snapshot.place_markings)} places, {len(snapshot.transition_rates)} transitions, {len(snapshot.arc_weights)} arcs")
             
             # CRITICAL: Verify arc types are preserved (test arcs should stay test arcs)
             # Disabled for performance - this per-arc loop is VERY slow
@@ -400,6 +375,7 @@ class BatchExecutor:
                 use_parallel=False,  # SEQUENTIAL execution of replicates
                 use_tau_leaping=True,
                 duration=duration,
+                termination_condition=termination_condition,
                 seed_base=42,
                 verbose=False,
                 progress_callback=progress_callback
@@ -422,17 +398,7 @@ class BatchExecutor:
                 statistics['n_replicates'] = len(results)
                 # print(f"[EXPERIMENT] Statistics computed successfully")
                 # print(f"[EXPERIMENT] Statistics keys: {statistics.keys()}")
-                if 'species_statistics' in statistics:
-                    print(f"[EXPERIMENT] Species count: {len(statistics['species_statistics'])}")
-                    for species_id in list(statistics['species_statistics'].keys())[:2]:
-                        species_data = statistics['species_statistics'][species_id]
-                        mean_len = len(species_data.get('mean', []))
-                        mean_first = species_data.get('mean', [])[:3] if len(species_data.get('mean', [])) > 0 else []
-                        print(f"[EXPERIMENT]   Species '{species_id}': mean length = {mean_len}, first values = {mean_first}")
-                if 'time_points' in statistics:
-                    print(f"[EXPERIMENT] Time points length: {len(statistics['time_points'])}, first = {statistics['time_points'][:3] if len(statistics['time_points']) > 0 else []}")
             else:
-                print(f"[EXPERIMENT] WARNING: No successful replicates")
                 statistics = {
                     'n_replicates': 0,
                     'elapsed_time': elapsed_time,
@@ -452,6 +418,16 @@ class BatchExecutor:
                             'final_time': traj.get('time_points', [0])[-1] if traj.get('time_points') else 0
                         })
             
+            # Include swept parameter metadata from snapshot
+            swept_param = getattr(snapshot, 'swept_parameter', None)
+            
+            # Include subnet structure for accurate plotting
+            subnet_structure = {
+                'place_ids': [p.id for p in subnet_data['places']],
+                'transition_ids': [t.id for t in subnet_data['transitions']],
+                'arc_ids': [a.id for a in subnet_data['arcs']]
+            }
+            
             # Return complete result dict with statistics (plottable from statistics)
             result = {
                 'name': name,
@@ -459,16 +435,16 @@ class BatchExecutor:
                 'trajectory_summary': trajectory_summary,  # Lightweight summary
                 'n_replicates': len(results) if results else 0,
                 'statistics': statistics,  # Contains mean/std/percentiles for plotting
-                'duration': elapsed_time
+                'duration': elapsed_time,
+                'swept_parameter': swept_param,  # Include swept parameter info for smart plotting
+                'subnet_structure': subnet_structure  # Include actual subnet composition
             }
             
-            print(f"[EXPERIMENT] Result dict created: {result['n_replicates']} replicates, {elapsed_time:.2f}s")
             return result
             
         except Exception as e:
             elapsed_time = time.time() - start_time
             error_msg = str(e)
-            print(f"[EXPERIMENT] ERROR: {error_msg}")
             import traceback
             traceback.print_exc()
             
@@ -731,7 +707,6 @@ class BatchExecutor:
         # Apply place markings (only to subnet places)
         # CRITICAL: Skip zero values to preserve baseline markings from model
         # Only the swept parameter should be modified; others keep their initial values
-        print(f"[SNAPSHOT] Applying {len(snapshot.place_markings)} place markings to {len(places)} subnet places")
         applied_markings = 0
         skipped_zeros = 0
         for place_id, marking in snapshot.place_markings.items():
@@ -744,27 +719,50 @@ class BatchExecutor:
                     place.tokens = marking_float
                     place.marking = marking_float
                     applied_markings += 1
-                    if applied_markings <= 3:  # Show first 3
-                        print(f"[SNAPSHOT]   {place_id}: {marking}")
                 else:
                     # Keep baseline value from model (don't overwrite with zero)
                     skipped_zeros += 1
-                    if skipped_zeros <= 3:
-                        baseline_value = getattr(place, 'tokens', getattr(place, 'marking', 0))
-                        print(f"[SNAPSHOT]   {place_id}: SKIPPED (keeping baseline {baseline_value})")
-        print(f"[SNAPSHOT] Applied {applied_markings}/{len(snapshot.place_markings)} place markings, skipped {skipped_zeros} zeros")
         
         # Apply transition rates (only to subnet transitions)
         # Handle both numeric rates and kinetic formulas
-        print(f"[SNAPSHOT] Applying {len(snapshot.transition_rates)} transition rates to {len(transitions)} subnet transitions")
         applied_rates = 0
         for trans_id, rate in snapshot.transition_rates.items():
             trans = next((t for t in transitions if t.id == trans_id), None)
             if trans:
+                # Ensure properties dict exists
+                if not hasattr(trans, 'properties') or trans.properties is None:
+                    trans.properties = {}
+                
                 # Check if rate is numeric or a formula string
                 if isinstance(rate, str):
-                    # It's a kinetic formula - keep as string
-                    trans.rate = rate
+                    # Try to parse as number first
+                    try:
+                        numeric_rate = float(rate)
+                        # It's a numeric string - store as number
+                        trans.rate = numeric_rate
+                    except ValueError:
+                        # It's a formula string - store in properties for behavior factory
+                        trans.properties['rate_function'] = rate
+                        
+                        # Evaluate formula with initial place markings to get numeric fallback rate
+                        # Build evaluation context with place tokens
+                        import re
+                        context = {}
+                        for place in places:
+                            # Add by ID (P1, P2, etc.)
+                            context[place.id] = place.tokens
+                            # Also add by name if it exists
+                            if hasattr(place, 'name') and place.name:
+                                context[place.name] = place.tokens
+                        
+                        try:
+                            # Safely evaluate the formula
+                            evaluated_rate = eval(rate, {"__builtins__": {}}, context)
+                            trans.rate = float(evaluated_rate)
+                        except Exception as e:
+                            # If evaluation fails, extract leading coefficient as fallback
+                            coef_match = re.match(r'^([\d.]+)', rate)
+                            trans.rate = float(coef_match.group(1)) if coef_match else 1.0
                 else:
                     # It's numeric - convert to float
                     try:
@@ -774,9 +772,6 @@ class BatchExecutor:
                         # Keep the value as-is if conversion fails
                         trans.rate = rate
                 applied_rates += 1
-                if applied_rates <= 3:  # Show first 3
-                    print(f"[SNAPSHOT]   {trans_id}: {rate}")
-        print(f"[SNAPSHOT] Applied {applied_rates}/{len(snapshot.transition_rates)} transition rates")
         
         # Apply arc weights (handle all arc types: normal, curved, inhibitor, test, curved_inhibitor)
         for arc_id, weight in snapshot.arc_weights.items():
@@ -819,7 +814,6 @@ class BatchExecutor:
     
     def reset(self):
         """Reset executor to initial state."""
-        print("[DEBUG] Resetting batch executor...")
         self.is_running = False
         self.is_cancelled = False
         self.current_experiment = None

@@ -499,11 +499,13 @@ class Transition(PetriNetObject):
             "is_sink": self.is_sink
         })
         
-        # Serialize behavioral properties (guard, rate, properties dict)
+        # Serialize behavioral properties (guard, rate, formula, properties dict)
         if self.guard is not None:
             data["guard"] = self.guard
         if self.rate is not None:
             data["rate"] = self.rate
+        if hasattr(self, 'formula') and self.formula:
+            data["formula"] = self.formula
         
         # Serialize directional rates for reversible reactions
         if hasattr(self, 'rate_forward') and self.rate_forward is not None:
@@ -666,6 +668,8 @@ class Transition(PetriNetObject):
             transition.guard = 1 if guard_value is None else guard_value
         if "rate" in data:
             transition.rate = data["rate"]
+        if "formula" in data:
+            transition.formula = data["formula"]
         
         # Restore directional rates for reversible reactions
         if "rate_forward" in data:

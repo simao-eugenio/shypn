@@ -17,16 +17,19 @@ class DataCollector:
     Thread-safe for single-threaded GTK event loop.
     """
     
-    def __init__(self, model):
+    def __init__(self, model, controller=None):
         """Initialize data collector.
         
         Args:
             model: DocumentModel instance with places and transitions
+            controller: Optional SimulationController for accessing behavior cache
         """
         self.model = model
+        self.controller = controller  # For accessing behavior cache
         self.time_points: List[float] = []
         self.place_data: Dict[str, List[int]] = {}
-        self.transition_data: Dict[str, List[int]] = {}
+        self.transition_data: Dict[str, List[int]] = {}  # Cumulative counts
+        self.transition_rates: Dict[str, List[float]] = {}  # Instantaneous rates/propensities
         self.is_collecting: bool = False
         
     def start_collection(self):
@@ -36,8 +39,11 @@ class DataCollector:
         # Initialize place data with empty lists
         self.place_data = {p.id: [] for p in self.model.places}
         
-        # Initialize transition data with empty lists
+        # Initialize transition data with empty lists (cumulative counts)
         self.transition_data = {t.id: [] for t in self.model.transitions}
+        
+        # Initialize transition rates (instantaneous propensity/rate values)
+        self.transition_rates = {t.id: [] for t in self.model.transitions}
         
         self.is_collecting = True
         
@@ -57,10 +63,47 @@ class DataCollector:
             tokens = place.tokens
             self.place_data[place.id].append(tokens)
             
-        # Record transition firing counts (cumulative)
+        # Record transition firing counts (cumulative) AND instantaneous rates
         for transition in self.model.transitions:
+            # Cumulative firing count
             count = getattr(transition, 'firing_count', 0)
             self.transition_data[transition.id].append(count)
+            
+            # Instantaneous rate/propensity - evaluate with CURRENT token state
+            rate = 0.0
+            
+            # Get behavior from controller's cache (behaviors are created on-demand by controller)
+            behavior = None
+            if self.controller and hasattr(self.controller, 'behavior_cache'):
+                behavior = self.controller.behavior_cache.get(transition.id)
+                if not behavior:
+                    # Behavior not in cache - try to create it
+                    from shypn.engine import behavior_factory
+                    try:
+                        behavior = behavior_factory.create_behavior(transition, self.model)
+                        self.controller.behavior_cache[transition.id] = behavior
+                    except Exception as e:
+                        pass
+            
+            if behavior:
+                try:
+                    # Force re-evaluation with current tokens by calling the method
+                    # This ensures we get the rate based on current marking, not cached value
+                    if hasattr(behavior, '_evaluate_rate_at_enablement'):
+                        # This method evaluates the rate formula with current place tokens
+                        rate = behavior._evaluate_rate_at_enablement(current_time)
+                    elif hasattr(behavior, 'evaluate_rate'):
+                        # For continuous transitions - needs places dict
+                        places_dict = {p.id: p for p in self.model.places}
+                        rate = behavior.evaluate_rate(places_dict, current_time)
+                    elif hasattr(transition, 'rate'):
+                        # Fallback: use static rate attribute (won't reflect token changes)
+                        rate = float(transition.rate) if transition.rate else 0.0
+                except Exception as e:
+                    # If rate evaluation fails, use 0.0
+                    rate = 0.0
+            
+            self.transition_rates[transition.id].append(rate)
     
     def record_event(self, time: float, event_type: str, data: dict = None):
         """Record a simulation event (for logging/debugging).

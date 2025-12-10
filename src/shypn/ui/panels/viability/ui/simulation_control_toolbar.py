@@ -61,11 +61,10 @@ class SimulationControlToolbar(Gtk.Box):
         self.copy_exp_button.set_tooltip_text("Duplicate current experiment for variation")
         row.pack_start(self.copy_exp_button, False, False, 0)
         
-        # Sync button (hidden by default until baseline becomes stale)
+        # Sync button (always visible)
         self.sync_baseline_button = Gtk.Button(label="↻ Sync to Automation")
         self.sync_baseline_button.set_tooltip_text("Update automation baseline from current table values")
         self.sync_baseline_button.get_style_context().add_class("suggested-action")
-        self.sync_baseline_button.set_no_show_all(True)  # Hidden by default
         row.pack_start(self.sync_baseline_button, False, False, 0)
         
         # Stale warning indicator (hidden by default)

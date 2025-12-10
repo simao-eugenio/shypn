@@ -65,6 +65,7 @@ class ReplicateRunner:
         use_parallel: bool = True,
         use_tau_leaping: bool = True,
         duration: float = 100.0,
+        termination_condition: str = "deadlock",
         time_step: Optional[float] = None,
         epsilon: float = 0.03,
         seed_base: int = 42,
@@ -81,7 +82,11 @@ class ReplicateRunner:
             n: Number of replicates to run
             use_parallel: Use parallel stochastic execution
             use_tau_leaping: Use tau-leaping algorithm
-            duration: Simulation duration in time_units
+            duration: Simulation duration in time_units (maximum time limit)
+            termination_condition: When to stop ("time_only", "deadlock", "steady_state")
+                - "time_only": Run until duration is reached
+                - "deadlock": Stop when deadlock occurs OR duration is reached
+                - "steady_state": Stop when steady state detected OR duration is reached
             time_step: Time step for recording (None = auto)
             epsilon: Tau-leaping epsilon parameter
             seed_base: Base random seed (replicate i uses seed_base + i)
@@ -98,6 +103,7 @@ class ReplicateRunner:
                 - 'transition_data': Dict mapping transition_id to firing counts
                 - 'final_marking': Dict of place_id -> final token count
                 - 'total_firings': Dict of transition_id -> total firings
+                - 'stopped_reason': Why simulation stopped ("duration", "deadlock", "steady_state")
         """
         if verbose:
             print(f"Running {n} replicates...")
@@ -159,6 +165,7 @@ class ReplicateRunner:
             
             # Run simulation synchronously (step-by-step) for background execution
             # controller.run() uses GLib callbacks which don't work in threads
+            stopped_reason = "duration"  # Default: ran to completion
             try:
                 # Initialize enablement states before simulation
                 controller._update_enablement_states()
@@ -167,7 +174,32 @@ class ReplicateRunner:
                 for step_num in range(max_steps):
                     success = controller.step(time_step=dt)
                     if not success:
-                        break  # Simulation stopped (e.g., deadlock or duration reached)
+                        # Simulation stopped (deadlock)
+                        if termination_condition in ["deadlock", "steady_state"]:
+                            stopped_reason = "deadlock"
+                            break  # Early termination allowed
+                        elif termination_condition == "time_only":
+                            # Time-only mode: ignore deadlock, continue (this shouldn't happen but handle it)
+                            pass
+                    
+                    # Check for steady state (simple heuristic: no token changes for N steps)
+                    if termination_condition == "steady_state" and step_num > 100:
+                        # Check if marking hasn't changed in last 50 steps
+                        # This is a simple heuristic - could be improved
+                        recent_data = controller.data_collector.place_data
+                        if recent_data and len(list(recent_data.values())[0]) >= 50:
+                            # Check last 50 time points for all places
+                            all_stable = True
+                            for place_id, data in recent_data.items():
+                                if len(data) >= 50:
+                                    last_50 = data[-50:]
+                                    if not all(v == last_50[0] for v in last_50):
+                                        all_stable = False
+                                        break
+                            
+                            if all_stable:
+                                stopped_reason = "steady_state"
+                                break
             except Exception as e:
                 if verbose:
                     print(f"  ERROR in replicate {i}: {e}")
@@ -192,17 +224,19 @@ class ReplicateRunner:
                     tid: data.copy()
                     for tid, data in controller.data_collector.transition_data.items()
                 },
+                'transition_rates': {
+                    tid: data.copy()
+                    for tid, data in controller.data_collector.transition_rates.items()
+                },
                 'final_marking': {
                     p.id: p.tokens for p in self.model.places
                 },
                 'total_firings': {
                     t.id: getattr(t, 'firing_count', 0)
                     for t in self.model.transitions
-                }
+                },
+                'stopped_reason': stopped_reason
             }
-            
-            if i == 0:
-                print(f"[REPLICATE] Result created with {len(result['time_points'])} time points")
             
             results.append(result)
         
@@ -224,7 +258,7 @@ class ReplicateRunner:
         """Compute statistics across replicates.
         
         Computes mean, std, min, max, CV (coefficient of variation),
-        and optionally percentiles for each species at each time point.
+        and optionally percentiles for each species (places and transitions) at each time point.
         
         Args:
             results: List of replicate results from run_replicates()
@@ -234,9 +268,9 @@ class ReplicateRunner:
             Dictionary containing:
                 - 'n_replicates': Number of successful replicates
                 - 'time_points': Common time points
-                - 'species_statistics': Dict mapping place_id to statistics dict
+                - 'species_statistics': Dict mapping place_id OR transition_id to statistics dict
                     Each statistics dict contains:
-                    - 'mean': Mean trajectory
+                    - 'mean': Mean trajectory (tokens for places, firing counts for transitions)
                     - 'std': Standard deviation
                     - 'min': Minimum trajectory
                     - 'max': Maximum trajectory
@@ -260,6 +294,11 @@ class ReplicateRunner:
         
         # Get all place IDs
         place_ids = list(successful[0]['place_data'].keys())
+        
+        # Get all transition IDs (if available)
+        transition_ids = []
+        if 'transition_data' in successful[0]:
+            transition_ids = list(successful[0]['transition_data'].keys())
         
         statistics = {
             'n_replicates': n_replicates,
@@ -293,6 +332,43 @@ class ReplicateRunner:
             }
             
             statistics['species_statistics'][place_id] = {
+                'mean': mean.tolist(),
+                'std': std.tolist(),
+                'min': min_traj.tolist(),
+                'max': max_traj.tolist(),
+                'cv': cv.tolist(),
+                'percentiles': {
+                    p: data.tolist()
+                    for p, data in percentile_data.items()
+                }
+            }
+        
+        # Compute statistics for each transition (use instantaneous rates from simulation)
+        for transition_id in transition_ids:
+            # Stack rate trajectories into matrix (replicates × time_points)
+            rate_trajectories = np.array([
+                r['transition_rates'][transition_id]
+                for r in successful
+            ])
+            
+            # Compute statistics on instantaneous rates (no derivatives needed!)
+            mean = np.mean(rate_trajectories, axis=0)
+            std = np.std(rate_trajectories, axis=0)
+            min_traj = np.min(rate_trajectories, axis=0)
+            max_traj = np.max(rate_trajectories, axis=0)
+            
+            # Coefficient of variation (handle divide by zero)
+            cv = np.zeros_like(mean)
+            nonzero_mask = mean > 0
+            cv[nonzero_mask] = std[nonzero_mask] / mean[nonzero_mask]
+            
+            # Percentiles
+            percentile_data = {
+                p: np.percentile(rate_trajectories, p, axis=0)
+                for p in percentiles
+            }
+            
+            statistics['species_statistics'][transition_id] = {
                 'mean': mean.tolist(),
                 'std': std.tolist(),
                 'min': min_traj.tolist(),
