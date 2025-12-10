@@ -1699,30 +1699,21 @@ class ModelCanvasManager:
         content_center_x = (min_x + max_x) / 2.0
         content_center_y = (min_y + max_y) / 2.0
         
-        # Calculate viewport dimensions in world coordinates (after zoom)
-        viewport_width_world = self.viewport_controller.viewport_width / target_zoom
-        viewport_height_world = self.viewport_controller.viewport_height / target_zoom
+        # Use viewport controller's pan_to method for proper centering
+        # This handles the coordinate transformation correctly
+        self.viewport_controller.pan_to(content_center_x, content_center_y)
         
-        # Calculate offsets in world coordinates
-        # Transform formula: screen = (world + pan) * zoom
-        # Therefore: pan shifts world in screen space direction
-        #   +pan_x shifts content RIGHT on screen
-        #   +pan_y shifts content DOWN on screen
-        horizontal_offset_world = (horizontal_offset_percent / 100.0) * viewport_width_world
-        vertical_offset_world = (vertical_offset_percent / 100.0) * viewport_height_world
-        
-        # Calculate pan to center content in viewport
-        # Base pan positions viewport top-left corner to show content centered
-        # Formula: pan = content_center - viewport_half_size
-        # This makes: screen_center = (content_center - viewport_half + viewport_half) * zoom = content_center * zoom ✓
-        base_pan_x = content_center_x - (viewport_width_world / 2.0)
-        base_pan_y = content_center_y - (viewport_height_world / 2.0)
-        
-        # Apply offsets to shift content position on screen
-        # Positive horizontal_offset shifts content RIGHT (increase pan_x)
-        # Positive vertical_offset shifts content DOWN (increase pan_y)
-        self.viewport_controller.pan_x = base_pan_x + horizontal_offset_world
-        self.viewport_controller.pan_y = base_pan_y + vertical_offset_world
+        # Apply offsets if specified
+        if horizontal_offset_percent != 0 or vertical_offset_percent != 0:
+            # Calculate offsets in world coordinates
+            viewport_width_world = self.viewport_controller.viewport_width / target_zoom
+            viewport_height_world = self.viewport_controller.viewport_height / target_zoom
+            horizontal_offset_world = (horizontal_offset_percent / 100.0) * viewport_width_world
+            vertical_offset_world = (vertical_offset_percent / 100.0) * viewport_height_world
+            
+            # Apply offsets to pan
+            self.viewport_controller.pan_x += horizontal_offset_world
+            self.viewport_controller.pan_y += vertical_offset_world
         
         # Update local references
         self.pan_x = self.viewport_controller.pan_x
