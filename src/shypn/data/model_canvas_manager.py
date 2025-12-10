@@ -61,7 +61,7 @@ class ModelCanvasManager:
     """Manages canvas properties, transformations, and rendering for Petri Net models."""
     
     # Zoom configuration
-    MIN_ZOOM = 0.3   # 30% minimum (practical engineering range)
+    MIN_ZOOM = 0.05  # 5% minimum (allows viewing very large models)
     MAX_ZOOM = 3.0   # 300% maximum (practical engineering range)
     ZOOM_STEP = 1.1  # Multiplicative zoom factor (10% per step)
     
@@ -1552,7 +1552,9 @@ class ModelCanvasManager:
         self._needs_redraw = True
     
     def get_content_bounds(self):
-        """Calculate the bounding box of all content (places and transitions).
+        """Calculate the bounding box of all content (places, transitions, and arcs).
+        
+        Includes arc control points and bezier curves to ensure entire model fits.
         
         Returns:
             tuple: (min_x, min_y, max_x, max_y) or None if no content.
@@ -1561,11 +1563,33 @@ class ModelCanvasManager:
         if not all_objects:
             return None
         
-        # Calculate bounds
+        # Start with place/transition bounds
         min_x = min(obj.x for obj in all_objects)
         max_x = max(obj.x for obj in all_objects)
         min_y = min(obj.y for obj in all_objects)
         max_y = max(obj.y for obj in all_objects)
+        
+        # Include arc control points (bezier curves can extend beyond nodes)
+        for arc in self.arcs:
+            # Include source and target points
+            if hasattr(arc.source, 'x') and hasattr(arc.source, 'y'):
+                min_x = min(min_x, arc.source.x)
+                max_x = max(max_x, arc.source.x)
+                min_y = min(min_y, arc.source.y)
+                max_y = max(max_y, arc.source.y)
+            if hasattr(arc.target, 'x') and hasattr(arc.target, 'y'):
+                min_x = min(min_x, arc.target.x)
+                max_x = max(max_x, arc.target.x)
+                min_y = min(min_y, arc.target.y)
+                max_y = max(max_y, arc.target.y)
+            
+            # Include control points if arc has bezier curves
+            if hasattr(arc, 'control_points') and arc.control_points:
+                for cp_x, cp_y in arc.control_points:
+                    min_x = min(min_x, cp_x)
+                    max_x = max(max_x, cp_x)
+                    min_y = min(min_y, cp_y)
+                    max_y = max(max_y, cp_y)
         
         return (min_x, min_y, max_x, max_y)
     
