@@ -17,7 +17,7 @@ WHEN IT POPULATES:
 """
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk
+from gi.repository import Gtk, GLib
 from datetime import datetime
 
 from .base_category import BaseReportCategory
@@ -39,6 +39,10 @@ class ModelsCategory(BaseReportCategory):
         """Initialize models category."""
         # Initialize instance variables BEFORE super().__init__
         # because super will call _build_content() which calls refresh()
+        
+        # Refresh throttling to prevent redundant updates during file loading
+        self._refresh_scheduled = False
+        self._refresh_pending = False
         
         # Selected locality tracking
         self.selected_transition = None
@@ -795,7 +799,26 @@ class ModelsCategory(BaseReportCategory):
             traceback.print_exc()
     
     def refresh(self):
-        """Refresh tables when model changes or tab switches."""
+        """Refresh tables when model changes or tab switches.
+        
+        OPTIMIZATION: Throttles redundant refreshes during file loading.
+        During a file open, refresh() can be called 8+ times from various events
+        (tab creation, tab switch, object notifications, explicit calls).
+        We defer all refreshes and execute only one at idle time.
+        """
+        # If refresh already scheduled, mark as pending and skip
+        if self._refresh_scheduled:
+            self._refresh_pending = True
+            return
+        
+        # Schedule deferred refresh at idle time
+        self._refresh_scheduled = True
+        GLib.idle_add(self._do_refresh)
+    
+    def _do_refresh(self):
+        """Actual refresh implementation, called at idle time."""
+        self._refresh_scheduled = False
+        
         # If no model, show empty state
         if not self.model_canvas:
             self.overview_label.set_text("No model loaded")
@@ -803,7 +826,7 @@ class ModelsCategory(BaseReportCategory):
             self.provenance_label.set_text("No import data")
             # Hide provenance frame when no data
             self.provenance_frame.hide()
-            return
+            return False  # Don't repeat this idle callback
         
         # The model_canvas IS the model (ModelCanvasManager with places/transitions/arcs)
         model = self.model_canvas
@@ -964,6 +987,13 @@ class ModelsCategory(BaseReportCategory):
         # === REFRESH LOCALITY TABLE IF SELECTION EXISTS ===
         if self.selected_transition and self.selected_locality:
             self._populate_locality_table()
+        
+        # If another refresh was requested while we were running, schedule it
+        if self._refresh_pending:
+            self._refresh_pending = False
+            GLib.idle_add(self._do_refresh)
+        
+        return False  # Don't repeat this idle callback
     
     def _find_linked_pathway_document(self, model):
         """Find the PathwayDocument linked to this model.

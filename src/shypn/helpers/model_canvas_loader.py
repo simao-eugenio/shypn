@@ -3083,16 +3083,21 @@ class ModelCanvasLoader:
             is_shift_pressed = event.state & Gdk.ModifierType.SHIFT_MASK
             should_pan = state['button'] in [2, 3] or (state['button'] == 1 and is_shift_pressed)
             if should_pan and state['is_panning']:
+                print(f"[PAN_DEBUG] Starting pan operation", flush=True)
                 dx = event.x - state['start_x']
                 dy = event.y - state['start_y']
                 
+                print(f"[PAN_DEBUG] Delta: dx={dx}, dy={dy}", flush=True)
                 # Use pan() method which handles rotation correctly
                 # Reset pan to start position first, then apply delta
                 manager.pan_x = state['start_pan_x']
                 manager.pan_y = state['start_pan_y']
+                print(f"[PAN_DEBUG] Calling manager.pan()", flush=True)
                 manager.pan(dx, dy)
+                print(f"[PAN_DEBUG] Pan complete, queueing draw", flush=True)
                 
                 widget.queue_draw()
+                print(f"[PAN_DEBUG] Pan operation finished", flush=True)
         return True
 
     def _on_scroll_event(self, widget, event, manager):
@@ -3297,11 +3302,13 @@ class ModelCanvasLoader:
             height: Viewport height in pixels.
             manager: ModelCanvasManager instance.
         """
+        print(f"[DRAW_DEBUG] Draw started", flush=True)
         if manager.viewport_width != width or manager.viewport_height != height:
             manager.set_viewport_size(width, height)
         
         # Execute deferred fit_to_page if pending (after viewport size is known)
         if hasattr(manager, '_fit_to_page_pending') and manager._fit_to_page_pending:
+            print(f"[DRAW_DEBUG] Executing deferred fit_to_page", flush=True)
             horizontal_offset = getattr(manager, '_fit_to_page_horizontal_offset', 0)
             vertical_offset = getattr(manager, '_fit_to_page_vertical_offset', 0)
             manager._fit_to_page_pending = False  # Clear flag before execution
@@ -3311,6 +3318,7 @@ class ModelCanvasLoader:
                 horizontal_offset_percent=horizontal_offset,
                 vertical_offset_percent=vertical_offset
             )
+            print(f"[DRAW_DEBUG] Fit to page complete", flush=True)
         
         cr.set_source_rgb(1.0, 1.0, 1.0)
         cr.paint()
@@ -3530,6 +3538,7 @@ class ModelCanvasLoader:
         cr.line_to(right_x, right_y)
         cr.close_path()
         cr.fill()
+        print(f"[DRAW_DEBUG] Draw complete", flush=True)
 
     def _show_canvas_context_menu(self, x, y, drawing_area):
         """Show the canvas context menu at the given position.
