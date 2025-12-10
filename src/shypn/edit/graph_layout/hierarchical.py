@@ -96,70 +96,18 @@ class HierarchicalLayout(LayoutAlgorithm):
     
     def _assign_layers(self, graph: nx.DiGraph) -> Dict[str, int]:
         """
-        Assign each node to a layer using Petri net aware algorithm.
+        Assign each node to a layer using longest path method.
         
-        For Petri nets, we need to respect the bipartite structure:
-        - Layer 0: Source places (no incoming arcs from transitions)
-        - Layer 1: Transitions consuming from layer 0
-        - Layer 2: Places produced by layer 1 transitions
-        - Layer 3: Transitions consuming from layer 2
-        - ... alternating places/transitions
+        Uses base class implementation which properly handles:
+        - Source nodes (no predecessors)
+        - Catalyst places (enzyme modifiers)
+        - Longest path for proper hierarchical ordering
         
         Returns:
             Dictionary mapping node IDs to layer numbers (0, 1, 2, ...)
         """
-        layers = {}
-        
-        # Identify source places (places with no incoming arcs from transitions)
-        source_places = []
-        for node in graph.nodes():
-            node_type = graph.nodes[node].get('type', 'unknown')
-            if node_type == 'place':
-                # Check if this place has any incoming arcs from transitions
-                has_incoming_from_transition = any(
-                    graph.nodes[pred].get('type') == 'transition'
-                    for pred in graph.predecessors(node)
-                )
-                if not has_incoming_from_transition:
-                    source_places.append(node)
-                    layers[node] = 0
-        
-        if not source_places:
-            # No clear sources - fallback to any place
-            for node in graph.nodes():
-                if graph.nodes[node].get('type') == 'place':
-                    source_places.append(node)
-                    layers[node] = 0
-                    break
-        
-        # Iteratively assign layers using longest path
-        # Multiple passes to handle cycles and find longest paths
-        changed = True
-        max_iterations = len(graph.nodes()) * 2  # Safety limit
-        iteration = 0
-        
-        while changed and iteration < max_iterations:
-            changed = False
-            iteration += 1
-            
-            for node in graph.nodes():
-                if node not in layers:
-                    layers[node] = 0
-                
-                # Calculate maximum predecessor layer
-                max_pred_layer = -1
-                for pred in graph.predecessors(node):
-                    if pred in layers:
-                        max_pred_layer = max(max_pred_layer, layers[pred])
-                
-                # Assign this node to next layer after maximum predecessor
-                if max_pred_layer >= 0:
-                    new_layer = max_pred_layer + 1
-                    if layers[node] != new_layer:
-                        layers[node] = new_layer
-                        changed = True
-        
-        return layers
+        # Use base class implementation which has proven layer assignment logic
+        return self.get_layer_assignment(graph)
     
     def _group_by_layer(self, layers: Dict[str, int]) -> List[List[str]]:
         """
