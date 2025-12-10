@@ -85,6 +85,15 @@ class DiagnosticsPanel:
         self.update_timer = None
         self.auto_tracking_enabled = False  # Track if auto-tracking is active
         
+        # Cache for change detection (Phase 1)
+        self._last_diagnostics_hash = None
+        self._cached_sections = {
+            'header': '',
+            'structure': '',
+            'static': '',
+            'runtime': ''
+        }
+        
         # Widgets
         self.selection_label = None
         self.textview = None
@@ -165,10 +174,12 @@ class DiagnosticsPanel:
             self._show_no_transition()
             self._stop_updates()
             self.auto_tracking_enabled = False  # Disable auto-tracking when cleared
+            self._last_diagnostics_hash = None  # Reset hash
             return
         
         self.current_transition = transition
         self.auto_tracking_enabled = False  # Manual selection disables auto-tracking
+        self._last_diagnostics_hash = None  # Reset hash to force initial update
         
         # Update selection label if available
         if self.selection_label:
@@ -415,8 +426,46 @@ class DiagnosticsPanel:
             GLib.source_remove(self.update_timer)
             self.update_timer = None
     
+    def _compute_diagnostics_hash(self):
+        """Compute hash of current diagnostic data for change detection.
+        
+        Returns:
+            int: Hash of relevant diagnostic fields, or None if no data
+        """
+        if not self.runtime_analyzer or not self.current_transition:
+            # Hash static data if available
+            if self.locality:
+                return hash((
+                    self.current_transition.id,
+                    len(self.locality.input_places),
+                    len(self.locality.output_places),
+                    len(self.locality.catalyst_places)
+                ))
+            return None
+        
+        try:
+            diag = self.runtime_analyzer.get_transition_diagnostics(
+                self.current_transition.id
+            )
+            
+            # Hash relevant runtime fields
+            recent_times = tuple(
+                e.get('time', 0) 
+                for e in diag.get('recent_events', [])[-5:]
+            )
+            
+            return hash((
+                diag.get('total_events', 0),
+                round(diag.get('last_event_time', 0), 3),  # Round to avoid float precision issues
+                round(diag.get('throughput', 0), 3),
+                recent_times
+            ))
+        except Exception:
+            # If error computing hash, return None to force update
+            return None
+    
     def _on_update_timer(self):
-        """Timer callback for periodic updates.
+        """Timer callback for periodic updates with change detection.
         
         Returns:
             bool: True to continue timer, False to stop
@@ -426,7 +475,12 @@ class DiagnosticsPanel:
             if self.auto_tracking_enabled:
                 self._auto_update_active_transition()
             
-            self._update_display()
+            # Phase 1: Only update if data actually changed
+            new_hash = self._compute_diagnostics_hash()
+            if new_hash != self._last_diagnostics_hash:
+                self._update_display()
+                self._last_diagnostics_hash = new_hash
+            
             return True  # Continue timer
         else:
             # Try to auto-select a transition if auto-tracking is enabled
