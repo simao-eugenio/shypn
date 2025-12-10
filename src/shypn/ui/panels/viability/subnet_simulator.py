@@ -173,13 +173,18 @@ class SubnetSimulator:
             if place_obj:
                 place_obj.marking = marking
         
-        # Update transition rates from Transitions tab
+        # Update transition rates - prefer formulas from experiment_manager baseline
         for row in self.panel.transitions_store:
             trans_id = row[0]
-            rate = row[2]
+            rate = row[2]  # Column 2: numeric rate
+            formula = row[3]  # Column 3: formula string
             trans_obj = next((t for t in subnet['transitions'] if t.id == trans_id), None)
             if trans_obj:
-                trans_obj.rate = rate
+                # Prefer formula over rate if available
+                if formula and formula.strip():
+                    trans_obj.rate = formula  # Assign formula string
+                else:
+                    trans_obj.rate = rate
         
         # Update arc weights from Arcs tab
         for row in self.panel.arcs_store:

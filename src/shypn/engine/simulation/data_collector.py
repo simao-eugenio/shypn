@@ -55,10 +55,6 @@ class DataCollector:
         """
         if not self.is_collecting:
             return
-        
-        # Debug: Verify this method is being called
-        if current_time <= 0.02:
-            print(f"[DATA_COLLECTOR] record_state called at t={current_time:.4f}")
             
         self.time_points.append(current_time)
         
@@ -73,14 +69,6 @@ class DataCollector:
             count = getattr(transition, 'firing_count', 0)
             self.transition_data[transition.id].append(count)
             
-            # Debug: Check if transition has behavior
-            if current_time <= 0.0:
-                trans_name = getattr(transition, 'name', transition.id)
-                has_behavior_attr = hasattr(transition, 'behavior')
-                behavior_obj = getattr(transition, 'behavior', None) if has_behavior_attr else None
-                has_controller = self.controller is not None
-                print(f"[BEHAVIOR_CHECK] t={current_time:.4f}, {trans_name}: has_behavior={has_behavior_attr}, behavior={behavior_obj}, has_controller={has_controller}")
-            
             # Instantaneous rate/propensity - evaluate with CURRENT token state
             rate = 0.0
             
@@ -92,19 +80,10 @@ class DataCollector:
                     # Behavior not in cache - try to create it
                     from shypn.engine import behavior_factory
                     try:
-                        # Debug: Check transition properties before creating behavior
-                        if current_time <= 0.0:
-                            trans_name = getattr(transition, 'name', transition.id)
-                            has_props = hasattr(transition, 'properties')
-                            props_value = getattr(transition, 'properties', None) if has_props else None
-                            rate_func = props_value.get('rate_function') if (props_value and isinstance(props_value, dict)) else 'N/A'
-                            print(f"[BEHAVIOR_CREATE] {trans_name}: has_properties={has_props}, properties={props_value}, rate_function={rate_func}")
-                        
                         behavior = behavior_factory.create_behavior(transition, self.model)
                         self.controller.behavior_cache[transition.id] = behavior
                     except Exception as e:
-                        if current_time < 0.1:
-                            print(f"[DATA_COLLECTOR] Failed to create behavior for {transition.id}: {e}")
+                        pass
             
             if behavior:
                 try:
@@ -120,18 +99,8 @@ class DataCollector:
                     elif hasattr(transition, 'rate'):
                         # Fallback: use static rate attribute (won't reflect token changes)
                         rate = float(transition.rate) if transition.rate else 0.0
-                    
-                    # Debug: Log first several rate evaluations to verify dynamics
-                    if current_time <= 0.1:  # First 20 time steps (at dt=0.005)
-                        trans_name = getattr(transition, 'name', transition.id)
-                        rate_func = getattr(behavior, 'rate_function_expr', 'N/A')
-                        # Also log place tokens to see what's driving the rate
-                        place_tokens = {p.id: p.tokens for p in self.model.places}
-                        print(f"[RATE] t={current_time:.4f}, {trans_name}: rate={rate:.6f}, formula={rate_func}, tokens={place_tokens}")
                 except Exception as e:
-                    # If rate evaluation fails, use 0.0 and log
-                    if current_time < 0.1:  # Only log errors early in simulation
-                        print(f"[DATA_COLLECTOR] Failed to evaluate rate for {transition.id}: {e}")
+                    # If rate evaluation fails, use 0.0
                     rate = 0.0
             
             self.transition_rates[transition.id].append(rate)
