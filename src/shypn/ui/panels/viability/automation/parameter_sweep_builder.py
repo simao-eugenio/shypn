@@ -328,7 +328,7 @@ class ParameterSweepBuilder(Gtk.Box):
                 self._apply_prediction(singular_type, evaluated_value)
                 
         except Exception as e:
-            print(f"[SWEEP_BUILDER] Auto-prediction failed: {e}")
+            pass  # Silent fail - user can manually adjust values
             import traceback
             traceback.print_exc()
     
@@ -654,7 +654,7 @@ class ParameterSweepBuilder(Gtk.Box):
                 pass
                 
         except Exception as e:
-            print(f"[PREDICTION] Failed to apply prediction: {e}")
+            pass  # Silent fail - user can manually adjust values
     
     def prefill_parameter(self, param_type, param_id, param_name, current_value):
         """Pre-fill sweep builder with parameter from right-click context menu.

@@ -98,7 +98,6 @@ class BatchExecutor:
             baseline_params = self._save_current_parameters(subnet_model, subnet_data)
         except Exception as e:
             self.is_running = False
-            print(f"[ERROR] Failed to extract subnet model: {e}")
             if complete_callback:
                 complete_callback()
             raise
@@ -121,8 +120,6 @@ class BatchExecutor:
         # Wait for thread to finish with timeout
         if self.executor_thread and self.executor_thread.is_alive():
             self.executor_thread.join(timeout=2.0)
-            if self.executor_thread.is_alive():
-                print("[WARNING] Executor thread did not terminate within timeout")
     
     def _execute_batch(
         self,
