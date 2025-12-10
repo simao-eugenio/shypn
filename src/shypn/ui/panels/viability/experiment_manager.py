@@ -71,9 +71,6 @@ class ExperimentSnapshot:
                 self.transition_rates[trans_id] = str(formula)
             else:
                 self.transition_rates[trans_id] = rate
-                # Warn if rate is zero (will prevent firing)
-                if rate == 0 or rate == 0.0 or rate == "0" or rate == "0.0":
-                    print(f"[BASELINE WARNING] Transition {trans_id} has ZERO rate and no formula - it will never fire!")
             
         # Capture arc weights (column 3 = weight)
         for row in arcs_store:
@@ -350,7 +347,6 @@ class ExperimentManager:
         if match:
             old_coefficient = match.group(1)
             modified = original_str.replace(f'{old_coefficient}*', f'{new_value}*', 1)
-            print(f"[FORMULA_SWEEP] Modified formula: '{original_str}' -> '{modified}'")
             return modified
         
         # Try to find coefficient after multiplication: "...*0.5"
@@ -358,12 +354,10 @@ class ExperimentManager:
         if match:
             old_coefficient = match.group(1)
             modified = re.sub(r'\*\s*[\d.]+$', f'*{new_value}', original_str)
-            print(f"[FORMULA_SWEEP] Modified formula: '{original_str}' -> '{modified}'")
             return modified
         
         # If no coefficient found, prepend new coefficient: "NAD" -> "4.5*NAD"
         modified = f'{new_value}*({original_str})'
-        print(f"[FORMULA_SWEEP] Added coefficient to formula: '{original_str}' -> '{modified}'")
         return modified
     
     def generate_sweep_snapshots(self, parameter_type, parameter_id, parameter_name, values, base_snapshot=None):
@@ -398,6 +392,7 @@ class ExperimentManager:
         # Check if parameter ID exists in baseline snapshot
         if parameter_id not in param_dict:
             raise ValueError(f"Parameter ID '{parameter_id}' (name: '{parameter_name}') not found in {parameter_type}")
+
         
         # Get baseline value to check if it's a formula
         baseline_value = param_dict[parameter_id]

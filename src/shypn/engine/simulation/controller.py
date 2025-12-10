@@ -843,15 +843,6 @@ class SimulationController:
         # Group continuous transitions by locality conflicts and apply firing policies
         continuous_transitions = [t for t in self.model.transitions if t.transition_type == 'continuous']
         
-        # Debug: Log what transitions exist and their types
-        if not hasattr(self, '_debug_trans_types_printed'):
-            self._debug_trans_types_printed = True
-            print(f"[CONTROLLER] Total transitions: {len(self.model.transitions)}")
-            for t in self.model.transitions:
-                trans_type = getattr(t, 'transition_type', 'MISSING')
-                print(f"[CONTROLLER]   {t.id}: type='{trans_type}'")
-            print(f"[CONTROLLER] Filtered continuous transitions: {len(continuous_transitions)}")
-        
         continuous_enabled = []
         for transition in continuous_transitions:
             behavior = self._get_behavior(transition)

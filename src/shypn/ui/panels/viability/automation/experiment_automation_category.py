@@ -110,6 +110,7 @@ class ExperimentAutomationCategory:
         
         # Create sweep builder
         self.sweep_builder = ParameterSweepBuilder()
+        self.sweep_builder.viability_panel = self.parent_panel  # Set reference for auto-prediction
         self.sweep_builder.set_generate_callback(self._on_sweep_generate)
         self.sweep_builder.set_clear_callback(lambda: self.queue_view.clear_queue())
         
@@ -192,7 +193,6 @@ class ExperimentAutomationCategory:
         
         # Get current parameter type
         param_type = self.sweep_builder.type_combo.get_active_id()
-        
         # Pull parameters from parent panel's TreeViews
         # Store as list of (name, id) tuples for ID/name separation
         params = []
@@ -383,18 +383,14 @@ class ExperimentAutomationCategory:
         
         # Clear old results from previous batch runs
         if self.results_browser:
-            print("[DEBUG] Clearing old results from browser")
             self.results_browser.clear_results()
         
         # Clear batch executor results to ensure clean state
         if self.batch_executor:
-            print("[DEBUG] Clearing old results from batch executor")
             self.batch_executor.clear_results()
         
         # Update UI for running state
         self.queue_view.set_running(True)
-        
-        print(f"[DEBUG] Starting batch with {len(pending_experiments)} experiments")
         
         # Start batch execution
         try:
@@ -417,8 +413,6 @@ class ExperimentAutomationCategory:
         if not self.batch_executor:
             return
         
-        print("[DEBUG] Cancel requested by user")
-        
         # Cancel the batch execution
         self.batch_executor.cancel()
         
@@ -432,7 +426,6 @@ class ExperimentAutomationCategory:
         When user clears completed experiments from queue, we should also
         clear the corresponding results from batch executor to free memory.
         """
-        print("[DEBUG] Queue cleared by user")
         
         if self.batch_executor:
             # Clear all stored results
@@ -498,26 +491,12 @@ class ExperimentAutomationCategory:
             name: Experiment name
             result: Result dictionary with statistics
         """
-        print(f"[RESULT] Adding result for '{name}' incrementally")
-        print(f"[RESULT]   Result has statistics: {'statistics' in result}")
-        if 'statistics' in result:
-            stats = result['statistics']
-            print(f"[RESULT]   N replicates in stats: {stats.get('n_replicates', 'MISSING')}")
-            print(f"[RESULT]   Time points length: {len(stats.get('time_points', []))}")
-            if 'species_statistics' in stats:
-                species_count = len(stats['species_statistics'])
-                print(f"[RESULT]   Species count: {species_count}")
-                if species_count > 0:
-                    first_species = list(stats['species_statistics'].keys())[0]
-                    first_mean = stats['species_statistics'][first_species].get('mean', [])
-                    print(f"[RESULT]   First species '{first_species}' mean length: {len(first_mean)}")
         
         if self.results_browser:
             try:
                 self.results_browser.add_result(name, result)
-                print(f"[RESULT] Successfully added '{name}' to results browser")
             except Exception as e:
-                print(f"[RESULT] ERROR adding result for '{name}': {e}")
+                print(f"[ERROR] Failed to add result for '{name}': {e}")
                 import traceback
                 traceback.print_exc()
     
@@ -527,53 +506,40 @@ class ExperimentAutomationCategory:
         Args:
             cancelled: Whether batch was cancelled by user
         """
-        if cancelled:
-            print("[DEBUG] _on_batch_complete called (CANCELLED)")
-        else:
-            print("[DEBUG] _on_batch_complete called (COMPLETED)")
         
         # Use GLib.idle_add for ALL UI updates from background thread
         def complete_ui_updates():
             """Complete all UI updates in main thread."""
-            print("[DEBUG] complete_ui_updates executing in main thread")
             try:
                 # Stop the running state
                 if self.queue_view:
-                    print("[DEBUG] Calling set_running(False)")
                     self.queue_view.set_running(False)
-                    print("[DEBUG] Queue view running state set to False")
                     
                     # Force status label update
-                    print("[DEBUG] Forcing status label update")
                     self.queue_view._update_status_label()
-                    print("[DEBUG] Status label updated")
                 
                 # NOTE: Results are now added incrementally via _on_experiment_result
                 # No need to add them again here - just handle cancellation cleanup
                 if cancelled:
                     # On cancellation, results may be incomplete - already handled incrementally
-                    print("[DEBUG] Batch cancelled - incremental results already displayed")
+                    pass
                 
                 # Clear pending updates
                 self._pending_updates.clear()
                 self._processing_updates.clear()
                 
-                status_msg = "cancelled" if cancelled else "complete"
-                print(f"[DEBUG] Batch execution {status_msg} - UI ready for next run")
+                status_msg = "cancelled" if cancelled else "completed"
                 
             except Exception as e:
                 print(f"[ERROR] Exception in complete_ui_updates: {e}")
                 import traceback
                 traceback.print_exc()
             
-            print("[DEBUG] complete_ui_updates finished")
             return False  # Don't repeat
         
         # Schedule UI updates in main thread with DEFAULT priority
         # This ensures completion runs BEFORE any queued progress updates
-        print("[DEBUG] Scheduling complete_ui_updates via GLib.idle_add")
-        result = GLib.idle_add(complete_ui_updates, priority=GLib.PRIORITY_DEFAULT)
-        print(f"[DEBUG] GLib.idle_add returned: {result}")
+        GLib.idle_add(complete_ui_updates, priority=GLib.PRIORITY_DEFAULT)
     
     def _on_export_results(self, name, result, format_type):
         """Handle export results request.
@@ -817,6 +783,10 @@ class ExperimentAutomationCategory:
             panel: Parent ViabilityPanel instance
         """
         self.parent_panel = panel
+        
+        # Update sweep builder's viability panel reference for auto-prediction
+        if self.sweep_builder:
+            self.sweep_builder.viability_panel = panel
         
         # Update batch executor's parent panel reference
         if self.batch_executor:

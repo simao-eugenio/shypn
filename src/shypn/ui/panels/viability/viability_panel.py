@@ -95,6 +95,9 @@ class ViabilityPanel(Gtk.Box):
         # Locality tracking for coloring
         self._locality_objects = {}
         
+        # Subnet model (complete DocumentModel created from localities)
+        self.subnet_model = None
+        
         # Track current drawing area to detect document switches
         self._current_drawing_area_id = None
         
@@ -945,6 +948,27 @@ class ViabilityPanel(Gtk.Box):
         # Refresh subnet parameters display
         self._refresh_subnet_parameters()
         
+        # Create/update subnet model immediately
+        self._create_subnet_model()
+        
+        # Auto-sync baseline snapshot when localities change
+        if hasattr(self, 'experiment_manager'):
+            em = self.experiment_manager
+            
+            # Ensure baseline snapshot exists
+            if not em.snapshots:
+                from shypn.ui.panels.viability.experiment_manager import ExperimentSnapshot
+                baseline = ExperimentSnapshot("Baseline")
+                em.snapshots.append(baseline)
+                em.active_index = 0
+            
+            # Sync baseline from current stores
+            em.sync_baseline_from_tables(
+                self.places_store,
+                self.transitions_store,
+                self.arcs_store
+            )
+        
         # Show (only if panel is packed)
         if self.get_parent() is not None:
             self.localities_listbox.show_all()
@@ -1041,6 +1065,13 @@ class ViabilityPanel(Gtk.Box):
         # Refresh subnet parameters display
         self._refresh_subnet_parameters()
         
+        # Recreate subnet model
+        if self.selected_localities:
+            self._create_subnet_model()
+        else:
+            # Clear subnet model if no localities
+            self.subnet_model = None
+        
         # Disable diagnose button if list is empty
         if not self.selected_localities:
             self.diagnose_button.set_sensitive(False)
@@ -1068,17 +1099,17 @@ class ViabilityPanel(Gtk.Box):
                 continue
             
             # Add transition ID
-            all_transition_ids.add(locality.transition_id)
+            all_transition_ids.add(locality.transition.id)
             
-            # Add place IDs
-            all_place_ids.update(locality.input_places)
-            all_place_ids.update(locality.output_places)
-            all_place_ids.update(locality.catalyst_places)  # Include catalyst/enzyme places
+            # Add place IDs (extract IDs from place objects)
+            all_place_ids.update(p.id for p in locality.input_places)
+            all_place_ids.update(p.id for p in locality.output_places)
+            all_place_ids.update(p.id for p in locality.catalyst_places)  # Include catalyst/enzyme places
             
-            # Add arc IDs
-            all_arc_ids.update(locality.input_arcs)
-            all_arc_ids.update(locality.output_arcs)
-            all_arc_ids.update(locality.catalyst_arcs)  # Include test arcs (non-consuming)
+            # Add arc IDs (extract IDs from arc objects)
+            all_arc_ids.update(a.id for a in locality.input_arcs)
+            all_arc_ids.update(a.id for a in locality.output_arcs)
+            all_arc_ids.update(a.id for a in locality.catalyst_arcs)  # Include test arcs (non-consuming)
         
         # Populate Places table
         for place in model.places:
@@ -1102,6 +1133,19 @@ class ViabilityPanel(Gtk.Box):
             if transition.id in all_transition_ids:
                 rate = transition.rate if hasattr(transition, 'rate') else 1.0
                 formula = transition.formula if hasattr(transition, 'formula') else ""
+                
+                # Handle case where rate might be a string formula
+                if isinstance(rate, str):
+                    # If rate is a string formula, move it to formula column and set numeric rate to 0
+                    if not formula:  # Only if formula column is empty
+                        formula = rate
+                    rate = 0.0
+                else:
+                    try:
+                        rate = float(rate)
+                    except (ValueError, TypeError):
+                        rate = 1.0
+                
                 trans_type = transition.transition_type if hasattr(transition, 'transition_type') else "continuous"
                 label = transition.label if hasattr(transition, 'label') else ""
                 self.transitions_store.append([
@@ -1133,8 +1177,63 @@ class ViabilityPanel(Gtk.Box):
             ])
         
         # Notify automation category that subnet parameters are updated
+        # Call synchronously (not idle_add) to ensure parameters refreshed before auto-sync
         if hasattr(self, 'automation_category') and self.automation_category:
-            GLib.idle_add(self.automation_category.refresh_parameters)
+            self.automation_category.refresh_parameters()
+    
+    def _create_subnet_model(self):
+        """Create a complete DocumentModel from selected localities.
+        
+        This creates the subnet model immediately when localities are added,
+        ensuring all elements (places, transitions, arcs) are captured correctly.
+        The model is stored and reused by batch execution.
+        """
+        from shypn.data.canvas.document_model import DocumentModel
+        
+        # Collect all elements from selected localities
+        subnet_places_set = set()
+        subnet_transitions_set = set()
+        subnet_arcs_set = set()
+        
+        for transition_id, data in self.selected_localities.items():
+            locality = data.get('locality')
+            if not locality:
+                continue
+            
+            # Add transition
+            subnet_transitions_set.add(locality.transition)
+            
+            # Add places
+            subnet_places_set.update(locality.input_places)
+            subnet_places_set.update(locality.output_places)
+            subnet_places_set.update(locality.catalyst_places)
+            
+            # Add arcs
+            subnet_arcs_set.update(locality.input_arcs)
+            subnet_arcs_set.update(locality.output_arcs)
+            subnet_arcs_set.update(locality.catalyst_arcs)
+        
+        # Create DocumentModel
+        model = DocumentModel()
+        
+        # Copy places via serialization (preserves all properties)
+        model.places = [type(p).from_dict(p.to_dict()) for p in subnet_places_set]
+        
+        # Copy transitions via serialization
+        model.transitions = [type(t).from_dict(t.to_dict()) for t in subnet_transitions_set]
+        
+        # Build ID lookup dictionaries for arc deserialization
+        places_dict = {p.id: p for p in model.places}
+        transitions_dict = {t.id: t for t in model.transitions}
+        
+        # Copy arcs (need references to copied places/transitions)
+        model.arcs = [type(a).from_dict(a.to_dict(), places_dict, transitions_dict) 
+                      for a in subnet_arcs_set]
+        
+        # Store the subnet model
+        self.subnet_model = model
+        
+        return model
     
     # === EDITING CALLBACKS ===
     
@@ -2225,116 +2324,12 @@ class ViabilityPanel(Gtk.Box):
         # and calling show_all() will cause GTK realize errors
         if self.get_parent() is not None:
             self.localities_listbox.show_all()
-    
-    def _refresh_subnet_parameters(self):
-        """Refresh subnet parameters tables from current selected localities."""
-        try:
-            # Clear existing data
-            self.places_store.clear()
-            self.transitions_store.clear()
-            self.arcs_store.clear()
-        except Exception as e:
-            import logging
-            logging.getLogger(__name__).warning(f"[VIABILITY_REFRESH] Error clearing stores: {e}")
-            return
         
-        # Rebuild from current localities
-        canvas_manager = self._get_canvas_manager()
-        if not canvas_manager:
-            return
-        
-        # Collect all places, transitions, and arcs from selected localities
-        all_place_ids = set()
-        all_transition_ids = set()
-        all_arc_ids = set()
-        
-        for transition_id, locality_obj in self._locality_objects.items():
-            # Places
-            for place_obj in locality_obj.input_places:
-                all_place_ids.add(place_obj.id)
-            for place_obj in locality_obj.output_places:
-                all_place_ids.add(place_obj.id)
-            
-            # Transitions
-            all_transition_ids.add(locality_obj.transition.id)
-            
-            # Arcs
-            for arc_obj in locality_obj.input_arcs:
-                all_arc_ids.add(arc_obj.id)
-            for arc_obj in locality_obj.output_arcs:
-                all_arc_ids.add(arc_obj.id)
-        
-        # Populate places table
-        for place_id in sorted(all_place_ids):
-            for place in canvas_manager.places:
-                if place.id == place_id:
-                    place_type = "Source" if (hasattr(place, 'is_source') and place.is_source) else "Normal"
-                    label = place.label if hasattr(place, 'label') else ""
-                    marking = place.marking if hasattr(place, 'marking') else (place.initial_marking if hasattr(place, 'initial_marking') else 0)
-                    self.places_store.append([
-                        place.id,
-                        place.name or place.id,
-                        marking,
-                        place_type,
-                        label,
-                        "#FFFFFF"  # Background color
-                    ])
-                    break
-        
-        # Populate transitions table
-        for transition_id in sorted(all_transition_ids):
-            for transition in canvas_manager.transitions:
-                if transition.id == transition_id:
-                    rate = getattr(transition, 'rate', 1.0)
-                    formula = getattr(transition, 'formula', getattr(transition, 'rate_formula', ''))
-                    
-                    # Handle case where rate might be a string expression (kinetic formula)
-                    if isinstance(rate, str):
-                        # If rate is a string formula, use it as the formula and set numeric rate to 0
-                        if not formula:  # Only if formula column is empty
-                            formula = rate
-                        rate = 0.0
-                    else:
-                        try:
-                            rate = float(rate)
-                        except (ValueError, TypeError):
-                            rate = 1.0
-                    
-                    trans_type = getattr(transition, 'transition_type', 'continuous')
-                    label = getattr(transition, 'label', '')
-                    self.transitions_store.append([
-                        transition.id,
-                        transition.name or transition.id,
-                        rate,
-                        formula,
-                        trans_type,
-                        label,
-                        "#FFFFFF"  # Background color
-                    ])
-                    break
-        
-        # Populate arcs table
-        for arc_id in sorted(all_arc_ids):
-            for arc in canvas_manager.arcs:
-                if arc.id == arc_id:
-                    from shypn.netobjs import Place
-                    source_id = arc.source.id if hasattr(arc.source, 'id') else str(arc.source)
-                    target_id = arc.target.id if hasattr(arc.target, 'id') else str(arc.target)
-                    arc_type = "Place→Transition" if isinstance(arc.source, Place) else "Transition→Place"
-                    weight = arc.weight if hasattr(arc, 'weight') else 1
-                    self.arcs_store.append([
-                        arc.id,
-                        source_id,
-                        target_id,
-                        weight,
-                        arc_type,
-                        "#FFFFFF"  # Background color
-                    ])
-                    break
-        
-        # Notify automation category that subnet parameters are updated
-        if hasattr(self, 'automation_category') and self.automation_category:
-            GLib.idle_add(self.automation_category.refresh_parameters)
+        # Recreate subnet model after rebuilding localities list
+        if self.selected_localities:
+            self._create_subnet_model()
+        else:
+            self.subnet_model = None
     
     def _update_ui_state(self):
         """Update UI state based on current selections."""
@@ -2848,13 +2843,35 @@ class ViabilityPanel(Gtk.Box):
         # Expand automation section
         self.automation_category.category_frame.set_expanded(True)
         
+        # Evaluate formula to get numeric value for prediction
+        evaluated_value = current_value
+        if isinstance(current_value, str):
+            try:
+                # Build context with current place markings
+                context = {}
+                for place in self.canvas.model.places:
+                    context[place.id] = place.tokens
+                    if hasattr(place, 'name') and place.name:
+                        context[place.name] = place.tokens
+                
+                # Safely evaluate the formula
+                evaluated_value = eval(current_value, {"__builtins__": {}}, context)
+            except:
+                # If evaluation fails, try to extract numeric coefficient
+                import re
+                match = re.match(r'^([\d.]+)', current_value.strip())
+                if match:
+                    evaluated_value = float(match.group(1))
+                else:
+                    evaluated_value = 1.0  # Fallback
+        
         # Pre-fill sweep builder with transition info
         if hasattr(self.automation_category, 'sweep_builder'):
             self.automation_category.sweep_builder.prefill_parameter(
                 param_type='transition',
                 param_id=trans_id,
                 param_name=trans_name,
-                current_value=current_value
+                current_value=evaluated_value
             )
     
     def _on_create_sweep_from_arc(self, menu_item, arc_id, arc_label, current_value):

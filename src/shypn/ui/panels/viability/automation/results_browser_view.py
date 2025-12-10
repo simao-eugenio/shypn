@@ -165,10 +165,6 @@ class ResultsBrowserView(Gtk.Box):
             name: Experiment name
             result: Results dictionary from BatchExecutor
         """
-        print(f"[BROWSER] add_result called for '{name}'")
-        print(f"[BROWSER]   Result keys: {result.keys()}")
-        print(f"[BROWSER]   Statistics keys: {result.get('statistics', {}).keys()}")
-        print(f"[BROWSER]   N replicates: {result.get('statistics', {}).get('n_replicates', 0)}")
         
         self.results[name] = result
         
@@ -182,8 +178,6 @@ class ResultsBrowserView(Gtk.Box):
         
         # Add to store
         self.results_store.append([name, n_replicates, duration_str, status])
-        
-        print(f"[BROWSER] Result '{name}' added to store: {n_replicates} replicates, {duration_str}, {status}")
         
         self._update_status_label()
     
@@ -396,13 +390,8 @@ class ResultsBrowserView(Gtk.Box):
             related_place_ids = self._get_related_places_for_transition(transition_id)
             
             # Add transition firing rate to plot if not already present
-            if transition_id not in species_stats:
-                print(f"[PLOT] Warning: Transition {transition_id} not found in statistics")
             
             # Ensure related places are in the plot
-            for place_id in related_place_ids:
-                if place_id not in species_stats:
-                    print(f"[PLOT] Warning: Related place {place_id} not found in statistics")
             
             # Reorder species: transition first, then related places, then others
             species_order = []
@@ -413,15 +402,6 @@ class ResultsBrowserView(Gtk.Box):
             
             # Rebuild species_stats in the new order (for display priority)
             species_stats = {sid: species_stats[sid] for sid in species_order}
-        
-        # DEBUG: Print what we received
-        print(f"[PLOT_DEBUG] stats keys: {stats.keys()}")
-        print(f"[PLOT_DEBUG] species_stats keys: {list(species_stats.keys())}")
-        print(f"[PLOT_DEBUG] time_points length: {len(time_points)}")
-        if species_stats:
-            first_species = list(species_stats.keys())[0]
-            print(f"[PLOT_DEBUG] first species '{first_species}' keys: {species_stats[first_species].keys()}")
-            print(f"[PLOT_DEBUG] first species mean length: {len(species_stats[first_species].get('mean', []))}")
         
         if not species_stats or not time_points:
             dialog = Gtk.MessageDialog(
@@ -451,21 +431,15 @@ class ResultsBrowserView(Gtk.Box):
             if subnet_structure and 'place_ids' in subnet_structure:
                 # Use the actual subnet places
                 related_place_ids = subnet_structure['place_ids']
-                print(f"[PLOT] Using subnet structure: {len(related_place_ids)} places from subnet")
             else:
                 # Fallback: Get all place IDs from statistics (exclude the transition itself)
                 related_place_ids = [
                     species_id for species_id in species_stats.keys()
                     if species_id != swept_transition_id
                 ]
-                print(f"[PLOT] Warning: No subnet structure, using statistics ({len(related_place_ids)} species)")
             
             # Get transition to plot (the swept one)
             related_transition_ids = [swept_transition_id] if swept_transition_id in species_stats else []
-            
-            print(f"[PLOT] Transition sweep detected: {swept_transition_id}")
-            print(f"[PLOT] Subnet places: {related_place_ids}")
-            print(f"[PLOT] Transition in stats: {swept_transition_id in species_stats}")
             
         elif swept_param and swept_param['type'] == 'places':
             # PLACE SWEEP: Show all places + transition
@@ -478,18 +452,10 @@ class ResultsBrowserView(Gtk.Box):
                     related_place_ids = subnet_structure['place_ids']
                 if 'transition_ids' in subnet_structure:
                     related_transition_ids = subnet_structure['transition_ids']
-                print(f"[PLOT] Using subnet structure: {len(related_place_ids)} places, {len(related_transition_ids)} transitions")
             else:
                 # Fallback: Get from statistics
                 related_place_ids = [sid for sid in species_stats.keys() if sid.startswith('P')]
                 related_transition_ids = [sid for sid in species_stats.keys() if sid.startswith('T')]
-                print(f"[PLOT] Warning: No subnet structure, using statistics")
-            
-            print(f"[PLOT] Place sweep detected: {swept_place_id}")
-            print(f"[PLOT] Subnet places: {related_place_ids}")
-            print(f"[PLOT] Subnet transitions: {related_transition_ids}")
-        
-        print(f"[PLOT] Available species in stats: {list(species_stats.keys())}")
         
         # Check if we should create superposed plot
         create_superposed = False
@@ -500,11 +466,8 @@ class ResultsBrowserView(Gtk.Box):
             # Place sweep with places/transitions to show
             create_superposed = True
         
-        print(f"[PLOT] Create superposed: {create_superposed}")
-        
         if create_superposed:
             # Create single plot with all variables superposed
-            print(f"[PLOT] Creating superposed plot...")
             self._plot_superposed_sweep(
                 name, result, swept_transition_id, swept_place_id,
                 related_place_ids, related_transition_ids,
@@ -512,7 +475,6 @@ class ResultsBrowserView(Gtk.Box):
             )
         else:
             # Create separate subplots for each species (original behavior)
-            print(f"[PLOT] Creating separate subplots...")
             self._plot_separate_subplots(
                 name, result, swept_param, species_stats, time_points, stats
             )
@@ -565,7 +527,6 @@ class ResultsBrowserView(Gtk.Box):
         for idx, place_id in enumerate(place_ids):
             if place_id not in species_stats:
                 missing_places.append(place_id)
-                print(f"[PLOT] Warning: Place {place_id} in subnet but not in statistics")
                 continue
             
             place_data = species_stats[place_id]
@@ -573,7 +534,6 @@ class ResultsBrowserView(Gtk.Box):
             std = np.array(place_data.get('std', []))
             
             if len(mean) == 0:
-                print(f"[PLOT] Warning: Place {place_id} has empty data")
                 continue
             
             plotted_places.append(place_id)
@@ -602,15 +562,12 @@ class ResultsBrowserView(Gtk.Box):
                     # Plot smooth mean line
                     line = ax1.plot(time_fine, mean_fine, color=color, 
                                   linewidth=2, label=place_name, alpha=0.8)
-                    print(f"[PLOT] Smoothed {place_id}: {len(time_points_arr)} → {len(time_fine)} points")
                 except Exception as e:
                     # Fallback to straight lines if smoothing fails
-                    print(f"[PLOT] Smoothing failed for {place_id}: {e}")
                     line = ax1.plot(time_points_arr, mean, color=color, 
                                   linewidth=2, label=place_name, alpha=0.8)
             else:
                 # Too few points, use raw data
-                print(f"[PLOT] Too few points for {place_id} ({len(time_points_arr)}), using raw data")
                 line = ax1.plot(time_points_arr, mean, color=color, 
                               linewidth=2, label=place_name, alpha=0.8)
             
@@ -632,7 +589,6 @@ class ResultsBrowserView(Gtk.Box):
         
         for idx, transition_id in enumerate(transition_ids):
             if transition_id not in species_stats:
-                print(f"[PLOT] Warning: Transition {transition_id} in subnet but not in statistics")
                 continue
                 
             trans_data = species_stats[transition_id]
@@ -640,7 +596,6 @@ class ResultsBrowserView(Gtk.Box):
             std = np.array(trans_data.get('std', []))
             
             if len(mean) == 0:
-                print(f"[PLOT] Warning: Transition {transition_id} has empty data")
                 continue
             
             plotted_transitions.append(transition_id)
@@ -672,14 +627,11 @@ class ResultsBrowserView(Gtk.Box):
                     # Plot smooth transition
                     ax2.plot(time_fine, mean_fine, color=color, 
                             linewidth=linewidth, label=label, alpha=0.8)
-                    print(f"[PLOT] Smoothed transition {transition_id}: {len(time_points_arr)} → {len(time_fine)} points")
                 except Exception as e:
-                    print(f"[PLOT] Smoothing failed for transition {transition_id}: {e}, using raw data")
                     ax2.plot(time_points_arr, mean, color=color, 
                             linewidth=linewidth, label=label, alpha=0.8, linestyle='-', marker='')
             else:
                 # Too few points, use raw data
-                print(f"[PLOT] Too few points for transition {transition_id} ({len(time_points_arr)}), using raw data")
                 ax2.plot(time_points_arr, mean, color=color, 
                         linewidth=linewidth, label=label, alpha=0.8, linestyle='-', marker='')
             
@@ -698,17 +650,6 @@ class ResultsBrowserView(Gtk.Box):
         
         # Grid
         ax1.grid(True, alpha=0.3)
-        
-        # Summary of what was plotted
-        print(f"[PLOT] Superposed plot complete:")
-        if swept_transition_id:
-            print(f"[PLOT]   Swept transition: {swept_transition_id} ({'found' if swept_transition_id in species_stats else 'MISSING'})")
-        if swept_place_id:
-            print(f"[PLOT]   Swept place: {swept_place_id} ({'found' if swept_place_id in species_stats else 'MISSING'})")
-        print(f"[PLOT]   Places plotted: {len(plotted_places)}/{len(place_ids)}")
-        print(f"[PLOT]   Transitions plotted: {len(plotted_transitions)}/{len(transition_ids)}")
-        if missing_places:
-            print(f"[PLOT]   WARNING: {len(missing_places)} places from subnet missing in statistics: {missing_places}")
         
         plt.tight_layout()
         plt.show()
@@ -761,16 +702,8 @@ class ResultsBrowserView(Gtk.Box):
             # Check if this is the swept transition
             is_swept_transition = (species_id == swept_transition_id)
             
-            # DEBUG: Check data structure
-            print(f"[PLOT_DEBUG] Species {species_id}: keys = {species_data.keys()}")
-            
             mean = np.array(species_data.get('mean', []))
             std = np.array(species_data.get('std', []))
-            
-            print(f"[PLOT_DEBUG] Species {species_id}: mean type = {type(species_data.get('mean'))}, len = {len(species_data.get('mean', []))}")
-            print(f"[PLOT_DEBUG] Species {species_id}: np.array(mean) shape = {mean.shape}, dtype = {mean.dtype}")
-            print(f"[PLOT_DEBUG] Species {species_id}: first few mean values = {mean[:5] if len(mean) > 0 else 'empty'}")
-            print(f"[PLOT_DEBUG] time_points type = {type(time_points)}, len = {len(time_points)}")
             
             if len(mean) == 0 or len(time_points) == 0:
                 ax.text(0.5, 0.5, 'No data', ha='center', va='center')

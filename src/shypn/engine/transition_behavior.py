@@ -373,7 +373,10 @@ class TransitionBehavior(ABC):
                 
                 # Add place tokens as P1, P2, ... (or P88, P105 if ID already has P)
                 if hasattr(self.model, 'places'):
-                    for place_id, place in self.model.places.items():
+                    # Handle both list and dict format for places
+                    places_iterable = self.model.places.items() if isinstance(self.model.places, dict) else [(p.id, p) for p in self.model.places]
+                    
+                    for place_id, place in places_iterable:
                         # Handle both numeric IDs (1, 2, 3) and string IDs ("P88", "P105")
                         if isinstance(place_id, str) and place_id.startswith('P'):
                             # ID already has P prefix (e.g., "P105")

@@ -238,9 +238,6 @@ class ReplicateRunner:
                 'stopped_reason': stopped_reason
             }
             
-            if i == 0:
-                print(f"[REPLICATE] Result created with {len(result['time_points'])} time points")
-            
             results.append(result)
         
         # Report final 100% progress
