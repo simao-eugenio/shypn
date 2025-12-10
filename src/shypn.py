@@ -14,6 +14,10 @@ Architecture:
 import os
 import sys
 import logging
+import warnings
+
+# Suppress matplotlib Axes3D import warning (harmless - system matplotlib visible in path)
+warnings.filterwarnings('ignore', message='Unable to import Axes3D')
 
 REPO_ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), '..'))
 UI_PATH = os.path.join(REPO_ROOT, 'ui', 'main', 'main_window.ui')
