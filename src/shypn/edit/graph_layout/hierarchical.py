@@ -132,35 +132,32 @@ class HierarchicalLayout(LayoutAlgorithm):
                     layers[node] = 0
                     break
         
-        # BFS traversal respecting Petri net structure
-        queue = source_places[:]
-        processed = set(source_places)
+        # Iteratively assign layers using longest path
+        # Multiple passes to handle cycles and find longest paths
+        changed = True
+        max_iterations = len(graph.nodes()) * 2  # Safety limit
+        iteration = 0
         
-        while queue:
-            current = queue.pop(0)
-            current_layer = layers[current]
-            current_type = graph.nodes[current].get('type')
+        while changed and iteration < max_iterations:
+            changed = False
+            iteration += 1
             
-            # Process successors
-            for successor in graph.successors(current):
-                if successor in processed:
-                    # Already processed, but may need to update layer if we found a longer path
-                    existing_layer = layers[successor]
-                    new_layer = current_layer + 1
-                    if new_layer > existing_layer:
-                        layers[successor] = new_layer
-                        # Re-add to queue to update its descendants
-                        queue.append(successor)
-                else:
-                    # First time seeing this node
-                    layers[successor] = current_layer + 1
-                    processed.add(successor)
-                    queue.append(successor)
-        
-        # Handle any unprocessed nodes (shouldn't happen in connected graph)
-        for node in graph.nodes():
-            if node not in layers:
-                layers[node] = 0
+            for node in graph.nodes():
+                if node not in layers:
+                    layers[node] = 0
+                
+                # Calculate maximum predecessor layer
+                max_pred_layer = -1
+                for pred in graph.predecessors(node):
+                    if pred in layers:
+                        max_pred_layer = max(max_pred_layer, layers[pred])
+                
+                # Assign this node to next layer after maximum predecessor
+                if max_pred_layer >= 0:
+                    new_layer = max_pred_layer + 1
+                    if layers[node] != new_layer:
+                        layers[node] = new_layer
+                        changed = True
         
         return layers
     
