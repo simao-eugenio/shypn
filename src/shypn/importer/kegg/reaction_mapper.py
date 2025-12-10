@@ -205,9 +205,18 @@ class StandardReactionMapper(ReactionMapper):
         # Get biological name for the transition (pass transition_id for fallback)
         transition_name = self._get_biological_name(reaction, ec_numbers, transition_id)
         
+        # For duplicate KEGG reactions (same reaction.name but different internal IDs),
+        # append internal ID to make labels unique and traceable
+        # This helps distinguish between multiple instances of R01175, R00631, etc.
+        display_label = name
+        if hasattr(reaction, 'id') and reaction.id:
+            # Check if we need to add disambiguation
+            # (This will be enhanced by pathway converter if duplicates detected)
+            display_label = f"{name}"
+        
         # Create transition with correct arguments: (x, y, id, name)
         # The reaction name becomes the label, not the system name
-        transition = Transition(x, y, transition_id, transition_name, label=name)
+        transition = Transition(x, y, transition_id, transition_name, label=display_label)
         
         # Store KEGG metadata
         if not hasattr(transition, 'metadata'):

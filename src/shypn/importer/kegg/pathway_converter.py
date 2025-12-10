@@ -329,11 +329,31 @@ class StandardConversionStrategy(ConversionStrategy):
         reaction_transition_map = {}  # Track reactions for kinetics enhancement
         reaction_name_to_transition = {}  # Map reaction names to transitions for enzyme conversion
         
+        # Track reaction name occurrences for disambiguation
+        reaction_name_counter = {}
+        
         for reaction in pathway.reactions:
+            # Track how many times we've seen this KEGG reaction name
+            if reaction.name not in reaction_name_counter:
+                reaction_name_counter[reaction.name] = 0
+            reaction_name_counter[reaction.name] += 1
+            
             # Create transition(s)
             transitions = self.reaction_mapper.create_transitions(reaction, pathway, options, document.id_manager)
             
             for transition in transitions:
+                # If this KEGG reaction name appears multiple times, add suffix to label
+                # to distinguish instances (e.g., R01175, R01175_2, R01175_3, etc.)
+                occurrence = reaction_name_counter[reaction.name]
+                if occurrence > 1:
+                    # Add suffix to make label unique
+                    base_label = transition.label
+                    transition.label = f"{base_label}_{occurrence}"
+                    logger.debug(
+                        f"Disambiguated duplicate reaction {reaction.name}: "
+                        f"internal ID {reaction.id} → label '{transition.label}'"
+                    )
+                
                 document.transitions.append(transition)
                 reaction_transition_map[transition] = reaction
                 
@@ -797,8 +817,26 @@ class StandardConversionStrategy(ConversionStrategy):
                     enzyme_str = ", ".join(enzyme_info) if enzyme_info else "unknown enzyme"
                     
                     logger.debug(
-                        f"    - Reaction {rxn.name} (ID:{rxn.id}): {enzyme_str}"
+                        f"    - Reaction {rxn.name} (internal ID:{rxn.id}, type:{rxn.type}): {enzyme_str}"
                     )
+                
+                # Additional detail: show if same KEGG reaction ID appears multiple times
+                # This happens when same reaction (e.g., R01175) is listed multiple times
+                # in KGML with different internal IDs for different enzyme associations
+                reaction_names = [r.name for r in reactions]
+                unique_reaction_names = set(reaction_names)
+                
+                if len(unique_reaction_names) < len(reactions):
+                    # Same KEGG reaction ID repeated
+                    for rname in unique_reaction_names:
+                        count = reaction_names.count(rname)
+                        if count > 1:
+                            logger.info(
+                                f"  ⚠ KEGG reaction {rname} appears {count} times with different "
+                                f"internal IDs. This is common in reference pathways where the "
+                                f"same reaction is associated with multiple enzyme entries "
+                                f"(isoforms, tissue-specific variants, or different organisms)."
+                            )
         
         if duplicates_found > 0:
             logger.info(
