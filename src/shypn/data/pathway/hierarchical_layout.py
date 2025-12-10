@@ -265,7 +265,9 @@ class HierarchicalLayoutProcessor:
                 layers.append(unprocessed)
         
         # Post-process: subdivide wide layers to prevent excessive horizontal spread
+        print(f"DEBUG: Before subdivision: {len(layers)} layers, sizes: {[len(l) for l in layers]}")
         layers = self._subdivide_wide_layers(layers)
+        print(f"DEBUG: After subdivision: {len(layers)} layers, sizes: {[len(l) for l in layers]}")
         
         return layers
     
@@ -282,16 +284,19 @@ class HierarchicalLayoutProcessor:
         Returns:
             New layer list with wide layers subdivided
         """
+        print(f"DEBUG: _subdivide_wide_layers called with {len(layers)} layers, max_per_layer={max_per_layer}")
         new_layers = []
         subdivided_count = 0
         
         for layer_idx, layer in enumerate(layers):
+            print(f"DEBUG: Layer {layer_idx} has {len(layer)} species")
             if len(layer) <= max_per_layer:
                 # Layer is fine, keep as-is
                 new_layers.append(layer)
             else:
                 # Split into multiple sub-layers
                 num_sublayers = (len(layer) + max_per_layer - 1) // max_per_layer
+                print(f"DEBUG: Subdividing layer {layer_idx} with {len(layer)} species into {num_sublayers} sub-layers")
                 self.logger.warning(f"⚠️  Subdividing layer {layer_idx} with {len(layer)} species into {num_sublayers} sub-layers")
                 subdivided_count += 1
                 
@@ -305,6 +310,7 @@ class HierarchicalLayoutProcessor:
         if subdivided_count > 0:
             self.logger.warning(f"✓ Subdivided {subdivided_count} wide layers: {len(layers)} → {len(new_layers)} total layers")
         
+        print(f"DEBUG: Returning {len(new_layers)} layers after subdivision")
         return new_layers
     
     def _position_layers(self, layers: List[List[str]]) -> Dict[str, Tuple[float, float]]:
