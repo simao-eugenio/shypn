@@ -73,6 +73,13 @@ class HierarchicalLayoutProcessor:
         # Step 2: Assign layers using topological sort (Kahn's algorithm)
         layers = self._assign_layers(graph, in_degree)
         
+        # Log layer distribution BEFORE subdivision
+        self.logger.warning(f"🔍 BEFORE SUBDIVISION: {len(layers)} layers")
+        for i, layer in enumerate(layers[:10]):  # Show first 10
+            self.logger.warning(f"   Layer {i}: {len(layer)} species")
+        if len(layers) > 10:
+            self.logger.warning(f"   ... and {len(layers) - 10} more layers")
+        
         # Step 3: Position species in layers
         positions = self._position_layers(layers)
         
@@ -276,21 +283,27 @@ class HierarchicalLayoutProcessor:
             New layer list with wide layers subdivided
         """
         new_layers = []
+        subdivided_count = 0
         
-        for layer in layers:
+        for layer_idx, layer in enumerate(layers):
             if len(layer) <= max_per_layer:
                 # Layer is fine, keep as-is
                 new_layers.append(layer)
             else:
                 # Split into multiple sub-layers
                 num_sublayers = (len(layer) + max_per_layer - 1) // max_per_layer
-                self.logger.info(f"Subdividing layer with {len(layer)} species into {num_sublayers} sub-layers")
+                self.logger.warning(f"⚠️  Subdividing layer {layer_idx} with {len(layer)} species into {num_sublayers} sub-layers")
+                subdivided_count += 1
                 
                 for i in range(num_sublayers):
                     start_idx = i * max_per_layer
                     end_idx = min(start_idx + max_per_layer, len(layer))
                     sublayer = layer[start_idx:end_idx]
                     new_layers.append(sublayer)
+                    self.logger.warning(f"   Sub-layer {i+1}/{num_sublayers}: {len(sublayer)} species")
+        
+        if subdivided_count > 0:
+            self.logger.warning(f"✓ Subdivided {subdivided_count} wide layers: {len(layers)} → {len(new_layers)} total layers")
         
         return new_layers
     
