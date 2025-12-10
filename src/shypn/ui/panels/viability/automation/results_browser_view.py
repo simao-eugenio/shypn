@@ -11,6 +11,11 @@ Date: December 7, 2025
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, GLib
+import matplotlib
+matplotlib.use('GTK3Agg')
+from matplotlib.backends.backend_gtk3agg import FigureCanvasGTK3Agg as FigureCanvas
+from matplotlib.backends.backend_gtk3 import NavigationToolbar2GTK3
+from matplotlib.figure import Figure
 
 
 class ResultsBrowserView(Gtk.Box):
@@ -41,16 +46,29 @@ class ResultsBrowserView(Gtk.Box):
         self.on_export_callback = None
         self.on_report_callback = None
         
+        # Matplotlib components for embedded plotting
+        self.figure = None
+        self.canvas = None
+        self.toolbar = None
+        
         # Build UI
         self._build_ui()
     
     def _build_ui(self):
-        """Build results browser UI."""
+        """Build results browser UI with notebook for list/plot views."""
         # Title
         title_label = Gtk.Label()
         title_label.set_markup("<b>Experiment Results</b>")
         title_label.set_xalign(0)
         self.pack_start(title_label, False, False, 0)
+        
+        # Create notebook with two pages: Results List and Plot View
+        self.notebook = Gtk.Notebook()
+        self.notebook.set_show_tabs(True)
+        self.notebook.set_show_border(True)
+        
+        # === PAGE 1: Results List ===
+        list_page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         
         # Results TreeView in ScrolledWindow
         scrolled = Gtk.ScrolledWindow()
@@ -94,7 +112,7 @@ class ResultsBrowserView(Gtk.Box):
         selection.connect("changed", self._on_selection_changed)
         
         scrolled.add(self.results_tree)
-        self.pack_start(scrolled, True, True, 0)
+        list_page.pack_start(scrolled, True, True, 0)
         
         # Statistics display
         stats_frame = Gtk.Frame()
@@ -110,7 +128,7 @@ class ResultsBrowserView(Gtk.Box):
         self.stats_label.set_margin_bottom(6)
         
         stats_frame.add(self.stats_label)
-        self.pack_start(stats_frame, False, False, 0)
+        list_page.pack_start(stats_frame, False, False, 0)
         
         # Action buttons
         button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
@@ -156,7 +174,26 @@ class ResultsBrowserView(Gtk.Box):
         self.status_label.set_hexpand(True)
         button_box.pack_start(self.status_label, True, True, 0)
         
-        self.pack_start(button_box, False, False, 0)
+        list_page.pack_start(button_box, False, False, 0)
+        
+        # === PAGE 2: Plot View ===
+        plot_page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        
+        # Create matplotlib figure and canvas
+        self.figure = Figure(figsize=(8, 6), dpi=80)
+        self.canvas = FigureCanvas(self.figure)
+        self.canvas.set_size_request(600, 400)
+        
+        # Navigation toolbar
+        self.toolbar = NavigationToolbar2GTK3(self.canvas)
+        plot_page.pack_start(self.toolbar, False, False, 0)
+        plot_page.pack_start(self.canvas, True, True, 0)
+        
+        # Add pages to notebook
+        self.notebook.append_page(list_page, Gtk.Label(label="Results List"))
+        self.notebook.append_page(plot_page, Gtk.Label(label="Plot View"))
+        
+        self.pack_start(self.notebook, True, True, 0)
     
     def add_result(self, name, result):
         """Add experiment result to browser.
@@ -330,13 +367,16 @@ class ResultsBrowserView(Gtk.Box):
             self.clear_results()
     
     def _on_plot_clicked(self, button):
-        """Handle Plot button click - show trajectory plot."""
+        """Handle Plot button click - show trajectory plot in embedded canvas."""
         name, result = self.get_selected_result()
         if name and result:
+            # Switch to plot view tab
+            self.notebook.set_current_page(1)
+            # Render plot in embedded canvas
             self._plot_trajectories(name, result)
     
     def _plot_trajectories(self, name, result):
-        """Plot mean trajectories with confidence intervals.
+        """Plot mean trajectories with confidence intervals in embedded canvas.
         
         For transition sweeps, automatically includes connected places.
         
@@ -345,9 +385,6 @@ class ResultsBrowserView(Gtk.Box):
             result: Result dictionary with statistics
         """
         try:
-            import matplotlib
-            matplotlib.use('TkAgg')  # Use TkAgg backend for popup windows
-            import matplotlib.pyplot as plt
             import numpy as np
         except ImportError:
             dialog = Gtk.MessageDialog(
@@ -355,10 +392,10 @@ class ResultsBrowserView(Gtk.Box):
                 flags=0,
                 message_type=Gtk.MessageType.ERROR,
                 buttons=Gtk.ButtonsType.OK,
-                text="Matplotlib not available"
+                text="NumPy not available"
             )
             dialog.format_secondary_text(
-                "Install matplotlib to use plotting: pip install matplotlib"
+                "Install numpy to use plotting: pip install numpy"
             )
             dialog.run()
             dialog.destroy()
@@ -442,7 +479,7 @@ class ResultsBrowserView(Gtk.Box):
             related_transition_ids = [swept_transition_id] if swept_transition_id in species_stats else []
             
         elif swept_param and swept_param['type'] == 'places':
-            # PLACE SWEEP: Show all places + transition
+            # PLACE SWEEP: Show all places + transitions (to see how initial marking affects dynamics)
             swept_place_id = swept_param['id']
             
             # Get all places and transitions from subnet structure
@@ -456,6 +493,22 @@ class ResultsBrowserView(Gtk.Box):
                 # Fallback: Get from statistics
                 related_place_ids = [sid for sid in species_stats.keys() if sid.startswith('P')]
                 related_transition_ids = [sid for sid in species_stats.keys() if sid.startswith('T')]
+                
+        elif swept_param and swept_param['type'] == 'arcs':
+            # ARC SWEEP: Show places (token dynamics) only, exclude transitions (flat lines)
+            # Arc weight affects transition firing rate calculation, but we want to see
+            # the effect on token dynamics in places, not the constant rate values
+            
+            # Get all places from subnet structure
+            subnet_structure = result.get('subnet_structure')
+            if subnet_structure and 'place_ids' in subnet_structure:
+                related_place_ids = subnet_structure['place_ids']
+            else:
+                # Fallback: Get from statistics
+                related_place_ids = [sid for sid in species_stats.keys() if sid.startswith('P')]
+            
+            # Don't include transitions for arc sweeps (they'll be flat lines)
+            related_transition_ids = []
         
         # Check if we should create superposed plot
         create_superposed = False
@@ -496,13 +549,15 @@ class ResultsBrowserView(Gtk.Box):
             time_points: Time points array
             stats: Full statistics dict
         """
-        import matplotlib.pyplot as plt
         import numpy as np
         
         time_points_arr = np.array(time_points)
         
-        # Create figure with two y-axes (left: tokens, right: firing rate)
-        fig, ax1 = plt.subplots(figsize=(12, 7))
+        # Clear previous plot
+        self.figure.clear()
+        
+        # Create axes with two y-axes (left: tokens, right: firing rate)
+        ax1 = self.figure.add_subplot(111)
         
         # Title with sweep info
         title_text = f"Experiment: {name}\n{stats.get('n_replicates', 0)} replicates"
@@ -512,7 +567,7 @@ class ResultsBrowserView(Gtk.Box):
                 title_text += f"\nSwept Transition: {swept_param['name']} = {swept_param['value']:.4g}"
             elif swept_param['type'] == 'places':
                 title_text += f"\nSwept Place: {swept_param['name']} = {swept_param['value']:.4g}"
-        fig.suptitle(title_text, fontsize=14, fontweight='bold')
+        self.figure.suptitle(title_text, fontsize=14, fontweight='bold')
         
         # Left y-axis: Plot places (tokens)
         ax1.set_xlabel('Time', fontsize=12)
@@ -651,8 +706,8 @@ class ResultsBrowserView(Gtk.Box):
         # Grid
         ax1.grid(True, alpha=0.3)
         
-        plt.tight_layout()
-        plt.show()
+        self.figure.tight_layout()
+        self.canvas.draw()
     
     def _plot_separate_subplots(self, name, result, swept_param, 
                                 species_stats, time_points, stats):
@@ -666,10 +721,12 @@ class ResultsBrowserView(Gtk.Box):
             time_points: Time points array
             stats: Full statistics dict
         """
-        import matplotlib.pyplot as plt
         import numpy as np
         
-        # Create figure with subplots for each species
+        # Clear previous plot
+        self.figure.clear()
+        
+        # Create subplots for each species
         n_species = len(species_stats)
         n_cols = min(3, n_species)  # Max 3 columns
         n_rows = (n_species + n_cols - 1) // n_cols
@@ -679,8 +736,8 @@ class ResultsBrowserView(Gtk.Box):
         if swept_param and swept_param['type'] == 'transitions':
             title_text += f"\nSwept Transition: {swept_param['name']} = {swept_param['value']:.4g}"
         
-        fig, axes = plt.subplots(n_rows, n_cols, figsize=(6*n_cols, 4*n_rows))
-        fig.suptitle(title_text, fontsize=14, fontweight='bold')
+        axes = self.figure.subplots(n_rows, n_cols)
+        self.figure.suptitle(title_text, fontsize=14, fontweight='bold')
         
         # Flatten axes for easy iteration
         if n_species == 1:
@@ -761,8 +818,8 @@ class ResultsBrowserView(Gtk.Box):
         for idx in range(n_species, len(axes)):
             axes[idx].set_visible(False)
         
-        plt.tight_layout()
-        plt.show()
+        self.figure.tight_layout()
+        self.canvas.draw()
     
     def set_export_callback(self, callback):
         """Set callback for export actions.
