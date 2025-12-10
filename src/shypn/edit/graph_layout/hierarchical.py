@@ -145,17 +145,12 @@ class HierarchicalLayout(LayoutAlgorithm):
             else:
                 # Split into multiple sub-layers
                 num_sublayers = (len(layer) + max_per_layer - 1) // max_per_layer
-                print(f"🔍 Subdividing layer {layer_idx} with {len(layer)} nodes into {num_sublayers} sub-layers (max {max_per_layer} per layer)")
                 
                 for i in range(num_sublayers):
                     start_idx = i * max_per_layer
                     end_idx = min(start_idx + max_per_layer, len(layer))
                     sublayer = layer[start_idx:end_idx]
                     new_layers.append(sublayer)
-                    print(f"   Sub-layer {i+1}/{num_sublayers}: {len(sublayer)} nodes")
-        
-        if len(new_layers) != len(layer_groups):
-            print(f"✓ Layer subdivision complete: {len(layer_groups)} → {len(new_layers)} layers")
         
         return new_layers
     
