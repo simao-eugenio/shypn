@@ -174,15 +174,15 @@
           <object class="GtkEntry" id="iterations_entry">
             <property name="visible">True</property>
             <property name="text">500</property>
-            <property name="width-chars">3</property>
-            <property name="max-width-chars">3</property>
-            <property name="max-length">3</property>
+            <property name="width-chars">5</property>
+            <property name="max-width-chars">5</property>
+            <property name="max-length">5</property>
             <property name="input-purpose">number</property>
-            <property name="tooltip-text">Physics simulation iterations (50-1000)</property>
+            <property name="tooltip-text">Physics simulation iterations (50-10000)</property>
             <property name="halign">center</property>
             <property name="xalign">0.5</property>
             <property name="hexpand">False</property>
-            <property name="width-request">45</property>
+            <property name="width-request">55</property>
           </object>
           <packing>
             <property name="left-attach">1</property>
