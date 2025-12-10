@@ -1896,12 +1896,14 @@ class FileExplorerPanel:
             document: DocumentModel instance
             filepath: Full path to the file
         """
+        print(f"[FILE_LOAD] Starting _load_document_into_canvas for {filepath}")
         if not document or not filepath:
             return
         import os
         filename = os.path.basename(filepath)
         base_name = os.path.splitext(filename)[0]
         
+        print(f"[FILE_LOAD] Creating new canvas for {base_name}")
         # UNIFIED APPROACH: Always create new canvas via add_document()
         # This ensures IDENTICAL initialization to File→New:
         # - Fresh ModelCanvasManager
@@ -1911,6 +1913,7 @@ class FileExplorerPanel:
         # Benefits: No reuse logic complexity, consistent behavior, no stale state
         page_index, drawing_area = self.canvas_loader.add_document(filename=base_name)
         manager = self.canvas_loader.get_canvas_manager(drawing_area)
+        print(f"[FILE_LOAD] Canvas created, manager={manager is not None}")
 
         # Ensure ID scope is set to the new canvas BEFORE loading objects
         try:
@@ -1924,6 +1927,7 @@ class FileExplorerPanel:
             pass
         
         if manager:
+            print(f"[FILE_LOAD] Loading {len(document.places)} places, {len(document.transitions)} transitions, {len(document.arcs)} arcs")
             # ===== UNIFIED OBJECT LOADING =====
             # Use load_objects() for consistent, unified initialization path
             # This replaces direct assignment + manual notification loop
@@ -1933,10 +1937,12 @@ class FileExplorerPanel:
                 transitions=document.transitions,
                 arcs=document.arcs
             )
+            print(f"[FILE_LOAD] Objects loaded")
             
             # CRITICAL: Set on_changed callback on all loaded objects
             # This is required for proper object state management and dirty tracking
             manager.document_controller.set_change_callback(manager._on_object_changed)
+            print(f"[FILE_LOAD] Callbacks set")
             
             # Restore view state (zoom, pan, and rotation) if available
             has_view_state = False
