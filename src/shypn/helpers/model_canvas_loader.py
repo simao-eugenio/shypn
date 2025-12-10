@@ -4428,21 +4428,28 @@ class ModelCanvasLoader:
             layout_params = {}
             try:
                 if drawing_area in self.overlay_managers:
-                    swissknife = self.overlay_managers[drawing_area].swissknife_palette
-                    if swissknife and hasattr(swissknife, 'layout_settings_loader'):
-                        settings_loader = swissknife.layout_settings_loader
-                        if settings_loader:
-                            all_settings = settings_loader.get_settings()
-                            # Provide all settings - auto will select best algorithm and use appropriate params
-                            layout_params = {
-                                'layer_spacing': all_settings.get('layer_spacing', 150),
-                                'node_spacing': all_settings.get('node_spacing', 100),
-                                'iterations': all_settings.get('iterations', 500),
-                                'k_multiplier': all_settings.get('k_multiplier', 1.5),
-                                'scale': all_settings.get('scale', 2000.0)
-                            }
-            except Exception:
-                pass  # Use defaults if we can't get settings
+                    overlay_mgr = self.overlay_managers.get(drawing_area)
+                    if overlay_mgr and hasattr(overlay_mgr, 'swissknife_palette'):
+                        swissknife = overlay_mgr.swissknife_palette
+                        if swissknife and hasattr(swissknife, 'layout_settings_loader'):
+                            settings_loader = swissknife.layout_settings_loader
+                            if settings_loader and hasattr(settings_loader, 'get_settings'):
+                                all_settings = settings_loader.get_settings()
+                                if all_settings:
+                                    # Provide all settings - auto will select best algorithm and use appropriate params
+                                    layout_params = {
+                                        'layer_spacing': all_settings.get('layer_spacing', 150),
+                                        'node_spacing': all_settings.get('node_spacing', 100),
+                                        'iterations': all_settings.get('iterations', 500),
+                                        'k_multiplier': all_settings.get('k_multiplier', 1.5),
+                                        'scale': all_settings.get('scale', 2000.0)
+                                    }
+            except Exception as e:
+                # Use defaults if we can't get settings - don't block layout
+                import traceback
+                print(f"Warning: Could not get layout parameters: {e}")
+                traceback.print_exc()
+                layout_params = {}
             
             # Create engine and apply layout with parameters
             engine = LayoutEngine(manager)
@@ -4594,23 +4601,26 @@ class ModelCanvasLoader:
             try:
                 # First priority: Layout palette parameter panel (layout_settings_loader)
                 if drawing_area in self.overlay_managers:
-                    swissknife = self.overlay_managers[drawing_area].swissknife_palette
-                    if swissknife and hasattr(swissknife, 'layout_settings_loader'):
-                        settings_loader = swissknife.layout_settings_loader
-                        if settings_loader:
-                            all_settings = settings_loader.get_settings()
-                            # Extract parameters relevant to this algorithm
-                            if algorithm == 'hierarchical':
-                                layout_params = {
-                                    'layer_spacing': all_settings.get('layer_spacing', 150),
-                                    'node_spacing': all_settings.get('node_spacing', 100)
-                                }
-                            elif algorithm == 'force_directed':
-                                layout_params = {
-                                    'iterations': all_settings.get('iterations', 500),
-                                    'k_multiplier': all_settings.get('k_multiplier', 1.5),
-                                    'scale': all_settings.get('scale', 2000.0)
-                                }
+                    overlay_mgr = self.overlay_managers.get(drawing_area)
+                    if overlay_mgr and hasattr(overlay_mgr, 'swissknife_palette'):
+                        swissknife = overlay_mgr.swissknife_palette
+                        if swissknife and hasattr(swissknife, 'layout_settings_loader'):
+                            settings_loader = swissknife.layout_settings_loader
+                            if settings_loader and hasattr(settings_loader, 'get_settings'):
+                                all_settings = settings_loader.get_settings()
+                                if all_settings:
+                                    # Extract parameters relevant to this algorithm
+                                    if algorithm == 'hierarchical':
+                                        layout_params = {
+                                            'layer_spacing': all_settings.get('layer_spacing', 150),
+                                            'node_spacing': all_settings.get('node_spacing', 100)
+                                        }
+                                    elif algorithm == 'force_directed':
+                                        layout_params = {
+                                            'iterations': all_settings.get('iterations', 500),
+                                            'k_multiplier': all_settings.get('k_multiplier', 1.5),
+                                            'scale': all_settings.get('scale', 2000.0)
+                                        }
                 
                 # Fallback: SBML Import panel (for SBML import workflows)
                 if not layout_params and hasattr(self, 'sbml_panel') and self.sbml_panel:
@@ -4618,7 +4628,11 @@ class ModelCanvasLoader:
                     if not layout_params:
                         layout_params = {}
             except Exception as e:
-                pass  # If we can't get params, just use defaults
+                # If we can't get params, just use defaults - don't block layout
+                import traceback
+                print(f"Warning: Could not get layout parameters: {e}")
+                traceback.print_exc()
+                layout_params = {}
             
             # Create engine and apply layout with parameters
             engine = LayoutEngine(manager)
