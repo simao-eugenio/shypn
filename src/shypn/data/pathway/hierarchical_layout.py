@@ -257,7 +257,42 @@ class HierarchicalLayoutProcessor:
             else:
                 layers.append(unprocessed)
         
+        # Post-process: subdivide wide layers to prevent excessive horizontal spread
+        layers = self._subdivide_wide_layers(layers)
+        
         return layers
+    
+    def _subdivide_wide_layers(self, layers: List[List[str]], max_per_layer: int = 15) -> List[List[str]]:
+        """Subdivide layers that are too wide into multiple narrower layers.
+        
+        This prevents excessive horizontal spread in large models by splitting
+        layers with many species into multiple sub-layers.
+        
+        Args:
+            layers: Original layers from topological sort
+            max_per_layer: Maximum species per layer before subdivision (default 15)
+            
+        Returns:
+            New layer list with wide layers subdivided
+        """
+        new_layers = []
+        
+        for layer in layers:
+            if len(layer) <= max_per_layer:
+                # Layer is fine, keep as-is
+                new_layers.append(layer)
+            else:
+                # Split into multiple sub-layers
+                num_sublayers = (len(layer) + max_per_layer - 1) // max_per_layer
+                self.logger.info(f"Subdividing layer with {len(layer)} species into {num_sublayers} sub-layers")
+                
+                for i in range(num_sublayers):
+                    start_idx = i * max_per_layer
+                    end_idx = min(start_idx + max_per_layer, len(layer))
+                    sublayer = layer[start_idx:end_idx]
+                    new_layers.append(sublayer)
+        
+        return new_layers
     
     def _position_layers(self, layers: List[List[str]]) -> Dict[str, Tuple[float, float]]:
         """Position species within their assigned layers - SIMPLE FIXED SPACING.
