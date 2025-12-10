@@ -96,13 +96,73 @@ class HierarchicalLayout(LayoutAlgorithm):
     
     def _assign_layers(self, graph: nx.DiGraph) -> Dict[str, int]:
         """
-        Assign each node to a layer using longest path method.
+        Assign each node to a layer using Petri net aware algorithm.
+        
+        For Petri nets, we need to respect the bipartite structure:
+        - Layer 0: Source places (no incoming arcs from transitions)
+        - Layer 1: Transitions consuming from layer 0
+        - Layer 2: Places produced by layer 1 transitions
+        - Layer 3: Transitions consuming from layer 2
+        - ... alternating places/transitions
         
         Returns:
             Dictionary mapping node IDs to layer numbers (0, 1, 2, ...)
         """
-        # Use base class implementation
-        return self.get_layer_assignment(graph)
+        layers = {}
+        
+        # Identify source places (places with no incoming arcs from transitions)
+        source_places = []
+        for node in graph.nodes():
+            node_type = graph.nodes[node].get('type', 'unknown')
+            if node_type == 'place':
+                # Check if this place has any incoming arcs from transitions
+                has_incoming_from_transition = any(
+                    graph.nodes[pred].get('type') == 'transition'
+                    for pred in graph.predecessors(node)
+                )
+                if not has_incoming_from_transition:
+                    source_places.append(node)
+                    layers[node] = 0
+        
+        if not source_places:
+            # No clear sources - fallback to any place
+            for node in graph.nodes():
+                if graph.nodes[node].get('type') == 'place':
+                    source_places.append(node)
+                    layers[node] = 0
+                    break
+        
+        # BFS traversal respecting Petri net structure
+        queue = source_places[:]
+        processed = set(source_places)
+        
+        while queue:
+            current = queue.pop(0)
+            current_layer = layers[current]
+            current_type = graph.nodes[current].get('type')
+            
+            # Process successors
+            for successor in graph.successors(current):
+                if successor in processed:
+                    # Already processed, but may need to update layer if we found a longer path
+                    existing_layer = layers[successor]
+                    new_layer = current_layer + 1
+                    if new_layer > existing_layer:
+                        layers[successor] = new_layer
+                        # Re-add to queue to update its descendants
+                        queue.append(successor)
+                else:
+                    # First time seeing this node
+                    layers[successor] = current_layer + 1
+                    processed.add(successor)
+                    queue.append(successor)
+        
+        # Handle any unprocessed nodes (shouldn't happen in connected graph)
+        for node in graph.nodes():
+            if node not in layers:
+                layers[node] = 0
+        
+        return layers
     
     def _group_by_layer(self, layers: Dict[str, int]) -> List[List[str]]:
         """
