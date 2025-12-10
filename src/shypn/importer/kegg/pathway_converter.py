@@ -748,22 +748,38 @@ class StandardConversionStrategy(ConversionStrategy):
         In KEGG pathways (especially reference pathways like rn00071), multiple
         reactions can have the same substrates and products but different reaction IDs.
         
-        This represents:
-        - Alternative enzymes (isoenzymes) catalyzing the same transformation
-        - Different organisms having different enzymes for same pathway step
-        - Alternative mechanisms for the same biochemical transformation
+        This represents ALTERNATIVE ENZYMES (isoenzymes/isozymes):
+        - Each enzyme CAN catalyze the reaction INDEPENDENTLY
+        - You only need ONE of them present for the reaction to occur
+        - They are mutually exclusive alternatives (OR relationship, not AND)
+        - NOT like cofactors which must all be present
+        
+        Common biological reasons for alternatives:
+        - Tissue-specificity: Different organs use different isoforms (heart vs liver LDH)
+        - Substrate specificity: Different chain lengths (ACADS/ACADM/ACADL for fatty acids)
+        - Developmental stages: Fetal vs adult hemoglobin
+        - Regulation: Different conditions activate different isoforms
+        - Organism diversity: Reference pathways show enzymes from multiple species
+        - Evolutionary redundancy: Backup enzymes for critical reactions
         
         Example from rn00071 (fatty acid degradation):
         - R00631: acyl-CoA + FAD → 2,3-dehydroacyl-CoA + FADH2  (enzyme: ACAD9)
         - R03990: acyl-CoA + FAD → 2,3-dehydroacyl-CoA + FADH2  (enzyme: ACADL)
         - R03857: acyl-CoA + FAD → 2,3-dehydroacyl-CoA + FADH2  (enzyme: ACADM)
         
-        All three reactions perform the same transformation but with different
-        acyl-CoA dehydrogenase isoforms.
+        All three perform the SAME transformation but with DIFFERENT enzyme isoforms.
+        The organism needs ONLY ONE of these enzymes to be present/active.
         
-        In the Petri net, this creates multiple parallel transitions between the
-        same places, which is correct biologically (alternative pathways) but may
-        appear visually redundant.
+        In the Petri net representation:
+        - Multiple parallel transitions = Alternative pathways (biological OR)
+        - Tokens can flow through ANY of the transitions
+        - Models biological flexibility and robustness
+        - This is CORRECT behavior, not a modeling error
+        
+        Compare to cofactors (different concept):
+        - Cofactors (ATP, NADH) must be present for reaction to occur (AND relationship)
+        - Represented as input places with arcs to transitions
+        - Consumed or required, not alternatives
         
         Args:
             pathway: KEGG pathway to analyze
