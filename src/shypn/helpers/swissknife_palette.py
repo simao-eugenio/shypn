@@ -576,36 +576,74 @@ class SwissKnifePalette(GObject.GObject):
         }
         
         .tool-button.swissknife-tool {
+            padding: 6px;  /* Space for 24x24 icons in 40x40 buttons */
+            transition: all 200ms ease;
+            /* Match category button style - dark semi-transparent */
+            background-color: rgba(60, 70, 80, 0.8);
+            border: 1px solid rgba(100, 110, 120, 0.5);
             border-left: 3px solid #3498db;
+            border-radius: 4px;
         }
         
         /* Edit buttons - Dark Blue left border */
         .sub-palette-edit .tool-button.swissknife-tool {
+            padding: 2px;  /* Reduced padding for inner white box */
+            transition: all 200ms ease;
+            background-color: rgba(60, 70, 80, 0.8);
+            border: 1px solid rgba(100, 110, 120, 0.5);
             border-left: 4px solid rgba(41, 128, 185, 1);
+            border-radius: 4px;
         }
         
-        /* Active Tool Button - Blue highlight with glow */
+        /* Ensure icons display properly - white background for visibility */
+        .tool-button.swissknife-tool image {
+            min-width: 24px;
+            min-height: 24px;
+            background-color: rgba(255, 255, 255, 0.95);
+            border-radius: 3px;
+            padding: 4px;
+        }
+        
+        /* Hover effects - match category button hover */
+        .tool-button.swissknife-tool:hover {
+            background-color: rgba(80, 90, 100, 0.9);
+            border-color: rgba(120, 130, 140, 0.7);
+            border-left-color: #3498db;
+        }
+        
+        .tool-button.swissknife-tool:hover image {
+            background-color: rgba(255, 255, 255, 1.0);
+        }
+        
+        .sub-palette-edit .tool-button.swissknife-tool:hover {
+            background-color: rgba(80, 90, 100, 0.9);
+            border-color: rgba(120, 130, 140, 0.7);
+            border-left-color: #2980b9;
+            border-left-width: 5px;
+        }
+        
+        /* Active Tool Button - match category button active style */
         .tool-button.tool-active {
-            background: linear-gradient(to bottom, #3498db 0%, #2980b9 100%);
-            color: white;
-            border-color: #1a5490;
-            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2),
-                        0 0 8px rgba(52, 152, 219, 0.6);
+            background-color: rgba(100, 110, 120, 1.0);
+            border-color: rgba(140, 150, 160, 0.9);
+            color: #ffffff;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3),
+                        0 0 10px rgba(52, 152, 219, 0.5);
         }
         
         .sub-palette-edit .tool-button.tool-active {
-            background: linear-gradient(to bottom, #3498db 0%, #2980b9 100%);
-            color: white;
-            border-color: #1a5490;
+            background-color: rgba(100, 110, 120, 1.0);
+            border-color: rgba(140, 150, 160, 0.9);
             border-left: 4px solid #ffffff;
-            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2),
-                        0 0 12px rgba(52, 152, 219, 0.8);
+            color: #ffffff;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3),
+                        0 0 15px rgba(52, 152, 219, 0.7);
         }
         """
         
         try:
             provider = Gtk.CssProvider()
-            provider.load_from_data(css)
+            provider.load_from_data(css.encode('utf-8'))
             
             Gtk.StyleContext.add_provider_for_screen(
                 Gdk.Screen.get_default(),
@@ -613,4 +651,4 @@ class SwissKnifePalette(GObject.GObject):
                 Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
             )
         except Exception as e:
-            pass  # Silently ignore CSS errors
+            print(f"ERROR loading SwissKnife CSS: {e}")  # Show CSS errors
