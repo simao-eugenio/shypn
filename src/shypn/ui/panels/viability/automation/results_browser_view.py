@@ -556,7 +556,7 @@ class ResultsBrowserView(Gtk.Box):
         # Clear previous plot
         self.figure.clear()
         
-        # Create axes with two y-axes (left: tokens, right: firing rate)
+        # Create axes with two y-axes (left: firing rate, right: tokens)
         ax1 = self.figure.add_subplot(111)
         
         # Title with sweep info
@@ -569,10 +569,74 @@ class ResultsBrowserView(Gtk.Box):
                 title_text += f"\nSwept Place: {swept_param['name']} = {swept_param['value']:.4g}"
         self.figure.suptitle(title_text, fontsize=14, fontweight='bold')
         
-        # Left y-axis: Plot places (tokens)
+        # Left y-axis: Plot transitions (firing rates) - INVERTED
         ax1.set_xlabel('Time', fontsize=12)
-        ax1.set_ylabel('Tokens (Places)', fontsize=12, color='blue')
-        ax1.tick_params(axis='y', labelcolor='blue')
+        ax1.set_ylabel('Firing Rate (Transitions)', fontsize=12, color='red')
+        ax1.tick_params(axis='y', labelcolor='red')
+        
+        # Plot each transition (if any)
+        plotted_transitions = []
+        colors_transitions = ['red', 'darkred', 'crimson', 'firebrick']
+        
+        for idx, transition_id in enumerate(transition_ids):
+            if transition_id not in species_stats:
+                continue
+                
+            trans_data = species_stats[transition_id]
+            mean = np.array(trans_data.get('mean', []))
+            std = np.array(trans_data.get('std', []))
+            
+            if len(mean) == 0:
+                continue
+            
+            plotted_transitions.append(transition_id)
+            color = colors_transitions[idx % len(colors_transitions)]
+            trans_name = self._resolve_species_name(transition_id)
+            
+            # Emphasize if this is the swept transition
+            is_swept = (transition_id == swept_transition_id)
+            linewidth = 3 if is_swept else 2
+            label = f'⚡ {trans_name}' if is_swept else trans_name
+            
+            # Plot firing rates directly from statistics (computed per-replicate then aggregated)
+            from scipy.interpolate import make_interp_spline
+            
+            if len(time_points_arr) > 50:
+                try:
+                    # Subsample for cleaner spline (same as places)
+                    indices = np.linspace(0, len(time_points_arr)-1, min(500, len(time_points_arr)), dtype=int)
+                    time_smooth = time_points_arr[indices]
+                    mean_smooth = mean[indices]
+                    
+                    # Create spline
+                    spl = make_interp_spline(time_smooth, mean_smooth, k=min(3, len(time_smooth)-1))
+                    
+                    # Generate extra smooth points
+                    time_fine = np.linspace(time_points_arr[0], time_points_arr[-1], 1000)
+                    mean_fine = spl(time_fine)
+                    
+                    # Plot smooth transition
+                    ax1.plot(time_fine, mean_fine, color=color, 
+                            linewidth=linewidth, label=label, alpha=0.8)
+                except Exception as e:
+                    ax1.plot(time_points_arr, mean, color=color, 
+                            linewidth=linewidth, label=label, alpha=0.8, linestyle='-', marker='')
+            else:
+                # Too few points, use raw data
+                ax1.plot(time_points_arr, mean, color=color, 
+                        linewidth=linewidth, label=label, alpha=0.8, linestyle='-', marker='')
+            
+            # Plot confidence interval
+            ax1.fill_between(time_points_arr, 
+                           mean - 2*std, 
+                           mean + 2*std, 
+                           alpha=0.3, 
+                           color=color)
+        
+        # Right y-axis: Plot places (tokens) - INVERTED
+        ax2 = ax1.twinx()
+        ax2.set_ylabel('Tokens (Places)', fontsize=12, color='blue')
+        ax2.tick_params(axis='y', labelcolor='blue')
         
         # Plot each place (only those with statistics)
         colors_places = ['#1f77b4', '#2ca02c', '#ff7f0e', '#9467bd', '#8c564b']
@@ -615,51 +679,23 @@ class ResultsBrowserView(Gtk.Box):
                     mean_fine = spl(time_fine)
                     
                     # Plot smooth mean line
-                    line = ax1.plot(time_fine, mean_fine, color=color, 
+                    line = ax2.plot(time_fine, mean_fine, color=color, 
                                   linewidth=2, label=place_name, alpha=0.8)
                 except Exception as e:
                     # Fallback to straight lines if smoothing fails
-                    line = ax1.plot(time_points_arr, mean, color=color, 
+                    line = ax2.plot(time_points_arr, mean, color=color, 
                                   linewidth=2, label=place_name, alpha=0.8)
             else:
                 # Too few points, use raw data
-                line = ax1.plot(time_points_arr, mean, color=color, 
+                line = ax2.plot(time_points_arr, mean, color=color, 
                               linewidth=2, label=place_name, alpha=0.8)
             
             # Plot confidence interval (use original data, not smoothed)
-            ax1.fill_between(time_points_arr, 
+            ax2.fill_between(time_points_arr, 
                            mean - 2*std, 
                            mean + 2*std, 
                            alpha=0.2, 
                            color=color)
-        
-        # Right y-axis: Plot transitions (firing rates)
-        ax2 = ax1.twinx()
-        ax2.set_ylabel('Firing Rate (firings/time)', fontsize=12, color='red')
-        ax2.tick_params(axis='y', labelcolor='red')
-        
-        # Plot each transition (if any)
-        plotted_transitions = []
-        colors_transitions = ['red', 'darkred', 'crimson', 'firebrick']
-        
-        for idx, transition_id in enumerate(transition_ids):
-            if transition_id not in species_stats:
-                continue
-                
-            trans_data = species_stats[transition_id]
-            mean = np.array(trans_data.get('mean', []))
-            std = np.array(trans_data.get('std', []))
-            
-            if len(mean) == 0:
-                continue
-            
-            plotted_transitions.append(transition_id)
-            color = colors_transitions[idx % len(colors_transitions)]
-            trans_name = self._resolve_species_name(transition_id)
-            
-            # Emphasize if this is the swept transition
-            is_swept = (transition_id == swept_transition_id)
-            linewidth = 3 if is_swept else 2
             label = f'⚡ {trans_name}' if is_swept else trans_name
             
             # Plot firing rates directly from statistics (computed per-replicate then aggregated)

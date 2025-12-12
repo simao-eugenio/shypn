@@ -52,12 +52,14 @@ class SimulationResults:
 
 
 class SubnetSimulator:
-    """Execute subnet simulation with step control.
+    """Execute subnet simulation using real SimulationController infrastructure.
     
-    Integrates with existing viability panel components:
-    - SubnetBuilder (subnet extraction)
-    - TreeViews (parameter source)
-    - LocalityDetector (subnet identification)
+    This ensures all viability panel simulations use the same engine as
+    the main simulation and automation experiments, providing:
+    - Consistent behavior across all simulation modes
+    - Proper data collection for analyses panel plotting
+    - Support for all transition types (continuous, stochastic, timed, immediate)
+    - Tau-leaping and advanced simulation features
     """
     
     def __init__(self, viability_panel):
@@ -67,19 +69,103 @@ class SubnetSimulator:
             viability_panel: ViabilityPanel instance
         """
         self.panel = viability_panel
-        self.state = None
-        self.subnet = None
+        self.controller = None  # Real SimulationController
+        self.subnet_model = None  # DocumentModel built from subnet
         self.initial_markings = {}  # Store for reset
         
+    def is_initialized(self):
+        """Check if simulator is ready.
+        
+        Returns:
+            bool: True if initialized
+        """
+        return self.controller is not None
+        
+    @property
+    def state(self):
+        """Get current simulation state (compatibility property).
+        
+        Returns:
+            SimulationState-like object with controller data
+        """
+        if not self.controller:
+            return None
+        
+        # Create compatibility wrapper around controller state
+        class ControllerStateWrapper:
+            def __init__(self, controller, initial_markings):
+                self.controller = controller
+                self.initial_markings = initial_markings
+                
+            @property
+            def time(self):
+                return self.controller.time
+            
+            @property
+            def current_markings(self):
+                return {p.id: p.tokens for p in self.controller.model_adapter.places}
+            
+            @property
+            def firing_counts(self):
+                return {t.id: getattr(t, 'firing_count', 0) 
+                       for t in self.controller.model_adapter.transitions}
+            
+            @property
+            def step_count(self):
+                # Approximate from data collector length
+                if self.controller.data_collector.time_points:
+                    return len(self.controller.data_collector.time_points)
+                return 0
+            
+            @property  
+            def trajectory(self):
+                # Build from data collector
+                if not self.controller.data_collector.time_points:
+                    return []
+                times = self.controller.data_collector.time_points
+                # Get place data for first place as reference
+                place_ids = list(self.controller.data_collector.place_data.keys())
+                if not place_ids:
+                    return []
+                result = []
+                for i, t in enumerate(times):
+                    marking = {
+                        pid: self.controller.data_collector.place_data[pid][i]
+                        for pid in place_ids
+                    }
+                    result.append((t, marking))
+                return result
+            
+            @property
+            def enabled_transitions(self):
+                # Return list of currently enabled transitions
+                enabled = []
+                for trans in self.controller.model_adapter.transitions:
+                    behavior = self.controller._get_behavior(trans)
+                    can_fire, _ = behavior.can_fire()
+                    if can_fire:
+                        enabled.append(trans)
+                return enabled
+            
+            @property
+            def is_running(self):
+                return self.controller.is_running if hasattr(self.controller, 'is_running') else False
+            
+            @property
+            def is_paused(self):
+                return self.controller.is_paused if hasattr(self.controller, 'is_paused') else False
+        
+        return ControllerStateWrapper(self.controller, self.initial_markings)
+        
     def initialize_simulation(self):
-        """Extract subnet and prepare for simulation.
+        """Extract subnet and prepare simulation using real SimulationController.
         
         Returns:
             bool: True if initialization successful
         """
-        # 1. Get model
-        model = self.panel._get_current_model()
-        if not model:
+        # 1. Get base model
+        base_model = self.panel._get_current_model()
+        if not base_model:
             return False
         
         # 2. Extract subnet from selected localities
@@ -87,24 +173,38 @@ class SubnetSimulator:
         if not subnet or not subnet['transitions']:
             return False
         
-        # 3. Read parameters from TreeViews
+        # 3. Read parameters from TreeViews and apply to subnet
         self._apply_parameters_from_treeviews(subnet)
         
-        # 4. Initialize state
-        self.state = SimulationState()
-        self.subnet = subnet
+        # 4. Build a complete DocumentModel from subnet
+        from shypn.data.canvas.document_model import DocumentModel
+        self.subnet_model = DocumentModel()
         
-        # Copy initial markings
-        for place in subnet['places']:
-            marking = place.marking if hasattr(place, 'marking') else 0
-            self.state.current_markings[place.id] = marking
+        # Copy subnet elements to new model
+        self.subnet_model.places = subnet['places']
+        self.subnet_model.transitions = subnet['transitions']
+        self.subnet_model.arcs = subnet['arcs']
+        
+        # Store initial markings
+        self.initial_markings = {}
+        for place in self.subnet_model.places:
+            marking = getattr(place, 'tokens', 0)
             self.initial_markings[place.id] = marking
-            
-        for trans in subnet['transitions']:
-            self.state.firing_counts[trans.id] = 0
         
-        # Initial trajectory point
-        self.state.trajectory = [(0.0, self.state.current_markings.copy())]
+        # 5. Create SimulationController with subnet model
+        from shypn.engine.simulation.controller import SimulationController
+        self.controller = SimulationController(self.subnet_model)
+        
+        # Configure controller settings
+        self.controller.settings.use_tau_leaping = True
+        self.controller.settings.tau_epsilon = 0.03
+        
+        # Start data collection
+        self.controller.data_collector.start_collection()
+        self.controller.data_collector.record_state(0.0)
+        
+        # Initialize transition enablement states
+        self.controller._update_enablement_states()
         
         return True
     
@@ -195,53 +295,68 @@ class SubnetSimulator:
                 arc_obj.weight = weight
     
     def step(self):
-        """Execute single firing event.
+        """Execute single simulation step using real SimulationController.
         
         Returns:
             dict or None: Step info with:
-                - 'fired_transition': transition_id or None
+                - 'fired_transition': transition_id or None  
                 - 'time_delta': dt
                 - 'marking_changes': {place_id: (old, new)}
                 - 'enabled_transitions': [trans_ids]
                 - 'deadlocked': bool
         """
-        if not self.state or not self.subnet:
+        if not self.controller:
             return None
         
-        # 1. Check enabled transitions
-        enabled = self._get_enabled_transitions()
-        self.state.enabled_transitions = enabled
+        # Get markings before step
+        markings_before = {p.id: p.tokens for p in self.controller.model_adapter.places}
+        time_before = self.controller.time
         
-        if not enabled:
-            # Deadlock
+        # Execute one simulation step using real controller
+        success = self.controller.step()
+        
+        # Get markings after step
+        markings_after = {p.id: p.tokens for p in self.controller.model_adapter.places}
+        time_after = self.controller.time
+        
+        # Calculate what changed
+        marking_changes = {}
+        for pid in markings_before:
+            if markings_before[pid] != markings_after.get(pid, 0):
+                marking_changes[pid] = (markings_before[pid], markings_after[pid])
+        
+        # Get enabled transitions
+        enabled_ids = []
+        for trans in self.controller.model_adapter.transitions:
+            behavior = self.controller._get_behavior(trans)
+            can_fire, _ = behavior.can_fire()
+            if can_fire:
+                enabled_ids.append(trans.id)
+        
+        if not success:
+            # Deadlock or simulation ended
             return {
                 'fired_transition': None,
                 'time_delta': 0.0,
                 'marking_changes': {},
-                'enabled_transitions': [],
-                'deadlocked': True
+                'enabled_transitions': enabled_ids,
+                'deadlocked': len(enabled_ids) == 0
             }
         
-        # 2. Select transition (random for stochastic, first for deterministic)
-        selected_trans = random.choice(enabled)
-        
-        # 3. Calculate time delta
-        dt = self._calculate_time_delta(enabled)
-        
-        # 4. Fire transition
-        marking_changes = self._fire_transition(selected_trans)
-        
-        # 5. Update state
-        self.state.time += dt
-        self.state.step_count += 1
-        self.state.firing_counts[selected_trans.id] += 1
-        self.state.trajectory.append((self.state.time, self.state.current_markings.copy()))
+        # Determine which transition fired (approximate from changes)
+        # In a real step, the controller doesn't track this explicitly,
+        # so we infer from the last recorded events or just report success
+        fired_transition = None
+        if marking_changes:
+            # Could be any enabled transition - just report first for now
+            # A better approach would be to track this in the controller
+            fired_transition = enabled_ids[0] if enabled_ids else None
         
         return {
-            'fired_transition': selected_trans.id,
-            'time_delta': dt,
+            'fired_transition': fired_transition,
+            'time_delta': time_after - time_before,
             'marking_changes': marking_changes,
-            'enabled_transitions': [t.id for t in enabled],
+            'enabled_transitions': enabled_ids,
             'deadlocked': False
         }
     
@@ -338,7 +453,7 @@ class SubnetSimulator:
         return -math.log(random.random()) / total_rate
     
     def run_to_completion(self, max_time=100, max_steps=1000, log_callback=None):
-        """Run simulation until deadlock or limits reached.
+        """Run simulation until deadlock or limits using real SimulationController.
         
         Args:
             max_time: Maximum simulation time
@@ -348,66 +463,90 @@ class SubnetSimulator:
         Returns:
             SimulationResults: Complete outcomes
         """
+        if not self.controller:
+            if log_callback:
+                log_callback("✗ Simulator not initialized")
+            return SimulationResults()
+        
         start_real_time = time.time()
         
-        self.state.is_running = True
-        self.state.is_paused = False
+        # Configure controller duration
+        self.controller.settings.duration = max_time
         
-        while self.state.is_running and not self.state.is_paused:
-            # Check limits
-            if self.state.time >= max_time:
-                if log_callback:
-                    log_callback(f"⏱ Reached time limit ({max_time}s)")
-                break
+        # Run simulation loop using controller.step()
+        step_count = 0
+        while step_count < max_steps and self.controller.time < max_time:
+            # Check for enabled transitions (deadlock detection)
+            has_enabled = False
+            for trans in self.controller.model_adapter.transitions:
+                behavior = self.controller._get_behavior(trans)
+                can_fire, _ = behavior.can_fire()
+                if can_fire:
+                    has_enabled = True
+                    break
             
-            if self.state.step_count >= max_steps:
-                if log_callback:
-                    log_callback(f"⏱ Reached step limit ({max_steps} steps)")
-                break
-            
-            # Execute step
-            step_info = self.step()
-            
-            if step_info['deadlocked']:
+            if not has_enabled:
                 if log_callback:
                     log_callback("✗ Deadlock detected - no enabled transitions")
                 break
             
-            # Log every step with transition firing and full place markings
-            if log_callback:
-                trans_id = step_info['fired_transition']
-                changes_str = ", ".join([
-                    f"{pid}: {old}→{new}"
-                    for pid, (old, new) in step_info['marking_changes'].items()
+            # Execute one controller step
+            success = self.controller.step()
+            step_count += 1
+            
+            if not success:
+                if log_callback:
+                    log_callback("✗ Simulation stopped")
+                break
+            
+            # Log progress periodically
+            if log_callback and (step_count % 100 == 0):
+                markings_summary = ", ".join([
+                    f"{p.id}={p.tokens}"
+                    for p in list(self.controller.model_adapter.places)[:3]
                 ])
-                # Build one-line log with markings snapshot
-                full_line = f"Step {self.state.step_count}: {trans_id} fired ({changes_str})"
-                try:
-                    markings_list = ", ".join([
-                        f"{pid}={self.state.current_markings.get(pid, 0)}"
-                        for pid in sorted(self.state.current_markings.keys())
-                    ])
-                    full_line += f" | Markings: {markings_list}"
-                except Exception:
-                    pass
-                log_callback(full_line)
+                log_callback(f"Step {step_count}: t={self.controller.time:.2f}s | {markings_summary}...")
         
-        self.state.is_running = False
+        # Check why we stopped
+        if self.controller.time >= max_time:
+            if log_callback:
+                log_callback(f"⏱ Reached time limit ({max_time}s)")
+        elif step_count >= max_steps:
+            if log_callback:
+                log_callback(f"⏱ Reached step limit ({max_steps} steps)")
         
-        # Create results
+        # Build results from controller state
         results = SimulationResults()
-        results.final_markings = self.state.current_markings.copy()
-        results.firing_counts = self.state.firing_counts.copy()
+        results.final_markings = {p.id: p.tokens for p in self.controller.model_adapter.places}
+        results.firing_counts = {
+            t.id: getattr(t, 'firing_count', 0)
+            for t in self.controller.model_adapter.transitions
+        }
         results.execution_time = time.time() - start_real_time
-        results.sim_time = self.state.time
-        results.step_count = self.state.step_count
-        results.trajectory = self.state.trajectory.copy()
-        results.deadlocked = len(self._get_enabled_transitions()) == 0
+        results.sim_time = self.controller.time
+        results.step_count = step_count
+        
+        # Get trajectory from data collector
+        if self.controller.data_collector.time_points:
+            times = self.controller.data_collector.time_points
+            place_ids = list(self.controller.data_collector.place_data.keys())
+            for i, t in enumerate(times):
+                marking = {
+                    pid: self.controller.data_collector.place_data[pid][i]
+                    for pid in place_ids
+                }
+                results.trajectory.append((t, marking))
+        
+        # Check for deadlock
+        results.deadlocked = not any(
+            self.controller._get_behavior(t).can_fire()[0]
+            for t in self.controller.model_adapter.transitions
+        )
         
         # Calculate fluxes (firings per unit time)
-        if self.state.time > 0:
-            for trans_id, count in self.state.firing_counts.items():
-                results.fluxes[trans_id] = count / self.state.time
+        if results.sim_time > 0:
+            for trans_id, count in results.firing_counts.items():
+                results.fluxes[trans_id] = count / results.sim_time
         
         # Determine viability status
         if results.deadlocked:
@@ -424,17 +563,29 @@ class SubnetSimulator:
     
     def reset(self):
         """Reset simulation to initial state."""
-        if self.subnet and self.initial_markings:
-            # Restore initial markings
-            self.state = SimulationState()
-            
-            for place_id, marking in self.initial_markings.items():
-                self.state.current_markings[place_id] = marking
-            
-            for trans in self.subnet['transitions']:
-                self.state.firing_counts[trans.id] = 0
-            
-            self.state.trajectory = [(0.0, self.state.current_markings.copy())]
+        if not self.controller or not self.initial_markings:
+            return
+        
+        # Reset place markings to initial values
+        for place in self.controller.model_adapter.places:
+            if place.id in self.initial_markings:
+                place.tokens = self.initial_markings[place.id]
+        
+        # Reset transition firing counts
+        for trans in self.controller.model_adapter.transitions:
+            if hasattr(trans, 'firing_count'):
+                trans.firing_count = 0
+        
+        # Reset controller time
+        self.controller.time = 0.0
+        
+        # Reset data collector
+        self.controller.data_collector.clear()
+        self.controller.data_collector.start_collection()
+        self.controller.data_collector.record_state(0.0)
+        
+        # Re-initialize enablement states
+        self.controller._update_enablement_states()
     
     def pause(self):
         """Pause running simulation."""

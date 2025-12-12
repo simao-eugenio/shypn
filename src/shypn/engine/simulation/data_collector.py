@@ -100,7 +100,14 @@ class DataCollector:
                         # Fallback: use static rate attribute (won't reflect token changes)
                         rate = float(transition.rate) if transition.rate else 0.0
                 except Exception as e:
-                    # If rate evaluation fails, use 0.0
+                    # If rate evaluation fails, log the error and use 0.0
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    if not hasattr(self, '_rate_eval_errors'):
+                        self._rate_eval_errors = set()
+                    if transition.id not in self._rate_eval_errors:
+                        logger.warning(f"Rate evaluation failed for transition {transition.id}: {e}")
+                        self._rate_eval_errors.add(transition.id)
                     rate = 0.0
             
             self.transition_rates[transition.id].append(rate)
@@ -178,7 +185,7 @@ class DataCollector:
         return self.time_points.copy(), self.place_data.get(place_id, []).copy()
         
     def get_transition_series(self, transition_id: str) -> Tuple[List[float], List[int]]:
-        """Get time-series for a specific transition.
+        """Get time-series for a specific transition (cumulative firing counts).
         
         Args:
             transition_id: Transition identifier
@@ -187,6 +194,20 @@ class DataCollector:
             Tuple of (time_points, firing_counts)
         """
         return self.time_points.copy(), self.transition_data.get(transition_id, []).copy()
+    
+    def get_transition_rate_series(self, transition_id: str) -> Tuple[List[float], List[float]]:
+        """Get instantaneous rate time-series for a specific transition.
+        
+        For transitions with rate functions, returns the evaluated rate values over time.
+        For constant-rate transitions, returns the static rate repeated at each time point.
+        
+        Args:
+            transition_id: Transition identifier
+            
+        Returns:
+            Tuple of (time_points, rate_values)
+        """
+        return self.time_points.copy(), self.transition_rates.get(transition_id, []).copy()
         
     def has_data(self) -> bool:
         """Check if any data has been collected.

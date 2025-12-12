@@ -161,20 +161,22 @@ class CurvedInhibitorArc(CurvedArc):
         # Draw hollow circle at target boundary (not pulled back)
         self._render_arrowhead(cr, marker_x, marker_y, dx_end, dy_end, zoom)
         
-        # Draw weight label if different from 1 (convention: weight=1 is implicit)
-        # This includes inhibitor thresholds (Ki values)
-        if abs(self.weight - 1.0) > 1e-6:
-            # Use curved arc specific weight rendering (calculates position on curve)
-            # Pass offset information to ensure text goes on outer side
-            offset_distance = None
-            if hasattr(self, '_manager') and self._manager:
-                parallels = self._manager.detect_parallel_arcs(self)
-                if parallels:
-                    offset_distance = self._manager.calculate_arc_offset(self, parallels)
-            
-            self._render_weight_curved(cr, start_world_x, start_world_y, 
-                                      end_world_x, end_world_y, 
-                                      cp_x, cp_y, offset_distance, zoom)
+        # Draw threshold label if different from 1 (show inhibition threshold)
+        # For inhibitor arcs, threshold is stored in 'threshold' attribute or 'weight' as fallback
+        threshold_value = getattr(self, 'threshold', self.weight)
+        
+        # Handle dynamic threshold formulas (strings) vs numeric thresholds
+        if threshold_value:
+            if isinstance(threshold_value, str):
+                # Dynamic threshold formula - always display
+                self._render_threshold_label_curved(cr, start_world_x, start_world_y, 
+                                                   end_world_x, end_world_y, 
+                                                   cp_x, cp_y, threshold_value, zoom)
+            elif isinstance(threshold_value, (int, float)) and abs(threshold_value - 1.0) > 1e-6:
+                # Numeric threshold different from 1
+                self._render_threshold_label_curved(cr, start_world_x, start_world_y, 
+                                                   end_world_x, end_world_y, 
+                                                   cp_x, cp_y, threshold_value, zoom)
         
         # Ensure clean state for next rendering operation
         cr.new_path()
@@ -283,6 +285,24 @@ class CurvedInhibitorArc(CurvedArc):
         
         # Restore context (clear any paths/state)
         cr.restore()
+    
+    def _render_threshold_label_curved(self, cr, x1: float, y1: float, x2: float, y2: float,
+                                       cp_x: float, cp_y: float, threshold_value: float, zoom: float = 1.0):
+        """Render threshold label on curved arc at the bezier curve midpoint.
+        
+        Delegates to InhibitorArc's implementation for consistency.
+        
+        Args:
+            cr: Cairo context
+            x1, y1: Start point (world coords)
+            x2, y2: End point (world coords)
+            cp_x, cp_y: Control point (world coords)
+            threshold_value: Threshold value to display (numeric or formula string)
+            zoom: Current zoom level
+        """
+        # Use InhibitorArc's threshold label rendering
+        InhibitorArc._render_threshold_label_curved(self, cr, x1, y1, x2, y2, 
+                                                    cp_x, cp_y, threshold_value, zoom)
     
     def consumes_tokens(self) -> bool:
         """Check if this arc consumes tokens on firing.
