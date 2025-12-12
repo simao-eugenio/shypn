@@ -73,15 +73,9 @@ class StochasticBehavior(TransitionBehavior):
         # Extract stochastic parameters
         props = getattr(transition, 'properties', {})
         
-        # Debug: Log properties dict
-        print(f"[STOCHASTIC_INIT] Transition {transition.id}: props type={type(props)}, props={props}")
-        
         # Check if has rate_function (SBML formulas)
         self.has_rate_function = 'rate_function' in props
         self.rate_function_expr = props.get('rate_function') if self.has_rate_function else None
-        
-        # Debug: Log formula extraction
-        print(f"[STOCHASTIC_INIT] Transition {transition.id}: has_rate_function={self.has_rate_function}, rate_function_expr={self.rate_function_expr}")
         
         # Warn if stochastic transition has complex formula (likely should be continuous)
         if self.has_rate_function and self.rate_function_expr:
@@ -102,10 +96,25 @@ class StochasticBehavior(TransitionBehavior):
             # Fallback: Use transition.rate attribute (UI stores it here)
             rate = getattr(transition, 'rate', None)
             if rate is not None:
-                try:
-                    self.rate = float(rate) if isinstance(rate, (int, float)) else 1.0
-                except (ValueError, TypeError):
-                    self.rate = 1.0  # Safe default
+                if isinstance(rate, (int, float)):
+                    # Numeric rate - use directly
+                    self.rate = float(rate)
+                elif isinstance(rate, str):
+                    # String rate - check if it's a formula or simple number
+                    rate_str = rate.strip()
+                    try:
+                        # Try to convert to float (simple numeric string like "0.1")
+                        self.rate = float(rate_str)
+                        self.logger.debug(f"Transition '{transition.name}': parsed rate string '{rate_str}' as {self.rate}")
+                    except ValueError:
+                        # It's a formula (like "0.1 * (1 + 0.5 * CI_Dimer)")
+                        # Store it as rate_function for evaluation
+                        self.has_rate_function = True
+                        self.rate_function_expr = rate_str
+                        self.rate = 1.0  # Temporary placeholder (will be evaluated dynamically)
+                        self.logger.debug(f"Transition '{transition.name}': detected rate formula: {rate_str}")
+                else:
+                    self.rate = 1.0  # Safe default for unknown types
             else:
                 self.rate = 1.0  # Default rate
         
@@ -190,6 +199,17 @@ class StochasticBehavior(TransitionBehavior):
                 # This doesn't affect simulation dynamics but prevents math errors
                 context[place_name] = max(tokens, 1e-10)
             
+            # Debug: Log context for first few evaluations
+            if not hasattr(self, '_eval_debug_count'):
+                self._eval_debug_count = 0
+            if self._eval_debug_count < 3:
+                self.logger.debug(
+                    f"Rate eval for {self.transition.name}: formula={self.rate_function_expr}, "
+                    f"context keys={list(context.keys())[:5]}, "
+                    f"sample values={dict(list(context.items())[:3])}"
+                )
+                self._eval_debug_count += 1
+            
             # Evaluate formula
             result = eval(self.rate_function_expr, {"__builtins__": {}}, context)
             rate = float(result)
@@ -261,8 +281,13 @@ class StochasticBehavior(TransitionBehavior):
             places_to_iterate = self.model.places.values() if isinstance(self.model.places, dict) else self.model.places
             
             for place in places_to_iterate:
-                if hasattr(place, 'tokens') and hasattr(place, 'name'):
-                    places_dict[place.name] = place.tokens
+                if hasattr(place, 'tokens'):
+                    # Add by ID (P1, P2, etc.) - used in most rate formulas
+                    if hasattr(place, 'id'):
+                        places_dict[place.id] = place.tokens
+                    # Also add by name if it exists (for SBML models)
+                    if hasattr(place, 'name') and place.name:
+                        places_dict[place.name] = place.tokens
             
             return places_dict
         
@@ -271,17 +296,25 @@ class StochasticBehavior(TransitionBehavior):
         for arc in self.get_input_arcs():
             if hasattr(arc, 'source'):
                 place = arc.source
-                if hasattr(place, 'tokens') and hasattr(place, 'name'):
-                    place_id = place.name
-                    places_dict[place_id] = place.tokens
+                if hasattr(place, 'tokens'):
+                    # Add by ID (P1, P2, etc.)
+                    if hasattr(place, 'id'):
+                        places_dict[place.id] = place.tokens
+                    # Also add by name if it exists
+                    if hasattr(place, 'name') and place.name:
+                        places_dict[place.name] = place.tokens
         
         # Get all output places (for access to all network state)
         for arc in self.get_output_arcs():
             if hasattr(arc, 'target'):
                 place = arc.target
-                if hasattr(place, 'tokens') and hasattr(place, 'name'):
-                    place_id = place.name
-                    places_dict[place_id] = place.tokens
+                if hasattr(place, 'tokens'):
+                    # Add by ID (P1, P2, etc.)
+                    if hasattr(place, 'id'):
+                        places_dict[place.id] = place.tokens
+                    # Also add by name if it exists
+                    if hasattr(place, 'name') and place.name:
+                        places_dict[place.name] = place.tokens
         
         return places_dict
     

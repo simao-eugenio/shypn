@@ -36,15 +36,15 @@ class SimulationSettings:
     DEFAULT_TIME_SCALE = 1.0
     DEFAULT_STEPS_TARGET = 10000  # Target number of steps for auto dt
     
-    # τ-Leaping defaults - ENABLED BY DEFAULT for performance
-    # Users should get fast simulation automatically, just like ODEs
-    DEFAULT_USE_TAU_LEAPING = True  # Use τ-leaping by default (10-100× faster)
-    DEFAULT_TAU_EPSILON = 0.03  # 3% leap condition tolerance
-    DEFAULT_CRITICAL_THRESHOLD = 10.0  # Propensity threshold for exact SSA
+    # τ-Leaping defaults - ALWAYS ENABLED (it's the stochastic engine, not an option)
+    # τ-leaping is 10-100× faster than exact SSA and enables continuous+stochastic concurrency
+    DEFAULT_TAU_EPSILON = 0.03  # 3% leap condition tolerance (controls accuracy)
+    DEFAULT_CRITICAL_THRESHOLD = 0.01  # Propensity threshold for critical reactions (lowered for biochemical models)
     DEFAULT_MAX_TAU = 0.01  # Maximum leap size (seconds) - conservative default to prevent huge time jumps
     DEFAULT_MIN_TAU = 1e-6  # Minimum leap size (seconds)
-    DEFAULT_USE_PARALLEL_STOCHASTIC = True  # Parallel by default (2-4× faster)
+    DEFAULT_USE_PARALLEL_STOCHASTIC = True  # Parallel sampling for weakly independent transitions (2-4× faster)
     # Note: max_workers is auto-determined from os.cpu_count(), not a user setting
+    # Note: use_tau_leaping removed - τ-leaping is always the stochastic simulation method
     
     # Precision tolerance for time comparisons (prevents floating-point errors)
     # Using 1e-9 (1 nanosecond) to safely handle accumulated rounding errors
@@ -59,8 +59,7 @@ class SimulationSettings:
         self._dt_manual = self.DEFAULT_DT_MANUAL
         self._time_scale = self.DEFAULT_TIME_SCALE
         
-        # τ-Leaping settings
-        self._use_tau_leaping = self.DEFAULT_USE_TAU_LEAPING
+        # τ-Leaping settings (τ-leaping is always used for stochastic simulation)
         self._tau_epsilon = self.DEFAULT_TAU_EPSILON
         self._critical_threshold = self.DEFAULT_CRITICAL_THRESHOLD
         self._max_tau = self.DEFAULT_MAX_TAU
@@ -167,13 +166,21 @@ class SimulationSettings:
     
     @property
     def use_tau_leaping(self) -> bool:
-        """Get whether τ-leaping is enabled."""
-        return self._use_tau_leaping
+        """DEPRECATED: τ-leaping is always enabled (it's the stochastic engine).
+        
+        This property exists for backward compatibility but always returns True.
+        To control parallelism, use use_parallel_stochastic instead.
+        """
+        return True  # Always enabled
     
     @use_tau_leaping.setter
     def use_tau_leaping(self, value: bool):
-        """Set τ-leaping mode."""
-        self._use_tau_leaping = bool(value)
+        """DEPRECATED: τ-leaping cannot be disabled (it's the stochastic engine).
+        
+        Setting this has no effect. τ-leaping is always used for stochastic simulation
+        because it's 10-100× faster than exact SSA and enables continuous+stochastic concurrency.
+        """
+        pass  # Ignored - τ-leaping is always enabled
     
     @property
     def tau_epsilon(self) -> float:
@@ -435,7 +442,7 @@ class SimulationSettings:
             'dt_manual': self._dt_manual,
             'time_scale': self._time_scale,
             # τ-Leaping settings
-            'use_tau_leaping': self._use_tau_leaping,
+            'use_tau_leaping': True,  # Always enabled (kept for compatibility)
             'tau_epsilon': self._tau_epsilon,
             'critical_threshold': self._critical_threshold,
             'max_tau': self._max_tau,
@@ -472,7 +479,7 @@ class SimulationSettings:
         
         # τ-Leaping settings (with defaults for backward compatibility)
         if 'use_tau_leaping' in data:
-            settings.use_tau_leaping = data['use_tau_leaping']
+            pass  # Ignored - τ-leaping is always enabled
         
         if 'tau_epsilon' in data:
             settings.tau_epsilon = data['tau_epsilon']
@@ -497,7 +504,7 @@ class SimulationSettings:
         """Get string representation for debugging."""
         duration_str = f"{self._duration} {self._time_units.full_name}" if self._duration else "None"
         dt_str = "auto" if self._dt_auto else f"manual ({self._dt_manual})"
-        tau_str = "τ-leaping" if self._use_tau_leaping else "exact SSA"
+        tau_str = "τ-leaping (always)"  # τ-leaping is always the stochastic engine
         parallel_str = "+parallel" if self._use_parallel_stochastic else ""
         
         return (f"SimulationSettings(duration={duration_str}, "
@@ -533,18 +540,15 @@ class SimulationSettings:
         # Time scale
         lines.append(f"Time scale: {self._time_scale}")
         
-        # Stochastic simulation mode
-        if self._use_tau_leaping:
-            lines.append(f"\nStochastic Mode: τ-Leaping (approximate)")
-            lines.append(f"  Epsilon (ε): {self._tau_epsilon}")
-            lines.append(f"  Critical threshold: {self._critical_threshold}")
-            lines.append(f"  Tau range: [{self._min_tau}, {self._max_tau}]")
-            if self._use_parallel_stochastic:
-                lines.append(f"  Parallel execution: Enabled (weak independence)")
-            else:
-                lines.append(f"  Parallel execution: Disabled")
+        # Stochastic simulation mode (τ-leaping is always used)
+        lines.append("\n✓ Stochastic Mode: τ-leaping (always enabled, 10-100× faster than exact SSA)")
+        lines.append(f"  Accuracy: ε={self._tau_epsilon:.4f} (leap condition tolerance)")
+        lines.append(f"  Critical threshold: {self._critical_threshold}")
+        lines.append(f"  Tau range: [{self._min_tau}, {self._max_tau}]")
+        if self._use_parallel_stochastic:
+            lines.append(f"  Parallel execution: Enabled (weak independence scheduling)")
         else:
-            lines.append(f"\nStochastic Mode: Exact SSA (Gillespie)")
+            lines.append(f"  Parallel execution: Disabled (sequential τ-leaping)")
         
         return "\n".join(lines)
 

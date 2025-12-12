@@ -12,6 +12,15 @@
     padding-bottom: 4px;
 }
 
+/* Bold menu buttons (File, Edit, View, Help) */
+.bold-menu-label {
+    font-weight: bold;
+}
+
+.bold-menu-label label {
+    font-weight: bold;
+}
+
 /* Menu item styling - two-column layout with better spacing */
 menuitem {
     min-height: 32px;

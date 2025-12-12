@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.25 (TeX Live 2023/Debian) (preloaded format=pdflatex 2025.11.17)  5 DEC 2025 15:12
+This is pdfTeX, Version 3.141592653-2.6-1.40.25 (TeX Live 2023/Debian) (preloaded format=pdflatex 2025.11.17)  12 DEC 2025 13:26
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -821,241 +821,211 @@ LaTeX Font Info:    Trying to load font information for T1+cmtt on input line 6
 (/usr/share/texlive/texmf-dist/tex/latex/base/t1cmtt.fd
 File: t1cmtt.fd 2023/04/13 v2.5m Standard LaTeX font definitions
 )
-Underfull \hbox (badness 10000) in paragraph at lines 68--70
-[]\T1/cmr/bx/n/10.95 Availability and Im-ple-men-ta-tion:
+Underfull \hbox (badness 1259) in paragraph at lines 68--70
+[]\T1/cmr/bx/n/10.95 Availability and Im-ple-men-ta-tion: \T1/cmr/m/n/10.95 Ope
+n-
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 68--70
-\T1/cmr/m/n/10.95 Open-source im-ple-men-ta-tion avail-able at
- []
-
-
-Underfull \hbox (badness 10000) in paragraph at lines 68--70
-[]$\T1/cmtt/m/n/10.95 https : / / github . com / simao-[]eugenio / shypn$[]
+Underfull \hbox (badness 1661) in paragraph at lines 68--70
+\T1/cmr/m/n/10.95 source at []$\T1/cmtt/m/n/10.95 https : / / github . com / si
+mao-[]eugenio /
  []
 
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
+
+
+Underfull \vbox (badness 2469) has occurred while \output is active []
 
  [1{/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map}{/usr/share/texmf/fonts/e
 nc/dvips/cm-super/cm-super-t1.enc}
 
 
 ]
-Underfull \hbox (badness 4108) in paragraph at lines 126--127
+Underfull \hbox (badness 4108) in paragraph at lines 122--123
 []\T1/cmr/bx/n/10.95 Limitations of Clas-si-cal In-de-pen-dence.
  []
 
 [2]
-Underfull \hbox (badness 1521) in paragraph at lines 170--171
-[]\T1/cmr/bx/n/10.95 Gap\T1/cmr/m/n/10.95 : Ex-ist-ing tools lack (1) for-mal t
-reat-
- []
-
-
-Underfull \hbox (badness 4084) in paragraph at lines 170--171
-\T1/cmr/m/n/10.95 ment of non-conflicting place-sharing (con-ver-
- []
-
-
-Underfull \vbox (badness 3428) has occurred while \output is active []
-
-
-Underfull \hbox (badness 1622) in paragraph at lines 194--195
+Underfull \hbox (badness 1622) in paragraph at lines 166--167
 []$\OT1/cmr/m/n/10.95 ^^A : \OML/cmm/m/it/10.95 T \OMS/cmsy/m/n/10.95 ^^B \OML/
 cmm/m/it/10.95 T \OMS/cmsy/m/n/10.95 ! f[]\OML/cmm/m/it/10.95 ; [];
  []
 
 
-Underfull \hbox (badness 3724) in paragraph at lines 195--196
+Underfull \hbox (badness 3724) in paragraph at lines 167--168
 []$\OML/cmm/m/it/10.95 ^^\ \OT1/cmr/m/n/10.95 : \OML/cmm/m/it/10.95 T \OMS/cmsy
 /m/n/10.95 ! f[]\OML/cmm/m/it/10.95 ; []; [];
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 200--205
-\T1/cmr/bx/n/10.95 Regulatory Struc-ture ($\OT1/cmr/m/n/10.95 ^^F$\T1/cmr/bx/n/
-10.95 ) \T1/cmr/m/n/10.95 cap-tures non-
+Underfull \hbox (badness 1173) in paragraph at lines 172--177
+\T1/cmr/m/n/10.95 for-mal-ism. \T1/cmr/bx/n/10.95 Reg-u-la-tory Struc-ture ($\O
+T1/cmr/m/n/10.95 ^^F$\T1/cmr/bx/n/10.95 ) \T1/cmr/m/n/10.95 cap-
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 200--205
-\T1/cmr/m/n/10.95 consumptive arcs for catal-y-sis (test arcs)
+Underfull \hbox (badness 2573) in paragraph at lines 172--177
+\T1/cmr/m/n/10.95 tures non-consumptive arcs for catal-y-sis (test
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 200--205
-\T1/cmr/m/n/10.95 and in-hi-bi-tion (in-hibitor arcs). Ex-am-
+Underfull \hbox (badness 1997) in paragraph at lines 172--177
+\T1/cmr/m/n/10.95 arcs) and in-hi-bi-tion (in-hibitor arcs). Ex-am-
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 200--205
-\T1/cmr/m/n/10.95 ple: enzyme-catalyzed re-ac-tion with in-hi-
+Underfull \hbox (badness 1371) in paragraph at lines 172--177
+\T1/cmr/m/n/10.95 ple: enzyme-catalyzed re-ac-tion with in-hi-bi-tion
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 200--205
-\T1/cmr/m/n/10.95 bi-tion has $\OT1/cmr/m/n/10.95 ^^H(\OML/cmm/m/it/10.95 t\OT1
-/cmr/m/n/10.95 ) = []$ \T1/cmr/m/n/10.95 and
+Underfull \hbox (badness 4205) in paragraph at lines 172--177
+\T1/cmr/m/n/10.95 has $\OT1/cmr/m/n/10.95 ^^H(\OML/cmm/m/it/10.95 t\OT1/cmr/m/n
+/10.95 ) = []$ \T1/cmr/m/n/10.95 and $\OT1/cmr/m/n/10.95 ^^F(\OML/cmm/m/it/10.9
+5 t\OT1/cmr/m/n/10.95 ) =
  []
 
 
-Underfull \hbox (badness 1097) in paragraph at lines 200--205
-\OT1/cmr/m/n/10.95 ^^F(\OML/cmm/m/it/10.95 t\OT1/cmr/m/n/10.95 ) = \OMS/cmsy/m/
-n/10.95 f\OT1/cmr/m/n/10.95 (\OML/cmm/m/it/10.95 E; t\OT1/cmr/m/n/10.95 )[]\OML
-/cmm/m/it/10.95 ; \OT1/cmr/m/n/10.95 (\OML/cmm/m/it/10.95 I; t\OT1/cmr/m/n/10.9
-5 )[]\OMS/cmsy/m/n/10.95 g$\T1/cmr/m/n/10.95 . \T1/cmr/bx/n/10.95 En-vi-ron-men
--
+Underfull \hbox (badness 4899) in paragraph at lines 172--177
+\OMS/cmsy/m/n/10.95 f\OT1/cmr/m/n/10.95 (\OML/cmm/m/it/10.95 E; t\OT1/cmr/m/n/1
+0.95 )[]\OML/cmm/m/it/10.95 ; \OT1/cmr/m/n/10.95 (\OML/cmm/m/it/10.95 I; t\OT1/
+cmr/m/n/10.95 )[]\OMS/cmsy/m/n/10.95 g$\T1/cmr/m/n/10.95 . \T1/cmr/bx/n/10.95 E
+n-vi-ron-men-tal Ex-
  []
 
+[3{/usr/share/texmf/fonts/enc/dvips/cm-super/cm-super-ts1.enc}]
 
-Underfull \hbox (badness 5847) in paragraph at lines 200--205
-\T1/cmr/bx/n/10.95 tal Ex-change ($\OT1/cmr/m/n/10.95 ^^B$\T1/cmr/bx/n/10.95 ) 
-\T1/cmr/m/n/10.95 clas-si-fies tran-si-tions by
- []
+LaTeX Font Warning: Command \small invalid in math mode on input line 218.
 
-
-Underfull \hbox (badness 1365) in paragraph at lines 200--205
-\T1/cmr/m/n/10.95 bound-ary in-ter-ac-tion. \T1/cmr/bx/n/10.95 Tran-si-tion Typ
-e ($\OML/cmm/m/it/10.95 ^^\$\T1/cmr/bx/n/10.95 )
- []
-
-
-Underfull \hbox (badness 1558) in paragraph at lines 200--205
-\T1/cmr/bx/n/10.95 ping ($\OML/cmm/m/it/10.95 ^^Z$\T1/cmr/bx/n/10.95 ) \T1/cmr/
-m/n/10.95 tracks atomic com-po-si-tion for mass
- []
-
-
-Underfull \vbox (badness 1389) has occurred while \output is active []
-
- [3{/usr/share/texmf/fonts/enc/dvips/cm-super/cm-super-ts1.enc}]
-
-LaTeX Font Warning: Command \small invalid in math mode on input line 243.
-
-LaTeX Font Info:    Calculating math sizes for size <> on input line 245.
+LaTeX Font Info:    Calculating math sizes for size <> on input line 220.
 
 LaTeX Font Warning: Font shape `OT1/cmr/m/n' in size <> not available
-(Font)              size <5> substituted on input line 245.
+(Font)              size <5> substituted on input line 220.
 
 
 LaTeX Font Warning: Font shape `OT1/cmr/m/n' in size <0.7> not available
-(Font)              size <5> substituted on input line 245.
+(Font)              size <5> substituted on input line 220.
 
 
 LaTeX Font Warning: Font shape `OT1/cmr/m/n' in size <0.5> not available
-(Font)              size <5> substituted on input line 245.
+(Font)              size <5> substituted on input line 220.
 
 
 LaTeX Font Warning: Font shape `OML/cmm/m/it' in size <> not available
-(Font)              size <5> substituted on input line 245.
+(Font)              size <5> substituted on input line 220.
 
 
 LaTeX Font Warning: Font shape `OML/cmm/m/it' in size <0.7> not available
-(Font)              size <5> substituted on input line 245.
+(Font)              size <5> substituted on input line 220.
 
 
 LaTeX Font Warning: Font shape `OML/cmm/m/it' in size <0.5> not available
-(Font)              size <5> substituted on input line 245.
+(Font)              size <5> substituted on input line 220.
 
 
 LaTeX Font Warning: Font shape `OMS/cmsy/m/n' in size <> not available
-(Font)              size <5> substituted on input line 245.
+(Font)              size <5> substituted on input line 220.
 
 
 LaTeX Font Warning: Font shape `OMS/cmsy/m/n' in size <0.7> not available
-(Font)              size <5> substituted on input line 245.
+(Font)              size <5> substituted on input line 220.
 
 
 LaTeX Font Warning: Font shape `OMS/cmsy/m/n' in size <0.5> not available
-(Font)              size <5> substituted on input line 245.
+(Font)              size <5> substituted on input line 220.
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 250--250
+Underfull \hbox (badness 10000) in paragraph at lines 225--225
 |[]\T1/cmr/bx/n/12 Dependency Clas-si-fi-ca-tion Al-go-
  []
 
 Package hyperref Info: bookmark level for unknown algorithm defaults to 0 on in
-put line 253.
-
-Overfull \hbox (6.35376pt too wide) in paragraph at lines 256--257
-[] []\T1/cmr/m/n/10.95 BioPN $\OT1/cmr/m/n/10.95 (\OML/cmm/m/it/10.95 P; T; F; 
-W; M[]; K; \OT1/cmr/m/n/10.95 ^^H\OML/cmm/m/it/10.95 ; \OT1/cmr/m/n/10.95 ^^F\O
-ML/cmm/m/it/10.95 ; \OT1/cmr/m/n/10.95 ^^B\OML/cmm/m/it/10.95 ; \OT1/cmr/m/n/10
-.95 ^^A\OML/cmm/m/it/10.95 ; ^^\; ^^Z\OT1/cmr/m/n/10.95 )$ 
- []
-
-
-Underfull \vbox (badness 10000) has occurred while \output is active []
-
+put line 228.
 
 
 pdfTeX warning: pdflatex (file ./figures/lac_operon.pdf): PDF inclusion: found 
 PDF version <1.7>, but at most version <1.5> allowed
-<figures/lac_operon.pdf, id=198, 1023.825pt x 1043.9pt>
+<figures/lac_operon.pdf, id=184, 1023.825pt x 1043.9pt>
 File: figures/lac_operon.pdf Graphic file (type pdf)
 <use figures/lac_operon.pdf>
-Package pdftex.def Info: figures/lac_operon.pdf  used on input line 282.
+Package pdftex.def Info: figures/lac_operon.pdf  used on input line 257.
 (pdftex.def)             Requested size: 194.50378pt x 198.3112pt.
-[4 <./figures/lac_operon.pdf>]
-Overfull \hbox (8.55453pt too wide) in paragraph at lines 292--300
+
+Overfull \hbox (8.55453pt too wide) in paragraph at lines 267--275
 [][]
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 292--300
+Underfull \hbox (badness 10000) in paragraph at lines 267--275
 
  []
 
 
-Underfull \hbox (badness 1270) in paragraph at lines 305--306
-\T1/cmr/m/n/10.95 Classical topol-ogy checks (P-invariants, bound-
+Underfull \hbox (badness 3158) in paragraph at lines 280--281
+\T1/cmr/m/n/10.95 Domain-specific val-i-da-tion re-quires bio-chem-i-cal
  []
 
-
-Underfull \hbox (badness 1147) in paragraph at lines 309--310
-\T1/cmr/m/n/10.95 di-verse SBML mod-els from BioMod-els [[]], se-
- []
-
-
-Underfull \hbox (badness 1527) in paragraph at lines 309--310
-\T1/cmr/m/n/10.95 lected across ID ranges 1--100, 200--299, 300--
- []
-
-
-Underfull \hbox (badness 5302) in paragraph at lines 311--311
+[4 <./figures/lac_operon.pdf>]
+Underfull \hbox (badness 5302) in paragraph at lines 286--286
 |[]\T1/cmr/bx/n/12 SBML Im-port and De-pen-dency
  []
 
-<figures/speedup_plot.pdf, id=261, 716.23112pt x 426.65146pt>
+
+Underfull \hbox (badness 1953) in paragraph at lines 308--309
+[]\T1/cmr/m/n/10.95 Perfect con-ver-sion fi-delity (Ta-ble []1[]): 1,775
+ []
+
+
+Underfull \hbox (badness 1406) in paragraph at lines 308--309
+\T1/cmr/m/n/10.95 species be-came places, 2,234 re-ac-tions be-came
+ []
+
+
+Underfull \hbox (badness 1484) in paragraph at lines 308--309
+\T1/cmr/m/n/10.95 ($[]$ = 102,960 pairs from 93 mod-els). Re-
+ []
+
+
+Underfull \hbox (badness 1259) in paragraph at lines 308--309
+\T1/cmr/m/n/10.95 work sparsity---most tran-si-tion pairs be-long to
+ []
+
+<figures/speedup_plot.pdf, id=245, 716.23112pt x 426.65146pt>
 File: figures/speedup_plot.pdf Graphic file (type pdf)
 <use figures/speedup_plot.pdf>
-Package pdftex.def Info: figures/speedup_plot.pdf  used on input line 361.
+Package pdftex.def Info: figures/speedup_plot.pdf  used on input line 338.
 (pdftex.def)             Requested size: 243.12881pt x 144.8252pt.
 
-Overfull \hbox (1.55345pt too wide) in alignment at lines 371--378
+Overfull \hbox (1.55345pt too wide) in alignment at lines 348--355
 [] [] []
  []
 
-[5]
-Underfull \hbox (badness 5533) in paragraph at lines 388--389
-\T1/cmr/m/n/10.95 clas-si-fi-ca-tion (Al-go-rithm []1[]), par-al-lel schedul-
+[5 <./figures/speedup_plot.pdf>]
+Underfull \hbox (badness 3375) in paragraph at lines 365--366
+\T1/cmr/m/n/10.95 We now con-tex-tu-al-ize SHYpn within Bio-PN
  []
 
 
-Underfull \hbox (badness 1661) in paragraph at lines 388--389
+Underfull \hbox (badness 1661) in paragraph at lines 365--366
 \T1/cmr/m/n/10.95 source at []$\T1/cmtt/m/n/10.95 https : / / github . com / si
 mao-[]eugenio /
  []
 
 
-Underfull \hbox (badness 1082) in paragraph at lines 392--393
-\T1/cmr/m/n/10.95 bi-o-log-i-cal cou-pling (con-ver-gent/regulatory) from
+Underfull \hbox (badness 1521) in paragraph at lines 389--390
+[]\T1/cmr/bx/n/10.95 Gap\T1/cmr/m/n/10.95 : Ex-ist-ing tools lack (1) for-mal t
+reat-
  []
 
-[6 <./figures/speedup_plot.pdf>] (./weak_independence_biopn_bioinformatics.bbl)
-[7] (./weak_independence_biopn_bioinformatics.aux)
+
+Underfull \hbox (badness 4084) in paragraph at lines 389--390
+\T1/cmr/m/n/10.95 ment of non-conflicting place-sharing (con-ver-
+ []
+
+(./weak_independence_biopn_bioinformatics.bbl [6]) [7]
+(./weak_independence_biopn_bioinformatics.aux)
  ***********
 LaTeX2e <2023-11-01> patch level 1
 L3 programming layer <2024-01-22>
@@ -1065,64 +1035,49 @@ L3 programming layer <2024-01-22>
 LaTeX Font Warning: Size substitutions with differences
 (Font)              up to 4.5pt have occurred.
 
-
-Package rerunfilecheck Warning: File `weak_independence_biopn_bioinformatics.ou
-t' has changed.
-(rerunfilecheck)                Rerun to get outlines right
-(rerunfilecheck)                or use package `bookmark'.
-
-Package rerunfilecheck Info: Checksums for `weak_independence_biopn_bioinformat
-ics.out':
-(rerunfilecheck)             Before: 293DEC4A1651A9F3C73B302661D2A7B5;5157
-(rerunfilecheck)             After:  AF58D223514DD1EE028055A6ED2F2130;4815.
+Package rerunfilecheck Info: File `weak_independence_biopn_bioinformatics.out' 
+has not changed.
+(rerunfilecheck)             Checksum: 7FA3588D566549116B750115C233FBFC;4285.
  ) 
 Here is how much of TeX's memory you used:
- 24215 strings out of 476106
- 448866 string characters out of 5793932
+ 24207 strings out of 476106
+ 448746 string characters out of 5793932
  1949975 words of memory out of 5000000
- 45732 multiletter control sequences out of 15000+600000
+ 45728 multiletter control sequences out of 15000+600000
  582524 words of font info for 99 fonts, out of 8000000 for 9000
  59 hyphenation exceptions out of 8191
- 84i,12n,87p,1163b,868s stack positions out of 10000i,1000n,20000p,200000b,200000s
-
-pdfTeX warning (dest): name{subsection.5.6} has been referenced but does not ex
-ist, replaced by a fixed one
-
-
-pdfTeX warning (dest): name{subsection.5.5} has been referenced but does not ex
-ist, replaced by a fixed one
-
-</usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmex10.pfb></usr/
-share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/share/
-texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi6.pfb></usr/share/texlive
-/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi7.pfb></usr/share/texlive/texmf-
-dist/fonts/type1/public/amsfonts/cm/cmmi8.pfb></usr/share/texlive/texmf-dist/fo
-nts/type1/public/amsfonts/cm/cmr10.pfb></usr/share/texlive/texmf-dist/fonts/typ
-e1/public/amsfonts/cm/cmr6.pfb></usr/share/texlive/texmf-dist/fonts/type1/publi
-c/amsfonts/cm/cmr7.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfon
-ts/cm/cmr8.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cm
-sy10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy5.pf
-b></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy6.pfb></usr
-/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy7.pfb></usr/share/
-texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy8.pfb></usr/share/texlive
-/texmf-dist/fonts/type1/public/amsfonts/symbols/msam10.pfb></usr/share/texlive/
-texmf-dist/fonts/type1/public/amsfonts/symbols/msbm10.pfb></usr/share/texmf/fon
-ts/type1/public/cm-super/sfbx1000.pfb></usr/share/texmf/fonts/type1/public/cm-s
-uper/sfbx1095.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfbx1200.pfb></
-usr/share/texmf/fonts/type1/public/cm-super/sfbx1440.pfb></usr/share/texmf/font
-s/type1/public/cm-super/sfbx1728.pfb></usr/share/texmf/fonts/type1/public/cm-su
-per/sfrm0800.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfrm0900.pfb></u
-sr/share/texmf/fonts/type1/public/cm-super/sfrm1000.pfb></usr/share/texmf/fonts
-/type1/public/cm-super/sfrm1095.pfb></usr/share/texmf/fonts/type1/public/cm-sup
-er/sfrm1200.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfti1000.pfb></us
-r/share/texmf/fonts/type1/public/cm-super/sfti1095.pfb></usr/share/texmf/fonts/
-type1/public/cm-super/sftt1095.pfb></usr/share/texlive/texmf-dist/fonts/type1/u
-rw/zapfding/uzdr.pfb>
-Output written on weak_independence_biopn_bioinformatics.pdf (7 pages, 528153 b
+ 84i,12n,87p,1663b,868s stack positions out of 10000i,1000n,20000p,200000b,200000s
+</usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmex10.pfb></us
+r/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/shar
+e/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi6.pfb></usr/share/texli
+ve/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi7.pfb></usr/share/texlive/texm
+f-dist/fonts/type1/public/amsfonts/cm/cmmi8.pfb></usr/share/texlive/texmf-dist/
+fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/share/texlive/texmf-dist/fonts/t
+ype1/public/amsfonts/cm/cmr6.pfb></usr/share/texlive/texmf-dist/fonts/type1/pub
+lic/amsfonts/cm/cmr7.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsf
+onts/cm/cmr8.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/
+cmsy10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy5.
+pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy6.pfb></u
+sr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy7.pfb></usr/shar
+e/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy8.pfb></usr/share/texli
+ve/texmf-dist/fonts/type1/public/amsfonts/symbols/msam10.pfb></usr/share/texliv
+e/texmf-dist/fonts/type1/public/amsfonts/symbols/msbm10.pfb></usr/share/texmf/f
+onts/type1/public/cm-super/sfbx1000.pfb></usr/share/texmf/fonts/type1/public/cm
+-super/sfbx1095.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfbx1200.pfb>
+</usr/share/texmf/fonts/type1/public/cm-super/sfbx1440.pfb></usr/share/texmf/fo
+nts/type1/public/cm-super/sfbx1728.pfb></usr/share/texmf/fonts/type1/public/cm-
+super/sfrm0800.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfrm0900.pfb><
+/usr/share/texmf/fonts/type1/public/cm-super/sfrm1000.pfb></usr/share/texmf/fon
+ts/type1/public/cm-super/sfrm1095.pfb></usr/share/texmf/fonts/type1/public/cm-s
+uper/sfrm1200.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfti1000.pfb></
+usr/share/texmf/fonts/type1/public/cm-super/sfti1095.pfb></usr/share/texmf/font
+s/type1/public/cm-super/sftt1095.pfb></usr/share/texlive/texmf-dist/fonts/type1
+/urw/zapfding/uzdr.pfb>
+Output written on weak_independence_biopn_bioinformatics.pdf (7 pages, 528674 b
 ytes).
 PDF statistics:
- 503 PDF objects out of 1000 (max. 8388607)
- 373 compressed objects within 4 object streams
- 79 named destinations out of 1000 (max. 500000)
- 255 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 487 PDF objects out of 1000 (max. 8388607)
+ 357 compressed objects within 4 object streams
+ 75 named destinations out of 1000 (max. 500000)
+ 223 words of extra memory for PDF output out of 10000 (max. 10000000)
 

@@ -249,6 +249,9 @@
             <property name="label">File</property>
             <property name="relief">none</property>
             <property name="popup">file_menu</property>
+            <style>
+              <class name="bold-menu-label"/>
+            </style>
           </object>
           <packing>
             <property name="pack-type">start</property>
@@ -263,6 +266,9 @@
             <property name="label">Edit</property>
             <property name="relief">none</property>
             <property name="popup">edit_menu</property>
+            <style>
+              <class name="bold-menu-label"/>
+            </style>
           </object>
           <packing>
             <property name="pack-type">start</property>
@@ -277,6 +283,9 @@
             <property name="label">View</property>
             <property name="relief">none</property>
             <property name="popup">view_menu</property>
+            <style>
+              <class name="bold-menu-label"/>
+            </style>
           </object>
           <packing>
             <property name="pack-type">start</property>
@@ -291,6 +300,9 @@
             <property name="label">Help</property>
             <property name="relief">none</property>
             <property name="popup">help_menu</property>
+            <style>
+              <class name="bold-menu-label"/>
+            </style>
           </object>
           <packing>
             <property name="pack-type">start</property>

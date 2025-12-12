@@ -675,11 +675,13 @@ class SimulationController:
         if time_step < 0:
             raise ValueError(f"time_step must be non-negative, got {time_step}")
         
-        # Warn about potentially problematic time steps
+        # Warn about potentially problematic time steps (once per simulation)
         if time_step > 1.0:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.warning(f"Large time step ({time_step}s) may cause timed transitions to miss firing windows")
+            if not hasattr(self, '_large_timestep_warned'):
+                self._large_timestep_warned = True
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Large time step ({time_step:.2f}s) may cause timed transitions to miss firing windows")
         
         # PHASE 1-2 DEBUG: Print transition types once
         if not hasattr(self, '_debug_transition_types_printed'):
@@ -696,6 +698,9 @@ class SimulationController:
             source_count = len([t for t in self.model.transitions if getattr(t, 'is_source', False)])
             if source_count > 0:
                 logger.info(f"  - {source_count} source transition(s)")
+        
+        # Debug output (can be enabled for troubleshooting)
+        # print(f"\n▶️  [SIMULATION_STEP] t={self.time:.3f}, dt={time_step:.3f}")
         
         self._update_enablement_states()
         
@@ -917,13 +922,36 @@ class SimulationController:
         # NOTE: Stochastic CAN fire alongside continuous (they operate on different time scales)
         if not discrete_fired:  # Only if no timed fired
             stochastic_transitions = [t for t in self.model.transitions if t.transition_type == 'stochastic']
-            enabled_stochastic = [t for t in stochastic_transitions if self._is_transition_enabled(t)]
+            
+            # For tau-leaping: Check structural enabling only (sufficient tokens)
+            # Don't use can_fire() which requires scheduled fire time (only for exact SSA)
+            enabled_stochastic = []
+            for t in stochastic_transitions:
+                behavior = self._get_behavior(t)
+                # Check structural enabling: sufficient tokens for input arcs
+                structurally_enabled = True
+                input_arcs = behavior.get_input_arcs()
+                for arc in input_arcs:
+                    # Skip test/inhibitor arcs - they don't block firing
+                    if hasattr(arc, 'consumes_tokens') and not arc.consumes_tokens():
+                        continue
+                    source_place = arc.source
+                    if source_place and source_place.tokens < arc.weight:
+                        structurally_enabled = False
+                        break
+                if structurally_enabled:
+                    enabled_stochastic.append(t)
+            
+            # Debug output (can be enabled for troubleshooting)
+            # print(f"[STOCHASTIC_PHASE] Found {len(stochastic_transitions)} stochastic, {len(enabled_stochastic)} enabled")
             
             if enabled_stochastic:
-                # ALWAYS use τ-leaping for mixed models (continuous + stochastic)
-                # This ensures stochastic transitions fire within the fixed time step
-                # without breaking the continuous integration schedule
-                if self.settings.use_tau_leaping or continuous_active > 0:
+                # ALWAYS use τ-leaping for stochastic simulation (10-100× faster than exact SSA)
+                # This is the correct stochastic engine for:
+                # 1. Pure stochastic models (faster than Gillespie SSA)
+                # 2. Hybrid models (enables continuous+stochastic concurrency)
+                # 3. Parallel stochastic execution (foundation for weak independence scheduling)
+                if True:  # τ-leaping is always enabled (use_parallel_stochastic controls parallelism)
                     # Use τ-leaping approximate simulation
                     from .tau_leaping import TauLeapingEngine
                     
@@ -955,16 +983,29 @@ class SimulationController:
                     #             print(f"   {t.name}: propensity=ERROR")
                     #     print(f"   time_step={time_step}")
                     
-                    # Execute τ-leaping step with current time_step as max tau
-                    # This ensures stochastic events happen within the current step
-                    original_max_tau = self._tau_leaping_engine.leap_selector.max_tau
-                    self._tau_leaping_engine.leap_selector.max_tau = min(time_step, original_max_tau)
+                    # Execute τ-leaping step
+                    # For hybrid models (stochastic + continuous/deterministic), clamp tau to dt
+                    # For pure stochastic models, let tau-leaping control its own time step
+                    is_pure_stochastic = all(
+                        t.transition_type == 'stochastic' 
+                        for t in self.model.transitions 
+                        if hasattr(t, 'transition_type')
+                    )
                     
-                    self._tau_leaping_engine.execute_step(self)
+                    if is_pure_stochastic:
+                        # Pure stochastic: tau-leaping controls time stepping
+                        self._tau_leaping_engine.execute_step(self)
+                    else:
+                        # Hybrid model: clamp tau to dt to stay synchronized
+                        original_max_tau = self._tau_leaping_engine.leap_selector.max_tau
+                        self._tau_leaping_engine.leap_selector.max_tau = min(time_step, original_max_tau)
+                        
+                        self._tau_leaping_engine.execute_step(self)
+                        
+                        # Restore original max_tau
+                        self._tau_leaping_engine.leap_selector.max_tau = original_max_tau
+                    
                     discrete_fired = True
-                    
-                    # Restore original max_tau
-                    self._tau_leaping_engine.leap_selector.max_tau = original_max_tau
                 else:
                     # Pure stochastic model: Use exact SSA (can advance time freely)
                     # Find transition with earliest scheduled fire time
