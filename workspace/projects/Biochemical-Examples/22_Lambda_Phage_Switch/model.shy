@@ -3,7 +3,7 @@
   "metadata": {
     "created": "2025-12-11T19:29:38.514553",
     "object_counts": {
-      "places": 15,
+      "places": 14,
       "transitions": 16,
       "arcs": 35
     }
@@ -209,25 +209,6 @@
         0.0
       ],
       "border_width": 4.0,
-      "is_catalyst": false
-    },
-    {
-      "id": "P11",
-      "name": "UV_Damage",
-      "label": "UV Damage\n0 events",
-      "object_type": "place",
-      "x": 600.0,
-      "y": -200.0,
-      "radius": 30.0,
-      "marking": 0,
-      "initial_marking": 0,
-      "capacity": 10.0,
-      "border_color": [
-        0.0,
-        0.0,
-        0.0
-      ],
-      "border_width": 3.0,
       "is_catalyst": false
     },
     {
