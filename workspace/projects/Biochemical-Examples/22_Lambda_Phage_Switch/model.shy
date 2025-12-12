@@ -3,9 +3,9 @@
   "metadata": {
     "created": "2025-12-11T19:29:38.514553",
     "object_counts": {
-      "places": 12,
-      "transitions": 12,
-      "arcs": 28
+      "places": 15,
+      "transitions": 16,
+      "arcs": 35
     }
   },
   "view_state": {
@@ -248,6 +248,63 @@
       ],
       "border_width": 3.0,
       "is_catalyst": false
+    },
+    {
+      "id": "P13",
+      "name": "RecA_Inactive",
+      "label": "RecA (Inactive)\n100 molecules",
+      "object_type": "place",
+      "x": 400.0,
+      "y": -200.0,
+      "radius": 30.0,
+      "marking": 100.0,
+      "initial_marking": 100.0,
+      "capacity": 200.0,
+      "border_color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false
+    },
+    {
+      "id": "P14",
+      "name": "RecA_Active",
+      "label": "RecA* (Active)\n0 molecules",
+      "object_type": "place",
+      "x": 600.0,
+      "y": -300.0,
+      "radius": 30.0,
+      "marking": 0.0,
+      "initial_marking": 0.0,
+      "capacity": 100.0,
+      "border_color": [
+        0.8,
+        0.0,
+        0.5
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false
+    },
+    {
+      "id": "P15",
+      "name": "DNA_Damage",
+      "label": "DNA Damage\n0 lesions",
+      "object_type": "place",
+      "x": 200.0,
+      "y": -300.0,
+      "radius": 30.0,
+      "marking": 0.0,
+      "initial_marking": 0.0,
+      "capacity": 20.0,
+      "border_color": [
+        0.9,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false
     }
   ],
   "transitions": [
@@ -399,7 +456,7 @@
       "is_source": false,
       "is_sink": true,
       "guard": 1,
-      "rate": "0.05 * CI_Protein"
+      "rate": "0.05 * CI_Protein * (1 + 2 * RecA_Active)"
     },
     {
       "id": "T6",
@@ -610,6 +667,126 @@
       "is_sink": false,
       "guard": 1,
       "rate": "0.1 * Cro_Dimer"
+    },
+    {
+      "id": "T13",
+      "name": "DNA_Damage_UV",
+      "label": "UV \u2192 DNA\nDamage",
+      "object_type": "transition",
+      "x": 200.0,
+      "y": -250.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "stochastic",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": true,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "0.01"
+    },
+    {
+      "id": "T14",
+      "name": "RecA_Activation",
+      "label": "RecA\nActivation\n(SOS)",
+      "object_type": "transition",
+      "x": 500.0,
+      "y": -250.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "stochastic",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "0.5 * DNA_Damage * RecA_Inactive"
+    },
+    {
+      "id": "T15",
+      "name": "RecA_Deactivation",
+      "label": "RecA*\nDeactivation",
+      "object_type": "transition",
+      "x": 700.0,
+      "y": -250.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "stochastic",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "0.1 * RecA_Active"
+    },
+    {
+      "id": "T16",
+      "name": "DNA_Repair",
+      "label": "DNA Repair",
+      "object_type": "transition",
+      "x": 300.0,
+      "y": -350.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "stochastic",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": true,
+      "guard": 1,
+      "rate": "0.05 * DNA_Damage"
     }
   ],
   "arcs": [
@@ -1138,14 +1315,34 @@
       "control_points": []
     },
     {
-      "id": "A30",
-      "name": "A30",
+      "id": "A31",
+      "name": "A31",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "inhibitor",
+      "source_id": "P7",
+      "source_type": "place",
+      "target_id": "T5",
+      "target_type": "transition",
+      "weight": 20.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A32",
+      "name": "A32",
       "label": "",
       "object_type": "arc",
       "arc_type": "normal",
-      "source_id": "T5",
+      "source_id": "T13",
       "source_type": "transition",
-      "target_id": "P11",
+      "target_id": "P15",
       "target_type": "place",
       "weight": 1.0,
       "threshold": null,
@@ -1158,16 +1355,138 @@
       "control_points": []
     },
     {
-      "id": "A31",
-      "name": "A31",
+      "id": "A33",
+      "name": "A33",
       "label": "",
       "object_type": "arc",
-      "arc_type": "inhibitor",
-      "source_id": "P7",
+      "arc_type": "test",
+      "source_id": "P15",
+      "source_type": "place",
+      "target_id": "T14",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": [],
+      "consumes": false
+    },
+    {
+      "id": "A34",
+      "name": "A34",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P13",
+      "source_type": "place",
+      "target_id": "T14",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A35",
+      "name": "A35",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T14",
+      "source_type": "transition",
+      "target_id": "P14",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A36",
+      "name": "A36",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P14",
+      "source_type": "place",
+      "target_id": "T15",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A37",
+      "name": "A37",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T15",
+      "source_type": "transition",
+      "target_id": "P13",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A38",
+      "name": "A38",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "test",
+      "source_id": "P14",
       "source_type": "place",
       "target_id": "T5",
       "target_type": "transition",
-      "weight": 20.0,
+      "weight": 5.0,
+      "threshold": 1,
+      "color": [
+        0.8,
+        0.0,
+        0.5
+      ],
+      "width": 3.0,
+      "control_points": [],
+      "consumes": false
+    },
+    {
+      "id": "A39",
+      "name": "A39",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P15",
+      "source_type": "place",
+      "target_id": "T16",
+      "target_type": "transition",
+      "weight": 1.0,
       "threshold": null,
       "color": [
         0.0,
