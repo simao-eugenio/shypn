@@ -242,8 +242,8 @@ def plot_performance_results(results, lambda_stats, output_path):
         '',
         '→ Enables high-throughput analysis'
     ])
-    ax.text(0.98, 0.97, textstr, transform=ax.transAxes, fontsize=10,
-           verticalalignment='top', horizontalalignment='right',
+    ax.text(0.02, 0.97, textstr, transform=ax.transAxes, fontsize=10,
+           verticalalignment='top', horizontalalignment='left',
            bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
     
     plt.tight_layout()
