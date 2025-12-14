@@ -405,8 +405,21 @@ class ExperimentAutomationCategory:
             )
         except Exception as e:
             print(f"[ERROR] Failed to start batch: {e}")
+            import traceback
+            traceback.print_exc()
             self.queue_view.set_running(False)
-            self._show_error(f"Failed to start batch: {str(e)}")
+            
+            # Show detailed error to user
+            error_msg = str(e)
+            if "No subnet model" in error_msg:
+                error_msg = ("No subnet loaded.\n\n"
+                           "Please:\n"
+                           "1. Right-click a transition in the model canvas\n"
+                           "2. Select 'Add to Viability Analysis'\n"
+                           "3. Verify the subnet appears in the Viability panel\n"
+                           "4. Then generate and run experiments")
+            
+            self._show_error(f"Cannot start simulation:\n\n{error_msg}")
     
     def _on_queue_cancel(self):
         """Handle queue cancel request."""

@@ -81,12 +81,24 @@ class SimulationSettingsDialog(Gtk.Dialog):
         project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
         ui_path = os.path.join(project_root, 'ui', 'dialogs', 'simulation_settings.ui')
         
+        print(f"DEBUG: Loading UI from: {ui_path}")
+        print(f"DEBUG: UI file exists: {os.path.exists(ui_path)}")
+        print(f"DEBUG: UI file size: {os.path.getsize(ui_path) if os.path.exists(ui_path) else 'N/A'} bytes")
+        
         if not os.path.exists(ui_path):
             raise FileNotFoundError(f"UI file not found: {ui_path}")
         
         # Load UI
         builder = Gtk.Builder()
         builder.add_from_file(ui_path)
+        
+        # Debug: Check if new expanders exist
+        sim_expander = builder.get_object('simulation_params_expander')
+        batch_expander = builder.get_object('batch_mode_expander')
+        tau_expander = builder.get_object('tau_leaping_expander')
+        print(f"DEBUG: simulation_params_expander found: {sim_expander is not None}")
+        print(f"DEBUG: batch_mode_expander found: {batch_expander is not None}")
+        print(f"DEBUG: tau_leaping_expander found: {tau_expander is not None}")
         
         # Get dialog object
         dialog_obj = builder.get_object('simulation_settings_dialog')
@@ -138,7 +150,13 @@ class SimulationSettingsDialog(Gtk.Dialog):
             'tau_leaping_enabled_check': builder.get_object('tau_leaping_enabled_check'),
             'tau_epsilon_entry': builder.get_object('tau_epsilon_entry'),
             'critical_threshold_entry': builder.get_object('critical_threshold_entry'),
-            'parallel_stochastic_check': builder.get_object('parallel_stochastic_check')
+            'parallel_stochastic_check': builder.get_object('parallel_stochastic_check'),
+            # Batch mode settings
+            'batch_mode_enabled_check': builder.get_object('batch_mode_enabled_check'),
+            'batch_replicates_label': builder.get_object('batch_replicates_label'),
+            'batch_replicates_spin': builder.get_object('batch_replicates_spin'),
+            'batch_output_label': builder.get_object('batch_output_label'),
+            'batch_output_chooser': builder.get_object('batch_output_chooser')
         }
         
         # Validate all widgets found
@@ -174,6 +192,10 @@ class SimulationSettingsDialog(Gtk.Dialog):
         # Manual dt radio toggle - enable manual entry when manual is selected
         if self._widgets['dt_manual_radio']:
             self._widgets['dt_manual_radio'].connect('toggled', self._on_manual_dt_toggled)
+        
+        # Batch mode checkbox - enable/disable batch controls
+        if self._widgets['batch_mode_enabled_check']:
+            self._widgets['batch_mode_enabled_check'].connect('toggled', self._on_batch_mode_toggled)
     
     def _update_dt_entry_sensitivity(self):
         """Update the manual dt entry sensitivity based on current radio button state."""
@@ -214,6 +236,20 @@ class SimulationSettingsDialog(Gtk.Dialog):
         if button.get_active():
             self._update_dt_entry_sensitivity()
     
+    def _on_batch_mode_toggled(self, button):
+        """Handle batch mode checkbox toggle.
+        
+        Args:
+            button: GtkCheckButton that was toggled
+        """
+        is_enabled = button.get_active()
+        
+        # Enable/disable batch controls
+        self._widgets['batch_replicates_label'].set_sensitive(is_enabled)
+        self._widgets['batch_replicates_spin'].set_sensitive(is_enabled)
+        self._widgets['batch_output_label'].set_sensitive(is_enabled)
+        self._widgets['batch_output_chooser'].set_sensitive(is_enabled)
+    
     def _load_from_settings(self):
         """Load current values from settings object."""
         # Time step mode - setting the radio button will trigger the signal handler
@@ -246,6 +282,39 @@ class SimulationSettingsDialog(Gtk.Dialog):
         self._widgets['tau_epsilon_entry'].set_text(str(self.settings.tau_epsilon))
         self._widgets['critical_threshold_entry'].set_text(str(self.settings.critical_threshold))
         self._widgets['parallel_stochastic_check'].set_active(self.settings.use_parallel_stochastic)
+        
+        # Batch mode settings
+        self._widgets['batch_mode_enabled_check'].set_active(self.settings.batch_mode_enabled)
+        self._widgets['batch_replicates_spin'].set_value(self.settings.batch_replicates)
+        
+        # Batch output folder
+        if self.settings.batch_output_folder:
+            self._widgets['batch_output_chooser'].set_filename(self.settings.batch_output_folder)
+        else:
+            # Set default to project directory from opened model
+            import os
+            project_dir = None
+            
+            # Try to get project directory from parent model's filepath
+            if hasattr(self.settings, 'parent_model') and self.settings.parent_model:
+                model = self.settings.parent_model
+                if hasattr(model, 'filepath') and model.filepath:
+                    model_path = model.filepath
+                    # Navigate up: model.shy -> models/ -> project/
+                    path_parts = model_path.split(os.sep)
+                    if 'projects' in path_parts:
+                        projects_idx = path_parts.index('projects')
+                        if projects_idx + 1 < len(path_parts):
+                            # Project folder is at projects/{project_name}
+                            project_dir = os.sep.join(path_parts[:projects_idx + 2])
+            
+            # Set chooser to project directory if found
+            if project_dir and os.path.exists(project_dir):
+                self._widgets['batch_output_chooser'].set_current_folder(project_dir)
+                print(f"📂 File chooser set to project: {project_dir}")
+        
+        # Trigger sensitivity update for batch controls
+        self._on_batch_mode_toggled(self._widgets['batch_mode_enabled_check'])
     
     def apply_to_settings(self) -> bool:
         """Apply dialog values to settings object atomically.
@@ -324,6 +393,23 @@ class SimulationSettingsDialog(Gtk.Dialog):
             # Parallel stochastic
             use_parallel = self._widgets['parallel_stochastic_check'].get_active()
             self.buffered_settings.buffer.use_parallel_stochastic = use_parallel
+            
+            # Batch mode settings
+            batch_enabled = self._widgets['batch_mode_enabled_check'].get_active()
+            self.buffered_settings.buffer.batch_mode_enabled = batch_enabled
+            
+            # Batch replicates
+            batch_replicates = int(self._widgets['batch_replicates_spin'].get_value())
+            if batch_replicates < 1:
+                self._show_error("Invalid replicates",
+                               f"Number of replicates must be at least 1. Got: {batch_replicates}")
+                self.buffered_settings.rollback()
+                return False
+            self.buffered_settings.buffer.batch_replicates = batch_replicates
+            
+            # Batch output folder
+            batch_folder = self._widgets['batch_output_chooser'].get_filename()
+            self.buffered_settings.buffer.batch_output_folder = batch_folder
             
             # Mark as dirty (has uncommitted changes)
             self.buffered_settings.mark_dirty()
@@ -413,5 +499,9 @@ def show_simulation_settings_dialog(settings: SimulationSettings,
     Returns:
         bool: True if settings were changed, False if cancelled
     """
+    print("=" * 80)
+    print("SHOW_SIMULATION_SETTINGS_DIALOG CALLED!")
+    print("=" * 80)
     dialog = SimulationSettingsDialog(settings, parent)
     return dialog.run_and_apply()
+

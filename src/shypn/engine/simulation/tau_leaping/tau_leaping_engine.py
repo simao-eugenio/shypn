@@ -39,7 +39,8 @@ class TauLeapingEngine:
         critical_threshold: float = 10.0,
         max_tau: float = 1.0,
         seed: int = None,
-        use_parallel: bool = False
+        use_parallel: bool = False,
+        verbose: bool = True
     ):
         """Initialize τ-leaping engine.
         
@@ -50,6 +51,7 @@ class TauLeapingEngine:
             seed: Random seed for reproducibility
             use_parallel: Enable parallel sampling for weakly independent transitions.
                          Worker count automatically determined from system capabilities.
+            verbose: If False, suppress warnings (for batch mode performance)
         """
         self.leap_selector = LeapSelector(
             epsilon=epsilon,
@@ -58,11 +60,16 @@ class TauLeapingEngine:
         )
         self.poisson_sampler = PoissonSampler(seed=seed)
         self.use_parallel = use_parallel
+        self.verbose = verbose
         
         # Parallel scheduler (initialized lazily)
         self._parallel_scheduler = None
         
         self.logger = logging.getLogger(__name__)
+        
+        # Suppress warnings if not verbose
+        if not verbose:
+            self.logger.setLevel(logging.ERROR)  # Only show errors, not warnings
         
         # Statistics
         self.stats = {
