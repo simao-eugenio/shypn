@@ -274,6 +274,11 @@ class ResultsBrowserView(Gtk.Box):
             
             # Display statistics
             self._display_statistics(name, result)
+            
+            # Auto-refresh plot if currently viewing plot tab
+            if self.notebook.get_current_page() == 1:
+                # User is on plot view - update plot automatically
+                self._plot_trajectories(name, result)
         else:
             # Disable action buttons
             self.export_csv_button.set_sensitive(False)
@@ -282,6 +287,11 @@ class ResultsBrowserView(Gtk.Box):
             self.report_button.set_sensitive(False)
             
             self.stats_label.set_markup("<i>Select an experiment to view statistics</i>")
+            
+            # Clear plot if on plot view
+            if self.notebook.get_current_page() == 1 and self.figure:
+                self.figure.clear()
+                self.canvas.draw()
     
     def _display_statistics(self, name, result):
         """Display statistics for selected result.
@@ -695,42 +705,6 @@ class ResultsBrowserView(Gtk.Box):
                            mean - 2*std, 
                            mean + 2*std, 
                            alpha=0.2, 
-                           color=color)
-            label = f'⚡ {trans_name}' if is_swept else trans_name
-            
-            # Plot firing rates directly from statistics (computed per-replicate then aggregated)
-            from scipy.interpolate import make_interp_spline
-            
-            if len(time_points_arr) > 50:
-                try:
-                    # Subsample for cleaner spline (same as places)
-                    indices = np.linspace(0, len(time_points_arr)-1, min(500, len(time_points_arr)), dtype=int)
-                    time_smooth = time_points_arr[indices]
-                    mean_smooth = mean[indices]
-                    
-                    # Create spline
-                    spl = make_interp_spline(time_smooth, mean_smooth, k=min(3, len(time_smooth)-1))
-                    
-                    # Generate extra smooth points
-                    time_fine = np.linspace(time_points_arr[0], time_points_arr[-1], 1000)
-                    mean_fine = spl(time_fine)
-                    
-                    # Plot smooth transition
-                    ax2.plot(time_fine, mean_fine, color=color, 
-                            linewidth=linewidth, label=label, alpha=0.8)
-                except Exception as e:
-                    ax2.plot(time_points_arr, mean, color=color, 
-                            linewidth=linewidth, label=label, alpha=0.8, linestyle='-', marker='')
-            else:
-                # Too few points, use raw data
-                ax2.plot(time_points_arr, mean, color=color, 
-                        linewidth=linewidth, label=label, alpha=0.8, linestyle='-', marker='')
-            
-            # Plot confidence interval
-            ax2.fill_between(time_points_arr, 
-                           mean - 2*std, 
-                           mean + 2*std, 
-                           alpha=0.3, 
                            color=color)
         
         # Add legends

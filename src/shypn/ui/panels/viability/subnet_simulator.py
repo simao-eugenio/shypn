@@ -191,20 +191,29 @@ class SubnetSimulator:
             marking = getattr(place, 'tokens', 0)
             self.initial_markings[place.id] = marking
         
+        # Initialize transition firing counts to 0 (CRITICAL for transition plots)
+        for transition in self.subnet_model.transitions:
+            transition.firing_count = 0
+        
         # 5. Create SimulationController with subnet model
         from shypn.engine.simulation.controller import SimulationController
         self.controller = SimulationController(self.subnet_model)
         
-        # Configure controller settings
+        # Configure controller settings (τ-leaping for performance)
         self.controller.settings.use_tau_leaping = True
         self.controller.settings.tau_epsilon = 0.03
         
-        # Start data collection
+        # Start data collection (CRITICAL: must start BEFORE recording initial state)
         self.controller.data_collector.start_collection()
+        
+        # Record initial state at t=0 (captures initial place tokens AND transition firing_count=0)
         self.controller.data_collector.record_state(0.0)
         
         # Initialize transition enablement states
         self.controller._update_enablement_states()
+        
+        print(f"✓ SubnetSimulator initialized: {len(self.subnet_model.places)} places, "
+              f"{len(self.subnet_model.transitions)} transitions")
         
         return True
     

@@ -65,6 +65,12 @@ class SimulationSettings:
         self._max_tau = self.DEFAULT_MAX_TAU
         self._min_tau = self.DEFAULT_MIN_TAU
         self._use_parallel_stochastic = self.DEFAULT_USE_PARALLEL_STOCHASTIC
+        
+        # Batch mode settings (for experiment replication)
+        self._batch_mode_enabled = False
+        self._batch_replicates = 100
+        self._batch_output_folder = None
+        self._recorded_objects = set()  # Set of place/transition IDs to record
     
     # ========== Properties with Validation ==========
     
@@ -662,3 +668,114 @@ class SimulationSettingsBuilder:
         """
         return self._settings
 
+# ==================== Batch Mode Extension ====================
+
+# Add batch mode properties to SimulationSettings
+def _add_batch_mode_properties():
+    """Add batch mode properties to SimulationSettings class.
+    
+    This function extends the SimulationSettings class with batch mode
+    functionality without modifying the core settings file structure.
+    """
+    
+    # Batch mode enabled property
+    @property
+    def batch_mode_enabled(self) -> bool:
+        """Get whether batch mode is enabled."""
+        return getattr(self, '_batch_mode_enabled', False)
+    
+    @batch_mode_enabled.setter
+    def batch_mode_enabled(self, value: bool):
+        """Set batch mode enabled state."""
+        self._batch_mode_enabled = bool(value)
+    
+    # Batch replicates property
+    @property
+    def batch_replicates(self) -> int:
+        """Get number of batch replicates."""
+        return getattr(self, '_batch_replicates', 100)
+    
+    @batch_replicates.setter
+    def batch_replicates(self, value: int):
+        """Set number of batch replicates with validation.
+        
+        Args:
+            value: Number of replicates (must be >= 1)
+        
+        Raises:
+            ValueError: If replicates < 1
+        """
+        if value < 1:
+            raise ValueError("Batch replicates must be at least 1")
+        self._batch_replicates = int(value)
+    
+    # Batch output folder property
+    @property
+    def batch_output_folder(self) -> Optional[str]:
+        """Get batch output folder path."""
+        return getattr(self, '_batch_output_folder', None)
+    
+    @batch_output_folder.setter
+    def batch_output_folder(self, value: Optional[str]):
+        """Set batch output folder path."""
+        self._batch_output_folder = value
+    
+    # Recorded objects property
+    @property
+    def recorded_objects(self) -> set:
+        """Get set of object IDs marked for recording."""
+        if not hasattr(self, '_recorded_objects'):
+            self._recorded_objects = set()
+        return self._recorded_objects
+    
+    # Batch mode methods
+    def add_recorded_object(self, object_id: str):
+        """Mark an object (place/transition) for recording.
+        
+        Args:
+            object_id: ID of place or transition to record
+        """
+        if not hasattr(self, '_recorded_objects'):
+            self._recorded_objects = set()
+        self._recorded_objects.add(object_id)
+    
+    def remove_recorded_object(self, object_id: str):
+        """Unmark an object from recording.
+        
+        Args:
+            object_id: ID of place or transition to stop recording
+        """
+        if hasattr(self, '_recorded_objects'):
+            self._recorded_objects.discard(object_id)
+    
+    def clear_recorded_objects(self):
+        """Clear all recorded objects."""
+        if hasattr(self, '_recorded_objects'):
+            self._recorded_objects.clear()
+    
+    def is_object_recorded(self, object_id: str) -> bool:
+        """Check if an object is marked for recording.
+        
+        Args:
+            object_id: ID of place or transition
+        
+        Returns:
+            bool: True if object is marked for recording
+        """
+        if not hasattr(self, '_recorded_objects'):
+            return False
+        return object_id in self._recorded_objects
+    
+    # Add methods to SimulationSettings class
+    SimulationSettings.batch_mode_enabled = batch_mode_enabled
+    SimulationSettings.batch_replicates = batch_replicates
+    SimulationSettings.batch_output_folder = batch_output_folder
+    SimulationSettings.recorded_objects = recorded_objects
+    SimulationSettings.add_recorded_object = add_recorded_object
+    SimulationSettings.remove_recorded_object = remove_recorded_object
+    SimulationSettings.clear_recorded_objects = clear_recorded_objects
+    SimulationSettings.is_object_recorded = is_object_recorded
+
+
+# Initialize batch mode properties
+_add_batch_mode_properties()

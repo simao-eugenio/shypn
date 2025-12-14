@@ -129,6 +129,32 @@ class ContinuousBehavior(TransitionBehavior):
         # Setting to small value (e.g., 1e-6) prevents numerical precision issues
         self.min_token_threshold = float(props.get('min_token_threshold', 0.0))
     
+    def evaluate_rate(self, places: Dict[int, Any], time: float) -> float:
+        """Evaluate rate function at given state and time.
+        
+        This public method wraps the compiled rate_function to provide
+        a consistent API for external callers (e.g., data_collector).
+        
+        Args:
+            places: Dictionary mapping place IDs to place objects
+            time: Current simulation time
+        
+        Returns:
+            float: Evaluated rate (clamped to [min_rate, max_rate])
+        """
+        try:
+            rate = self.rate_function(places, time)
+            return max(self.min_rate, min(self.max_rate, rate))
+        except Exception as e:
+            # Log error and return 0.0 as safe fallback
+            if not self._rate_function_failed:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Rate function evaluation failed for {self.transition.id}: {e}")
+                self._rate_function_failed = True
+                self._rate_function_error = str(e)
+            return 0.0
+    
     def _compile_rate_function(self, expr: str) -> Callable:
         """Compile rate function expression to callable.
         

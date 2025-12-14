@@ -3693,8 +3693,36 @@ class ModelCanvasLoader:
                 menu_item.connect('activate', on_activate, callback)
                 menu_item.show()
             menu.append(menu_item)
+        
+        # Add analysis menu items from context menu handler
         if self.context_menu_handler:
             self.context_menu_handler.add_analysis_menu_items(menu, obj)
+        
+        # Add batch mode recording menu item for places and transitions
+        if isinstance(obj, (Place, Transition)):
+            # Add separator before batch recording item
+            sep = Gtk.SeparatorMenuItem()
+            sep.show()
+            menu.append(sep)
+            
+            # Check if object is already marked for recording
+            is_recorded = False
+            if hasattr(manager, 'simulation_settings'):
+                settings = manager.simulation_settings
+                if settings and hasattr(settings, 'is_object_recorded'):
+                    is_recorded = settings.is_object_recorded(obj.id)
+            
+            # Create menu item with checkmark if marked
+            if is_recorded:
+                record_label = '✓ Mark for Recording (Batch Mode)'
+            else:
+                record_label = '📊 Mark for Recording (Batch Mode)'
+            
+            record_item = Gtk.MenuItem(label=record_label)
+            record_item.connect('activate', lambda w: self._on_toggle_recording(obj, manager, drawing_area))
+            record_item.show()
+            menu.append(record_item)
+        
         self._active_context_menu = menu
         
         # Attach menu to drawing_area for proper Wayland parent window handling
@@ -4805,6 +4833,59 @@ class ModelCanvasLoader:
         if not obj.selected:
             manager.selection_manager.select(obj, multi=False, manager=manager)
         manager.selection_manager.enter_edit_mode(obj, manager=manager)
+        drawing_area.queue_draw()
+    
+    def _on_toggle_recording(self, obj, manager, drawing_area):
+        """Toggle batch mode recording for an object (place or transition).
+        
+        Args:
+            obj: Object to toggle recording (Place or Transition)
+            manager: ModelCanvasManager instance
+            drawing_area: GtkDrawingArea widget
+        """
+        # Get simulation settings from manager
+        if not hasattr(manager, 'simulation_settings'):
+            print("Warning: No simulation settings available for recording")
+            return
+        
+        settings = manager.simulation_settings
+        if not settings or not hasattr(settings, 'is_object_recorded'):
+            print("Warning: Simulation settings not properly initialized")
+            return
+        
+        # Toggle recording state
+        obj_id = obj.id
+        
+        # Define recording indicator color (orange/amber for visibility)
+        RECORDING_COLOR = (1.0, 0.6, 0.0)  # RGB: orange
+        
+        # Import default colors
+        from shypn.netobjs import Place, Transition
+        
+        if settings.is_object_recorded(obj_id):
+            settings.remove_recorded_object(obj_id)
+            
+            # Restore default colors
+            if isinstance(obj, Place):
+                obj.border_color = Place.DEFAULT_BORDER_COLOR
+            elif isinstance(obj, Transition):
+                obj.border_color = Transition.DEFAULT_BORDER_COLOR
+                obj.fill_color = Transition.DEFAULT_COLOR
+        else:
+            settings.add_recorded_object(obj_id)
+            
+            # Apply recording color
+            if isinstance(obj, Place):
+                obj.border_color = RECORDING_COLOR
+            elif isinstance(obj, Transition):
+                obj.border_color = RECORDING_COLOR
+                obj.fill_color = RECORDING_COLOR
+        
+        # Trigger on_changed callback if available
+        if hasattr(obj, 'on_changed') and obj.on_changed:
+            obj.on_changed()
+        
+        # Redraw to show visual indicator
         drawing_area.queue_draw()
 
     def _on_object_properties(self, obj, manager, drawing_area):

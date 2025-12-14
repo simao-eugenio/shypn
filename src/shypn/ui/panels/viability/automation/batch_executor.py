@@ -705,17 +705,22 @@ class BatchExecutor:
             arcs = model.arcs if hasattr(model, 'arcs') else []
         
         # Apply place markings (only to subnet places)
-        # CRITICAL: Skip zero values to preserve baseline markings from model
-        # Only the swept parameter should be modified; others keep their initial values
+        # CRITICAL: Always apply swept parameter values (even zero)
+        # Skip zero values only for non-swept parameters to preserve baseline
         applied_markings = 0
         skipped_zeros = 0
+        swept_place_id = None
+        if hasattr(snapshot, 'swept_parameter') and snapshot.swept_parameter:
+            if snapshot.swept_parameter.get('type') == 'places':
+                swept_place_id = snapshot.swept_parameter.get('id')
+        
         for place_id, marking in snapshot.place_markings.items():
             place = next((p for p in places if p.id == place_id), None)
             if place:
-                # Only apply non-zero values OR if this is explicitly a swept parameter
-                # (detected by checking if value differs significantly from default 0)
                 marking_float = float(marking)
-                if marking_float != 0.0 or abs(marking_float) > 1e-10:
+                # Always apply if this is the swept parameter (even zero values)
+                # For non-swept parameters, skip zeros to preserve baseline
+                if place_id == swept_place_id or marking_float != 0.0:
                     place.tokens = marking_float
                     place.marking = marking_float
                     applied_markings += 1
@@ -741,34 +746,17 @@ class BatchExecutor:
                         # It's a numeric string - store as number
                         trans.rate = numeric_rate
                     except ValueError:
-                        # It's a formula string - store in properties for behavior factory
+                        # It's a formula string - store in properties for behavior factory to evaluate dynamically
                         trans.properties['rate_function'] = rate
-                        
-                        # Evaluate formula with initial place markings to get numeric fallback rate
-                        # Build evaluation context with place tokens
-                        import re
-                        context = {}
-                        for place in places:
-                            # Add by ID (P1, P2, etc.)
-                            context[place.id] = place.tokens
-                            # Also add by name if it exists
-                            if hasattr(place, 'name') and place.name:
-                                context[place.name] = place.tokens
-                        
-                        try:
-                            # Safely evaluate the formula
-                            evaluated_rate = eval(rate, {"__builtins__": {}}, context)
-                            trans.rate = float(evaluated_rate)
-                        except Exception as e:
-                            # If evaluation fails, extract leading coefficient as fallback
-                            coef_match = re.match(r'^([\d.]+)', rate)
-                            trans.rate = float(coef_match.group(1)) if coef_match else 1.0
+                        trans.rate = rate  # Also store as string in rate attribute for behavior factory
                 else:
                     # It's numeric - convert to float
                     try:
                         trans.rate = float(rate)
                     except (ValueError, TypeError) as e:
-                        print(f"[WARNING] Could not convert rate for {trans_id}: {rate} - {e}")
+                        import logging
+                        logger = logging.getLogger(__name__)
+                        logger.warning(f"Could not convert rate for {trans_id}: {rate} - {e}")
                         # Keep the value as-is if conversion fails
                         trans.rate = rate
                 applied_rates += 1

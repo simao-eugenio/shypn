@@ -125,11 +125,13 @@ class SimulationController:
         interaction_guard: InteractionGuard for permission-based UI control
     """
 
-    def __init__(self, model):
+    def __init__(self, model, verbose: bool = True, recording_interval: int = 1):
         """Initialize the simulation controller.
         
         Args:
             model: ModelCanvasManager instance (has places, transitions, arcs lists)
+            verbose: If True, print debug output (disable for batch mode performance)
+            recording_interval: Record data every Nth step (higher = less overhead for batch mode)
         """
         self.model = model
         self.time = 0.0
@@ -142,10 +144,11 @@ class SimulationController:
         self.transition_states = {}
         self.conflict_policy = DEFAULT_POLICY
         self._round_robin_index = 0
+        self.verbose = verbose  # Control debug output
         
         # Data collection for simulation results
         from shypn.engine.simulation.data_collector import DataCollector
-        self.data_collector = DataCollector(model, controller=self)
+        self.data_collector = DataCollector(model, controller=self, recording_interval=recording_interval)
         
         # Callback for simulation complete event
         # Use private attribute with property to trace all assignments
@@ -523,16 +526,7 @@ class SimulationController:
                         break
             state = self._get_or_create_state(transition)
             
-            # Debug stochastic enablement (first time only)
-            if transition.transition_type == 'stochastic':
-                if locally_enabled and state.enablement_time is None:
-                    if not hasattr(self, f'_first_enable_{transition.id}'):
-                        print(f"✅ Enabling stochastic {transition.name} at t={self.time:.3f}")
-                        for arc in input_arcs:
-                            sp = behavior._get_place(arc.source_id)
-                            if sp:
-                                print(f"   {sp.name}: {sp.tokens:.1f} >= {arc.weight}")
-                        setattr(self, f'_first_enable_{transition.id}', True)
+            # Debug stochastic enablement (first time only) - removed for cleaner output
             
             if locally_enabled:
                 if state.enablement_time is None:
@@ -961,7 +955,8 @@ class SimulationController:
                             critical_threshold=self.settings.critical_threshold,
                             max_tau=self.settings.max_tau,
                             seed=None,  # Use default random seed
-                            use_parallel=self.settings.use_parallel_stochastic
+                            use_parallel=self.settings.use_parallel_stochastic,
+                            verbose=self.verbose  # Pass verbose flag to suppress warnings
                         )
                         self._tau_leaping_engine.leap_selector.min_tau = self.settings.min_tau
                         # Config printed once at initialization (commented out for cleaner output)

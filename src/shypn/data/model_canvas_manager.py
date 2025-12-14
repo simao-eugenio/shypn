@@ -128,6 +128,10 @@ class ModelCanvasManager:
         # Flag to track if document was imported (needs "Save As" on first save)
         self._is_imported = False
         
+        # Simulation settings (for batch mode and recording configuration)
+        from shypn.engine.simulation.settings import SimulationSettings
+        self.simulation_settings = SimulationSettings()
+        
         # ===== PER-DOCUMENT FILE STATE (Phase 1: Multi-Document Support) =====
         # Each manager now owns its filepath and dirty state
         # This fixes critical data loss issues from single global persistency
