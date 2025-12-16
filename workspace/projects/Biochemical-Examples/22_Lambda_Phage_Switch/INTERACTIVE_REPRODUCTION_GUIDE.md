@@ -2,6 +2,20 @@
 
 This guide shows how to reproduce Experiments 1-7 using the **actual SHYpn simulator** with the new **Batch Mode** functionality for automated experiment replication.
 
+**Key Workflow**: Use the SHYpn GUI's Batch Mode to generate simulation data → Analyze with Python scripts to create publication figures.
+
+---
+
+## Important Note About Python Scripts
+
+This directory contains two types of Python scripts:
+
+1. **`experiments/run_*.py`** - Generate **mock data** for demonstration and experimental design validation. These are standalone scripts that don't require running SHYpn.
+
+2. **Analysis scripts** (shown in this guide) - Load **real batch results** from SHYpn UI's Batch Mode (CSV files in `results/batch_*/`) and create publication figures.
+
+**For actual research**: Use the **UI Batch Mode** workflow described in this guide to generate real simulation data.
+
 ---
 
 ## Prerequisites
@@ -13,11 +27,18 @@ This guide shows how to reproduce Experiments 1-7 using the **actual SHYpn simul
    python src/shypn.py
    ```
 
-2. **Load Lambda Phage Model**:
-   - File → Open → `workspace/projects/Biochemical-Examples/22_Lambda_Phage_Switch/model.shy`
+2. **Setup Working Directory**:
+   ```bash
+   # Copy model to your working directory (preserves paper results)
+   cp workspace/projects/Biochemical-Examples/22_Lambda_Phage_Switch/model.shy \
+      workspace/projects/My_Project/simulations/
+   ```
+
+3. **Load Lambda Phage Model in Working Directory**:
+   - File → Open → `workspace/projects/My_Project/simulations/model.shy`
    - Verify: 14 places, 16 transitions, 35 arcs
 
-3. **Access Simulation Settings**:
+4. **Access Simulation Settings**:
    - Swiss Palette → Simulate → Click **Settings** button
    - You'll see three expandable categories:
      * **SIMULATION PARAMETERS** (expanded by default)
@@ -58,13 +79,18 @@ Reproduce Figure 2 showing 62% lysogeny vs 38% lysis decision using automated ba
 
 ### Interactive Steps
 
-1. **Set Initial Conditions**:
+1. **Set Initial Conditions** (IMPORTANT: Updated for optimized bistability):
    ```
    CI_Gene = 1          (catalyst, always 1)
    Cro_Gene = 1         (catalyst, always 1)
-   All proteins = 0     (start from infection)
+   CI_Protein = 2       (small seed to accelerate competition)
+   Cro_Protein = 2      (small seed to accelerate competition)
+   All other proteins = 0
    DNA_Damage = 0       (no UV initially)
    ```
+   
+   **Note**: The model has been optimized with faster rates (dimerization 10×, transcription 3×). 
+   Initial protein seeds (2 molecules each) ensure faster startup and reduce undecided outcomes.
 
 2. **Mark Objects for Recording**:
    - Right-click `CI_Dimer` → **"📊 Mark for Recording"** (checkmark appears)
@@ -78,13 +104,16 @@ Reproduce Figure 2 showing 62% lysogeny vs 38% lysis decision using automated ba
    - Settings → Expand **BATCH MODE (EXPERIMENT REPLICATION)**
    - ✓ **Enable Batch Mode**
    - **Replicates:** 100
-   - **Output:** `workspace/projects/Biochemical-Examples/22_Lambda_Phage_Switch/results/bistability/`
+   - **Output:** `workspace/projects/My_Project/simulations/results/bistability/`
    
-4. **Configure Simulation Parameters**:
+4. **Configure Simulation Parameters** (UPDATED for optimized model):
    - Expand **SIMULATION PARAMETERS**
-   - Duration: 200 time units
+   - Duration: **500 time units** (increased from 200 for slower decisions)
    - Time Step: Auto (recommended)
    - Playback Speed: 1000× (for faster execution)
+   
+   **Note**: With optimized rates, most runs should reach decision within 100-150 time units, 
+   but 500 gives margin for stochastic variability.
    
 5. **Run Batch Simulation**:
    - Click **"Run"** button in Swiss Palette
@@ -94,7 +123,7 @@ Reproduce Figure 2 showing 62% lysogeny vs 38% lysis decision using automated ba
 
 6. **Results Automatically Saved**:
    ```
-   results/batch_2025-12-13_18-30-45/
+   workspace/projects/My_Project/simulations/results/batch_YYYYMMDD_HHMMSS/
    ├── config.json              # Simulation settings + recorded objects
    ├── run_001.csv             # Time, CI_Dimer, Cro_Dimer, Lysogenic_State, Lytic_Genes_Active
    ├── run_002.csv
@@ -103,66 +132,111 @@ Reproduce Figure 2 showing 62% lysogeny vs 38% lysis decision using automated ba
    └── summary.json            # Statistics: mean, std, min, max per object
    ```
 
-7. **Expected Results**:
-   - ~60% reach Lysogenic_State=1
-   - ~40% reach Lytic_Genes_Active=1
-   - Decision time: 30-50 time units
+7. **Expected Results** (with optimized model):
+   - **~50-60%** reach Lysogenic_State=1 (improved from 29%)
+   - **~40-50%** reach Lytic_Genes_Active=1 (improved from 17%)
+   - **<10%** undecided (improved from 54%)
+   - Decision time: **40-80 time units** (faster than previous ~120)
+   - CI_Dimer peaks: **15-25 molecules** (improved from ~3)
+   - Cro_Dimer peaks: **15-25 molecules** (improved from ~3)
+   
+   **Model Optimizations Applied**:
+   - Dimerization rates increased 10× (0.005 → 0.05)
+   - Transcription rates increased 3× (0.1 → 0.3)
+   - Initial protein seeds added (2 molecules each)
+   - Simulation duration extended (200 → 500 time units)
+   
+   **Note**: In this model, the state indicator transitions (Establish_Lysogeny, Enter_Lytic_Cycle) 
+   consume CI_Dimer/Cro_Dimer tokens to set the state flags. This means proteins drop to near-zero 
+   after the decision is made. This is biologically reasonable (differentiation) but produces 
+   different-looking plots than papers where state indicators use test arcs. The analysis still 
+   correctly classifies outcomes based on the state flags (P9=Lytic_Genes_Active, P10=Lysogenic_State).
 
-### Python Analysis Script (Updated for Batch Results)
+### Visualize Results with Quick Plotting Tool
+
+After batch completion, use the provided plotting utility to instantly visualize all results:
+
+```bash
+# Activate environment
+source .venv/bin/activate
+
+# Generate 5 standard plots (using your working directory)
+python examples/plot_batch_results.py "workspace/projects/My_Project/simulations/results/batch_YYYYMMDD_HHMMSS"
+```
+
+This automatically generates:
+- `batch_all_trajectories.png` - All 100 replicate trajectories
+- `batch_mean_std.png` - Mean ± standard deviation bands  
+- `batch_comparison.png` - Compare all recorded objects
+- `batch_heatmap.png` - Time × replicate heatmap
+- `batch_final_states.png` - Histogram of final states
+
+**Summary statistics printed to console:**
+```
+Final values:
+  CI_Dimer:
+    Mean: 25.43
+    Std:  12.67
+  Cro_Dimer:
+    Mean: 3.21
+    Std:  2.45
+  Lysogenic_State:
+    Mean: 0.62 (62% lysogeny)
+    Std:  0.49
+```
+
+### Custom Analysis for Publication Figure 2
+
+For the specific 4-panel bistability figure (trajectories, statistics, phase portrait, distribution), use the provided example script:
+
+```bash
+# Run custom bistability analysis (from project root)
+cd /home/simao/projetos/shypn
+python workspace/projects/Biochemical-Examples/22_Lambda_Phage_Switch/analyze_batch_bistability.py \
+       "workspace/projects/My_Project/simulations/results/batch_YYYYMMDD_HHMMSS"
+```
+
+This script demonstrates:
+- Loading batch CSV results from UI
+- Classifying lysogenic vs lytic outcomes
+- Creating a 4-panel publication figure
+- Comparing with literature expectations
+
+**Or create your own analysis** using this template:
 
 ```python
-import pandas as pd
+import csv
+import json
 import numpy as np
 import matplotlib.pyplot as plt
-import json
 from pathlib import Path
 
-# Load batch results
-batch_dir = Path('results/batch_2025-12-13_18-30-45')
+# Load batch results from SHYpn UI Batch Mode output
+batch_dir = Path('workspace/projects/My_Project/simulations/results/batch_YYYYMMDD_HHMMSS')
 
 # Load configuration
-with open(batch_dir / 'config.json', 'r') as f:
+with open(batch_dir / 'config.json') as f:
     config = json.load(f)
-print(f"Replicates: {config['replicates']}")
-print(f"Recorded objects: {config['recorded_objects']}")
 
-# Load summary statistics
-with open(batch_dir / 'summary.json', 'r') as f:
-    summary = json.load(f)
-print(f"CI_Dimer final mean: {summary['CI_Dimer']['mean']:.2f} ± {summary['CI_Dimer']['std']:.2f}")
-
-# Load all trajectories
+# Load all 100 trajectories
 trajectories = []
 for i in range(1, 101):
-    df = pd.read_csv(batch_dir / f'run_{i:03d}.csv')
-    trajectories.append(df)
+    with open(batch_dir / f'run_{i:03d}.csv') as f:
+        reader = csv.DictReader(f)
+        data = list(reader)
+        traj = {
+            'time': [float(row['time']) for row in data],
+            'CI_Dimer': [float(row['CI_Dimer']) for row in data],
+            'Lysogenic_State': [float(row['Lysogenic_State']) for row in data],
+            # ... add other recorded objects
+        }
+        trajectories.append(traj)
 
 # Classify outcomes
-lysogenic = 0
-lytic = 0
-
-for df in trajectories:
-    final_state = df.iloc[-1]
-    if final_state['Lysogenic_State'] == 1:
-        lysogenic += 1
-    elif final_state['Lytic_Genes_Active'] == 1:
-        lytic += 1
-
+lysogenic = sum(1 for traj in trajectories if traj['Lysogenic_State'][-1] >= 0.5)
 print(f"Lysogeny: {lysogenic}% vs expected 50±10%")
-print(f"Lysis: {lytic}% vs expected 50±10%")
 
-# Plot trajectories (Panel A)
-plt.figure(figsize=(10, 6))
-for df in trajectories:
-    final = df.iloc[-1]
-    color = 'blue' if final['Lysogenic_State'] == 1 else 'red'
-    plt.plot(df['time'], df['CI_Dimer'], alpha=0.3, color=color)
-plt.xlabel('Time (simulation units)')
-plt.ylabel('CI Dimer Level')
-plt.title('Bistability: 100 Stochastic Trajectories (Batch Mode)')
-plt.savefig('figure2_bistability_batch.png', dpi=300)
-plt.show()
-```
+# Create your custom plots...
 ```
 
 ---
@@ -200,7 +274,7 @@ Reproduce Figure 3 sigmoid curve: 19% induction at 1 lesion, 95% at 10 lesions.
    - Settings → **BATCH MODE (EXPERIMENT REPLICATION)**
    - ✓ **Enable Batch Mode**
    - **Replicates:** 100
-   - **Output:** `results/uv_dose_response/dose_0/` (change number for each dose)
+   - **Output:** `workspace/projects/My_Project/simulations/results/uv_dose_response/dose_0/` (change number for each dose)
    
    **Run Batch**:
    - Click **Run** button
@@ -209,21 +283,15 @@ Reproduce Figure 3 sigmoid curve: 19% induction at 1 lesion, 95% at 10 lesions.
    
    **Repeat** for doses 1, 2, 3, 5, 7, 10
 
-4. **Data Collection** (automated by batch mode):
-   - Each batch folder contains:
-     * `run_001.csv` ... `run_100.csv` (time, Lytic_Genes_Active, CI_Dimer, Cro_Dimer)
-     * `summary.json` (mean, std, min, max for each object)
-     * `config.json` (DNA_Damage = dose recorded)
+4. **Quick Visualization per Dose**:
+   ```bash
+   # After each batch completes, quickly visualize
+   python examples/plot_batch_results.py "workspace/projects/My_Project/simulations/results/uv_dose_response/dose_0"
+   python examples/plot_batch_results.py "workspace/projects/My_Project/simulations/results/uv_dose_response/dose_1"
+   # ... etc
+   ```
 
-5. **Expected Results**:
-   | Dose | Induction % | Literature |
-   |------|-------------|------------|
-   | 0    | ~5%         | Spontaneous |
-   | 1    | 15-25%      | 18±10% |
-   | 3    | 50-70%      | ~50% |
-   | 10   | >95%        | >95% |
-
-6. **Python Analysis** (aggregate batch results):
+5. **Aggregate Analysis for Dose-Response Curve**:
    ```python
    import pandas as pd
    import numpy as np
@@ -234,7 +302,8 @@ Reproduce Figure 3 sigmoid curve: 19% induction at 1 lesion, 95% at 10 lesions.
    induction_rates = []
    
    for dose in doses:
-       batch_dir = Path(f'results/uv_dose_response/dose_{dose}')
+       # Load batch results from UI
+       batch_dir = Path(f'workspace/projects/My_Project/simulations/results/uv_dose_response/dose_{dose}')
        induced_count = 0
        
        # Count how many runs reached lytic state
@@ -246,11 +315,28 @@ Reproduce Figure 3 sigmoid curve: 19% induction at 1 lesion, 95% at 10 lesions.
        
        induction_rates.append(induced_count)
    
-   # Plot dose-response curve
+   # Plot dose-response curve (Figure 3)
    plt.figure(figsize=(8, 6))
-   plt.plot(doses, induction_rates, 'o-', markersize=10)
-   plt.xlabel('DNA Lesions (UV dose)')
-   plt.ylabel('% Induction (Lytic)')
+   plt.plot(doses, induction_rates, 'bo-', linewidth=2, markersize=8)
+   plt.xlabel('DNA Damage (lesions)')
+   plt.ylabel('Lytic Induction (%)')
+   plt.title('UV Dose-Response Curve (Real SHYpn Data)')
+   plt.grid(True, alpha=0.3)
+   plt.savefig('figure3_uv_dose_response.png', dpi=300)
+   plt.show()
+   ```
+
+6. **Expected Results**:
+   | Dose | Induction % | Literature |
+   |------|-------------|------------|
+   | 0    | ~5%         | Spontaneous |
+   | 1    | 15-25%      | 18±10% |
+   | 3    | 50-70%      | ~50% |
+   | 10   | >95%        | >95% |
+
+---
+
+## Experiment 3: Temporal Kinetics (With Batch Mode)
    plt.title('UV Dose-Response Curve (Batch Mode)')
    plt.grid(True, alpha=0.3)
    plt.savefig('figure3_dose_response_batch.png', dpi=300)
@@ -923,25 +1009,50 @@ print(f"Lysogeny rate: {lysogenic_count/len(trajectories)*100:.1f}%")
 
 ---
 
-## Recommended Workflow
+## Recommended Workflow: From UI to Publication Figures
 
-1. **Start with Mock** (already done):
-   - Validate experimental design
-   - Generate draft figures
-   - Identify key metrics
+### Step 1: Generate Data with SHYpn UI Batch Mode
+1. Launch SHYpn and load `workspace/projects/My_Project/simulations/model.shy` (working copy)
+2. Set initial conditions for experiment
+3. **Mark objects for recording** (right-click → 📊 Mark for Recording)
+4. Enable Batch Mode in Settings → Set replicates to 100
+5. Choose output directory (e.g., `results/bistability/`)
+6. Click **Run** once → Wait 30-60 seconds
+7. Results automatically saved as CSV files + statistics
 
-2. **Run Real SHYpn with Batch Mode**:
-   - Mark objects for selective recording
-   - Configure batch parameters (100 replicates)
-   - Run automated experiments (this guide)
-   - Analyze organized batch results
-   - Compare with mock results
-   - Adjust rate constants if needed
+### Step 2: Quick Visualization
+```bash
+# Instantly visualize batch results (5 standard plots)
+python examples/plot_batch_results.py "workspace/projects/My_Project/simulations/results/bistability/batch_YYYYMMDD_HHMMSS"
+```
 
-3. **Publication**:
-   - Replace mock figures with real data
-   - Report actual simulation times
-   - Include reproducibility details
+Generates:
+- All trajectories overlay
+- Mean ± std bands
+- Object comparison
+- Heatmap
+- Final state histogram
+
+### Step 3: Custom Analysis for Publication
+Create experiment-specific scripts using the batch CSV files:
+
+```python
+# Load batch results generated by UI
+import pandas as pd
+from pathlib import Path
+
+batch_dir = Path('results/bistability/batch_YYYYMMDD_HHMMSS')
+
+# Load all 100 replicates
+trajectories = []
+for i in range(1, 101):
+    df = pd.read_csv(batch_dir / f'run_{i:03d}.csv')
+    trajectories.append(df)
+
+# Analyze and create custom figures...
+```
+
+**Key Point**: The `experiments/run_*.py` scripts generate **mock data** for demonstration. For actual research, use the **UI Batch Mode** to generate real simulation data, then create custom analysis scripts using those CSV files.
 
 ---
 

@@ -88,6 +88,7 @@ class BatchSimulationRunner:
             - Controller's settings should be configured (duration, tau-leaping, etc.)
             - Only objects in recorded_objects will be tracked (saves memory)
             - Random seed is incremented per replicate: base_seed + replicate_id
+            - Place concentrations stored as float for biochemical accuracy
         """
         results = []
         start_time = time.time()
@@ -111,16 +112,18 @@ class BatchSimulationRunner:
             try:
                 # Create fresh controller for this replicate
                 # verbose=False: No debug output
-                # recording_interval=20: Record every 20th step (20x faster data collection)
-                replicate_controller = SimulationController(model, verbose=False, recording_interval=20)
+                # recording_interval=1: Record every step for smooth stochastic trajectories
+                replicate_controller = SimulationController(model, verbose=False, recording_interval=1)
                 
                 # Copy settings from original controller
                 replicate_controller.settings = deepcopy(settings)
                 
-                # BATCH MODE OPTIMIZATIONS: Increase tau-leaping parameters for speed
-                # Larger max_tau allows bigger time jumps in stochastic simulation
-                if hasattr(replicate_controller.settings, 'max_tau'):
-                    replicate_controller.settings.max_tau = min(replicate_controller.settings.max_tau * 5.0, 5.0)
+                # CRITICAL: Ensure stochastic/continuous mode with tau-leaping
+                replicate_controller.settings.use_tau_leaping = True
+                replicate_controller.settings.use_parallel_stochastic = True
+                replicate_controller.settings.tau_epsilon = 0.03
+                replicate_controller.settings.max_tau = 0.01
+                replicate_controller.settings.critical_threshold = 0.01
                 
                 # Set unique seed for this replicate
                 replicate_controller.settings.random_seed = base_seed + i
@@ -132,27 +135,22 @@ class BatchSimulationRunner:
                 replicate_controller.data_collector.start_collection()
                 replicate_controller.data_collector.record_state(replicate_controller.time)
                 
-                # Calculate time step
+                # Calculate time step (use same as real-time mode)
                 dt = replicate_controller.settings.get_effective_dt()
+                max_steps = int(duration / dt) if dt > 0 else 1000
                 
-                # BATCH MODE OPTIMIZATION: Use larger time step for faster execution
-                # Increase dt by 10x for batch mode (reduces steps from 1000 to 100)
-                # This is acceptable since we're only recording every 20th step anyway
-                batch_dt = dt * 10.0
-                max_steps = int(duration / batch_dt) if batch_dt > 0 else 1000
-                
-                # Run simulation synchronously (step-by-step)
-                stopped_reason = "duration"
+                # Initialize enablement states before stepping
                 replicate_controller._update_enablement_states()
                 
+                # Run simulation step-by-step (like real-time mode does internally)
+                stopped_reason = "duration"
                 for step_num in range(max_steps):
-                    success = replicate_controller.step(time_step=batch_dt)
+                    success = replicate_controller.step(time_step=dt)
                     if not success:
-                        # Deadlock detected
                         stopped_reason = "deadlock"
                         break
                     
-                    # Check cancellation during long simulations
+                    # Check cancellation periodically
                     if step_num % 100 == 0 and cancellation_check and cancellation_check():
                         stopped_reason = "cancelled"
                         self.is_cancelled = True
@@ -217,12 +215,14 @@ class BatchSimulationRunner:
         
         return results
     
-    def _reset_model(self, model, initial_marking: Dict[str, int]):
+    def _reset_model(self, model, initial_marking: Dict[str, float]):
         """Reset model places to initial marking.
+        
+        Supports both discrete (int) and continuous (float) concentrations.
         
         Args:
             model: DocumentModel to reset
-            initial_marking: Dict of place_id -> token_count
+            initial_marking: Dict of place_id -> token_count (float for concentrations)
         """
         for place in model.places:
             if place.id in initial_marking:

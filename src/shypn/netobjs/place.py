@@ -169,28 +169,33 @@ class Place(PetriNetObject):
         self.y = y
         self._trigger_redraw()
     
-    def set_tokens(self, count: int):
+    def set_tokens(self, count: float):
         """Set the number of tokens in this place.
+        
+        Supports both discrete (int) and continuous (float) concentrations.
+        For stochastic/continuous simulations, accepts floating-point values.
         
         Respects capacity constraint if set.
         
         Args:
-            count: Token count (non-negative, will be capped at capacity)
+            count: Token count or concentration (non-negative, will be capped at capacity)
         """
-        count = max(0, count)
+        count = max(0.0, float(count))
         # Handle capacity: None and float('inf') both mean unlimited
         if self.capacity is not None and self.capacity != float('inf'):
-            count = min(count, int(self.capacity))
+            count = min(count, float(self.capacity))
         self.tokens = count
         self._trigger_redraw()
     
-    def set_initial_marking(self, count: int):
+    def set_initial_marking(self, count: float):
         """Set the initial marking for this place (for simulation reset).
         
+        Supports both discrete (int) and continuous (float) concentrations.
+        
         Args:
-            count: Initial token count (non-negative)
+            count: Initial token count or concentration (non-negative)
         """
-        self.initial_marking = max(0, count)
+        self.initial_marking = max(0.0, float(count))
     
     def reset_to_initial_marking(self):
         """Reset the current marking to the initial marking."""
