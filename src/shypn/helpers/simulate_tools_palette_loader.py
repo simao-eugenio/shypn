@@ -1425,21 +1425,25 @@ class SimulateToolsPaletteLoader(GObject.GObject):
                         obj_trajectories.append(result['transition_data'][obj_id])
                 
                 if obj_trajectories:
-                    # Convert to numpy array (pad to same length if needed)
-                    max_len = max(len(traj) for traj in obj_trajectories)
-                    padded = np.array([
-                        traj + [traj[-1]] * (max_len - len(traj))
-                        for traj in obj_trajectories
-                    ])
+                    # Filter out empty trajectories
+                    obj_trajectories = [traj for traj in obj_trajectories if len(traj) > 0]
                     
-                    summary['statistics'][obj_id] = {
-                        'mean': np.mean(padded, axis=0).tolist(),
-                        'std': np.std(padded, axis=0).tolist(),
-                        'min': np.min(padded, axis=0).tolist(),
-                        'max': np.max(padded, axis=0).tolist(),
-                        'final_mean': float(np.mean(padded[:, -1])),
-                        'final_std': float(np.std(padded[:, -1]))
-                    }
+                    if obj_trajectories:  # Check again after filtering
+                        # Convert to numpy array (pad to same length if needed)
+                        max_len = max(len(traj) for traj in obj_trajectories)
+                        padded = np.array([
+                            traj + [traj[-1]] * (max_len - len(traj))
+                            for traj in obj_trajectories
+                        ])
+                        
+                        summary['statistics'][obj_id] = {
+                            'mean': np.mean(padded, axis=0).tolist(),
+                            'std': np.std(padded, axis=0).tolist(),
+                            'min': np.min(padded, axis=0).tolist(),
+                            'max': np.max(padded, axis=0).tolist(),
+                            'final_mean': float(np.mean(padded[:, -1])),
+                            'final_std': float(np.std(padded[:, -1]))
+                        }
             
             with open(os.path.join(results_dir, 'summary.json'), 'w') as f:
                 json.dump(summary, f, indent=2)
