@@ -19,6 +19,7 @@ import random
 import math
 import logging
 from .transition_behavior import TransitionBehavior
+from shypn.netobjs.inhibitor_arc import InhibitorArc
 
 
 class StochasticBehavior(TransitionBehavior):
@@ -77,9 +78,11 @@ class StochasticBehavior(TransitionBehavior):
         self.has_rate_function = 'rate_function' in props
         self.rate_function_expr = props.get('rate_function') if self.has_rate_function else None
         
-        # Warn if stochastic transition has complex formula (likely should be continuous)
+        # Detect signal places for quorum sensing (13-tuple formalism: Ψ)
         if self.has_rate_function and self.rate_function_expr:
-            # Check for patterns indicating reversible reactions (forward - reverse)
+            self._detect_signal_places()
+            
+            # Warn if stochastic transition has complex formula (likely should be continuous)
             formula_lower = str(self.rate_function_expr).lower()
             if ' - ' in self.rate_function_expr or 'k_r' in formula_lower or 'kr_' in formula_lower:
                 self.logger.warning(
@@ -135,6 +138,51 @@ class StochasticBehavior(TransitionBehavior):
         self._enablement_time = None
         self._scheduled_fire_time = None
         self._sampled_burst = None
+    
+    def _detect_signal_places(self):
+        """Detect signal places (Ψ) for this transition's rate formula.
+        
+        Signal places are referenced in the rate function but have no
+        arc connection (input, output, or regulatory). They represent
+        environmental sensing or quorum sensing behavior.
+        
+        Mathematical Definition:
+            Ψ(t) = ReferencedPlaces(Φ(t)) \ (•t ∪ t• ∪ Σ(t))
+        
+        Updates:
+            self.transition.signal_places: List of place IDs
+            self.transition.is_environment_aware: Boolean flag
+        
+        Example:
+            Rate: "0.5 * AHL / (1.0 + AHL)"
+            If AHL has no arc to transition → AHL is a signal place
+        """
+        try:
+            from shypn.analysis.quorum_sensing import QuorumSensingDetector
+            
+            detector = QuorumSensingDetector(self.model)
+            signal_places = detector.detect_signal_places(
+                self.transition, 
+                self.rate_function_expr
+            )
+            
+            # Annotate transition with results
+            self.transition.signal_places = list(signal_places)
+            self.transition.is_environment_aware = len(signal_places) > 0
+            
+            if signal_places:
+                self.logger.info(
+                    f"Transition '{self.transition.name}' has {len(signal_places)} "
+                    f"signal place(s): {signal_places} (quorum sensing / environmental sensing)"
+                )
+        
+        except Exception as e:
+            # Don't fail initialization if signal detection fails
+            self.logger.warning(
+                f"Could not detect signal places for '{self.transition.name}': {e}"
+            )
+            self.transition.signal_places = []
+            self.transition.is_environment_aware = False
     
     def _evaluate_rate_at_enablement(self, time: float) -> float:
         """Evaluate rate (λ) at enablement time.
@@ -445,12 +493,25 @@ class StochasticBehavior(TransitionBehavior):
                 if source_place is None:
                     return False, f"missing-source-place-{arc.source_id}"
                 
-                # Test arcs only check presence (weight), not burst requirements
+                # INHIBITOR ARC: Transition is DISABLED when place has too many tokens
+                # This implements negative feedback / product inhibition
+                if isinstance(arc, InhibitorArc):
+                    # Inhibitor arcs use INVERTED logic: disable when tokens >= threshold
+                    threshold = getattr(arc, 'threshold', None)
+                    if threshold is None:
+                        threshold = arc.weight
+                    
+                    if source_place.tokens >= threshold:
+                        return False, f"inhibited-by-P{arc.source_id} (tokens={source_place.tokens:.1f} >= threshold={threshold})"
+                    # If tokens < threshold, inhibitor doesn't block (continue checking other arcs)
+                    continue
+                
+                # TEST ARC: Check presence only (weight), not burst requirements
                 # They don't consume tokens, so burst doesn't apply
                 if hasattr(arc, 'consumes_tokens') and not arc.consumes_tokens():
                     required = arc.weight  # Just check presence for catalysts
                 else:
-                    required = arc.weight * burst  # Normal/inhibitor need burst tokens
+                    required = arc.weight * burst  # Normal arcs need burst tokens
                 
                 if source_place.tokens < required:
                     return False, f"insufficient-tokens-for-burst-P{arc.source_id}"

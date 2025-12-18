@@ -227,8 +227,8 @@ class TauLeapingEngine:
                         enable_parallel=True
                     )
                 else:
-                    # Fallback to sequential
-                    self.logger.warning("Could not access model for parallel scheduler, using sequential")
+                    # Fallback to sequential (normal for small models)
+                    self.logger.debug("Could not access model for parallel scheduler, using sequential")
                     self.use_parallel = False
             
             if self._parallel_scheduler:
@@ -283,9 +283,9 @@ class TauLeapingEngine:
             
             actual_firings = min(num_firings, max_possible_firings)
             
-            # Log if we had to cap firings due to insufficient tokens
+            # Log if we had to cap firings due to insufficient tokens (debug level only)
             if actual_firings < num_firings:
-                self.logger.warning(
+                self.logger.debug(
                     f"τ-leaping: Capped {transition.name} firings from {num_firings} to {actual_firings} "
                     f"(insufficient tokens). Consider reducing tau or epsilon."
                 )

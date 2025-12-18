@@ -423,10 +423,17 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         # Commit atomically
         if self.buffered_settings.commit():
             # Restart simulation if it was running
-            if self.simulation.is_running():
+            was_running = self.simulation.is_running()
+            if was_running:
                 self.simulation.stop()
                 time_step = self.simulation.get_effective_dt()
-                self.simulation.run(time_step=time_step)
+                started = self.simulation.run(time_step=time_step)
+                
+                # Update button states to reflect restarted simulation
+                if started and self.simulation.is_running():
+                    self._update_button_states(running=True)
+                else:
+                    self._update_button_states(running=False)
             
             self.emit('settings-changed')
         else:
@@ -1059,6 +1066,11 @@ class SimulateToolsPaletteLoader(GObject.GObject):
             self.stop_button.set_sensitive(True)
             self.reset_button.set_sensitive(False)
             self.settings_button.set_sensitive(False)
+            
+            # Debug: Verify button state was set
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"Button states updated: Stop enabled = {self.stop_button.get_sensitive()}")
         elif completed:
             # Completed: only Reset available
             self.run_button.set_sensitive(False)
@@ -1100,16 +1112,31 @@ class SimulateToolsPaletteLoader(GObject.GObject):
             batch_enabled = getattr(settings, 'batch_mode_enabled', False)
             n_replicates = getattr(settings, 'batch_replicates', 100)
             recorded_objects = getattr(settings, 'recorded_objects', set())
+            
+            # Debug output
+            print(f"🔍 Batch mode check: batch_enabled={batch_enabled}, n_replicates={n_replicates}, recorded_objects={len(recorded_objects)}")
+        else:
+            print(f"⚠️ No simulation_settings found on model")
         
         if batch_enabled:
+            print(f"🚀 Starting batch mode with {n_replicates} replicates")
             # Batch mode - run N replicates
             self._run_batch_mode(n_replicates, recorded_objects)
         else:
             # Normal mode - single simulation
-            self.simulation.run()
+            started = self.simulation.run()
             
-            # Update button states for running simulation
-            self._update_button_states(running=True)
+            # Update button states based on actual simulation state
+            if started and self.simulation.is_running():
+                self._update_button_states(running=True)
+                
+                # Force UI update to ensure button state is immediately visible
+                from gi.repository import Gtk
+                while Gtk.events_pending():
+                    Gtk.main_iteration()
+            else:
+                # Failed to start - keep buttons in idle state
+                self._update_button_states(running=False)
 
     def _on_step_clicked(self, button):
         """Handle Step button click - execute one simulation step."""
@@ -1169,7 +1196,7 @@ class SimulateToolsPaletteLoader(GObject.GObject):
             recorded_objects: Set of place/transition IDs to record
         """
         import threading
-        from gi.repository import GLib
+        from gi.repository import GLib, Gtk
         from shypn.engine.simulation.batch_runner import BatchSimulationRunner
         from shypn.ui.dialogs.batch_progress_dialog import BatchProgressDialog
         
@@ -1230,6 +1257,10 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         
         # Disable buttons during batch execution (but preserve object selection/recording marks)
         self._update_button_states(running=True)
+        
+        # Force UI update to ensure button state is immediately visible
+        while Gtk.events_pending():
+            Gtk.main_iteration()
         
         # Keep recorded objects visually highlighted by NOT clearing selection
         # The selection shows which objects are being recorded in batch mode
