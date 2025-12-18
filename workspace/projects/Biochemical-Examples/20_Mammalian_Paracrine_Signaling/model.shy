@@ -573,8 +573,8 @@
       "transition_type": "stochastic",
       "priority": 0,
       "firing_policy": "single_server",
-      "is_source": true,
-      "is_sink": false,
+      "is_source": false,
+      "is_sink": true,
       "guard": null,
       "properties": {
         "rate_function": "0.05 * IL2_extracellular"
