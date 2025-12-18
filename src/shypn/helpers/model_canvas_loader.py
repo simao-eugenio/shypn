@@ -2707,6 +2707,16 @@ class ModelCanvasLoader:
         except Exception:
             pass
 
+    def _mark_interaction(self, widget):
+        """Mark user interaction timestamp (lightweight tracking).
+        
+        Just stores a timestamp - no widget tree traversal or expensive operations.
+        """
+        import time
+        if not hasattr(self, '_last_interaction_time'):
+            self._last_interaction_time = 0
+        self._last_interaction_time = time.time()
+
     def _on_button_press(self, widget, event, manager):
         """Handle button press events (GTK3)."""
         # Grab focus so keyboard shortcuts work
@@ -3010,24 +3020,26 @@ class ModelCanvasLoader:
         self._last_pointer_world_x = world_x
         self._last_pointer_world_y = world_y
         
-        # Update hover tooltip for objects under cursor
-        hovered_obj = manager.find_object_at_position(world_x, world_y)
-        if hovered_obj:
-            from shypn.netobjs import Place, Transition, Arc
-            if isinstance(hovered_obj, (Place, Transition, Arc)):
-                # Show ID-Name tooltip with green background and black text (styled via CSS)
-                # ONLY show tooltips for network objects (places, transitions, arcs)
-                obj_id = hovered_obj.id if hasattr(hovered_obj, 'id') else "?"
-                obj_name = hovered_obj.name if hasattr(hovered_obj, 'name') else ""
-                if obj_name and obj_name != obj_id:
-                    tooltip = f"{obj_id} - {obj_name}"
-                else:
-                    tooltip = obj_id
-                # Use set_tooltip_text - CSS will apply green background and black text
-                widget.set_tooltip_text(tooltip)
-        else:
-            # Clear tooltip when not hovering over any object
-            widget.set_tooltip_text(None)
+        # Update hover tooltip - but only if not actively dragging/panning
+        # Tooltip lookup can be expensive for large models (268 objects in rn00071)
+        if not state['active']:
+            hovered_obj = manager.find_object_at_position(world_x, world_y)
+            if hovered_obj:
+                from shypn.netobjs import Place, Transition, Arc
+                if isinstance(hovered_obj, (Place, Transition, Arc)):
+                    # Show ID-Name tooltip with green background and black text (styled via CSS)
+                    # ONLY show tooltips for network objects (places, transitions, arcs)
+                    obj_id = hovered_obj.id if hasattr(hovered_obj, 'id') else "?"
+                    obj_name = hovered_obj.name if hasattr(hovered_obj, 'name') else ""
+                    if obj_name and obj_name != obj_id:
+                        tooltip = f"{obj_id} - {obj_name}"
+                    else:
+                        tooltip = obj_id
+                    # Use set_tooltip_text - CSS will apply green background and black text
+                    widget.set_tooltip_text(tooltip)
+            else:
+                # Clear tooltip when not hovering over any object
+                widget.set_tooltip_text(None)
         
         # Update lasso path if active
         if lasso_state.get('active', False) and lasso_state.get('selector'):
@@ -3072,6 +3084,9 @@ class ModelCanvasLoader:
                 widget.queue_draw()
                 return True
             if manager.selection_manager.update_drag(event.x, event.y, manager):
+                # Notify report panel of user interaction
+                self._mark_interaction(widget)
+                
                 click_state = self._click_state.get(widget)
                 if click_state and click_state.get('pending_timeout'):
                     from gi.repository import GLib
@@ -3083,6 +3098,9 @@ class ModelCanvasLoader:
             is_shift_pressed = event.state & Gdk.ModifierType.SHIFT_MASK
             should_pan = state['button'] in [2, 3] or (state['button'] == 1 and is_shift_pressed)
             if should_pan and state['is_panning']:
+                # Notify report panel of user interaction to defer expensive refreshes
+                self._mark_interaction(widget)
+                
                 dx = event.x - state['start_x']
                 dy = event.y - state['start_y']
                 
@@ -3114,6 +3132,10 @@ class ModelCanvasLoader:
             factor = 1 / 1.1
         if factor is None:
             return False
+        
+        # Notify report panel of user interaction
+        self._mark_interaction(widget)
+        
         manager.zoom_at_point(factor, event.x, event.y)
         manager.save_view_state_to_file()
         widget.queue_draw()
@@ -3302,6 +3324,7 @@ class ModelCanvasLoader:
         
         # Execute deferred fit_to_page if pending (after viewport size is known)
         if hasattr(manager, '_fit_to_page_pending') and manager._fit_to_page_pending:
+            print(f"[DRAW_DEBUG] Executing deferred fit_to_page", flush=True)
             horizontal_offset = getattr(manager, '_fit_to_page_horizontal_offset', 0)
             vertical_offset = getattr(manager, '_fit_to_page_vertical_offset', 0)
             manager._fit_to_page_pending = False  # Clear flag before execution
@@ -3311,6 +3334,7 @@ class ModelCanvasLoader:
                 horizontal_offset_percent=horizontal_offset,
                 vertical_offset_percent=vertical_offset
             )
+            print(f"[DRAW_DEBUG] Fit to page complete", flush=True)
         
         cr.set_source_rgb(1.0, 1.0, 1.0)
         cr.paint()
@@ -3669,8 +3693,36 @@ class ModelCanvasLoader:
                 menu_item.connect('activate', on_activate, callback)
                 menu_item.show()
             menu.append(menu_item)
+        
+        # Add analysis menu items from context menu handler
         if self.context_menu_handler:
             self.context_menu_handler.add_analysis_menu_items(menu, obj)
+        
+        # Add batch mode recording menu item for places and transitions
+        if isinstance(obj, (Place, Transition)):
+            # Add separator before batch recording item
+            sep = Gtk.SeparatorMenuItem()
+            sep.show()
+            menu.append(sep)
+            
+            # Check if object is already marked for recording
+            is_recorded = False
+            if hasattr(manager, 'simulation_settings'):
+                settings = manager.simulation_settings
+                if settings and hasattr(settings, 'is_object_recorded'):
+                    is_recorded = settings.is_object_recorded(obj.id)
+            
+            # Create menu item with checkmark if marked
+            if is_recorded:
+                record_label = '✓ Mark for Recording (Batch Mode)'
+            else:
+                record_label = '📊 Mark for Recording (Batch Mode)'
+            
+            record_item = Gtk.MenuItem(label=record_label)
+            record_item.connect('activate', lambda w: self._on_toggle_recording(obj, manager, drawing_area))
+            record_item.show()
+            menu.append(record_item)
+        
         self._active_context_menu = menu
         
         # Attach menu to drawing_area for proper Wayland parent window handling
@@ -4325,13 +4377,9 @@ class ModelCanvasLoader:
         drawing_area.queue_draw()
 
     def _on_fit_to_window_clicked(self, menu, drawing_area, manager):
-        """Fit canvas to window."""
-        zoom_x = manager.viewport_width / manager.canvas_width
-        zoom_y = manager.viewport_height / manager.canvas_height
-        fit_zoom = min(zoom_x, zoom_y) * 0.95
-        manager.set_zoom(fit_zoom, manager.viewport_width / 2, manager.viewport_height / 2)
-        manager.pan_x = 0
-        manager.pan_y = 0
+        """Fit entire model to window with padding."""
+        # Use fit_to_page to properly fit all content with 10% padding
+        manager.fit_to_page(padding_percent=10)
         drawing_area.queue_draw()
     
     def _on_rotate_90_cw_clicked(self, menu, drawing_area, manager):
@@ -4424,9 +4472,36 @@ class ModelCanvasLoader:
                 center_x = manager.canvas_width / 2
                 center_y = manager.canvas_height / 2
             
-            # Create engine and apply layout
+            # Get layout parameters from Layout Settings (palette parameter panel)
+            layout_params = {}
+            try:
+                if drawing_area in self.overlay_managers:
+                    overlay_mgr = self.overlay_managers.get(drawing_area)
+                    if overlay_mgr and hasattr(overlay_mgr, 'swissknife_palette'):
+                        swissknife = overlay_mgr.swissknife_palette
+                        if swissknife and hasattr(swissknife, 'layout_settings_loader'):
+                            settings_loader = swissknife.layout_settings_loader
+                            if settings_loader and hasattr(settings_loader, 'get_settings'):
+                                all_settings = settings_loader.get_settings()
+                                if all_settings:
+                                    # Provide all settings - auto will select best algorithm and use appropriate params
+                                    layout_params = {
+                                        'layer_spacing': all_settings.get('layer_spacing', 150),
+                                        'node_spacing': all_settings.get('node_spacing', 100),
+                                        'iterations': all_settings.get('iterations', 500),
+                                        'k_multiplier': all_settings.get('k_multiplier', 1.5),
+                                        'scale': all_settings.get('scale', 2000.0)
+                                    }
+            except Exception as e:
+                # Use defaults if we can't get settings - don't block layout
+                import traceback
+                print(f"Warning: Could not get layout parameters: {e}")
+                traceback.print_exc()
+                layout_params = {}
+            
+            # Create engine and apply layout with parameters
             engine = LayoutEngine(manager)
-            result = engine.apply_layout('auto')
+            result = engine.apply_layout('auto', **layout_params)
             
             # The layout algorithms center at (0, 0), so we need to offset
             # back to the original center or canvas center
@@ -4450,6 +4525,9 @@ class ModelCanvasLoader:
             message = (f"Applied {result['algorithm']} layout\n"
                       f"Moved {result['nodes_moved']} objects\n"
                       f"Reason: {result['reason']}")
+            if layout_params and result.get('parameters'):
+                # Show what parameters were actually used
+                message += f"\nParameters: {result['parameters']}"
             self._show_layout_message(message, drawing_area)
             
             # Redraw
@@ -4566,17 +4644,43 @@ class ModelCanvasLoader:
                 center_x = manager.canvas_width / 2
                 center_y = manager.canvas_height / 2
             
-            # Try to get layout parameters from SBML Import panel (if available)
+            # Try to get layout parameters from Layout Settings (palette parameter panel)
             layout_params = {}
             try:
-                pass
-                # Check if sbml_panel is available (set during initialization)
-                if hasattr(self, 'sbml_panel') and self.sbml_panel:
+                # First priority: Layout palette parameter panel (layout_settings_loader)
+                if drawing_area in self.overlay_managers:
+                    overlay_mgr = self.overlay_managers.get(drawing_area)
+                    if overlay_mgr and hasattr(overlay_mgr, 'swissknife_palette'):
+                        swissknife = overlay_mgr.swissknife_palette
+                        if swissknife and hasattr(swissknife, 'layout_settings_loader'):
+                            settings_loader = swissknife.layout_settings_loader
+                            if settings_loader and hasattr(settings_loader, 'get_settings'):
+                                all_settings = settings_loader.get_settings()
+                                if all_settings:
+                                    # Extract parameters relevant to this algorithm
+                                    if algorithm == 'hierarchical':
+                                        layout_params = {
+                                            'layer_spacing': all_settings.get('layer_spacing', 150),
+                                            'node_spacing': all_settings.get('node_spacing', 100)
+                                        }
+                                    elif algorithm == 'force_directed':
+                                        layout_params = {
+                                            'iterations': all_settings.get('iterations', 500),
+                                            'k_multiplier': all_settings.get('k_multiplier', 1.5),
+                                            'scale': all_settings.get('scale', 2000.0)
+                                        }
+                
+                # Fallback: SBML Import panel (for SBML import workflows)
+                if not layout_params and hasattr(self, 'sbml_panel') and self.sbml_panel:
                     layout_params = self.sbml_panel.get_layout_parameters_for_algorithm(algorithm)
-                    if layout_params:
-                        pass  # Use these params
+                    if not layout_params:
+                        layout_params = {}
             except Exception as e:
-                pass  # If we can't get params from SBML panel, just use defaults
+                # If we can't get params, just use defaults - don't block layout
+                import traceback
+                print(f"Warning: Could not get layout parameters: {e}")
+                traceback.print_exc()
+                layout_params = {}
             
             # Create engine and apply layout with parameters
             engine = LayoutEngine(manager)
@@ -4729,6 +4833,59 @@ class ModelCanvasLoader:
         if not obj.selected:
             manager.selection_manager.select(obj, multi=False, manager=manager)
         manager.selection_manager.enter_edit_mode(obj, manager=manager)
+        drawing_area.queue_draw()
+    
+    def _on_toggle_recording(self, obj, manager, drawing_area):
+        """Toggle batch mode recording for an object (place or transition).
+        
+        Args:
+            obj: Object to toggle recording (Place or Transition)
+            manager: ModelCanvasManager instance
+            drawing_area: GtkDrawingArea widget
+        """
+        # Get simulation settings from manager
+        if not hasattr(manager, 'simulation_settings'):
+            print("Warning: No simulation settings available for recording")
+            return
+        
+        settings = manager.simulation_settings
+        if not settings or not hasattr(settings, 'is_object_recorded'):
+            print("Warning: Simulation settings not properly initialized")
+            return
+        
+        # Toggle recording state
+        obj_id = obj.id
+        
+        # Define recording indicator color (orange/amber for visibility)
+        RECORDING_COLOR = (1.0, 0.6, 0.0)  # RGB: orange
+        
+        # Import default colors
+        from shypn.netobjs import Place, Transition
+        
+        if settings.is_object_recorded(obj_id):
+            settings.remove_recorded_object(obj_id)
+            
+            # Restore default colors
+            if isinstance(obj, Place):
+                obj.border_color = Place.DEFAULT_BORDER_COLOR
+            elif isinstance(obj, Transition):
+                obj.border_color = Transition.DEFAULT_BORDER_COLOR
+                obj.fill_color = Transition.DEFAULT_COLOR
+        else:
+            settings.add_recorded_object(obj_id)
+            
+            # Apply recording color
+            if isinstance(obj, Place):
+                obj.border_color = RECORDING_COLOR
+            elif isinstance(obj, Transition):
+                obj.border_color = RECORDING_COLOR
+                obj.fill_color = RECORDING_COLOR
+        
+        # Trigger on_changed callback if available
+        if hasattr(obj, 'on_changed') and obj.on_changed:
+            obj.on_changed()
+        
+        # Redraw to show visual indicator
         drawing_area.queue_draw()
 
     def _on_object_properties(self, obj, manager, drawing_area):

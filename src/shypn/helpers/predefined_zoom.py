@@ -344,13 +344,11 @@ class PredefinedZoom:
     def _on_fit_clicked(self, button):
         """Handle fit-to-window button click.
         
-        This would calculate zoom to fit entire canvas in viewport.
-        For now, we'll just set to 100%.
+        Fits the entire model to the viewport with padding.
         """
         if self.canvas_manager:
-            center_x = self.canvas_manager.viewport_width / 2
-            center_y = self.canvas_manager.viewport_height / 2
-            self.canvas_manager.set_zoom(1.0, center_x, center_y)
+            # Use fit_to_page to properly fit all model content
+            self.canvas_manager.fit_to_page(padding_percent=10)
             self._update_zoom_display()
             if self.drawing_area:
                 self.drawing_area.queue_draw()

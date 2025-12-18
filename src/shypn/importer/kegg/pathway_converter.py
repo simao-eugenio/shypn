@@ -320,15 +320,40 @@ class StandardConversionStrategy(ConversionStrategy):
                 logger.warning(f"Failed to pre-fetch EC numbers: {e}")
                 logger.info("Will fall back to fetching EC numbers individually")
         
+        # Phase 1.7: Detect and document duplicate reactions (alternative enzymes/isoforms)
+        # In KEGG, multiple reactions can have same substrates/products but different enzymes
+        # These represent alternative pathways (isoenzymes) for the same transformation
+        self._detect_duplicate_reactions(pathway)
+        
         # Phase 2: Create transitions and arcs from reactions
         reaction_transition_map = {}  # Track reactions for kinetics enhancement
         reaction_name_to_transition = {}  # Map reaction names to transitions for enzyme conversion
         
+        # Track reaction name occurrences for disambiguation
+        reaction_name_counter = {}
+        
         for reaction in pathway.reactions:
+            # Track how many times we've seen this KEGG reaction name
+            if reaction.name not in reaction_name_counter:
+                reaction_name_counter[reaction.name] = 0
+            reaction_name_counter[reaction.name] += 1
+            
             # Create transition(s)
             transitions = self.reaction_mapper.create_transitions(reaction, pathway, options, document.id_manager)
             
             for transition in transitions:
+                # If this KEGG reaction name appears multiple times, add suffix to label
+                # to distinguish instances (e.g., R01175, R01175_2, R01175_3, etc.)
+                occurrence = reaction_name_counter[reaction.name]
+                if occurrence > 1:
+                    # Add suffix to make label unique
+                    base_label = transition.label
+                    transition.label = f"{base_label}_{occurrence}"
+                    logger.debug(
+                        f"Disambiguated duplicate reaction {reaction.name}: "
+                        f"internal ID {reaction.id} → label '{transition.label}'"
+                    )
+                
                 document.transitions.append(transition)
                 reaction_transition_map[transition] = reaction
                 
@@ -378,6 +403,11 @@ class StandardConversionStrategy(ConversionStrategy):
         
         # VALIDATION: Ensure bipartite property
         self._validate_bipartite_property(document, pathway)
+        
+        # Phase 4: Filter disconnected components if requested
+        # This removes isolated micro-networks that disrupt layout
+        if options.filter_isolated_compounds:  # Reuse flag for now
+            self._filter_disconnected_components(document)
         
         # LOGGING: Log conversion statistics
         self._log_conversion_statistics(document, pathway)
@@ -566,6 +596,273 @@ class StandardConversionStrategy(ConversionStrategy):
             f"{enhancement_stats['skipped']} skipped, "
             f"{enhancement_stats['failed']} failed"
         )
+    
+    def _filter_disconnected_components(self, document: DocumentModel):
+        """Filter out small disconnected components (isolated micro-networks).
+        
+        KEGG pathways often contain auxiliary information as small disconnected
+        sub-networks that disrupt layout. This method identifies connected components
+        and removes small isolated ones, keeping only the largest component as the
+        main pathway network.
+        
+        Strategy:
+        1. Build graph of all places and transitions
+        2. Find connected components using BFS/DFS
+        3. Keep only the largest component
+        4. Store filtered elements as metadata (not deleted, just excluded from model)
+        
+        Args:
+            document: DocumentModel to filter (modified in place)
+        """
+        from collections import deque
+        
+        # Build adjacency list for the Petri net graph
+        graph = {}  # node_id -> set of connected node_ids
+        all_nodes = {}  # node_id -> actual object
+        
+        # Add all places and transitions to graph
+        for place in document.places:
+            graph[place.id] = set()
+            all_nodes[place.id] = place
+        
+        for transition in document.transitions:
+            graph[transition.id] = set()
+            all_nodes[transition.id] = transition
+        
+        # Build edges from arcs (undirected graph for connectivity)
+        for arc in document.arcs:
+            source_id = arc.source.id
+            target_id = arc.target.id
+            graph[source_id].add(target_id)
+            graph[target_id].add(source_id)
+        
+        # Find connected components using BFS
+        visited = set()
+        components = []
+        
+        for node_id in graph:
+            if node_id in visited:
+                continue
+            
+            # BFS to find component
+            component = set()
+            queue = deque([node_id])
+            
+            while queue:
+                current = queue.popleft()
+                if current in visited:
+                    continue
+                
+                visited.add(current)
+                component.add(current)
+                
+                # Add neighbors
+                for neighbor in graph[current]:
+                    if neighbor not in visited:
+                        queue.append(neighbor)
+            
+            components.append(component)
+        
+        # Find largest component (main network)
+        if not components:
+            logger.warning("No connected components found in network")
+            return
+        
+        largest_component = max(components, key=len)
+        num_components = len(components)
+        
+        logger.info(
+            f"Found {num_components} connected component(s): "
+            f"largest has {len(largest_component)} nodes"
+        )
+        
+        # If only one component, nothing to filter
+        if num_components == 1:
+            logger.info("Single connected component - no filtering needed")
+            return
+        
+        # Filter: keep only nodes in largest component
+        main_component_node_ids = largest_component
+        
+        # Separate places into kept and filtered
+        kept_places = []
+        filtered_places = []
+        for place in document.places:
+            if place.id in main_component_node_ids:
+                kept_places.append(place)
+            else:
+                filtered_places.append(place)
+        
+        # Separate transitions into kept and filtered
+        kept_transitions = []
+        filtered_transitions = []
+        for transition in document.transitions:
+            if transition.id in main_component_node_ids:
+                kept_transitions.append(transition)
+            else:
+                filtered_transitions.append(transition)
+        
+        # Filter arcs: keep only those connecting nodes in main component
+        kept_arcs = []
+        filtered_arcs = []
+        for arc in document.arcs:
+            if arc.source.id in main_component_node_ids and arc.target.id in main_component_node_ids:
+                kept_arcs.append(arc)
+            else:
+                filtered_arcs.append(arc)
+        
+        # Update document with filtered elements
+        document.places = kept_places
+        document.transitions = kept_transitions
+        document.arcs = kept_arcs
+        
+        # Store filtered elements in metadata for reference
+        if not hasattr(document, 'metadata') or document.metadata is None:
+            document.metadata = {}
+        
+        document.metadata['filtered_disconnected_components'] = {
+            'num_components_total': num_components,
+            'num_places_filtered': len(filtered_places),
+            'num_transitions_filtered': len(filtered_transitions),
+            'num_arcs_filtered': len(filtered_arcs),
+            'filtered_place_labels': [p.label for p in filtered_places],
+            'filtered_transition_labels': [t.label for t in filtered_transitions]
+        }
+        
+        logger.info(
+            f"Filtered {num_components - 1} disconnected component(s): "
+            f"removed {len(filtered_places)} places, "
+            f"{len(filtered_transitions)} transitions, "
+            f"{len(filtered_arcs)} arcs"
+        )
+        
+        if filtered_places:
+            logger.debug(
+                f"{', '.join([p.label for p in filtered_places[:5]])}"
+                f"{' ...' if len(filtered_places) > 5 else ''}"
+            )
+    
+    def _detect_duplicate_reactions(self, pathway: KEGGPathway):
+        """Detect and document reactions with identical substrates/products.
+        
+        In KEGG pathways (especially reference pathways like rn00071), multiple
+        reactions can have the same substrates and products but different reaction IDs.
+        
+        This represents ALTERNATIVE ENZYMES (isoenzymes/isozymes):
+        - Each enzyme CAN catalyze the reaction INDEPENDENTLY
+        - You only need ONE of them present for the reaction to occur
+        - They are mutually exclusive alternatives (OR relationship, not AND)
+        - NOT like cofactors which must all be present
+        
+        Common biological reasons for alternatives:
+        - Tissue-specificity: Different organs use different isoforms (heart vs liver LDH)
+        - Substrate specificity: Different chain lengths (ACADS/ACADM/ACADL for fatty acids)
+        - Developmental stages: Fetal vs adult hemoglobin
+        - Regulation: Different conditions activate different isoforms
+        - Organism diversity: Reference pathways show enzymes from multiple species
+        - Evolutionary redundancy: Backup enzymes for critical reactions
+        
+        Example from rn00071 (fatty acid degradation):
+        - R00631: acyl-CoA + FAD → 2,3-dehydroacyl-CoA + FADH2  (enzyme: ACAD9)
+        - R03990: acyl-CoA + FAD → 2,3-dehydroacyl-CoA + FADH2  (enzyme: ACADL)
+        - R03857: acyl-CoA + FAD → 2,3-dehydroacyl-CoA + FADH2  (enzyme: ACADM)
+        
+        All three perform the SAME transformation but with DIFFERENT enzyme isoforms.
+        The organism needs ONLY ONE of these enzymes to be present/active.
+        
+        In the Petri net representation:
+        - Multiple parallel transitions = Alternative pathways (biological OR)
+        - Tokens can flow through ANY of the transitions
+        - Models biological flexibility and robustness
+        - This is CORRECT behavior, not a modeling error
+        
+        Compare to cofactors (different concept):
+        - Cofactors (ATP, NADH) must be present for reaction to occur (AND relationship)
+        - Represented as input places with arcs to transitions
+        - Consumed or required, not alternatives
+        
+        Args:
+            pathway: KEGG pathway to analyze
+        """
+        from collections import defaultdict
+        
+        # Group reactions by their substrate/product signature
+        reaction_signatures = defaultdict(list)
+        
+        for reaction in pathway.reactions:
+            # Create signature: sorted tuple of (substrate_ids, product_ids)
+            substrate_ids = tuple(sorted([s.id for s in reaction.substrates]))
+            product_ids = tuple(sorted([p.id for p in reaction.products]))
+            signature = (substrate_ids, product_ids)
+            
+            reaction_signatures[signature].append(reaction)
+        
+        # Find duplicates
+        duplicates_found = 0
+        total_duplicate_reactions = 0
+        
+        for signature, reactions in reaction_signatures.items():
+            if len(reactions) > 1:
+                duplicates_found += 1
+                total_duplicate_reactions += len(reactions)
+                
+                # Get compound names for readability
+                substrate_ids, product_ids = signature
+                
+                # Log the duplicate group
+                logger.info(
+                    f"Alternative enzymes detected: {len(reactions)} reactions "
+                    f"with same substrates/products"
+                )
+                logger.debug(
+                    f"  Substrates: {list(substrate_ids)}"
+                )
+                logger.debug(
+                    f"  Products: {list(product_ids)}"
+                )
+                
+                # Log individual reactions in the group
+                for rxn in reactions:
+                    enzyme_info = []
+                    
+                    # Try to find associated enzyme entries
+                    for entry_id, entry in pathway.entries.items():
+                        if entry.is_gene() and entry.reaction == rxn.name:
+                            enzyme_info.append(f"{entry.name}({entry.type})")
+                    
+                    enzyme_str = ", ".join(enzyme_info) if enzyme_info else "unknown enzyme"
+                    
+                    logger.debug(
+                        f"    - Reaction {rxn.name} (internal ID:{rxn.id}, type:{rxn.type}): {enzyme_str}"
+                    )
+                
+                # Additional detail: show if same KEGG reaction ID appears multiple times
+                # This happens when same reaction (e.g., R01175) is listed multiple times
+                # in KGML with different internal IDs for different enzyme associations
+                reaction_names = [r.name for r in reactions]
+                unique_reaction_names = set(reaction_names)
+                
+                if len(unique_reaction_names) < len(reactions):
+                    # Same KEGG reaction ID repeated
+                    for rname in unique_reaction_names:
+                        count = reaction_names.count(rname)
+                        if count > 1:
+                            logger.info(
+                                f"  ⚠ KEGG reaction {rname} appears {count} times with different "
+                                f"internal IDs. This is common in reference pathways where the "
+                                f"same reaction is associated with multiple enzyme entries "
+                                f"(isoforms, tissue-specific variants, or different organisms)."
+                            )
+        
+        if duplicates_found > 0:
+            logger.info(
+                f"Found {duplicates_found} groups of alternative enzymes "
+                f"(total {total_duplicate_reactions} reactions with duplicates). "
+                f"These create parallel transitions in the Petri net, representing "
+                f"biologically valid alternative pathways (isoenzymes)."
+            )
+        else:
+            logger.debug("No duplicate reactions found (no alternative enzymes detected)")
     
     def _log_conversion_statistics(self, document: DocumentModel, pathway: KEGGPathway):
         """Log conversion statistics for debugging and monitoring.

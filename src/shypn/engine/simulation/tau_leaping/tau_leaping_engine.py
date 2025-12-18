@@ -39,7 +39,8 @@ class TauLeapingEngine:
         critical_threshold: float = 10.0,
         max_tau: float = 1.0,
         seed: int = None,
-        use_parallel: bool = False
+        use_parallel: bool = False,
+        verbose: bool = True
     ):
         """Initialize τ-leaping engine.
         
@@ -50,6 +51,7 @@ class TauLeapingEngine:
             seed: Random seed for reproducibility
             use_parallel: Enable parallel sampling for weakly independent transitions.
                          Worker count automatically determined from system capabilities.
+            verbose: If False, suppress warnings (for batch mode performance)
         """
         self.leap_selector = LeapSelector(
             epsilon=epsilon,
@@ -58,11 +60,16 @@ class TauLeapingEngine:
         )
         self.poisson_sampler = PoissonSampler(seed=seed)
         self.use_parallel = use_parallel
+        self.verbose = verbose
         
         # Parallel scheduler (initialized lazily)
         self._parallel_scheduler = None
         
         self.logger = logging.getLogger(__name__)
+        
+        # Suppress warnings if not verbose
+        if not verbose:
+            self.logger.setLevel(logging.ERROR)  # Only show errors, not warnings
         
         # Statistics
         self.stats = {
@@ -140,6 +147,11 @@ class TauLeapingEngine:
         # Step 4: Advance time
         controller.time += tau
         
+        # CRITICAL: Record state after time advancement
+        # This captures updated firing counts and place tokens for automation experiments
+        if controller.data_collector:
+            controller.data_collector.record_state(controller.time)
+        
         # Step 5: Update statistics
         self.stats['total_leaps'] += 1
         self.stats['total_firings'] += total_firings
@@ -215,8 +227,8 @@ class TauLeapingEngine:
                         enable_parallel=True
                     )
                 else:
-                    # Fallback to sequential
-                    self.logger.warning("Could not access model for parallel scheduler, using sequential")
+                    # Fallback to sequential (normal for small models)
+                    self.logger.debug("Could not access model for parallel scheduler, using sequential")
                     self.use_parallel = False
             
             if self._parallel_scheduler:
@@ -271,9 +283,9 @@ class TauLeapingEngine:
             
             actual_firings = min(num_firings, max_possible_firings)
             
-            # Log if we had to cap firings due to insufficient tokens
+            # Log if we had to cap firings due to insufficient tokens (debug level only)
             if actual_firings < num_firings:
-                self.logger.warning(
+                self.logger.debug(
                     f"τ-leaping: Capped {transition.name} firings from {num_firings} to {actual_firings} "
                     f"(insufficient tokens). Consider reducing tau or epsilon."
                 )
@@ -292,7 +304,7 @@ class TauLeapingEngine:
             
             total_firings += actual_firings
             
-            # Record firing event
+            # Record firing event in engine's data collector (for reports)
             if hasattr(controller, 'data_collector') and controller.data_collector:
                 controller.data_collector.record_firing(
                     time=controller.time,
@@ -302,6 +314,22 @@ class TauLeapingEngine:
                     mode='tau_leaping',
                     firings=actual_firings
                 )
+            
+            # Notify step listeners that have on_transition_fired (for analyses/plotting)
+            if hasattr(controller, 'step_listeners'):
+                details = {
+                    'consumed': consumed_map,
+                    'produced': produced_map,
+                    'mode': 'tau_leaping',
+                    'firings': actual_firings
+                }
+                for listener in controller.step_listeners:
+                    # Listeners are bound methods, check the object they're bound to
+                    listener_obj = getattr(listener, '__self__', listener)
+                    if hasattr(listener_obj, 'on_transition_fired'):
+                        # Notify once per actual firing for cumulative count tracking
+                        for _ in range(actual_firings):
+                            listener_obj.on_transition_fired(transition, controller.time, details)
         
         return total_firings
     
@@ -397,6 +425,12 @@ class TauLeapingEngine:
                 amount = arc.weight * num_firings
                 target_place.set_tokens(target_place.tokens + amount)
                 produced_map[target_place.id] = float(amount)
+        
+        # CRITICAL: Increment firing count for statistics/plotting
+        # This is needed for automation experiments and data collection
+        if not hasattr(transition, 'firing_count'):
+            transition.firing_count = 0
+        transition.firing_count += num_firings
         
         return consumed_map, produced_map
     

@@ -95,9 +95,15 @@ class BasePalette(GObject.GObject, ABC, metaclass=GObjectABCMeta):
         self.event_box.get_style_context().add_class(f"palette-{self.palette_id}")
         self.event_box.get_style_context().add_class("floating-palette")
         self.event_box.set_visible(True)  # Event box must be visible
-        # Allow EventBox to be resized freely to avoid GTK warnings
+        # Prevent GTK size allocation warnings during animations/drag
         self.event_box.set_can_focus(False)
         self.event_box.set_above_child(False)
+        # CRITICAL: Disable expand to prevent size negotiation conflicts
+        self.event_box.set_hexpand(False)
+        self.event_box.set_vexpand(False)
+        # Prevent shrinking below natural size
+        self.event_box.set_halign(Gtk.Align.START)
+        self.event_box.set_valign(Gtk.Align.START)
         
         # Create content box for widgets
         self.content_box = Gtk.Box(orientation=self._orientation, spacing=6)

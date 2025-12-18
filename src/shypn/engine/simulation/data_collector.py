@@ -17,12 +17,14 @@ class DataCollector:
     Thread-safe for single-threaded GTK event loop.
     """
     
-    def __init__(self, model, controller=None):
+    def __init__(self, model, controller=None, recording_interval: int = 1):
         """Initialize data collector.
         
         Args:
             model: DocumentModel instance with places and transitions
             controller: Optional SimulationController for accessing behavior cache
+            recording_interval: Record state every Nth call to record_state (1=every step, 10=every 10th step)
+                              Higher values reduce overhead for batch mode
         """
         self.model = model
         self.controller = controller  # For accessing behavior cache
@@ -31,10 +33,13 @@ class DataCollector:
         self.transition_data: Dict[str, List[int]] = {}  # Cumulative counts
         self.transition_rates: Dict[str, List[float]] = {}  # Instantaneous rates/propensities
         self.is_collecting: bool = False
+        self.recording_interval = recording_interval
+        self._record_counter = 0  # Track calls to record_state
         
     def start_collection(self):
         """Initialize data structures and start collecting."""
         self.time_points = []
+        self._record_counter = 0  # Reset counter
         
         # Initialize place data with empty lists
         self.place_data = {p.id: [] for p in self.model.places}
@@ -55,6 +60,11 @@ class DataCollector:
         """
         if not self.is_collecting:
             return
+        
+        # Check recording interval - only record every Nth call
+        self._record_counter += 1
+        if self._record_counter % self.recording_interval != 0:
+            return  # Skip this recording
             
         self.time_points.append(current_time)
         
@@ -87,20 +97,47 @@ class DataCollector:
             
             if behavior:
                 try:
-                    # Force re-evaluation with current tokens by calling the method
-                    # This ensures we get the rate based on current marking, not cached value
-                    if hasattr(behavior, '_evaluate_rate_at_enablement'):
-                        # This method evaluates the rate formula with current place tokens
-                        rate = behavior._evaluate_rate_at_enablement(current_time)
-                    elif hasattr(behavior, 'evaluate_rate'):
-                        # For continuous transitions - needs places dict
+                    # Evaluate rate based on transition type
+                    if hasattr(behavior, 'evaluate_rate'):
+                        # Continuous transitions use evaluate_rate()
                         places_dict = {p.id: p for p in self.model.places}
                         rate = behavior.evaluate_rate(places_dict, current_time)
-                    elif hasattr(transition, 'rate'):
-                        # Fallback: use static rate attribute (won't reflect token changes)
-                        rate = float(transition.rate) if transition.rate else 0.0
+                    elif hasattr(behavior, 'get_propensity'):
+                        # Stochastic transitions use get_propensity() which evaluates formula
+                        rate = behavior.get_propensity()
+                    elif hasattr(behavior, '_evaluate_rate_at_enablement'):
+                        # Timed transitions - evaluate rate formula with current tokens
+                        rate = behavior._evaluate_rate_at_enablement(current_time)
+                    else:
+                        # Fallback: try to evaluate rate as a number or formula
+                        if hasattr(transition, 'rate'):
+                            rate_value = transition.rate
+                            if isinstance(rate_value, (int, float)):
+                                rate = float(rate_value)
+                            elif isinstance(rate_value, str):
+                                # Try to evaluate formula with place tokens
+                                try:
+                                    # Build evaluation context with place tokens
+                                    eval_context = {p.id: p.tokens for p in self.model.places}
+                                    # Also add place names as variables
+                                    for p in self.model.places:
+                                        eval_context[p.name] = p.tokens
+                                    rate = float(eval(rate_value, {"__builtins__": {}}, eval_context))
+                                except Exception as eval_err:
+                                    rate = 0.0
+                            else:
+                                rate = 0.0
+                        else:
+                            rate = 0.0
                 except Exception as e:
-                    # If rate evaluation fails, use 0.0
+                    # If rate evaluation fails, log the error and use 0.0
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    if not hasattr(self, '_rate_eval_errors'):
+                        self._rate_eval_errors = set()
+                    if transition.id not in self._rate_eval_errors:
+                        logger.warning(f"Rate evaluation failed for transition {transition.id}: {e}")
+                        self._rate_eval_errors.add(transition.id)
                     rate = 0.0
             
             self.transition_rates[transition.id].append(rate)
@@ -178,7 +215,7 @@ class DataCollector:
         return self.time_points.copy(), self.place_data.get(place_id, []).copy()
         
     def get_transition_series(self, transition_id: str) -> Tuple[List[float], List[int]]:
-        """Get time-series for a specific transition.
+        """Get time-series for a specific transition (cumulative firing counts).
         
         Args:
             transition_id: Transition identifier
@@ -187,6 +224,20 @@ class DataCollector:
             Tuple of (time_points, firing_counts)
         """
         return self.time_points.copy(), self.transition_data.get(transition_id, []).copy()
+    
+    def get_transition_rate_series(self, transition_id: str) -> Tuple[List[float], List[float]]:
+        """Get instantaneous rate time-series for a specific transition.
+        
+        For transitions with rate functions, returns the evaluated rate values over time.
+        For constant-rate transitions, returns the static rate repeated at each time point.
+        
+        Args:
+            transition_id: Transition identifier
+            
+        Returns:
+            Tuple of (time_points, rate_values)
+        """
+        return self.time_points.copy(), self.transition_rates.get(transition_id, []).copy()
         
     def has_data(self) -> bool:
         """Check if any data has been collected.

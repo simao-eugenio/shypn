@@ -21,297 +21,196 @@
         <property name="orientation">vertical</property>
         <property name="spacing">0</property>
 
-        <!-- Main Grid Container -->
+        <!-- Main Box Container -->
         <child>
-          <object class="GtkGrid" id="settings_grid">
+          <object class="GtkBox" id="settings_box">
             <property name="visible">True</property>
-            <property name="row-spacing">16</property>
-            <property name="column-spacing">12</property>
+            <property name="orientation">vertical</property>
+            <property name="spacing">12</property>
             <property name="margin">20</property>
             <style>
-              <class name="settings-grid"/>
+              <class name="settings-box"/>
             </style>
 
-            <!-- Time Step Section -->
+            <!-- Simulation Parameters Expander -->
             <child>
-              <object class="GtkFrame" id="timestep_frame">
+              <object class="GtkExpander" id="simulation_params_expander">
                 <property name="visible">True</property>
-                <property name="label-xalign">0</property>
-                <property name="shadow-type">none</property>
-                <style>
-                  <class name="settings-section"/>
-                </style>
-                
-                <child type="label">
-                  <object class="GtkLabel" id="timestep_section_label">
-                    <property name="visible">True</property>
-                    <property name="label" translatable="yes">Time Step Configuration</property>
-                    <style>
-                      <class name="settings-section-title"/>
-                    </style>
-                  </object>
-                </child>
+                <property name="expanded">True</property>
+                <property name="label" translatable="yes">Simulation Parameters</property>
 
                 <child>
-                  <object class="GtkGrid" id="timestep_grid">
+                  <object class="GtkBox" id="sim_params_box">
                     <property name="visible">True</property>
-                    <property name="row-spacing">8</property>
-                    <property name="column-spacing">8</property>
-                    <property name="margin-start">12</property>
-                    <property name="margin-top">8</property>
-                    <property name="margin-bottom">8</property>
-                    
-                    <!-- Automatic Radio -->
+                    <property name="orientation">vertical</property>
+                    <property name="spacing">12</property>
+                    <property name="margin">12</property>
+
+                    <!-- Time Step -->
                     <child>
-                      <object class="GtkRadioButton" id="dt_auto_radio">
+                      <object class="GtkGrid" id="timestep_grid">
                         <property name="visible">True</property>
-                        <property name="label" translatable="yes">Automatic (Recommended)</property>
-                        <property name="active">True</property>
-                        <property name="tooltip-text">Time step automatically calculated as duration/1000</property>
-                        <style>
-                          <class name="settings-radio"/>
-                        </style>
+                        <property name="row-spacing">8</property>
+                        <property name="column-spacing">8</property>
+                        
+                        <child>
+                          <object class="GtkLabel">
+                            <property name="visible">True</property>
+                            <property name="label" translatable="yes">Time Step:</property>
+                            <property name="xalign">0</property>
+                            <property name="hexpand">False</property>
+                          </object>
+                          <packing>
+                            <property name="left-attach">0</property>
+                            <property name="top-attach">0</property>
+                          </packing>
+                        </child>
+
+                        <child>
+                          <object class="GtkRadioButton" id="dt_auto_radio">
+                            <property name="visible">True</property>
+                            <property name="label" translatable="yes">Automatic (Recommended)</property>
+                            <property name="active">True</property>
+                            <property name="tooltip-text">Time step automatically calculated as duration/1000</property>
+                          </object>
+                          <packing>
+                            <property name="left-attach">1</property>
+                            <property name="top-attach">0</property>
+                            <property name="width">2</property>
+                          </packing>
+                        </child>
+
+                        <child>
+                          <object class="GtkRadioButton" id="dt_manual_radio">
+                            <property name="visible">True</property>
+                            <property name="label" translatable="yes">Manual:</property>
+                            <property name="group">dt_auto_radio</property>
+                          </object>
+                          <packing>
+                            <property name="left-attach">1</property>
+                            <property name="top-attach">1</property>
+                          </packing>
+                        </child>
+
+                        <child>
+                          <object class="GtkEntry" id="dt_manual_entry">
+                            <property name="visible">True</property>
+                            <property name="text">0.1</property>
+                            <property name="width-chars">10</property>
+                            <property name="tooltip-text">Time step in seconds</property>
+                          </object>
+                          <packing>
+                            <property name="left-attach">2</property>
+                            <property name="top-attach">1</property>
+                          </packing>
+                        </child>
                       </object>
-                      <packing>
-                        <property name="left-attach">0</property>
-                        <property name="top-attach">0</property>
-                        <property name="width">2</property>
-                      </packing>
                     </child>
 
-                    <!-- Manual Radio -->
+                    <!-- Time Scale -->
                     <child>
-                      <object class="GtkRadioButton" id="dt_manual_radio">
+                      <object class="GtkGrid" id="timescale_grid">
                         <property name="visible">True</property>
-                        <property name="label" translatable="yes">Manual:</property>
-                        <property name="group">dt_auto_radio</property>
-                        <style>
-                          <class name="settings-radio"/>
-                        </style>
+                        <property name="column-spacing">8</property>
+
+                        <child>
+                          <object class="GtkLabel">
+                            <property name="visible">True</property>
+                            <property name="label" translatable="yes">Time Scale Factor:</property>
+                            <property name="xalign">0</property>
+                          </object>
+                          <packing>
+                            <property name="left-attach">0</property>
+                            <property name="top-attach">0</property>
+                          </packing>
+                        </child>
+
+                        <child>
+                          <object class="GtkEntry" id="time_scale_entry">
+                            <property name="visible">True</property>
+                            <property name="text">1.0</property>
+                            <property name="width-chars">10</property>
+                            <property name="tooltip-text">1.0 = real-time, 1000 = compressed</property>
+                          </object>
+                          <packing>
+                            <property name="left-attach">1</property>
+                            <property name="top-attach">0</property>
+                          </packing>
+                        </child>
+
+                        <child>
+                          <object class="GtkLabel">
+                            <property name="visible">True</property>
+                            <property name="label" translatable="yes">(1.0 = real-time)</property>
+                            <property name="xalign">0</property>
+                            <style>
+                              <class name="dim-label"/>
+                            </style>
+                          </object>
+                          <packing>
+                            <property name="left-attach">2</property>
+                            <property name="top-attach">0</property>
+                          </packing>
+                        </child>
                       </object>
-                      <packing>
-                        <property name="left-attach">0</property>
-                        <property name="top-attach">1</property>
-                      </packing>
                     </child>
 
-                    <!-- Manual Entry -->
+                    <!-- Conflict Resolution -->
                     <child>
-                      <object class="GtkEntry" id="dt_manual_entry">
+                      <object class="GtkGrid" id="conflict_grid">
                         <property name="visible">True</property>
-                        <property name="can-focus">True</property>
-                        <property name="editable">True</property>
-                        <property name="text">0.1</property>
-                        <property name="width-chars">10</property>
-                        <property name="tooltip-text">Time step in seconds</property>
-                        <style>
-                          <class name="settings-entry"/>
-                        </style>
+                        <property name="column-spacing">8</property>
+
+                        <child>
+                          <object class="GtkLabel">
+                            <property name="visible">True</property>
+                            <property name="label" translatable="yes">Conflict Policy:</property>
+                            <property name="xalign">0</property>
+                          </object>
+                          <packing>
+                            <property name="left-attach">0</property>
+                            <property name="top-attach">0</property>
+                          </packing>
+                        </child>
+
+                        <child>
+                          <object class="GtkComboBoxText" id="conflict_policy_combo">
+                            <property name="visible">True</property>
+                            <property name="active">0</property>
+                            <property name="tooltip-text">How to select when multiple transitions are enabled</property>
+                            <items>
+                              <item translatable="yes">Random</item>
+                              <item translatable="yes">Priority</item>
+                              <item translatable="yes">Round Robin</item>
+                            </items>
+                          </object>
+                          <packing>
+                            <property name="left-attach">1</property>
+                            <property name="top-attach">0</property>
+                          </packing>
+                        </child>
                       </object>
-                      <packing>
-                        <property name="left-attach">1</property>
-                        <property name="top-attach">1</property>
-                      </packing>
                     </child>
 
                   </object>
                 </child>
               </object>
-              <packing>
-                <property name="left-attach">0</property>
-                <property name="top-attach">0</property>
-              </packing>
             </child>
 
-            <!-- Time Scale Section -->
+            <!-- τ-Leaping Expander -->
             <child>
-              <object class="GtkFrame" id="timescale_frame">
+              <object class="GtkExpander" id="tau_leaping_expander">
                 <property name="visible">True</property>
-                <property name="label-xalign">0</property>
-                <property name="shadow-type">none</property>
-                <style>
-                  <class name="settings-section"/>
-                </style>
-
-                <child type="label">
-                  <object class="GtkLabel" id="timescale_section_label">
-                    <property name="visible">True</property>
-                    <property name="label" translatable="yes">Time Scale (Advanced)</property>
-                    <style>
-                      <class name="settings-section-title"/>
-                    </style>
-                  </object>
-                </child>
+                <property name="expanded">False</property>
+                <property name="label" translatable="yes">Stochastic Acceleration (τ-Leaping)</property>
 
                 <child>
-                  <object class="GtkGrid" id="timescale_grid">
+                  <object class="GtkBox" id="tau_leaping_box">
                     <property name="visible">True</property>
-                    <property name="column-spacing">8</property>
-                    <property name="margin-start">12</property>
-                    <property name="margin-top">8</property>
-                    <property name="margin-bottom">8</property>
+                    <property name="orientation">vertical</property>
+                    <property name="spacing">8</property>
+                    <property name="margin">12</property>
 
-                    <!-- Scale Label -->
-                    <child>
-                      <object class="GtkLabel" id="scale_label">
-                        <property name="visible">True</property>
-                        <property name="label" translatable="yes">Scale Factor:</property>
-                        <property name="xalign">0</property>
-                        <style>
-                          <class name="settings-label"/>
-                        </style>
-                      </object>
-                      <packing>
-                        <property name="left-attach">0</property>
-                        <property name="top-attach">0</property>
-                      </packing>
-                    </child>
-
-                    <!-- Scale Entry -->
-                    <child>
-                      <object class="GtkEntry" id="time_scale_entry">
-                        <property name="visible">True</property>
-                        <property name="text">1.0</property>
-                        <property name="width-chars">10</property>
-                        <property name="tooltip-text">1.0 = real-time, 1000 = compressed</property>
-                        <style>
-                          <class name="settings-entry"/>
-                        </style>
-                      </object>
-                      <packing>
-                        <property name="left-attach">1</property>
-                        <property name="top-attach">0</property>
-                      </packing>
-                    </child>
-
-                    <!-- Hint Label -->
-                    <child>
-                      <object class="GtkLabel" id="scale_hint_label">
-                        <property name="visible">True</property>
-                        <property name="label" translatable="yes">(1.0 = real-time)</property>
-                        <property name="xalign">0</property>
-                        <style>
-                          <class name="dim-label"/>
-                        </style>
-                      </object>
-                      <packing>
-                        <property name="left-attach">2</property>
-                        <property name="top-attach">0</property>
-                      </packing>
-                    </child>
-
-                  </object>
-                </child>
-              </object>
-              <packing>
-                <property name="left-attach">0</property>
-                <property name="top-attach">1</property>
-              </packing>
-            </child>
-
-            <!-- Conflict Resolution Section -->
-            <child>
-              <object class="GtkFrame" id="conflict_frame">
-                <property name="visible">True</property>
-                <property name="label-xalign">0</property>
-                <property name="shadow-type">none</property>
-                <style>
-                  <class name="settings-section"/>
-                </style>
-
-                <child type="label">
-                  <object class="GtkLabel" id="conflict_section_label">
-                    <property name="visible">True</property>
-                    <property name="label" translatable="yes">Conflict Resolution</property>
-                    <style>
-                      <class name="settings-section-title"/>
-                    </style>
-                  </object>
-                </child>
-
-                <child>
-                  <object class="GtkGrid" id="conflict_grid">
-                    <property name="visible">True</property>
-                    <property name="column-spacing">8</property>
-                    <property name="margin-start">12</property>
-                    <property name="margin-top">8</property>
-                    <property name="margin-bottom">8</property>
-
-                    <!-- Policy Label -->
-                    <child>
-                      <object class="GtkLabel" id="policy_label">
-                        <property name="visible">True</property>
-                        <property name="label" translatable="yes">Policy:</property>
-                        <property name="xalign">0</property>
-                        <style>
-                          <class name="settings-label"/>
-                        </style>
-                      </object>
-                      <packing>
-                        <property name="left-attach">0</property>
-                        <property name="top-attach">0</property>
-                      </packing>
-                    </child>
-
-                    <!-- Policy Combo -->
-                    <child>
-                      <object class="GtkComboBoxText" id="conflict_policy_combo">
-                        <property name="visible">True</property>
-                        <property name="active">0</property>
-                        <property name="tooltip-text">How to select when multiple transitions are enabled</property>
-                        <style>
-                          <class name="settings-combo"/>
-                        </style>
-                        <items>
-                          <item translatable="yes">Random</item>
-                          <item translatable="yes">Priority</item>
-                          <item translatable="yes">Round Robin</item>
-                        </items>
-                      </object>
-                      <packing>
-                        <property name="left-attach">1</property>
-                        <property name="top-attach">0</property>
-                      </packing>
-                    </child>
-
-                  </object>
-                </child>
-              </object>
-              <packing>
-                <property name="left-attach">0</property>
-                <property name="top-attach">2</property>
-              </packing>
-            </child>
-
-            <!-- τ-Leaping (Stochastic) Section -->
-            <child>
-              <object class="GtkFrame" id="tau_leaping_frame">
-                <property name="visible">True</property>
-                <property name="label-xalign">0</property>
-                <property name="shadow-type">none</property>
-                <style>
-                  <class name="settings-section"/>
-                </style>
-
-                <child type="label">
-                  <object class="GtkLabel" id="tau_leaping_section_label">
-                    <property name="visible">True</property>
-                    <property name="label" translatable="yes">Stochastic Acceleration (Enabled by Default)</property>
-                    <style>
-                      <class name="settings-section-title"/>
-                    </style>
-                  </object>
-                </child>
-
-                <child>
-                  <object class="GtkGrid" id="tau_leaping_grid">
-                    <property name="visible">True</property>
-                    <property name="row-spacing">8</property>
-                    <property name="column-spacing">8</property>
-                    <property name="margin-start">12</property>
-                    <property name="margin-top">8</property>
-                    <property name="margin-bottom">8</property>
-                    
                     <!-- Info label -->
                     <child>
                       <object class="GtkLabel" id="tau_info_label">
@@ -324,11 +223,6 @@
                           <class name="dim-label"/>
                         </style>
                       </object>
-                      <packing>
-                        <property name="left-attach">0</property>
-                        <property name="top-attach">0</property>
-                        <property name="width">3</property>
-                      </packing>
                     </child>
 
                     <!-- Enable τ-Leaping Checkbox -->
@@ -338,115 +232,98 @@
                         <property name="label" translatable="yes">Enable τ-Leaping</property>
                         <property name="active">True</property>
                         <property name="tooltip-text">Uncheck to use exact Gillespie SSA (slower, for verification only)</property>
-                        <style>
-                          <class name="settings-checkbox"/>
-                        </style>
                       </object>
-                      <packing>
-                        <property name="left-attach">0</property>
-                        <property name="top-attach">1</property>
-                        <property name="width">3</property>
-                      </packing>
                     </child>
 
-                    <!-- Epsilon Label -->
+                    <!-- Parameters Grid -->
                     <child>
-                      <object class="GtkLabel" id="tau_epsilon_label">
+                      <object class="GtkGrid" id="tau_params_grid">
                         <property name="visible">True</property>
-                        <property name="label" translatable="yes">Epsilon (ε):</property>
-                        <property name="xalign">0</property>
-                        <property name="tooltip-text">Leap condition tolerance (0.01-0.1)</property>
-                        <style>
-                          <class name="settings-label"/>
-                        </style>
-                      </object>
-                      <packing>
-                        <property name="left-attach">0</property>
-                        <property name="top-attach">2</property>
-                      </packing>
-                    </child>
+                        <property name="row-spacing">8</property>
+                        <property name="column-spacing">8</property>
 
-                    <!-- Epsilon Entry -->
-                    <child>
-                      <object class="GtkEntry" id="tau_epsilon_entry">
-                        <property name="visible">True</property>
-                        <property name="text">0.03</property>
-                        <property name="width-chars">8</property>
-                        <property name="tooltip-text">Controls accuracy (lower = more accurate but slower)</property>
-                        <style>
-                          <class name="settings-entry"/>
-                        </style>
-                      </object>
-                      <packing>
-                        <property name="left-attach">1</property>
-                        <property name="top-attach">2</property>
-                      </packing>
-                    </child>
+                        <!-- Epsilon -->
+                        <child>
+                          <object class="GtkLabel">
+                            <property name="visible">True</property>
+                            <property name="label" translatable="yes">Epsilon (ε):</property>
+                            <property name="xalign">0</property>
+                          </object>
+                          <packing>
+                            <property name="left-attach">0</property>
+                            <property name="top-attach">0</property>
+                          </packing>
+                        </child>
 
-                    <!-- Epsilon Hint -->
-                    <child>
-                      <object class="GtkLabel" id="tau_epsilon_hint">
-                        <property name="visible">True</property>
-                        <property name="label" translatable="yes">(default: 0.03)</property>
-                        <property name="xalign">0</property>
-                        <style>
-                          <class name="dim-label"/>
-                        </style>
-                      </object>
-                      <packing>
-                        <property name="left-attach">2</property>
-                        <property name="top-attach">2</property>
-                      </packing>
-                    </child>
+                        <child>
+                          <object class="GtkEntry" id="tau_epsilon_entry">
+                            <property name="visible">True</property>
+                            <property name="text">0.03</property>
+                            <property name="width-chars">8</property>
+                            <property name="tooltip-text">Controls accuracy (lower = more accurate but slower)</property>
+                          </object>
+                          <packing>
+                            <property name="left-attach">1</property>
+                            <property name="top-attach">0</property>
+                          </packing>
+                        </child>
 
-                    <!-- Critical Threshold Label -->
-                    <child>
-                      <object class="GtkLabel" id="critical_threshold_label">
-                        <property name="visible">True</property>
-                        <property name="label" translatable="yes">Critical Threshold:</property>
-                        <property name="xalign">0</property>
-                        <property name="tooltip-text">Low propensity threshold for exact handling</property>
-                        <style>
-                          <class name="settings-label"/>
-                        </style>
-                      </object>
-                      <packing>
-                        <property name="left-attach">0</property>
-                        <property name="top-attach">3</property>
-                      </packing>
-                    </child>
+                        <child>
+                          <object class="GtkLabel">
+                            <property name="visible">True</property>
+                            <property name="label" translatable="yes">(default: 0.03)</property>
+                            <property name="xalign">0</property>
+                            <style>
+                              <class name="dim-label"/>
+                            </style>
+                          </object>
+                          <packing>
+                            <property name="left-attach">2</property>
+                            <property name="top-attach">0</property>
+                          </packing>
+                        </child>
 
-                    <!-- Critical Threshold Entry -->
-                    <child>
-                      <object class="GtkEntry" id="critical_threshold_entry">
-                        <property name="visible">True</property>
-                        <property name="text">10</property>
-                        <property name="width-chars">8</property>
-                        <property name="tooltip-text">Transitions with propensity below this use exact SSA</property>
-                        <style>
-                          <class name="settings-entry"/>
-                        </style>
-                      </object>
-                      <packing>
-                        <property name="left-attach">1</property>
-                        <property name="top-attach">3</property>
-                      </packing>
-                    </child>
+                        <!-- Critical Threshold -->
+                        <child>
+                          <object class="GtkLabel">
+                            <property name="visible">True</property>
+                            <property name="label" translatable="yes">Critical Threshold:</property>
+                            <property name="xalign">0</property>
+                          </object>
+                          <packing>
+                            <property name="left-attach">0</property>
+                            <property name="top-attach">1</property>
+                          </packing>
+                        </child>
 
-                    <!-- Critical Threshold Hint -->
-                    <child>
-                      <object class="GtkLabel" id="critical_threshold_hint">
-                        <property name="visible">True</property>
-                        <property name="label" translatable="yes">(default: 10)</property>
-                        <property name="xalign">0</property>
-                        <style>
-                          <class name="dim-label"/>
-                        </style>
+                        <child>
+                          <object class="GtkEntry" id="critical_threshold_entry">
+                            <property name="visible">True</property>
+                            <property name="text">10</property>
+                            <property name="width-chars">8</property>
+                            <property name="tooltip-text">Transitions with propensity below this use exact SSA</property>
+                          </object>
+                          <packing>
+                            <property name="left-attach">1</property>
+                            <property name="top-attach">1</property>
+                          </packing>
+                        </child>
+
+                        <child>
+                          <object class="GtkLabel">
+                            <property name="visible">True</property>
+                            <property name="label" translatable="yes">(default: 10)</property>
+                            <property name="xalign">0</property>
+                            <style>
+                              <class name="dim-label"/>
+                            </style>
+                          </object>
+                          <packing>
+                            <property name="left-attach">2</property>
+                            <property name="top-attach">1</property>
+                          </packing>
+                        </child>
                       </object>
-                      <packing>
-                        <property name="left-attach">2</property>
-                        <property name="top-attach">3</property>
-                      </packing>
                     </child>
 
                     <!-- Enable Parallel Checkbox -->
@@ -456,24 +333,119 @@
                         <property name="label" translatable="yes">Enable Parallel Execution</property>
                         <property name="active">True</property>
                         <property name="tooltip-text">Uses weak independence for parallel sampling (enabled by default, 2-4× additional speedup)</property>
-                        <style>
-                          <class name="settings-checkbox"/>
-                        </style>
                       </object>
-                      <packing>
-                        <property name="left-attach">0</property>
-                        <property name="top-attach">4</property>
-                        <property name="width">3</property>
-                      </packing>
                     </child>
 
                   </object>
                 </child>
               </object>
-              <packing>
-                <property name="left-attach">0</property>
-                <property name="top-attach">3</property>
-              </packing>
+            </child>
+
+            <!-- Batch Mode Expander -->
+            <child>
+              <object class="GtkExpander" id="batch_mode_expander">
+                <property name="visible">True</property>
+                <property name="expanded">False</property>
+                <property name="label" translatable="yes">Batch Mode (Experiment Replication)</property>
+
+                <child>
+                  <object class="GtkBox" id="batch_mode_box">
+                    <property name="visible">True</property>
+                    <property name="orientation">vertical</property>
+                    <property name="spacing">8</property>
+                    <property name="margin">12</property>
+
+                    <!-- Enable Batch Mode Checkbox -->
+                    <child>
+                      <object class="GtkCheckButton" id="batch_mode_enabled_check">
+                        <property name="visible">True</property>
+                        <property name="label" translatable="yes">Enable Batch Mode</property>
+                        <property name="active">False</property>
+                        <property name="tooltip-text">Run multiple independent simulations with same initial conditions (for stochastic variability analysis)</property>
+                      </object>
+                    </child>
+
+                    <!-- Parameters Grid -->
+                    <child>
+                      <object class="GtkGrid" id="batch_params_grid">
+                        <property name="visible">True</property>
+                        <property name="row-spacing">8</property>
+                        <property name="column-spacing">8</property>
+
+                        <!-- Replicates -->
+                        <child>
+                          <object class="GtkLabel" id="batch_replicates_label">
+                            <property name="visible">True</property>
+                            <property name="label" translatable="yes">Number of Replicates:</property>
+                            <property name="xalign">0</property>
+                            <property name="sensitive">False</property>
+                          </object>
+                          <packing>
+                            <property name="left-attach">0</property>
+                            <property name="top-attach">0</property>
+                          </packing>
+                        </child>
+
+                        <child>
+                          <object class="GtkSpinButton" id="batch_replicates_spin">
+                            <property name="visible">True</property>
+                            <property name="adjustment">batch_replicates_adjustment</property>
+                            <property name="sensitive">False</property>
+                            <property name="tooltip-text">How many independent simulation runs to execute</property>
+                          </object>
+                          <packing>
+                            <property name="left-attach">1</property>
+                            <property name="top-attach">0</property>
+                          </packing>
+                        </child>
+
+                        <!-- Output Folder -->
+                        <child>
+                          <object class="GtkLabel" id="batch_output_label">
+                            <property name="visible">True</property>
+                            <property name="label" translatable="yes">Output Folder:</property>
+                            <property name="xalign">0</property>
+                            <property name="sensitive">False</property>
+                          </object>
+                          <packing>
+                            <property name="left-attach">0</property>
+                            <property name="top-attach">1</property>
+                          </packing>
+                        </child>
+
+                        <child>
+                          <object class="GtkFileChooserButton" id="batch_output_chooser">
+                            <property name="visible">True</property>
+                            <property name="action">select-folder</property>
+                            <property name="title" translatable="yes">Select Output Folder</property>
+                            <property name="sensitive">False</property>
+                            <property name="tooltip-text">Where to save batch results (CSV files and statistics)</property>
+                          </object>
+                          <packing>
+                            <property name="left-attach">1</property>
+                            <property name="top-attach">1</property>
+                          </packing>
+                        </child>
+                      </object>
+                    </child>
+
+                    <!-- Info label -->
+                    <child>
+                      <object class="GtkLabel">
+                        <property name="visible">True</property>
+                        <property name="label" translatable="yes">Tip: Right-click places/transitions to mark them for recording in batch mode</property>
+                        <property name="xalign">0</property>
+                        <property name="wrap">True</property>
+                        <property name="max-width-chars">50</property>
+                        <style>
+                          <class name="dim-label"/>
+                        </style>
+                      </object>
+                    </child>
+
+                  </object>
+                </child>
+              </object>
             </child>
 
           </object>
@@ -482,51 +454,41 @@
       </object>
     </child>
 
-    <!-- Dialog Action Buttons -->
-    <child internal-child="action_area">
-      <object class="GtkButtonBox" id="dialog_action_area">
+    <!-- Dialog Action Area -->
+    <action-widgets>
+      <action-widget response="-6">cancel_button</action-widget>
+      <action-widget response="-5">apply_button</action-widget>
+    </action-widgets>
+
+    <child type="action">
+      <object class="GtkButton" id="cancel_button">
+        <property name="label">gtk-cancel</property>
         <property name="visible">True</property>
-        <property name="layout-style">end</property>
-        <property name="spacing">6</property>
-        <style>
-          <class name="dialog-action-area"/>
-        </style>
-
-        <!-- Cancel Button -->
-        <child>
-          <object class="GtkButton" id="cancel_button">
-            <property name="visible">True</property>
-            <property name="label" translatable="yes">Cancel</property>
-            <property name="use-underline">True</property>
-            <style>
-              <class name="dialog-button"/>
-            </style>
-          </object>
-        </child>
-
-        <!-- OK Button -->
-        <child>
-          <object class="GtkButton" id="ok_button">
-            <property name="visible">True</property>
-            <property name="label" translatable="yes">OK</property>
-            <property name="use-underline">True</property>
-            <property name="can-default">True</property>
-            <style>
-              <class name="dialog-button"/>
-              <class name="suggested-action"/>
-            </style>
-          </object>
-        </child>
-
+        <property name="can_focus">True</property>
+        <property name="receives_default">True</property>
+        <property name="use_stock">True</property>
       </object>
     </child>
 
-    <!-- Dialog Responses -->
-    <action-widgets>
-      <action-widget response="-6">cancel_button</action-widget>
-      <action-widget response="-5">ok_button</action-widget>
-    </action-widgets>
+    <child type="action">
+      <object class="GtkButton" id="apply_button">
+        <property name="label">gtk-apply</property>
+        <property name="visible">True</property>
+        <property name="can_focus">True</property>
+        <property name="receives_default">True</property>
+        <property name="use_stock">True</property>
+      </object>
+    </child>
 
+  </object>
+
+  <!-- Adjustment for Batch Replicates -->
+  <object class="GtkAdjustment" id="batch_replicates_adjustment">
+    <property name="lower">1</property>
+    <property name="upper">10000</property>
+    <property name="value">100</property>
+    <property name="step-increment">1</property>
+    <property name="page-increment">10</property>
   </object>
 
 </interface>

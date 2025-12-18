@@ -1901,7 +1901,6 @@ class FileExplorerPanel:
         import os
         filename = os.path.basename(filepath)
         base_name = os.path.splitext(filename)[0]
-        
         # UNIFIED APPROACH: Always create new canvas via add_document()
         # This ensures IDENTICAL initialization to File→New:
         # - Fresh ModelCanvasManager

@@ -54,17 +54,19 @@ class KEGGImportPanel:
         current_pathway_doc: PathwayDocument for current import
     """
     
-    def __init__(self, builder: Gtk.Builder, model_canvas=None, project=None):
+    def __init__(self, builder: Gtk.Builder, model_canvas=None, project=None, parent_window=None):
         """Initialize the KEGG import panel controller.
         
         Args:
             builder: GTK Builder with loaded pathway_panel.ui
             model_canvas: Optional ModelCanvasManager for loading pathways
             project: Optional Project instance for metadata tracking
+            parent_window: Optional parent window for dialogs (WAYLAND FIX)
         """
         self.builder = builder
         self.model_canvas = model_canvas
         self.project = project
+        self.parent_window = parent_window  # WAYLAND FIX: Store parent for dialogs
         self.file_panel_loader = None  # Will be set by main app to enable file tree refresh
         
         # Initialize logger
@@ -117,9 +119,19 @@ class KEGGImportPanel:
     
     def _get_widgets(self):
         """Get references to UI widgets from builder."""
-        # Input widgets
+        # Mode selection widgets
+        self.kegg_database_radio = self.builder.get_object('kegg_database_radio')
+        self.kegg_local_radio = self.builder.get_object('kegg_local_radio')
+        
+        # Database mode widgets
+        self.kegg_database_box = self.builder.get_object('kegg_database_box')
         self.pathway_id_entry = self.builder.get_object('pathway_id_entry')
         self.organism_combo = self.builder.get_object('organism_combo')
+        
+        # Local file mode widgets
+        self.kegg_local_box = self.builder.get_object('kegg_local_box')
+        self.kegg_file_entry = self.builder.get_object('kegg_file_entry')
+        self.kegg_browse_button = self.builder.get_object('kegg_browse_button')
         
         # Options widgets
         self.filter_cofactors_check = self.builder.get_object('filter_cofactors_check')
@@ -139,18 +151,36 @@ class KEGGImportPanel:
         # Note: fetch_button removed in unified flow - only kegg_import_button exists
         self.fetch_button = None  # Legacy - no longer in UI
         self.import_button = self.builder.get_object('kegg_import_button')
+        
+        # Current mode state
+        self.current_filepath = None  # For local file mode
     
     def _connect_signals(self):
         """Connect widget signals to handlers."""
+        # Mode selection
+        if self.kegg_database_radio:
+            self.kegg_database_radio.connect('toggled', self._on_mode_changed)
+        
+        if self.kegg_local_radio:
+            self.kegg_local_radio.connect('toggled', self._on_mode_changed)
+        
+        # Database mode
         if self.fetch_button:
             self.fetch_button.connect('clicked', self._on_fetch_clicked)
         
-        if self.import_button:
-            self.import_button.connect('clicked', self._on_import_clicked)
-        
-        # Enable import button when pathway ID is entered
         if self.pathway_id_entry:
             self.pathway_id_entry.connect('changed', self._on_pathway_id_changed)
+        
+        # Local file mode
+        if self.kegg_browse_button:
+            self.kegg_browse_button.connect('clicked', self._on_browse_clicked)
+        
+        if self.kegg_file_entry:
+            self.kegg_file_entry.connect('changed', self._on_file_entry_changed)
+        
+        # Import button
+        if self.import_button:
+            self.import_button.connect('clicked', self._on_import_clicked)
     
     def set_model_canvas(self, model_canvas):
         """Set or update the model canvas for loading imported pathways.
@@ -166,6 +196,111 @@ class KEGGImportPanel:
         pathway_id = entry.get_text().strip()
         if self.fetch_button:
             self.fetch_button.set_sensitive(len(pathway_id) > 0)
+    
+    def _on_mode_changed(self, radio_button):
+        """Handle mode toggle between database and local file."""
+        if not radio_button.get_active():
+            return  # Only respond to activation, not deactivation
+        
+        # Determine which mode is active
+        is_database_mode = self.kegg_database_radio and self.kegg_database_radio.get_active()
+        
+        # Toggle visibility
+        if self.kegg_database_box:
+            self.kegg_database_box.set_visible(is_database_mode)
+        if self.kegg_local_box:
+            self.kegg_local_box.set_visible(not is_database_mode)
+        
+        self.logger.debug(f"KEGG mode changed: database={is_database_mode}")
+    
+    def _on_browse_clicked(self, button):
+        """Handle browse button click - open file chooser for KGML files."""
+        # Use parent window if available (Wayland fix)
+        parent = getattr(self, 'parent_window', None)
+        
+        dialog = Gtk.FileChooserDialog(
+            title="Select KEGG File",
+            transient_for=parent,
+            action=Gtk.FileChooserAction.OPEN,
+            buttons=(
+                Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+                Gtk.STOCK_OPEN, Gtk.ResponseType.OK
+            )
+        )
+        
+        # Add file filters
+        filter_kegg = Gtk.FileFilter()
+        filter_kegg.set_name("KEGG Files")
+        filter_kegg.add_pattern("*.kgml")
+        filter_kegg.add_pattern("*.xml")
+        dialog.add_filter(filter_kegg)
+        
+        filter_all = Gtk.FileFilter()
+        filter_all.set_name("All Files")
+        filter_all.add_pattern("*")
+        dialog.add_filter(filter_all)
+        
+        # Wayland-safe async approach
+        result_container = [None]
+        
+        def on_response(dlg, response_id):
+            if response_id == Gtk.ResponseType.OK:
+                result_container[0] = dlg.get_filename()
+            dlg.destroy()
+            Gtk.main_quit()
+        
+        dialog.connect('response', on_response)
+        dialog.show()
+        Gtk.main()
+        
+        filepath = result_container[0]
+        if filepath and self.kegg_file_entry:
+            self.kegg_file_entry.set_text(filepath)
+            self.current_filepath = filepath
+    
+    def _on_file_entry_changed(self, entry):
+        """Handle file entry changes - update current filepath."""
+        self.current_filepath = entry.get_text().strip()
+    
+    def _load_local_kegg_file(self, filepath):
+        """Load and parse a local KGML file.
+        
+        Args:
+            filepath: Path to KGML file
+        """
+        if not os.path.exists(filepath):
+            self._show_status(f"❌ File not found: {filepath}", error=True)
+            return
+        
+        try:
+            self._show_status(f"🔄 Loading KGML file: {os.path.basename(filepath)}")
+            
+            # Read file content
+            with open(filepath, 'r', encoding='utf-8') as f:
+                kgml_data = f.read()
+            
+            # Parse KGML
+            if not self.parser:
+                self._show_status("❌ KEGG parser not available", error=True)
+                return
+            
+            parsed_pathway = self.parser.parse(kgml_data)
+            
+            # Store data
+            self.current_kgml = kgml_data
+            self.current_pathway = parsed_pathway
+            self.current_pathway_id = os.path.splitext(os.path.basename(filepath))[0]
+            
+            # Update preview
+            self._update_preview()
+            
+            self._show_status(f"✅ Loaded {os.path.basename(filepath)}")
+            
+        except Exception as e:
+            self._show_status(f"❌ Failed to load file: {e}", error=True)
+            self.logger.error(f"Error loading KGML file {filepath}: {e}")
+            import traceback
+            traceback.print_exc()
     
     def _on_fetch_clicked(self, button):
         """Handle fetch button click - download pathway from KEGG."""
@@ -289,19 +424,36 @@ class KEGGImportPanel:
         NOTE: Does NOT auto-load to canvas. File must be explicitly opened.
         This is intentional design for user control and avoiding state issues.
         """
-        # Check if we already have a fetched pathway
+        # Check if we already have a loaded pathway
         if self.current_pathway and self.current_kgml:
-            # Pathway already fetched - go straight to conversion and save
+            # Pathway already loaded - go straight to conversion and save
             self._do_import_and_save()
         else:
-            # No pathway fetched yet - need to fetch first
-            pathway_id = self.pathway_id_entry.get_text().strip()
-            if not pathway_id:
-                self._show_status("Please enter a pathway ID", error=True)
-                return
+            # Determine mode
+            is_database_mode = self.kegg_database_radio and self.kegg_database_radio.get_active()
             
-            # Fetch and then import when complete
-            self._fetch_and_import(pathway_id)
+            if is_database_mode:
+                # Database mode - fetch from KEGG
+                pathway_id = self.pathway_id_entry.get_text().strip()
+                if not pathway_id:
+                    self._show_status("Please enter a pathway ID", error=True)
+                    return
+                
+                # Fetch and then import when complete
+                self._fetch_and_import(pathway_id)
+            else:
+                # Local file mode - load from file
+                filepath = self.current_filepath
+                if not filepath or not os.path.exists(filepath):
+                    self._show_status("Please select a valid KGML file", error=True)
+                    return
+                
+                # Load file and then import
+                self._load_local_kegg_file(filepath)
+                
+                # If load succeeded, proceed to import
+                if self.current_pathway and self.current_kgml:
+                    self._do_import_and_save()
     
     def _fetch_and_import(self, pathway_id):
         """Fetch pathway and then import it automatically."""

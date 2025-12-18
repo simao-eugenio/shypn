@@ -90,12 +90,6 @@ class SimulationDataCollector:
             details: Optional additional details about the firing
         """
         self.total_firings += 1
-        # Debug output disabled to reduce console spam
-        # if self.total_firings <= 5:
-        #     print(f"[OLD_DC] Transition fired: {transition.id} ({transition.name}) at time {time:.4f}")
-        #     print(f"[OLD_DC]   Total firings so far: {self.total_firings}")
-        #     if details:
-        #         print(f"[OLD_DC]   Details: {details}")
         
         data = self.transition_data[transition.id]
         data.append((time, 'fired', details))

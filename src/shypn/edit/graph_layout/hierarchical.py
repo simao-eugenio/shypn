@@ -73,11 +73,21 @@ class HierarchicalLayout(LayoutAlgorithm):
         if connected_graph.number_of_nodes() == 0:
             return {}
         
+        # Check if hierarchical layout is suitable for this graph structure
+        # Print warning if force-directed would be better (but still proceed)
+        if not self.is_suitable_for_hierarchical(connected_graph):
+            print("⚠️  WARNING: This model has many redundant reactions (>40%)")
+            print("   Hierarchical layout may create dense clusters")
+            print("   Consider using Force-Directed layout instead for better spread")
+        
         # Phase 1: Layer Assignment
         layers = self._assign_layers(connected_graph)
         
         # Group nodes by layer
         layer_groups = self._group_by_layer(layers)
+        
+        # Phase 1.5: Subdivide wide layers to prevent excessive horizontal spread
+        layer_groups = self._subdivide_wide_layers(layer_groups, max_per_layer=10)
         
         # Phase 2: Crossing Reduction (barycentric heuristic)
         layer_groups = self._reduce_crossings(connected_graph, layer_groups)
@@ -95,10 +105,15 @@ class HierarchicalLayout(LayoutAlgorithm):
         """
         Assign each node to a layer using longest path method.
         
+        Uses base class implementation which properly handles:
+        - Source nodes (no predecessors)
+        - Catalyst places (enzyme modifiers)
+        - Longest path for proper hierarchical ordering
+        
         Returns:
             Dictionary mapping node IDs to layer numbers (0, 1, 2, ...)
         """
-        # Use base class implementation
+        # Use base class implementation which has proven layer assignment logic
         return self.get_layer_assignment(graph)
     
     def _group_by_layer(self, layers: Dict[str, int]) -> List[List[str]]:
@@ -118,6 +133,95 @@ class HierarchicalLayout(LayoutAlgorithm):
             layer_groups[layer].append(node)
         
         return layer_groups
+    
+    def _subdivide_wide_layers(self, layer_groups: List[List[str]], max_per_layer: int = 10) -> List[List[str]]:
+        """
+        Subdivide layers that are too wide into multiple narrower layers.
+        
+        This prevents excessive horizontal spread in large models by splitting
+        layers with many nodes into multiple sub-layers.
+        
+        For very large layers (>30 nodes), use even smaller subdivisions (8 per layer).
+        
+        Args:
+            layer_groups: Original layers
+            max_per_layer: Maximum nodes per layer before subdivision (default 10)
+            
+        Returns:
+            New layer list with wide layers subdivided
+        """
+        new_layers = []
+        
+        for layer_idx, layer in enumerate(layer_groups):
+            if len(layer) <= max_per_layer:
+                # Layer is fine, keep as-is
+                new_layers.append(layer)
+            else:
+                # For very large layers (redundant reactions), use smaller subdivisions
+                if len(layer) > 30:
+                    subdivision_size = 8
+                elif len(layer) > 20:
+                    subdivision_size = 10
+                else:
+                    subdivision_size = max_per_layer
+                
+                # Split into multiple sub-layers
+                num_sublayers = (len(layer) + subdivision_size - 1) // subdivision_size
+                
+                for i in range(num_sublayers):
+                    start_idx = i * subdivision_size
+                    end_idx = min(start_idx + subdivision_size, len(layer))
+                    sublayer = layer[start_idx:end_idx]
+                    new_layers.append(sublayer)
+        
+        return new_layers
+    
+    def is_suitable_for_hierarchical(self, graph: nx.DiGraph) -> bool:
+        """
+        Check if this graph is suitable for hierarchical layout.
+        
+        Hierarchical layout works best for:
+        - Linear/branching pathways (glycolysis, signaling cascades)
+        - Low redundancy (few parallel reactions with same inputs/outputs)
+        
+        Returns False for:
+        - Dense clusters with many redundant reactions (better for force-directed)
+        - Highly cyclic graphs
+        
+        Args:
+            graph: NetworkX directed graph
+            
+        Returns:
+            bool: True if hierarchical is suitable, False if force-directed is better
+        """
+        if graph.number_of_nodes() == 0:
+            return True
+        
+        # Check for redundant transitions (many transitions with same inputs/outputs)
+        transitions = [n for n in graph.nodes() if graph.nodes[n].get('type') == 'transition']
+        
+        if len(transitions) < 10:
+            # Small model, hierarchical is fine
+            return True
+        
+        # Count transitions with same predecessor/successor patterns
+        signature_counts = {}
+        for t in transitions:
+            # Create signature from sorted predecessors and successors
+            preds = tuple(sorted(str(p) for p in graph.predecessors(t)))
+            succs = tuple(sorted(str(s) for s in graph.successors(t)))
+            signature = (preds, succs)
+            signature_counts[signature] = signature_counts.get(signature, 0) + 1
+        
+        # If many transitions share the same signature, it's redundant (bad for hierarchical)
+        redundant_count = sum(1 for count in signature_counts.values() if count > 1)
+        redundancy_ratio = redundant_count / len(transitions) if transitions else 0
+        
+        # If >40% of transitions are redundant, force-directed is better
+        if redundancy_ratio > 0.4:
+            return False
+        
+        return True
     
     def _reduce_crossings(
         self, 

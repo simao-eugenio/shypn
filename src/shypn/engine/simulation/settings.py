@@ -36,15 +36,15 @@ class SimulationSettings:
     DEFAULT_TIME_SCALE = 1.0
     DEFAULT_STEPS_TARGET = 10000  # Target number of steps for auto dt
     
-    # τ-Leaping defaults - ENABLED BY DEFAULT for performance
-    # Users should get fast simulation automatically, just like ODEs
-    DEFAULT_USE_TAU_LEAPING = True  # Use τ-leaping by default (10-100× faster)
-    DEFAULT_TAU_EPSILON = 0.03  # 3% leap condition tolerance
-    DEFAULT_CRITICAL_THRESHOLD = 10.0  # Propensity threshold for exact SSA
+    # τ-Leaping defaults - ALWAYS ENABLED (it's the stochastic engine, not an option)
+    # τ-leaping is 10-100× faster than exact SSA and enables continuous+stochastic concurrency
+    DEFAULT_TAU_EPSILON = 0.03  # 3% leap condition tolerance (controls accuracy)
+    DEFAULT_CRITICAL_THRESHOLD = 0.01  # Propensity threshold for critical reactions (lowered for biochemical models)
     DEFAULT_MAX_TAU = 0.01  # Maximum leap size (seconds) - conservative default to prevent huge time jumps
     DEFAULT_MIN_TAU = 1e-6  # Minimum leap size (seconds)
-    DEFAULT_USE_PARALLEL_STOCHASTIC = True  # Parallel by default (2-4× faster)
+    DEFAULT_USE_PARALLEL_STOCHASTIC = True  # Parallel sampling for weakly independent transitions (2-4× faster)
     # Note: max_workers is auto-determined from os.cpu_count(), not a user setting
+    # Note: use_tau_leaping removed - τ-leaping is always the stochastic simulation method
     
     # Precision tolerance for time comparisons (prevents floating-point errors)
     # Using 1e-9 (1 nanosecond) to safely handle accumulated rounding errors
@@ -59,13 +59,23 @@ class SimulationSettings:
         self._dt_manual = self.DEFAULT_DT_MANUAL
         self._time_scale = self.DEFAULT_TIME_SCALE
         
-        # τ-Leaping settings
-        self._use_tau_leaping = self.DEFAULT_USE_TAU_LEAPING
+        # τ-Leaping settings (τ-leaping is always used for stochastic simulation)
         self._tau_epsilon = self.DEFAULT_TAU_EPSILON
         self._critical_threshold = self.DEFAULT_CRITICAL_THRESHOLD
         self._max_tau = self.DEFAULT_MAX_TAU
         self._min_tau = self.DEFAULT_MIN_TAU
         self._use_parallel_stochastic = self.DEFAULT_USE_PARALLEL_STOCHASTIC
+        
+        # Batch mode settings (for experiment replication)
+        self._batch_mode_enabled = False
+        self._batch_replicates = 100
+        self._batch_output_folder = None
+        self._recorded_objects = set()  # Set of place/transition IDs to record
+        
+        # Initial condition randomness (biological variability)
+        self._ic_noise_enabled = False  # Enable random perturbations to initial conditions
+        self._ic_noise_percent = 20.0  # Percentage of noise (±20% = uniform in [0.8, 1.2] range)
+        self._ic_noise_places = set()  # Specific places to randomize (empty = all non-catalyst places)
     
     # ========== Properties with Validation ==========
     
@@ -167,13 +177,21 @@ class SimulationSettings:
     
     @property
     def use_tau_leaping(self) -> bool:
-        """Get whether τ-leaping is enabled."""
-        return self._use_tau_leaping
+        """DEPRECATED: τ-leaping is always enabled (it's the stochastic engine).
+        
+        This property exists for backward compatibility but always returns True.
+        To control parallelism, use use_parallel_stochastic instead.
+        """
+        return True  # Always enabled
     
     @use_tau_leaping.setter
     def use_tau_leaping(self, value: bool):
-        """Set τ-leaping mode."""
-        self._use_tau_leaping = bool(value)
+        """DEPRECATED: τ-leaping cannot be disabled (it's the stochastic engine).
+        
+        Setting this has no effect. τ-leaping is always used for stochastic simulation
+        because it's 10-100× faster than exact SSA and enables continuous+stochastic concurrency.
+        """
+        pass  # Ignored - τ-leaping is always enabled
     
     @property
     def tau_epsilon(self) -> float:
@@ -435,7 +453,7 @@ class SimulationSettings:
             'dt_manual': self._dt_manual,
             'time_scale': self._time_scale,
             # τ-Leaping settings
-            'use_tau_leaping': self._use_tau_leaping,
+            'use_tau_leaping': True,  # Always enabled (kept for compatibility)
             'tau_epsilon': self._tau_epsilon,
             'critical_threshold': self._critical_threshold,
             'max_tau': self._max_tau,
@@ -472,7 +490,7 @@ class SimulationSettings:
         
         # τ-Leaping settings (with defaults for backward compatibility)
         if 'use_tau_leaping' in data:
-            settings.use_tau_leaping = data['use_tau_leaping']
+            pass  # Ignored - τ-leaping is always enabled
         
         if 'tau_epsilon' in data:
             settings.tau_epsilon = data['tau_epsilon']
@@ -497,7 +515,7 @@ class SimulationSettings:
         """Get string representation for debugging."""
         duration_str = f"{self._duration} {self._time_units.full_name}" if self._duration else "None"
         dt_str = "auto" if self._dt_auto else f"manual ({self._dt_manual})"
-        tau_str = "τ-leaping" if self._use_tau_leaping else "exact SSA"
+        tau_str = "τ-leaping (always)"  # τ-leaping is always the stochastic engine
         parallel_str = "+parallel" if self._use_parallel_stochastic else ""
         
         return (f"SimulationSettings(duration={duration_str}, "
@@ -533,18 +551,15 @@ class SimulationSettings:
         # Time scale
         lines.append(f"Time scale: {self._time_scale}")
         
-        # Stochastic simulation mode
-        if self._use_tau_leaping:
-            lines.append(f"\nStochastic Mode: τ-Leaping (approximate)")
-            lines.append(f"  Epsilon (ε): {self._tau_epsilon}")
-            lines.append(f"  Critical threshold: {self._critical_threshold}")
-            lines.append(f"  Tau range: [{self._min_tau}, {self._max_tau}]")
-            if self._use_parallel_stochastic:
-                lines.append(f"  Parallel execution: Enabled (weak independence)")
-            else:
-                lines.append(f"  Parallel execution: Disabled")
+        # Stochastic simulation mode (τ-leaping is always used)
+        lines.append("\n✓ Stochastic Mode: τ-leaping (always enabled, 10-100× faster than exact SSA)")
+        lines.append(f"  Accuracy: ε={self._tau_epsilon:.4f} (leap condition tolerance)")
+        lines.append(f"  Critical threshold: {self._critical_threshold}")
+        lines.append(f"  Tau range: [{self._min_tau}, {self._max_tau}]")
+        if self._use_parallel_stochastic:
+            lines.append(f"  Parallel execution: Enabled (weak independence scheduling)")
         else:
-            lines.append(f"\nStochastic Mode: Exact SSA (Gillespie)")
+            lines.append(f"  Parallel execution: Disabled (sequential τ-leaping)")
         
         return "\n".join(lines)
 
@@ -658,3 +673,193 @@ class SimulationSettingsBuilder:
         """
         return self._settings
 
+# ==================== Batch Mode Extension ====================
+
+# Add batch mode properties to SimulationSettings
+def _add_batch_mode_properties():
+    """Add batch mode properties to SimulationSettings class.
+    
+    This function extends the SimulationSettings class with batch mode
+    functionality without modifying the core settings file structure.
+    """
+    
+    # Batch mode enabled property
+    @property
+    def batch_mode_enabled(self) -> bool:
+        """Get whether batch mode is enabled."""
+        return getattr(self, '_batch_mode_enabled', False)
+    
+    @batch_mode_enabled.setter
+    def batch_mode_enabled(self, value: bool):
+        """Set batch mode enabled state."""
+        self._batch_mode_enabled = bool(value)
+    
+    # Batch replicates property
+    @property
+    def batch_replicates(self) -> int:
+        """Get number of batch replicates."""
+        return getattr(self, '_batch_replicates', 100)
+    
+    @batch_replicates.setter
+    def batch_replicates(self, value: int):
+        """Set number of batch replicates with validation.
+        
+        Args:
+            value: Number of replicates (must be >= 1)
+        
+        Raises:
+            ValueError: If replicates < 1
+        """
+        if value < 1:
+            raise ValueError("Batch replicates must be at least 1")
+        self._batch_replicates = int(value)
+    
+    # Batch output folder property
+    @property
+    def batch_output_folder(self) -> Optional[str]:
+        """Get batch output folder path."""
+        return getattr(self, '_batch_output_folder', None)
+    
+    @batch_output_folder.setter
+    def batch_output_folder(self, value: Optional[str]):
+        """Set batch output folder path."""
+        self._batch_output_folder = value
+    
+    # Recorded objects property
+    @property
+    def recorded_objects(self) -> set:
+        """Get set of object IDs marked for recording."""
+        if not hasattr(self, '_recorded_objects'):
+            self._recorded_objects = set()
+        return self._recorded_objects
+    
+    # Batch mode methods
+    def add_recorded_object(self, object_id: str):
+        """Mark an object (place/transition) for recording.
+        
+        Args:
+            object_id: ID of place or transition to record
+        """
+        if not hasattr(self, '_recorded_objects'):
+            self._recorded_objects = set()
+        self._recorded_objects.add(object_id)
+    
+    def remove_recorded_object(self, object_id: str):
+        """Unmark an object from recording.
+        
+        Args:
+            object_id: ID of place or transition to stop recording
+        """
+        if hasattr(self, '_recorded_objects'):
+            self._recorded_objects.discard(object_id)
+    
+    def clear_recorded_objects(self):
+        """Clear all recorded objects."""
+        if hasattr(self, '_recorded_objects'):
+            self._recorded_objects.clear()
+    
+    def is_object_recorded(self, object_id: str) -> bool:
+        """Check if an object is marked for recording.
+        
+        Args:
+            object_id: ID of place or transition
+        
+        Returns:
+            bool: True if object is marked for recording
+        """
+        if not hasattr(self, '_recorded_objects'):
+            return False
+        return object_id in self._recorded_objects
+    
+    # Initial condition noise properties
+    @property
+    def ic_noise_enabled(self) -> bool:
+        """Get whether initial condition noise is enabled.
+        
+        When enabled, initial markings are perturbed by random noise
+        for each replicate in batch mode. This simulates biological
+        cell-to-cell variability in initial molecular concentrations.
+        """
+        return getattr(self, '_ic_noise_enabled', False)
+    
+    @ic_noise_enabled.setter
+    def ic_noise_enabled(self, value: bool):
+        """Set initial condition noise enabled state."""
+        self._ic_noise_enabled = bool(value)
+    
+    @property
+    def ic_noise_percent(self) -> float:
+        """Get initial condition noise percentage.
+        
+        Noise is applied as uniform distribution: value * uniform(1-p/100, 1+p/100)
+        Example: 20% means each IC is multiplied by uniform(0.8, 1.2)
+        """
+        return getattr(self, '_ic_noise_percent', 20.0)
+    
+    @ic_noise_percent.setter
+    def ic_noise_percent(self, value: float):
+        """Set noise percentage with validation.
+        
+        Args:
+            value: Noise percentage (0-100)
+        
+        Raises:
+            ValueError: If percentage is out of range
+        """
+        if not 0 <= value <= 100:
+            raise ValueError("Noise percentage must be between 0 and 100")
+        self._ic_noise_percent = float(value)
+    
+    @property
+    def ic_noise_places(self) -> set:
+        """Get set of place IDs to apply noise to.
+        
+        If empty, noise is applied to all non-catalyst places.
+        """
+        if not hasattr(self, '_ic_noise_places'):
+            self._ic_noise_places = set()
+        return self._ic_noise_places
+    
+    def add_ic_noise_place(self, place_id: str):
+        """Mark a place for initial condition randomization.
+        
+        Args:
+            place_id: ID of place to randomize
+        """
+        if not hasattr(self, '_ic_noise_places'):
+            self._ic_noise_places = set()
+        self._ic_noise_places.add(place_id)
+    
+    def remove_ic_noise_place(self, place_id: str):
+        """Remove a place from randomization.
+        
+        Args:
+            place_id: ID of place to stop randomizing
+        """
+        if hasattr(self, '_ic_noise_places'):
+            self._ic_noise_places.discard(place_id)
+    
+    def clear_ic_noise_places(self):
+        """Clear all places from randomization list."""
+        if hasattr(self, '_ic_noise_places'):
+            self._ic_noise_places.clear()
+    
+    # Add methods to SimulationSettings class
+    SimulationSettings.batch_mode_enabled = batch_mode_enabled
+    SimulationSettings.batch_replicates = batch_replicates
+    SimulationSettings.batch_output_folder = batch_output_folder
+    SimulationSettings.recorded_objects = recorded_objects
+    SimulationSettings.add_recorded_object = add_recorded_object
+    SimulationSettings.remove_recorded_object = remove_recorded_object
+    SimulationSettings.clear_recorded_objects = clear_recorded_objects
+    SimulationSettings.is_object_recorded = is_object_recorded
+    SimulationSettings.ic_noise_enabled = ic_noise_enabled
+    SimulationSettings.ic_noise_percent = ic_noise_percent
+    SimulationSettings.ic_noise_places = ic_noise_places
+    SimulationSettings.add_ic_noise_place = add_ic_noise_place
+    SimulationSettings.remove_ic_noise_place = remove_ic_noise_place
+    SimulationSettings.clear_ic_noise_places = clear_ic_noise_places
+
+
+# Initialize batch mode properties
+_add_batch_mode_properties()

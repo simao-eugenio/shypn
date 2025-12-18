@@ -229,6 +229,13 @@ class SimulateToolsPaletteLoader(GObject.GObject):
             self.critical_threshold_entry = settings_builder.get_object('critical_threshold_entry')
             self.parallel_stochastic_check = settings_builder.get_object('parallel_stochastic_check')
             
+            # Batch mode controls
+            self.batch_mode_enabled_check = settings_builder.get_object('batch_mode_enabled_check')
+            self.batch_replicates_label = settings_builder.get_object('batch_replicates_label')
+            self.batch_replicates_spin = settings_builder.get_object('batch_replicates_spin')
+            self.batch_output_label = settings_builder.get_object('batch_output_label')
+            self.batch_output_chooser = settings_builder.get_object('batch_output_chooser')
+            
             # Ensure manual entry is editable (critical fix)
             if self.dt_manual_entry:
                 self.dt_manual_entry.set_editable(True)
@@ -336,6 +343,68 @@ class SimulateToolsPaletteLoader(GObject.GObject):
             self.critical_threshold_entry.connect('activate', self._on_critical_threshold_activate)
         if self.parallel_stochastic_check:
             self.parallel_stochastic_check.connect('toggled', self._on_parallel_stochastic_toggled)
+        
+        # Wire batch mode controls
+        if self.batch_mode_enabled_check:
+            self.batch_mode_enabled_check.connect('toggled', self._on_batch_mode_toggled)
+        if self.batch_replicates_spin:
+            self.batch_replicates_spin.connect('value-changed', self._on_batch_replicates_changed)
+        if self.batch_output_chooser:
+            self.batch_output_chooser.connect('file-set', self._on_batch_output_changed)
+    
+    def _on_batch_mode_toggled(self, check_button):
+        """Handle batch mode enable/disable toggle with atomic persistence.
+        
+        Args:
+            check_button: GtkCheckButton that was toggled
+        """
+        is_enabled = check_button.get_active()
+        
+        # Enable/disable batch controls
+        if self.batch_replicates_label:
+            self.batch_replicates_label.set_sensitive(is_enabled)
+        if self.batch_replicates_spin:
+            self.batch_replicates_spin.set_sensitive(is_enabled)
+        if self.batch_output_label:
+            self.batch_output_label.set_sensitive(is_enabled)
+        if self.batch_output_chooser:
+            self.batch_output_chooser.set_sensitive(is_enabled)
+        
+        # Atomically save to model's simulation_settings
+        if self.simulation:
+            model = self.simulation.model
+            if hasattr(model, 'simulation_settings'):
+                model.simulation_settings.batch_mode_enabled = is_enabled
+                print(f"✓ Batch mode {'enabled' if is_enabled else 'disabled'}")
+    
+    def _on_batch_replicates_changed(self, spin_button):
+        """Handle batch replicates spinner change with atomic persistence.
+        
+        Args:
+            spin_button: GtkSpinButton that changed
+        """
+        value = int(spin_button.get_value())
+        
+        # Atomically save to model's simulation_settings
+        if self.simulation:
+            model = self.simulation.model
+            if hasattr(model, 'simulation_settings'):
+                model.simulation_settings.batch_replicates = value
+                print(f"✓ Batch replicates set to {value}")
+    
+    def _on_batch_output_changed(self, file_chooser):
+        """Handle batch output folder change with atomic persistence.
+        
+        Args:
+            file_chooser: GtkFileChooserButton that changed
+        """
+        folder = file_chooser.get_filename()
+        
+        # Atomically save to model's simulation_settings
+        if self.simulation and folder:
+            model = self.simulation.model
+            if hasattr(model, 'simulation_settings'):
+                model.simulation_settings.batch_output_folder = folder
     
     def _on_speed_changed(self, spin):
         """Handle playback speed spinner change (atomic).
@@ -354,10 +423,17 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         # Commit atomically
         if self.buffered_settings.commit():
             # Restart simulation if it was running
-            if self.simulation.is_running():
+            was_running = self.simulation.is_running()
+            if was_running:
                 self.simulation.stop()
                 time_step = self.simulation.get_effective_dt()
-                self.simulation.run(time_step=time_step)
+                started = self.simulation.run(time_step=time_step)
+                
+                # Update button states to reflect restarted simulation
+                if started and self.simulation.is_running():
+                    self._update_button_states(running=True)
+                else:
+                    self._update_button_states(running=False)
             
             self.emit('settings-changed')
         else:
@@ -673,6 +749,28 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         if self.parallel_stochastic_check:
             self.parallel_stochastic_check.set_active(settings.use_parallel_stochastic)
             self.parallel_stochastic_check.set_sensitive(settings.use_tau_leaping)
+        
+        # Update batch mode controls (sync from manager.simulation_settings)
+        model = self.simulation.model
+        if hasattr(model, 'simulation_settings'):
+            batch_settings = model.simulation_settings
+            
+            if self.batch_mode_enabled_check:
+                self.batch_mode_enabled_check.set_active(batch_settings.batch_mode_enabled)
+            
+            if self.batch_replicates_spin:
+                self.batch_replicates_spin.set_value(batch_settings.batch_replicates)
+                self.batch_replicates_spin.set_sensitive(batch_settings.batch_mode_enabled)
+            
+            if self.batch_output_chooser and batch_settings.batch_output_folder:
+                self.batch_output_chooser.set_filename(batch_settings.batch_output_folder)
+                self.batch_output_chooser.set_sensitive(batch_settings.batch_mode_enabled)
+            
+            if self.batch_replicates_label:
+                self.batch_replicates_label.set_sensitive(batch_settings.batch_mode_enabled)
+            
+            if self.batch_output_label:
+                self.batch_output_label.set_sensitive(batch_settings.batch_mode_enabled)
     
     def _hide_settings_panel(self):
         """Hide the settings panel with animation.
@@ -968,6 +1066,11 @@ class SimulateToolsPaletteLoader(GObject.GObject):
             self.stop_button.set_sensitive(True)
             self.reset_button.set_sensitive(False)
             self.settings_button.set_sensitive(False)
+            
+            # Debug: Verify button state was set
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"Button states updated: Stop enabled = {self.stop_button.get_sensitive()}")
         elif completed:
             # Completed: only Reset available
             self.run_button.set_sensitive(False)
@@ -998,11 +1101,42 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         # Hide settings panel if open
         self._hide_settings_panel()
         
-        # Use effective dt from settings (no hardcoded time_step)
-        self.simulation.run()
+        # Check if batch mode is enabled in document model
+        model = self.simulation.model
+        batch_enabled = False
+        recorded_objects = set()
+        n_replicates = 100
         
-        # Update button states for running simulation
-        self._update_button_states(running=True)
+        if hasattr(model, 'simulation_settings'):
+            settings = model.simulation_settings
+            batch_enabled = getattr(settings, 'batch_mode_enabled', False)
+            n_replicates = getattr(settings, 'batch_replicates', 100)
+            recorded_objects = getattr(settings, 'recorded_objects', set())
+            
+            # Debug output
+            print(f"🔍 Batch mode check: batch_enabled={batch_enabled}, n_replicates={n_replicates}, recorded_objects={len(recorded_objects)}")
+        else:
+            print(f"⚠️ No simulation_settings found on model")
+        
+        if batch_enabled:
+            print(f"🚀 Starting batch mode with {n_replicates} replicates")
+            # Batch mode - run N replicates
+            self._run_batch_mode(n_replicates, recorded_objects)
+        else:
+            # Normal mode - single simulation
+            started = self.simulation.run()
+            
+            # Update button states based on actual simulation state
+            if started and self.simulation.is_running():
+                self._update_button_states(running=True)
+                
+                # Force UI update to ensure button state is immediately visible
+                from gi.repository import Gtk
+                while Gtk.events_pending():
+                    Gtk.main_iteration()
+            else:
+                # Failed to start - keep buttons in idle state
+                self._update_button_states(running=False)
 
     def _on_step_clicked(self, button):
         """Handle Step button click - execute one simulation step."""
@@ -1054,6 +1188,299 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         # Update button states for reset simulation
         self._update_button_states(running=False, reset=True)
     
+    def _run_batch_mode(self, n_replicates: int, recorded_objects: set):
+        """Execute batch mode simulation with N replicates.
+        
+        Args:
+            n_replicates: Number of replicates to run
+            recorded_objects: Set of place/transition IDs to record
+        """
+        import threading
+        from gi.repository import GLib, Gtk
+        from shypn.engine.simulation.batch_runner import BatchSimulationRunner
+        from shypn.ui.dialogs.batch_progress_dialog import BatchProgressDialog
+        
+        # Apply recording color to recorded objects for visual feedback
+        # This provides visual indication of what's being recorded during batch execution
+        if hasattr(self.simulation, 'model') and recorded_objects:
+            model = self.simulation.model
+            
+            # Define recording indicator color (same as context menu)
+            RECORDING_COLOR = (1.0, 0.6, 0.0)  # RGB: orange
+            
+            from shypn.netobjs import Place, Transition
+            
+            # Apply color to recorded objects
+            for obj_id in recorded_objects:
+                # Find object by ID
+                obj = None
+                for place in model.places:
+                    if place.id == obj_id:
+                        obj = place
+                        break
+                if not obj:
+                    for trans in model.transitions:
+                        if trans.id == obj_id:
+                            obj = trans
+                            break
+                
+                # Apply recording color
+                if obj:
+                    if isinstance(obj, Place):
+                        obj.border_color = RECORDING_COLOR
+                    elif isinstance(obj, Transition):
+                        obj.border_color = RECORDING_COLOR
+                        obj.fill_color = RECORDING_COLOR
+                    
+                    # Trigger on_changed callback if available
+                    if hasattr(obj, 'on_changed') and obj.on_changed:
+                        obj.on_changed()
+        
+        # Get parent window for dialog
+        parent_window = None
+        widget = self.simulate_tools_container
+        while widget:
+            if isinstance(widget, Gtk.Window):
+                parent_window = widget
+                break
+            widget = widget.get_parent()
+        
+        # Create and show progress dialog
+        progress_dialog = BatchProgressDialog(parent_window, n_replicates)
+        
+        # Use present() instead of show() to properly handle parent hierarchy
+        # This ensures parent window is mapped before showing the dialog
+        if parent_window and parent_window.get_visible():
+            progress_dialog.present()
+        else:
+            progress_dialog.show()
+        
+        # Disable buttons during batch execution (but preserve object selection/recording marks)
+        self._update_button_states(running=True)
+        
+        # Force UI update to ensure button state is immediately visible
+        while Gtk.events_pending():
+            Gtk.main_iteration()
+        
+        # Keep recorded objects visually highlighted by NOT clearing selection
+        # The selection shows which objects are being recorded in batch mode
+        
+        # Create batch runner
+        batch_runner = BatchSimulationRunner()
+        
+        # Set up cancel callback
+        def on_cancel():
+            batch_runner.cancel()
+        
+        progress_dialog.set_cancel_callback(on_cancel)
+        
+        def run_batch_thread():
+            """Background thread for batch execution."""
+            import time
+            start_time = time.time()
+            
+            try:
+                # Progress callback to update dialog
+                def progress_callback(replicate_num, total, elapsed, eta_str):
+                    """Update progress dialog from background thread."""
+                    GLib.idle_add(
+                        progress_dialog.update_progress,
+                        replicate_num, total, elapsed, eta_str
+                    )
+                
+                # Check cancellation callback
+                def cancellation_check():
+                    return batch_runner.is_cancelled
+                
+                # Run batch
+                results = batch_runner.run_batch(
+                    controller=self.simulation,
+                    n_replicates=n_replicates,
+                    recorded_objects=recorded_objects,
+                    progress_callback=progress_callback,
+                    cancellation_check=cancellation_check
+                )
+                
+                # Calculate results
+                total_time = time.time() - start_time
+                successful = sum(1 for r in results if 'error' not in r)
+                
+                # Show completion in dialog
+                GLib.idle_add(progress_dialog.show_completion, successful, n_replicates, total_time)
+                
+                # Auto-save results
+                try:
+                    results_folder = self._save_batch_results(results, recorded_objects, n_replicates)
+                except Exception as save_error:
+                    print(f"⚠️ Failed to save results: {save_error}")
+                    import traceback
+                    traceback.print_exc()
+                
+                # Re-enable buttons on main thread
+                GLib.idle_add(self._update_button_states, False, True)
+                
+            except Exception as e:
+                print(f"❌ Batch execution error: {e}")
+                import traceback
+                traceback.print_exc()
+                
+                # Show error in dialog
+                GLib.idle_add(progress_dialog.show_error, str(e))
+                
+                # Re-enable buttons
+                GLib.idle_add(self._update_button_states, False, False)
+        
+        # Start batch execution in background thread
+        batch_thread = threading.Thread(target=run_batch_thread, daemon=True)
+        batch_thread.start()
+    
+    def _save_batch_results(self, results: list, recorded_objects: set, n_replicates: int) -> str:
+        """Save batch simulation results to CSV files and JSON metadata.
+        
+        Args:
+            results: List of result dictionaries from batch runner
+            recorded_objects: Set of recorded object IDs
+            n_replicates: Total number of replicates
+            
+        Returns:
+            str: Path to results folder, or None if save failed
+        """
+        import os
+        import json
+        import csv
+        from datetime import datetime
+        import numpy as np
+        
+        # Use user-specified batch output folder if set
+        model = self.simulation.model
+        project_folder = None
+        
+        if hasattr(model, 'simulation_settings') and model.simulation_settings:
+            settings = model.simulation_settings
+            if hasattr(settings, 'batch_output_folder') and settings.batch_output_folder:
+                # User chose a specific folder - use it
+                project_folder = settings.batch_output_folder
+        
+        # Fallback: determine from document path
+        if not project_folder:
+            if hasattr(model, 'filepath') and model.filepath:
+                # Document has been saved - use its directory
+                model_path = model.filepath
+                # Navigate up to find project root (assumes workspace/projects/{project}/models/model.shy)
+                path_parts = model_path.split(os.sep)
+                if 'projects' in path_parts:
+                    projects_idx = path_parts.index('projects')
+                    if projects_idx + 1 < len(path_parts):
+                        # Project name is after 'projects'
+                        project_folder = os.sep.join(path_parts[:projects_idx + 2])
+        
+        if not project_folder:
+            # Final fallback: use workspace/results/
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            repo_root = os.path.normpath(os.path.join(current_dir, '..', '..', '..'))
+            project_folder = os.path.join(repo_root, 'workspace')
+        
+        # Create results folder with timestamp
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        results_dir = os.path.join(project_folder, 'results', f'batch_{timestamp}')
+        os.makedirs(results_dir, exist_ok=True)
+        
+        # Save configuration
+        config = {
+            'timestamp': timestamp,
+            'n_replicates': n_replicates,
+            'recorded_objects': list(recorded_objects),
+            'settings': {
+                'duration': self.simulation.settings.duration,
+                'time_units': str(self.simulation.settings.time_units),
+                'dt_auto': self.simulation.settings.dt_auto,
+                'use_tau_leaping': self.simulation.settings.use_tau_leaping,
+                'tau_epsilon': self.simulation.settings.tau_epsilon
+            }
+        }
+        
+        with open(os.path.join(results_dir, 'config.json'), 'w') as f:
+            json.dump(config, f, indent=2)
+        
+        # Save individual replicate CSVs
+        csv_count = 0
+        for result in results:
+            if 'error' in result:
+                continue  # Skip failed replicates
+            
+            replicate_id = result['replicate_id']
+            time_points = result['time_points']
+            place_data = result.get('place_data', {})
+            transition_data = result.get('transition_data', {})
+            
+            # Write CSV with time and recorded objects
+            csv_path = os.path.join(results_dir, f'run_{replicate_id + 1:03d}.csv')
+            with open(csv_path, 'w', newline='') as f:
+                writer = csv.writer(f)
+                
+                # Header row
+                header = ['time'] + sorted(place_data.keys()) + sorted(transition_data.keys())
+                writer.writerow(header)
+                
+                # Data rows
+                for i, t in enumerate(time_points):
+                    row = [t]
+                    # Add place values
+                    for obj_id in sorted(place_data.keys()):
+                        row.append(place_data[obj_id][i] if i < len(place_data[obj_id]) else '')
+                    # Add transition values
+                    for obj_id in sorted(transition_data.keys()):
+                        row.append(transition_data[obj_id][i] if i < len(transition_data[obj_id]) else '')
+                    writer.writerow(row)
+            csv_count += 1
+        
+        # Calculate and save summary statistics
+        successful_results = [r for r in results if 'error' not in r]
+        if successful_results:
+            summary = {
+                'timestamp': timestamp,
+                'successful_replicates': len(successful_results),
+                'total_replicates': n_replicates,
+                'statistics': {}
+            }
+            
+            # Calculate stats for each recorded object
+            for obj_id in recorded_objects:
+                obj_trajectories = []
+                
+                # Collect trajectories from all replicates
+                for result in successful_results:
+                    if obj_id in result.get('place_data', {}):
+                        obj_trajectories.append(result['place_data'][obj_id])
+                    elif obj_id in result.get('transition_data', {}):
+                        obj_trajectories.append(result['transition_data'][obj_id])
+                
+                if obj_trajectories:
+                    # Filter out empty trajectories
+                    obj_trajectories = [traj for traj in obj_trajectories if len(traj) > 0]
+                    
+                    if obj_trajectories:  # Check again after filtering
+                        # Convert to numpy array (pad to same length if needed)
+                        max_len = max(len(traj) for traj in obj_trajectories)
+                        padded = np.array([
+                            traj + [traj[-1]] * (max_len - len(traj))
+                            for traj in obj_trajectories
+                        ])
+                        
+                        summary['statistics'][obj_id] = {
+                            'mean': np.mean(padded, axis=0).tolist(),
+                            'std': np.std(padded, axis=0).tolist(),
+                            'min': np.min(padded, axis=0).tolist(),
+                            'max': np.max(padded, axis=0).tolist(),
+                            'final_mean': float(np.mean(padded[:, -1])),
+                            'final_std': float(np.std(padded[:, -1]))
+                        }
+            
+            with open(os.path.join(results_dir, 'summary.json'), 'w') as f:
+                json.dump(summary, f, indent=2)
+        
+        return results_dir
+
     def _on_settings_clicked(self, button):
         """Handle Settings button click - request parameter panel toggle.
         
@@ -1096,9 +1523,28 @@ class SimulateToolsPaletteLoader(GObject.GObject):
             if not isinstance(parent, Gtk.Window):
                 parent = None
             
+            # Synchronize batch mode settings from manager to controller before showing dialog
+            model = self.simulation.model
+            if hasattr(model, 'simulation_settings'):
+                manager_settings = model.simulation_settings
+                # Copy batch settings to controller settings before dialog
+                self.simulation.settings.batch_mode_enabled = manager_settings.batch_mode_enabled
+                self.simulation.settings.batch_replicates = manager_settings.batch_replicates
+                self.simulation.settings.batch_output_folder = manager_settings.batch_output_folder
+                # Note: recorded_objects is stored only in manager_settings
+            
             # Show dialog and apply settings
             if show_simulation_settings_dialog(self.simulation.settings, parent):
                 # Settings updated successfully
+                
+                # Synchronize batch mode settings back to manager
+                if hasattr(model, 'simulation_settings'):
+                    manager_settings = model.simulation_settings
+                    manager_settings.batch_mode_enabled = self.simulation.settings.batch_mode_enabled
+                    manager_settings.batch_replicates = self.simulation.settings.batch_replicates
+                    manager_settings.batch_output_folder = self.simulation.settings.batch_output_folder
+                    # recorded_objects stays in manager_settings (managed via context menu)
+                
                 # Update duration display to reflect any changes
                 self._update_duration_display()
                 # Reset progress if duration changed

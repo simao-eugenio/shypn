@@ -119,6 +119,9 @@ class ColorPickerRow(Gtk.ScrolledWindow):
         event_box.set_size_request(self.button_size, self.button_size)
         event_box.set_hexpand(False)
         event_box.set_vexpand(False)
+        # Prevent size allocation warnings
+        event_box.set_halign(Gtk.Align.START)
+        event_box.set_valign(Gtk.Align.START)
         
         # Create drawing area for color display (full size, no padding)
         drawing_area = Gtk.DrawingArea()
