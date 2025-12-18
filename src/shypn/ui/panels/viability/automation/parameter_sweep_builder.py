@@ -623,8 +623,6 @@ class ParameterSweepBuilder(Gtk.Box):
             
             # === APPLY TO UI ===
             
-            print(f"[PREDICTION] Computed values: min={min_val}, max={max_val}, steps={steps}, replicates={replicates}, duration={duration}")
-            
             # Set to linear mode
             self.linear_radio.set_active(True)
             

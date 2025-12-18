@@ -19,6 +19,7 @@ import random
 import math
 import logging
 from .transition_behavior import TransitionBehavior
+from shypn.netobjs.inhibitor_arc import InhibitorArc
 
 
 class StochasticBehavior(TransitionBehavior):
@@ -73,19 +74,15 @@ class StochasticBehavior(TransitionBehavior):
         # Extract stochastic parameters
         props = getattr(transition, 'properties', {})
         
-        # Debug: Log properties dict
-        print(f"[STOCHASTIC_INIT] Transition {transition.id}: props type={type(props)}, props={props}")
-        
         # Check if has rate_function (SBML formulas)
         self.has_rate_function = 'rate_function' in props
         self.rate_function_expr = props.get('rate_function') if self.has_rate_function else None
         
-        # Debug: Log formula extraction
-        print(f"[STOCHASTIC_INIT] Transition {transition.id}: has_rate_function={self.has_rate_function}, rate_function_expr={self.rate_function_expr}")
-        
-        # Warn if stochastic transition has complex formula (likely should be continuous)
+        # Detect signal places for quorum sensing (13-tuple formalism: Ψ)
         if self.has_rate_function and self.rate_function_expr:
-            # Check for patterns indicating reversible reactions (forward - reverse)
+            self._detect_signal_places()
+            
+            # Warn if stochastic transition has complex formula (likely should be continuous)
             formula_lower = str(self.rate_function_expr).lower()
             if ' - ' in self.rate_function_expr or 'k_r' in formula_lower or 'kr_' in formula_lower:
                 self.logger.warning(
@@ -102,10 +99,25 @@ class StochasticBehavior(TransitionBehavior):
             # Fallback: Use transition.rate attribute (UI stores it here)
             rate = getattr(transition, 'rate', None)
             if rate is not None:
-                try:
-                    self.rate = float(rate) if isinstance(rate, (int, float)) else 1.0
-                except (ValueError, TypeError):
-                    self.rate = 1.0  # Safe default
+                if isinstance(rate, (int, float)):
+                    # Numeric rate - use directly
+                    self.rate = float(rate)
+                elif isinstance(rate, str):
+                    # String rate - check if it's a formula or simple number
+                    rate_str = rate.strip()
+                    try:
+                        # Try to convert to float (simple numeric string like "0.1")
+                        self.rate = float(rate_str)
+                        self.logger.debug(f"Transition '{transition.name}': parsed rate string '{rate_str}' as {self.rate}")
+                    except ValueError:
+                        # It's a formula (like "0.1 * (1 + 0.5 * CI_Dimer)")
+                        # Store it as rate_function for evaluation
+                        self.has_rate_function = True
+                        self.rate_function_expr = rate_str
+                        self.rate = 1.0  # Temporary placeholder (will be evaluated dynamically)
+                        self.logger.debug(f"Transition '{transition.name}': detected rate formula: {rate_str}")
+                else:
+                    self.rate = 1.0  # Safe default for unknown types
             else:
                 self.rate = 1.0  # Default rate
         
@@ -126,6 +138,51 @@ class StochasticBehavior(TransitionBehavior):
         self._enablement_time = None
         self._scheduled_fire_time = None
         self._sampled_burst = None
+    
+    def _detect_signal_places(self):
+        """Detect signal places (Ψ) for this transition's rate formula.
+        
+        Signal places are referenced in the rate function but have no
+        arc connection (input, output, or regulatory). They represent
+        environmental sensing or quorum sensing behavior.
+        
+        Mathematical Definition:
+            Ψ(t) = ReferencedPlaces(Φ(t)) \ (•t ∪ t• ∪ Σ(t))
+        
+        Updates:
+            self.transition.signal_places: List of place IDs
+            self.transition.is_environment_aware: Boolean flag
+        
+        Example:
+            Rate: "0.5 * AHL / (1.0 + AHL)"
+            If AHL has no arc to transition → AHL is a signal place
+        """
+        try:
+            from shypn.analysis.quorum_sensing import QuorumSensingDetector
+            
+            detector = QuorumSensingDetector(self.model)
+            signal_places = detector.detect_signal_places(
+                self.transition, 
+                self.rate_function_expr
+            )
+            
+            # Annotate transition with results
+            self.transition.signal_places = list(signal_places)
+            self.transition.is_environment_aware = len(signal_places) > 0
+            
+            if signal_places:
+                self.logger.info(
+                    f"Transition '{self.transition.name}' has {len(signal_places)} "
+                    f"signal place(s): {signal_places} (quorum sensing / environmental sensing)"
+                )
+        
+        except Exception as e:
+            # Don't fail initialization if signal detection fails
+            self.logger.warning(
+                f"Could not detect signal places for '{self.transition.name}': {e}"
+            )
+            self.transition.signal_places = []
+            self.transition.is_environment_aware = False
     
     def _evaluate_rate_at_enablement(self, time: float) -> float:
         """Evaluate rate (λ) at enablement time.
@@ -189,6 +246,17 @@ class StochasticBehavior(TransitionBehavior):
                 # Add tiny epsilon (1e-10) to avoid division by zero
                 # This doesn't affect simulation dynamics but prevents math errors
                 context[place_name] = max(tokens, 1e-10)
+            
+            # Debug: Log context for first few evaluations
+            if not hasattr(self, '_eval_debug_count'):
+                self._eval_debug_count = 0
+            if self._eval_debug_count < 3:
+                self.logger.debug(
+                    f"Rate eval for {self.transition.name}: formula={self.rate_function_expr}, "
+                    f"context keys={list(context.keys())[:5]}, "
+                    f"sample values={dict(list(context.items())[:3])}"
+                )
+                self._eval_debug_count += 1
             
             # Evaluate formula
             result = eval(self.rate_function_expr, {"__builtins__": {}}, context)
@@ -261,8 +329,13 @@ class StochasticBehavior(TransitionBehavior):
             places_to_iterate = self.model.places.values() if isinstance(self.model.places, dict) else self.model.places
             
             for place in places_to_iterate:
-                if hasattr(place, 'tokens') and hasattr(place, 'name'):
-                    places_dict[place.name] = place.tokens
+                if hasattr(place, 'tokens'):
+                    # Add by ID (P1, P2, etc.) - used in most rate formulas
+                    if hasattr(place, 'id'):
+                        places_dict[place.id] = place.tokens
+                    # Also add by name if it exists (for SBML models)
+                    if hasattr(place, 'name') and place.name:
+                        places_dict[place.name] = place.tokens
             
             return places_dict
         
@@ -271,17 +344,25 @@ class StochasticBehavior(TransitionBehavior):
         for arc in self.get_input_arcs():
             if hasattr(arc, 'source'):
                 place = arc.source
-                if hasattr(place, 'tokens') and hasattr(place, 'name'):
-                    place_id = place.name
-                    places_dict[place_id] = place.tokens
+                if hasattr(place, 'tokens'):
+                    # Add by ID (P1, P2, etc.)
+                    if hasattr(place, 'id'):
+                        places_dict[place.id] = place.tokens
+                    # Also add by name if it exists
+                    if hasattr(place, 'name') and place.name:
+                        places_dict[place.name] = place.tokens
         
         # Get all output places (for access to all network state)
         for arc in self.get_output_arcs():
             if hasattr(arc, 'target'):
                 place = arc.target
-                if hasattr(place, 'tokens') and hasattr(place, 'name'):
-                    place_id = place.name
-                    places_dict[place_id] = place.tokens
+                if hasattr(place, 'tokens'):
+                    # Add by ID (P1, P2, etc.)
+                    if hasattr(place, 'id'):
+                        places_dict[place.id] = place.tokens
+                    # Also add by name if it exists
+                    if hasattr(place, 'name') and place.name:
+                        places_dict[place.name] = place.tokens
         
         return places_dict
     
@@ -412,12 +493,25 @@ class StochasticBehavior(TransitionBehavior):
                 if source_place is None:
                     return False, f"missing-source-place-{arc.source_id}"
                 
-                # Test arcs only check presence (weight), not burst requirements
+                # INHIBITOR ARC: Transition is DISABLED when place has too many tokens
+                # This implements negative feedback / product inhibition
+                if isinstance(arc, InhibitorArc):
+                    # Inhibitor arcs use INVERTED logic: disable when tokens >= threshold
+                    threshold = getattr(arc, 'threshold', None)
+                    if threshold is None:
+                        threshold = arc.weight
+                    
+                    if source_place.tokens >= threshold:
+                        return False, f"inhibited-by-P{arc.source_id} (tokens={source_place.tokens:.1f} >= threshold={threshold})"
+                    # If tokens < threshold, inhibitor doesn't block (continue checking other arcs)
+                    continue
+                
+                # TEST ARC: Check presence only (weight), not burst requirements
                 # They don't consume tokens, so burst doesn't apply
                 if hasattr(arc, 'consumes_tokens') and not arc.consumes_tokens():
                     required = arc.weight  # Just check presence for catalysts
                 else:
-                    required = arc.weight * burst  # Normal/inhibitor need burst tokens
+                    required = arc.weight * burst  # Normal arcs need burst tokens
                 
                 if source_place.tokens < required:
                     return False, f"insufficient-tokens-for-burst-P{arc.source_id}"

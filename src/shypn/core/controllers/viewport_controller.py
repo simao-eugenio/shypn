@@ -35,7 +35,7 @@ class ViewportController:
     """
     
     # Zoom configuration
-    MIN_ZOOM = 0.3   # 30% minimum (practical engineering range)
+    MIN_ZOOM = 0.05  # 5% minimum (allows viewing very large models)
     MAX_ZOOM = 3.0   # 300% maximum (practical engineering range)
     ZOOM_STEP = 1.1  # Multiplicative zoom factor (10% per step)
     
@@ -170,8 +170,8 @@ class ViewportController:
         world_dx = dx / self.zoom
         world_dy = dy / self.zoom
         
-        # Apply inverse rotation if canvas is rotated
-        if rotation and rotation.angle_degrees != 0:
+        # Apply inverse rotation if canvas is rotated (with tolerance for floating point errors)
+        if rotation and abs(rotation.angle_degrees) > 0.001:
             import math
             cos_a = math.cos(-rotation.angle_radians)  # Inverse rotation
             sin_a = math.sin(-rotation.angle_radians)
@@ -226,6 +226,9 @@ class ViewportController:
         Grid always fills viewport regardless of pan/zoom by clamping
         the pan values to ensure the canvas extent covers the screen.
         
+        At very low zoom levels (<0.2), disable clamping to allow free panning
+        for viewing large models without instability.
+        
         Canvas extent: ±CANVAS_EXTENT in world space
         Viewport: viewport_width × viewport_height in screen space
         
@@ -233,6 +236,11 @@ class ViewportController:
         - Left edge: (-extent + pan) * zoom <= 0  →  pan <= extent
         - Right edge: (extent + pan) * zoom >= width  →  pan >= width/zoom - extent
         """
+        # At very low zoom levels, allow free panning (don't clamp)
+        # This prevents instability when viewing very large models
+        if self.zoom < 0.2:
+            return
+        
         extent_x = self.CANVAS_EXTENT
         extent_y = self.CANVAS_EXTENT
         

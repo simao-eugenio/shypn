@@ -61,7 +61,7 @@ class ModelCanvasManager:
     """Manages canvas properties, transformations, and rendering for Petri Net models."""
     
     # Zoom configuration
-    MIN_ZOOM = 0.3   # 30% minimum (practical engineering range)
+    MIN_ZOOM = 0.05  # 5% minimum (allows viewing very large models)
     MAX_ZOOM = 3.0   # 300% maximum (practical engineering range)
     ZOOM_STEP = 1.1  # Multiplicative zoom factor (10% per step)
     
@@ -127,6 +127,10 @@ class ModelCanvasManager:
         
         # Flag to track if document was imported (needs "Save As" on first save)
         self._is_imported = False
+        
+        # Simulation settings (for batch mode and recording configuration)
+        from shypn.engine.simulation.settings import SimulationSettings
+        self.simulation_settings = SimulationSettings()
         
         # ===== PER-DOCUMENT FILE STATE (Phase 1: Multi-Document Support) =====
         # Each manager now owns its filepath and dirty state
@@ -601,9 +605,10 @@ class ModelCanvasManager:
             arc._manager = self  # Set manager reference for parallel detection
             self._notify_observers('created', arc)
         
-        # SAFETY: Validate and remove corrupted arcs after loading
-        # Corrupted arcs can have invalid source/target references (e.g., pointing to other arcs)
-        # This prevents crashes in rendering and hit-testing
+        # SAFETY: Validate and remove corrupted arcs BEFORE auto-conversion
+        # Corrupted arcs can have invalid source/target references (e.g., None or pointing to other arcs)
+        # We must remove these BEFORE calling _auto_convert_parallel_arcs_to_curved
+        # which assumes valid source/target references
         validation = self.validate_arcs()
         if not validation['valid']:
             logger.warning(f"[ARC_VALIDATION] ⚠️ Detected {len(validation['corrupted_arcs'])} corrupted arc(s) after load")
@@ -611,9 +616,12 @@ class ModelCanvasManager:
                 logger.warning(f"[ARC_VALIDATION]   - {error}")
             removed = self.remove_corrupted_arcs()
             logger.info(f"[ARC_VALIDATION] ✅ Cleaned up {removed} corrupted arc(s)")
+            # Filter out removed arcs from the arcs list we'll process below
+            arcs = [arc for arc in arcs if arc in self.arcs]
         
         # Auto-convert loop arcs and parallel arcs to curved
         # This ensures loaded models have proper curved rendering for loops and parallels
+        # Only process arcs that passed validation
         for arc in arcs:
             self._auto_convert_parallel_arcs_to_curved(arc)
         
@@ -991,6 +999,16 @@ class ModelCanvasManager:
         from shypn.netobjs import CurvedArc, CurvedInhibitorArc, InhibitorArc
         from shypn.utils.arc_transform import make_curved
         import math
+        
+        # SAFETY: Skip arcs with invalid source/target references
+        if not hasattr(new_arc, 'source') or new_arc.source is None:
+            return
+        if not hasattr(new_arc, 'target') or new_arc.target is None:
+            return
+        if not hasattr(new_arc.source, 'x') or not hasattr(new_arc.source, 'y'):
+            return
+        if not hasattr(new_arc.target, 'x') or not hasattr(new_arc.target, 'y'):
+            return
         
         # Check if this is a loop arc (source == target)
         is_loop = (new_arc.source == new_arc.target)
@@ -1538,7 +1556,9 @@ class ModelCanvasManager:
         self._needs_redraw = True
     
     def get_content_bounds(self):
-        """Calculate the bounding box of all content (places and transitions).
+        """Calculate the bounding box of all content (places, transitions, and arcs).
+        
+        Includes arc control points and bezier curves to ensure entire model fits.
         
         Returns:
             tuple: (min_x, min_y, max_x, max_y) or None if no content.
@@ -1547,11 +1567,33 @@ class ModelCanvasManager:
         if not all_objects:
             return None
         
-        # Calculate bounds
+        # Start with place/transition bounds
         min_x = min(obj.x for obj in all_objects)
         max_x = max(obj.x for obj in all_objects)
         min_y = min(obj.y for obj in all_objects)
         max_y = max(obj.y for obj in all_objects)
+        
+        # Include arc control points (bezier curves can extend beyond nodes)
+        for arc in self.arcs:
+            # Include source and target points
+            if hasattr(arc.source, 'x') and hasattr(arc.source, 'y'):
+                min_x = min(min_x, arc.source.x)
+                max_x = max(max_x, arc.source.x)
+                min_y = min(min_y, arc.source.y)
+                max_y = max(max_y, arc.source.y)
+            if hasattr(arc.target, 'x') and hasattr(arc.target, 'y'):
+                min_x = min(min_x, arc.target.x)
+                max_x = max(max_x, arc.target.x)
+                min_y = min(min_y, arc.target.y)
+                max_y = max(max_y, arc.target.y)
+            
+            # Include control points if arc has bezier curves
+            if hasattr(arc, 'control_points') and arc.control_points:
+                for cp_x, cp_y in arc.control_points:
+                    min_x = min(min_x, cp_x)
+                    max_x = max(max_x, cp_x)
+                    min_y = min(min_y, cp_y)
+                    max_y = max(max_y, cp_y)
         
         return (min_x, min_y, max_x, max_y)
     
@@ -1661,30 +1703,21 @@ class ModelCanvasManager:
         content_center_x = (min_x + max_x) / 2.0
         content_center_y = (min_y + max_y) / 2.0
         
-        # Calculate viewport dimensions in world coordinates (after zoom)
-        viewport_width_world = self.viewport_controller.viewport_width / target_zoom
-        viewport_height_world = self.viewport_controller.viewport_height / target_zoom
+        # Use viewport controller's pan_to method for proper centering
+        # This handles the coordinate transformation correctly
+        self.viewport_controller.pan_to(content_center_x, content_center_y)
         
-        # Calculate offsets in world coordinates
-        # Transform formula: screen = (world + pan) * zoom
-        # Therefore: pan shifts world in screen space direction
-        #   +pan_x shifts content RIGHT on screen
-        #   +pan_y shifts content DOWN on screen
-        horizontal_offset_world = (horizontal_offset_percent / 100.0) * viewport_width_world
-        vertical_offset_world = (vertical_offset_percent / 100.0) * viewport_height_world
-        
-        # Calculate pan to center content in viewport
-        # Base pan positions viewport top-left corner to show content centered
-        # Formula: pan = content_center - viewport_half_size
-        # This makes: screen_center = (content_center - viewport_half + viewport_half) * zoom = content_center * zoom ✓
-        base_pan_x = content_center_x - (viewport_width_world / 2.0)
-        base_pan_y = content_center_y - (viewport_height_world / 2.0)
-        
-        # Apply offsets to shift content position on screen
-        # Positive horizontal_offset shifts content RIGHT (increase pan_x)
-        # Positive vertical_offset shifts content DOWN (increase pan_y)
-        self.viewport_controller.pan_x = base_pan_x + horizontal_offset_world
-        self.viewport_controller.pan_y = base_pan_y + vertical_offset_world
+        # Apply offsets if specified
+        if horizontal_offset_percent != 0 or vertical_offset_percent != 0:
+            # Calculate offsets in world coordinates
+            viewport_width_world = self.viewport_controller.viewport_width / target_zoom
+            viewport_height_world = self.viewport_controller.viewport_height / target_zoom
+            horizontal_offset_world = (horizontal_offset_percent / 100.0) * viewport_width_world
+            vertical_offset_world = (vertical_offset_percent / 100.0) * viewport_height_world
+            
+            # Apply offsets to pan
+            self.viewport_controller.pan_x += horizontal_offset_world
+            self.viewport_controller.pan_y += vertical_offset_world
         
         # Update local references
         self.pan_x = self.viewport_controller.pan_x

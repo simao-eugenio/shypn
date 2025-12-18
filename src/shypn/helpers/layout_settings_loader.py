@@ -25,7 +25,7 @@ class LayoutSettingsLoader(GObject.GObject):
     - node_spacing: Horizontal spacing between nodes (50-300px, default 100)
     
     Force-Directed Layout:
-    - iterations: Number of physics simulation steps (50-1000, default 500)
+    - iterations: Number of physics simulation steps (50-10000, default 500)
     - k_multiplier: Spacing control multiplier (0.5-3.0, default 1.5)
       * 0.5-1.0: Compact layout
       * 1.5: Balanced (default)
@@ -184,8 +184,8 @@ class LayoutSettingsLoader(GObject.GObject):
         """Handle iterations entry change - auto-emit signal."""
         try:
             value = int(entry.get_text())
-            # Clamp to valid range (50-1000)
-            value = max(50, min(1000, value))
+            # Clamp to valid range (50-10000)
+            value = max(50, min(10000, value))
             self.iterations = value
             self.emit('settings-changed')
         except ValueError:

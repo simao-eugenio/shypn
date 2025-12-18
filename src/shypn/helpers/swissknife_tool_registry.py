@@ -5,8 +5,9 @@ This module provides tool management for the SwissKnifePalette.
 Tools are simple button wrappers that emit activation signals.
 """
 
-from gi.repository import Gtk, GObject
+from gi.repository import Gtk, GObject, GdkPixbuf
 from typing import Dict, List, Optional
+import os
 
 
 class SwissKnifeTool(GObject.Object):
@@ -38,15 +39,68 @@ class SwissKnifeTool(GObject.Object):
         self.tooltip = tooltip
         self._active = False
         
+        # Icon mapping for edit tools
+        icon_files = {
+            'place': 'place.png',
+            'transition': 'transition.png',
+            'arc': 'arc.png',
+            'select': 'select.png',
+            'lasso': 'lasso.png'
+        }
+        
         # Create button
-        self._button = Gtk.Button(label=label)
+        self._button = Gtk.Button()
+        
+        # Load icon if available for this tool
+        if tool_id in icon_files:
+            icon_loaded = self._load_icon(icon_files[tool_id])
+            if not icon_loaded:
+                self._button.set_label(label)
+        else:
+            self._button.set_label(label)
+        
         # Tooltip disabled - only show tooltips on canvas network objects
         # self._button.set_tooltip_text(tooltip)
         self._button.set_size_request(40, 40)
+        self._button.get_style_context().add_class('tool-button')
         self._button.get_style_context().add_class('swissknife-tool')
+        
+        # Add settings-button class for settings tools to make them distinct
+        if 'settings' in tool_id:
+            self._button.get_style_context().add_class('settings-button')
         
         # Connect click handler
         self._button.connect('clicked', self._on_clicked)
+    
+    def _load_icon(self, icon_filename: str) -> bool:
+        """Load icon from icons directory.
+        
+        Args:
+            icon_filename: Icon filename (e.g., 'place.png')
+            
+        Returns:
+            bool: True if icon loaded successfully, False otherwise
+        """
+        try:
+            # Get path to icons directory: from helpers/ up to shypn/, then to icons/
+            # __file__ is in src/shypn/helpers/
+            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # Go up to src/shypn/
+            icon_path = os.path.join(base_dir, 'icons', icon_filename)
+            
+            if os.path.exists(icon_path):
+                # Load 24x24 icon (no scaling needed)
+                pixbuf = GdkPixbuf.Pixbuf.new_from_file(icon_path)
+                image = Gtk.Image.new_from_pixbuf(pixbuf)
+                image.show()
+                
+                # Add image as child instead of using set_image
+                self._button.add(image)
+                return True
+            else:
+                return False
+        except Exception as e:
+            print(f"Warning: Could not load icon {icon_filename}: {e}")
+            return False
     
     def _on_clicked(self, button):
         """Handle button click - emit activated signal."""

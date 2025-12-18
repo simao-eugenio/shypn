@@ -90,6 +90,11 @@ class CategoryFrame(Gtk.Frame):
         # Title bar container (clickable)
         self._title_event_box = Gtk.EventBox()
         self._title_event_box.connect('button-press-event', self._on_title_clicked)
+        # Prevent size allocation warnings
+        self._title_event_box.set_hexpand(False)
+        self._title_event_box.set_vexpand(False)
+        self._title_event_box.set_halign(Gtk.Align.FILL)
+        self._title_event_box.set_valign(Gtk.Align.START)
         
         title_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
         title_box.set_margin_top(5)

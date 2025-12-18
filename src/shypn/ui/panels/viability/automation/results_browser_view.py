@@ -274,6 +274,11 @@ class ResultsBrowserView(Gtk.Box):
             
             # Display statistics
             self._display_statistics(name, result)
+            
+            # Auto-refresh plot if currently viewing plot tab
+            if self.notebook.get_current_page() == 1:
+                # User is on plot view - update plot automatically
+                self._plot_trajectories(name, result)
         else:
             # Disable action buttons
             self.export_csv_button.set_sensitive(False)
@@ -282,6 +287,11 @@ class ResultsBrowserView(Gtk.Box):
             self.report_button.set_sensitive(False)
             
             self.stats_label.set_markup("<i>Select an experiment to view statistics</i>")
+            
+            # Clear plot if on plot view
+            if self.notebook.get_current_page() == 1 and self.figure:
+                self.figure.clear()
+                self.canvas.draw()
     
     def _display_statistics(self, name, result):
         """Display statistics for selected result.
@@ -556,7 +566,7 @@ class ResultsBrowserView(Gtk.Box):
         # Clear previous plot
         self.figure.clear()
         
-        # Create axes with two y-axes (left: tokens, right: firing rate)
+        # Create axes with two y-axes (left: firing rate, right: tokens)
         ax1 = self.figure.add_subplot(111)
         
         # Title with sweep info
@@ -569,74 +579,10 @@ class ResultsBrowserView(Gtk.Box):
                 title_text += f"\nSwept Place: {swept_param['name']} = {swept_param['value']:.4g}"
         self.figure.suptitle(title_text, fontsize=14, fontweight='bold')
         
-        # Left y-axis: Plot places (tokens)
+        # Left y-axis: Plot transitions (firing rates) - INVERTED
         ax1.set_xlabel('Time', fontsize=12)
-        ax1.set_ylabel('Tokens (Places)', fontsize=12, color='blue')
-        ax1.tick_params(axis='y', labelcolor='blue')
-        
-        # Plot each place (only those with statistics)
-        colors_places = ['#1f77b4', '#2ca02c', '#ff7f0e', '#9467bd', '#8c564b']
-        plotted_places = []
-        missing_places = []
-        
-        for idx, place_id in enumerate(place_ids):
-            if place_id not in species_stats:
-                missing_places.append(place_id)
-                continue
-            
-            place_data = species_stats[place_id]
-            mean = np.array(place_data.get('mean', []))
-            std = np.array(place_data.get('std', []))
-            
-            if len(mean) == 0:
-                continue
-            
-            plotted_places.append(place_id)
-            color = colors_places[idx % len(colors_places)]
-            place_name = self._resolve_species_name(place_id)
-            
-            # Smooth the curves for better visualization
-            from scipy.interpolate import make_interp_spline
-            
-            # Use more aggressive smoothing for cleaner curves
-            if len(time_points_arr) > 50:  # Lower threshold
-                # Create smooth curve using spline interpolation
-                try:
-                    # Use more points for very smooth curves
-                    indices = np.linspace(0, len(time_points_arr)-1, min(500, len(time_points_arr)), dtype=int)
-                    time_smooth = time_points_arr[indices]
-                    mean_smooth = mean[indices]
-                    
-                    # Create spline with k=3 (cubic)
-                    spl = make_interp_spline(time_smooth, mean_smooth, k=min(3, len(time_smooth)-1))
-                    
-                    # Generate extra smooth points
-                    time_fine = np.linspace(time_points_arr[0], time_points_arr[-1], 1000)
-                    mean_fine = spl(time_fine)
-                    
-                    # Plot smooth mean line
-                    line = ax1.plot(time_fine, mean_fine, color=color, 
-                                  linewidth=2, label=place_name, alpha=0.8)
-                except Exception as e:
-                    # Fallback to straight lines if smoothing fails
-                    line = ax1.plot(time_points_arr, mean, color=color, 
-                                  linewidth=2, label=place_name, alpha=0.8)
-            else:
-                # Too few points, use raw data
-                line = ax1.plot(time_points_arr, mean, color=color, 
-                              linewidth=2, label=place_name, alpha=0.8)
-            
-            # Plot confidence interval (use original data, not smoothed)
-            ax1.fill_between(time_points_arr, 
-                           mean - 2*std, 
-                           mean + 2*std, 
-                           alpha=0.2, 
-                           color=color)
-        
-        # Right y-axis: Plot transitions (firing rates)
-        ax2 = ax1.twinx()
-        ax2.set_ylabel('Firing Rate (firings/time)', fontsize=12, color='red')
-        ax2.tick_params(axis='y', labelcolor='red')
+        ax1.set_ylabel('Firing Rate (Transitions)', fontsize=12, color='red')
+        ax1.tick_params(axis='y', labelcolor='red')
         
         # Plot each transition (if any)
         plotted_transitions = []
@@ -680,21 +626,85 @@ class ResultsBrowserView(Gtk.Box):
                     mean_fine = spl(time_fine)
                     
                     # Plot smooth transition
-                    ax2.plot(time_fine, mean_fine, color=color, 
+                    ax1.plot(time_fine, mean_fine, color=color, 
                             linewidth=linewidth, label=label, alpha=0.8)
                 except Exception as e:
-                    ax2.plot(time_points_arr, mean, color=color, 
+                    ax1.plot(time_points_arr, mean, color=color, 
                             linewidth=linewidth, label=label, alpha=0.8, linestyle='-', marker='')
             else:
                 # Too few points, use raw data
-                ax2.plot(time_points_arr, mean, color=color, 
+                ax1.plot(time_points_arr, mean, color=color, 
                         linewidth=linewidth, label=label, alpha=0.8, linestyle='-', marker='')
             
             # Plot confidence interval
-            ax2.fill_between(time_points_arr, 
+            ax1.fill_between(time_points_arr, 
                            mean - 2*std, 
                            mean + 2*std, 
                            alpha=0.3, 
+                           color=color)
+        
+        # Right y-axis: Plot places (tokens) - INVERTED
+        ax2 = ax1.twinx()
+        ax2.set_ylabel('Tokens (Places)', fontsize=12, color='blue')
+        ax2.tick_params(axis='y', labelcolor='blue')
+        
+        # Plot each place (only those with statistics)
+        colors_places = ['#1f77b4', '#2ca02c', '#ff7f0e', '#9467bd', '#8c564b']
+        plotted_places = []
+        missing_places = []
+        
+        for idx, place_id in enumerate(place_ids):
+            if place_id not in species_stats:
+                missing_places.append(place_id)
+                continue
+            
+            place_data = species_stats[place_id]
+            mean = np.array(place_data.get('mean', []))
+            std = np.array(place_data.get('std', []))
+            
+            if len(mean) == 0:
+                continue
+            
+            plotted_places.append(place_id)
+            color = colors_places[idx % len(colors_places)]
+            place_name = self._resolve_species_name(place_id)
+            
+            # Smooth the curves for better visualization
+            from scipy.interpolate import make_interp_spline
+            
+            # Use more aggressive smoothing for cleaner curves
+            if len(time_points_arr) > 50:  # Lower threshold
+                # Create smooth curve using spline interpolation
+                try:
+                    # Use more points for very smooth curves
+                    indices = np.linspace(0, len(time_points_arr)-1, min(500, len(time_points_arr)), dtype=int)
+                    time_smooth = time_points_arr[indices]
+                    mean_smooth = mean[indices]
+                    
+                    # Create spline with k=3 (cubic)
+                    spl = make_interp_spline(time_smooth, mean_smooth, k=min(3, len(time_smooth)-1))
+                    
+                    # Generate extra smooth points
+                    time_fine = np.linspace(time_points_arr[0], time_points_arr[-1], 1000)
+                    mean_fine = spl(time_fine)
+                    
+                    # Plot smooth mean line
+                    line = ax2.plot(time_fine, mean_fine, color=color, 
+                                  linewidth=2, label=place_name, alpha=0.8)
+                except Exception as e:
+                    # Fallback to straight lines if smoothing fails
+                    line = ax2.plot(time_points_arr, mean, color=color, 
+                                  linewidth=2, label=place_name, alpha=0.8)
+            else:
+                # Too few points, use raw data
+                line = ax2.plot(time_points_arr, mean, color=color, 
+                              linewidth=2, label=place_name, alpha=0.8)
+            
+            # Plot confidence interval (use original data, not smoothed)
+            ax2.fill_between(time_points_arr, 
+                           mean - 2*std, 
+                           mean + 2*std, 
+                           alpha=0.2, 
                            color=color)
         
         # Add legends

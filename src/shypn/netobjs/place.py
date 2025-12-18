@@ -48,14 +48,20 @@ class Place(PetriNetObject):
         self.tokens = 0  # Number of tokens in this place
         self.initial_marking = 0  # Initial marking for simulation reset
         self.capacity = float('inf')  # Maximum token capacity (infinite by default)
+        
+        # Signal place marker (13-tuple Bio-PN formalism: Ψ)
+        # True if this place is referenced in rate formulas but has no arc connections
+        # (quorum sensing, environment sensing, paracrine signaling)
+        self.is_signal_place = False
     
     def render(self, cr, zoom=1.0):
-        """Render the place as a hollow circle with optional tokens.
+        """Render the place as a hollow circle (or hexagon for signal places).
         
         Uses legacy rendering style with Cairo transform approach:
-        - Hollow circle (stroke only, no fill) like classic Petri nets
+        - Hollow shape (stroke only, no fill) like classic Petri nets
+        - Circle for regular places, hexagon for signal places (Ψ)
         - 3.0px line width (compensated for zoom to maintain constant pixel size)
-        - Black border by default
+        - Black border by default (blue for signal places)
         - Draws in world coordinates (Cairo transform handles scaling)
         
         Args:
@@ -65,18 +71,29 @@ class Place(PetriNetObject):
         # Use world coordinates directly (Cairo transform handles conversion)
         # Legacy approach: cr.scale() is already applied, so we draw in world space
         
+        # Signal places use blue color to distinguish them
+        display_color = (0.0, 0.4, 0.8) if self.is_signal_place else self.border_color
+        
         # Add glow effect for colored objects (CSS-like styling)
-        if self.border_color != self.DEFAULT_BORDER_COLOR:
-            # Draw outer glow (subtle shadow effect)
-            cr.arc(self.x, self.y, self.radius + 2 / zoom, 0, 2 * math.pi)
-            r, g, b = self.border_color
+        if display_color != self.DEFAULT_BORDER_COLOR:
+            if self.is_signal_place:
+                self._draw_hexagon_path(cr, self.x, self.y, self.radius + 2 / zoom)
+            else:
+                cr.arc(self.x, self.y, self.radius + 2 / zoom, 0, 2 * math.pi)
+            r, g, b = display_color
             cr.set_source_rgba(r, g, b, 0.3)  # Semi-transparent color
             cr.set_line_width((self.border_width + 2) / max(zoom, 1e-6))
             cr.stroke()
         
-        # Draw hollow circle (legacy style: stroke only, no fill)
-        cr.arc(self.x, self.y, self.radius, 0, 2 * math.pi)
-        cr.set_source_rgb(*self.border_color)
+        # Draw shape based on type
+        if self.is_signal_place:
+            # Draw hexagon for signal places (environment sensing)
+            self._draw_hexagon_path(cr, self.x, self.y, self.radius)
+        else:
+            # Draw hollow circle (legacy style: stroke only, no fill)
+            cr.arc(self.x, self.y, self.radius, 0, 2 * math.pi)
+        
+        cr.set_source_rgb(*display_color)
         cr.set_line_width(self.border_width / max(zoom, 1e-6))  # Compensate for zoom
         cr.stroke()
         
@@ -145,19 +162,53 @@ class Place(PetriNetObject):
         # Clear path to prevent spurious lines to text position
         cr.new_path()
     
+    def _draw_hexagon_path(self, cr, x: float, y: float, radius: float):
+        """Draw a regular hexagon path for signal places.
+        
+        Signal places (Ψ) are rendered as hexagons to distinguish them from
+        regular circular places. The hexagon is oriented with flat top/bottom.
+        
+        Args:
+            cr: Cairo context
+            x, y: Center position (world coords)
+            radius: Distance from center to vertex (world space)
+        """
+        # Regular hexagon with flat top/bottom (6 vertices)
+        # Start at top vertex and draw clockwise
+        for i in range(6):
+            angle = math.pi / 6 + i * math.pi / 3  # 30°, 90°, 150°, 210°, 270°, 330°
+            px = x + radius * math.cos(angle)
+            py = y + radius * math.sin(angle)
+            
+            if i == 0:
+                cr.move_to(px, py)
+            else:
+                cr.line_to(px, py)
+        
+        cr.close_path()
+    
     def contains_point(self, x: float, y: float) -> bool:
         """Check if a point is inside this place.
+        
+        For signal places (hexagons), uses approximate circular hit testing.
+        For regular places, uses exact circular hit testing.
         
         Args:
             x, y: Point coordinates (world space)
             
         Returns:
-            bool: True if point is inside the circle
+            bool: True if point is inside the shape
         """
         dx = x - self.x
         dy = y - self.y
         distance = math.sqrt(dx * dx + dy * dy)
-        return distance <= self.radius
+        
+        # For hexagons, use inscribed circle for hit testing (conservative)
+        # Hexagon's inscribed circle radius ≈ 0.866 * circumradius
+        if self.is_signal_place:
+            return distance <= (self.radius * 0.866)
+        else:
+            return distance <= self.radius
     
     def set_position(self, x: float, y: float):
         """Move the place to a new position.
@@ -169,28 +220,33 @@ class Place(PetriNetObject):
         self.y = y
         self._trigger_redraw()
     
-    def set_tokens(self, count: int):
+    def set_tokens(self, count: float):
         """Set the number of tokens in this place.
+        
+        Supports both discrete (int) and continuous (float) concentrations.
+        For stochastic/continuous simulations, accepts floating-point values.
         
         Respects capacity constraint if set.
         
         Args:
-            count: Token count (non-negative, will be capped at capacity)
+            count: Token count or concentration (non-negative, will be capped at capacity)
         """
-        count = max(0, count)
+        count = max(0.0, float(count))
         # Handle capacity: None and float('inf') both mean unlimited
         if self.capacity is not None and self.capacity != float('inf'):
-            count = min(count, int(self.capacity))
+            count = min(count, float(self.capacity))
         self.tokens = count
         self._trigger_redraw()
     
-    def set_initial_marking(self, count: int):
+    def set_initial_marking(self, count: float):
         """Set the initial marking for this place (for simulation reset).
         
+        Supports both discrete (int) and continuous (float) concentrations.
+        
         Args:
-            count: Initial token count (non-negative)
+            count: Initial token count or concentration (non-negative)
         """
-        self.initial_marking = max(0, count)
+        self.initial_marking = max(0.0, float(count))
     
     def reset_to_initial_marking(self):
         """Reset the current marking to the initial marking."""
@@ -214,7 +270,8 @@ class Place(PetriNetObject):
             "capacity": "Infinity" if self.capacity == float('inf') else self.capacity,  # Normalize infinity to string for JSON
             "border_color": list(self.border_color),
             "border_width": self.border_width,
-            "is_catalyst": getattr(self, 'is_catalyst', False)  # Save catalyst flag
+            "is_catalyst": getattr(self, 'is_catalyst', False),  # Save catalyst flag
+            "is_signal_place": getattr(self, 'is_signal_place', False)  # Save signal place flag (13-tuple Ψ)
         })
         
         # Serialize metadata (KEGG IDs, ChEBI IDs, data sources, etc.)
@@ -270,6 +327,8 @@ class Place(PetriNetObject):
         
         # Restore catalyst flag (for hierarchical layout)
         place.is_catalyst = data.get("is_catalyst", False)
+        # Restore signal place flag (13-tuple formalism: Ψ)
+        place.is_signal_place = data.get("is_signal_place", False)
         if "capacity" in data:
             capacity_value = data["capacity"]
             # Normalize capacity: handle string "Infinity" or "inf"

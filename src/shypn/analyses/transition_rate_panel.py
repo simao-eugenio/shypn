@@ -175,6 +175,9 @@ class TransitionRatePanel(AnalysisPlotPanel):
         - Continuous: (time, rate) - time vs rate value
         - Discrete (immediate/timed/stochastic): (time, cumulative_count)
         
+        For stochastic/timed transitions with rate FUNCTIONS (e.g., "0.1*P1"),
+        we prefer to plot the instantaneous rate values over cumulative counts.
+        
         Args:
             transition_id: ID of the transition
             
@@ -185,7 +188,6 @@ class TransitionRatePanel(AnalysisPlotPanel):
         
         if DEBUG_PLOT_DATA and logger.isEnabledFor(logging.DEBUG):
             logger.debug(f"[PLOT] _get_rate_data() called for transition {transition_id}")
-            # print(f"[PLOT]   self.data_collector={self.data_collector} (id={id(self.data_collector) if self.data_collector else 'None'})")
         
         # Safety check: return empty if no data collector
         if not self.data_collector:
@@ -193,12 +195,29 @@ class TransitionRatePanel(AnalysisPlotPanel):
                 logger.debug("[PLOT] ERROR: No data collector")
             return []
         
+        # PRIORITY 1: Check if we have instantaneous rate data (for rate functions)
+        # This works for ALL transition types with rate functions
+        if hasattr(self.data_collector, 'get_transition_rate_series'):
+            times, rates = self.data_collector.get_transition_rate_series(transition_id)
+            if times and rates and len(times) == len(rates):
+                # We have rate time-series data - use it!
+                # This will show varying rates for transitions with rate functions like "0.1*P1"
+                rate_series = list(zip(times, rates))
+                if DEBUG_PLOT_DATA and rate_series:
+                    logger.debug(f"[PLOT] Using instantaneous rate data: {len(rate_series)} points")
+                    # Check if rate varies (not flat line)
+                    if len(set(rates[:min(10, len(rates))])) > 1:
+                        logger.debug(f"[PLOT] Rate varies: min={min(rates):.3f}, max={max(rates):.3f}")
+                    else:
+                        logger.debug(f"[PLOT] Rate appears constant: {rates[0] if rates else 0:.3f}")
+                return rate_series
+        
+        # PRIORITY 2: Fall back to checking event details (continuous transitions)
         # Get raw firing event data from collector
         raw_events = self.data_collector.get_transition_data(transition_id)
         
         if DEBUG_PLOT_DATA:
             pass
-            # print(f"[PLOT]   raw_events count: {len(raw_events) if raw_events else 0}")
         
         if not raw_events:
             if DEBUG_PLOT_DATA and logger.isEnabledFor(logging.DEBUG):
@@ -214,7 +233,6 @@ class TransitionRatePanel(AnalysisPlotPanel):
                 has_rate_data = True
         
         if has_rate_data:
-            pass
             # CONTINUOUS TRANSITION: Always use time on X-axis
             rate_series = []
             for time, event_type, details in raw_events:
@@ -224,8 +242,7 @@ class TransitionRatePanel(AnalysisPlotPanel):
             
             return rate_series
         else:
-            pass
-            # DISCRETE TRANSITION: Plot cumulative firing count
+            # DISCRETE TRANSITION: Plot cumulative firing count (fallback)
             if DEBUG_PLOT_DATA:
                 pass
             firing_times = [t for t, event_type, _ in raw_events 

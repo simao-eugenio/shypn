@@ -85,6 +85,15 @@ class DiagnosticsPanel:
         self.update_timer = None
         self.auto_tracking_enabled = False  # Track if auto-tracking is active
         
+        # Cache for change detection (Phase 1)
+        self._last_diagnostics_hash = None
+        self._cached_sections = {
+            'header': '',
+            'structure': '',
+            'static': '',
+            'runtime': ''
+        }
+        
         # Widgets
         self.selection_label = None
         self.textview = None
@@ -165,10 +174,20 @@ class DiagnosticsPanel:
             self._show_no_transition()
             self._stop_updates()
             self.auto_tracking_enabled = False  # Disable auto-tracking when cleared
+            self._last_diagnostics_hash = None  # Reset hash
             return
         
         self.current_transition = transition
         self.auto_tracking_enabled = False  # Manual selection disables auto-tracking
+        self._last_diagnostics_hash = None  # Reset hash to force initial update
+        
+        # Clear cached sections for fresh display
+        self._cached_sections = {
+            'header': '',
+            'structure': '',
+            'static': '',
+            'runtime': ''
+        }
         
         # Update selection label if available
         if self.selection_label:
@@ -189,7 +208,7 @@ class DiagnosticsPanel:
             self._start_updates()
     
     def _update_display(self):
-        """Update diagnostics display with current data."""
+        """Update diagnostics display with differential updates (Phase 2)."""
         if not self.current_transition:
             self._show_no_transition()
             return
@@ -198,101 +217,126 @@ class DiagnosticsPanel:
             self._show_invalid_locality()
             return
         
-        self._show_diagnostics()
-    
-    def _show_diagnostics(self):
-        """Show full diagnostics for valid locality."""
-        text_lines = []
+        # Generate sections separately
+        new_sections = {
+            'header': self._generate_header_section(),
+            'structure': self._generate_structure_section(),
+            'static': self._generate_static_section(),
+            'runtime': self._generate_runtime_section()
+        }
         
-        # Header
+        # Check if any section changed and update differentially
+        has_changes = False
+        for section_name, new_content in new_sections.items():
+            if new_content != self._cached_sections[section_name]:
+                has_changes = True
+                self._cached_sections[section_name] = new_content
+        
+        # Only update text if something changed
+        if has_changes:
+            # Combine all sections
+            full_text = '\n'.join(new_sections.values())
+            self._update_text_preserve_scroll(full_text)
+    
+    def _generate_header_section(self):
+        """Generate header section text."""
         transition_name = getattr(self.current_transition, 'name', f'T{self.current_transition.id}')
         transition_type = getattr(self.current_transition, 'transition_type', 'unknown')
         
-        text_lines.append("╔" + "═" * 58 + "╗")
-        text_lines.append(f"║ Diagnostics: {transition_name:<45} ║")
-        text_lines.append(f"║ Type: {transition_type:<50} ║")
-        text_lines.append("╚" + "═" * 58 + "╝")
-        text_lines.append("")
-        text_lines.append("ℹ Auto-tracking: Showing most recently fired transition")
-        text_lines.append("")
+        lines = []
+        lines.append("╔" + "═" * 58 + "╗")
+        lines.append(f"║ Diagnostics: {transition_name:<45} ║")
+        lines.append(f"║ Type: {transition_type:<50} ║")
+        lines.append("╚" + "═" * 58 + "╝")
+        lines.append("")
+        if self.auto_tracking_enabled:
+            lines.append("ℹ Auto-tracking: Showing most recently fired transition")
+        lines.append("")
         
-        # Locality Structure
-        if self.locality:
-            text_lines.append("━━━ Locality Structure ━━━")
-            text_lines.append(self.locality.get_summary())
-            text_lines.append("")
+        return '\n'.join(lines)
+    
+    def _generate_structure_section(self):
+        """Generate locality structure section text."""
+        if not self.locality:
+            return ""
         
-        # Static Analysis
-        if self.analyzer and self.locality:
-            analysis = self.analyzer.analyze_locality(self.locality)
-            
-            text_lines.append("━━━ Static Analysis ━━━")
-            text_lines.append(f"  Places:           {analysis['place_count']} ({analysis['input_count']} in, {analysis['output_count']} out)")
-            text_lines.append(f"  Arcs:             {analysis['arc_count']}")
-            text_lines.append(f"  Arc Weight:       {analysis['total_weight']:.1f}")
-            text_lines.append("")
-            text_lines.append(f"  Input Tokens:     {analysis['input_tokens']}")
-            text_lines.append(f"  Output Tokens:    {analysis['output_tokens']}")
-            text_lines.append(f"  Token Balance:    {analysis['token_balance']:+.0f}")
-            text_lines.append("")
-            
-            can_fire = analysis['can_fire']
-            fire_icon = "✓" if can_fire else "✗"
-            fire_status = "Yes" if can_fire else "No (insufficient tokens)"
-            text_lines.append(f"  Can Fire (static): {fire_icon} {fire_status}")
-            text_lines.append("")
+        lines = []
+        lines.append("━━━ Locality Structure ━━━")
+        lines.append(self.locality.get_summary())
+        lines.append("")
         
-        # Runtime Diagnostics
-        if self.runtime_analyzer:
-            text_lines.append("━━━ Runtime Diagnostics ━━━")
-            
-            try:
-                diag = self.runtime_analyzer.get_transition_diagnostics(
-                    self.current_transition, 
-                    window=10
-                )
-                
-                # Current state
-                text_lines.append(f"  Simulation Time:  {diag['logical_time']:.2f}s")
-                text_lines.append("")
-                
-                # Enablement
-                enabled_icon = "✓" if diag['enabled'] else "✗"
-                text_lines.append(f"  Enabled Now:      {enabled_icon} {diag['enabled']}")
-                text_lines.append(f"  Reason:           {diag['enablement_reason']}")
-                text_lines.append("")
-                
-                # Activity metrics
-                if diag['last_fired'] is not None:
-                    text_lines.append(f"  Last Fired:       {diag['last_fired']:.2f}s")
-                    text_lines.append(f"  Time Since:       {diag['time_since_fire']:.2f}s ago")
-                    text_lines.append(f"  Recent Events:    {diag['event_count']}")
-                    text_lines.append(f"  Throughput:       {diag['throughput']:.3f} fires/sec")
-                else:
-                    text_lines.append("  Status:           No firing events recorded")
-                
-                text_lines.append("")
-                
-                # Recent events list
-                if diag['recent_events']:
-                    text_lines.append("━━━ Recent Events (last 5) ━━━")
-                    for i, event in enumerate(diag['recent_events'][-5:], 1):
-                        time_val = event.get('time', 0.0)
-                        event_type = event.get('type', 'unknown')
-                        text_lines.append(f"  {i}. t={time_val:6.2f}s  {event_type}")
-                    
-                    if len(diag['recent_events']) > 5:
-                        text_lines.append(f"  ... and {len(diag['recent_events']) - 5} more")
-            
-            except Exception as e:
-                text_lines.append(f"  Error: {str(e)}")
-        else:
-            text_lines.append("━━━ Runtime Diagnostics ━━━")
-            text_lines.append("  No data collector available")
+        return '\n'.join(lines)
+    
+    def _generate_static_section(self):
+        """Generate static analysis section text."""
+        if not self.analyzer or not self.locality:
+            return ""
         
-        # Update TextView with scroll position preservation
-        if self.textview:
-            self._update_text_preserve_scroll("\n".join(text_lines))
+        analysis = self.analyzer.analyze_locality(self.locality)
+        
+        lines = []
+        lines.append("━━━ Static Analysis ━━━")
+        lines.append(f"  Places:           {analysis['place_count']} ({analysis['input_count']} in, {analysis['output_count']} out)")
+        lines.append(f"  Arcs:             {analysis['arc_count']}")
+        lines.append(f"  Arc Weight:       {analysis['total_weight']:.1f}")
+        lines.append("")
+        lines.append(f"  Input Tokens:     {analysis['input_tokens']}")
+        lines.append(f"  Output Tokens:    {analysis['output_tokens']}")
+        lines.append(f"  Token Balance:    {analysis['token_balance']:+.0f}")
+        lines.append("")
+        
+        can_fire = analysis['can_fire']
+        fire_icon = "✓" if can_fire else "✗"
+        fire_status = "Yes" if can_fire else "No (insufficient tokens)"
+        lines.append(f"  Can Fire (static): {fire_icon} {fire_status}")
+        lines.append("")
+        
+        return '\n'.join(lines)
+    
+    def _generate_runtime_section(self):
+        """Generate runtime diagnostics section text."""
+        lines = []
+        lines.append("━━━ Runtime Diagnostics ━━━")
+        
+        if not self.runtime_analyzer:
+            lines.append("  No data collector available")
+            return '\n'.join(lines)
+        
+        try:
+            # Pass the full transition object, not just the ID
+            diag = self.runtime_analyzer.get_transition_diagnostics(
+                self.current_transition,
+                window=10
+            )
+            
+            # Event statistics
+            total = diag.get('total_events', 0)
+            lines.append(f"  Total Events:     {total}")
+            
+            if total > 0:
+                last_time = diag.get('last_event_time', 0.0)
+                lines.append(f"  Last Event:       t={last_time:.2f}s")
+                lines.append(f"  Throughput:       {diag['throughput']:.3f} fires/sec")
+            else:
+                lines.append("  Status:           No firing events recorded")
+            
+            lines.append("")
+            
+            # Recent events list
+            if diag.get('recent_events'):
+                lines.append("━━━ Recent Events (last 5) ━━━")
+                for i, event in enumerate(diag['recent_events'][-5:], 1):
+                    time_val = event.get('time', 0.0)
+                    event_type = event.get('type', 'unknown')
+                    lines.append(f"  {i}. t={time_val:6.2f}s  {event_type}")
+                
+                if len(diag['recent_events']) > 5:
+                    lines.append(f"  ... and {len(diag['recent_events']) - 5} more")
+        
+        except Exception as e:
+            lines.append(f"  Error: {str(e)}")
+        
+        return '\n'.join(lines)
     
     def _update_text_preserve_scroll(self, text):
         """Update TextView text while preserving scroll position.
@@ -415,8 +459,47 @@ class DiagnosticsPanel:
             GLib.source_remove(self.update_timer)
             self.update_timer = None
     
+    def _compute_diagnostics_hash(self):
+        """Compute hash of current diagnostic data for change detection.
+        
+        Returns:
+            int: Hash of relevant diagnostic fields, or None if no data
+        """
+        if not self.runtime_analyzer or not self.current_transition:
+            # Hash static data if available
+            if self.locality:
+                return hash((
+                    self.current_transition.id,
+                    len(self.locality.input_places),
+                    len(self.locality.output_places),
+                    len(self.locality.catalyst_places)
+                ))
+            return None
+        
+        try:
+            diag = self.runtime_analyzer.get_transition_diagnostics(
+                self.current_transition,
+                window=10
+            )
+            
+            # Hash relevant runtime fields
+            recent_times = tuple(
+                e.get('time', 0) 
+                for e in diag.get('recent_events', [])[-5:]
+            )
+            
+            return hash((
+                diag.get('total_events', 0),
+                round(diag.get('last_event_time', 0), 3),  # Round to avoid float precision issues
+                round(diag.get('throughput', 0), 3),
+                recent_times
+            ))
+        except Exception:
+            # If error computing hash, return None to force update
+            return None
+    
     def _on_update_timer(self):
-        """Timer callback for periodic updates.
+        """Timer callback for periodic updates with change detection.
         
         Returns:
             bool: True to continue timer, False to stop
@@ -426,7 +509,12 @@ class DiagnosticsPanel:
             if self.auto_tracking_enabled:
                 self._auto_update_active_transition()
             
-            self._update_display()
+            # Phase 1: Only update if data actually changed
+            new_hash = self._compute_diagnostics_hash()
+            if new_hash != self._last_diagnostics_hash:
+                self._update_display()
+                self._last_diagnostics_hash = new_hash
+            
             return True  # Continue timer
         else:
             # Try to auto-select a transition if auto-tracking is enabled

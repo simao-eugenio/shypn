@@ -53,21 +53,23 @@ class KEGGCategory(BasePathwayCategory):
     - Status display
     """
     
-    def __init__(self, expanded=False, model_canvas=None, project=None):
+    def __init__(self, expanded=False, model_canvas=None, project=None, parent_window=None):
         """Initialize KEGG category.
         
         Args:
             expanded: Whether category starts expanded
             model_canvas: ModelCanvasManager instance (optional)
             project: Project instance for metadata tracking (optional)
+            parent_window: Parent window for dialogs (Wayland fix)
         """
         # Initialize attributes BEFORE calling super().__init__()
         # because _build_content() is called during super().__init__()
         self.logger = logging.getLogger(self.__class__.__name__)
         
-        # Set project and canvas
+        # Set project, canvas, and parent window
         self.model_canvas = model_canvas
         self.project = project
+        self.parent_window = parent_window
         
         # Initialize backend components
         if KEGGAPIClient and KGMLParser and PathwayConverter:
@@ -199,10 +201,22 @@ class KEGGCategory(BasePathwayCategory):
         label.set_xalign(0)
         box.pack_start(label, False, False, 0)
         
+        # Entry with browse button for local mode
+        entry_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        
         self.pathway_id_entry = Gtk.Entry()
         self.pathway_id_entry.set_placeholder_text("e.g., hsa00010, eco00020")
         self.pathway_id_entry.connect('changed', self._on_accession_entry_changed)
-        box.pack_start(self.pathway_id_entry, False, False, 0)
+        entry_box.pack_start(self.pathway_id_entry, True, True, 0)
+        
+        # Browse button (only visible in local mode)
+        self.browse_button = Gtk.Button(label="Browse...")
+        self.browse_button.set_no_show_all(True)  # Hidden by default
+        self.browse_button.set_visible(False)
+        self.browse_button.connect('clicked', self._on_browse_clicked)
+        entry_box.pack_start(self.browse_button, False, False, 0)
+        
+        box.pack_start(entry_box, False, False, 0)
         
         # Help text (will change based on mode)
         self.accession_help_label = Gtk.Label()
@@ -292,9 +306,6 @@ class KEGGCategory(BasePathwayCategory):
         label.set_markup("<b>Preview:</b>")
         label.set_xalign(0)
         box.pack_start(label, False, False, 0)
-        label.set_xalign(0)
-        label.set_markup("<b>Preview:</b>")
-        box.pack_start(label, False, False, 0)
         
         # Scrolled window for preview text
         scrolled = Gtk.ScrolledWindow()
@@ -344,6 +355,7 @@ class KEGGCategory(BasePathwayCategory):
         if self.local_radio.get_active():
             # Local mode - update UI for file selection
             self.pathway_id_entry.set_placeholder_text("Path to local KGML file")
+            self.browse_button.set_visible(True)
             self.accession_help_label.set_markup(
                 '<span size="small">Enter full path to local KGML file (.kgml or .xml)\n'
                 'Local files may exist in project/pathways/ from previous imports</span>'
@@ -353,6 +365,7 @@ class KEGGCategory(BasePathwayCategory):
         else:
             # Remote mode - update UI for KEGG API
             self.pathway_id_entry.set_placeholder_text("e.g., hsa00010, eco00020")
+            self.browse_button.set_visible(False)
             self.accession_help_label.set_markup(
                 '<span size="small">Enter KEGG pathway ID (organism code + pathway number)\n'
                 'Examples: hsa00010 (human glycolysis), eco00020 (E.coli TCA cycle)</span>'
@@ -397,6 +410,47 @@ class KEGGCategory(BasePathwayCategory):
                 )
             else:
                 self.import_button.set_sensitive(False)
+    
+    def _on_browse_clicked(self, button):
+        """Handle browse button click - open file chooser for KGML files."""
+        dialog = Gtk.FileChooserDialog(
+            title="Select KEGG File",
+            transient_for=self.parent_window,
+            action=Gtk.FileChooserAction.OPEN
+        )
+        dialog.add_buttons(
+            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+            Gtk.STOCK_OPEN, Gtk.ResponseType.OK
+        )
+        
+        # Add file filters
+        filter_kegg = Gtk.FileFilter()
+        filter_kegg.set_name("KEGG Files")
+        filter_kegg.add_pattern("*.kgml")
+        filter_kegg.add_pattern("*.xml")
+        dialog.add_filter(filter_kegg)
+        
+        filter_all = Gtk.FileFilter()
+        filter_all.set_name("All Files")
+        filter_all.add_pattern("*")
+        dialog.add_filter(filter_all)
+        
+        # Wayland-safe async approach
+        result_container = [None]
+        
+        def on_response(dlg, response_id):
+            if response_id == Gtk.ResponseType.OK:
+                result_container[0] = dlg.get_filename()
+            dlg.destroy()
+            Gtk.main_quit()
+        
+        dialog.connect('response', on_response)
+        dialog.show()
+        Gtk.main()
+        
+        filepath = result_container[0]
+        if filepath:
+            self.pathway_id_entry.set_text(filepath)
     
     def _update_ui_for_project_state(self):
         """Update UI based on project availability.

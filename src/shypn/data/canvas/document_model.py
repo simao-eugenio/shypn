@@ -37,6 +37,10 @@ class DocumentModel:
             "pan_x": 0.0,
             "pan_y": 0.0
         }
+        
+        # Simulation settings (for batch mode and recording configuration)
+        from shypn.engine.simulation.settings import SimulationSettings
+        self.simulation_settings = SimulationSettings()
     
     # ============================================================================
     # Object Creation

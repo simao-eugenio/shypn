@@ -1,0 +1,1626 @@
+{
+  "experiment": "Experiment 7: Weak Independence Analysis",
+  "statistics": {
+    "total_pairs": 120,
+    "independent_count": 108,
+    "weakly_independent_count": 8,
+    "competitive_count": 4,
+    "independent_percent": 90.0,
+    "weakly_independent_percent": 6.666666666666667,
+    "competitive_percent": 3.3333333333333335,
+    "concurrent_capable_percent": 96.66666666666667
+  },
+  "pathway_analysis": {
+    "same_pathway": {
+      "weak": 1,
+      "independent": 21,
+      "competitive": 4
+    },
+    "cross_pathway": {
+      "weak": 7,
+      "independent": 87,
+      "competitive": 0
+    }
+  },
+  "validation": {
+    "expected_range": [
+      60,
+      70
+    ],
+    "observed_percent": 96.66666666666667,
+    "validated": false,
+    "expected_speedup": 3.9333333333333336
+  },
+  "pairs": {
+    "independent": [
+      {
+        "t1": {
+          "id": "T1",
+          "name": "CI_Transcription"
+        },
+        "t2": {
+          "id": "T10",
+          "name": "Cro_Protein_Decay"
+        },
+        "shared_places": [],
+        "pathway_t1": "CI_pathway",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T1",
+          "name": "CI_Transcription"
+        },
+        "t2": {
+          "id": "T11",
+          "name": "Establish_Lysogeny"
+        },
+        "shared_places": [],
+        "pathway_t1": "CI_pathway",
+        "pathway_t2": "State_lysogenic"
+      },
+      {
+        "t1": {
+          "id": "T1",
+          "name": "CI_Transcription"
+        },
+        "t2": {
+          "id": "T13",
+          "name": "DNA_Damage_UV"
+        },
+        "shared_places": [],
+        "pathway_t1": "CI_pathway",
+        "pathway_t2": "SOS_pathway"
+      },
+      {
+        "t1": {
+          "id": "T1",
+          "name": "CI_Transcription"
+        },
+        "t2": {
+          "id": "T14",
+          "name": "RecA_Activation"
+        },
+        "shared_places": [],
+        "pathway_t1": "CI_pathway",
+        "pathway_t2": "SOS_pathway"
+      },
+      {
+        "t1": {
+          "id": "T1",
+          "name": "CI_Transcription"
+        },
+        "t2": {
+          "id": "T15",
+          "name": "RecA_Deactivation"
+        },
+        "shared_places": [],
+        "pathway_t1": "CI_pathway",
+        "pathway_t2": "SOS_pathway"
+      },
+      {
+        "t1": {
+          "id": "T1",
+          "name": "CI_Transcription"
+        },
+        "t2": {
+          "id": "T16",
+          "name": "DNA_Repair"
+        },
+        "shared_places": [],
+        "pathway_t1": "CI_pathway",
+        "pathway_t2": "SOS_pathway"
+      },
+      {
+        "t1": {
+          "id": "T1",
+          "name": "CI_Transcription"
+        },
+        "t2": {
+          "id": "T2",
+          "name": "CI_Translation"
+        },
+        "shared_places": [],
+        "pathway_t1": "CI_pathway",
+        "pathway_t2": "CI_pathway"
+      },
+      {
+        "t1": {
+          "id": "T1",
+          "name": "CI_Transcription"
+        },
+        "t2": {
+          "id": "T3",
+          "name": "CI_Dimerization"
+        },
+        "shared_places": [],
+        "pathway_t1": "CI_pathway",
+        "pathway_t2": "CI_pathway"
+      },
+      {
+        "t1": {
+          "id": "T1",
+          "name": "CI_Transcription"
+        },
+        "t2": {
+          "id": "T4",
+          "name": "CI_mRNA_Decay"
+        },
+        "shared_places": [],
+        "pathway_t1": "CI_pathway",
+        "pathway_t2": "CI_pathway"
+      },
+      {
+        "t1": {
+          "id": "T1",
+          "name": "CI_Transcription"
+        },
+        "t2": {
+          "id": "T5",
+          "name": "CI_Protein_Decay"
+        },
+        "shared_places": [],
+        "pathway_t1": "CI_pathway",
+        "pathway_t2": "CI_pathway"
+      },
+      {
+        "t1": {
+          "id": "T1",
+          "name": "CI_Transcription"
+        },
+        "t2": {
+          "id": "T7",
+          "name": "Cro_Translation"
+        },
+        "shared_places": [],
+        "pathway_t1": "CI_pathway",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T1",
+          "name": "CI_Transcription"
+        },
+        "t2": {
+          "id": "T9",
+          "name": "Cro_mRNA_Decay"
+        },
+        "shared_places": [],
+        "pathway_t1": "CI_pathway",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T10",
+          "name": "Cro_Protein_Decay"
+        },
+        "t2": {
+          "id": "T11",
+          "name": "Establish_Lysogeny"
+        },
+        "shared_places": [],
+        "pathway_t1": "Cro_pathway",
+        "pathway_t2": "State_lysogenic"
+      },
+      {
+        "t1": {
+          "id": "T10",
+          "name": "Cro_Protein_Decay"
+        },
+        "t2": {
+          "id": "T12",
+          "name": "Enter_Lytic_Cycle"
+        },
+        "shared_places": [],
+        "pathway_t1": "Cro_pathway",
+        "pathway_t2": "State_lytic"
+      },
+      {
+        "t1": {
+          "id": "T10",
+          "name": "Cro_Protein_Decay"
+        },
+        "t2": {
+          "id": "T13",
+          "name": "DNA_Damage_UV"
+        },
+        "shared_places": [],
+        "pathway_t1": "Cro_pathway",
+        "pathway_t2": "SOS_pathway"
+      },
+      {
+        "t1": {
+          "id": "T10",
+          "name": "Cro_Protein_Decay"
+        },
+        "t2": {
+          "id": "T14",
+          "name": "RecA_Activation"
+        },
+        "shared_places": [],
+        "pathway_t1": "Cro_pathway",
+        "pathway_t2": "SOS_pathway"
+      },
+      {
+        "t1": {
+          "id": "T10",
+          "name": "Cro_Protein_Decay"
+        },
+        "t2": {
+          "id": "T15",
+          "name": "RecA_Deactivation"
+        },
+        "shared_places": [],
+        "pathway_t1": "Cro_pathway",
+        "pathway_t2": "SOS_pathway"
+      },
+      {
+        "t1": {
+          "id": "T10",
+          "name": "Cro_Protein_Decay"
+        },
+        "t2": {
+          "id": "T16",
+          "name": "DNA_Repair"
+        },
+        "shared_places": [],
+        "pathway_t1": "Cro_pathway",
+        "pathway_t2": "SOS_pathway"
+      },
+      {
+        "t1": {
+          "id": "T10",
+          "name": "Cro_Protein_Decay"
+        },
+        "t2": {
+          "id": "T2",
+          "name": "CI_Translation"
+        },
+        "shared_places": [],
+        "pathway_t1": "Cro_pathway",
+        "pathway_t2": "CI_pathway"
+      },
+      {
+        "t1": {
+          "id": "T10",
+          "name": "Cro_Protein_Decay"
+        },
+        "t2": {
+          "id": "T3",
+          "name": "CI_Dimerization"
+        },
+        "shared_places": [],
+        "pathway_t1": "Cro_pathway",
+        "pathway_t2": "CI_pathway"
+      },
+      {
+        "t1": {
+          "id": "T10",
+          "name": "Cro_Protein_Decay"
+        },
+        "t2": {
+          "id": "T4",
+          "name": "CI_mRNA_Decay"
+        },
+        "shared_places": [],
+        "pathway_t1": "Cro_pathway",
+        "pathway_t2": "CI_pathway"
+      },
+      {
+        "t1": {
+          "id": "T10",
+          "name": "Cro_Protein_Decay"
+        },
+        "t2": {
+          "id": "T5",
+          "name": "CI_Protein_Decay"
+        },
+        "shared_places": [],
+        "pathway_t1": "Cro_pathway",
+        "pathway_t2": "CI_pathway"
+      },
+      {
+        "t1": {
+          "id": "T10",
+          "name": "Cro_Protein_Decay"
+        },
+        "t2": {
+          "id": "T6",
+          "name": "Cro_Transcription"
+        },
+        "shared_places": [],
+        "pathway_t1": "Cro_pathway",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T10",
+          "name": "Cro_Protein_Decay"
+        },
+        "t2": {
+          "id": "T7",
+          "name": "Cro_Translation"
+        },
+        "shared_places": [],
+        "pathway_t1": "Cro_pathway",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T10",
+          "name": "Cro_Protein_Decay"
+        },
+        "t2": {
+          "id": "T9",
+          "name": "Cro_mRNA_Decay"
+        },
+        "shared_places": [],
+        "pathway_t1": "Cro_pathway",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T11",
+          "name": "Establish_Lysogeny"
+        },
+        "t2": {
+          "id": "T12",
+          "name": "Enter_Lytic_Cycle"
+        },
+        "shared_places": [],
+        "pathway_t1": "State_lysogenic",
+        "pathway_t2": "State_lytic"
+      },
+      {
+        "t1": {
+          "id": "T11",
+          "name": "Establish_Lysogeny"
+        },
+        "t2": {
+          "id": "T13",
+          "name": "DNA_Damage_UV"
+        },
+        "shared_places": [],
+        "pathway_t1": "State_lysogenic",
+        "pathway_t2": "SOS_pathway"
+      },
+      {
+        "t1": {
+          "id": "T11",
+          "name": "Establish_Lysogeny"
+        },
+        "t2": {
+          "id": "T14",
+          "name": "RecA_Activation"
+        },
+        "shared_places": [],
+        "pathway_t1": "State_lysogenic",
+        "pathway_t2": "SOS_pathway"
+      },
+      {
+        "t1": {
+          "id": "T11",
+          "name": "Establish_Lysogeny"
+        },
+        "t2": {
+          "id": "T15",
+          "name": "RecA_Deactivation"
+        },
+        "shared_places": [],
+        "pathway_t1": "State_lysogenic",
+        "pathway_t2": "SOS_pathway"
+      },
+      {
+        "t1": {
+          "id": "T11",
+          "name": "Establish_Lysogeny"
+        },
+        "t2": {
+          "id": "T16",
+          "name": "DNA_Repair"
+        },
+        "shared_places": [],
+        "pathway_t1": "State_lysogenic",
+        "pathway_t2": "SOS_pathway"
+      },
+      {
+        "t1": {
+          "id": "T11",
+          "name": "Establish_Lysogeny"
+        },
+        "t2": {
+          "id": "T2",
+          "name": "CI_Translation"
+        },
+        "shared_places": [],
+        "pathway_t1": "State_lysogenic",
+        "pathway_t2": "CI_pathway"
+      },
+      {
+        "t1": {
+          "id": "T11",
+          "name": "Establish_Lysogeny"
+        },
+        "t2": {
+          "id": "T3",
+          "name": "CI_Dimerization"
+        },
+        "shared_places": [],
+        "pathway_t1": "State_lysogenic",
+        "pathway_t2": "CI_pathway"
+      },
+      {
+        "t1": {
+          "id": "T11",
+          "name": "Establish_Lysogeny"
+        },
+        "t2": {
+          "id": "T4",
+          "name": "CI_mRNA_Decay"
+        },
+        "shared_places": [],
+        "pathway_t1": "State_lysogenic",
+        "pathway_t2": "CI_pathway"
+      },
+      {
+        "t1": {
+          "id": "T11",
+          "name": "Establish_Lysogeny"
+        },
+        "t2": {
+          "id": "T5",
+          "name": "CI_Protein_Decay"
+        },
+        "shared_places": [],
+        "pathway_t1": "State_lysogenic",
+        "pathway_t2": "CI_pathway"
+      },
+      {
+        "t1": {
+          "id": "T11",
+          "name": "Establish_Lysogeny"
+        },
+        "t2": {
+          "id": "T7",
+          "name": "Cro_Translation"
+        },
+        "shared_places": [],
+        "pathway_t1": "State_lysogenic",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T11",
+          "name": "Establish_Lysogeny"
+        },
+        "t2": {
+          "id": "T8",
+          "name": "Cro_Dimerization"
+        },
+        "shared_places": [],
+        "pathway_t1": "State_lysogenic",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T11",
+          "name": "Establish_Lysogeny"
+        },
+        "t2": {
+          "id": "T9",
+          "name": "Cro_mRNA_Decay"
+        },
+        "shared_places": [],
+        "pathway_t1": "State_lysogenic",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T12",
+          "name": "Enter_Lytic_Cycle"
+        },
+        "t2": {
+          "id": "T13",
+          "name": "DNA_Damage_UV"
+        },
+        "shared_places": [],
+        "pathway_t1": "State_lytic",
+        "pathway_t2": "SOS_pathway"
+      },
+      {
+        "t1": {
+          "id": "T12",
+          "name": "Enter_Lytic_Cycle"
+        },
+        "t2": {
+          "id": "T14",
+          "name": "RecA_Activation"
+        },
+        "shared_places": [],
+        "pathway_t1": "State_lytic",
+        "pathway_t2": "SOS_pathway"
+      },
+      {
+        "t1": {
+          "id": "T12",
+          "name": "Enter_Lytic_Cycle"
+        },
+        "t2": {
+          "id": "T15",
+          "name": "RecA_Deactivation"
+        },
+        "shared_places": [],
+        "pathway_t1": "State_lytic",
+        "pathway_t2": "SOS_pathway"
+      },
+      {
+        "t1": {
+          "id": "T12",
+          "name": "Enter_Lytic_Cycle"
+        },
+        "t2": {
+          "id": "T16",
+          "name": "DNA_Repair"
+        },
+        "shared_places": [],
+        "pathway_t1": "State_lytic",
+        "pathway_t2": "SOS_pathway"
+      },
+      {
+        "t1": {
+          "id": "T12",
+          "name": "Enter_Lytic_Cycle"
+        },
+        "t2": {
+          "id": "T2",
+          "name": "CI_Translation"
+        },
+        "shared_places": [],
+        "pathway_t1": "State_lytic",
+        "pathway_t2": "CI_pathway"
+      },
+      {
+        "t1": {
+          "id": "T12",
+          "name": "Enter_Lytic_Cycle"
+        },
+        "t2": {
+          "id": "T3",
+          "name": "CI_Dimerization"
+        },
+        "shared_places": [],
+        "pathway_t1": "State_lytic",
+        "pathway_t2": "CI_pathway"
+      },
+      {
+        "t1": {
+          "id": "T12",
+          "name": "Enter_Lytic_Cycle"
+        },
+        "t2": {
+          "id": "T4",
+          "name": "CI_mRNA_Decay"
+        },
+        "shared_places": [],
+        "pathway_t1": "State_lytic",
+        "pathway_t2": "CI_pathway"
+      },
+      {
+        "t1": {
+          "id": "T12",
+          "name": "Enter_Lytic_Cycle"
+        },
+        "t2": {
+          "id": "T5",
+          "name": "CI_Protein_Decay"
+        },
+        "shared_places": [],
+        "pathway_t1": "State_lytic",
+        "pathway_t2": "CI_pathway"
+      },
+      {
+        "t1": {
+          "id": "T12",
+          "name": "Enter_Lytic_Cycle"
+        },
+        "t2": {
+          "id": "T6",
+          "name": "Cro_Transcription"
+        },
+        "shared_places": [],
+        "pathway_t1": "State_lytic",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T12",
+          "name": "Enter_Lytic_Cycle"
+        },
+        "t2": {
+          "id": "T7",
+          "name": "Cro_Translation"
+        },
+        "shared_places": [],
+        "pathway_t1": "State_lytic",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T12",
+          "name": "Enter_Lytic_Cycle"
+        },
+        "t2": {
+          "id": "T8",
+          "name": "Cro_Dimerization"
+        },
+        "shared_places": [],
+        "pathway_t1": "State_lytic",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T12",
+          "name": "Enter_Lytic_Cycle"
+        },
+        "t2": {
+          "id": "T9",
+          "name": "Cro_mRNA_Decay"
+        },
+        "shared_places": [],
+        "pathway_t1": "State_lytic",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T13",
+          "name": "DNA_Damage_UV"
+        },
+        "t2": {
+          "id": "T14",
+          "name": "RecA_Activation"
+        },
+        "shared_places": [],
+        "pathway_t1": "SOS_pathway",
+        "pathway_t2": "SOS_pathway"
+      },
+      {
+        "t1": {
+          "id": "T13",
+          "name": "DNA_Damage_UV"
+        },
+        "t2": {
+          "id": "T15",
+          "name": "RecA_Deactivation"
+        },
+        "shared_places": [],
+        "pathway_t1": "SOS_pathway",
+        "pathway_t2": "SOS_pathway"
+      },
+      {
+        "t1": {
+          "id": "T13",
+          "name": "DNA_Damage_UV"
+        },
+        "t2": {
+          "id": "T16",
+          "name": "DNA_Repair"
+        },
+        "shared_places": [],
+        "pathway_t1": "SOS_pathway",
+        "pathway_t2": "SOS_pathway"
+      },
+      {
+        "t1": {
+          "id": "T13",
+          "name": "DNA_Damage_UV"
+        },
+        "t2": {
+          "id": "T2",
+          "name": "CI_Translation"
+        },
+        "shared_places": [],
+        "pathway_t1": "SOS_pathway",
+        "pathway_t2": "CI_pathway"
+      },
+      {
+        "t1": {
+          "id": "T13",
+          "name": "DNA_Damage_UV"
+        },
+        "t2": {
+          "id": "T3",
+          "name": "CI_Dimerization"
+        },
+        "shared_places": [],
+        "pathway_t1": "SOS_pathway",
+        "pathway_t2": "CI_pathway"
+      },
+      {
+        "t1": {
+          "id": "T13",
+          "name": "DNA_Damage_UV"
+        },
+        "t2": {
+          "id": "T4",
+          "name": "CI_mRNA_Decay"
+        },
+        "shared_places": [],
+        "pathway_t1": "SOS_pathway",
+        "pathway_t2": "CI_pathway"
+      },
+      {
+        "t1": {
+          "id": "T13",
+          "name": "DNA_Damage_UV"
+        },
+        "t2": {
+          "id": "T5",
+          "name": "CI_Protein_Decay"
+        },
+        "shared_places": [],
+        "pathway_t1": "SOS_pathway",
+        "pathway_t2": "CI_pathway"
+      },
+      {
+        "t1": {
+          "id": "T13",
+          "name": "DNA_Damage_UV"
+        },
+        "t2": {
+          "id": "T6",
+          "name": "Cro_Transcription"
+        },
+        "shared_places": [],
+        "pathway_t1": "SOS_pathway",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T13",
+          "name": "DNA_Damage_UV"
+        },
+        "t2": {
+          "id": "T7",
+          "name": "Cro_Translation"
+        },
+        "shared_places": [],
+        "pathway_t1": "SOS_pathway",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T13",
+          "name": "DNA_Damage_UV"
+        },
+        "t2": {
+          "id": "T8",
+          "name": "Cro_Dimerization"
+        },
+        "shared_places": [],
+        "pathway_t1": "SOS_pathway",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T13",
+          "name": "DNA_Damage_UV"
+        },
+        "t2": {
+          "id": "T9",
+          "name": "Cro_mRNA_Decay"
+        },
+        "shared_places": [],
+        "pathway_t1": "SOS_pathway",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T14",
+          "name": "RecA_Activation"
+        },
+        "t2": {
+          "id": "T15",
+          "name": "RecA_Deactivation"
+        },
+        "shared_places": [],
+        "pathway_t1": "SOS_pathway",
+        "pathway_t2": "SOS_pathway"
+      },
+      {
+        "t1": {
+          "id": "T14",
+          "name": "RecA_Activation"
+        },
+        "t2": {
+          "id": "T2",
+          "name": "CI_Translation"
+        },
+        "shared_places": [],
+        "pathway_t1": "SOS_pathway",
+        "pathway_t2": "CI_pathway"
+      },
+      {
+        "t1": {
+          "id": "T14",
+          "name": "RecA_Activation"
+        },
+        "t2": {
+          "id": "T3",
+          "name": "CI_Dimerization"
+        },
+        "shared_places": [],
+        "pathway_t1": "SOS_pathway",
+        "pathway_t2": "CI_pathway"
+      },
+      {
+        "t1": {
+          "id": "T14",
+          "name": "RecA_Activation"
+        },
+        "t2": {
+          "id": "T4",
+          "name": "CI_mRNA_Decay"
+        },
+        "shared_places": [],
+        "pathway_t1": "SOS_pathway",
+        "pathway_t2": "CI_pathway"
+      },
+      {
+        "t1": {
+          "id": "T14",
+          "name": "RecA_Activation"
+        },
+        "t2": {
+          "id": "T5",
+          "name": "CI_Protein_Decay"
+        },
+        "shared_places": [],
+        "pathway_t1": "SOS_pathway",
+        "pathway_t2": "CI_pathway"
+      },
+      {
+        "t1": {
+          "id": "T14",
+          "name": "RecA_Activation"
+        },
+        "t2": {
+          "id": "T6",
+          "name": "Cro_Transcription"
+        },
+        "shared_places": [],
+        "pathway_t1": "SOS_pathway",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T14",
+          "name": "RecA_Activation"
+        },
+        "t2": {
+          "id": "T7",
+          "name": "Cro_Translation"
+        },
+        "shared_places": [],
+        "pathway_t1": "SOS_pathway",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T14",
+          "name": "RecA_Activation"
+        },
+        "t2": {
+          "id": "T8",
+          "name": "Cro_Dimerization"
+        },
+        "shared_places": [],
+        "pathway_t1": "SOS_pathway",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T14",
+          "name": "RecA_Activation"
+        },
+        "t2": {
+          "id": "T9",
+          "name": "Cro_mRNA_Decay"
+        },
+        "shared_places": [],
+        "pathway_t1": "SOS_pathway",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T15",
+          "name": "RecA_Deactivation"
+        },
+        "t2": {
+          "id": "T16",
+          "name": "DNA_Repair"
+        },
+        "shared_places": [],
+        "pathway_t1": "SOS_pathway",
+        "pathway_t2": "SOS_pathway"
+      },
+      {
+        "t1": {
+          "id": "T15",
+          "name": "RecA_Deactivation"
+        },
+        "t2": {
+          "id": "T2",
+          "name": "CI_Translation"
+        },
+        "shared_places": [],
+        "pathway_t1": "SOS_pathway",
+        "pathway_t2": "CI_pathway"
+      },
+      {
+        "t1": {
+          "id": "T15",
+          "name": "RecA_Deactivation"
+        },
+        "t2": {
+          "id": "T3",
+          "name": "CI_Dimerization"
+        },
+        "shared_places": [],
+        "pathway_t1": "SOS_pathway",
+        "pathway_t2": "CI_pathway"
+      },
+      {
+        "t1": {
+          "id": "T15",
+          "name": "RecA_Deactivation"
+        },
+        "t2": {
+          "id": "T4",
+          "name": "CI_mRNA_Decay"
+        },
+        "shared_places": [],
+        "pathway_t1": "SOS_pathway",
+        "pathway_t2": "CI_pathway"
+      },
+      {
+        "t1": {
+          "id": "T15",
+          "name": "RecA_Deactivation"
+        },
+        "t2": {
+          "id": "T6",
+          "name": "Cro_Transcription"
+        },
+        "shared_places": [],
+        "pathway_t1": "SOS_pathway",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T15",
+          "name": "RecA_Deactivation"
+        },
+        "t2": {
+          "id": "T7",
+          "name": "Cro_Translation"
+        },
+        "shared_places": [],
+        "pathway_t1": "SOS_pathway",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T15",
+          "name": "RecA_Deactivation"
+        },
+        "t2": {
+          "id": "T8",
+          "name": "Cro_Dimerization"
+        },
+        "shared_places": [],
+        "pathway_t1": "SOS_pathway",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T15",
+          "name": "RecA_Deactivation"
+        },
+        "t2": {
+          "id": "T9",
+          "name": "Cro_mRNA_Decay"
+        },
+        "shared_places": [],
+        "pathway_t1": "SOS_pathway",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T16",
+          "name": "DNA_Repair"
+        },
+        "t2": {
+          "id": "T2",
+          "name": "CI_Translation"
+        },
+        "shared_places": [],
+        "pathway_t1": "SOS_pathway",
+        "pathway_t2": "CI_pathway"
+      },
+      {
+        "t1": {
+          "id": "T16",
+          "name": "DNA_Repair"
+        },
+        "t2": {
+          "id": "T3",
+          "name": "CI_Dimerization"
+        },
+        "shared_places": [],
+        "pathway_t1": "SOS_pathway",
+        "pathway_t2": "CI_pathway"
+      },
+      {
+        "t1": {
+          "id": "T16",
+          "name": "DNA_Repair"
+        },
+        "t2": {
+          "id": "T4",
+          "name": "CI_mRNA_Decay"
+        },
+        "shared_places": [],
+        "pathway_t1": "SOS_pathway",
+        "pathway_t2": "CI_pathway"
+      },
+      {
+        "t1": {
+          "id": "T16",
+          "name": "DNA_Repair"
+        },
+        "t2": {
+          "id": "T5",
+          "name": "CI_Protein_Decay"
+        },
+        "shared_places": [],
+        "pathway_t1": "SOS_pathway",
+        "pathway_t2": "CI_pathway"
+      },
+      {
+        "t1": {
+          "id": "T16",
+          "name": "DNA_Repair"
+        },
+        "t2": {
+          "id": "T6",
+          "name": "Cro_Transcription"
+        },
+        "shared_places": [],
+        "pathway_t1": "SOS_pathway",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T16",
+          "name": "DNA_Repair"
+        },
+        "t2": {
+          "id": "T7",
+          "name": "Cro_Translation"
+        },
+        "shared_places": [],
+        "pathway_t1": "SOS_pathway",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T16",
+          "name": "DNA_Repair"
+        },
+        "t2": {
+          "id": "T8",
+          "name": "Cro_Dimerization"
+        },
+        "shared_places": [],
+        "pathway_t1": "SOS_pathway",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T16",
+          "name": "DNA_Repair"
+        },
+        "t2": {
+          "id": "T9",
+          "name": "Cro_mRNA_Decay"
+        },
+        "shared_places": [],
+        "pathway_t1": "SOS_pathway",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T2",
+          "name": "CI_Translation"
+        },
+        "t2": {
+          "id": "T3",
+          "name": "CI_Dimerization"
+        },
+        "shared_places": [],
+        "pathway_t1": "CI_pathway",
+        "pathway_t2": "CI_pathway"
+      },
+      {
+        "t1": {
+          "id": "T2",
+          "name": "CI_Translation"
+        },
+        "t2": {
+          "id": "T5",
+          "name": "CI_Protein_Decay"
+        },
+        "shared_places": [],
+        "pathway_t1": "CI_pathway",
+        "pathway_t2": "CI_pathway"
+      },
+      {
+        "t1": {
+          "id": "T2",
+          "name": "CI_Translation"
+        },
+        "t2": {
+          "id": "T6",
+          "name": "Cro_Transcription"
+        },
+        "shared_places": [],
+        "pathway_t1": "CI_pathway",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T2",
+          "name": "CI_Translation"
+        },
+        "t2": {
+          "id": "T7",
+          "name": "Cro_Translation"
+        },
+        "shared_places": [],
+        "pathway_t1": "CI_pathway",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T2",
+          "name": "CI_Translation"
+        },
+        "t2": {
+          "id": "T8",
+          "name": "Cro_Dimerization"
+        },
+        "shared_places": [],
+        "pathway_t1": "CI_pathway",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T2",
+          "name": "CI_Translation"
+        },
+        "t2": {
+          "id": "T9",
+          "name": "Cro_mRNA_Decay"
+        },
+        "shared_places": [],
+        "pathway_t1": "CI_pathway",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T3",
+          "name": "CI_Dimerization"
+        },
+        "t2": {
+          "id": "T4",
+          "name": "CI_mRNA_Decay"
+        },
+        "shared_places": [],
+        "pathway_t1": "CI_pathway",
+        "pathway_t2": "CI_pathway"
+      },
+      {
+        "t1": {
+          "id": "T3",
+          "name": "CI_Dimerization"
+        },
+        "t2": {
+          "id": "T7",
+          "name": "Cro_Translation"
+        },
+        "shared_places": [],
+        "pathway_t1": "CI_pathway",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T3",
+          "name": "CI_Dimerization"
+        },
+        "t2": {
+          "id": "T8",
+          "name": "Cro_Dimerization"
+        },
+        "shared_places": [],
+        "pathway_t1": "CI_pathway",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T3",
+          "name": "CI_Dimerization"
+        },
+        "t2": {
+          "id": "T9",
+          "name": "Cro_mRNA_Decay"
+        },
+        "shared_places": [],
+        "pathway_t1": "CI_pathway",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T4",
+          "name": "CI_mRNA_Decay"
+        },
+        "t2": {
+          "id": "T5",
+          "name": "CI_Protein_Decay"
+        },
+        "shared_places": [],
+        "pathway_t1": "CI_pathway",
+        "pathway_t2": "CI_pathway"
+      },
+      {
+        "t1": {
+          "id": "T4",
+          "name": "CI_mRNA_Decay"
+        },
+        "t2": {
+          "id": "T6",
+          "name": "Cro_Transcription"
+        },
+        "shared_places": [],
+        "pathway_t1": "CI_pathway",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T4",
+          "name": "CI_mRNA_Decay"
+        },
+        "t2": {
+          "id": "T7",
+          "name": "Cro_Translation"
+        },
+        "shared_places": [],
+        "pathway_t1": "CI_pathway",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T4",
+          "name": "CI_mRNA_Decay"
+        },
+        "t2": {
+          "id": "T8",
+          "name": "Cro_Dimerization"
+        },
+        "shared_places": [],
+        "pathway_t1": "CI_pathway",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T4",
+          "name": "CI_mRNA_Decay"
+        },
+        "t2": {
+          "id": "T9",
+          "name": "Cro_mRNA_Decay"
+        },
+        "shared_places": [],
+        "pathway_t1": "CI_pathway",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T5",
+          "name": "CI_Protein_Decay"
+        },
+        "t2": {
+          "id": "T7",
+          "name": "Cro_Translation"
+        },
+        "shared_places": [],
+        "pathway_t1": "CI_pathway",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T5",
+          "name": "CI_Protein_Decay"
+        },
+        "t2": {
+          "id": "T8",
+          "name": "Cro_Dimerization"
+        },
+        "shared_places": [],
+        "pathway_t1": "CI_pathway",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T5",
+          "name": "CI_Protein_Decay"
+        },
+        "t2": {
+          "id": "T9",
+          "name": "Cro_mRNA_Decay"
+        },
+        "shared_places": [],
+        "pathway_t1": "CI_pathway",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T6",
+          "name": "Cro_Transcription"
+        },
+        "t2": {
+          "id": "T7",
+          "name": "Cro_Translation"
+        },
+        "shared_places": [],
+        "pathway_t1": "Cro_pathway",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T6",
+          "name": "Cro_Transcription"
+        },
+        "t2": {
+          "id": "T8",
+          "name": "Cro_Dimerization"
+        },
+        "shared_places": [],
+        "pathway_t1": "Cro_pathway",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T6",
+          "name": "Cro_Transcription"
+        },
+        "t2": {
+          "id": "T9",
+          "name": "Cro_mRNA_Decay"
+        },
+        "shared_places": [],
+        "pathway_t1": "Cro_pathway",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T7",
+          "name": "Cro_Translation"
+        },
+        "t2": {
+          "id": "T8",
+          "name": "Cro_Dimerization"
+        },
+        "shared_places": [],
+        "pathway_t1": "Cro_pathway",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T8",
+          "name": "Cro_Dimerization"
+        },
+        "t2": {
+          "id": "T9",
+          "name": "Cro_mRNA_Decay"
+        },
+        "shared_places": [],
+        "pathway_t1": "Cro_pathway",
+        "pathway_t2": "Cro_pathway"
+      }
+    ],
+    "weakly_independent": [
+      {
+        "t1": {
+          "id": "T1",
+          "name": "CI_Transcription"
+        },
+        "t2": {
+          "id": "T12",
+          "name": "Enter_Lytic_Cycle"
+        },
+        "shared_places": [
+          "Lytic_Genes_Active"
+        ],
+        "pathway_t1": "CI_pathway",
+        "pathway_t2": "State_lytic"
+      },
+      {
+        "t1": {
+          "id": "T1",
+          "name": "CI_Transcription"
+        },
+        "t2": {
+          "id": "T6",
+          "name": "Cro_Transcription"
+        },
+        "shared_places": [
+          "Energy_ATP"
+        ],
+        "pathway_t1": "CI_pathway",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T1",
+          "name": "CI_Transcription"
+        },
+        "t2": {
+          "id": "T8",
+          "name": "Cro_Dimerization"
+        },
+        "shared_places": [
+          "Cro_Dimer"
+        ],
+        "pathway_t1": "CI_pathway",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T11",
+          "name": "Establish_Lysogeny"
+        },
+        "t2": {
+          "id": "T6",
+          "name": "Cro_Transcription"
+        },
+        "shared_places": [
+          "Lysogenic_State"
+        ],
+        "pathway_t1": "State_lysogenic",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T14",
+          "name": "RecA_Activation"
+        },
+        "t2": {
+          "id": "T16",
+          "name": "DNA_Repair"
+        },
+        "shared_places": [
+          "DNA_Damage"
+        ],
+        "pathway_t1": "SOS_pathway",
+        "pathway_t2": "SOS_pathway"
+      },
+      {
+        "t1": {
+          "id": "T15",
+          "name": "RecA_Deactivation"
+        },
+        "t2": {
+          "id": "T5",
+          "name": "CI_Protein_Decay"
+        },
+        "shared_places": [
+          "RecA_Active"
+        ],
+        "pathway_t1": "SOS_pathway",
+        "pathway_t2": "CI_pathway"
+      },
+      {
+        "t1": {
+          "id": "T3",
+          "name": "CI_Dimerization"
+        },
+        "t2": {
+          "id": "T6",
+          "name": "Cro_Transcription"
+        },
+        "shared_places": [
+          "CI_Dimer"
+        ],
+        "pathway_t1": "CI_pathway",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T5",
+          "name": "CI_Protein_Decay"
+        },
+        "t2": {
+          "id": "T6",
+          "name": "Cro_Transcription"
+        },
+        "shared_places": [
+          "CI_Dimer"
+        ],
+        "pathway_t1": "CI_pathway",
+        "pathway_t2": "Cro_pathway"
+      }
+    ],
+    "competitive": [
+      {
+        "t1": {
+          "id": "T10",
+          "name": "Cro_Protein_Decay"
+        },
+        "t2": {
+          "id": "T8",
+          "name": "Cro_Dimerization"
+        },
+        "shared_places": [
+          "Cro_Protein"
+        ],
+        "pathway_t1": "Cro_pathway",
+        "pathway_t2": "Cro_pathway"
+      },
+      {
+        "t1": {
+          "id": "T2",
+          "name": "CI_Translation"
+        },
+        "t2": {
+          "id": "T4",
+          "name": "CI_mRNA_Decay"
+        },
+        "shared_places": [
+          "CI_mRNA"
+        ],
+        "pathway_t1": "CI_pathway",
+        "pathway_t2": "CI_pathway"
+      },
+      {
+        "t1": {
+          "id": "T3",
+          "name": "CI_Dimerization"
+        },
+        "t2": {
+          "id": "T5",
+          "name": "CI_Protein_Decay"
+        },
+        "shared_places": [
+          "CI_Protein"
+        ],
+        "pathway_t1": "CI_pathway",
+        "pathway_t2": "CI_pathway"
+      },
+      {
+        "t1": {
+          "id": "T7",
+          "name": "Cro_Translation"
+        },
+        "t2": {
+          "id": "T9",
+          "name": "Cro_mRNA_Decay"
+        },
+        "shared_places": [
+          "Cro_mRNA"
+        ],
+        "pathway_t1": "Cro_pathway",
+        "pathway_t2": "Cro_pathway"
+      }
+    ]
+  }
+}

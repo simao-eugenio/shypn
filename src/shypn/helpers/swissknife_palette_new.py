@@ -157,10 +157,13 @@ class SwissKnifePalette(GObject.GObject):
         self.drag_event_box.add(self.ui.main_container)
         self.drag_event_box.set_above_child(False)
         
-        # Prevent GTK warnings during drag/animation by allowing flexible sizing
+        # Prevent GTK warnings during drag/animation by constraining size behavior
         self.drag_event_box.set_can_focus(False)
         self.drag_event_box.set_hexpand(False)
         self.drag_event_box.set_vexpand(False)
+        # CRITICAL: Set alignment to prevent allocation adjustments
+        self.drag_event_box.set_halign(Gtk.Align.START)
+        self.drag_event_box.set_valign(Gtk.Align.START)
         
         # Enable events for drag and double-click
         self.drag_event_box.add_events(
@@ -509,6 +512,63 @@ class SwissKnifePalette(GObject.GObject):
             background-color: rgba(50, 60, 70, 0.9);
             border-radius: 6px;
             padding: 4px;
+        }
+        
+        /* Tool buttons - clearer design with better visibility */
+        .tool-button.swissknife-tool {
+            min-width: 40px;
+            min-height: 40px;
+            padding: 0px;
+            margin: 2px;
+            transition: all 200ms ease;
+            /* Light gray background for better icon visibility */
+            background: linear-gradient(to bottom, #f5f5f5 0%, #e0e0e0 100%);
+            border: 2px solid #3498db;
+            border-radius: 5px;
+        }
+        
+        /* Tool button icons - no extra background needed */
+        .tool-button.swissknife-tool image {
+            min-width: 24px;
+            min-height: 24px;
+        }
+        
+        /* Tool button hover - bright blue */
+        .tool-button.swissknife-tool:hover {
+            background: linear-gradient(to bottom, #ebf5fb 0%, #d6eaf8 100%);
+            border-color: #2980b9;
+            border-width: 3px;
+            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.6);
+        }
+        
+        /* Active tool button - solid blue with white border */
+        .tool-button.tool-active {
+            background: linear-gradient(to bottom, #3498db 0%, #2980b9 100%);
+            border: 3px solid #ffffff;
+            color: #ffffff;
+            box-shadow: 0 0 16px rgba(52, 152, 219, 0.9),
+                        inset 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        
+        /* Active tool button icons - inverted for visibility on blue */
+        .tool-button.tool-active image {
+            -gtk-icon-effect: highlight;
+        }
+        
+        /* Settings button - blue/purple theme to distinguish from action buttons */
+        .tool-button.swissknife-tool.settings-button {
+            background-image: linear-gradient(to bottom, #5d6db9, #4a5899);
+            border: 2px solid #3a4578;
+        }
+        
+        .tool-button.swissknife-tool.settings-button:hover {
+            background-image: linear-gradient(to bottom, #6c7dc9, #5d6db9);
+            border: 3px solid #3a4578;
+            box-shadow: 0 0 12px rgba(93, 109, 185, 0.7);
+        }
+        
+        .tool-button.swissknife-tool.settings-button:active {
+            background-image: linear-gradient(to bottom, #4a5899, #3a4578);
         }
         """
         
