@@ -11,6 +11,7 @@ Key differences from ReplicateRunner:
 - Full model execution: Works on entire model, not subnet
 - GUI integration: Progress callbacks and cancellation support
 - Auto-save support: Returns structured data for CSV export
+- Initial condition noise: Optional random perturbations for biological variability
 
 Example:
     from shypn.engine.simulation.batch_runner import BatchSimulationRunner
@@ -34,6 +35,7 @@ Date: December 2025
 """
 
 import time
+import numpy as np
 from typing import Dict, List, Optional, Any, Callable, Set
 from copy import deepcopy
 
@@ -128,8 +130,15 @@ class BatchSimulationRunner:
                 # Set unique seed for this replicate
                 replicate_controller.settings.random_seed = base_seed + i
                 
-                # Reset model to initial marking
-                self._reset_model(model, initial_marking)
+                # Reset model to initial marking with optional noise
+                self._reset_model(
+                    model, 
+                    initial_marking,
+                    apply_noise=replicate_controller.settings.ic_noise_enabled,
+                    noise_percent=replicate_controller.settings.ic_noise_percent,
+                    noise_places=replicate_controller.settings.ic_noise_places,
+                    seed=base_seed + i  # Use replicate-specific seed for noise
+                )
                 
                 # Start data collection (will track all objects initially)
                 replicate_controller.data_collector.start_collection()
@@ -215,18 +224,75 @@ class BatchSimulationRunner:
         
         return results
     
-    def _reset_model(self, model, initial_marking: Dict[str, float]):
-        """Reset model places to initial marking.
+    def _reset_model(
+        self, 
+        model, 
+        initial_marking: Dict[str, float],
+        apply_noise: bool = False,
+        noise_percent: float = 20.0,
+        noise_places: Set[str] = None,
+        seed: int = None
+    ):
+        """Reset model places to initial marking with optional random perturbations.
         
         Supports both discrete (int) and continuous (float) concentrations.
+        When apply_noise=True, adds random perturbations to simulate biological
+        cell-to-cell variability in initial molecular counts.
         
         Args:
             model: DocumentModel to reset
             initial_marking: Dict of place_id -> token_count (float for concentrations)
+            apply_noise: Whether to add random perturbations to initial conditions
+            noise_percent: Percentage of noise (20 = ±20% uniform noise)
+            noise_places: Set of place IDs to randomize (None = all non-catalyst places)
+            seed: Random seed for noise generation (ensures reproducibility per replicate)
+        
+        Example:
+            With noise_percent=20 and base value=0.5:
+            - Noise range: 0.5 * uniform(0.8, 1.2) = uniform(0.4, 0.6)
+            - Ensures different initial conditions for each replicate
+            - Simulates biological variability in mRNA/protein counts at infection
         """
+        # Initialize random number generator with replicate-specific seed
+        if apply_noise and seed is not None:
+            rng = np.random.RandomState(seed)
+        else:
+            rng = None
+        
         for place in model.places:
             if place.id in initial_marking:
-                place.tokens = initial_marking[place.id]
+                base_value = initial_marking[place.id]
+                
+                # Apply noise if enabled
+                if apply_noise and rng is not None:
+                    # Determine if this place should be randomized
+                    should_randomize = False
+                    
+                    if noise_places and len(noise_places) > 0:
+                        # Explicit list: only randomize specified places
+                        should_randomize = place.id in noise_places
+                    else:
+                        # Default: randomize all non-catalyst places with non-zero initial values
+                        is_catalyst = getattr(place, 'is_catalyst', False)
+                        should_randomize = (not is_catalyst) and (base_value > 0)
+                    
+                    if should_randomize:
+                        # Calculate noise bounds: value * uniform(1-p%, 1+p%)
+                        noise_factor = noise_percent / 100.0
+                        min_factor = 1.0 - noise_factor
+                        max_factor = 1.0 + noise_factor
+                        
+                        # Sample random multiplier
+                        multiplier = rng.uniform(min_factor, max_factor)
+                        
+                        # Apply noise while maintaining non-negativity
+                        place.tokens = max(0.0, base_value * multiplier)
+                    else:
+                        # No noise: use exact initial value
+                        place.tokens = base_value
+                else:
+                    # Noise disabled: use exact initial value
+                    place.tokens = base_value
     
     def cancel(self):
         """Request cancellation of batch execution.

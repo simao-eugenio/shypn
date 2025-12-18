@@ -78,6 +78,12 @@ class Transition(PetriNetObject):
         
         # Kinetic metadata (optional, added by importers or enrichment)
         self.kinetic_metadata: Optional[KineticMetadata] = None
+        
+        # Quorum sensing / signal dependencies (13-tuple formalism: Ψ: T → 2^P)
+        # Places that this transition senses as environmental signals without arc connection
+        # Example: AHL concentration in bacterial quorum sensing
+        self.signal_places = []  # List of place IDs (e.g., ['P10', 'P15'])
+        self.is_environment_aware = False  # True if transition has signal dependencies
     
     def render(self, cr, zoom=1.0):
         """Render the transition as a filled rectangle with optional markers.
@@ -690,4 +696,56 @@ class Transition(PetriNetObject):
         if "kinetic_metadata" in data and create_metadata_from_dict is not None:
             transition.kinetic_metadata = create_metadata_from_dict(data["kinetic_metadata"])
         
+        # Restore signal places (quorum sensing)
+        if "signal_places" in data:
+            transition.signal_places = data["signal_places"]
+        if "is_environment_aware" in data:
+            transition.is_environment_aware = data["is_environment_aware"]
+        
         return transition
+    
+    def get_signal_dependencies(self):
+        """Return list of place IDs used as environmental signals.
+        
+        Signal places are non-local dependencies used in rate functions
+        following quorum sensing principles (e.g., AHL concentration).
+        
+        Returns:
+            list: Place IDs that this transition senses (e.g., ['P10', 'P15'])
+        """
+        return self.signal_places
+    
+    def is_environment_aware_transition(self):
+        """Check if transition responds to environmental signals.
+        
+        Returns:
+            bool: True if transition has signal dependencies (quorum sensing)
+        """
+        return len(self.signal_places) > 0
+    
+    def get_all_place_dependencies(self, arcs_list=None):
+        """Return all places used in rate function (local + signals).
+        
+        Combines:
+        - Local places: connected by input/output arcs
+        - Signal places: sensed as environmental signals (non-local)
+        
+        Args:
+            arcs_list: List of all arcs (optional, for computing local places)
+        
+        Returns:
+            set: All place IDs that affect this transition's rate
+        """
+        local_places = set()
+        
+        if arcs_list is not None:
+            # Get connected places
+            for arc in arcs_list:
+                if hasattr(arc, 'source') and hasattr(arc, 'target'):
+                    if arc.target == self.id:  # Input arc
+                        local_places.add(arc.source)
+                    elif arc.source == self.id:  # Output arc
+                        local_places.add(arc.target)
+        
+        # Combine local and signal places
+        return local_places | set(self.signal_places)

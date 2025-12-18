@@ -71,6 +71,11 @@ class SimulationSettings:
         self._batch_replicates = 100
         self._batch_output_folder = None
         self._recorded_objects = set()  # Set of place/transition IDs to record
+        
+        # Initial condition randomness (biological variability)
+        self._ic_noise_enabled = False  # Enable random perturbations to initial conditions
+        self._ic_noise_percent = 20.0  # Percentage of noise (±20% = uniform in [0.8, 1.2] range)
+        self._ic_noise_places = set()  # Specific places to randomize (empty = all non-catalyst places)
     
     # ========== Properties with Validation ==========
     
@@ -766,6 +771,79 @@ def _add_batch_mode_properties():
             return False
         return object_id in self._recorded_objects
     
+    # Initial condition noise properties
+    @property
+    def ic_noise_enabled(self) -> bool:
+        """Get whether initial condition noise is enabled.
+        
+        When enabled, initial markings are perturbed by random noise
+        for each replicate in batch mode. This simulates biological
+        cell-to-cell variability in initial molecular concentrations.
+        """
+        return getattr(self, '_ic_noise_enabled', False)
+    
+    @ic_noise_enabled.setter
+    def ic_noise_enabled(self, value: bool):
+        """Set initial condition noise enabled state."""
+        self._ic_noise_enabled = bool(value)
+    
+    @property
+    def ic_noise_percent(self) -> float:
+        """Get initial condition noise percentage.
+        
+        Noise is applied as uniform distribution: value * uniform(1-p/100, 1+p/100)
+        Example: 20% means each IC is multiplied by uniform(0.8, 1.2)
+        """
+        return getattr(self, '_ic_noise_percent', 20.0)
+    
+    @ic_noise_percent.setter
+    def ic_noise_percent(self, value: float):
+        """Set noise percentage with validation.
+        
+        Args:
+            value: Noise percentage (0-100)
+        
+        Raises:
+            ValueError: If percentage is out of range
+        """
+        if not 0 <= value <= 100:
+            raise ValueError("Noise percentage must be between 0 and 100")
+        self._ic_noise_percent = float(value)
+    
+    @property
+    def ic_noise_places(self) -> set:
+        """Get set of place IDs to apply noise to.
+        
+        If empty, noise is applied to all non-catalyst places.
+        """
+        if not hasattr(self, '_ic_noise_places'):
+            self._ic_noise_places = set()
+        return self._ic_noise_places
+    
+    def add_ic_noise_place(self, place_id: str):
+        """Mark a place for initial condition randomization.
+        
+        Args:
+            place_id: ID of place to randomize
+        """
+        if not hasattr(self, '_ic_noise_places'):
+            self._ic_noise_places = set()
+        self._ic_noise_places.add(place_id)
+    
+    def remove_ic_noise_place(self, place_id: str):
+        """Remove a place from randomization.
+        
+        Args:
+            place_id: ID of place to stop randomizing
+        """
+        if hasattr(self, '_ic_noise_places'):
+            self._ic_noise_places.discard(place_id)
+    
+    def clear_ic_noise_places(self):
+        """Clear all places from randomization list."""
+        if hasattr(self, '_ic_noise_places'):
+            self._ic_noise_places.clear()
+    
     # Add methods to SimulationSettings class
     SimulationSettings.batch_mode_enabled = batch_mode_enabled
     SimulationSettings.batch_replicates = batch_replicates
@@ -775,6 +853,12 @@ def _add_batch_mode_properties():
     SimulationSettings.remove_recorded_object = remove_recorded_object
     SimulationSettings.clear_recorded_objects = clear_recorded_objects
     SimulationSettings.is_object_recorded = is_object_recorded
+    SimulationSettings.ic_noise_enabled = ic_noise_enabled
+    SimulationSettings.ic_noise_percent = ic_noise_percent
+    SimulationSettings.ic_noise_places = ic_noise_places
+    SimulationSettings.add_ic_noise_place = add_ic_noise_place
+    SimulationSettings.remove_ic_noise_place = remove_ic_noise_place
+    SimulationSettings.clear_ic_noise_places = clear_ic_noise_places
 
 
 # Initialize batch mode properties

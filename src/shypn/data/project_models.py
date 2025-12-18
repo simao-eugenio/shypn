@@ -131,7 +131,10 @@ class Project:
         self.settings = {
             'auto_backup': True,
             'backup_frequency': 'daily',
-            'keep_backups': 5
+            'keep_backups': 5,
+            'auto_discover_models': True,
+            'auto_discover_pathways': True,
+            'auto_sync_on_load': True
         }
     
     def __str__(self) -> str:
@@ -402,35 +405,51 @@ class Project:
         return project
     
     def _sync_with_filesystem(self):
-        """Sync PathwayDocuments with actual files in pathways directory.
+        """Sync PathwayDocuments and ModelDocuments with actual files in directories.
         
         Actions:
             - Remove PathwayDocuments for missing files
+            - Remove ModelDocuments for missing files
             - Discover new files not tracked
         """
+        # Sync pathway files
         pathways_dir = self.get_pathways_dir()
-        if not pathways_dir or not pathways_dir.exists():
-            return
-        
-        # Find and remove PathwayDocuments for missing files
-        for pathway_id, pathway_doc in list(self._pathway_manager.pathways.items()):
-            if pathway_doc.raw_file:
-                file_path = pathways_dir / pathway_doc.raw_file
-                if not file_path.exists():
-                    # File was deleted externally
-                    self.remove_pathway(pathway_id)
-        
-        # Discover new files (if auto-discovery enabled)
-        if self.settings.get('auto_discover_pathways', True):
-            for file_path in pathways_dir.glob('*.kgml'):
-                self._discover_pathway_file(file_path)
+        if pathways_dir and pathways_dir.exists():
+            # Find and remove PathwayDocuments for missing files
+            for pathway_id, pathway_doc in list(self._pathway_manager.pathways.items()):
+                if pathway_doc.raw_file:
+                    file_path = pathways_dir / pathway_doc.raw_file
+                    if not file_path.exists():
+                        # File was deleted externally
+                        self.remove_pathway(pathway_id)
             
-            for file_path in pathways_dir.glob('*.xml'):
-                if not file_path.name.endswith('.meta.xml'):
+            # Discover new files (if auto-discovery enabled)
+            if self.settings.get('auto_discover_pathways', True):
+                for file_path in pathways_dir.glob('*.kgml'):
                     self._discover_pathway_file(file_path)
-            
-            for file_path in pathways_dir.glob('*.sbml'):
-                self._discover_pathway_file(file_path)
+                
+                for file_path in pathways_dir.glob('*.xml'):
+                    if not file_path.name.endswith('.meta.xml'):
+                        self._discover_pathway_file(file_path)
+                
+                for file_path in pathways_dir.glob('*.sbml'):
+                    self._discover_pathway_file(file_path)
+        
+        # Sync model files
+        models_dir_str = self.get_models_dir()
+        if models_dir_str:
+            models_dir = Path(models_dir_str)
+            if models_dir.exists():
+                # Find and remove ModelDocuments for missing files
+                for model_id, model_doc in list(self.models.items()):
+                    if model_doc.file_path and not os.path.exists(model_doc.file_path):
+                        # File was deleted externally
+                        self.remove_model(model_id)
+                
+                # Discover new model files (if auto-discovery enabled)
+                if self.settings.get('auto_discover_models', True):
+                    for file_path in models_dir.glob('*.shy'):
+                        self._discover_model_file(file_path)
     
     def _discover_pathway_file(self, file_path: Path):
         """Discover a pathway file if not already tracked.
@@ -450,7 +469,29 @@ class Project:
         # Use file handler to discover
         handler = ProjectFileHandler(self)
         handler._handle_pathway_file_added(file_path)
-        return cls.from_dict(data)
+    
+    def _discover_model_file(self, file_path: Path):
+        """Discover a model file if not already tracked.
+        
+        Args:
+            file_path: Path to model file (.shy)
+        """
+        abs_path = str(file_path.absolute())
+        
+        # Check if already tracked
+        for model_id, model in self.models.items():
+            if model.file_path == abs_path:
+                return  # Already tracked
+        
+        # Create a new ModelDocument for this file
+        model_name = file_path.stem  # Filename without extension
+        model = ModelDocument(
+            name=model_name,
+            file_path=abs_path
+        )
+        
+        # Add to project
+        self.add_model(model)
     
     def create_directory_structure(self):
         """Create the project directory structure."""
