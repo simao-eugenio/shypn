@@ -553,6 +553,6 @@
     {"id": "A25", "name": "A25", "label": "", "object_type": "arc", "source_id": "P3", "source_type": "place", "target_id": "T12", "target_type": "transition", "arc_type": "normal", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []},
     {"id": "A26", "name": "A26", "label": "", "object_type": "arc", "source_id": "P8", "source_type": "place", "target_id": "T12", "target_type": "transition", "arc_type": "normal", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []},
     {"id": "A27", "name": "A27", "label": "", "object_type": "arc", "source_id": "P9", "source_type": "place", "target_id": "T12", "target_type": "transition", "arc_type": "normal", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []},
-    {"id": "A28", "name": "A28", "label": "", "object_type": "arc", "source_id": "P12", "source_type": "place", "target_id": "T12", "target_type": "transition", "arc_type": "normal", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []}}
+    {"id": "A28", "name": "A28", "label": "", "object_type": "arc", "source_id": "P12", "source_type": "place", "target_id": "T12", "target_type": "transition", "arc_type": "normal", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []}
   ]
 }
