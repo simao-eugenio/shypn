@@ -4,7 +4,7 @@
     "created": "2025-12-18T00:00:00",
     "object_counts": {
       "places": 15,
-      "transitions": 13,
+      "transitions": 12,
       "arcs": 25
     },
     "author": "Shypn Quorum Sensing Feature",
@@ -554,30 +554,6 @@
       "guard": null,
       "properties": {
         "rate_function": "0.01 * Activation_marker * FOXP3"
-      }
-    },
-    {
-      "id": "T13",
-      "name": "t_IL2_degradation",
-      "label": "IL2\nDegradation",
-      "object_type": "transition",
-      "x": 700.0,
-      "y": 50.0,
-      "width": 40.0,
-      "height": 15.0,
-      "horizontal": true,
-      "enabled": true,
-      "fill_color": [1.0, 1.0, 1.0],
-      "border_color": [0.0, 0.0, 0.0],
-      "border_width": 2.0,
-      "transition_type": "stochastic",
-      "priority": 0,
-      "firing_policy": "single_server",
-      "is_source": false,
-      "is_sink": true,
-      "guard": null,
-      "properties": {
-        "rate_function": "0.05 * IL2_extracellular"
       }
     }
   ],
