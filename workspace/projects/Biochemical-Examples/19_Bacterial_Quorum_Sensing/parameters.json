@@ -1,0 +1,56 @@
+{
+  "description": "V. fischeri quorum sensing model parameters",
+  "reference": "Waters & Bassler (2005) Annu. Rev. Cell Dev. Biol. 21:319-346",
+  
+  "transcription": {
+    "k_txn_luxI": 0.5,
+    "k_txn_luxR": 0.3,
+    "k_txn_luxAB_basal": 0.01,
+    "k_txn_luxAB_max": 10.0,
+    "unit": "molecules/min",
+    "note": "Constitutive rates for luxI/luxR, QS-activated for luxAB"
+  },
+  
+  "translation": {
+    "k_trl": 1.0,
+    "unit": "proteins/mRNA/min",
+    "note": "Assumed same for all genes"
+  },
+  
+  "ahl_dynamics": {
+    "k_synth_AHL": 0.2,
+    "k_export": 0.1,
+    "AHL_external_base": 100,
+    "units": {
+      "k_synth_AHL": "molecules/LuxI/min",
+      "k_export": "1/min",
+      "AHL_external_base": "molecules"
+    },
+    "note": "Export rate accounts for passive diffusion"
+  },
+  
+  "binding": {
+    "k_binding": 0.01,
+    "K_luxR": 50.0,
+    "K_inhibit": 1000.0,
+    "units": {
+      "k_binding": "1/(molecules·min)",
+      "K_luxR": "molecules",
+      "K_inhibit": "molecules"
+    },
+    "note": "K_inhibit models negative feedback at high AHL"
+  },
+  
+  "bioluminescence": {
+    "k_light": 100.0,
+    "unit": "photons/LuxAB/min",
+    "note": "Light emission proportional to luciferase"
+  },
+  
+  "experimental_values": {
+    "AHL_EC50": "~10 nM",
+    "quorum_threshold": "1e8-1e9 cells/mL",
+    "response_time": "30-60 min",
+    "max_luminescence": "1e6-1e7 photons/s/cell"
+  }
+}
