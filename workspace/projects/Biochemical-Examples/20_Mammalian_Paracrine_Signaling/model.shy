@@ -4,8 +4,8 @@
     "created": "2025-12-18T00:00:00",
     "object_counts": {
       "places": 15,
-      "transitions": 12,
-      "arcs": 27
+      "transitions": 13,
+      "arcs": 25
     },
     "author": "Shypn Quorum Sensing Feature",
     "category": "biochemical",
@@ -334,7 +334,7 @@
       "priority": 0,
       "firing_policy": "single_server",
       "is_source": false,
-      "is_sink": false,
+      "is_sink": true,
       "guard": null,
       "properties": {
         "rate_function": "0.5 * IL2_intracellular"
@@ -555,6 +555,30 @@
       "properties": {
         "rate_function": "0.01 * Activation_marker * FOXP3"
       }
+    },
+    {
+      "id": "T13",
+      "name": "t_IL2_degradation",
+      "label": "IL2\nDegradation",
+      "object_type": "transition",
+      "x": 700.0,
+      "y": 50.0,
+      "width": 40.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [1.0, 1.0, 1.0],
+      "border_color": [0.0, 0.0, 0.0],
+      "border_width": 2.0,
+      "transition_type": "stochastic",
+      "priority": 0,
+      "firing_policy": "single_server",
+      "is_source": true,
+      "is_sink": false,
+      "guard": null,
+      "properties": {
+        "rate_function": "0.05 * IL2_extracellular"
+      }
     }
   ],
   "arcs": [
@@ -563,27 +587,25 @@
     {"id": "A3", "name": "A3", "label": "", "object_type": "arc", "source_id": "P2", "source_type": "place", "target_id": "T2", "target_type": "transition", "arc_type": "normal", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []},
     {"id": "A4", "name": "A4", "label": "", "object_type": "arc", "source_id": "T2", "source_type": "transition", "target_id": "P3", "target_type": "place", "arc_type": "normal", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []},
     {"id": "A5", "name": "A5", "label": "", "object_type": "arc", "source_id": "P3", "source_type": "place", "target_id": "T3", "target_type": "transition", "arc_type": "normal", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []},
-    {"id": "A6", "name": "A6", "label": "", "object_type": "arc", "source_id": "T3", "source_type": "transition", "target_id": "P4", "target_type": "place", "arc_type": "normal", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []},
+    {"id": "A6", "name": "A6", "label": "", "object_type": "arc", "source_id": "T4", "source_type": "transition", "target_id": "P6", "target_type": "place", "arc_type": "normal", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []},
     {"id": "A7", "name": "A7", "label": "", "object_type": "arc", "source_id": "P5", "source_type": "place", "target_id": "T4", "target_type": "transition", "arc_type": "test", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []},
-    {"id": "A8", "name": "A8", "label": "", "object_type": "arc", "source_id": "T4", "source_type": "transition", "target_id": "P6", "target_type": "place", "arc_type": "normal", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []},
-    {"id": "A9", "name": "A9", "label": "", "object_type": "arc", "source_id": "P6", "source_type": "place", "target_id": "T5", "target_type": "transition", "arc_type": "normal", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []},
-    {"id": "A10", "name": "A10", "label": "", "object_type": "arc", "source_id": "T5", "source_type": "transition", "target_id": "P7", "target_type": "place", "arc_type": "normal", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []},
-    {"id": "A11", "name": "A11", "label": "", "object_type": "arc", "source_id": "P7", "source_type": "place", "target_id": "T6", "target_type": "transition", "arc_type": "normal", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []},
-    {"id": "A12", "name": "A12", "label": "", "object_type": "arc", "source_id": "P4", "source_type": "place", "target_id": "T6", "target_type": "transition", "arc_type": "test", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []},
-    {"id": "A13", "name": "A13", "label": "", "object_type": "arc", "source_id": "T6", "source_type": "transition", "target_id": "P8", "target_type": "place", "arc_type": "normal", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []},
-    {"id": "A14", "name": "A14", "label": "", "object_type": "arc", "source_id": "P8", "source_type": "place", "target_id": "T7", "target_type": "transition", "arc_type": "test", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []},
-    {"id": "A15", "name": "A15", "label": "", "object_type": "arc", "source_id": "P9", "source_type": "place", "target_id": "T7", "target_type": "transition", "arc_type": "normal", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []},
-    {"id": "A16", "name": "A16", "label": "", "object_type": "arc", "source_id": "T7", "source_type": "transition", "target_id": "P10", "target_type": "place", "arc_type": "normal", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []},
-    {"id": "A17", "name": "A17", "label": "", "object_type": "arc", "source_id": "P10", "source_type": "place", "target_id": "T8", "target_type": "transition", "arc_type": "normal", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []},
-    {"id": "A18", "name": "A18", "label": "", "object_type": "arc", "source_id": "T8", "source_type": "transition", "target_id": "P9", "target_type": "place", "arc_type": "normal", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []},
-    {"id": "A19", "name": "A19", "label": "", "object_type": "arc", "source_id": "P11", "source_type": "place", "target_id": "T9", "target_type": "transition", "arc_type": "test", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []},
-    {"id": "A20", "name": "A20", "label": "", "object_type": "arc", "source_id": "P10", "source_type": "place", "target_id": "T9", "target_type": "transition", "arc_type": "test", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []},
-    {"id": "A21", "name": "A21", "label": "", "object_type": "arc", "source_id": "T9", "source_type": "transition", "target_id": "P12", "target_type": "place", "arc_type": "normal", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []},
-    {"id": "A22", "name": "A22", "label": "", "object_type": "arc", "source_id": "P12", "source_type": "place", "target_id": "T10", "target_type": "transition", "arc_type": "normal", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []},
-    {"id": "A23", "name": "A23", "label": "", "object_type": "arc", "source_id": "T10", "source_type": "transition", "target_id": "P13", "target_type": "place", "arc_type": "normal", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []},
-    {"id": "A24", "name": "A24", "label": "", "object_type": "arc", "source_id": "P8", "source_type": "place", "target_id": "T11", "target_type": "transition", "arc_type": "test", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []},
-    {"id": "A25", "name": "A25", "label": "SIGNAL", "object_type": "arc", "source_id": "P4", "source_type": "place", "target_id": "T11", "target_type": "transition", "arc_type": "none", "weight": 0.0, "threshold": 0.0, "color": [0.0, 0.4, 0.8], "width": 1.0, "control_points": [], "note": "NOT A REAL ARC - P4 referenced in rate formula only (signal place)"},
-    {"id": "A26", "name": "A26", "label": "", "object_type": "arc", "source_id": "T11", "source_type": "transition", "target_id": "P14", "target_type": "place", "arc_type": "normal", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []},
-    {"id": "A27", "name": "A27", "label": "", "object_type": "arc", "source_id": "P14", "source_type": "place", "target_id": "T12", "target_type": "transition", "arc_type": "test", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []}
+    {"id": "A8", "name": "A8", "label": "", "object_type": "arc", "source_id": "P6", "source_type": "place", "target_id": "T5", "target_type": "transition", "arc_type": "normal", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []},
+    {"id": "A9", "name": "A9", "label": "", "object_type": "arc", "source_id": "T5", "source_type": "transition", "target_id": "P7", "target_type": "place", "arc_type": "normal", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []},
+    {"id": "A10", "name": "A10", "label": "", "object_type": "arc", "source_id": "P7", "source_type": "place", "target_id": "T6", "target_type": "transition", "arc_type": "normal", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []},
+    {"id": "A11", "name": "A11", "label": "", "object_type": "arc", "source_id": "T6", "source_type": "transition", "target_id": "P8", "target_type": "place", "arc_type": "normal", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []},
+    {"id": "A12", "name": "A12", "label": "", "object_type": "arc", "source_id": "P8", "source_type": "place", "target_id": "T7", "target_type": "transition", "arc_type": "test", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []},
+    {"id": "A13", "name": "A13", "label": "", "object_type": "arc", "source_id": "P9", "source_type": "place", "target_id": "T7", "target_type": "transition", "arc_type": "normal", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []},
+    {"id": "A14", "name": "A14", "label": "", "object_type": "arc", "source_id": "T7", "source_type": "transition", "target_id": "P10", "target_type": "place", "arc_type": "normal", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []},
+    {"id": "A15", "name": "A15", "label": "", "object_type": "arc", "source_id": "P10", "source_type": "place", "target_id": "T8", "target_type": "transition", "arc_type": "normal", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []},
+    {"id": "A16", "name": "A16", "label": "", "object_type": "arc", "source_id": "T8", "source_type": "transition", "target_id": "P9", "target_type": "place", "arc_type": "normal", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []},
+    {"id": "A17", "name": "A17", "label": "", "object_type": "arc", "source_id": "P11", "source_type": "place", "target_id": "T9", "target_type": "transition", "arc_type": "test", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []},
+    {"id": "A18", "name": "A18", "label": "", "object_type": "arc", "source_id": "P10", "source_type": "place", "target_id": "T9", "target_type": "transition", "arc_type": "test", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []},
+    {"id": "A19", "name": "A19", "label": "", "object_type": "arc", "source_id": "T9", "source_type": "transition", "target_id": "P12", "target_type": "place", "arc_type": "normal", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []},
+    {"id": "A20", "name": "A20", "label": "", "object_type": "arc", "source_id": "P12", "source_type": "place", "target_id": "T10", "target_type": "transition", "arc_type": "normal", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []},
+    {"id": "A21", "name": "A21", "label": "", "object_type": "arc", "source_id": "T10", "source_type": "transition", "target_id": "P13", "target_type": "place", "arc_type": "normal", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []},
+    {"id": "A22", "name": "A22", "label": "", "object_type": "arc", "source_id": "P8", "source_type": "place", "target_id": "T11", "target_type": "transition", "arc_type": "test", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []},
+    {"id": "A23", "name": "A23", "label": "", "object_type": "arc", "source_id": "T11", "source_type": "transition", "target_id": "P14", "target_type": "place", "arc_type": "normal", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []},
+    {"id": "A24", "name": "A24", "label": "", "object_type": "arc", "source_id": "P14", "source_type": "place", "target_id": "T12", "target_type": "transition", "arc_type": "test", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []},
+    {"id": "A25", "name": "A25", "label": "", "object_type": "arc", "source_id": "T12", "source_type": "transition", "target_id": "P15", "target_type": "place", "arc_type": "normal", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []}
   ]
 }
