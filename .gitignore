@@ -95,6 +95,7 @@ examples/
 
 # Test suite
 tests/
+test_output/
 
 # Utility scripts (development tools)
 scripts/
