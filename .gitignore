@@ -111,6 +111,10 @@ workspace/projects/My_Project/
 workspace/projects/thesis/
 workspace/projects/*.json
 
+# Biochemical-Examples artifacts (metadata, simulation results)
+workspace/projects/*/metadata/
+workspace/projects/*/results/
+
 # LaTeX auxiliary files
 *.aux
 *.log

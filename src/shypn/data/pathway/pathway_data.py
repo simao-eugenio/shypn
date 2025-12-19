@@ -16,6 +16,145 @@ from typing import List, Dict, Tuple, Optional, Any
 
 
 @dataclass
+class Annotation:
+    """
+    MIRIAM-compliant annotation for species/reactions.
+    
+    Stores database cross-references following MIRIAM guidelines:
+    - identifiers.org URIs
+    - Biological database IDs (ChEBI, KEGG, UniProt, etc.)
+    - SBO (Systems Biology Ontology) terms
+    
+    Attributes:
+        identifiers: Dict mapping database names to IDs
+                    Example: {'chebi': 'CHEBI:15422', 'kegg': 'C00002'}
+        uris: List of full identifiers.org URIs
+             Example: ['http://identifiers.org/chebi/CHEBI:15422']
+        sbo_term: Systems Biology Ontology term
+                 Example: "SBO:0000247" (simple chemical)
+        notes: Free-text notes from SBML
+    """
+    identifiers: Dict[str, str] = field(default_factory=dict)
+    uris: List[str] = field(default_factory=list)
+    sbo_term: Optional[str] = None
+    notes: Optional[str] = None
+    
+    def get_uri(self, database: str) -> Optional[str]:
+        """
+        Get identifiers.org URI for a specific database.
+        
+        Args:
+            database: Database name (e.g., 'chebi', 'kegg')
+            
+        Returns:
+            Full URI or None if database not found
+        """
+        if database in self.identifiers:
+            db_id = self.identifiers[database]
+            return f"http://identifiers.org/{database}/{db_id}"
+        return None
+    
+    def __repr__(self) -> str:
+        dbs = ', '.join(self.identifiers.keys())
+        return f"Annotation(databases=[{dbs}], sbo={self.sbo_term})"
+
+
+@dataclass
+class Compartment:
+    """
+    Cellular compartment with volume information.
+    
+    Enhanced from simple string mapping to full object representation.
+    Enables proper amount ↔ concentration conversion in multi-compartment models.
+    
+    Attributes:
+        id: Unique identifier (e.g., "cytosol", "mitochondria")
+        name: Human-readable name
+        size: Volume (default unit: liters)
+        spatial_dimensions: Dimensionality (3D by default)
+        units: Volume units (optional)
+        constant: True if volume doesn't change over time
+        metadata: Additional properties
+    """
+    id: str
+    name: str
+    size: float = 1.0
+    spatial_dimensions: int = 3
+    units: Optional[str] = None
+    constant: bool = True
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    
+    def __repr__(self) -> str:
+        return f"Compartment(id={self.id!r}, name={self.name!r}, size={self.size})"
+
+
+@dataclass
+class Event:
+    """
+    SBML Event representation (14th tuple component).
+    
+    Events enable experimental perturbations and environmental changes:
+    - Time-based triggers (e.g., t > 100)
+    - State-based triggers (e.g., [Glucose] < 0.1)
+    - Discrete assignments to species/parameters
+    
+    Used for modeling:
+    - Drug addition
+    - Nutrient depletion
+    - Temperature changes
+    - Protocol steps
+    
+    Attributes:
+        id: Unique identifier
+        name: Human-readable name
+        trigger: Mathematical expression for trigger condition
+        delay: Delay before executing assignments (time units)
+        use_values_from_trigger_time: Use values at trigger time or execution time
+        priority: Priority for simultaneous events (higher = first)
+        assignments: Dict mapping variable IDs to assignment expressions
+        trigger_compiled: Compiled trigger for simulation (set during simulation init)
+        metadata: Additional properties
+    """
+    id: str
+    name: Optional[str] = None
+    trigger: str = ""
+    delay: float = 0.0
+    use_values_from_trigger_time: bool = True
+    priority: int = 0
+    assignments: Dict[str, str] = field(default_factory=dict)
+    trigger_compiled: Optional[Any] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    
+    def __repr__(self) -> str:
+        return f"Event(id={self.id!r}, trigger={self.trigger!r}, assignments={len(self.assignments)})"
+
+
+@dataclass
+class UnitDefinition:
+    """
+    SBML unit definition for consistent parameter interpretation.
+    
+    Stores custom units and conversion factors to base SI units.
+    Enables proper unit normalization during SBML import.
+    
+    Attributes:
+        id: Unit identifier (e.g., "mM", "per_second")
+        name: Human-readable name
+        base_units: List of base unit components
+                   Each tuple: (kind, exponent, scale, multiplier)
+                   Example for mM: [('mole', 1, -3, 1.0), ('litre', -1, 0, 1.0)]
+        si_conversion_factor: Multiplicative factor to convert to SI base units
+    """
+    id: str
+    name: Optional[str] = None
+    base_units: List[Tuple[str, int, int, float]] = field(default_factory=list)
+    si_conversion_factor: float = 1.0
+    
+    def __repr__(self) -> str:
+        return f"UnitDefinition(id={self.id!r}, si_factor={self.si_conversion_factor})"
+
+
+@dataclass
 class Species:
     """
     Represents a biochemical species (metabolite/compound).
@@ -51,6 +190,12 @@ class Species:
     # Database cross-references
     chebi_id: Optional[str] = None
     kegg_id: Optional[str] = None
+    
+    # Phase 1 additions: SBML Compliance
+    annotation: Optional[Annotation] = None
+    compartment_ref: Optional[Compartment] = None  # Reference to Compartment object
+    substance_units: Optional[str] = None
+    has_only_substance_units: bool = False  # True = amount, False = concentration
     
     # Additional properties
     metadata: Dict[str, Any] = field(default_factory=dict)
@@ -106,6 +251,10 @@ class Reaction:
     reversible: bool = False
     enzyme: Optional[str] = None  # Legacy field for enzyme name
     
+    # Phase 1 additions: SBML Compliance
+    annotation: Optional[Annotation] = None
+    sbo_term: Optional[str] = None
+    
     # Additional properties
     metadata: Dict[str, Any] = field(default_factory=dict)
     
@@ -125,14 +274,24 @@ class PathwayData:
     Attributes:
         species: List of all species (metabolites)
         reactions: List of all reactions
-        compartments: Dict mapping compartment IDs to names
+        compartments: Dict mapping compartment IDs to names (legacy, for backward compatibility)
         parameters: Global parameters
         metadata: Pathway-level information (name, source, etc.)
+        
+    Phase 1 additions (SBML Compliance):
+        events: List of SBML events (14th tuple component)
+        compartments_enhanced: Dict mapping compartment IDs to Compartment objects
+        unit_definitions: Dict mapping unit IDs to UnitDefinition objects
     """
     species: List[Species] = field(default_factory=list)
     reactions: List[Reaction] = field(default_factory=list)
-    compartments: Dict[str, str] = field(default_factory=dict)  # {id: name}
+    compartments: Dict[str, str] = field(default_factory=dict)  # {id: name} - legacy
     parameters: Dict[str, float] = field(default_factory=dict)
+    
+    # Phase 1 additions: SBML Compliance
+    events: List[Event] = field(default_factory=list)
+    compartments_enhanced: Dict[str, Compartment] = field(default_factory=dict)
+    unit_definitions: Dict[str, UnitDefinition] = field(default_factory=dict)
     
     # Metadata
     metadata: Dict[str, Any] = field(default_factory=dict)
