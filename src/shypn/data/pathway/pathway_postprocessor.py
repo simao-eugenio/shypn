@@ -264,6 +264,7 @@ class PathwayPostProcessor:
             species=list(pathway.species),
             reactions=list(pathway.reactions),
             compartments=dict(pathway.compartments),
+            compartments_enhanced=dict(pathway.compartments_enhanced),  # Phase 1: Enhanced
             parameters=dict(pathway.parameters),
             metadata=dict(pathway.metadata),
             positions={},
@@ -271,32 +272,77 @@ class PathwayPostProcessor:
             compartment_groups={}
         )
         
-        # Assign ARBITRARY positions (force-directed will recalculate everything)
-        # These positions are just placeholders so the converter doesn't complain
-        self.logger.info("Assigning arbitrary positions (force-directed will recalculate)")
+        # Assign positions with compartment-aware spatial separation
+        # Extracellular/non-default compartments → periphery (top edge)
+        # Default compartment (cytosol) → center
+        self.logger.info("Assigning compartment-aware positions")
         
-        base_x, base_y = 100.0, 100.0
+        # Determine default compartment (same logic as PathwayConverter)
+        from collections import Counter
+        compartment_counts = Counter(s.compartment for s in processed.species if s.compartment)
+        default_compartment = None
+        DEFAULT_NAMES = ['cytosol', 'cytoplasm', 'cell', 'intracellular', 'default']
+        
+        for default_name in DEFAULT_NAMES:
+            if default_name in compartment_counts:
+                default_compartment = default_name
+                break
+        
+        if not default_compartment and compartment_counts:
+            default_compartment = compartment_counts.most_common(1)[0][0]
+        
+        self.logger.info(f"Default compartment for layout: {default_compartment}")
+        
+        # Separate species by compartment type
+        default_species = []
+        non_default_species = []
+        
+        for species in processed.species:
+            if species.compartment == default_compartment:
+                default_species.append(species)
+            else:
+                non_default_species.append(species)
+        
+        # Position non-default compartment species on periphery (top edge)
+        periphery_y = 100.0
+        periphery_x = 100.0
+        spacing = 100.0  # Horizontal spacing between extracellular species
+        
+        for i, species in enumerate(non_default_species):
+            x = periphery_x + (i * spacing)
+            y = periphery_y
+            processed.positions[species.id] = (x, y)
+            self.logger.debug(
+                f"Non-default compartment '{species.compartment}': {species.id} at ({x}, {y})"
+            )
+        
+        # Position default compartment species in center region (below periphery)
+        center_y = 300.0  # Below extracellular species
+        center_x = 100.0
         offset = 0.0
         
-        # All species at similar positions (force-directed will spread them)
-        for species in processed.species:
-            processed.positions[species.id] = (base_x + offset, base_y + offset)
+        for species in default_species:
+            processed.positions[species.id] = (center_x + offset, center_y + offset)
             offset += 10.0  # Small offset to avoid exact overlap
         
-        # All reactions at similar positions (force-directed will spread them)
+        # All reactions positioned between compartment regions
         offset = 0.0
+        reaction_y = 200.0  # Between periphery and center
         for reaction in processed.reactions:
-            processed.positions[reaction.id] = (base_x + 50.0 + offset, base_y + 50.0 + offset)
+            processed.positions[reaction.id] = (center_x + offset, reaction_y + offset)
             offset += 10.0
         
         self.logger.info(
-            f"Assigned {len(processed.positions)} arbitrary positions "
-            f"(Swiss Palette force-directed will replace these)"
+            f"Positioned {len(non_default_species)} non-default species on periphery (y=100), "
+            f"{len(default_species)} default species in center (y=300)"
         )
         
-        # Mark as arbitrary (no real layout applied)
-        processed.metadata['layout_type'] = 'arbitrary'
-        processed.metadata['layout_note'] = 'Use Swiss Palette → Force-Directed to apply physics-based layout'
+        # Mark as compartment-separated layout
+        processed.metadata['layout_type'] = 'compartment_separated'
+        processed.metadata['layout_note'] = (
+            'Compartments spatially separated: non-default on periphery, default in center. '
+            'Use Swiss Palette → Force-Directed to refine layout.'
+        )
         
         # Create processors (NO LAYOUT PROCESSOR - that's gone!)
         processors = [

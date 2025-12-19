@@ -53,6 +53,11 @@ class Place(PetriNetObject):
         # True if this place is referenced in rate formulas but has no arc connections
         # (quorum sensing, environment sensing, paracrine signaling)
         self.is_signal_place = False
+        
+        # Compartment place marker (14-tuple Bio-PN formalism)
+        # is_compartment_place: True if in non-default compartment (e.g., extracellular)
+        #   Rendered as green circle (NOT hexagon - those are only for signal places)
+        self.is_compartment_place = False
     
     def render(self, cr, zoom=1.0):
         """Render the place as a hollow circle (or hexagon for signal places).
@@ -71,14 +76,21 @@ class Place(PetriNetObject):
         # Use world coordinates directly (Cairo transform handles conversion)
         # Legacy approach: cr.scale() is already applied, so we draw in world space
         
-        # Signal places use blue color to distinguish them
-        display_color = (0.0, 0.4, 0.8) if self.is_signal_place else self.border_color
+        # Color coding for different place types
+        if self.is_signal_place:
+            display_color = (0.0, 0.4, 0.8)  # Blue for signal places (no arcs)
+        elif self.is_compartment_place:
+            display_color = (0.6, 0.0, 0.8)  # Violet for non-default compartment (has arcs)
+        else:
+            display_color = self.border_color  # Black for normal places (cytosol, uncompartmentalized)
         
         # Add glow effect for colored objects (CSS-like styling)
         if display_color != self.DEFAULT_BORDER_COLOR:
             if self.is_signal_place:
+                # Hexagons only for signal places (no arcs)
                 self._draw_hexagon_path(cr, self.x, self.y, self.radius + 2 / zoom)
             else:
+                # Circles for compartment places (have arcs)
                 cr.arc(self.x, self.y, self.radius + 2 / zoom, 0, 2 * math.pi)
             r, g, b = display_color
             cr.set_source_rgba(r, g, b, 0.3)  # Semi-transparent color
@@ -87,10 +99,10 @@ class Place(PetriNetObject):
         
         # Draw shape based on type
         if self.is_signal_place:
-            # Draw hexagon for signal places (environment sensing)
+            # Draw hexagon ONLY for signal places (no arcs - Bio-PN Ψ)
             self._draw_hexagon_path(cr, self.x, self.y, self.radius)
         else:
-            # Draw hollow circle (legacy style: stroke only, no fill)
+            # Draw circle for all other places (including compartment places with arcs)
             cr.arc(self.x, self.y, self.radius, 0, 2 * math.pi)
         
         cr.set_source_rgb(*display_color)

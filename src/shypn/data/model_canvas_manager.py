@@ -2365,24 +2365,41 @@ class ModelCanvasManager:
         When objects are selected in the Analyses panel, they get colored with
         plot colors for visualization. These colors are temporary and should NOT
         be saved to the file. This method resets:
-        - Transition border and fill colors
-        - Place border colors
-        - Arc colors (for locality highlighting)
+        - Transition border and fill colors (except source/sink transitions)
+        - Place border colors (except compartment/signal places)
+        - Arc colors (except boundary species arcs)
+        
+        IMPORTANT: We preserve colors that are part of the model semantics:
+        - Source/sink transitions keep their cyan colors
+        - Compartment places keep their violet borders
+        - Boundary species arcs keep their cyan colors
         """
         from shypn.netobjs import Transition, Place
         from shypn.netobjs.arc import Arc
         
-        # Reset transition colors
+        # Reset transition colors (but preserve source/sink)
         for transition in self.transitions:
+            # Skip source/sink transitions - they have semantic colors
+            if transition.is_source or transition.is_sink:
+                continue
             transition.border_color = Transition.DEFAULT_BORDER_COLOR
             transition.fill_color = Transition.DEFAULT_COLOR
         
-        # Reset place colors
+        # Reset place colors (but preserve compartment/signal places)
         for place in self.places:
+            # Skip compartment and signal places - they have semantic colors
+            if place.is_compartment_place or place.is_signal_place:
+                continue
             place.border_color = Place.DEFAULT_BORDER_COLOR
         
-        # Reset arc colors
+        # Reset arc colors (but preserve boundary species arcs)
+        # Boundary species arcs are cyan (0.0, 0.5, 0.5)
+        # We assume any non-black arc is a semantic color and should be preserved
         for arc in self.arcs:
+            # Skip arcs with semantic colors (non-black)
+            if arc.color != Arc.DEFAULT_COLOR:
+                continue
+            # This arc is already black, keep it black
             arc.color = Arc.DEFAULT_COLOR
         
         # Trigger redraw to show the reset colors
