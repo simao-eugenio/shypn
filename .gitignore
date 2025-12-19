@@ -133,12 +133,3 @@ workspace/projects/*/results/
 # PDF outputs (except final paper if needed)
 doc/**/*.pdf
 *.pdf
-
-# Diagnostic and test scripts (development only, not for reviewers)
-check_*.py
-diagnose_*.py
-deep_dive_*.py
-repair_*.py
-reimport_*.py
-test_*.py
-*_debug*.py
