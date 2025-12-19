@@ -84,6 +84,10 @@ class Transition(PetriNetObject):
         # Example: AHL concentration in bacterial quorum sensing
         self.signal_places = []  # List of place IDs (e.g., ['P10', 'P15'])
         self.is_environment_aware = False  # True if transition has signal dependencies
+        
+        # Module assignment (modular Bio-PN architecture)
+        # Transitions belong to modules, enabling network partitioning
+        self.module_id: Optional[str] = None  # Module identifier (e.g., "M_cytoplasm", "M_mitochondria")
     
     def render(self, cr, zoom=1.0):
         """Render the transition as a filled rectangle with optional markers.

@@ -5,7 +5,9 @@ Places represent conditions or states and can contain tokens.
 Rendered as a circle with optional label and token display.
 """
 import math
+from typing import Optional, List
 from shypn.netobjs.petri_net_object import PetriNetObject
+from shypn.netobjs.signal_type import SignalType
 
 
 class Place(PetriNetObject):
@@ -49,14 +51,19 @@ class Place(PetriNetObject):
         self.initial_marking = 0  # Initial marking for simulation reset
         self.capacity = float('inf')  # Maximum token capacity (infinite by default)
         
-        # Signal place marker (13-tuple Bio-PN formalism: Ψ)
-        # True if this place is referenced in rate formulas but has no arc connections
-        # (quorum sensing, environment sensing, paracrine signaling)
-        self.is_signal_place = False
+        # Signal place properties (13-tuple Bio-PN formalism: Ψ)
+        # Signal places enable modular architecture through information flow without mass transfer
+        self.is_signal_place = False  # True if this place has no arc connections (read-only sensing)
+        self.signal_type: Optional[SignalType] = None  # Classification: quorum, energy, regulatory, spatial
+        self.signal_scope: List[str] = []  # Module IDs that can read this signal (empty = global scope)
         
-        # Compartment place marker (14-tuple Bio-PN formalism)
+        # Module assignment (modular Bio-PN architecture)
+        # Places belong to modules, enabling network partitioning and compartmentalization
+        self.module_id: Optional[str] = None  # Module identifier (e.g., "M_cytoplasm", "M_mitochondria")
+        
+        # Compartment place marker (backward compatibility)
         # is_compartment_place: True if in non-default compartment (e.g., extracellular)
-        #   Rendered as green circle (NOT hexagon - those are only for signal places)
+        #   Rendered as violet circle (NOT hexagon - those are only for signal places)
         self.is_compartment_place = False
     
     def render(self, cr, zoom=1.0):
