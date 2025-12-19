@@ -251,13 +251,58 @@ class SBMLCategory(BasePathwayCategory):
 
     
     def _build_preview_section(self) -> Gtk.Widget:
-        """Build preview text view."""
+        """Build preview section with metadata tree view."""
         frame = Gtk.Frame()
-        frame.set_label("Preview")
+        frame.set_label("SBML Metadata Inspector")
         
-        scrolled = Gtk.ScrolledWindow()
-        scrolled.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-        scrolled.set_size_request(-1, 150)
+        # Main container with notebook for tabs
+        notebook = Gtk.Notebook()
+        notebook.set_tab_pos(Gtk.PositionType.TOP)
+        
+        # Tab 1: Tree view for structured metadata
+        tree_scroll = Gtk.ScrolledWindow()
+        tree_scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        tree_scroll.set_size_request(-1, 200)
+        
+        # Tree store: [icon, name, value, type, object_id, tooltip]
+        self.metadata_store = Gtk.TreeStore(str, str, str, str, str, str)
+        self.metadata_tree = Gtk.TreeView(model=self.metadata_store)
+        self.metadata_tree.set_grid_lines(Gtk.TreeViewGridLines.HORIZONTAL)
+        self.metadata_tree.set_enable_tree_lines(True)
+        self.metadata_tree.set_tooltip_column(5)  # Tooltip from column 5
+        
+        # Icon column
+        icon_renderer = Gtk.CellRendererText()
+        icon_col = Gtk.TreeViewColumn("", icon_renderer, text=0)
+        icon_col.set_fixed_width(30)
+        self.metadata_tree.append_column(icon_col)
+        
+        # Name column
+        name_renderer = Gtk.CellRendererText()
+        name_col = Gtk.TreeViewColumn("Name", name_renderer, text=1)
+        name_col.set_resizable(True)
+        name_col.set_expand(True)
+        self.metadata_tree.append_column(name_col)
+        
+        # Value column
+        value_renderer = Gtk.CellRendererText()
+        value_renderer.set_property("family", "monospace")
+        value_renderer.set_property("editable", True)
+        value_renderer.connect("edited", self._on_value_edited)
+        value_col = Gtk.TreeViewColumn("Value", value_renderer, text=2)
+        value_col.set_resizable(True)
+        value_col.set_expand(True)
+        self.metadata_tree.append_column(value_col)
+        
+        # Connect click handler
+        self.metadata_tree.connect("row-activated", self._on_metadata_row_clicked)
+        
+        tree_scroll.add(self.metadata_tree)
+        notebook.append_page(tree_scroll, Gtk.Label(label="📊 Metadata Tree"))
+        
+        # Tab 2: Text view for summary
+        text_scroll = Gtk.ScrolledWindow()
+        text_scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
         
         self.preview_text = Gtk.TextView()
         self.preview_text.set_editable(False)
@@ -267,19 +312,16 @@ class SBMLCategory(BasePathwayCategory):
         self.preview_text.set_top_margin(6)
         self.preview_text.set_bottom_margin(6)
         
-        # Set initial placeholder text
         buffer = self.preview_text.get_buffer()
         buffer.set_text(
-            "Model information will appear here after import...\n\n"
-            "The preview will show:\n"
-            "• Model name and organism\n"
-            "• Number of species and reactions\n"
-            "• Compartments and metadata"
+            "Model summary will appear here after import...\n\n"
+            "Click the 'Metadata Tree' tab to see detailed SBML information."
         )
         
-        scrolled.add(self.preview_text)
+        text_scroll.add(self.preview_text)
+        notebook.append_page(text_scroll, Gtk.Label(label="📄 Summary"))
         
-        frame.add(scrolled)
+        frame.add(notebook)
         return frame
     
     # Event handlers
@@ -1243,6 +1285,255 @@ class SBMLCategory(BasePathwayCategory):
         
         # Execute on main thread
         GLib.idle_add(do_update)
+        
+        # Also update metadata tree
+        self._update_metadata_tree(pathway)
+    
+    def _update_metadata_tree(self, pathway):
+        """Update metadata tree with SBML information.
+        
+        Args:
+            pathway: PathwayData object from parser
+        """
+        def do_update():
+            try:
+                self.metadata_store.clear()
+                
+                if not pathway:
+                    root = self.metadata_store.append(None, [
+                        "ℹ️", "No pathway data", "", "", "", ""
+                    ])
+                    return False
+                
+                # Parameters section
+                params_root = self.metadata_store.append(None, [
+                    "📊", "Parameters", f"{len(getattr(pathway, 'parameters', {}))} items",
+                    "section", "", "Global and local kinetic parameters"
+                ])
+                for param_id, param_value in getattr(pathway, 'parameters', {}).items():
+                    self.metadata_store.append(params_root, [
+                        "🌐", param_id, str(param_value), "parameter",
+                        param_id, f"Global parameter: {param_id} = {param_value}"
+                    ])
+                
+                # Compartments section
+                comps = getattr(pathway, 'compartments_enhanced', {})
+                comps_root = self.metadata_store.append(None, [
+                    "🔷", "Compartments", f"{len(comps)} items",
+                    "section", "", "Cellular compartments with volumes"
+                ])
+                for comp_id, comp in comps.items():
+                    self.metadata_store.append(comps_root, [
+                        "🔷", comp.name, f"{comp.size} L",
+                        "compartment", comp_id,
+                        f"Compartment: {comp.name}, Volume: {comp.size} L"
+                    ])
+                
+                # Species section (with annotations)
+                species = getattr(pathway, 'species', [])
+                species_root = self.metadata_store.append(None, [
+                    "🔵", "Species", f"{len(species)} items",
+                    "section", "", "Metabolites and compounds"
+                ])
+                for s in species[:20]:  # Limit to first 20 for performance
+                    species_iter = self.metadata_store.append(species_root, [
+                        "🔵", s.name or s.id, 
+                        f"{s.initial_concentration} mM" if s.initial_concentration else "",
+                        "species", s.id,
+                        f"Species: {s.name or s.id}, Compartment: {s.compartment or 'default'}"
+                    ])
+                    
+                    # Add annotations if available
+                    if hasattr(s, 'annotation') and s.annotation:
+                        annot = s.annotation
+                        if hasattr(annot, 'identifiers') and annot.identifiers:
+                            for db, db_id in annot.identifiers.items():
+                                self.metadata_store.append(species_iter, [
+                                    "🏷️", db.upper(), db_id, "annotation",
+                                    "", f"Database ID: {db}:{db_id}"
+                                ])
+                
+                # Reactions section
+                reactions = getattr(pathway, 'reactions', [])
+                reactions_root = self.metadata_store.append(None, [
+                    "🔶", "Reactions", f"{len(reactions)} items",
+                    "section", "", "Biochemical reactions"
+                ])
+                for r in reactions[:20]:  # Limit to first 20
+                    r_name = r.name or r.id
+                    reaction_iter = self.metadata_store.append(reactions_root, [
+                        "🔶", r_name, 
+                        "reversible" if r.reversible else "irreversible",
+                        "reaction", r.id,
+                        f"Reaction: {r_name}"
+                    ])
+                    
+                    # Add local parameters if available
+                    if hasattr(r, 'kinetic_law') and r.kinetic_law:
+                        if hasattr(r.kinetic_law, 'parameters') and r.kinetic_law.parameters:
+                            params_iter = self.metadata_store.append(reaction_iter, [
+                                "📊", "Local Parameters", 
+                                f"{len(r.kinetic_law.parameters)} items",
+                                "section", "", "Parameters specific to this reaction"
+                            ])
+                            for param_id, param_value in r.kinetic_law.parameters.items():
+                                self.metadata_store.append(params_iter, [
+                                    "🔵", param_id, str(param_value),
+                                    "local_param", param_id,
+                                    f"Local parameter: {param_id} = {param_value}"
+                                ])
+                
+                # Events section
+                events = getattr(pathway, 'events', [])
+                events_root = self.metadata_store.append(None, [
+                    "⚡", "Events", f"{len(events)} items",
+                    "section", "", "Time/state-triggered perturbations"
+                ])
+                if events:
+                    for event in events:
+                        event_iter = self.metadata_store.append(events_root, [
+                            "⚡", event.name or event.id,
+                            event.trigger[:50] if event.trigger else "",
+                            "event", event.id,
+                            f"Trigger: {event.trigger}"
+                        ])
+                        # Add assignments
+                        if hasattr(event, 'assignments') and event.assignments:
+                            for var, expr in event.assignments.items():
+                                self.metadata_store.append(event_iter, [
+                                    "➜", var, expr[:50], "assignment",
+                                    "", f"Sets {var} = {expr}"
+                                ])
+                else:
+                    self.metadata_store.append(events_root, [
+                        "", "No events", "", "", "", ""
+                    ])
+                
+                # Expand top level
+                self.metadata_tree.expand_row(Gtk.TreePath.new_first(), False)
+                
+            except Exception as e:
+                self.logger.error(f"Error updating metadata tree: {e}", exc_info=True)
+            
+            return False
+        
+        GLib.idle_add(do_update)
+    
+    def _on_metadata_row_clicked(self, tree_view, path, column):
+        """Handle metadata tree row activation.
+        
+        Shows a dialog with full information about the clicked item.
+        """
+        model = tree_view.get_model()
+        iter_node = model.get_iter(path)
+        
+        obj_type = model.get_value(iter_node, 3)
+        obj_id = model.get_value(iter_node, 4)
+        tooltip = model.get_value(iter_node, 5)
+        
+        if not tooltip:
+            return
+        
+        # Show info dialog
+        dialog = Gtk.MessageDialog(
+            transient_for=self.parent_window,
+            flags=0,
+            message_type=Gtk.MessageType.INFO,
+            buttons=Gtk.ButtonsType.OK,
+            text=model.get_value(iter_node, 1)
+        )
+        dialog.format_secondary_text(tooltip)
+        dialog.run()
+        dialog.destroy()
+    
+    def _on_value_edited(self, renderer, path, new_text):
+        """Handle value editing in metadata tree.
+        
+        Updates the underlying pathway data and marks as modified.
+        """
+        try:
+            model = self.metadata_store
+            iter_node = model.get_iter(path)
+            
+            obj_type = model.get_value(iter_node, 3)  # type column
+            obj_id = model.get_value(iter_node, 4)    # object_id column
+            old_value = model.get_value(iter_node, 2) # current value
+            
+            # Validate and parse new value
+            try:
+                # Try to parse as float for numeric parameters
+                if obj_type in ['parameter', 'local_param', 'compartment']:
+                    # Remove units if present (e.g., "1.5 L" -> 1.5)
+                    numeric_part = new_text.split()[0] if ' ' in new_text else new_text
+                    new_value = float(numeric_part)
+                else:
+                    new_value = new_text
+            except ValueError:
+                # If not numeric, keep as string
+                new_value = new_text
+            
+            # Update the tree store
+            model.set_value(iter_node, 2, str(new_value))
+            
+            # Update the underlying pathway data
+            if not self.parsed_pathway:
+                self.logger.warning("No parsed pathway to update")
+                return
+            
+            if obj_type == 'parameter':
+                # Update global parameter
+                if hasattr(self.parsed_pathway, 'parameters'):
+                    if obj_id in self.parsed_pathway.parameters:
+                        self.parsed_pathway.parameters[obj_id] = new_value
+                        self.logger.info(f"Updated global parameter {obj_id}: {old_value} → {new_value}")
+                        self._show_status(f"✓ Updated {obj_id} = {new_value}")
+            
+            elif obj_type == 'compartment':
+                # Update compartment size
+                if hasattr(self.parsed_pathway, 'compartments_enhanced'):
+                    if obj_id in self.parsed_pathway.compartments_enhanced:
+                        comp = self.parsed_pathway.compartments_enhanced[obj_id]
+                        comp.size = new_value
+                        # Also update in parameters dict (used in formulas)
+                        if hasattr(self.parsed_pathway, 'parameters'):
+                            self.parsed_pathway.parameters[obj_id] = new_value
+                        self.logger.info(f"Updated compartment {obj_id}: {old_value} → {new_value}")
+                        self._show_status(f"✓ Updated compartment {obj_id} = {new_value} L")
+            
+            elif obj_type == 'local_param':
+                # Update local parameter in reaction
+                # Need to find the parent reaction
+                parent_iter = model.iter_parent(iter_node)
+                if parent_iter:
+                    grandparent_iter = model.iter_parent(parent_iter)
+                    if grandparent_iter:
+                        reaction_id = model.get_value(grandparent_iter, 4)
+                        if hasattr(self.parsed_pathway, 'reactions'):
+                            for reaction in self.parsed_pathway.reactions:
+                                if reaction.id == reaction_id:
+                                    if hasattr(reaction, 'kinetic_law') and reaction.kinetic_law:
+                                        if hasattr(reaction.kinetic_law, 'parameters'):
+                                            if obj_id in reaction.kinetic_law.parameters:
+                                                reaction.kinetic_law.parameters[obj_id] = new_value
+                                                self.logger.info(
+                                                    f"Updated local parameter {obj_id} in {reaction_id}: "
+                                                    f"{old_value} → {new_value}"
+                                                )
+                                                self._show_status(
+                                                    f"✓ Updated {obj_id} = {new_value} in {reaction_id}"
+                                                )
+                                                break
+            
+            # Mark as modified
+            if hasattr(self.parsed_pathway, 'metadata'):
+                if not isinstance(self.parsed_pathway.metadata, dict):
+                    self.parsed_pathway.metadata = {}
+                self.parsed_pathway.metadata['modified'] = True
+                self.parsed_pathway.metadata['modified_time'] = time.time()
+        
+        except Exception as e:
+            self.logger.error(f"Error editing value: {e}", exc_info=True)
+            self._show_status(f"✗ Error updating value: {e}", error=True)
     
     def _show_status(self, message: str, error: bool = False):
         """Update status label (Wayland-safe)."""

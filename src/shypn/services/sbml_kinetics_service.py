@@ -344,14 +344,23 @@ class SBMLKineticsIntegrationService:
             
             # Merge parameters: global parameters (includes compartment sizes) + local kinetic law parameters
             all_parameters = {}
+            global_params = set()
+            local_params = set()
             
             # 1. Add global parameters from SBML model (includes compartment sizes)
             if hasattr(self, 'pathway_data') and self.pathway_data.parameters:
                 all_parameters.update(self.pathway_data.parameters)
+                global_params = set(self.pathway_data.parameters.keys())
                 self.logger.debug(f"  Added {len(self.pathway_data.parameters)} global parameters (incl. compartments)")
             
             # 2. Add local kinetic law parameters (these override globals if duplicate)
-            all_parameters.update(kinetic_law.parameters)
+            if kinetic_law.parameters:
+                local_params = set(kinetic_law.parameters.keys())
+                overridden = global_params & local_params
+                if overridden:
+                    self.logger.debug(f"  Local parameters override globals: {overridden}")
+                all_parameters.update(kinetic_law.parameters)
+                self.logger.debug(f"  Added {len(kinetic_law.parameters)} local parameters")
             
             # Create SBMLKineticMetadata with all parameters
             metadata = SBMLKineticMetadata(
@@ -394,6 +403,23 @@ class SBMLKineticsIntegrationService:
                 )
                 self.logger.debug(f"  Original SBML: {kinetic_law.formula[:60]}...")
                 self.logger.debug(f"  Petri net: {translated_formula[:60]}...")
+                
+                # Mark reversible reactions in properties (but don't set directional rates)
+                # SBML reversible reactions use net rate formula (forward - reverse combined)
+                # Setting rate_forward = rate_reverse = formula would give net = 0!
+                if reaction.reversible:
+                    if not hasattr(transition, 'properties'):
+                        transition.properties = {}
+                    transition.properties['is_reversible'] = True
+                    transition.properties['reversible_note'] = (
+                        "SBML reversible reaction - formula represents net rate (forward - reverse). "
+                        "Negative rates indicate reverse flow. "
+                        "Use properties dialog to split into separate rate_forward/rate_reverse if needed."
+                    )
+                    
+                    self.logger.debug(
+                        f"  Reversible reaction - marked in properties (net rate formula)"
+                    )
             
             # Also update transition.rate if parameters available
             if kinetic_law.parameters:

@@ -174,6 +174,9 @@ class TauLeapingEngine:
             )
         
         # Check if simulation should continue
+        # If duration is None, run indefinitely (return True)
+        if controller.settings.duration is None:
+            return True
         return controller.time < controller.settings.duration
     
     def _sample_firings(

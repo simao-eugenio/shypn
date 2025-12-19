@@ -346,6 +346,7 @@ class ProcessedPathwayData:
     
     # Original data preserved
     compartments: Dict[str, str] = field(default_factory=dict)
+    compartments_enhanced: Dict[str, 'Compartment'] = field(default_factory=dict)  # Phase 1: Enhanced
     parameters: Dict[str, float] = field(default_factory=dict)
     
     # Enriched metadata

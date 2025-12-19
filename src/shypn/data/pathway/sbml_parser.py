@@ -204,7 +204,10 @@ class SBMLParser:
             metadata=metadata
         )
         
-        # Step 9: Post-processing (unit conversion, concentration calculation)
+        # Step 9: Validate formulas for undeclared variables
+        self._validate_formula_variables(pathway_data)
+        
+        # Step 10: Post-processing (unit conversion, concentration calculation)
         # TODO: Implement in future PR when simulation integration is ready
         # pathway_data = self._postprocess(pathway_data)
         
@@ -350,6 +353,82 @@ class SBMLParser:
             raise ValueError("SBML contains no model")
         
         return self._extract_pathway_data(model, Path("(string)"), filter_isolated_species)
+    
+    def _validate_formula_variables(self, pathway_data: PathwayData) -> None:
+        """
+        Validate that all variables in rate formulas are declared.
+        
+        Checks that every variable in a formula is one of:
+        - Species ID (place)
+        - Global parameter
+        - Local kinetic law parameter
+        - Compartment ID
+        - Mathematical function (sin, cos, exp, log, etc.)
+        
+        Args:
+            pathway_data: PathwayData to validate
+            
+        Raises:
+            ValueError: If undeclared variables found
+        """
+        import re
+        
+        # Build set of all valid identifiers
+        valid_ids = set()
+        
+        # Add species IDs
+        valid_ids.update(s.id for s in pathway_data.species)
+        
+        # Add global parameters
+        valid_ids.update(pathway_data.parameters.keys())
+        
+        # Add compartment IDs
+        valid_ids.update(pathway_data.compartments_enhanced.keys())
+        
+        # Add common math functions (don't flag these as undeclared)
+        math_functions = {
+            'sin', 'cos', 'tan', 'exp', 'log', 'log10', 'sqrt', 'abs', 
+            'ceil', 'floor', 'pow', 'min', 'max', 'sum', 'product',
+            'pi', 'e', 'inf', 'nan', 'time', 't'  # time is simulation time
+        }
+        valid_ids.update(math_functions)
+        
+        # Check each reaction's formula
+        undeclared_vars = []
+        
+        for reaction in pathway_data.reactions:
+            if not reaction.kinetic_law or not reaction.kinetic_law.formula:
+                continue
+            
+            formula = reaction.kinetic_law.formula
+            
+            # Add local parameters for this reaction
+            local_params = set(reaction.kinetic_law.parameters.keys()) if reaction.kinetic_law.parameters else set()
+            reaction_valid_ids = valid_ids | local_params
+            
+            # Extract all identifiers from formula (alphanumeric + underscore)
+            identifiers = re.findall(r'\b[a-zA-Z_][a-zA-Z0-9_]*\b', formula)
+            
+            # Check each identifier
+            for identifier in identifiers:
+                if identifier not in reaction_valid_ids:
+                    undeclared_vars.append((reaction.id, identifier, formula))
+        
+        # Report errors
+        if undeclared_vars:
+            error_msg = "Undeclared variables in rate formulas:\n"
+            for reaction_id, var_name, formula in undeclared_vars:
+                error_msg += f"  Reaction '{reaction_id}': '{var_name}' not found\n"
+                error_msg += f"    Formula: {formula}\n"
+            error_msg += "\nValid identifiers:\n"
+            error_msg += f"  Species: {sorted([s.id for s in pathway_data.species])}\n"
+            error_msg += f"  Parameters: {sorted(pathway_data.parameters.keys())}\n"
+            error_msg += f"  Compartments: {sorted(pathway_data.compartments_enhanced.keys())}\n"
+            
+            self.logger.error(error_msg)
+            raise ValueError(error_msg)
+        
+        self.logger.info("Formula validation passed - all variables declared")
 
 
 # Example usage

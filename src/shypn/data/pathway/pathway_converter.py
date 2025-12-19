@@ -105,8 +105,20 @@ class SpeciesConverter(BaseConverter):
     - Species ID → Place name/label
     - Initial tokens → Place marking
     - Position → Place position
-    - Compartment color → Place border color
+    - Compartment membership → Visual indicator (hexagons for non-default)
     """
+    
+    def __init__(self, pathway: ProcessedPathwayData, document: DocumentModel, 
+                 default_compartment: Optional[str] = None):
+        """Initialize species converter.
+        
+        Args:
+            pathway: Processed pathway data
+            document: DocumentModel to populate
+            default_compartment: The default compartment (species in this compartment use circles)
+        """
+        super().__init__(pathway, document)
+        self.default_compartment = default_compartment
     
     def convert(self) -> Dict[str, Place]:
         """
@@ -161,6 +173,17 @@ class SpeciesConverter(BaseConverter):
             # Set initial marking (from normalized tokens)
             place.set_tokens(species.initial_tokens)
             place.set_initial_marking(species.initial_tokens)
+            
+            # Mark non-default compartment places (extracellular, etc.)
+            # Default compartment (cytosol) stays as normal black circle
+            # Note: Boundary species are NOT marked as signal places here
+            # They have arcs (infinite sources/sinks) unlike true signal places (no arcs)
+            if species.compartment and species.compartment != self.default_compartment:
+                place.is_compartment_place = True
+                self.logger.debug(
+                    f"Marking place '{place.name}' as non-default compartment place "
+                    f"(compartment: {species.compartment}, green border)"
+                )
             
             # Keep default black border for visibility
             # TODO: Use compartment colors for fill instead of border
@@ -334,11 +357,15 @@ class ReactionConverter(BaseConverter):
             # Determine biological name for transition
             biological_name = self._get_biological_name(reaction)
             
+            # Create label with reversible indicator if applicable
+            base_label = reaction.name or reaction.id
+            label = f"⇌ {base_label}" if reaction.reversible else base_label
+            
             # Create transition with biological name
             transition = self.document.create_transition(
                 x=x,
                 y=y,
-                label=reaction.name or reaction.id
+                label=label
             )
             
             # Override system-generated name with biological name
@@ -835,6 +862,16 @@ class ArcConverter(BaseConverter):
                     self.logger.debug(
                         f"Created output arc: {transition.name} → {place.name} (weight: {weight})"
                     )
+            
+            # NOTE: Reversible reactions handled via rate_forward/rate_reverse formulas
+            # DO NOT create bidirectional arcs - this causes Petri net deadlock!
+            # SBML reversible reactions use a single transition with net rate (forward - reverse)
+            # The simulation engine evaluates the rate formula which can be negative (reverse direction)
+            if reaction.reversible:
+                self.logger.debug(
+                    f"Reaction '{reaction.id}' is reversible - "
+                    f"handled via rate_forward/rate_reverse formulas, not bidirectional arcs"
+                )
         
         self.logger.info(f"Created {len(arcs)} arcs")
         return arcs
@@ -996,6 +1033,245 @@ class PathwayConverter:
                 f"(prevents steady state traps)"
             )
     
+    # Known default compartments (cytosolic/intracellular)
+    DEFAULT_COMPARTMENT_NAMES = ['cytosol', 'cytoplasm', 'cell', 'intracellular', 'default']
+    
+    def _create_compartment_places_if_referenced(self, pathway: ProcessedPathwayData, 
+                                                  document: DocumentModel,
+                                                  species_to_place: Dict[str, Place]) -> None:
+        """[DEPRECATED] Create explicit places for compartments and parameters.
+        
+        This method is no longer used. All metadata (parameters, compartments, events,
+        annotations) is now visible and editable in the SBML panel's metadata tree view.
+        
+        Creating hexagon places for every parameter clutters the canvas and is redundant
+        now that we have a dedicated metadata inspector.
+        
+        Kept for reference only. Not called in conversion workflow.
+        
+        Previous behavior:
+        - Created hexagon places for compartments used in formulas
+        - Created hexagon places for global parameters
+        - Created hexagon places for local reaction parameters
+        
+        New approach:
+        - All metadata visible in SBML metadata tree (src/shypn/ui/panels/pathway_operations/sbml_category.py)
+        - Canvas shows only biological entities (species, reactions)
+        - Cleaner visualization
+        
+        Args:
+            pathway: Processed pathway data
+            document: DocumentModel to add places to
+            species_to_place: Existing species-to-place mapping
+        """
+        import re
+        
+        # Collect all parameters referenced in formulas
+        params_in_formulas = {}  # {param_id: (value, source_reaction_id)}
+        
+        for reaction in pathway.reactions:
+            if not reaction.kinetic_law or not reaction.kinetic_law.formula:
+                continue
+            
+            formula = reaction.kinetic_law.formula
+            
+            # Extract all identifiers from formula
+            identifiers = re.findall(r'\b[a-zA-Z_][a-zA-Z0-9_]*\b', formula)
+            
+            # Check compartments
+            for comp_id in pathway.compartments_enhanced.keys():
+                if comp_id in identifiers and comp_id not in species_to_place:
+                    comp = pathway.compartments_enhanced[comp_id]
+                    params_in_formulas[comp_id] = (comp.size, reaction.id, 'compartment')
+            
+            # Check global parameters
+            for param_id, param_value in pathway.parameters.items():
+                if param_id in identifiers and param_id not in species_to_place:
+                    # Skip compartments (already handled above)
+                    if param_id not in pathway.compartments_enhanced:
+                        params_in_formulas[param_id] = (param_value, reaction.id, 'global')
+            
+            # Check local parameters
+            if reaction.kinetic_law.parameters:
+                for param_id, param_value in reaction.kinetic_law.parameters.items():
+                    if param_id in identifiers and param_id not in species_to_place:
+                        params_in_formulas[param_id] = (param_value, reaction.id, 'local')
+        
+        if not params_in_formulas:
+            return  # No parameters referenced in formulas
+        
+        # Create hexagon places for all referenced parameters
+        x_offset = 50.0
+        y_offset = 50.0
+        spacing = 80.0
+        
+        for i, (param_id, (param_value, reaction_id, param_type)) in enumerate(params_in_formulas.items()):
+            # Skip if already exists as a place
+            if param_id in species_to_place:
+                continue
+            
+            # Create parameter place as hexagon (signal place)
+            place = document.create_place(
+                x=x_offset + (i * spacing),
+                y=y_offset,
+                label=f"{param_id} = {param_value}"
+            )
+            place.name = param_id  # Use parameter ID as place name for formula evaluation
+            place.set_tokens(param_value)  # Parameter value as tokens
+            place.set_initial_marking(param_value)
+            place.is_signal_place = True  # Hexagon shape - shows it's a parameter, not pathway element
+            
+            # Mark as a parameter place
+            if not hasattr(place, 'metadata'):
+                place.metadata = {}
+            place.metadata['is_parameter_place'] = True
+            place.metadata['parameter_type'] = param_type
+            place.metadata['parameter_value'] = param_value
+            place.metadata['used_in_reaction'] = reaction_id
+            
+            # Add to species_to_place mapping so formulas can reference it
+            species_to_place[param_id] = place
+            
+            self.logger.info(
+                f"Created parameter place '{param_id}' = {param_value} ({param_type}) "
+                f"- used in reaction {reaction_id}"
+            )
+    
+    def _determine_default_compartment(self, pathway: ProcessedPathwayData) -> Optional[str]:
+        """Determine which compartment should be considered 'default'.
+        
+        Uses heuristics:
+        1. Check for known default compartment names (cytosol, cytoplasm, etc.)
+        2. Use the compartment containing the most species
+        3. Return None if no compartments exist
+        
+        Args:
+            pathway: Processed pathway data
+        
+        Returns:
+            Default compartment ID, or None
+        """
+        if not pathway.species:
+            return None
+        
+        # Count species per compartment
+        from collections import Counter
+        compartment_counts = Counter(s.compartment for s in pathway.species if s.compartment)
+        
+        if not compartment_counts:
+            return None
+        
+        # Check for known default compartment names
+        for default_name in self.DEFAULT_COMPARTMENT_NAMES:
+            if default_name in compartment_counts:
+                self.logger.info(f"Using known default compartment: {default_name}")
+                return default_name
+        
+        # Use most common compartment
+        default_comp = compartment_counts.most_common(1)[0][0]
+        count = compartment_counts[default_comp]
+        self.logger.info(
+            f"Using most common compartment as default: {default_comp} "
+            f"({count}/{len(pathway.species)} species)"
+        )
+        return default_comp
+    
+    def _color_compartment_arcs(self, document: DocumentModel) -> None:
+        """Color arcs connected to compartment places with violet.
+        
+        Arcs that originate from or target non-default compartment places
+        (e.g., extracellular, mitochondrial) are colored violet to visually
+        group them with their compartment.
+        
+        Priority: Boundary species arcs (blue) take precedence over compartment
+        arcs (violet), so we only color arcs that are still black.
+        
+        Args:
+            document: DocumentModel with places and arcs
+        """
+        VIOLET_COLOR = (0.6, 0.0, 0.8)  # Violet for compartment arcs
+        compartment_arc_count = 0
+        
+        # Find all compartment places
+        compartment_places = [p for p in document.places if p.is_compartment_place]
+        
+        if not compartment_places:
+            return
+        
+        # Color arcs connected to compartment places (if not already colored)
+        for arc in document.arcs:
+            # Skip if already colored (e.g., blue for boundary species)
+            if arc.color != (0.0, 0.0, 0.0):
+                continue
+            
+            # Check if arc is connected to a compartment place
+            if arc.source in compartment_places or arc.target in compartment_places:
+                arc.color = VIOLET_COLOR
+                compartment_arc_count += 1
+        
+        # Also color test arcs connected to compartment places
+        if hasattr(document, 'test_arcs'):
+            for test_arc in document.test_arcs:
+                if test_arc.color != (0.0, 0.0, 0.0):
+                    continue
+                if test_arc.place in compartment_places:
+                    test_arc.color = VIOLET_COLOR
+                    compartment_arc_count += 1
+        
+        if compartment_arc_count > 0:
+            self.logger.info(
+                f"Colored {compartment_arc_count} arcs connected to compartment places (violet)"
+            )
+    
+    def _color_boundary_arcs(self, pathway: ProcessedPathwayData, 
+                            document: DocumentModel,
+                            species_to_place: Dict[str, Place]) -> None:
+        """Color arcs connected to boundary species (infinite reservoirs).
+        
+        SBML boundary species (boundaryCondition=true) represent infinite reservoirs
+        that maintain constant concentration through parameters and formulas.
+        We mark them visually with blue color but do NOT create source/sink transitions.
+        
+        Color coding:
+        - VIOLET = Non-default compartment (WHERE - spatial location)
+        - BLUE = Boundary species (WHAT - infinite reservoir property)
+        
+        Args:
+            pathway: Processed pathway data
+            document: DocumentModel to add transitions/arcs to
+            species_to_place: Mapping from species ID to Place
+        """
+        boundary_places = []
+        BLUE_COLOR = (0.0, 0.498, 1.0)  # Blue RGB(0,127,255) for boundary species
+        
+        for species in pathway.species:
+            # Check if this is a boundary species
+            if not (hasattr(species, 'metadata') and species.metadata.get('boundary_condition')):
+                continue
+            
+            place = species_to_place.get(species.id)
+            if place:
+                boundary_places.append(place)
+        
+        # Color ALL arcs connected to boundary places BLUE (both regular and test arcs)
+        if boundary_places:
+            for arc in document.arcs:
+                if arc.source in boundary_places or arc.target in boundary_places:
+                    arc.color = BLUE_COLOR
+            
+            # Also color test arcs (catalysts using boundary species)
+            if hasattr(document, 'test_arcs'):
+                for test_arc in document.test_arcs:
+                    if test_arc.place in boundary_places:
+                        test_arc.color = BLUE_COLOR
+            
+            self.logger.info(
+                f"Colored arcs for {len(boundary_places)} boundary species (blue, no source/sink)"
+            )
+            
+            document.metadata['has_boundary_species'] = True
+            document.metadata['boundary_species_count'] = len(boundary_places)
+    
     def convert(self, pathway: ProcessedPathwayData) -> DocumentModel:
         """
         Convert processed pathway to DocumentModel.
@@ -1021,9 +1297,24 @@ class PathwayConverter:
             "layout_type": pathway.metadata.get('layout_type', 'unknown')
         }
         
+        # Determine default compartment (most common one, or known defaults)
+        default_compartment = self._determine_default_compartment(pathway)
+        self.logger.info(f"Default compartment: {default_compartment}")
+        
         # Convert species to places
-        species_converter = SpeciesConverter(pathway, document)
+        species_converter = SpeciesConverter(pathway, document, default_compartment)
         species_to_place = species_converter.convert()
+        
+        # ==============================================================================
+        # PARAMETERS & COMPARTMENTS: Visible in SBML metadata tree, not as hexagons
+        # ==============================================================================
+        # All metadata (parameters, compartments, events, annotations) is now visible
+        # and editable in the SBML panel's metadata tree view. No need to create
+        # hexagon places that clutter the canvas. The canvas shows only the actual
+        # pathway structure (species and reactions).
+        # 
+        # Removed: _create_compartment_places_if_referenced()
+        # Users can view and edit all parameters in the SBML metadata inspector.
         
         # Convert reactions to transitions (pass species_to_place for rate functions)
         reaction_converter = ReactionConverter(
@@ -1039,6 +1330,19 @@ class PathwayConverter:
             species_to_place, reaction_to_transition
         )
         arcs = arc_converter.convert()
+        
+        # ==============================================================================
+        # BOUNDARY SPECIES: Color arcs but DO NOT create source/sink transitions
+        # ==============================================================================
+        # SBML models handle boundary species through parameters and formulas, not
+        # explicit source/sink transitions. We only mark them visually with blue color.
+        self._color_boundary_arcs(pathway, document, species_to_place)
+        
+        # ==============================================================================
+        # COMPARTMENT ARCS: Color arcs connected to compartment places
+        # ==============================================================================
+        # Arcs originating from or targeting non-default compartment places get violet color
+        self._color_compartment_arcs(document)
         
         # ==============================================================================
         # BIOLOGICAL PETRI NET: Convert modifiers to test arcs (catalysts/enzymes)

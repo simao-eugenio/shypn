@@ -86,6 +86,14 @@ class SpeciesExtractor(BaseExtractor[List[Species]]):
         # Mark as SBML import (so converter knows to preserve original names)
         metadata['data_source'] = 'sbml_import'
         
+        # Extract boundary condition (for signal places)
+        # Boundary species = constant external sources/sinks (infinite reservoirs)
+        if sbml_species.getBoundaryCondition():
+            metadata['boundary_condition'] = True
+            self.logger.debug(
+                f"Species '{species_id}' is a boundary species (constant source/sink)"
+            )
+        
         # Get compartment volume for unit conversion
         compartment_obj = self.model.getCompartment(compartment)
         compartment_volume = compartment_obj.getSize() if compartment_obj else 1.0

@@ -141,6 +141,13 @@ class ReactionExtractor(BaseExtractor[List[Reaction]]):
             param = sbml_kinetic_law.getParameter(i)
             param_id = param.getId()
             param_value = param.getValue()
+            
+            # Validate parameter has a valid numeric value
+            if param_value is None or (isinstance(param_value, float) and not (param_value == param_value)):  # Check for NaN
+                self.logger.warning(
+                    f"Parameter '{param_id}' in reaction has invalid value: {param_value}"
+                )
+            
             parameters[param_id] = param_value
         
         # Try to detect kinetic law type
@@ -168,24 +175,24 @@ class ReactionExtractor(BaseExtractor[List[Reaction]]):
     
     def _sanitize_formula(self, formula: str) -> str:
         """
-        Sanitize formula by replacing hyphens with underscores in identifiers.
+        Sanitize formula by replacing hyphens with underscores in identifiers
+        and fixing malformed scientific notation.
         
-        This prevents Python syntax errors when species IDs contain hyphens
-        (e.g., "MOS-P" would be parsed as "MOS - P" subtraction).
-        
-        Uses regex to identify word boundaries and replace hyphens only within
-        identifiers, not in mathematical operators.
+        This prevents Python syntax errors when:
+        1. Species IDs contain hyphens (e.g., "MOS-P" → "MOS_P")
+        2. Scientific notation has underscore instead of minus (libSBML bug)
+           (e.g., "5.9e_4" → "5.9e-4")
         
         Args:
             formula: Original formula from SBML
             
         Returns:
-            Sanitized formula with underscores instead of hyphens
+            Sanitized formula with underscores and correct scientific notation
         """
         if not formula:
             return formula
         
-        # Replace hyphens with underscores in identifiers
+        # Fix 1: Replace hyphens with underscores in identifiers
         # Match word characters followed by hyphen followed by word characters
         # This preserves mathematical operators like minus signs
         # Pattern: word boundary, alphanumeric+hyphen+alphanumeric, word boundary
@@ -194,6 +201,12 @@ class ReactionExtractor(BaseExtractor[List[Reaction]]):
         
         # Match identifiers with hyphens (e.g., MOS-P, Erk2-pp, Mek1-p)
         sanitized = re.sub(r'\b\w+(?:-\w+)+\b', replace_hyphen, formula)
+        
+        # Fix 2: Correct malformed scientific notation from libSBML
+        # Some versions of libSBML convert <cn type="e-notation">5.9 <sep/> -4</cn>
+        # to "5.9e_4" instead of "5.9e-4"
+        # Pattern: digit followed by 'e_' followed by digit → replace 'e_' with 'e-'
+        sanitized = re.sub(r'(\d)e_(\d)', r'\1e-\2', sanitized)
         
         return sanitized
     
