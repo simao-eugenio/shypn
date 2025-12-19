@@ -23,6 +23,24 @@ except ImportError:
     logging.warning("libsbml not available. SBML parsing will not work.")
 
 from .converters import UnitConverter, ConcentrationCalculator
+from .extractors import (
+    SpeciesExtractor,
+    ReactionExtractor,
+    CompartmentExtractor,
+    ParameterExtractor,
+    EventExtractor,
+    AnnotationExtractor,
+    UnitExtractor
+)
+from .pathway_data import (
+    PathwayData, 
+    Species, 
+    Reaction,
+    Event,
+    Annotation,
+    Compartment,
+    UnitDefinition
+)
 
 
 class SBMLParser:
