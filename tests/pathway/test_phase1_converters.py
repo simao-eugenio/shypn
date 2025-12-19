@@ -132,9 +132,9 @@ class TestConcentrationCalculator(unittest.TestCase):
         )
         self.compartments["cell"] = compartment
         
-        # Should return original value with warning
+        # With zero volume, amount = concentration * 0 = 0
         result = self.calculator.concentration_to_amount(1.0, "cell")
-        self.assertEqual(result, 1.0)
+        self.assertEqual(result, 0.0)
     
     def test_unknown_compartment(self):
         """Test conversion with unknown compartment."""
