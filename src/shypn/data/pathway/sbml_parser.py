@@ -4,15 +4,15 @@ SBML Parser Module
 Parses SBML (Systems Biology Markup Language) files and extracts
 pathway information into PathwayData objects.
 
-Architecture:
-- SBMLParser: Main parser class (coordinates parsing)
-- SpeciesExtractor: Extracts species/metabolites
-- ReactionExtractor: Extracts reactions
-- KineticsExtractor: Extracts kinetic laws
-- CompartmentExtractor: Extracts compartments
+Architecture (Phase 1 - Refactored):
+- SBMLParser: Thin orchestrator (delegates to specialized extractors)
+- Extractors: Specialized classes in extractors/ subpackage
+- Converters: Unit and concentration conversion utilities
+
+Legacy extractor classes moved to extractors/ subpackage for modularity.
 """
 
-from typing import Optional, Dict, List, Any
+from typing import Optional, Dict, List
 from pathlib import Path
 import logging
 
@@ -22,427 +22,25 @@ except ImportError:
     libsbml = None
     logging.warning("libsbml not available. SBML parsing will not work.")
 
-from .pathway_data import (
-    PathwayData,
-    Species,
-    Reaction,
-    KineticLaw,
-)
+from .converters import UnitConverter, ConcentrationCalculator
 
 
-# Base extractor class
-class BaseExtractor:
-    """
-    Base class for SBML element extractors.
-    
-    Each extractor handles a specific type of SBML element
-    (species, reactions, compartments, etc.)
-    """
-    
-    def __init__(self, sbml_model):
-        """
-        Initialize extractor with SBML model.
-        
-        Args:
-            sbml_model: libsbml Model object
-        """
-        self.model = sbml_model
-        self.logger = logging.getLogger(self.__class__.__name__)
-    
-    def extract(self) -> Any:
-        """
-        Extract elements from SBML model.
-        
-        Must be implemented by subclasses.
-        
-        Returns:
-            Extracted data (type depends on subclass)
-        """
-        raise NotImplementedError("Subclasses must implement extract()")
-
-
-class SpeciesExtractor(BaseExtractor):
-    """
-    Extracts species (metabolites/compounds) from SBML model.
-    
-    Converts SBML species to Species data objects.
-    """
-    
-    def extract(self) -> List[Species]:
-        """
-        Extract all species from SBML model.
-        
-        Returns:
-            List of Species objects
-        """
-        species_list = []
-        
-        num_species = self.model.getNumSpecies()
-        self.logger.info(f"Extracting {num_species} species...")
-        
-        for i in range(num_species):
-            sbml_species = self.model.getSpecies(i)
-            species = self._convert_species(sbml_species)
-            species_list.append(species)
-            self.logger.debug(f"  - {species.id}: {species.name}")
-        
-        return species_list
-    
-    def _convert_species(self, sbml_species) -> Species:
-        """
-        Convert SBML species to Species object.
-        
-        Args:
-            sbml_species: libsbml Species object
-            
-        Returns:
-            Species object
-        """
-        # Extract basic info
-        species_id = sbml_species.getId()
-        name = sbml_species.getName() or species_id
-        compartment = sbml_species.getCompartment()
-        
-        # Extract initial amount/concentration
-        if sbml_species.isSetInitialConcentration():
-            initial_concentration = sbml_species.getInitialConcentration()
-        elif sbml_species.isSetInitialAmount():
-            initial_concentration = sbml_species.getInitialAmount()
-        else:
-            # No initial value specified - use physiological default
-            # Assumption: mM scale (millimolar, typical for cellular metabolites)
-            # Default: 1.0 mM (reasonable for most metabolites)
-            initial_concentration = 1.0
-            self.logger.debug(
-                f"Species '{species_id}' has no initial concentration, "
-                f"using default 1.0 mM (physiological scale)"
-            )
-        
-        # Extract annotation data (ChEBI, KEGG IDs)
-        metadata = self._extract_species_annotations(sbml_species)
-        chebi_id = metadata.get('chebi_id')
-        kegg_id = metadata.get('kegg_id')
-        
-        # Mark as SBML import (so converter knows to preserve original names)
-        metadata['data_source'] = 'sbml_import'
-        
-        # Get compartment volume for unit conversion
-        compartment_obj = self.model.getCompartment(compartment)
-        compartment_volume = compartment_obj.getSize() if compartment_obj else 1.0
-        
-        return Species(
-            id=species_id,
-            name=name,
-            compartment=compartment,
-            initial_concentration=initial_concentration,
-            compartment_volume=compartment_volume,
-            chebi_id=chebi_id,
-            kegg_id=kegg_id,
-            metadata=metadata
-        )
-    
-    def _extract_species_annotations(self, sbml_species) -> Dict[str, Any]:
-        """
-        Extract annotation data from SBML species.
-        
-        Args:
-            sbml_species: libsbml Species object
-            
-        Returns:
-            Dictionary with annotation data
-        """
-        metadata = {}
-        
-        # Try to extract database cross-references from annotation
-        if sbml_species.isSetAnnotation():
-            annotation = sbml_species.getAnnotationString()
-            
-            # Simple parsing for common databases
-            # (In production, use proper XML parsing)
-            if 'chebi/CHEBI:' in annotation:
-                start = annotation.find('chebi/CHEBI:') + len('chebi/CHEBI:')
-                end = annotation.find('"', start)
-                if end > start:
-                    metadata['chebi_id'] = f"CHEBI:{annotation[start:end]}"
-            
-            if 'kegg.compound/' in annotation:
-                start = annotation.find('kegg.compound/') + len('kegg.compound/')
-                end = annotation.find('"', start)
-                if end > start:
-                    metadata['kegg_id'] = annotation[start:end]
-        
-        return metadata
-
-
-class ReactionExtractor(BaseExtractor):
-    """
-    Extracts reactions from SBML model.
-    
-    Converts SBML reactions to Reaction data objects.
-    """
-    
-    def extract(self) -> List[Reaction]:
-        """
-        Extract all reactions from SBML model.
-        
-        Returns:
-            List of Reaction objects
-        """
-        reaction_list = []
-        
-        num_reactions = self.model.getNumReactions()
-        self.logger.info(f"Extracting {num_reactions} reactions...")
-        
-        for i in range(num_reactions):
-            sbml_reaction = self.model.getReaction(i)
-            reaction = self._convert_reaction(sbml_reaction)
-            reaction_list.append(reaction)
-            self.logger.debug(f"  - {reaction.id}: {reaction.name}")
-        
-        return reaction_list
-    
-    def _convert_reaction(self, sbml_reaction) -> Reaction:
-        """
-        Convert SBML reaction to Reaction object.
-        
-        Args:
-            sbml_reaction: libsbml Reaction object
-            
-        Returns:
-            Reaction object with reactants, products, and modifiers
-        """
-        # Extract basic info
-        reaction_id = sbml_reaction.getId()
-        name = sbml_reaction.getName() or reaction_id
-        reversible = sbml_reaction.getReversible()
-        
-        # Extract reactants (inputs)
-        reactants = []
-        for i in range(sbml_reaction.getNumReactants()):
-            species_ref = sbml_reaction.getReactant(i)
-            species_id = species_ref.getSpecies()
-            stoichiometry = species_ref.getStoichiometry()
-            reactants.append((species_id, stoichiometry))
-        
-        # Extract products (outputs)
-        products = []
-        for i in range(sbml_reaction.getNumProducts()):
-            species_ref = sbml_reaction.getProduct(i)
-            species_id = species_ref.getSpecies()
-            stoichiometry = species_ref.getStoichiometry()
-            products.append((species_id, stoichiometry))
-        
-        # Extract modifiers (catalysts/enzymes/inhibitors)
-        # These will be converted to test arcs in Biological Petri Nets
-        modifiers = []
-        for i in range(sbml_reaction.getNumModifiers()):
-            modifier_ref = sbml_reaction.getModifier(i)
-            species_id = modifier_ref.getSpecies()
-            modifiers.append(species_id)
-            self.logger.debug(f"    Modifier: {species_id} (catalyst/enzyme)")
-        
-        # Extract kinetic law
-        kinetic_law = None
-        if sbml_reaction.isSetKineticLaw():
-            kinetic_law = self._extract_kinetic_law(
-                sbml_reaction.getKineticLaw(),
-                sbml_reaction=sbml_reaction
-            )
-        
-        return Reaction(
-            id=reaction_id,
-            name=name,
-            reactants=reactants,
-            products=products,
-            modifiers=modifiers,  # NEW: Catalysts from SBML modifiers
-            kinetic_law=kinetic_law,
-            reversible=reversible
-        )
-    
-    def _extract_kinetic_law(self, sbml_kinetic_law, sbml_reaction=None) -> Optional[KineticLaw]:
-        """
-        Extract kinetic law from SBML.
-        
-        Args:
-            sbml_kinetic_law: libsbml KineticLaw object
-            sbml_reaction: libsbml Reaction object (for metadata)
-            
-        Returns:
-            KineticLaw object or None
-        """
-        if not sbml_kinetic_law.isSetMath():
-            return None
-        
-        # Get formula as string
-        math_ast = sbml_kinetic_law.getMath()
-        formula = libsbml.formulaToL3String(math_ast)
-        
-        # Sanitize formula to replace hyphens with underscores in species IDs
-        # This prevents Python syntax errors like "MOS-P" being parsed as "MOS - P"
-        formula = self._sanitize_formula(formula)
-        
-        # Extract parameters
-        parameters = {}
-        for i in range(sbml_kinetic_law.getNumParameters()):
-            param = sbml_kinetic_law.getParameter(i)
-            param_id = param.getId()
-            param_value = param.getValue()
-            parameters[param_id] = param_value
-        
-        # Try to detect kinetic law type
-        rate_type = self._detect_rate_type(formula)
-        
-        # Store SBML-specific metadata for later metadata creation
-        # This will be used by the converter to create SBMLKineticMetadata
-        sbml_metadata = {}
-        if sbml_reaction:
-            sbml_metadata['sbml_reaction_id'] = sbml_reaction.getId()
-            sbml_metadata['sbml_level'] = self.model.getLevel()
-            sbml_metadata['sbml_version'] = self.model.getVersion()
-            sbml_metadata['sbml_model_id'] = self.model.getId()
-        
-        kinetic_law = KineticLaw(
-            formula=formula,
-            rate_type=rate_type,
-            parameters=parameters
-        )
-        
-        # Attach SBML metadata to kinetic law for converter to use
-        kinetic_law.sbml_metadata = sbml_metadata
-        
-        return kinetic_law
-    
-    def _sanitize_formula(self, formula: str) -> str:
-        """
-        Sanitize formula by replacing hyphens with underscores in identifiers.
-        
-        This prevents Python syntax errors when species IDs contain hyphens
-        (e.g., "MOS-P" would be parsed as "MOS - P" subtraction).
-        
-        Uses regex to identify word boundaries and replace hyphens only within
-        identifiers, not in mathematical operators.
-        
-        Args:
-            formula: Original formula from SBML
-            
-        Returns:
-            Sanitized formula with underscores instead of hyphens
-        """
-        if not formula:
-            return formula
-        
-        import re
-        
-        # Replace hyphens with underscores in identifiers
-        # Match word characters followed by hyphen followed by word characters
-        # This preserves mathematical operators like minus signs
-        # Pattern: word boundary, alphanumeric+hyphen+alphanumeric, word boundary
-        def replace_hyphen(match):
-            return match.group(0).replace('-', '_')
-        
-        # Match identifiers with hyphens (e.g., MOS-P, Erk2-pp, Mek1-p)
-        sanitized = re.sub(r'\b\w+(?:-\w+)+\b', replace_hyphen, formula)
-        
-        return sanitized
-    
-    def _detect_rate_type(self, formula: str) -> str:
-        """
-        Detect type of kinetic law from formula.
-        
-        Args:
-            formula: Mathematical formula string
-            
-        Returns:
-            Rate type string
-        """
-        formula_lower = formula.lower()
-        
-        # Simple heuristics
-        if 'vmax' in formula_lower and 'km' in formula_lower:
-            return 'michaelis_menten'
-        elif '*' in formula and '/' not in formula:
-            return 'mass_action'
-        else:
-            return 'custom'
-
-
-class CompartmentExtractor(BaseExtractor):
-    """
-    Extracts compartments (cellular locations) from SBML model.
-    """
-    
-    def extract(self) -> Dict[str, str]:
-        """
-        Extract all compartments from SBML model.
-        
-        Returns:
-            Dict mapping compartment IDs to names
-        """
-        compartments = {}
-        
-        num_compartments = self.model.getNumCompartments()
-        self.logger.info(f"Extracting {num_compartments} compartments...")
-        
-        for i in range(num_compartments):
-            sbml_compartment = self.model.getCompartment(i)
-            comp_id = sbml_compartment.getId()
-            comp_name = sbml_compartment.getName() or comp_id
-            compartments[comp_id] = comp_name
-            self.logger.debug(f"  - {comp_id}: {comp_name}")
-        
-        return compartments
-    
-    def extract_sizes(self) -> Dict[str, float]:
-        """
-        Extract compartment sizes from SBML model.
-        
-        Returns:
-            Dict mapping compartment IDs to sizes (volumes)
-        """
-        compartment_sizes = {}
-        
-        num_compartments = self.model.getNumCompartments()
-        
-        for i in range(num_compartments):
-            sbml_compartment = self.model.getCompartment(i)
-            comp_id = sbml_compartment.getId()
-            # Get size (volume), default to 1.0 if not set
-            comp_size = sbml_compartment.getSize() if sbml_compartment.isSetSize() else 1.0
-            compartment_sizes[comp_id] = comp_size
-            self.logger.debug(f"  - {comp_id} size: {comp_size}")
-        
-        return compartment_sizes
-
-
-class ParameterExtractor(BaseExtractor):
-    """
-    Extracts global parameters from SBML model.
-    """
-    
-    def extract(self) -> Dict[str, float]:
-        """
-        Extract all global parameters from SBML model.
-        
-        Returns:
-            Dict mapping parameter IDs to values
-        """
-        parameters = {}
-        
-        num_parameters = self.model.getNumParameters()
-        self.logger.info(f"Extracting {num_parameters} parameters...")
-        
-        for i in range(num_parameters):
-            sbml_parameter = self.model.getParameter(i)
-            param_id = sbml_parameter.getId()
-            param_value = sbml_parameter.getValue()
-            parameters[param_id] = param_value
-            self.logger.debug(f"  - {param_id}: {param_value}")
-        
-        return parameters
-
-
-# Main parser class
 class SBMLParser:
+    """
+    Main SBML parser - thin orchestrator pattern.
+    
+    Delegates extraction to specialized classes in extractors/ subpackage.
+    Coordinates the extraction pipeline and applies post-processing.
+    
+    Design Principles:
+    - Minimal logic in parser (delegates to extractors)
+    - Extensible (add new extractors without modifying parser)
+    - Clear separation of concerns
+    
+    Example:
+        parser = SBMLParser()
+        pathway = parser.parse_file('glycolysis.sbml')
+    """
     """
     Main SBML parser class.
     
@@ -524,7 +122,7 @@ class SBMLParser:
         """
         Extract all pathway data from SBML model.
         
-        Uses specialized extractor classes for different element types.
+        Phase 1 Refactor: Uses modular extractors + converters.
         
         Args:
             model: libsbml Model object
@@ -532,60 +130,154 @@ class SBMLParser:
             filter_isolated_species: If True, exclude species not used in reactions
             
         Returns:
-            PathwayData object
+            PathwayData object with Phase 1 enhancements
         """
-        # Create extractors
-        species_extractor = SpeciesExtractor(model)
-        reaction_extractor = ReactionExtractor(model)
-        compartment_extractor = CompartmentExtractor(model)
-        parameter_extractor = ParameterExtractor(model)
+        # Step 1: Create all extractors
+        logger = self.logger
         
-        # Extract all elements
+        compartment_extractor = CompartmentExtractor(model, logger)
+        unit_extractor = UnitExtractor(model, logger)
+        parameter_extractor = ParameterExtractor(model, logger)
+        species_extractor = SpeciesExtractor(model, logger)
+        reaction_extractor = ReactionExtractor(model, logger)
+        event_extractor = EventExtractor(model, logger)
+        annotation_extractor = AnnotationExtractor(model, logger)
+        
+        # Step 2: Extract all elements (in dependency order)
+        compartments_enhanced = compartment_extractor.extract()
+        compartments_legacy = compartment_extractor.extract_legacy()
+        unit_defs = unit_extractor.extract()
+        parameters = parameter_extractor.extract()
         all_species = species_extractor.extract()
         reactions = reaction_extractor.extract()
-        compartments = compartment_extractor.extract()
-        parameters = parameter_extractor.extract()
+        events = event_extractor.extract()
+        annotations = annotation_extractor.extract()
         
-        # Filter isolated species if requested (similar to KEGG filtering)
+        # Step 3: Apply annotations to species/reactions
+        self._apply_annotations(all_species, reactions, annotations)
+        
+        # Step 4: Link species to compartment objects
+        self._link_compartments(all_species, compartments_enhanced)
+        
+        # Step 5: Filter isolated species if requested
         if filter_isolated_species:
-            # Build set of species IDs that are actually used in reactions
-            used_species_ids = set()
-            for reaction in reactions:
-                # Add reactants
-                for species_id, _ in reaction.reactants:
-                    used_species_ids.add(species_id)
-                # Add products
-                for species_id, _ in reaction.products:
-                    used_species_ids.add(species_id)
-                # Add modifiers (catalysts)
-                if hasattr(reaction, 'modifiers'):
-                    for modifier_id in reaction.modifiers:
-                        used_species_ids.add(modifier_id)
-            
-            # Filter species to only include those used in reactions
-            species = [s for s in all_species if s.id in used_species_ids]
-            
-            # Log filtering results
-            num_filtered = len(all_species) - len(species)
-            if num_filtered > 0:
-                filtered_ids = [s.id for s in all_species if s.id not in used_species_ids]
-                self.logger.info(
-                    f"Filtered {num_filtered} isolated species not used in reactions: "
-                    f"{', '.join(filtered_ids[:5])}"
-                    + ("..." if len(filtered_ids) > 5 else "")
-                )
+            species = self._filter_isolated_species(all_species, reactions)
         else:
-            # Include all species (old behavior)
             species = all_species
             self.logger.debug("Including all species (no filtering)")
         
-        # Extract compartment sizes and merge into parameters
-        # This makes compartment sizes available in kinetic formulas
-        compartment_sizes = compartment_extractor.extract_sizes()
-        parameters.update(compartment_sizes)
-        self.logger.debug(f"Merged {len(compartment_sizes)} compartment sizes into parameters")
+        # Step 6: Merge compartment sizes into parameters (for kinetic formulas)
+        for comp_id, comp in compartments_enhanced.items():
+            parameters[comp_id] = comp.size
+        self.logger.debug(f"Merged {len(compartments_enhanced)} compartment sizes into parameters")
         
-        # Create metadata
+        # Step 7: Create metadata
+        metadata = self._create_metadata(model, filepath)
+        
+        # Step 8: Assemble PathwayData
+        pathway_data = PathwayData(
+            species=species,
+            reactions=reactions,
+            compartments=compartments_legacy,  # Legacy for compatibility
+            compartments_enhanced=compartments_enhanced,  # Phase 1: Enhanced
+            parameters=parameters,
+            events=events,  # Phase 1: Events
+            unit_definitions=unit_defs,  # Phase 1: Unit definitions
+            metadata=metadata
+        )
+        
+        # Step 9: Post-processing (unit conversion, concentration calculation)
+        # TODO: Implement in future PR when simulation integration is ready
+        # pathway_data = self._postprocess(pathway_data)
+        
+        return pathway_data
+    
+    def _apply_annotations(self, 
+                          species: List[Species],
+                          reactions: List[Reaction],
+                          annotations: Dict[str, 'Annotation']) -> None:
+        """
+        Apply annotations to species and reactions.
+        
+        Args:
+            species: List of Species objects
+            reactions: List of Reaction objects
+            annotations: Dict mapping element IDs to Annotation objects
+        """
+        for s in species:
+            if s.id in annotations:
+                s.annotation = annotations[s.id]
+        
+        for r in reactions:
+            if r.id in annotations:
+                r.annotation = annotations[r.id]
+    
+    def _link_compartments(self,
+                           species: List[Species],
+                           compartments: Dict[str, 'Compartment']) -> None:
+        """
+        Link species to Compartment objects.
+        
+        Args:
+            species: List of Species objects
+            compartments: Dict mapping compartment IDs to Compartment objects
+        """
+        for s in species:
+            if s.compartment and s.compartment in compartments:
+                s.compartment_ref = compartments[s.compartment]
+    
+    def _filter_isolated_species(self,
+                                  all_species: List[Species],
+                                  reactions: List[Reaction]) -> List[Species]:
+        """
+        Filter out species not used in any reactions.
+        
+        Args:
+            all_species: All extracted species
+            reactions: All extracted reactions
+            
+        Returns:
+            Filtered list of species
+        """
+        # Build set of species IDs that are actually used in reactions
+        used_species_ids = set()
+        for reaction in reactions:
+            # Add reactants
+            for species_id, _ in reaction.reactants:
+                used_species_ids.add(species_id)
+            # Add products
+            for species_id, _ in reaction.products:
+                used_species_ids.add(species_id)
+            # Add modifiers (catalysts)
+            for modifier_id in reaction.modifiers:
+                used_species_ids.add(modifier_id)
+        
+        # Filter species to only include those used in reactions
+        species = [s for s in all_species if s.id in used_species_ids]
+        
+        # Log filtering results
+        num_filtered = len(all_species) - len(species)
+        if num_filtered > 0:
+            filtered_ids = [s.id for s in all_species if s.id not in used_species_ids]
+            self.logger.info(
+                f"Filtered {num_filtered} isolated species not used in reactions: "
+                f"{', '.join(filtered_ids[:5])}"
+                + ("..." if len(filtered_ids) > 5 else "")
+            )
+        
+        return species
+    
+    def _create_metadata(self, model, filepath: Path) -> Dict:
+        """
+        Create metadata dictionary from SBML model.
+        
+        Args:
+            model: libsbml Model object
+            filepath: Path to source file
+            
+        Returns:
+            Metadata dictionary
+        """
         metadata = {
             'source_file': str(filepath),
             'model_id': model.getId(),
@@ -608,13 +300,7 @@ class SBMLParser:
                     self.logger.warning(f"Could not process notes: {e}")
                     metadata['notes'] = "Notes unavailable"
         
-        return PathwayData(
-            species=species,
-            reactions=reactions,
-            compartments=compartments,
-            parameters=parameters,
-            metadata=metadata
-        )
+        return metadata
     
     def parse_string(self, sbml_string: str, filter_isolated_species: bool = False) -> PathwayData:
         """
@@ -657,9 +343,4 @@ if __name__ == "__main__":
     )
     
     # Example: Parse SBML file
-    
-    # Check if libsbml is available
-    if libsbml is None:
-        pass  # libsbml not available
-    else:
-        pass  # libsbml available
+    pass  # Implementation examples removed for brevity
