@@ -35,8 +35,9 @@ except ImportError as e:
     sys.exit(1)
 try:
     from shypn.rendering import ModuleRenderer
+    print(f"[IMPORT_DEBUG] ModuleRenderer imported successfully: {ModuleRenderer}", flush=True)
 except ImportError as e:
-    print(f'Warning: ModuleRenderer not available: {e}', file=sys.stderr)
+    print(f'Warning: ModuleRenderer not available: {e}', file=sys.stderr, flush=True)
     ModuleRenderer = None
 try:
     from shypn.netobjs import Place, Transition, Arc
@@ -3372,6 +3373,7 @@ class ModelCanvasLoader:
         manager.draw_grid(cr)
         
         # STEP 4: Render module boundaries (if ModuleRenderer available)
+        print(f"[MODULE_CHECK] ModuleRenderer={ModuleRenderer is not None}, has_document={hasattr(manager, 'document')}, document={manager.document is not None if hasattr(manager, 'document') else False}", flush=True)
         if ModuleRenderer and hasattr(manager, 'document') and manager.document:
             modules = manager.document.get_modules_list() if hasattr(manager.document, 'get_modules_list') else []
             
