@@ -754,7 +754,8 @@ class SBMLCategory(BasePathwayCategory):
                             canvas_manager.load_objects(
                                 places=document_model.places,
                                 transitions=document_model.transitions,
-                                arcs=document_model.arcs
+                                arcs=document_model.arcs,
+                                modules=document_model.modules
                             )
                         except Exception as e:
                             raise ValueError(f"Failed to load objects to canvas: {e}")

@@ -547,7 +547,7 @@ class ModelCanvasManager:
         self.mark_dirty()  # Mark document as having unsaved changes
         self.mark_needs_redraw()  # Trigger canvas redraw to remove from view
     
-    def load_objects(self, places=None, transitions=None, arcs=None):
+    def load_objects(self, places=None, transitions=None, arcs=None, modules=None):
         """Load objects into the model in bulk (for import/deserialize operations).
         
         This method ensures all objects are added through proper channels with
@@ -568,6 +568,7 @@ class ModelCanvasManager:
             places: List of Place objects to add (default: None = no places)
             transitions: List of Transition objects to add (default: None = no transitions)
             arcs: List of Arc objects to add (default: None = no arcs)
+            modules: Dict of Module objects to add (default: None = no modules)
         
         Example:
             # For imports/loads:
@@ -587,7 +588,15 @@ class ModelCanvasManager:
             transitions = []
         if arcs is None:
             arcs = []
+        if modules is None:
+            modules = {}
         
+        # Add modules to document_controller if it exists
+        if modules and hasattr(self, 'document_controller'):
+            if not hasattr(self.document_controller, 'modules'):
+                self.document_controller.modules = {}
+            self.document_controller.modules.update(modules)
+            logger.info(f"[LOAD_OBJECTS] Loaded {len(modules)} modules to document_controller")
         
         # Add places with proper notification
         for place in places:
@@ -2430,6 +2439,9 @@ class ModelCanvasManager:
         document.transitions = list(self.transitions)
         document.arcs = list(self.arcs)
         
+        # Copy modules if they exist in the document_controller
+        if hasattr(self.document_controller, 'modules') and self.document_controller.modules:
+            document.modules = dict(self.document_controller.modules)
         
         # Sync ID counters from DocumentController's IDManager to DocumentModel's IDManager
         place_id, trans_id, arc_id = self.document_controller.id_manager.get_state()
