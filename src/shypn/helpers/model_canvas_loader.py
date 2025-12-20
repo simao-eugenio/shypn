@@ -2830,22 +2830,9 @@ class ModelCanvasLoader:
                             widget.queue_draw()
                             return True
             
-            # Check for objects FIRST (places, transitions, arcs)
+            # Module click handling removed - signals work via formula references
+            # Check for objects (places, transitions, arcs)
             clicked_obj = manager.find_object_at_position(world_x, world_y)
-            
-            # If NO object was clicked, check if clicking on a module (for collapse/expand)
-            if clicked_obj is None:
-                if ModuleRenderer and hasattr(manager, 'document_controller') and hasattr(manager.document_controller, 'modules'):
-                    modules = list(manager.document_controller.modules.values()) if manager.document_controller.modules else []
-                    module_renderer = ModuleRenderer()
-                    for module in modules:
-                        if module_renderer.is_point_in_module_header(module, world_x, world_y, manager.zoom):
-                            # Toggle collapse state
-                            old_state = module.collapsed
-                            module.collapsed = not module.collapsed
-                            print(f"[TOGGLE] {module.name}: {old_state} → {module.collapsed}", flush=True)
-                            widget.queue_draw()
-                            return True
             
             is_ctrl = event.state & Gdk.ModifierType.CONTROL_MASK
             if clicked_obj is not None:
@@ -3387,22 +3374,8 @@ class ModelCanvasLoader:
         # Grid bounds are calculated to cover the entire rotated viewport
         manager.draw_grid(cr)
         
-        # STEP 4: Render module boundaries (if ModuleRenderer available)
-        # Access document through manager.document_controller (the DocumentController has modules via DocumentModel)
-        document = manager.document_controller if hasattr(manager, 'document_controller') else None
-        
-        if ModuleRenderer and document:
-            # DocumentController wraps DocumentModel - need to get the actual DocumentModel
-            # Check if document_controller has a modules attribute or get_modules_list method
-            modules = []
-            if hasattr(document, 'modules'):
-                modules = list(document.modules.values()) if isinstance(document.modules, dict) else document.modules
-            elif hasattr(document, 'get_modules_list'):
-                modules = document.get_modules_list()
-            
-            if modules:
-                module_renderer = ModuleRenderer()
-                module_renderer.render_modules(cr, modules, manager.zoom, show_headers=True)
+        # STEP 4: Module boundaries removed - signal communication happens via formulas
+        # Signal places can be referenced in transition rate formulas without visual arcs
         
         # Render all objects (these will be rotated)
         all_objects = manager.get_all_objects()
