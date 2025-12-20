@@ -534,6 +534,11 @@ class SBMLCategory(BasePathwayCategory):
                             for mod in modules:
                                 print(f"    • {mod.name}: {len(mod.places)} places, {len(mod.transitions)} transitions", flush=True)
                             print(f"  - Boundary signals: {len(signals)}", flush=True)
+                            
+                            # Add modules to document so they're saved and rendered
+                            for module in modules:
+                                document_model.add_module(module)
+                            print(f"  - Modules registered with document: {len(document_model.modules)}", flush=True)
                         else:
                             error = conversion_result.get('error', 'Unknown error') if conversion_result else 'No result'
                             print(f"⚠ Module conversion failed: {error}", flush=True)
