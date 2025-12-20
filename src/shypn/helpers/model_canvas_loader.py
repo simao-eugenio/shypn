@@ -34,6 +34,11 @@ except ImportError as e:
     print(f'ERROR: Cannot import ModelCanvasManager: {e}', file=sys.stderr)
     sys.exit(1)
 try:
+    from shypn.rendering import ModuleRenderer
+except ImportError as e:
+    print(f'Warning: ModuleRenderer not available: {e}', file=sys.stderr)
+    ModuleRenderer = None
+try:
     from shypn.netobjs import Place, Transition, Arc
 except ImportError as e:
     print(f'ERROR: Cannot import Petri net objects: {e}', file=sys.stderr)
@@ -3365,6 +3370,14 @@ class ModelCanvasLoader:
         # STEP 3: Draw grid with all transformations applied (infinite canvas effect)
         # Grid bounds are calculated to cover the entire rotated viewport
         manager.draw_grid(cr)
+        
+        # STEP 4: Render module boundaries (if ModuleRenderer available)
+        if ModuleRenderer and hasattr(manager, 'document') and manager.document:
+            modules = manager.document.get_modules() if hasattr(manager.document, 'get_modules') else []
+            if modules:
+                module_renderer = ModuleRenderer()
+                for module in modules:
+                    module_renderer.render_module_box(cr, module, manager, manager.zoom)
         
         # Render all objects (these will be rotated)
         all_objects = manager.get_all_objects()
