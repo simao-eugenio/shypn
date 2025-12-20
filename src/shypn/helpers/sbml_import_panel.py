@@ -35,12 +35,14 @@ try:
     from shypn.data.pathway.pathway_validator import PathwayValidator
     from shypn.data.pathway.pathway_postprocessor import PathwayPostProcessor
     from shypn.data.pathway.pathway_converter import PathwayConverter
+    from shypn.services.sbml_compartment_module_service import SBMLCompartmentModuleService
 except ImportError as e:
     print(f'Warning: SBML importer not available: {e}', file=sys.stderr)
     SBMLParser = None
     PathwayValidator = None
     PathwayPostProcessor = None
     PathwayConverter = None
+    SBMLCompartmentModuleService = None
 
 
 class SBMLImportPanel:
@@ -659,6 +661,22 @@ class SBMLImportPanel:
                 
                 # Convert ProcessedPathwayData to Petri net
                 document_model = self.converter.convert(processed)
+                
+                # Convert SBML compartments to modules (if service available)
+                if SBMLCompartmentModuleService and document_model and processed:
+                    try:
+                        module_service = SBMLCompartmentModuleService()
+                        conversion_result = module_service.convert_compartments_to_modules(
+                            pathway=processed,
+                            document=document_model,
+                            auto_assign_places=True,
+                            auto_assign_transitions=True,
+                            detect_signals=True
+                        )
+                        if conversion_result and conversion_result.get('modules_created', 0) > 0:
+                            print(f"✓ Created {conversion_result['modules_created']} modules from SBML compartments")
+                    except Exception as e:
+                        print(f"Warning: Module conversion failed: {e}")
                 
                 # Pass results back to main thread for saving
                 GLib.idle_add(self._on_load_and_save_complete, document_model, pathway_name)
