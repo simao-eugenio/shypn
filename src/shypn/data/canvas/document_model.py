@@ -589,7 +589,7 @@ class DocumentModel:
         # Restore modules (if present)
         from shypn.netobjs.module import Module
         for module_data in data.get("modules", []):
-            module = Module.from_dict(module_data, places=places_dict, transitions=transitions_dict)
+            module = Module.from_dict(module_data, place_lookup=places_dict, transition_lookup=transitions_dict)
             document.add_module(module)
         
         # IMPORTANT: Reset all places to their initial marking
