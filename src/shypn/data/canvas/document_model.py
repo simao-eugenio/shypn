@@ -588,19 +588,13 @@ class DocumentModel:
         
         # Restore modules (if present)
         from shypn.netobjs.module import Module
-        module_count = len(data.get("modules", []))
-        print(f"[LOAD_DEBUG] Loading {module_count} modules from file", flush=True)
         for module_data in data.get("modules", []):
             try:
                 module = Module.from_dict(module_data, place_lookup=places_dict, transition_lookup=transitions_dict)
                 document.add_module(module)
-                print(f"[LOAD_DEBUG] Loaded module: {module.name} ({len(module.places)} places, {len(module.transitions)} transitions)", flush=True)
             except Exception as e:
-                print(f"[LOAD_DEBUG] Failed to load module: {e}", flush=True)
                 import traceback
                 traceback.print_exc()
-        
-        print(f"[LOAD_DEBUG] Total modules in document: {len(document.modules)}", flush=True)
         
         # IMPORTANT: Reset all places to their initial marking
         # When loading a saved file, we want to start with the initial state,

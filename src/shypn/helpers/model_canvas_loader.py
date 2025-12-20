@@ -35,7 +35,6 @@ except ImportError as e:
     sys.exit(1)
 try:
     from shypn.rendering import ModuleRenderer
-    print(f"[IMPORT_DEBUG] ModuleRenderer imported successfully: {ModuleRenderer}", flush=True)
 except ImportError as e:
     print(f'Warning: ModuleRenderer not available: {e}', file=sys.stderr, flush=True)
     ModuleRenderer = None
@@ -3375,7 +3374,6 @@ class ModelCanvasLoader:
         # STEP 4: Render module boundaries (if ModuleRenderer available)
         # Access document through manager.document_controller (the DocumentController has modules via DocumentModel)
         document = manager.document_controller if hasattr(manager, 'document_controller') else None
-        print(f"[MODULE_CHECK] ModuleRenderer={ModuleRenderer is not None}, has_document_controller={document is not None}", flush=True)
         
         if ModuleRenderer and document:
             # DocumentController wraps DocumentModel - need to get the actual DocumentModel
@@ -3385,14 +3383,6 @@ class ModelCanvasLoader:
                 modules = list(document.modules.values()) if isinstance(document.modules, dict) else document.modules
             elif hasattr(document, 'get_modules_list'):
                 modules = document.get_modules_list()
-            
-            # Debug output once per second
-            if not hasattr(self, '_last_module_debug') or time.time() - self._last_module_debug > 1.0:
-                self._last_module_debug = time.time()
-                print(f"[MODULE_RENDER] Found {len(modules)} modules to render", flush=True)
-                if modules:
-                    for mod in modules:
-                        print(f"[MODULE_RENDER]   - {mod.name}: {len(mod.places)} places, {len(mod.transitions)} transitions", flush=True)
             
             if modules:
                 module_renderer = ModuleRenderer()
