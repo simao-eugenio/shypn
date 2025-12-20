@@ -2,6 +2,7 @@
 
 This module contains pure rendering functions for canvas elements:
 - GridRenderer: Adaptive grid drawing (line/dot/cross styles)
+- ModuleRenderer: Module boundary boxes and collapse/expand controls
 """
 
 from .grid_renderer import (
@@ -14,6 +15,8 @@ from .grid_renderer import (
     draw_grid,
 )
 
+from .module_renderer import ModuleRenderer
+
 __all__ = [
     'GRID_STYLE_LINE',
     'GRID_STYLE_DOT',
@@ -22,4 +25,5 @@ __all__ = [
     'GRID_MAJOR_EVERY',
     'get_adaptive_grid_spacing',
     'draw_grid',
+    'ModuleRenderer',
 ]

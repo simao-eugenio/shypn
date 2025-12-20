@@ -126,6 +126,29 @@ class Arc(PetriNetObject):
         else:
             raise RuntimeError("Arc has no manager reference - cannot perform transformation")
     
+    def _is_signal_arc(self) -> bool:
+        """Check if this arc connects to a signal place.
+        
+        Signal arcs (connecting to Ψ places) are rendered with dashed lines
+        to visually distinguish information flow from mass transfer.
+        
+        Returns:
+            bool: True if source or target is a signal place
+        """
+        from shypn.netobjs.place import Place
+        
+        # Check if source is a signal place
+        if isinstance(self.source, Place):
+            if hasattr(self.source, 'is_signal_place') and self.source.is_signal_place:
+                return True
+        
+        # Check if target is a signal place
+        if isinstance(self.target, Place):
+            if hasattr(self.target, 'is_signal_place') and self.target.is_signal_place:
+                return True
+        
+        return False
+    
     @staticmethod
     def _validate_connection(source, target):
         """Validate that connection follows bipartite property.
@@ -261,6 +284,17 @@ class Arc(PetriNetObject):
                 control_x = mid_x + self.control_offset_x
                 control_y = mid_y + self.control_offset_y
         
+        # Check if this arc connects to a signal place (for dashed rendering)
+        is_signal_arc = self._is_signal_arc()
+        
+        # Set dash pattern for signal arcs
+        if is_signal_arc:
+            # Dashed line: 8px dash, 4px gap (scaled by zoom)
+            cr.set_dash([8.0 / zoom, 4.0 / zoom])
+        else:
+            # Solid line
+            cr.set_dash([])
+        
         # Add glow effect for colored arcs (CSS-like styling)
         if self.color != self.DEFAULT_COLOR:
             # Draw outer glow (subtle shadow effect)
@@ -285,6 +319,9 @@ class Arc(PetriNetObject):
         cr.set_source_rgb(*self.color)
         cr.set_line_width(self.width / max(zoom, 1e-6))  # Compensate for zoom
         cr.stroke()
+        
+        # Reset dash pattern for arrowhead (always solid)
+        cr.set_dash([])
         
         # Calculate direction at end point for arrowhead
         if render_as_curved:
