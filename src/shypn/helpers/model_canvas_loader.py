@@ -2830,7 +2830,6 @@ class ModelCanvasLoader:
                             widget.queue_draw()
                             return True
             
-            # Module click handling removed - signals work via formula references
             # Check for objects (places, transitions, arcs)
             clicked_obj = manager.find_object_at_position(world_x, world_y)
             
