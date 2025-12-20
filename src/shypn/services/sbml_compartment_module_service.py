@@ -252,12 +252,7 @@ class SBMLCompartmentModuleService:
         """
         unassigned_places = []
         
-        # DEBUG: Check mapping keys
-        print(f"[MODULE_ASSIGN_DEBUG] Species to place mapping has {len(species_to_place)} entries", flush=True)
-        print(f"[MODULE_ASSIGN_DEBUG] First 3 mapping keys: {list(species_to_place.keys())[:3]}", flush=True)
-        
         for species in pathway.species:
-            print(f"[MODULE_ASSIGN_DEBUG] Looking for species.id='{species.id}' in mapping", flush=True)
             place = species_to_place.get(species.id)
             if not place:
                 warnings.append(

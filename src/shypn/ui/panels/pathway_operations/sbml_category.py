@@ -496,30 +496,14 @@ class SBMLCategory(BasePathwayCategory):
                     try:
                         print("🔍 Converting SBML compartments to modules...", flush=True)
                         
-                        # Build species_id → Place mapping
+                        # Build species_id → Place mapping using metadata
                         # The original species.id is stored in place.metadata['original_species_id']
                         species_to_place = {}
-                        print(f"[DEBUG] Checking {len(document_model.places)} places for metadata", flush=True)
-                        for i, place in enumerate(document_model.places):
-                            if i < 3:  # Debug first 3 places
-                                print(f"[DEBUG] Place {i}: id={place.id}, name={place.name}", flush=True)
-                                if hasattr(place, 'metadata'):
-                                    print(f"[DEBUG]   metadata keys: {list(place.metadata.keys()) if place.metadata else 'None'}", flush=True)
-                                    if place.metadata:
-                                        print(f"[DEBUG]   original_species_id: {place.metadata.get('original_species_id')}", flush=True)
-                                else:
-                                    print(f"[DEBUG]   NO metadata attribute", flush=True)
-                            
+                        for place in document_model.places:
                             if hasattr(place, 'metadata') and place.metadata:
                                 original_species_id = place.metadata.get('original_species_id')
                                 if original_species_id:
                                     species_to_place[original_species_id] = place
-                                else:
-                                    # Fallback: try place.name
-                                    species_to_place[place.name] = place
-                            else:
-                                # No metadata, use place.name as fallback
-                                species_to_place[place.name] = place
                         
                         # Build reaction_id → Transition mapping
                         # The original reaction.id is stored in transition.metadata['reaction_id']
