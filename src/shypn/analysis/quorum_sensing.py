@@ -50,7 +50,7 @@ class QuorumSensingDetector:
         self.logger = logging.getLogger(self.__class__.__name__)
     
     def detect_signal_places(self, transition, rate_expr: str) -> Set[str]:
-        """Detect signal places from rate expression.
+        r"""Detect signal places from rate expression.
         
         Computes: Ψ(t) = Referenced \ (•t ∪ t• ∪ Σ(t))
         
