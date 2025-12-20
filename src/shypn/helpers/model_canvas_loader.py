@@ -2837,7 +2837,9 @@ class ModelCanvasLoader:
                 for module in modules:
                     if module_renderer.is_point_in_module_header(module, world_x, world_y, manager.zoom):
                         # Toggle collapse state
+                        old_state = module.collapsed
                         module.collapsed = not module.collapsed
+                        print(f"[TOGGLE] {module.name}: {old_state} → {module.collapsed}", flush=True)
                         widget.queue_draw()
                         return True
             
