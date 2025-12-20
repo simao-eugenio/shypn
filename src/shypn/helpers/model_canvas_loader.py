@@ -3373,15 +3373,23 @@ class ModelCanvasLoader:
         manager.draw_grid(cr)
         
         # STEP 4: Render module boundaries (if ModuleRenderer available)
-        print(f"[MODULE_CHECK] ModuleRenderer={ModuleRenderer is not None}, has_document={hasattr(manager, 'document')}, document={manager.document is not None if hasattr(manager, 'document') else False}", flush=True)
-        if ModuleRenderer and hasattr(manager, 'document') and manager.document:
-            modules = manager.document.get_modules_list() if hasattr(manager.document, 'get_modules_list') else []
+        # Access document through manager.document_controller (the DocumentController has modules via DocumentModel)
+        document = manager.document_controller if hasattr(manager, 'document_controller') else None
+        print(f"[MODULE_CHECK] ModuleRenderer={ModuleRenderer is not None}, has_document_controller={document is not None}", flush=True)
+        
+        if ModuleRenderer and document:
+            # DocumentController wraps DocumentModel - need to get the actual DocumentModel
+            # Check if document_controller has a modules attribute or get_modules_list method
+            modules = []
+            if hasattr(document, 'modules'):
+                modules = list(document.modules.values()) if isinstance(document.modules, dict) else document.modules
+            elif hasattr(document, 'get_modules_list'):
+                modules = document.get_modules_list()
             
             # Debug output once per second
             if not hasattr(self, '_last_module_debug') or time.time() - self._last_module_debug > 1.0:
                 self._last_module_debug = time.time()
-                print(f"[MODULE_RENDER] document.modules has {len(manager.document.modules)} entries", flush=True)
-                print(f"[MODULE_RENDER] get_modules_list() returns {len(modules)} modules", flush=True)
+                print(f"[MODULE_RENDER] Found {len(modules)} modules to render", flush=True)
                 if modules:
                     for mod in modules:
                         print(f"[MODULE_RENDER]   - {mod.name}: {len(mod.places)} places, {len(mod.transitions)} transitions", flush=True)
