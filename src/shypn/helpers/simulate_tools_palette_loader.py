@@ -1113,8 +1113,6 @@ class SimulateToolsPaletteLoader(GObject.GObject):
             n_replicates = getattr(settings, 'batch_replicates', 100)
             recorded_objects = getattr(settings, 'recorded_objects', set())
             
-            # Debug output
-            print(f"🔍 Batch mode check: batch_enabled={batch_enabled}, n_replicates={n_replicates}, recorded_objects={len(recorded_objects)}")
         else:
             print(f"⚠️ No simulation_settings found on model")
         

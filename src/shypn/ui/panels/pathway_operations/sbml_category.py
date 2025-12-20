@@ -494,8 +494,6 @@ class SBMLCategory(BasePathwayCategory):
                 # 4. Convert SBML compartments to modules (if service available)
                 if SBMLCompartmentModuleService and document_model and processed_pathway:
                     try:
-                        print("🔍 Converting SBML compartments to modules...", flush=True)
-                        
                         # Build species_id → Place mapping using metadata
                         # The original species.id is stored in place.metadata['original_species_id']
                         species_to_place = {}
@@ -514,8 +512,6 @@ class SBMLCategory(BasePathwayCategory):
                                 if reaction_id:
                                     reaction_to_transition[reaction_id] = transition
                         
-                        print(f"  Found {len(species_to_place)} places, {len(reaction_to_transition)} transitions", flush=True)
-                        
                         module_service = SBMLCompartmentModuleService()
                         conversion_result = module_service.convert_compartments_to_modules(
                             document=document_model,
@@ -527,25 +523,13 @@ class SBMLCategory(BasePathwayCategory):
                         )
                         
                         if conversion_result and conversion_result.get('success'):
+                            # Add modules to document so they're saved
                             modules = conversion_result.get('modules', [])
-                            signals = conversion_result.get('boundary_signals', [])
-                            print(f"✓ Module conversion successful:", flush=True)
-                            print(f"  - Modules created: {len(modules)}", flush=True)
-                            for mod in modules:
-                                print(f"    • {mod.name}: {len(mod.places)} places, {len(mod.transitions)} transitions", flush=True)
-                            print(f"  - Boundary signals: {len(signals)}", flush=True)
-                            
-                            # Add modules to document so they're saved and rendered
                             for module in modules:
                                 document_model.add_module(module)
-                            print(f"  - Modules registered with document: {len(document_model.modules)}", flush=True)
-                        else:
-                            error = conversion_result.get('error', 'Unknown error') if conversion_result else 'No result'
-                            print(f"⚠ Module conversion failed: {error}", flush=True)
                     except Exception as e:
-                        import traceback
-                        print(f"❌ Module conversion exception: {e}", flush=True)
-                        traceback.print_exc()
+                        # Module conversion failed, continue without modules
+                        pass
                 
                 return {
                     'filepath': filepath,
