@@ -118,6 +118,10 @@ class Place(PetriNetObject):
         
         # Selection rendering moved to ObjectEditingTransforms in src/shypn/api/edit/
         
+        # Draw Ψ symbol for signal places (when no tokens shown)
+        if self.is_signal_place and self.tokens == 0:
+            self._render_signal_symbol(cr, self.x, self.y, self.radius, zoom)
+        
         # Draw tokens if any
         if self.tokens > 0:
             self._render_tokens(cr, self.x, self.y, self.radius, zoom)
@@ -160,6 +164,58 @@ class Place(PetriNetObject):
         cr.fill()
         
         # Clear path to prevent spurious lines to text position
+        cr.new_path()
+    
+    def _render_signal_symbol(self, cr, x: float, y: float, radius: float, zoom: float = 1.0):
+        """Render Ψ (psi) symbol inside signal place hexagons.
+        
+        Signal places are marked with the Greek letter Ψ (psi) to indicate
+        information flow without mass transfer. Optional subscript shows signal type.
+        
+        Args:
+            cr: Cairo context
+            x, y: Center position (world coords)
+            radius: Hexagon radius (world space)
+            zoom: Current zoom level for font size compensation
+        """
+        # Draw Ψ symbol (Unicode U+03A8)
+        cr.set_source_rgb(0.0, 0.4, 0.8)  # Blue color matching signal place border
+        cr.select_font_face("Sans", 0, 0)  # Normal weight for Ψ
+        cr.set_font_size(16 / zoom)  # Slightly larger than tokens
+        
+        psi_symbol = "Ψ"
+        extents = cr.text_extents(psi_symbol)
+        text_x = x - extents.width / 2
+        text_y = y + extents.height / 2
+        
+        cr.move_to(text_x, text_y)
+        cr.show_text(psi_symbol)
+        cr.fill()
+        
+        # Draw subscript type indicator if signal_type is set
+        if self.signal_type:
+            # Map signal types to subscripts
+            type_subscripts = {
+                'quorum': 'q',
+                'energy': 'e',
+                'regulatory': 'r',
+                'spatial': 's'
+            }
+            
+            signal_type_name = self.signal_type.value if hasattr(self.signal_type, 'value') else str(self.signal_type)
+            subscript = type_subscripts.get(signal_type_name, '?')
+            
+            # Draw subscript (smaller, slightly offset)
+            cr.set_font_size(10 / zoom)
+            sub_extents = cr.text_extents(subscript)
+            sub_x = text_x + extents.width - 2 / zoom
+            sub_y = text_y + 6 / zoom  # Below baseline
+            
+            cr.move_to(sub_x, sub_y)
+            cr.show_text(subscript)
+            cr.fill()
+        
+        # Clear path
         cr.new_path()
     
     def _render_label(self, cr, x: float, y: float, radius: float, zoom: float = 1.0):
