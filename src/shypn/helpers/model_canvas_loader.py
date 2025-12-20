@@ -3374,13 +3374,19 @@ class ModelCanvasLoader:
         # STEP 4: Render module boundaries (if ModuleRenderer available)
         if ModuleRenderer and hasattr(manager, 'document') and manager.document:
             modules = manager.document.get_modules_list() if hasattr(manager.document, 'get_modules_list') else []
+            
+            # Debug output once per second
+            if not hasattr(self, '_last_module_debug') or time.time() - self._last_module_debug > 1.0:
+                self._last_module_debug = time.time()
+                print(f"[MODULE_RENDER] document.modules has {len(manager.document.modules)} entries", flush=True)
+                print(f"[MODULE_RENDER] get_modules_list() returns {len(modules)} modules", flush=True)
+                if modules:
+                    for mod in modules:
+                        print(f"[MODULE_RENDER]   - {mod.name}: {len(mod.places)} places, {len(mod.transitions)} transitions", flush=True)
+            
             if modules:
                 module_renderer = ModuleRenderer()
                 module_renderer.render_modules(cr, modules, manager.zoom, show_headers=True)
-                # Debug: Print module count once per second to avoid spam
-                if not hasattr(self, '_last_module_debug') or time.time() - self._last_module_debug > 1.0:
-                    self._last_module_debug = time.time()
-                    print(f"[MODULE_RENDER] Rendering {len(modules)} modules", flush=True)
         
         # Render all objects (these will be rotated)
         all_objects = manager.get_all_objects()
