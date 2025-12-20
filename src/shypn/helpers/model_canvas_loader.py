@@ -3618,6 +3618,39 @@ class ModelCanvasLoader:
             pass
             # For normal objects, include "Edit Mode" option
             menu_items = [('Edit Properties...', lambda: self._on_object_properties(obj, manager, drawing_area)), ('Edit Mode (Double-click)', lambda: self._on_object_edit_mode(obj, manager, drawing_area)), None, ('Delete', lambda: self._on_object_delete(obj, manager, drawing_area))]
+        
+        # Add signal place conversion options for places
+        if isinstance(obj, Place):
+            is_signal = getattr(obj, 'is_signal_place', False)
+            
+            if is_signal:
+                # If already a signal place, offer to remove designation
+                menu_items.insert(2, ('Remove Signal Designation', lambda: self._on_remove_signal_designation(obj, manager, drawing_area)))
+            else:
+                # If not a signal place, offer conversion submenu
+                signal_submenu_item = Gtk.MenuItem(label='Convert to Signal Place ►')
+                signal_submenu = Gtk.Menu()
+                
+                signal_types = [
+                    ('energy', 'Ψₑ - Energy/Metabolic State'),
+                    ('regulatory', 'Ψᵣ - Regulatory/Gene Expression'),
+                    ('quorum', 'Ψq - Quorum/Cell Communication'),
+                    ('spatial', 'Ψₛ - Spatial/Compartment Sensing')
+                ]
+                
+                for type_value, type_label in signal_types:
+                    signal_item = Gtk.MenuItem(label=type_label)
+                    signal_item.connect('activate', lambda w, t=type_value: self._on_convert_to_signal(obj, t, manager, drawing_area))
+                    signal_item.show()
+                    signal_submenu.append(signal_item)
+                
+                signal_submenu_item.set_submenu(signal_submenu)
+                signal_submenu_item.show()
+                menu_items.insert(2, ('__SUBMENU__', signal_submenu_item))
+            
+            # Add separator after signal place options
+            menu_items.insert(3, None)
+        
         if isinstance(obj, Transition):
             type_submenu_item = Gtk.MenuItem(label='Change Type ►')
             type_submenu = Gtk.Menu()
@@ -5177,6 +5210,57 @@ class ModelCanvasLoader:
             
             # Redraw canvas
             drawing_area.queue_draw()
+    
+    def _on_convert_to_signal(self, place, signal_type, manager, drawing_area):
+        """Convert place to signal place with specified type.
+        
+        Args:
+            place: Place object to convert
+            signal_type: Signal type ('energy', 'regulatory', 'quorum', 'spatial')
+            manager: ModelCanvasManager instance
+            drawing_area: GtkDrawingArea widget
+        """
+        # Set signal place properties
+        place.is_signal_place = True
+        place.signal_type = signal_type
+        
+        # Mark document dirty
+        if self.persistency:
+            self.persistency.mark_dirty()
+        
+        # Redraw canvas
+        drawing_area.queue_draw()
+        
+        # Show confirmation
+        type_labels = {
+            'energy': 'Ψₑ - Energy/Metabolic State',
+            'regulatory': 'Ψᵣ - Regulatory/Gene Expression',
+            'quorum': 'Ψq - Quorum/Cell Communication',
+            'spatial': 'Ψₛ - Spatial/Compartment Sensing'
+        }
+        type_label = type_labels.get(signal_type, signal_type)
+        print(f"Converted '{place.name}' to signal place: {type_label}")
+    
+    def _on_remove_signal_designation(self, place, manager, drawing_area):
+        """Remove signal place designation from place.
+        
+        Args:
+            place: Place object to modify
+            manager: ModelCanvasManager instance
+            drawing_area: GtkDrawingArea widget
+        """
+        # Clear signal place properties
+        place.is_signal_place = False
+        place.signal_type = None
+        
+        # Mark document dirty
+        if self.persistency:
+            self.persistency.mark_dirty()
+        
+        # Redraw canvas
+        drawing_area.queue_draw()
+        
+        print(f"Removed signal designation from '{place.name}'")
 
     def _on_arc_edit_weight(self, arc, manager, drawing_area):
         """Quick edit arc weight.

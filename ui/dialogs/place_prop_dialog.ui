@@ -234,6 +234,108 @@
                   </object>
                 </child>
                 
+                <!-- Signal Place Properties -->
+                <child>
+                  <object class="GtkFrame" id="signal_frame">
+                    <property name="visible">True</property>
+                    <property name="can-focus">False</property>
+                    <property name="label-xalign">0</property>
+                    <property name="shadow-type">in</property>
+                    
+                    <child>
+                      <object class="GtkBox" id="signal_box">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="orientation">vertical</property>
+                        <property name="spacing">8</property>
+                        <property name="margin-top">10</property>
+                        <property name="margin-bottom">10</property>
+                        <property name="margin-left">15</property>
+                        <property name="margin-right">15</property>
+                        
+                        <!-- Signal Place Checkbox -->
+                        <child>
+                          <object class="GtkCheckButton" id="signal_place_checkbox">
+                            <property name="visible">True</property>
+                            <property name="can-focus">True</property>
+                            <property name="label" translatable="yes">Is Signal Place (Ψ) - Information only, read-only</property>
+                            <property name="tooltip-text" translatable="yes">Signal places carry information that can be read by multiple transitions without token consumption. Used for cross-module communication.</property>
+                          </object>
+                        </child>
+                        
+                        <!-- Signal Type Selector -->
+                        <child>
+                          <object class="GtkBox" id="signal_type_box">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="spacing">10</property>
+                            
+                            <child>
+                              <object class="GtkLabel" id="signal_type_label">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="label" translatable="yes">Signal Type:</property>
+                                <property name="width-chars">12</property>
+                                <property name="xalign">1</property>
+                              </object>
+                              <packing>
+                                <property name="expand">False</property>
+                                <property name="fill">True</property>
+                                <property name="position">0</property>
+                              </packing>
+                            </child>
+                            
+                            <child>
+                              <object class="GtkComboBoxText" id="signal_type_combo">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="active">0</property>
+                                <property name="tooltip-text" translatable="yes">Type of signal this place represents</property>
+                                <items>
+                                  <item id="energy" translatable="yes">Ψₑ - Energy/Metabolic State</item>
+                                  <item id="regulatory" translatable="yes">Ψᵣ - Regulatory/Gene Expression</item>
+                                  <item id="quorum" translatable="yes">Ψq - Quorum/Cell Communication</item>
+                                  <item id="spatial" translatable="yes">Ψₛ - Spatial/Compartment Sensing</item>
+                                </items>
+                              </object>
+                              <packing>
+                                <property name="expand">True</property>
+                                <property name="fill">True</property>
+                                <property name="position">1</property>
+                              </packing>
+                            </child>
+                          </object>
+                        </child>
+                        
+                        <!-- Signal Help Text -->
+                        <child>
+                          <object class="GtkLabel" id="signal_help_label">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="xalign">0</property>
+                            <property name="yalign">0</property>
+                            <property name="wrap">True</property>
+                            <property name="max-width-chars">60</property>
+                            <property name="label" translatable="yes">Signal places enable cross-module communication. Tokens are read-only and broadcast to all connected transitions. Use for metabolic state sensing, regulatory signals, or compartment communication.</property>
+                            <attributes>
+                              <attribute name="style" value="italic"/>
+                              <attribute name="scale" value="0.9"/>
+                            </attributes>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                    
+                    <child type="label">
+                      <object class="GtkLabel" id="signal_frame_label">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="label" translatable="yes">Signal Place (Ψ) Properties</property>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                
                 <!-- Place Properties -->
                 <child>
                   <object class="GtkFrame" id="place_frame">
