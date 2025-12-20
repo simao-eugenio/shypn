@@ -662,10 +662,16 @@ class SBMLImportPanel:
                 # Convert ProcessedPathwayData to Petri net
                 document_model = self.converter.convert(processed)
                 
+                # DEBUG: Check if we reach module conversion
+                print(f"[MODULE_CONV_DEBUG] Reached module conversion block", flush=True)
+                print(f"[MODULE_CONV_DEBUG] SBMLCompartmentModuleService available: {SBMLCompartmentModuleService is not None}", flush=True)
+                print(f"[MODULE_CONV_DEBUG] document_model: {document_model is not None}", flush=True)
+                print(f"[MODULE_CONV_DEBUG] processed: {processed is not None}", flush=True)
+                
                 # Convert SBML compartments to modules (if service available)
                 if SBMLCompartmentModuleService and document_model and processed:
                     try:
-                        print("🔍 Converting SBML compartments to modules...")
+                        print("🔍 Converting SBML compartments to modules...", flush=True)
                         
                         # Build species_id → Place mapping from document
                         species_to_place = {}
@@ -680,7 +686,7 @@ class SBMLImportPanel:
                             if hasattr(transition, 'id'):
                                 reaction_to_transition[transition.id] = transition
                         
-                        print(f"  Found {len(species_to_place)} places, {len(reaction_to_transition)} transitions")
+                        print(f"  Found {len(species_to_place)} places, {len(reaction_to_transition)} transitions", flush=True)
                         
                         module_service = SBMLCompartmentModuleService()
                         conversion_result = module_service.convert_compartments_to_modules(
@@ -694,17 +700,17 @@ class SBMLImportPanel:
                         if conversion_result and conversion_result.get('success'):
                             modules = conversion_result.get('modules', [])
                             signals = conversion_result.get('boundary_signals', [])
-                            print(f"✓ Module conversion successful:")
-                            print(f"  - Modules created: {len(modules)}")
+                            print(f"✓ Module conversion successful:", flush=True)
+                            print(f"  - Modules created: {len(modules)}", flush=True)
                             for mod in modules:
-                                print(f"    • {mod.name}: {len(mod.places)} places, {len(mod.transitions)} transitions")
-                            print(f"  - Boundary signals: {len(signals)}")
+                                print(f"    • {mod.name}: {len(mod.places)} places, {len(mod.transitions)} transitions", flush=True)
+                            print(f"  - Boundary signals: {len(signals)}", flush=True)
                         else:
                             error = conversion_result.get('error', 'Unknown error') if conversion_result else 'No result'
-                            print(f"⚠ Module conversion failed: {error}")
+                            print(f"⚠ Module conversion failed: {error}", flush=True)
                     except Exception as e:
                         import traceback
-                        print(f"❌ Module conversion failed: {e}")
+                        print(f"❌ Module conversion exception: {e}", flush=True)
                         traceback.print_exc()
                 
                 # Pass results back to main thread for saving
