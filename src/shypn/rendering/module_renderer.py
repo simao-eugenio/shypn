@@ -44,22 +44,22 @@ class ModuleRenderer:
     HEADER_HEIGHT = 30.0  # Height of module header bar (pixels)
     
     # Colors (RGBA tuples)
-    DEFAULT_MODULE_COLOR = (0.85, 0.90, 0.95, 0.15)  # Light blue, 15% opacity
-    COLLAPSED_MODULE_COLOR = (0.75, 0.80, 0.85, 0.25)  # Gray, 25% opacity
-    BORDER_COLOR = (0.4, 0.5, 0.6, 0.8)  # Medium gray-blue, 80% opacity
+    DEFAULT_MODULE_COLOR = (0.85, 0.90, 0.95, 0.35)  # Light blue, 35% opacity
+    COLLAPSED_MODULE_COLOR = (0.75, 0.80, 0.85, 0.45)  # Gray, 45% opacity
+    BORDER_COLOR = (0.4, 0.5, 0.6, 0.9)  # Medium gray-blue, 90% opacity
     LABEL_COLOR = (0.2, 0.3, 0.4, 1.0)  # Dark gray, opaque
     
-    # Compartment-specific colors (from SBML color palette)
+    # Compartment-specific colors (from SBML color palette) - more distinct and visible
     COMPARTMENT_COLORS = {
-        'cytosol': (0.85, 0.90, 0.95, 0.15),  # Light blue
-        'cytoplasm': (0.85, 0.90, 0.95, 0.15),  # Light blue
-        'extracellular': (0.90, 0.85, 0.85, 0.15),  # Light red
-        'mitochondria': (0.85, 0.95, 0.85, 0.15),  # Light green
-        'mitochondrion': (0.85, 0.95, 0.85, 0.15),  # Light green
-        'nucleus': (0.95, 0.90, 0.85, 0.15),  # Light orange
-        'endoplasmic_reticulum': (0.95, 0.85, 0.90, 0.15),  # Light pink
-        'golgi': (0.90, 0.90, 0.85, 0.15),  # Light yellow
-        'membrane': (0.85, 0.85, 0.95, 0.15),  # Light purple
+        'cytosol': (0.60, 0.80, 0.95, 0.35),  # Sky blue
+        'cytoplasm': (0.60, 0.80, 0.95, 0.35),  # Sky blue
+        'extracellular': (0.95, 0.70, 0.70, 0.35),  # Coral red
+        'mitochondria': (0.70, 0.95, 0.70, 0.35),  # Spring green
+        'mitochondrion': (0.70, 0.95, 0.70, 0.35),  # Spring green
+        'nucleus': (0.95, 0.80, 0.60, 0.35),  # Peach orange
+        'endoplasmic_reticulum': (0.95, 0.70, 0.85, 0.35),  # Rose pink
+        'golgi': (0.95, 0.95, 0.60, 0.35),  # Butter yellow
+        'membrane': (0.75, 0.70, 0.95, 0.35),  # Lavender purple
     }
     
     def __init__(self):
