@@ -80,6 +80,9 @@ class SBMLImportPanel:
         self.project = project
         self.logger = logging.getLogger(self.__class__.__name__)
         
+        # DEBUG: Confirm module conversion code is loaded
+        print(f"[SBML_INIT] SBMLCompartmentModuleService available: {SBMLCompartmentModuleService is not None}", flush=True)
+        
         # Initialize backend components
         if SBMLParser and PathwayValidator and PathwayPostProcessor and PathwayConverter:
             self.parser = SBMLParser()
