@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Quorum Sensing Detection - Automatic signal place identification.
+r"""Quorum Sensing Detection - Automatic signal place identification.
 
 This module implements signal place detection for the 13-tuple Bio-PN formalism.
 Signal places (Ψ: T → 2^P) are non-local dependencies in rate functions that
