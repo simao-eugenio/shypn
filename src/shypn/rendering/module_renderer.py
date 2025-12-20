@@ -431,7 +431,7 @@ class ModuleRenderer:
         y: float,
         zoom: float
     ) -> bool:
-        """Check if point is inside module header (for interaction detection).
+        """Check if point is inside module (for interaction detection).
         
         Args:
             module: Module to check
@@ -439,7 +439,7 @@ class ModuleRenderer:
             zoom: Current zoom level
         
         Returns:
-            True if point is in header area
+            True if point is inside module area
         """
         bbox = self._calculate_module_bounds(module)
         if not bbox:
@@ -447,16 +447,16 @@ class ModuleRenderer:
         
         min_x, min_y, max_x, max_y = bbox
         padding = self.PADDING / zoom
-        header_height = self.HEADER_HEIGHT / zoom
         
-        # Header area
-        header_min_x = min_x - padding
-        header_min_y = min_y - padding - header_height
-        header_max_x = max_x + padding
-        header_max_y = min_y - padding
+        # Make entire module clickable for easier interaction
+        # Include padding area around module
+        module_min_x = min_x - padding
+        module_min_y = min_y - padding
+        module_max_x = max_x + padding
+        module_max_y = max_y + padding
         
-        return (header_min_x <= x <= header_max_x and
-                header_min_y <= y <= header_max_y)
+        return (module_min_x <= x <= module_max_x and
+                module_min_y <= y <= module_max_y)
     
     def is_point_in_collapse_button(
         self,

@@ -2830,9 +2830,9 @@ class ModelCanvasLoader:
                             widget.queue_draw()
                             return True
             
-            # Check if clicking on a module header (for collapse/expand)
+            # Check if clicking on a module (for collapse/expand)
             if ModuleRenderer and hasattr(manager, 'document_controller') and hasattr(manager.document_controller, 'modules'):
-                modules = manager.document_controller.modules.values() if manager.document_controller.modules else []
+                modules = list(manager.document_controller.modules.values()) if manager.document_controller.modules else []
                 module_renderer = ModuleRenderer()
                 for module in modules:
                     if module_renderer.is_point_in_module_header(module, world_x, world_y, manager.zoom):
