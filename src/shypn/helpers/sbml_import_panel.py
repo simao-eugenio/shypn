@@ -666,13 +666,30 @@ class SBMLImportPanel:
                 if SBMLCompartmentModuleService and document_model and processed:
                     try:
                         print("🔍 Converting SBML compartments to modules...")
+                        
+                        # Build species_id → Place mapping from document
+                        species_to_place = {}
+                        for place in document_model.places:
+                            # Place.id might be the species ID
+                            if hasattr(place, 'id'):
+                                species_to_place[place.id] = place
+                        
+                        # Build reaction_id → Transition mapping
+                        reaction_to_transition = {}
+                        for transition in document_model.transitions:
+                            if hasattr(transition, 'id'):
+                                reaction_to_transition[transition.id] = transition
+                        
+                        print(f"  Found {len(species_to_place)} places, {len(reaction_to_transition)} transitions")
+                        
                         module_service = SBMLCompartmentModuleService()
                         conversion_result = module_service.convert_compartments_to_modules(
-                            pathway=processed,
                             document=document_model,
-                            auto_assign_places=True,
-                            auto_assign_transitions=True,
-                            detect_signals=True
+                            pathway=processed,
+                            species_to_place=species_to_place,
+                            reaction_to_transition=reaction_to_transition,
+                            auto_detect_signals=True,
+                            validate=True
                         )
                         if conversion_result and conversion_result.get('success'):
                             modules = conversion_result.get('modules', [])
@@ -683,7 +700,8 @@ class SBMLImportPanel:
                                 print(f"    • {mod.name}: {len(mod.places)} places, {len(mod.transitions)} transitions")
                             print(f"  - Boundary signals: {len(signals)}")
                         else:
-                            print(f"⚠ Module conversion returned no results")
+                            error = conversion_result.get('error', 'Unknown error') if conversion_result else 'No result'
+                            print(f"⚠ Module conversion failed: {error}")
                     except Exception as e:
                         import traceback
                         print(f"❌ Module conversion failed: {e}")
