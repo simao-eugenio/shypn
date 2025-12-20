@@ -36,6 +36,7 @@ try:
     from shypn.data.pathway.pathway_postprocessor import PathwayPostProcessor
     from shypn.data.pathway.pathway_converter import PathwayConverter
     from shypn.data.pathway_document import PathwayDocument
+    from shypn.services.sbml_compartment_module_service import SBMLCompartmentModuleService
 except ImportError as e:
     print(f'Warning: SBML backend not available: {e}', file=sys.stderr)
     SBMLParser = None
@@ -43,6 +44,7 @@ except ImportError as e:
     PathwayPostProcessor = None
     PathwayConverter = None
     PathwayDocument = None
+    SBMLCompartmentModuleService = None
 
 
 class SBMLCategory(BasePathwayCategory):
@@ -488,6 +490,51 @@ class SBMLCategory(BasePathwayCategory):
                 # 3. Convert to Petri net → DocumentModel
                 self.logger.info("Converting to Petri net...")
                 document_model = self.converter.convert(processed_pathway)
+                
+                # 4. Convert SBML compartments to modules (if service available)
+                if SBMLCompartmentModuleService and document_model and processed_pathway:
+                    try:
+                        print("🔍 Converting SBML compartments to modules...", flush=True)
+                        
+                        # Build species_id → Place mapping
+                        species_to_place = {}
+                        for place in document_model.places:
+                            if hasattr(place, 'id'):
+                                species_to_place[place.id] = place
+                        
+                        # Build reaction_id → Transition mapping
+                        reaction_to_transition = {}
+                        for transition in document_model.transitions:
+                            if hasattr(transition, 'id'):
+                                reaction_to_transition[transition.id] = transition
+                        
+                        print(f"  Found {len(species_to_place)} places, {len(reaction_to_transition)} transitions", flush=True)
+                        
+                        module_service = SBMLCompartmentModuleService()
+                        conversion_result = module_service.convert_compartments_to_modules(
+                            document=document_model,
+                            pathway=processed_pathway,
+                            species_to_place=species_to_place,
+                            reaction_to_transition=reaction_to_transition,
+                            auto_detect_signals=True,
+                            validate=True
+                        )
+                        
+                        if conversion_result and conversion_result.get('success'):
+                            modules = conversion_result.get('modules', [])
+                            signals = conversion_result.get('boundary_signals', [])
+                            print(f"✓ Module conversion successful:", flush=True)
+                            print(f"  - Modules created: {len(modules)}", flush=True)
+                            for mod in modules:
+                                print(f"    • {mod.name}: {len(mod.places)} places, {len(mod.transitions)} transitions", flush=True)
+                            print(f"  - Boundary signals: {len(signals)}", flush=True)
+                        else:
+                            error = conversion_result.get('error', 'Unknown error') if conversion_result else 'No result'
+                            print(f"⚠ Module conversion failed: {error}", flush=True)
+                    except Exception as e:
+                        import traceback
+                        print(f"❌ Module conversion exception: {e}", flush=True)
+                        traceback.print_exc()
                 
                 return {
                     'filepath': filepath,
