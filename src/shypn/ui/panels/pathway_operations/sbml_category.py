@@ -497,19 +497,22 @@ class SBMLCategory(BasePathwayCategory):
                         print("🔍 Converting SBML compartments to modules...", flush=True)
                         
                         # Build species_id → Place mapping
-                        # NOTE: Place.name contains the biological identifier (species ID)
-                        # while Place.id is system-generated (P1, P2, P3...)
+                        # The original species.id is stored in place.metadata['original_species_id']
                         species_to_place = {}
                         for place in document_model.places:
-                            if hasattr(place, 'name'):
-                                species_to_place[place.name] = place
+                            if hasattr(place, 'metadata') and place.metadata:
+                                original_species_id = place.metadata.get('original_species_id')
+                                if original_species_id:
+                                    species_to_place[original_species_id] = place
                         
                         # Build reaction_id → Transition mapping
-                        # Same pattern: Transition.name contains the reaction ID
+                        # The original reaction.id is stored in transition.metadata['reaction_id']
                         reaction_to_transition = {}
                         for transition in document_model.transitions:
-                            if hasattr(transition, 'name'):
-                                reaction_to_transition[transition.name] = transition
+                            if hasattr(transition, 'metadata') and transition.metadata:
+                                reaction_id = transition.metadata.get('reaction_id')
+                                if reaction_id:
+                                    reaction_to_transition[reaction_id] = transition
                         
                         print(f"  Found {len(species_to_place)} places, {len(reaction_to_transition)} transitions", flush=True)
                         
