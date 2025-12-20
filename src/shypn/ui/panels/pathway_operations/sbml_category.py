@@ -497,16 +497,19 @@ class SBMLCategory(BasePathwayCategory):
                         print("🔍 Converting SBML compartments to modules...", flush=True)
                         
                         # Build species_id → Place mapping
+                        # NOTE: Place.name contains the biological identifier (species ID)
+                        # while Place.id is system-generated (P1, P2, P3...)
                         species_to_place = {}
                         for place in document_model.places:
-                            if hasattr(place, 'id'):
-                                species_to_place[place.id] = place
+                            if hasattr(place, 'name'):
+                                species_to_place[place.name] = place
                         
                         # Build reaction_id → Transition mapping
+                        # Same pattern: Transition.name contains the reaction ID
                         reaction_to_transition = {}
                         for transition in document_model.transitions:
-                            if hasattr(transition, 'id'):
-                                reaction_to_transition[transition.id] = transition
+                            if hasattr(transition, 'name'):
+                                reaction_to_transition[transition.name] = transition
                         
                         print(f"  Found {len(species_to_place)} places, {len(reaction_to_transition)} transitions", flush=True)
                         
