@@ -87,7 +87,7 @@ class ModuleRenderer:
             return
         
         for module in modules:
-            if module.is_collapsed:
+            if module.collapsed:
                 self._render_collapsed_module(cr, module, zoom, show_headers)
             else:
                 self._render_expanded_module(
