@@ -3376,8 +3376,14 @@ class ModelCanvasLoader:
             modules = manager.document.get_modules() if hasattr(manager.document, 'get_modules') else []
             if modules:
                 module_renderer = ModuleRenderer()
-                for module in modules:
-                    module_renderer.render_module_box(cr, module, manager, manager.zoom)
+                module_renderer.render_modules(cr, modules, manager.zoom, show_headers=True)
+            # Debug: Print module count once per second to avoid spam
+            if not hasattr(self, '_last_module_debug') or time.time() - self._last_module_debug > 1.0:
+                self._last_module_debug = time.time()
+                if modules:
+                    print(f"[MODULE_DEBUG] Rendering {len(modules)} modules")
+                elif hasattr(manager.document, 'get_modules'):
+                    print(f"[MODULE_DEBUG] Document has get_modules but no modules found")
         
         # Render all objects (these will be rotated)
         all_objects = manager.get_all_objects()

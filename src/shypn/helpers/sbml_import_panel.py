@@ -665,6 +665,7 @@ class SBMLImportPanel:
                 # Convert SBML compartments to modules (if service available)
                 if SBMLCompartmentModuleService and document_model and processed:
                     try:
+                        print("🔍 Converting SBML compartments to modules...")
                         module_service = SBMLCompartmentModuleService()
                         conversion_result = module_service.convert_compartments_to_modules(
                             pathway=processed,
@@ -673,10 +674,20 @@ class SBMLImportPanel:
                             auto_assign_transitions=True,
                             detect_signals=True
                         )
-                        if conversion_result and conversion_result.get('modules_created', 0) > 0:
-                            print(f"✓ Created {conversion_result['modules_created']} modules from SBML compartments")
+                        if conversion_result and conversion_result.get('success'):
+                            modules = conversion_result.get('modules', [])
+                            signals = conversion_result.get('boundary_signals', [])
+                            print(f"✓ Module conversion successful:")
+                            print(f"  - Modules created: {len(modules)}")
+                            for mod in modules:
+                                print(f"    • {mod.name}: {len(mod.places)} places, {len(mod.transitions)} transitions")
+                            print(f"  - Boundary signals: {len(signals)}")
+                        else:
+                            print(f"⚠ Module conversion returned no results")
                     except Exception as e:
-                        print(f"Warning: Module conversion failed: {e}")
+                        import traceback
+                        print(f"❌ Module conversion failed: {e}")
+                        traceback.print_exc()
                 
                 # Pass results back to main thread for saving
                 GLib.idle_add(self._on_load_and_save_complete, document_model, pathway_name)
