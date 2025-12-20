@@ -523,7 +523,8 @@ class DocumentModel:
         metadata["object_counts"] = {
             "places": len(self.places),
             "transitions": len(self.transitions),
-            "arcs": len(self.arcs)
+            "arcs": len(self.arcs),
+            "modules": len(self.modules)
         }
         
         return {
@@ -532,7 +533,8 @@ class DocumentModel:
             "view_state": self.view_state,
             "places": [place.to_dict() for place in self.places],
             "transitions": [transition.to_dict() for transition in self.transitions],
-            "arcs": [arc.to_dict() for arc in self.arcs]
+            "arcs": [arc.to_dict() for arc in self.arcs],
+            "modules": [module.to_dict() for module in self.modules.values()]
         }
     
     @classmethod
@@ -583,6 +585,12 @@ class DocumentModel:
             # Register ID to update counter (LOCAL ONLY)
             with suspend_lifecycle_delegation():
                 document.id_manager.register_arc_id(arc.id)
+        
+        # Restore modules (if present)
+        from shypn.netobjs.module import Module
+        for module_data in data.get("modules", []):
+            module = Module.from_dict(module_data, places=places_dict, transitions=transitions_dict)
+            document.add_module(module)
         
         # IMPORTANT: Reset all places to their initial marking
         # When loading a saved file, we want to start with the initial state,
