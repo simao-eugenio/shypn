@@ -39,6 +39,31 @@ class ImmediateBehavior(TransitionBehavior):
             )
     """
     
+    def _is_signal_place(self, place) -> bool:
+        """Check if a place is a signal place (read-only, non-consuming).
+        
+        Signal places (Ψ) in modular Bio-PN architecture provide information
+        flow without mass transfer. They are never consumed during simulation.
+        
+        Args:
+            place: Place object to check
+        
+        Returns:
+            bool: True if place is a signal place
+        """
+        if place is None:
+            return False
+        
+        # Check is_signal_place attribute (primary indicator)
+        if hasattr(place, 'is_signal_place') and place.is_signal_place:
+            return True
+        
+        # Check signal_type property (alternative indicator)
+        if hasattr(place, 'signal_type') and place.signal_type is not None:
+            return True
+        
+        return False
+    
     def can_fire(self) -> Tuple[bool, str]:
         """Check if transition can fire (sufficient tokens in input places).
         
@@ -86,6 +111,12 @@ class ImmediateBehavior(TransitionBehavior):
             source_place = arc.source
             if source_place is None:
                 return False, f"missing-source-place-{arc.name}"
+            
+            # SIGNAL PLACE SEMANTICS: Signal places are read-only (Ψ in Bio-PN)
+            # They broadcast information without token consumption
+            # Skip token requirement checks for signal places
+            if self._is_signal_place(source_place):
+                continue  # Signal places don't block enablement
             
             # Check sufficient tokens (applies to both normal arcs and test arcs)
             if source_place.tokens < arc.weight:
@@ -155,6 +186,15 @@ class ImmediateBehavior(TransitionBehavior):
                             'immediate_mode': True
                         }
                     
+                    # SIGNAL PLACE SEMANTICS: DO NOT consume tokens from signal places (Ψ)
+                    # Signal places broadcast information without depletion
+                    # This enables multiple transitions to read the same signal simultaneously
+                    if self._is_signal_place(source_place):
+                        # Signal places are read-only - skip token consumption
+                        # But still track as "consumed" for event recording (informational only)
+                        consumed_map[source_place.id] = float(arc.weight)  # Record read access
+                        continue  # Skip actual token deduction
+                    
                     # Check sufficient tokens for immediate firing
                     if source_place.tokens < arc.weight:
                         return False, {
@@ -181,6 +221,15 @@ class ImmediateBehavior(TransitionBehavior):
                     if target_place is None:
                         # Skip if target place missing (shouldn't happen in valid net)
                         continue
+                    
+                    # SIGNAL PLACE SEMANTICS: DO NOT produce tokens to signal places (Ψ)
+                    # Signal places represent external information and are not updated by transitions
+                    # They are set externally (e.g., by environment, regulatory logic, or user)
+                    if self._is_signal_place(target_place):
+                        # Signal places cannot be produced to - skip token addition
+                        # Record as produced for event logging (informational only)
+                        produced_map[target_place.id] = float(arc.weight)  # Record write attempt
+                        continue  # Skip actual token addition
                     
                     # Produce exactly arc_weight tokens (discrete semantics)
                     old_tokens = target_place.tokens
