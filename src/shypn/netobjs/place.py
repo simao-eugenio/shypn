@@ -18,7 +18,7 @@ class Place(PetriNetObject):
     """
     
     # Default styling (proportional metrics at 1:1 scale)
-    DEFAULT_RADIUS = 30.0  # 30px radius = 60px diameter at 100% zoom
+    DEFAULT_RADIUS = 40.0  # 40px radius = 80px diameter at 100% zoom
     DEFAULT_BORDER_COLOR = (0.0, 0.0, 0.0)  # Black border
     DEFAULT_BORDER_WIDTH = 3.0  # 3px for better visibility
     
@@ -57,6 +57,10 @@ class Place(PetriNetObject):
         self.signal_type: Optional[SignalType] = None  # Classification: quorum, energy, regulatory, spatial
         self.signal_scope: List[str] = []  # Module IDs that can read this signal (empty = global scope)
         
+        # Regulatory place properties (gene loci, constant resources)
+        # Regulatory places represent genetic elements or constant resource pools
+        self.is_regulatory_place = False  # True if this is a gene locus or constant resource
+        
         # Module assignment (modular Bio-PN architecture)
         # Places belong to modules, enabling network partitioning and compartmentalization
         self.module_id: Optional[str] = None  # Module identifier (e.g., "M_cytoplasm", "M_mitochondria")
@@ -84,8 +88,20 @@ class Place(PetriNetObject):
         # Legacy approach: cr.scale() is already applied, so we draw in world space
         
         # Color coding for different place types
-        if self.is_signal_place:
-            display_color = (0.0, 0.4, 0.8)  # Blue for signal places (no arcs)
+        # Use self.border_color if it's been modified (e.g., for recording)
+        # Otherwise use default colors based on place type
+        if self.is_regulatory_place:
+            # Regulatory places (genes/constant resources): purple border
+            if self.border_color != self.DEFAULT_BORDER_COLOR and self.border_color != (0.4, 0.0, 0.6):
+                display_color = self.border_color  # Use recording color (orange) if marked
+            else:
+                display_color = (0.4, 0.0, 0.6)  # Purple for regulatory places
+        elif self.is_signal_place:
+            # Check if border_color has been modified from default (e.g., orange for recording)
+            if self.border_color != self.DEFAULT_BORDER_COLOR and self.border_color != (0.0, 0.4, 0.8):
+                display_color = self.border_color  # Use recording color (orange) or custom color
+            else:
+                display_color = (0.0, 0.4, 0.8)  # Blue for signal places (no arcs)
         elif self.is_compartment_place:
             display_color = (0.6, 0.0, 0.8)  # Violet for non-default compartment (has arcs)
         else:
@@ -96,6 +112,9 @@ class Place(PetriNetObject):
             if self.is_signal_place:
                 # Hexagons only for signal places (no arcs)
                 self._draw_hexagon_path(cr, self.x, self.y, self.radius + 2 / zoom)
+            elif self.is_regulatory_place:
+                # Double circles for regulatory places (genes/resources)
+                cr.arc(self.x, self.y, self.radius + 2 / zoom, 0, 2 * math.pi)
             else:
                 # Circles for compartment places (have arcs)
                 cr.arc(self.x, self.y, self.radius + 2 / zoom, 0, 2 * math.pi)
@@ -346,7 +365,8 @@ class Place(PetriNetObject):
             "border_color": list(self.border_color),
             "border_width": self.border_width,
             "is_catalyst": getattr(self, 'is_catalyst', False),  # Save catalyst flag
-            "is_signal_place": getattr(self, 'is_signal_place', False)  # Save signal place flag (13-tuple Ψ)
+            "is_signal_place": getattr(self, 'is_signal_place', False),  # Save signal place flag (13-tuple Ψ)
+            "is_regulatory_place": getattr(self, 'is_regulatory_place', False)  # Save regulatory place flag
         })
         
         # Serialize metadata (KEGG IDs, ChEBI IDs, data sources, etc.)
@@ -404,6 +424,8 @@ class Place(PetriNetObject):
         place.is_catalyst = data.get("is_catalyst", False)
         # Restore signal place flag (13-tuple formalism: Ψ)
         place.is_signal_place = data.get("is_signal_place", False)
+        # Restore regulatory place flag (genes/resources)
+        place.is_regulatory_place = data.get("is_regulatory_place", False)
         if "capacity" in data:
             capacity_value = data["capacity"]
             # Normalize capacity: handle string "Infinity" or "inf"

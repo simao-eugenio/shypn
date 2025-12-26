@@ -150,6 +150,33 @@ class SBMLMetadataCategory:
         else:
             self.store.append(events_root, ["", "No events", "", "", "", ""])
         
+        # Function Definitions section
+        function_count = metadata.get('function_definitions_count', 0)
+        functions_root = self.store.append(None, [
+            "ƒ", "Function Definitions", f"{function_count} items",
+            "section", "", "User-defined mathematical functions"
+        ])
+        if function_count > 0:
+            function_names = metadata.get('function_definitions', [])
+            for func_name in function_names:
+                # Extract function name and arguments
+                if '(' in func_name:
+                    name_part = func_name.split('(')[0]
+                    args_part = func_name.split('(', 1)[1].rstrip(')')
+                    self.store.append(functions_root, [
+                        "ƒ", name_part, args_part,
+                        "function", name_part,
+                        f"Function: {func_name}"
+                    ])
+                else:
+                    self.store.append(functions_root, [
+                        "ƒ", func_name, "",
+                        "function", func_name,
+                        f"Function: {func_name}"
+                    ])
+        else:
+            self.store.append(functions_root, ["", "No function definitions", "", "", "", ""])
+        
         # Annotations section
         annot_root = self.store.append(None, [
             "🏷️", "Annotations", "Database IDs",

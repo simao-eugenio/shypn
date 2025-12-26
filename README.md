@@ -97,14 +97,17 @@ MIT License - See [LICENSE](LICENSE) file for details.
 If you use SHYpn in your research, please cite:
 
 ```bibtex
-@article{shypn2025,
-  title={SHYpn: Stochastic Hybrid Petri Nets with Weak Independence for Efficient Biological Pathway Simulation},
-  author={Simão, Eugênio},
-  journal={arXiv preprint},
+@article{simao2025weak,
+  title={Weak Independence and Coupled Parallelism in Biological Petri Nets},
+  author={Sim{\~a}o, Eug{\'e}nio},
+  journal={arXiv preprint arXiv:2512.17106},
   year={2025},
-  note={Available at: https://github.com/simao-eugenio/shypn}
+  url={https://arxiv.org/abs/2512.17106}
 }
 ```
+
+**Paper:** [arXiv:2512.17106](https://arxiv.org/abs/2512.17106) - Weak Independence and Coupled Parallelism in Biological Petri Nets  
+**Software:** https://github.com/simao-eugenio/shypn
 
 ## Contact
 

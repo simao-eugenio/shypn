@@ -30,8 +30,11 @@ from .extractors import (
     ParameterExtractor,
     EventExtractor,
     AnnotationExtractor,
-    UnitExtractor
+    UnitExtractor,
+    FunctionDefinitionExtractor,
+    FunctionDefinition
 )
+from .sbml_validator import SBMLValidator, format_validation_report
 from .pathway_data import (
     PathwayData, 
     Species, 
@@ -120,6 +123,37 @@ class SBMLParser:
         if model is None:
             raise ValueError("SBML file contains no model")
         
+        # Validate SBML model for compatibility (NEW)
+        self.logger.info("Validating SBML model...")
+        validator = SBMLValidator(model, self.logger)
+        is_valid, issues = validator.validate()
+        
+        # Store issues for later inclusion in metadata
+        self._validation_issues = issues
+        
+        # Print validation report
+        report = format_validation_report(issues)
+        print(report)
+        
+        # Only block on truly critical structural issues (none currently defined)
+        # Most issues are warnings that allow import to proceed
+        critical_issues = [i for i in issues if i.severity.value == "critical"]
+        error_issues = [i for i in issues if i.severity.value == "error"]
+        
+        if critical_issues:
+            raise ValueError(
+                f"Cannot import SBML model: {len(critical_issues)} critical issue(s) found.\n"
+                "These represent structural problems that will cause immediate failure.\n"
+                "See validation report above for details."
+            )
+        
+        # Show warning but allow import to proceed
+        if error_issues:
+            print("\n" + "=" * 80)
+            print(f"⚠️  WARNING: {len(error_issues)} error(s) found but import will proceed.")
+            print("Simulation may fail or produce incorrect results.")
+            print("=" * 80 + "\n")
+        
         # Extract all elements using specialized extractors
         pathway_data = self._extract_pathway_data(model, filepath, filter_isolated_species)
         
@@ -156,6 +190,7 @@ class SBMLParser:
         compartment_extractor = CompartmentExtractor(model, logger)
         unit_extractor = UnitExtractor(model, logger)
         parameter_extractor = ParameterExtractor(model, logger)
+        function_extractor = FunctionDefinitionExtractor(model, logger)
         species_extractor = SpeciesExtractor(model, logger)
         reaction_extractor = ReactionExtractor(model, logger)
         event_extractor = EventExtractor(model, logger)
@@ -166,33 +201,59 @@ class SBMLParser:
         compartments_legacy = compartment_extractor.extract_legacy()
         unit_defs = unit_extractor.extract()
         parameters = parameter_extractor.extract()
+        functions = function_extractor.extract()  # NEW: Extract function definitions
         all_species = species_extractor.extract()
         reactions = reaction_extractor.extract()
         events = event_extractor.extract()
         annotations = annotation_extractor.extract()
         
-        # Step 3: Apply annotations to species/reactions
+        # Step 3: Expand function calls in reaction formulas
+        if functions:
+            self._expand_function_calls(reactions, functions)
+        
+        # Step 4: Apply annotations to species/reactions
         self._apply_annotations(all_species, reactions, annotations)
         
-        # Step 4: Link species to compartment objects
+        # Step 5: Link species to compartment objects
         self._link_compartments(all_species, compartments_enhanced)
         
-        # Step 5: Filter isolated species if requested
+        # Step 6: Filter isolated species if requested
         if filter_isolated_species:
             species = self._filter_isolated_species(all_species, reactions)
         else:
             species = all_species
             self.logger.debug("Including all species (no filtering)")
         
-        # Step 6: Merge compartment sizes into parameters (for kinetic formulas)
+        # Step 6.5: Evaluate assignment rules at t=0 (NEW)
+        self._evaluate_assignment_rules(model, species, parameters)
+        
+        # Step 7: Merge compartment sizes into parameters (for kinetic formulas)
         for comp_id, comp in compartments_enhanced.items():
             parameters[comp_id] = comp.size
         self.logger.debug(f"Merged {len(compartments_enhanced)} compartment sizes into parameters")
         
-        # Step 7: Create metadata
+        # Step 8: Create metadata
         metadata = self._create_metadata(model, filepath)
         
-        # Step 8: Assemble PathwayData
+        # Store validation issues in metadata (NEW)
+        if hasattr(self, '_validation_issues'):
+            metadata['validation_issues'] = [
+                {
+                    'severity': issue.severity.value,
+                    'category': issue.category,
+                    'message': issue.message,
+                    'suggestion': issue.suggestion
+                }
+                for issue in self._validation_issues
+            ]
+        
+        # Step 8.5: Add function definition metadata
+        if functions:
+            metadata['function_definitions_count'] = len(functions)
+            metadata['function_definitions'] = [f"{func_id}({', '.join(func.arguments)})" 
+                                               for func_id, func in functions.items()]
+        
+        # Step 9: Assemble PathwayData
         pathway_data = PathwayData(
             species=species,
             reactions=reactions,
@@ -204,14 +265,118 @@ class SBMLParser:
             metadata=metadata
         )
         
-        # Step 9: Validate formulas for undeclared variables
+        # Step 10: Validate formulas for undeclared variables
         self._validate_formula_variables(pathway_data)
         
-        # Step 10: Post-processing (unit conversion, concentration calculation)
+        # Step 11: Post-processing (unit conversion, concentration calculation)
         # TODO: Implement in future PR when simulation integration is ready
         # pathway_data = self._postprocess(pathway_data)
         
         return pathway_data
+    
+    def _expand_function_calls(self,
+                               reactions: List[Reaction],
+                               functions: Dict[str, FunctionDefinition]) -> None:
+        """
+        Expand user-defined function calls in reaction formulas.
+        
+        Replaces function calls like R_PFK(x, y, z) with their expanded definitions.
+        Uses regex to find and replace function calls with actual argument substitution.
+        
+        Args:
+            reactions: List of Reaction objects to process
+            functions: Dict of FunctionDefinition objects
+            
+        Example:
+            Formula: "Vmax * R_PFK(ATP, F6P, 0.5)"
+            Function: R_PFK(x, y, z) = x * y / (z + x)
+            Result:  "Vmax * ((ATP) * (F6P) / ((0.5) + (ATP)))"
+        """
+        if not functions:
+            return
+        
+        import re
+        
+        self.logger.info(f"Expanding {len(functions)} function definitions in formulas...")
+        
+        expanded_count = 0
+        
+        for reaction in reactions:
+            if not reaction.kinetic_law or not reaction.kinetic_law.formula:
+                continue
+            
+            formula = reaction.kinetic_law.formula
+            original_formula = formula
+            
+            # Expand each function that appears in the formula
+            for func_id, func_def in functions.items():
+                # Pattern: function_name(args...)
+                # Matches: R_PFK(ATP, F6P, gR) or R_PFK( ATP , F6P , gR )
+                pattern = rf'\b{re.escape(func_id)}\s*\((.*?)\)'
+                
+                def replace_call(match):
+                    """Replace a single function call with expanded definition."""
+                    args_str = match.group(1)
+                    
+                    # Split arguments, handling nested parentheses
+                    args = self._split_function_args(args_str)
+                    
+                    try:
+                        expanded = func_def.expand(args)
+                        return f"({expanded})"
+                    except ValueError as e:
+                        self.logger.warning(
+                            f"Failed to expand {func_id} in reaction {reaction.id}: {e}"
+                        )
+                        return match.group(0)  # Keep original if expansion fails
+                
+                # Replace all occurrences of this function
+                formula = re.sub(pattern, replace_call, formula)
+            
+            # Update formula if changed
+            if formula != original_formula:
+                reaction.kinetic_law.formula = formula
+                expanded_count += 1
+                self.logger.debug(
+                    f"  {reaction.id}: Expanded function calls\n"
+                    f"    Before: {original_formula[:100]}...\n"
+                    f"    After:  {formula[:100]}..."
+                )
+        
+        self.logger.info(f"Expanded functions in {expanded_count} reaction formulas")
+    
+    def _split_function_args(self, args_str: str) -> List[str]:
+        """Split function arguments, respecting nested parentheses.
+        
+        Args:
+            args_str: Comma-separated argument string
+            
+        Returns:
+            List of argument strings
+            
+        Example:
+            "ATP, F6P, (Km + S)"  →  ["ATP", "F6P", "(Km + S)"]
+        """
+        args = []
+        current = []
+        depth = 0
+        
+        for char in args_str:
+            if char == ',' and depth == 0:
+                args.append(''.join(current).strip())
+                current = []
+            else:
+                if char == '(':
+                    depth += 1
+                elif char == ')':
+                    depth -= 1
+                current.append(char)
+        
+        # Add last argument
+        if current:
+            args.append(''.join(current).strip())
+        
+        return args
     
     def _apply_annotations(self, 
                           species: List[Species],
@@ -232,6 +397,129 @@ class SBMLParser:
         for r in reactions:
             if r.id in annotations:
                 r.annotation = annotations[r.id]
+    
+    def _evaluate_assignment_rules(self,
+                                   model,
+                                   species: List[Species],
+                                   parameters: Dict[str, float]) -> None:
+        """
+        Evaluate assignment rules at t=0 to set initial values.
+        
+        Assignment rules define algebraic relationships like:
+            ATP = (P - ADP) / 2
+        
+        This method evaluates them once at initialization to get correct
+        starting values. NOTE: Rules are NOT re-evaluated during simulation,
+        which may cause incorrect results.
+        
+        Args:
+            model: libsbml Model object
+            species: List of Species objects to update
+            parameters: Dict of parameters
+        """
+        num_rules = model.getNumRules()
+        if num_rules == 0:
+            return
+        
+        assignment_rules = []
+        for i in range(num_rules):
+            rule = model.getRule(i)
+            if rule.isAssignment():
+                variable = rule.getVariable()
+                math_ast = rule.getMath()
+                assignment_rules.append((variable, math_ast))
+        
+        if not assignment_rules:
+            return
+        
+        self.logger.info(f"Evaluating {len(assignment_rules)} assignment rule(s) at t=0...")
+        
+        # Build evaluation context
+        context = {}
+        
+        # Add all species initial values
+        species_dict = {s.id: s for s in species}
+        for s in species:
+            context[s.id] = s.initial_concentration or 0.0
+        
+        # Add all parameters
+        context.update(parameters)
+        
+        # Add compartment sizes
+        for i in range(model.getNumCompartments()):
+            comp = model.getCompartment(i)
+            context[comp.getId()] = comp.getSize()
+        
+        # Evaluate rules in order (handle dependencies)
+        max_iterations = 10  # Prevent infinite loops
+        evaluated = set()
+        
+        for iteration in range(max_iterations):
+            made_progress = False
+            
+            for variable, math_ast in assignment_rules:
+                if variable in evaluated:
+                    continue
+                
+                try:
+                    # Convert MathML to Python expression
+                    formula = libsbml.formulaToL3String(math_ast)
+                    
+                    # Replace SBML power operator (^) with Python power (**)
+                    formula = formula.replace('^', '**')
+                    
+                    # Try to evaluate
+                    import math
+                    import numpy as np
+                    safe_context = {
+                        "__builtins__": {},
+                        "sqrt": math.sqrt,
+                        "pow": pow,
+                        "exp": math.exp,
+                        "log": math.log,
+                        "log10": math.log10,
+                        "sin": math.sin,
+                        "cos": math.cos,
+                        "tan": math.tan,
+                        "abs": abs,
+                        "min": min,
+                        "max": max,
+                    }
+                    safe_context.update(context)
+                    
+                    value = eval(formula, safe_context)
+                    
+                    # Update context and species/parameter
+                    context[variable] = value
+                    
+                    # Update the actual species or parameter
+                    if variable in species_dict:
+                        spec = species_dict[variable]
+                        spec.initial_concentration = value
+                        self.logger.debug(f"  Rule: {variable} = {value:.6g}")
+                    elif variable in parameters:
+                        parameters[variable] = value
+                        self.logger.debug(f"  Rule: {variable} = {value:.6g}")
+                    
+                    evaluated.add(variable)
+                    made_progress = True
+                    
+                except Exception as e:
+                    # Can't evaluate yet (may depend on other rules)
+                    pass
+            
+            if not made_progress:
+                break
+        
+        # Warn about unevaluated rules
+        unevaluated = set(var for var, _ in assignment_rules) - evaluated
+        if unevaluated:
+            self.logger.warning(
+                f"Could not evaluate assignment rules for: {', '.join(unevaluated)}. "
+                f"These may have circular dependencies or use unsupported functions."
+            )
+        else:
+            self.logger.info(f"✓ Evaluated all {len(assignment_rules)} assignment rules")
     
     def _link_compartments(self,
                            species: List[Species],

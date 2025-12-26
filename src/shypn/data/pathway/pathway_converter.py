@@ -1172,51 +1172,128 @@ class PathwayConverter:
         return default_comp
     
     def _color_compartment_arcs(self, document: DocumentModel) -> None:
-        """Color arcs connected to compartment places with violet.
+        """Color arcs for cross-compartment transport with violet.
         
-        Arcs that originate from or target non-default compartment places
-        (e.g., extracellular, mitochondrial) are colored violet to visually
-        group them with their compartment.
+        Transport arcs (import/export between compartments) are colored violet
+        to unify the visual representation of mass transfer, distinguishing them
+        from information transfer (signal arcs in orange).
         
-        Priority: Boundary species arcs (blue) take precedence over compartment
-        arcs (violet), so we only color arcs that are still black.
+        Unified transport coloring:
+        - Import (extracellular → cytosol): VIOLET
+        - Export (cytosol → extracellular): VIOLET
+        - Signal arcs (already orange): preserved
+        
+        Priority: Signal arcs (orange) and boundary arcs (blue) take precedence,
+        so we only color arcs that are still black or need to be standardized.
         
         Args:
             document: DocumentModel with places and arcs
         """
-        VIOLET_COLOR = (0.6, 0.0, 0.8)  # Violet for compartment arcs
+        VIOLET_COLOR = (0.6, 0.0, 0.8)  # Violet for compartment transport
         compartment_arc_count = 0
         
-        # Find all compartment places
+        # Find all compartment places (non-default compartments)
         compartment_places = [p for p in document.places if p.is_compartment_place]
+        
+        # Find all signal places (to preserve their orange arcs)
+        signal_places = [p for p in document.places if p.is_signal_place]
         
         if not compartment_places:
             return
         
-        # Color arcs connected to compartment places (if not already colored)
+        # Color arcs for cross-compartment transport (unified import/export)
         for arc in document.arcs:
-            # Skip if already colored (e.g., blue for boundary species)
-            if arc.color != (0.0, 0.0, 0.0):
+            # Skip if already colored by higher priority (orange for signals, blue for boundary)
+            ORANGE = (1.0, 0.6, 0.0)
+            BLUE = (0.0, 0.498, 1.0)
+            BLACK = (0.0, 0.0, 0.0)
+            
+            # Preserve signal arcs (orange) - don't color transport if it's a signal
+            if arc.source in signal_places or arc.target in signal_places:
                 continue
             
-            # Check if arc is connected to a compartment place
+            # Preserve boundary arcs (blue)
+            if arc.color == BLUE:
+                continue
+            
+            # Color cross-compartment transport arcs (both import and export)
             if arc.source in compartment_places or arc.target in compartment_places:
                 arc.color = VIOLET_COLOR
                 compartment_arc_count += 1
         
-        # Also color test arcs connected to compartment places
+        # Also handle test arcs for compartment places (modifiers from other compartments)
         if hasattr(document, 'test_arcs'):
             for test_arc in document.test_arcs:
-                if test_arc.color != (0.0, 0.0, 0.0):
+                # Skip signal place test arcs
+                if test_arc.place in signal_places:
                     continue
+                
+                # Skip boundary arcs
+                BLUE = (0.0, 0.498, 1.0)
+                if test_arc.color == BLUE:
+                    continue
+                
                 if test_arc.place in compartment_places:
                     test_arc.color = VIOLET_COLOR
                     compartment_arc_count += 1
         
         if compartment_arc_count > 0:
             self.logger.info(
-                f"Colored {compartment_arc_count} arcs connected to compartment places (violet)"
+                f"Colored {compartment_arc_count} transport arcs (violet) - "
+                f"unified import/export between compartments"
             )
+    
+    def _color_signal_arcs(self, document: DocumentModel) -> None:
+        """Color arcs connected to signal places with orange.
+        
+        Signal places (Ψ) represent information flow, not mass transfer.
+        Their arcs should be visually distinct from:
+        - Metabolic arcs (black)
+        - Compartment transport arcs (violet)
+        - Boundary species arcs (blue)
+        
+        This is the HIGHEST priority coloring - applied first.
+        Other coloring functions check if arc is still black before coloring.
+        
+        Color coding:
+        - ORANGE = Signal communication (information transfer)
+        - VIOLET = Compartment transport (mass transfer across membrane)
+        - BLUE = Boundary species (infinite reservoir)
+        - BLACK = Default metabolic reactions
+        
+        Args:
+            document: DocumentModel with places and arcs
+        """
+        ORANGE_COLOR = (1.0, 0.6, 0.0)  # Orange RGB for signal communication
+        signal_arc_count = 0
+        
+        # Find all signal places
+        signal_places = [p for p in document.places if p.is_signal_place]
+        
+        if not signal_places:
+            return
+        
+        # Color arcs connected to signal places (both regular and test arcs)
+        for arc in document.arcs:
+            if arc.source in signal_places or arc.target in signal_places:
+                arc.color = ORANGE_COLOR
+                signal_arc_count += 1
+        
+        # Also color test arcs from signal places
+        if hasattr(document, 'test_arcs'):
+            for test_arc in document.test_arcs:
+                if test_arc.place in signal_places:
+                    test_arc.color = ORANGE_COLOR
+                    signal_arc_count += 1
+        
+        if signal_arc_count > 0:
+            self.logger.info(
+                f"Colored {signal_arc_count} signal arcs (orange) for "
+                f"{len(signal_places)} signal places"
+            )
+            
+            document.metadata['has_signal_arcs'] = True
+            document.metadata['signal_arc_count'] = signal_arc_count
     
     def _color_boundary_arcs(self, pathway: ProcessedPathwayData, 
                             document: DocumentModel,
@@ -1292,6 +1369,11 @@ class PathwayConverter:
             "layout_type": pathway.metadata.get('layout_type', 'unknown')
         }
         
+        # Copy function definition metadata if present
+        if 'function_definitions_count' in pathway.metadata:
+            document.metadata['function_definitions_count'] = pathway.metadata['function_definitions_count']
+            document.metadata['function_definitions'] = pathway.metadata['function_definitions']
+        
         # Determine default compartment (most common one, or known defaults)
         default_compartment = self._determine_default_compartment(pathway)
         self.logger.info(f"Default compartment: {default_compartment}")
@@ -1325,6 +1407,13 @@ class PathwayConverter:
             species_to_place, reaction_to_transition
         )
         arcs = arc_converter.convert()
+        
+        # ==============================================================================
+        # SIGNAL ARCS: Color arcs connected to signal places (HIGHEST PRIORITY)
+        # ==============================================================================
+        # Signal places (Ψ) represent information flow, not mass transfer
+        # Their arcs get orange color to distinguish from metabolic transport
+        self._color_signal_arcs(document)
         
         # ==============================================================================
         # BOUNDARY SPECIES: Color arcs but DO NOT create source/sink transitions

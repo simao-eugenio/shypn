@@ -961,6 +961,11 @@ class SBMLImportPanel:
                 self.current_pathway_doc.metadata['reactions_count'] = len(parsed_pathway.reactions)
                 self.current_pathway_doc.metadata['compartments'] = list(parsed_pathway.compartments.keys())
                 
+                # Add function definitions metadata if present
+                if 'function_definitions_count' in parsed_pathway.metadata:
+                    self.current_pathway_doc.metadata['function_definitions_count'] = parsed_pathway.metadata['function_definitions_count']
+                    self.current_pathway_doc.metadata['function_definitions'] = parsed_pathway.metadata['function_definitions']
+                
                 # Save updated metadata
                 self.project.save()
                 
@@ -993,13 +998,13 @@ class SBMLImportPanel:
         if self.sbml_parse_button:
             self.sbml_parse_button.set_sensitive(True)
         
-        # Auto-load to canvas after parse
-        # NOTE: Canvas was already created in _on_import_clicked() for lazy loading
-        if self.model_canvas:
-            self.logger.info("Auto-loading to canvas after parse")
-            self._on_load_clicked(None)
-        else:
-            self.logger.debug("Canvas not available, skipping auto-load")
+        # Auto-continue to load/convert only if triggered by unified Import button
+        if self._import_button_flow:
+            if self.model_canvas:
+                self.logger.info("Auto-loading to canvas after parse")
+                self._on_load_clicked(None)
+            else:
+                self.logger.debug("Canvas not available, skipping auto-load")
         
         return False
     
@@ -1108,6 +1113,19 @@ class SBMLImportPanel:
                 lines.append(f"  • {comp_name or comp_id}")
             if len(pathway.compartments) > 5:
                 lines.append(f"  ... and {len(pathway.compartments) - 5} more")
+            lines.append("")
+        
+        # Function definitions info (if any)
+        function_count = pathway.metadata.get('function_definitions_count', 0)
+        if function_count > 0:
+            lines.append(f"Function Definitions: {function_count}")
+            function_names = pathway.metadata.get('function_definitions', [])
+            if function_names:
+                for func_name in function_names[:5]:
+                    lines.append(f"  • {func_name}")
+                if len(function_names) > 5:
+                    lines.append(f"  ... and {len(function_names) - 5} more")
+            lines.append("")
         
         preview_text = "\n".join(lines)
         

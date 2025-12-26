@@ -3,13 +3,14 @@
 
 This module provides utilities for transforming arcs between different types:
 - Straight ↔ Curved
-- Normal ↔ Inhibitor ↔ Test
+- Normal ↔ Inhibitor ↔ Test ↔ SignalFlow
 
 Transformations preserve all arc properties (weight, color, width, etc.)
 and maintain the arc's identity (ID, name) in the model.
 """
 from shypn.netobjs import Arc, InhibitorArc, CurvedArc, CurvedInhibitorArc
 from shypn.netobjs.test_arc import TestArc
+from shypn.netobjs.signal_flow_arc import SignalFlowArc
 
 
 def transform_arc(arc, make_curved=None, make_inhibitor=None):
@@ -227,7 +228,7 @@ def is_test(arc):
 
 
 def is_normal(arc):
-    """Check if arc is a normal arc (not inhibitor or test).
+    """Check if arc is a normal arc (not inhibitor, test, or signal_flow).
     
     Args:
         arc: Arc instance to check
@@ -235,7 +236,19 @@ def is_normal(arc):
     Returns:
         bool: True if arc is normal (Arc or CurvedArc)
     """
-    return not isinstance(arc, (InhibitorArc, CurvedInhibitorArc, TestArc))
+    return not isinstance(arc, (InhibitorArc, CurvedInhibitorArc, TestArc, SignalFlowArc))
+
+
+def is_signal_flow(arc):
+    """Check if arc is a signal flow arc (information transfer).
+    
+    Args:
+        arc: Arc instance to check
+        
+    Returns:
+        bool: True if arc is signal flow arc (SignalFlowArc)
+    """
+    return isinstance(arc, SignalFlowArc)
 
 
 def convert_to_test(arc):
@@ -301,9 +314,11 @@ def get_arc_type_name(arc):
         arc: Arc instance
         
     Returns:
-        str: Arc type name ("Arc", "Inhibitor Arc", "Test Arc", "Curved Arc", "Curved Inhibitor Arc")
+        str: Arc type name
     """
-    if isinstance(arc, TestArc):
+    if isinstance(arc, SignalFlowArc):
+        return "Signal Flow Arc"
+    elif isinstance(arc, TestArc):
         return "Test Arc"
     elif isinstance(arc, CurvedInhibitorArc):
         return "Curved Inhibitor Arc"
@@ -313,3 +328,69 @@ def get_arc_type_name(arc):
         return "Inhibitor Arc"
     else:
         return "Arc"
+
+
+def convert_to_signal_flow(arc):
+    """Convert arc to signal flow arc (information transfer).
+    
+    Signal flow arcs must connect to at least one signal place (Ψ).
+    They consume tokens (unlike test arcs) to model signal depletion
+    in hierarchical control systems.
+    
+    Args:
+        arc: Arc instance to convert
+        
+    Returns:
+        SignalFlowArc: Signal flow version of the arc
+        
+    Raises:
+        ValueError: If arc doesn't connect to a signal place
+    """
+    from shypn.netobjs.place import Place
+    
+    # If already signal flow arc, return it
+    if isinstance(arc, SignalFlowArc):
+        return arc
+    
+    # Validate that at least one endpoint is a signal place
+    is_source_signal = (isinstance(arc.source, Place) and 
+                       getattr(arc.source, 'is_signal_place', False))
+    is_target_signal = (isinstance(arc.target, Place) and 
+                       getattr(arc.target, 'is_signal_place', False))
+    
+    if not (is_source_signal or is_target_signal):
+        raise ValueError(
+            f"Cannot convert to signal flow arc: Neither endpoint is a signal place. "
+            f"Source: {arc.source.name} (is_signal_place={is_source_signal}), "
+            f"Target: {arc.target.name} (is_signal_place={is_target_signal}). "
+            f"Mark a place as signal place first (is_signal_place=True)."
+        )
+    
+    # Create new signal flow arc
+    new_arc = SignalFlowArc(
+        source=arc.source,
+        target=arc.target,
+        id=arc.id,
+        name=arc.name,
+        weight=arc.weight
+    )
+    
+    # Copy all properties
+    new_arc.color = arc.color
+    new_arc.width = arc.width
+    new_arc.threshold = arc.threshold
+    new_arc.control_points = arc.control_points
+    
+    # Copy optional properties if they exist
+    if hasattr(arc, 'label'):
+        new_arc.label = arc.label
+    if hasattr(arc, 'description'):
+        new_arc.description = arc.description
+    
+    # Copy internal references
+    if hasattr(arc, '_manager'):
+        new_arc._manager = arc._manager
+    if hasattr(arc, 'on_changed'):
+        new_arc.on_changed = arc.on_changed
+    
+    return new_arc

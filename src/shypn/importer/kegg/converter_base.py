@@ -41,10 +41,12 @@ class ConversionOptions:
             (stochastic vs continuous) and reasonable parameter defaults
             Uses the heuristic system to fill gaps since KEGG lacks explicit kinetic data
         
-        create_enzyme_places: Create explicit places for enzyme entries (default: False)
+        create_enzyme_places: Create explicit places for enzymes and test arcs (default: True)
             When True, creates places for gene/enzyme/ortholog entries and test arcs (Biological PN)
-            When False, enzymes remain implicit (cleaner layout, classical PN, matches original KEGG visualization)
-            Recommendation: Set True for biological analysis, False for visual clarity
+            When False, enzymes remain implicit (cleaner layout, classical PN)
+            Recommendation: True for biological correctness (enzymes are biological entities),
+            False only for simplified visualization. Signal partition theory requires True for
+            proper representation of regulatory signal flow (Ψ_regulatory).
         
         merge_duplicate_reactions: Merge reactions with identical substrates/products (default: False)
             When True, alternative enzymes (isoenzymes) are merged into single transitions
@@ -62,7 +64,7 @@ class ConversionOptions:
     add_initial_marking: bool = False  # KEGG has no initial concentrations - leave empty by default
     filter_isolated_compounds: bool = True
     enhance_kinetics: bool = True  # Auto-enhance kinetics for better simulation
-    create_enzyme_places: bool = False  # Keep layout clean by default - set True for biological analysis
+    create_enzyme_places: bool = True  # True for biological correctness and signal partition theory
     merge_duplicate_reactions: bool = False  # Keep alternative enzymes as separate transitions by default
     center_x: float = 0.0
     center_y: float = 0.0

@@ -266,6 +266,14 @@ When importing SBML with compartments:
 - **API Reference**: Explore `src/shypn/` for programmatic access
 - **Examples**: Study models in `workspace/projects/Biochemical-Examples/`
 
+## Publication
+
+SHYpn is based on the weak independence theory published on arXiv:
+
+**[arXiv:2512.17106](https://arxiv.org/abs/2512.17106)** - *Weak Independence and Coupled Parallelism in Biological Petri Nets*
+
+If you use SHYpn in your research, please cite this paper.
+
 ## Getting Help
 
 - **GitHub Issues**: Report bugs or request features
