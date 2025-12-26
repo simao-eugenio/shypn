@@ -98,6 +98,150 @@ Cleaves CI dimers during UV stress.
 - **Result**: batch_20251217_171118 achieved 42:48 balance (70% bias reduction)
 
 **2. Semaphore Removal (Dec 16, 2025)**
+
+---
+
+## Phase 2: Hierarchical Signal Integration (Dec 25-26, 2025)
+
+### Model: lambda_hierarchical_v3.shy
+
+**Architecture**: Multi-layer signal hierarchy with environmental sensors  
+**Key Enhancement**: CII-CI connection with Hill cooperativity for decisive outcomes
+
+### Extended Architecture (23 places, 36 transitions, 65 arcs)
+
+**Additional Places**:
+- **P12**: Energy_ATP (metabolic sensor)
+- **P14**: RecA_Active (UV damage sensor)
+- **P21**: CII_Protein (signal integrator)
+- **P24**: Metabolic_Health (host condition sensor)
+- **P27**: Cell_Cycle_Phase (replication state sensor)
+
+**Key Rate Functions**:
+
+**T1 (CI_Transcription)** - CII activation with Hill cooperativity:
+```
+rate = 2.0 * (1 + 1.0 * CI_Dimer / (3 + CI_Dimer)) * 
+       (1 + 3.5 * (CII_Protein / 8)^2 / (1 + (CII_Protein / 8)^2)) / 
+       (1 + (Cro_Dimer / 15)^2)
+```
+- CII activation: coefficient 3.5, Ki=8, Hill n=2
+- At CII=16 mM: 2.84× boost (stronger than Michaelis-Menten)
+
+**T6 (Cro_Transcription)** - CII inhibition:
+```
+rate = 2.0 * (1 + 0.5 * Cro_Dimer / (5 + Cro_Dimer)) / 
+       (1 + (CI_Dimer / 15)^2) / (1 + (CII_Protein / 6)^2)
+```
+- CII inhibition: Ki=6, Hill n=2
+- At CII=16 mM: 83% suppression (stronger than original Ki=10)
+
+### Batch Results: Hierarchical Validation
+
+**batch_20251225_235533** (100 replicates, UV enabled - stochastic source):
+- **UV stochastic**: 50% runs RecA>10 (active), 50% RecA<10 (inactive)
+- **High RecA** (>50, n=41): **71% lytic**, RecA=77.2, CII=5.7 (blocked), CI=13.3, Cro=24.5
+- **Low RecA** (<10, n=50): **52% lysogenic**, RecA=0.2, CII=14.0, CI=74.7, Cro=15.4
+- **Hierarchical override**: RecA>50 forces lytic despite favorable conditions
+- **CII blocking**: 59% reduction (14.0→5.7 mM) with high RecA
+
+**batch_20251226_010448** (100 replicates, NO UV):
+- **RecA=0.0** (all runs), **CII=15.95±5.33** (freely accumulates)
+- **Outcomes**: **57% lysogenic**, 42% undecided, 1% lytic
+- **Lysogenic subset** (n=57): CII=17.5, CI=119.8, Cro=8.6, ratio=17.16
+- **Undecided subset** (n=42): CII=14.1, CI=45.2, Cro=22.5, ratio=2.36
+- **Strong lysogenic bias**: CII-CI connection working
+
+### Information Flow Analysis (Dec 26, 2025)
+
+**Method**: Mutual information on 200 combined replicates (UV + NO UV batches)  
+**Decision Entropy**: H(Decision) = 0.8474 bits (124 decided: 72.6% lysogenic, 27.4% lytic)
+
+#### Signal Ranking by Information Content
+
+| Rank | Signal | MI (bits) | % Decision Info |
+|------|--------|-----------|----------------|
+| **1** | **CII_Protein** | **0.6294** | **74.3%** |
+| **2** | **RecA_Active** | **0.3645** | **43.0%** |
+| 3 | Energy_ATP | 0.0649 | 7.7% |
+| 4 | Cell_Cycle_Phase | 0.0213 | 2.5% |
+| 5 | Metabolic_Health | 0.0085 | 1.0% |
+
+**Hierarchical Priority Confirmed**: 
+- RecA advantage: **2.01× over environmental signals** (ATP + Cycle + Metabolic mean)
+- CII dominates as proximal integrator (74% of decision information)
+- Environmental signals weak (1-8%), validating hierarchical architecture
+
+#### Key Findings
+
+1. **CII as Proximal Integrator** (74.3% MI)
+   - Direct mechanistic control of CI and Cro transcription
+   - Carries most predictive information about decision outcome
+   - Validates Layer 2 signal integration role
+
+2. **RecA as Hierarchical Override** (43.0% MI, 2.01× advantage)
+   - Acts as conditional switch on CII pathway
+   - High RecA blocks CII → forces lytic (71%)
+   - Low RecA allows CII → permits lysogenic (57%)
+
+3. **Environmental Signals Minimal** (1-8% combined)
+   - ATP, Metabolic, Cycle contribute ~11% total
+   - Decisions driven by RecA-CII layer, not direct environmental sensing
+   - Validates hierarchical information flow architecture
+
+4. **Context-Dependent Monostability**
+   - NO UV: Monostable toward lysogenic (57% commitment)
+   - UV (RecA>50): Monostable toward lytic (71% commitment)
+   - UV acts as attractor landscape modifier, not noise source
+
+### Attractor Landscape
+
+**Two Distinct Basins** (batch_20251225_235533):
+- **Lysogenic attractor** (Low RecA): CI=74.7±45.0, Cro=15.4±9.1
+- **Lytic attractor** (High RecA): CI=13.3±26.3, Cro=24.5±13.4
+- **Separation**: ΔCI=61.4 mM, ΔCro=9.1 mM
+- **Visualization**: attractor_landscape.png (two-panel plot)
+
+### Biological Implications
+
+**Hierarchical Information Architecture**:
+```
+Layer 0 (Environmental): ATP, Metabolic, Cycle - weak sensing (1-8% MI)
+           ↓
+Layer 1 (UV Damage): RecA - hierarchical gate (43% MI, 2× priority)
+           ↓
+Layer 2 (Integration): CII - proximal control (74% MI)
+           ↓  
+Layer 3 (Decision): CI vs Cro - binary outcome
+```
+
+**Hierarchical Control Validated**:
+- UV damage signal (RecA) dominates metabolic signals by 2×
+- CII integrates signals and directly controls decision machinery
+- Environmental signals feed hierarchy but don't directly determine outcome
+- Result: Robust UV override with clear signal priority
+
+### Comparison to Phase 1 (Symmetric Bistable)
+
+| Feature | Phase 1 | Phase 2 (Hierarchical) |
+|---------|---------|------------------------|
+| Places | 12 | 23 (+11 environmental) |
+| Transitions | 17 | 36 (+19 sensors/integration) |
+| Decision mechanism | Pure bistability | Signal-driven commitment |
+| NO UV outcome | 42% lysogenic, 48% lytic | **57% lysogenic**, 42% undecided |
+| UV outcome | 86% lytic (ZERO+UV) | **71% lytic** (RecA>50) |
+| CII role | None | **74% decision information** |
+| Metabolic signals | None | ATP, Metabolic, Cycle (weak 1-8%) |
+| Information flow | Not quantified | **Mutual information analysis** |
+
+**Phase 2 Advantages**:
+- Hierarchical UV override mathematically validated (2.01× RecA advantage)
+- CII-CI connection creates lysogenic bias without UV
+- Environmental sensors provide biological realism
+- Information-theoretic framework for signal priority
+- Attractor landscape visualization shows two distinct basins
+
+**2. Semaphore Removal (Dec 16, 2025)**
 - Removed P9/P10 (Lysogenic_State, Lytic_State) semaphores
 - Removed T11/T12 (state-setting transitions)
 - Converted test arcs to normal arcs (A51, A53)

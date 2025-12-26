@@ -5,7 +5,7 @@
     "object_counts": {
       "places": 15,
       "transitions": 12,
-      "arcs": 27
+      "arcs": 26
     },
     "author": "Shypn Quorum Sensing Feature",
     "category": "biochemical",
@@ -88,7 +88,7 @@
       "border_color": [0.0, 0.4, 0.8],
       "border_width": 3.0,
       "is_catalyst": false,
-      "is_signal_place": false
+      "is_signal_place": true
     },
     {
       "id": "P5",
@@ -583,7 +583,6 @@
     {"id": "A23", "name": "A23", "label": "", "object_type": "arc", "source_id": "T11", "source_type": "transition", "target_id": "P14", "target_type": "place", "arc_type": "normal", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []},
     {"id": "A24", "name": "A24", "label": "", "object_type": "arc", "source_id": "P14", "source_type": "place", "target_id": "T12", "target_type": "transition", "arc_type": "test", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []},
     {"id": "A25", "name": "A25", "label": "", "object_type": "arc", "source_id": "T12", "source_type": "transition", "target_id": "P15", "target_type": "place", "arc_type": "normal", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []},
-    {"id": "A26", "name": "A26", "label": "", "object_type": "arc", "source_id": "T3", "source_type": "transition", "target_id": "P4", "target_type": "place", "arc_type": "normal", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []},
-    {"id": "A27", "name": "A27", "label": "", "object_type": "arc", "source_id": "P4", "source_type": "place", "target_id": "T6", "target_type": "transition", "arc_type": "normal", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []}
+    {"id": "A26", "name": "A26", "label": "", "object_type": "arc", "source_id": "T3", "source_type": "transition", "target_id": "P4", "target_type": "place", "arc_type": "normal", "weight": 1.0, "threshold": 0.0, "color": [0.0, 0.0, 0.0], "width": 2.0, "control_points": []}
   ]
 }

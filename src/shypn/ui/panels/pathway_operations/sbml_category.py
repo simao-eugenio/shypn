@@ -1452,6 +1452,36 @@ class SBMLCategory(BasePathwayCategory):
                         "", "No events", "", "", "", ""
                     ])
                 
+                # Function Definitions section
+                metadata = getattr(pathway, 'metadata', {})
+                function_count = metadata.get('function_definitions_count', 0)
+                functions_root = self.metadata_store.append(None, [
+                    "ƒ", "Function Definitions", f"{function_count} items",
+                    "section", "", "User-defined mathematical functions"
+                ])
+                if function_count > 0:
+                    function_names = metadata.get('function_definitions', [])
+                    for func_name in function_names:
+                        # Extract function name and arguments
+                        if '(' in func_name:
+                            name_part = func_name.split('(')[0]
+                            args_part = func_name.split('(', 1)[1].rstrip(')')
+                            self.metadata_store.append(functions_root, [
+                                "ƒ", name_part, args_part,
+                                "function", name_part,
+                                f"Function: {func_name}"
+                            ])
+                        else:
+                            self.metadata_store.append(functions_root, [
+                                "ƒ", func_name, "",
+                                "function", func_name,
+                                f"Function: {func_name}"
+                            ])
+                else:
+                    self.metadata_store.append(functions_root, [
+                        "", "No function definitions", "", "", "", ""
+                    ])
+                
                 # Expand top level
                 self.metadata_tree.expand_row(Gtk.TreePath.new_first(), False)
                 

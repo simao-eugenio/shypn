@@ -124,12 +124,17 @@ class SBMLCompartmentModuleService:
             modules, pathway, reaction_to_transition, species_to_place, warnings
         )
         
-        # Step 5: Detect boundary signals (cross-compartment modifiers)
+        # Step 5: Detect energy currency molecules (ATP, NAD, etc.)
+        energy_signals = self._detect_energy_currency_signals(
+            document, modules, pathway, species_to_place, warnings
+        )
+        
+        # Step 6: Detect boundary signals (cross-compartment modifiers)
         boundary_signals = self._detect_boundary_signals(
             modules, pathway, species_to_place, warnings
         )
         
-        # Step 6: Apply signal detection (if enabled)
+        # Step 7: Apply signal detection (if enabled)
         signal_suggestions = None
         if auto_detect_signals and SignalDetectionService is not None:
             signal_suggestions = self._apply_signal_detection(
@@ -150,6 +155,7 @@ class SBMLCompartmentModuleService:
         # Log summary
         self.logger.info(
             f"Conversion complete: {len(modules)} modules created, "
+            f"{len(energy_signals)} energy signals, "
             f"{len(boundary_signals)} boundary signals identified"
         )
         
@@ -157,6 +163,7 @@ class SBMLCompartmentModuleService:
             'success': True,
             'modules': list(modules.values()),
             'compartment_mapping': compartment_mapping,
+            'energy_signals': energy_signals,
             'boundary_signals': boundary_signals,
             'signal_suggestions': signal_suggestions,
             'validation': validation_report,
@@ -394,6 +401,177 @@ class SBMLCompartmentModuleService:
                 f"(transport/signaling)"
             )
     
+    def _detect_energy_currency_signals(
+        self,
+        document: DocumentModel,
+        modules: Dict[str, Module],
+        pathway: ProcessedPathwayData,
+        species_to_place: Dict[str, Place],
+        warnings: List[str]
+    ) -> List[Place]:
+        """Detect and mark energy currency molecules as signal places (Ψₑ).
+        
+        Energy currency molecules (ATP, ADP, AMP, NAD, NADH, NADP, NADPH, 
+        FAD, FADH2, CoA, etc.) represent energy transfer and redox state.
+        They couple multiple reactions through shared energy/redox pools
+        and should be marked as Energy signals (Ψₑ).
+        
+        Detection strategy:
+        1. Name/ID pattern matching (ATP, NAD, etc.)
+        2. ChEBI ID matching for known energy carriers
+        3. High connectivity (modifier in multiple reactions)
+        
+        Args:
+            modules: Dict of Module objects
+            pathway: ProcessedPathwayData with species/reactions
+            species_to_place: Mapping from species ID to Place
+            warnings: List to append warnings to
+        
+        Returns:
+            List of Place objects identified as energy signals
+        """
+        # Known energy currency molecule patterns
+        ENERGY_CURRENCY_PATTERNS = {
+            # Adenylates (energy charge)
+            'ATP', 'ADP', 'AMP', 'cAMP', 'dATP', 'dADP', 'dAMP',
+            # NAD/NADP (redox)
+            'NAD', 'NADH', 'NAD+', 'NADP', 'NADPH', 'NADP+',
+            # FAD (redox)
+            'FAD', 'FADH', 'FADH2',
+            # Coenzyme A
+            'CoA', 'CoASH', 'Acetyl-CoA', 'AcCoA',
+            # GTP/GDP (G-proteins, translation)
+            'GTP', 'GDP', 'GMP', 'dGTP', 'dGDP',
+            # UTP/UDP (glycosylation)
+            'UTP', 'UDP', 'UMP', 'dUTP', 'dUDP',
+            # CTP/CDP (phospholipids)
+            'CTP', 'CDP', 'CMP', 'dCTP', 'dCDP',
+            # Inorganic phosphate
+            'Pi', 'PPi', 'Phosphate',
+        }
+        
+        # ChEBI IDs for energy currencies (subset)
+        ENERGY_CURRENCY_CHEBI = {
+            'CHEBI:15422',  # ATP
+            'CHEBI:456216', # ADP
+            'CHEBI:456215', # AMP
+            'CHEBI:57540',  # NAD+
+            'CHEBI:57945',  # NADH
+            'CHEBI:58349',  # NADP+
+            'CHEBI:57783',  # NADPH
+            'CHEBI:57692',  # FAD
+            'CHEBI:57618',  # FADH2
+            'CHEBI:57287',  # CoA
+            'CHEBI:15377',  # H2O
+            'CHEBI:18009',  # Inorganic phosphate
+        }
+        
+        energy_signals = []
+        
+        # Iterate through all species
+        for species in pathway.species:
+            place = species_to_place.get(species.id)
+            if not place:
+                continue
+            
+            # Skip if already marked as signal
+            if place.is_signal_place:
+                continue
+            
+            is_energy_currency = False
+            detection_reason = None
+            
+            # Check 1: Name/ID pattern matching (case-insensitive)
+            species_name_upper = species.name.upper() if species.name else ''
+            species_id_upper = species.id.upper()
+            
+            for pattern in ENERGY_CURRENCY_PATTERNS:
+                # Exact match or as part of compound name
+                if pattern in species_name_upper or pattern in species_id_upper:
+                    # Avoid false positives like "ATPASE" (enzyme, not ATP)
+                    if pattern + 'ASE' not in species_name_upper and pattern + 'ASE' not in species_id_upper:
+                        is_energy_currency = True
+                        detection_reason = f"name pattern '{pattern}'"
+                        break
+            
+            # Check 2: ChEBI ID matching
+            if not is_energy_currency and hasattr(species, 'chebi_id') and species.chebi_id:
+                if species.chebi_id in ENERGY_CURRENCY_CHEBI:
+                    is_energy_currency = True
+                    detection_reason = f"ChEBI ID {species.chebi_id}"
+            
+            # Check 3: High connectivity as modifier (heuristic)
+            # Energy carriers are often modifiers in many reactions
+            if not is_energy_currency:
+                modifier_count = sum(
+                    1 for rxn in pathway.reactions 
+                    if species.id in rxn.modifiers
+                )
+                # If modifier in 5+ reactions, likely a cofactor
+                if modifier_count >= 5:
+                    is_energy_currency = True
+                    detection_reason = f"modifier in {modifier_count} reactions"
+            
+            # Mark as energy signal if detected
+            if is_energy_currency:
+                place.is_signal_place = True
+                place.signal_type = SignalType.ENERGY  # Ψₑ
+                energy_signals.append(place)
+                
+                self.logger.info(
+                    f"Detected energy signal: '{place.name}' (Ψₑ) - {detection_reason}"
+                )
+        
+        if energy_signals:
+            self.logger.info(
+                f"Energy currency detection: {len(energy_signals)} signals identified"
+            )
+            
+            # Re-color arcs for newly detected signal places
+            self._recolor_signal_arcs(document, energy_signals)
+        
+        return energy_signals
+    
+    def _recolor_signal_arcs(self, document: DocumentModel, signal_places: List[Place]) -> None:
+        """Re-color arcs connected to signal places with orange.
+        
+        This is called after signal detection to update arc colors for newly
+        identified signal places (e.g., energy currencies detected by heuristics).
+        
+        Args:
+            document: DocumentModel with arcs
+            signal_places: List of newly detected signal places
+        """
+        ORANGE_COLOR = (1.0, 0.6, 0.0)
+        BLUE_COLOR = (0.0, 0.498, 1.0)
+        recolored_count = 0
+        
+        # Re-color regular arcs
+        for arc in document.arcs:
+            # Skip boundary arcs (blue takes precedence)
+            if arc.color == BLUE_COLOR:
+                continue
+            
+            # Color if connected to a signal place
+            if arc.source in signal_places or arc.target in signal_places:
+                arc.color = ORANGE_COLOR
+                recolored_count += 1
+        
+        # Re-color test arcs
+        if hasattr(document, 'test_arcs'):
+            for test_arc in document.test_arcs:
+                if test_arc.color == BLUE_COLOR:
+                    continue
+                
+                if test_arc.place in signal_places:
+                    test_arc.color = ORANGE_COLOR
+                    recolored_count += 1
+        
+        if recolored_count > 0:
+            self.logger.info(
+                f"Re-colored {recolored_count} arcs to orange for {len(signal_places)} signal places"
+            )
+    
     def _detect_boundary_signals(
         self,
         modules: Dict[str, Module],
@@ -608,6 +786,15 @@ class SBMLCompartmentModuleService:
                     f"({place_count} places, {transition_count} transitions, "
                     f"{signal_count} signals)"
                 )
+        
+        # Energy signals
+        energy_signals = conversion_result.get('energy_signals', [])
+        if energy_signals:
+            lines.append(f"\nEnergy Signals (Ψₑ) ({len(energy_signals)}):")
+            for signal in energy_signals[:10]:  # First 10
+                lines.append(f"  {signal.name}")
+            if len(energy_signals) > 10:
+                lines.append(f"  ... and {len(energy_signals) - 10} more")
         
         # Boundary signals
         boundary_signals = conversion_result.get('boundary_signals', [])

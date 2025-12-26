@@ -2,6 +2,8 @@
 
 This project contains a series of progressively complex biochemical examples demonstrating SHYpn's capabilities in modeling human glycolysis and its regulatory mechanisms, as well as advanced cell communication systems.
 
+**Theoretical Foundation:** [arXiv:2512.17106](https://arxiv.org/abs/2512.17106) - *Weak Independence and Coupled Parallelism in Biological Petri Nets*
+
 ## Organization
 
 ### Phase 1: Foundation - Simple Reactions

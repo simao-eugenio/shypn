@@ -111,6 +111,9 @@ workspace/projects/My_Project/
 workspace/projects/thesis/
 workspace/projects/*.json
 
+# Signal hierarchy paper (private development)
+workspace/projects/My_Project/signal_hierarchy/
+
 # Biochemical-Examples artifacts (metadata, simulation results)
 workspace/projects/*/metadata/
 workspace/projects/*/results/

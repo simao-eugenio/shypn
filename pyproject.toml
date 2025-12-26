@@ -27,6 +27,12 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Visualization",
 ]
 
+[project.urls]
+Homepage = "https://github.com/simao-eugenio/shypn"
+Documentation = "https://github.com/simao-eugenio/shypn/tree/main/doc"
+Repository = "https://github.com/simao-eugenio/shypn"
+Paper = "https://arxiv.org/abs/2512.17106"
+
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["shypn*", "shypn.api*"]

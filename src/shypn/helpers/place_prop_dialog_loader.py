@@ -50,6 +50,7 @@ class PlacePropDialogLoader(GObject.GObject):
         self.topology_loader = None
         self._load_ui()
         self._setup_color_picker()
+        self._setup_signal_handlers()
         self._populate_fields()
         self._setup_topology_tab()
 

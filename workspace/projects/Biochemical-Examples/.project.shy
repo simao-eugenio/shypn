@@ -6,14 +6,30 @@
     "name": "Biochemical-Examples",
     "description": "",
     "created_date": "2025-11-18T11:03:29.589087",
-    "modified_date": "2025-11-18T11:03:29.589087"
+    "modified_date": "2025-12-23T20:22:46.004350"
   },
   "location": {
     "base_path": "/home/simao/projetos/shypn/workspace/projects/Biochemical-Examples"
   },
   "content": {
     "models": [],
-    "pathways": {},
+    "pathways": {
+      "0a67b566-f812-441c-bc34-a30edc255683": {
+        "id": "0a67b566-f812-441c-bc34-a30edc255683",
+        "name": "BIOMD0000000064",
+        "source_type": "sbml",
+        "source_id": "BIOMD0000000064",
+        "source_organism": "Unknown",
+        "raw_file": "BIOMD0000000064.xml",
+        "metadata_file": "",
+        "imported_date": "2025-12-23T20:22:46.004301",
+        "last_modified": "2025-12-23T20:22:46.004301",
+        "enrichments": [],
+        "model_id": null,
+        "tags": [],
+        "notes": "SBML model: BIOMD0000000064\nSpecies: 26, Reactions: 17"
+      }
+    },
     "simulations": []
   },
   "metadata": {

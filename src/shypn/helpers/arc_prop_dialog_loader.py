@@ -10,7 +10,7 @@ import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, GObject
 from shypn.helpers.color_picker import setup_color_picker_in_dialog
-from shypn.utils.arc_transform import is_inhibitor, is_test, convert_to_inhibitor, convert_to_normal, convert_to_test
+from shypn.utils.arc_transform import is_inhibitor, is_test, is_signal_flow, convert_to_inhibitor, convert_to_normal, convert_to_test, convert_to_signal_flow
 
 class ArcPropDialogLoader(GObject.GObject):
     """Loader for Arc properties dialog.
@@ -138,8 +138,10 @@ class ArcPropDialogLoader(GObject.GObject):
         type_combo = self.builder.get_object('prop_arc_type_combo')
         if type_combo:
             # Determine current arc type
-            # 0 = Normal, 1 = Inhibitor, 2 = Test
-            if is_test(self.arc_obj):
+            # 0 = Normal, 1 = Inhibitor, 2 = Test, 3 = Signal Flow
+            if is_signal_flow(self.arc_obj):
+                type_combo.set_active(3)  # Signal Flow
+            elif is_test(self.arc_obj):
                 type_combo.set_active(2)  # Test
             elif is_inhibitor(self.arc_obj):
                 type_combo.set_active(1)  # Inhibitor
@@ -244,16 +246,17 @@ class ArcPropDialogLoader(GObject.GObject):
         type_combo = self.builder.get_object('prop_arc_type_combo')
         if type_combo:
             new_type_index = type_combo.get_active()
-            # 0 = Normal, 1 = Inhibitor, 2 = Test
+            # 0 = Normal, 1 = Inhibitor, 2 = Test, 3 = Signal Flow
             current_is_inhibitor = is_inhibitor(self.arc_obj)
             current_is_test = is_test(self.arc_obj)
+            current_is_signal_flow = is_signal_flow(self.arc_obj)
             
-            if new_type_index == 0 and (current_is_inhibitor or current_is_test):
-                # Convert from Inhibitor/Test to Normal
+            if new_type_index == 0 and (current_is_inhibitor or current_is_test or current_is_signal_flow):
+                # Convert from Inhibitor/Test/SignalFlow to Normal
                 self.arc_obj = convert_to_normal(self.arc_obj)
                 self._replace_arc_in_model()
             elif new_type_index == 1 and not current_is_inhibitor:
-                # Convert from Normal/Test to Inhibitor
+                # Convert from Normal/Test/SignalFlow to Inhibitor
                 try:
                     self.arc_obj = convert_to_inhibitor(self.arc_obj)
                     self._replace_arc_in_model()
@@ -271,7 +274,7 @@ class ArcPropDialogLoader(GObject.GObject):
                     error_dialog.destroy()
                     return  # Don't apply other changes
             elif new_type_index == 2 and not current_is_test:
-                # Convert from Normal/Inhibitor to Test
+                # Convert from Normal/Inhibitor/SignalFlow to Test
                 try:
                     self.arc_obj = convert_to_test(self.arc_obj)
                     self._replace_arc_in_model()
@@ -287,6 +290,27 @@ class ArcPropDialogLoader(GObject.GObject):
                     error_dialog.format_secondary_text(
                         f"{e}\n\nTest arcs model catalysts/enzymes that enable reactions "
                         "without being consumed. They must connect Place → Transition only."
+                    )
+                    error_dialog.run()
+                    error_dialog.destroy()
+                    return  # Don't apply other changes
+            elif new_type_index == 3 and not current_is_signal_flow:
+                # Convert from Normal/Inhibitor/Test to Signal Flow
+                try:
+                    self.arc_obj = convert_to_signal_flow(self.arc_obj)
+                    self._replace_arc_in_model()
+                except ValueError as e:
+                    # Show error dialog if conversion invalid (must connect to signal place)
+                    error_dialog = Gtk.MessageDialog(
+                        transient_for=self.dialog,
+                        flags=0,
+                        message_type=Gtk.MessageType.ERROR,
+                        buttons=Gtk.ButtonsType.OK,
+                        text="Cannot convert to Signal Flow Arc"
+                    )
+                    error_dialog.format_secondary_text(
+                        f"{e}\n\nSignal flow arcs model information transfer in hierarchical control "
+                        "systems. At least one endpoint (source or target) must be a signal place."
                     )
                     error_dialog.run()
                     error_dialog.destroy()

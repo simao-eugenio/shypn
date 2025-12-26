@@ -333,6 +333,7 @@
                                   <item id="normal" translatable="yes">Normal</item>
                                   <item id="inhibitor" translatable="yes">Inhibitor</item>
                                   <item id="test" translatable="yes">Test (Catalyst)</item>
+                                  <item id="signal_flow" translatable="yes">Signal Flow</item>
                                 </items>
                               </object>
                               <packing>

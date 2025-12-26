@@ -1422,7 +1422,13 @@ class ModelCanvasLoader:
                     manager.set_screen_dpi(dpi)
         except Exception as e:
             pass
-        manager.load_view_state_from_file()
+        
+        # Only load view state for non-temporary filenames
+        # Temporary names like "importing_temp" are used during imports
+        # to prevent loading stale view states
+        if filename != "importing_temp":
+            manager.load_view_state_from_file()
+        
         validation = manager.create_new_document(filename=filename)
         
         # Create Knowledge Base for intelligent model repair
@@ -4899,7 +4905,7 @@ class ModelCanvasLoader:
         # Toggle recording state
         obj_id = obj.id
         
-        # Define recording indicator color (orange/amber for visibility)
+        # Define recording indicator color (orange for all recorded objects)
         RECORDING_COLOR = (1.0, 0.6, 0.0)  # RGB: orange
         
         # Import default colors
@@ -4908,16 +4914,22 @@ class ModelCanvasLoader:
         if settings.is_object_recorded(obj_id):
             settings.remove_recorded_object(obj_id)
             
-            # Restore default colors
+            # Restore default colors based on object type
             if isinstance(obj, Place):
-                obj.border_color = Place.DEFAULT_BORDER_COLOR
+                # Signal places use blue color, others use default black
+                if getattr(obj, 'is_signal_place', False):
+                    obj.border_color = (0.0, 0.4, 0.8)  # Blue for signal places
+                elif getattr(obj, 'is_compartment_place', False):
+                    obj.border_color = (0.6, 0.0, 0.8)  # Violet for compartment places
+                else:
+                    obj.border_color = Place.DEFAULT_BORDER_COLOR
             elif isinstance(obj, Transition):
                 obj.border_color = Transition.DEFAULT_BORDER_COLOR
                 obj.fill_color = Transition.DEFAULT_COLOR
         else:
             settings.add_recorded_object(obj_id)
             
-            # Apply recording color
+            # Apply recording color (orange for all types)
             if isinstance(obj, Place):
                 obj.border_color = RECORDING_COLOR
             elif isinstance(obj, Transition):

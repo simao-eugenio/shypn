@@ -222,14 +222,10 @@ class ImmediateBehavior(TransitionBehavior):
                         # Skip if target place missing (shouldn't happen in valid net)
                         continue
                     
-                    # SIGNAL PLACE SEMANTICS: DO NOT produce tokens to signal places (Ψ)
-                    # Signal places represent external information and are not updated by transitions
-                    # They are set externally (e.g., by environment, regulatory logic, or user)
-                    if self._is_signal_place(target_place):
-                        # Signal places cannot be produced to - skip token addition
-                        # Record as produced for event logging (informational only)
-                        produced_map[target_place.id] = float(arc.weight)  # Record write attempt
-                        continue  # Skip actual token addition
+                    # SIGNAL PLACE SEMANTICS (Communication Model):
+                    # Signal places CAN accumulate tokens (modules produce signals)
+                    # Other modules sense via formulas (non-consuming read)
+                    # This enables inter-module communication (quorum sensing, paracrine signaling)
                     
                     # Produce exactly arc_weight tokens (discrete semantics)
                     old_tokens = target_place.tokens

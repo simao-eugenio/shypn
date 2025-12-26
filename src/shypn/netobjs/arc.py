@@ -75,10 +75,11 @@ class Arc(PetriNetObject):
         """Get the arc type identifier.
         
         Returns:
-            str: Arc type - "normal", "inhibitor", "test", "curved_arc", "curved_inhibitor_arc"
+            str: Arc type - "normal", "inhibitor", "test", "signal_flow", "curved_arc", "curved_inhibitor_arc"
         """
         from shypn.netobjs.inhibitor_arc import InhibitorArc
         from shypn.netobjs.test_arc import TestArc
+        from shypn.netobjs.signal_flow_arc import SignalFlowArc
         from shypn.netobjs.curved_arc import CurvedArc
         from shypn.netobjs.curved_inhibitor_arc import CurvedInhibitorArc
         
@@ -86,6 +87,8 @@ class Arc(PetriNetObject):
             return "curved_inhibitor_arc"
         if isinstance(self, CurvedArc):
             return "curved_arc"
+        if isinstance(self, SignalFlowArc):
+            return "signal_flow"
         if isinstance(self, TestArc):
             return "test"
         if isinstance(self, InhibitorArc):
@@ -94,6 +97,8 @@ class Arc(PetriNetObject):
     
     def set_arc_type(self, arc_type: str):
         """Set the arc type by converting to appropriate class.
+        
+        Supported types: 'normal', 'test', 'inhibitor', 'signal_flow'
         
         This method should be called by the dialog to trigger transformation.
         The actual transformation is handled by arc_transform utilities and
@@ -339,7 +344,11 @@ class Arc(PetriNetObject):
             arrow_dx, arrow_dy = dx_world, dy_world
         
         # Draw arrowhead at target (with zoom compensation)
-        self._render_arrowhead(cr, display_end_x, display_end_y, arrow_dx, arrow_dy, zoom)
+        # Use angled arrowhead for signal flow arcs
+        if self.arc_type == "signal_flow":
+            self._render_angled_arrowhead(cr, display_end_x, display_end_y, arrow_dx, arrow_dy, zoom)
+        else:
+            self._render_arrowhead(cr, display_end_x, display_end_y, arrow_dx, arrow_dy, zoom)
         
         # Draw weight label if different from 1 (convention: weight=1 is implicit)
         # This includes stoichiometric coefficients and inhibitor thresholds (Ki values)
@@ -463,6 +472,54 @@ class Arc(PetriNetObject):
         right_y = y - arrow_size * math.sin(angle + arrow_angle)
         
         # Draw two lines (legacy style, not filled triangle)
+        cr.set_source_rgb(*self.color)
+        cr.set_line_width(self.width / max(zoom, 1e-6))
+        
+        # Left wing line
+        cr.move_to(x, y)
+        cr.line_to(left_x, left_y)
+        cr.stroke()
+        
+        # Right wing line
+        cr.move_to(x, y)
+        cr.line_to(right_x, right_y)
+        cr.stroke()
+    
+    def _render_angled_arrowhead(self, cr, x: float, y: float, dx: float, dy: float, zoom: float = 1.0):
+        """Render angled arrowhead for signal flow arcs (information transfer).
+        
+        Signal flow arcs use an angled arrowhead (15° offset) to distinguish
+        from test arcs (hollow diamond marker, catalytic read) and normal arcs.
+        
+        Visual encoding:
+        - Two lines at asymmetric angles (15° offset)
+        - 15px length (zoom-compensated)
+        - Same color and width as arc line
+        
+        Args:
+            cr: Cairo context
+            x, y: Arrow tip position (world coords)
+            dx, dy: Direction vector (normalized, world space)
+            zoom: Current zoom level for size compensation
+        """
+        # Base angle from direction vector
+        angle = math.atan2(dy, dx)
+        
+        # Angled arrowhead: asymmetric wings (15° offset for distinction)
+        angle_offset = math.radians(15)  # 15° angle offset
+        arrow_angle = math.pi / 5  # 36 degrees wing spread
+        
+        # Arrow size compensated for zoom
+        arrow_size = self.ARROW_SIZE / zoom
+        
+        # Calculate wing endpoints with angle offset
+        left_x = x - arrow_size * math.cos(angle - arrow_angle + angle_offset)
+        left_y = y - arrow_size * math.sin(angle - arrow_angle + angle_offset)
+        
+        right_x = x - arrow_size * math.cos(angle + arrow_angle + angle_offset)
+        right_y = y - arrow_size * math.sin(angle + arrow_angle + angle_offset)
+        
+        # Draw two lines (angled style for information transfer)
         cr.set_source_rgb(*self.color)
         cr.set_line_width(self.width / max(zoom, 1e-6))
         
@@ -762,6 +819,9 @@ class Arc(PetriNetObject):
         elif arc_type == 'inhibitor':
             from shypn.netobjs.inhibitor_arc import InhibitorArc
             arc_class = InhibitorArc
+        elif arc_type == 'signal_flow':
+            from shypn.netobjs.signal_flow_arc import SignalFlowArc
+            arc_class = SignalFlowArc
         elif arc_type in ('curved_arc', 'curved'):  # Support both for backward compatibility
             from shypn.netobjs.curved_arc import CurvedArc
             arc_class = CurvedArc
