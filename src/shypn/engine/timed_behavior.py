@@ -257,15 +257,6 @@ class TimedBehavior(TransitionBehavior):
                     if source_place is None:
                         return (False, {'reason': 'missing-source-place', 'place_id': arc.source_id, 'timed_mode': True})
                     
-                    # SIGNAL PLACE SEMANTICS: DO NOT consume tokens from signal places (Ψ)
-                    # Signal places broadcast information without depletion
-                    # This enables multiple transitions to read the same signal simultaneously
-                    if self._is_signal_place(source_place):
-                        # Signal places are read-only - skip token consumption
-                        # But still track as "consumed" for event recording (informational only)
-                        consumed_map[arc.source_id] = float(arc.weight)  # Record read access
-                        continue  # Skip actual token deduction
-                    
                     if source_place.tokens < arc.weight:
                         return (False, {'reason': 'insufficient-tokens', 'place_id': arc.source_id, 'required': arc.weight, 'available': source_place.tokens, 'timed_mode': True})
                     
@@ -279,10 +270,6 @@ class TimedBehavior(TransitionBehavior):
                     if target_place is None:
                         continue
                     
-                    # SIGNAL PLACE SEMANTICS (Communication Model):
-                    # Signal places CAN accumulate tokens (modules produce signals)
-                    # Other modules sense via formulas (non-consuming read)
-                    # This enables inter-module communication (quorum sensing, paracrine signaling)
                     target_place.set_tokens(target_place.tokens + arc.weight)
                     produced_map[arc.target_id] = float(arc.weight)
             

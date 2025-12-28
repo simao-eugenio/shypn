@@ -758,17 +758,6 @@ class ContinuousBehavior(TransitionBehavior):
                     if source_place is None:
                         continue
                     
-                    # SIGNAL PLACE SEMANTICS: DO NOT consume tokens from signal places (Ψ)
-                    # Signal places broadcast information without depletion
-                    # This enables multiple transitions to read the same signal simultaneously
-                    if self._is_signal_place(source_place):
-                        # Signal places are read-only - skip token consumption
-                        # But still track as "consumed" for event recording (informational only)
-                        consumption = arc.weight * actual_flow
-                        if consumption > 0:
-                            consumed_map[place_id] = consumption  # Record read access
-                        continue  # Skip actual token deduction
-                    
                     # Continuous consumption: arc_weight * actual_flow
                     consumption = arc.weight * actual_flow
                     
@@ -783,11 +772,6 @@ class ContinuousBehavior(TransitionBehavior):
                     target_place = self._get_place(place_id)
                     if target_place is None:
                         continue
-                    
-                    # SIGNAL PLACE SEMANTICS (Communication Model):
-                    # Signal places CAN accumulate tokens (modules produce signals)
-                    # Other modules sense via formulas (non-consuming read)
-                    # This enables inter-module communication (quorum sensing, paracrine signaling)
                     
                     # Continuous production: arc_weight * actual_flow
                     production = arc.weight * actual_flow
