@@ -99,24 +99,19 @@ class ImmediateBehavior(TransitionBehavior):
         
         # Check each input place for sufficient tokens
         for arc in input_arcs:
-            # Skip inhibitor arcs in enablement check (they have inverted logic)
-            kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
-            if kind == 'inhibitor':
+            # Skip inhibitor arcs in enablement check (they have inverted logic handled elsewhere)
+            from shypn.netobjs.inhibitor_arc import InhibitorArc
+            from shypn.netobjs.curved_inhibitor_arc import CurvedInhibitorArc
+            if isinstance(arc, (InhibitorArc, CurvedInhibitorArc)):
                 continue
             
-            # Test arcs (catalysts) SHOULD be checked for token presence
-            # They require enzyme to be present but won't consume the tokens
+            # Test arcs (catalysts) check token presence without consuming
+            # They require tokens to be present for enablement
             
             # Get source place directly from arc reference
             source_place = arc.source
             if source_place is None:
                 return False, f"missing-source-place-{arc.name}"
-            
-            # SIGNAL PLACE SEMANTICS: Signal places are read-only (Ψ in Bio-PN)
-            # They broadcast information without token consumption
-            # Skip token requirement checks for signal places
-            if self._is_signal_place(source_place):
-                continue  # Signal places don't block enablement
             
             # Check sufficient tokens (applies to both normal arcs and test arcs)
             if source_place.tokens < arc.weight:
@@ -168,12 +163,7 @@ class ImmediateBehavior(TransitionBehavior):
             # Phase 1: Consume tokens from input places (skip if source transition)
             if not is_source:
                 for arc in input_arcs:
-                    # Skip inhibitor arcs (they don't consume)
-                    kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
-                    if kind != 'normal':
-                        continue
-                    
-                    # Skip test arcs - they check enablement but don't consume tokens
+                    # Skip test arcs and inhibitor arcs - they don't consume tokens
                     if hasattr(arc, 'consumes_tokens') and not arc.consumes_tokens():
                         continue
                     
@@ -185,15 +175,6 @@ class ImmediateBehavior(TransitionBehavior):
                             'place_name': arc.name,
                             'immediate_mode': True
                         }
-                    
-                    # SIGNAL PLACE SEMANTICS: DO NOT consume tokens from signal places (Ψ)
-                    # Signal places broadcast information without depletion
-                    # This enables multiple transitions to read the same signal simultaneously
-                    if self._is_signal_place(source_place):
-                        # Signal places are read-only - skip token consumption
-                        # But still track as "consumed" for event recording (informational only)
-                        consumed_map[source_place.id] = float(arc.weight)  # Record read access
-                        continue  # Skip actual token deduction
                     
                     # Check sufficient tokens for immediate firing
                     if source_place.tokens < arc.weight:
@@ -221,11 +202,6 @@ class ImmediateBehavior(TransitionBehavior):
                     if target_place is None:
                         # Skip if target place missing (shouldn't happen in valid net)
                         continue
-                    
-                    # SIGNAL PLACE SEMANTICS (Communication Model):
-                    # Signal places CAN accumulate tokens (modules produce signals)
-                    # Other modules sense via formulas (non-consuming read)
-                    # This enables inter-module communication (quorum sensing, paracrine signaling)
                     
                     # Produce exactly arc_weight tokens (discrete semantics)
                     old_tokens = target_place.tokens

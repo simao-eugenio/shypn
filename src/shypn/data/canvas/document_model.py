@@ -94,7 +94,7 @@ class DocumentModel:
             source: Source object (Place or Transition)
             target: Target object (must be different type from source)
             weight: Arc weight (default 1)
-            arc_type: Type of arc ('normal', 'test', 'inhibitor', 'curved', 'curved_inhibitor_arc')
+            arc_type: Type of arc ('normal', 'test', 'inhibitor', 'signal_flow', 'curved', 'curved_inhibitor_arc')
             
         Returns:
             The created Arc object (proper subclass), or None if connection is invalid
@@ -107,6 +107,17 @@ class DocumentModel:
             # Both same type → invalid
             return None
         
+        # AUTO-DETECT signal_flow arc: if connecting to/from signal place and arc_type is 'normal'
+        if arc_type == 'normal':
+            source_is_signal = (source_is_place and 
+                               getattr(source, 'is_signal_place', False))
+            target_is_signal = (target_is_place and 
+                               getattr(target, 'is_signal_place', False))
+            
+            if source_is_signal or target_is_signal:
+                # Automatically create signal_flow arc when connecting to signal places
+                arc_type = 'signal_flow'
+        
         arc_id = self.id_manager.generate_arc_id()
         arc_name = arc_id  # Name matches ID
         
@@ -118,6 +129,9 @@ class DocumentModel:
             elif arc_type == 'inhibitor':
                 from shypn.netobjs.inhibitor_arc import InhibitorArc
                 arc = InhibitorArc(source=source, target=target, id=arc_id, name=arc_name, weight=weight)
+            elif arc_type == 'signal_flow':
+                from shypn.netobjs.signal_flow_arc import SignalFlowArc
+                arc = SignalFlowArc(source=source, target=target, id=arc_id, name=arc_name, weight=weight)
             elif arc_type == 'curved':
                 from shypn.netobjs.curved_arc import CurvedArc
                 arc = CurvedArc(source=source, target=target, id=arc_id, name=arc_name, weight=weight)
