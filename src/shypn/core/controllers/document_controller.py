@@ -135,6 +135,9 @@ class DocumentController:
         elif arc_type == 'inhibitor':
             from shypn.netobjs.inhibitor_arc import InhibitorArc
             arc = InhibitorArc(source, target, arc_id, arc_name, **kwargs)
+        elif arc_type == 'signal_flow':
+            from shypn.netobjs.signal_flow_arc import SignalFlowArc
+            arc = SignalFlowArc(source, target, arc_id, arc_name, **kwargs)
         elif arc_type == 'curved':
             from shypn.netobjs.curved_arc import CurvedArc
             arc = CurvedArc(source, target, arc_id, arc_name, **kwargs)

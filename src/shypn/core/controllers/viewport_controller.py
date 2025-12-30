@@ -67,6 +67,9 @@ class ViewportController:
         # Filename for persistence
         self.filename = filename
         
+        # File path for model-specific view state (set by manager)
+        self.model_filepath = None
+        
         # Dirty flag for redraw tracking
         self._needs_redraw = True
     
@@ -321,7 +324,8 @@ class ViewportController:
     def save_view_state_to_file(self):
         """Save current view state (pan and zoom) to file.
         
-        Saves to workspace/.view_state_{filename}.json
+        Saves to model's directory as .view_state_{basename}.json
+        or to ~/.shypn/{filename}_view.json for unsaved models.
         This preserves user's view position across sessions.
         """
         view_state = {
@@ -330,10 +334,23 @@ class ViewportController:
             'zoom': self.zoom,
         }
         
-        state_file = f"workspace/.view_state_{self.filename}.json"
-        os.makedirs(os.path.dirname(state_file), exist_ok=True)
+        # Determine state file location based on model filepath
+        if self.model_filepath:
+            # Save in model's directory
+            model_dir = os.path.dirname(self.model_filepath)
+            basename = os.path.basename(self.model_filepath)
+            # Remove .shy extension if present
+            if basename.endswith('.shy'):
+                basename = basename[:-4]
+            state_file = os.path.join(model_dir, f".view_state_{basename}.json")
+        else:
+            # Unsaved model - use ~/.shypn config directory
+            config_dir = os.path.expanduser('~/.shypn')
+            os.makedirs(config_dir, exist_ok=True)
+            state_file = os.path.join(config_dir, f"{self.filename}_view.json")
         
         try:
+            os.makedirs(os.path.dirname(state_file), exist_ok=True)
             with open(state_file, 'w') as f:
                 json.dump(view_state, f, indent=2)
         except Exception as e:
@@ -342,10 +359,24 @@ class ViewportController:
     def load_view_state_from_file(self):
         """Load view state (pan and zoom) from file.
         
+        Looks in model's directory first, then falls back to ~/.shypn/
+        
         Returns:
             bool: True if state was loaded successfully, False otherwise.
         """
-        state_file = f"workspace/.view_state_{self.filename}.json"
+        # Determine state file location based on model filepath
+        if self.model_filepath:
+            # Load from model's directory
+            model_dir = os.path.dirname(self.model_filepath)
+            basename = os.path.basename(self.model_filepath)
+            # Remove .shy extension if present
+            if basename.endswith('.shy'):
+                basename = basename[:-4]
+            state_file = os.path.join(model_dir, f".view_state_{basename}.json")
+        else:
+            # Unsaved model - try ~/.shypn config directory
+            config_dir = os.path.expanduser('~/.shypn')
+            state_file = os.path.join(config_dir, f"{self.filename}_view.json")
         
         if not os.path.exists(state_file):
             return False

@@ -2332,6 +2332,11 @@ class ModelCanvasManager:
         """
         import os
         self.filepath = filepath
+        
+        # Update viewport controller's model filepath for view state persistence
+        if hasattr(self, 'viewport_controller'):
+            self.viewport_controller.model_filepath = filepath
+        
         if filepath:
             # Extract base filename without extension
             base_name = os.path.splitext(os.path.basename(filepath))[0]

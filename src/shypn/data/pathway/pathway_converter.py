@@ -1244,7 +1244,7 @@ class PathwayConverter:
             )
     
     def _color_signal_arcs(self, document: DocumentModel) -> None:
-        """Color arcs connected to signal places with orange.
+        """Color arcs connected to signal places with light gray.
         
         Signal places (Ψ) represent information flow, not mass transfer.
         Their arcs should be visually distinct from:
@@ -1256,7 +1256,7 @@ class PathwayConverter:
         Other coloring functions check if arc is still black before coloring.
         
         Color coding:
-        - ORANGE = Signal communication (information transfer)
+        - LIGHT GRAY = Signal communication (information transfer)
         - VIOLET = Compartment transport (mass transfer across membrane)
         - BLUE = Boundary species (infinite reservoir)
         - BLACK = Default metabolic reactions
@@ -1264,7 +1264,7 @@ class PathwayConverter:
         Args:
             document: DocumentModel with places and arcs
         """
-        ORANGE_COLOR = (1.0, 0.6, 0.0)  # Orange RGB for signal communication
+        SIGNAL_COLOR = (0.7, 0.7, 0.7)  # Light gray RGB for signal communication
         signal_arc_count = 0
         
         # Find all signal places
@@ -1276,14 +1276,14 @@ class PathwayConverter:
         # Color arcs connected to signal places (both regular and test arcs)
         for arc in document.arcs:
             if arc.source in signal_places or arc.target in signal_places:
-                arc.color = ORANGE_COLOR
+                arc.color = SIGNAL_COLOR
                 signal_arc_count += 1
         
         # Also color test arcs from signal places
         if hasattr(document, 'test_arcs'):
             for test_arc in document.test_arcs:
                 if test_arc.place in signal_places:
-                    test_arc.color = ORANGE_COLOR
+                    test_arc.color = SIGNAL_COLOR
                     signal_arc_count += 1
         
         if signal_arc_count > 0:

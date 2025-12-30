@@ -106,7 +106,25 @@ class DeleteOperation:
 			source = id_map.get(arc_snap.get('source_id'))
 			target = id_map.get(arc_snap.get('target_id'))
 			if source and target:
-				arc = Arc(source, target, arc_id, arc_snap.get('label'))
+				# Restore arc using correct class based on arc_type
+				arc_type = arc_snap.get('arc_type', 'normal')
+				if arc_type == 'signal_flow':
+					from shypn.netobjs.signal_flow_arc import SignalFlowArc
+					arc = SignalFlowArc(source, target, arc_id, arc_snap.get('label'))
+				elif arc_type == 'test':
+					from shypn.netobjs.test_arc import TestArc
+					arc = TestArc(source, target, arc_id, arc_snap.get('label'))
+				elif arc_type == 'inhibitor':
+					from shypn.netobjs.inhibitor_arc import InhibitorArc
+					arc = InhibitorArc(source, target, arc_id, arc_snap.get('label'))
+				elif arc_type == 'curved':
+					from shypn.netobjs.curved_arc import CurvedArc
+					arc = CurvedArc(source, target, arc_id, arc_snap.get('label'))
+				elif arc_type == 'curved_inhibitor_arc':
+					from shypn.netobjs.curved_inhibitor_arc import CurvedInhibitorArc
+					arc = CurvedInhibitorArc(source, target, arc_id, arc_snap.get('label'))
+				else:
+					arc = Arc(source, target, arc_id, arc_snap.get('label'))
 				dc.arcs.append(arc)
 				created_arcs.append(arc)
 				if arc_id and 'A' in arc_id:
